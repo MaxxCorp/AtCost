@@ -1,0 +1,55 @@
+test-results
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+/static/contacts
+/static/events
+/static/cms
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Paraglide
+src/lib/paraglide
+
+# PNPM
+# PNPM
+.pnpm-store
+
+.github
+
+# local dev experiments
+src/routes/test1
+
+# vscode
+.vscode
+
+# scripts
+scripts
+
+# rolldown
+.rolldown
+
+# paraglide
+.paraglide
+project.inlang/cache
+
+# turbo
+.turbo

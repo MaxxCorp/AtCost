@@ -1,0 +1,29 @@
+{
+    "name": "@ac/auth",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./schema": "./src/schema.ts",
+        "./client": "./src/client.ts",
+        "./server": "./src/server.ts"
+    },
+    "scripts": {
+        "lint": "oxlint .",
+        "check": "svelte-check --tsconfig ./tsconfig.json"
+    },
+    "dependencies": {
+        "better-auth": "^1.4.18",
+        "drizzle-orm": "^0.45.1",
+        "pg": "^8.18.0",
+        "postgres": "^3.4.8"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^4.20260214.0",
+        "@types/pg": "^8.16.0",
+        "svelte": "^5.51.0",
+        "svelte-check": "^4.0.0",
+        "typescript": "^5.9.3"
+    }
+}

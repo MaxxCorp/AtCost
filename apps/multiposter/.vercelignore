@@ -1,0 +1,11 @@
+# Ignore local build artifacts
+.svelte-kit/cloudflare
+.svelte-kit/cloudflare-tmp
+wrangler.json
+wrangler.toml
+
+# Standard ignores
+node_modules
+.env
+.env.*
+!.env.example
