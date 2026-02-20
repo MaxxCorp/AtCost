@@ -15,7 +15,7 @@
         Earth,
         Share2,
     } from "@lucide/svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import { onMount } from "svelte";
 
     const contactId = page.params.id || "";

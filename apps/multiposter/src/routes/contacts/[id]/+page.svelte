@@ -3,6 +3,7 @@
     import { readContact } from "./read.remote";
     import { updateExistingContact } from "./update.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import LocationManager from "$lib/components/locations/LocationManager.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
@@ -61,7 +62,7 @@
                     </div>
                     <ContactForm
                         remoteFunction={updateExistingContact}
-                        schema={updateContactSchema}
+                        validationSchema={updateContactSchema}
                         onSuccess={handleSuccess}
                         contactId={contact.id}
                         initialData={{
@@ -73,6 +74,11 @@
                             relations: contact.relations,
                         }}
                     />
+
+                    <div class="mt-8 border-t pt-8">
+                        <h2 class="text-xl font-bold mb-4">Locations</h2>
+                        <LocationManager contactId={contact.id} />
+                    </div>
                 </div>
             {/if}
         {:catch error}

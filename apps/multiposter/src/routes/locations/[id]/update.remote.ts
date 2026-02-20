@@ -18,6 +18,7 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
 
         const updateData: any = {
             name: data.name,
+            type: data.type || undefined, // undefined to not overwrite if not provided? Schema usually makes it required or default.
             street: data.street || null,
             houseNumber: data.houseNumber || null,
             addressSuffix: data.addressSuffix || null,
@@ -51,7 +52,12 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
         }
 
         const updated = result[0];
-        await readLocation(data.id).refresh();
+        if (!updated) {
+            console.error('No rows updated. ID might be wrong or missing.');
+            return { success: false, error: { message: 'Location not found or update failed' } };
+        }
+
+        await readLocation(updated.id).set(updated);
         await listLocations().refresh();
 
         console.log('--- updateLocation SUCCESS ---');

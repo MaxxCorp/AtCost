@@ -6,7 +6,7 @@
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import { Share2, Pencil } from "@lucide/svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
     import { onMount } from "svelte";
 

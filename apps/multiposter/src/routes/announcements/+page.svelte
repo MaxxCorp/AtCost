@@ -3,7 +3,7 @@
     import type { Announcement } from "./list.remote";
     import { deleteAnnouncements } from "./[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";

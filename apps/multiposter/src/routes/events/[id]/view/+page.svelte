@@ -24,7 +24,7 @@
         RefreshCw,
         ChevronDown,
     } from "@lucide/svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import { deleteEvents } from "../delete.remote";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 

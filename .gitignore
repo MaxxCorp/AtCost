@@ -32,6 +32,7 @@ src/lib/paraglide
 # PNPM
 # PNPM
 .pnpm-store
+.pnpm-lock.yaml
 
 .github
 

@@ -8,7 +8,7 @@
         const segments = path.split("/").filter(Boolean);
 
         let currentPath = "";
-        const items = segments.map((segment) => {
+        const items = segments.map((segment: string) => {
             currentPath += `/${segment}`;
             return {
                 label: formatSegment(segment),

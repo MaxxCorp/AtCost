@@ -44,6 +44,11 @@ export function createAuth(db: any, options: {
         },
         user: {
             additionalFields: {
+                role: {
+                    type: "string",
+                    required: false,
+                    defaultValue: "user"
+                },
                 roles: {
                     type: "json",
                     required: false,

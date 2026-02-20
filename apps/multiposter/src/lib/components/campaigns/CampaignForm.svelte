@@ -5,7 +5,7 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "@ac/ui";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import type { updateCampaign } from "../../../routes/campaigns/[id]/update.remote";
     import type { createCampaign } from "../../../routes/campaigns/new/create.remote";

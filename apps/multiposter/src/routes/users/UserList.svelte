@@ -2,7 +2,7 @@
     import { deleteUser } from "./[id]/delete.remote";
 
     import type { User } from "./list.remote";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { User as UserIcon } from "@lucide/svelte";
 

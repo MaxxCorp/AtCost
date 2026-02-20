@@ -3,7 +3,7 @@
     import { deleteResource } from "./[id]/delete.remote";
     import type { Resource } from "./list.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { Box, Pencil, Trash2 } from "@lucide/svelte";
 

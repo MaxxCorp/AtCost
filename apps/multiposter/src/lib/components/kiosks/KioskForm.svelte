@@ -1,7 +1,7 @@
 <script lang="ts">
     import { listLocations } from "../../../routes/locations/list.remote";
     import type { Location } from "../../../routes/locations/list.remote";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import LocationSelector from "$lib/components/locations/LocationSelector.svelte";
     import { onMount } from "svelte";

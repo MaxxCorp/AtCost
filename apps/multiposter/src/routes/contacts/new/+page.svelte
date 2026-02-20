@@ -22,7 +22,7 @@
             <h1 class="text-2xl font-bold mb-6">Create New Contact</h1>
             <ContactForm
                 remoteFunction={createNewContact}
-                schema={createContactSchema}
+                validationSchema={createContactSchema}
                 onSuccess={handleSuccess}
             />
         </div>

@@ -2,7 +2,7 @@
     import { listKiosks, type Kiosk } from "./list.remote";
     import { deleteKiosk } from "./[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import { Button } from "@ac/ui";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { Monitor, Trash2, Pencil, ExternalLink } from "@lucide/svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";

@@ -2,8 +2,10 @@ import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { location } from '$lib/server/db/schema';
 import { listLocations } from '../list.remote';
+import { readLocation } from '../[id]/read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
 import { createLocationSchema } from '$lib/validations/locations';
+import { error } from '@sveltejs/kit';
 
 export const createLocation = form(createLocationSchema, async (data) => {
     console.log('--- createLocation START ---');
@@ -17,6 +19,7 @@ export const createLocation = form(createLocationSchema, async (data) => {
         const insertData: any = {
             userId: user.id,
             name: data.name,
+            type: data.type || 'Other',
             street: data.street || null,
             houseNumber: data.houseNumber || null,
             addressSuffix: data.addressSuffix || null,
@@ -39,11 +42,14 @@ export const createLocation = form(createLocationSchema, async (data) => {
         const result = await db.insert(location).values(insertData).returning();
 
         if (result.length === 0) {
-            throw new Error('Failed to create location');
+            console.log('Failed to create location');
+            error(500, 'Failed to create location');
         }
 
         const newLocation = result[0];
+
         await listLocations().refresh();
+        await readLocation(newLocation.id).set(newLocation);
 
         console.log('--- createLocation SUCCESS ---');
         return { success: true, location: newLocation };

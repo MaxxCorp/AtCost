@@ -5,7 +5,7 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "@ac/ui";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import type { updateExistingEvent } from "../../../routes/events/[id]/update.remote";
     import type { createNewEvent } from "../../../routes/events/new/create.remote";
@@ -38,34 +38,43 @@
     } = $props();
 
     // State derived from initialData
+    // svelte-ignore state_referenced_locally
     let isAllDay = $state(
         initialData?.startDateTime || initialData?.startDate
             ? !initialData.startDateTime && !!initialData.startDate
             : false,
     );
 
+    // svelte-ignore state_referenced_locally
     let hasEndTime = $state(
         initialData?.endDateTime || initialData?.endDate
             ? !!(initialData.endDateTime || initialData.endDate)
             : true,
     );
+    // svelte-ignore state_referenced_locally
     let useDefaultReminders = $state(
         initialData?.reminders?.useDefault ?? true,
     );
+    // svelte-ignore state_referenced_locally
     let reminders = $state(
         initialData?.reminders?.overrides ?? [{ method: "popup", minutes: 10 }],
     );
 
+    // svelte-ignore state_referenced_locally
     let guestsCanInviteOthers = $state(
         initialData?.guestsCanInviteOthers ?? true,
     );
+    // svelte-ignore state_referenced_locally
     let guestsCanModify = $state(initialData?.guestsCanModify ?? false);
+    // svelte-ignore state_referenced_locally
     let guestsCanSeeOtherGuests = $state(
         initialData?.guestsCanSeeOtherGuests ?? false,
     );
+    // svelte-ignore state_referenced_locally
     let isPublic = $state(initialData?.isPublic ?? false);
 
     // Recurrence State
+    // svelte-ignore state_referenced_locally
     let recurrence = $state<string[]>(initialData?.recurrence || []);
     // We only support creating single rule recurrences in UI for now
     let recurrenceRule = $state<string | null>(recurrence[0] || null);
@@ -73,6 +82,7 @@
 
     // Tags State
     // Initial tags are string[] from read.remote.ts
+    // svelte-ignore state_referenced_locally
     let tags = $state<string[]>(initialData?.tags || []);
     let tagsString = $state(tags.join(", "));
 
@@ -95,8 +105,11 @@
     // Resource and location state
     let resourcesPromise = listResourcesWithHierarchy();
     let locationsPromise = listLocations();
+    // svelte-ignore state_referenced_locally
     let selectedResourceIds = $state<string[]>(initialData?.resourceIds || []);
+    // svelte-ignore state_referenced_locally
     let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
+    // svelte-ignore state_referenced_locally
     let freeTextLocation = $state(initialData?.location || "");
 
     // Helper to find location ID from text (for initial matching)
@@ -113,6 +126,7 @@
         return match ? match.id : "";
     }
 
+    // svelte-ignore state_referenced_locally
     let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
     $effect(() => {
         if (initialData?.locationIds && initialData.locationIds.length > 0) {
@@ -149,11 +163,13 @@
         "Vermischtes",
     ];
 
+    // svelte-ignore state_referenced_locally
     let useFreeTextLocation = $state(
         !!initialData?.location &&
             (!initialData?.locationIds || initialData.locationIds.length === 0),
     );
 
+    // svelte-ignore state_referenced_locally
     let descriptionValue = $state(
         getField("description").value() ?? initialData?.description ?? "",
     );
@@ -188,16 +204,20 @@
         }
     }
 
+    // svelte-ignore state_referenced_locally
     const startParsed = parseDateTime(
         initialData?.startDateTime || initialData?.startDate,
     );
+    // svelte-ignore state_referenced_locally
     const endParsed = parseDateTime(
         initialData?.endDateTime || initialData?.endDate,
     );
 
+    // svelte-ignore state_referenced_locally
     let startDateInput = $state(
         startParsed.date || new Date().toISOString().split("T")[0],
     );
+    // svelte-ignore state_referenced_locally
     let startTimeInput = $state(
         startParsed.time || new Date().toTimeString().slice(0, 5),
     );
@@ -227,7 +247,9 @@
     }
 
     const initialEnd = getInitialEndDateTime();
+    // svelte-ignore state_referenced_locally
     let endDateInput = $state(initialEnd.date);
+    // svelte-ignore state_referenced_locally
     let endTimeInput = $state(initialEnd.time);
 
     // Sync default end time when start time changes if end time is empty
