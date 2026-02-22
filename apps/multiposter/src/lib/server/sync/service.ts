@@ -21,6 +21,7 @@ import {
 	contactEmail as contactEmailTable,
 	location as locationTable,
 	eventLocation as eventLocationTable,
+	eventTag as eventTag,
 	recurringSeries as recurringSeries
 } from '../db/schema';
 import { getEntityContacts } from '../contacts';
@@ -259,12 +260,18 @@ export class SyncService {
 		const result = { pushed: 0, errors: [] as SyncResult['errors'] };
 
 		try {
-			// Find local events that need to be pushed (no mapping exists)
+			// Find local events that need to be pushed (no mapping exists for THIS config)
 			const unmappedEvents = await db
 				.select({ event: eventTable })
 				.from(eventTable)
-				.leftJoin(syncMappingTable, eq(eventTable.id, syncMappingTable.eventId))
-				.where(isNull(syncMappingTable.eventId));
+				.leftJoin(
+					syncMappingTable,
+					and(
+						eq(eventTable.id, syncMappingTable.eventId),
+						eq(syncMappingTable.syncConfigId, config.id)
+					)
+				)
+				.where(isNull(syncMappingTable.id));
 
 			for (const { event } of unmappedEvents) {
 				try {
@@ -277,7 +284,9 @@ export class SyncService {
 						externalId: externalId,
 						providerId: config.providerId,
 						etag: etag ?? null,
-						lastSyncedAt: new Date()
+						lastSyncedAt: new Date(),
+						announcementId: null,
+						metadata: null
 					});
 
 					result.pushed++;
@@ -441,7 +450,9 @@ export class SyncService {
 						externalId: externalEvent.externalId,
 						providerId: config.providerId,
 						etag: externalEvent.etag ?? null,
-						lastSyncedAt: new Date()
+						lastSyncedAt: new Date(),
+						announcementId: null,
+						metadata: null
 					});
 
 					return;
@@ -466,9 +477,6 @@ export class SyncService {
 					gte(eventTable.startDateTime, new Date(t - timeWindow)),
 					lte(eventTable.startDateTime, new Date(t + timeWindow))
 				);
-			} else if (externalEvent.startDate) {
-				// For all-day events, check startDate string
-				startTimeCheck = eq(eventTable.startDate, externalEvent.startDate);
 			}
 
 			const recentEvents = await db
@@ -486,30 +494,19 @@ export class SyncService {
 			// Check if any recent event matches this external event
 			console.log(`[SyncService] No match found for external ${externalEvent.externalId}. Checking ${recentEvents.length} recent events for fuzzy match:`, {
 				externalTitle: externalEvent.summary,
-				externalStart: externalEvent.startDateTime || externalEvent.startDate
+				externalStart: externalEvent.startDateTime
 			});
 
 			for (const recentEvent of recentEvents) {
 				// Compare times more robustly
 				let startTimesMatch = false;
 
-				if (recentEvent.startDate && externalEvent.startDate) {
-					startTimesMatch = recentEvent.startDate === externalEvent.startDate;
-				} else if (recentEvent.startDateTime && externalEvent.startDateTime) {
+				if (recentEvent.startDateTime && externalEvent.startDateTime) {
 					// Compare timestamps to handle timezone differences
 					const t1 = recentEvent.startDateTime.getTime();
 					const t2 = externalEvent.startDateTime.getTime();
 					// Allow 1 second difference
 					startTimesMatch = Math.abs(t1 - t2) < 1000;
-				} else if (recentEvent.startDateTime && externalEvent.startDate) {
-					// Cross-type match: Local is timed, External is all-day
-					// Check if the timed event falls on the all-day date
-					const localDate = recentEvent.startDateTime.toISOString().split('T')[0];
-					startTimesMatch = localDate === externalEvent.startDate;
-				} else if (recentEvent.startDate && externalEvent.startDateTime) {
-					// Cross-type match: Local is all-day, External is timed
-					const externalDate = externalEvent.startDateTime.toISOString().split('T')[0];
-					startTimesMatch = recentEvent.startDate === externalDate;
 				}
 
 				if (startTimesMatch) {
@@ -521,7 +518,9 @@ export class SyncService {
 						externalId: externalEvent.externalId,
 						providerId: config.providerId,
 						etag: externalEvent.etag ?? null,
-						lastSyncedAt: new Date()
+						lastSyncedAt: new Date(),
+						announcementId: null,
+						metadata: null
 					});
 
 					return; // Don't create duplicate
@@ -539,7 +538,9 @@ export class SyncService {
 			externalId: externalEvent.externalId,
 			providerId: config.providerId,
 			etag: externalEvent.etag ?? null,
-			lastSyncedAt: new Date()
+			lastSyncedAt: new Date(),
+			announcementId: null,
+			metadata: null
 		});
 
 		await publishEventChange('create', [newEvent.id]);
@@ -787,10 +788,8 @@ export class SyncService {
 			summary: external.summary,
 			description: external.description ?? null,
 			location: external.location ?? null,
-			startDate: external.startDate ?? null,
-			startDateTime: external.startDateTime ?? null,
+			startDateTime: external.startDateTime ?? new Date(0),
 			startTimeZone: external.startTimeZone ?? null,
-			endDate: external.endDate ?? null,
 			endDateTime: external.endDateTime ?? null,
 			endTimeZone: external.endTimeZone ?? null,
 			attendees: external.attendees ?? null,
@@ -858,37 +857,40 @@ export class SyncService {
 			}
 		}
 
+
 		// Resolve Venue (Location)
 		let venue: ExternalEvent['venue'] | undefined;
-		if (internal.location) {
-			// Try to find structured location data
-			const [locationMapping] = await db
-				.select({ location: locationTable })
-				.from(eventLocationTable)
-				.innerJoin(locationTable, eq(eventLocationTable.locationId, locationTable.id))
-				.where(eq(eventLocationTable.eventId, internal.id))
-				.limit(1);
+		let venueId: string | undefined;
 
-			if (locationMapping) {
-				venue = {
-					name: locationMapping.location.name,
-					address: locationMapping.location.street ? `${locationMapping.location.street} ${locationMapping.location.houseNumber || ''}`.trim() : undefined,
-					city: locationMapping.location.city ?? undefined,
-					country: locationMapping.location.country ?? undefined,
-					zip: locationMapping.location.zip ?? undefined,
-					// Province/State not strictly typed in location schema but often part of address
-					province: locationMapping.location.state ?? undefined,
-				};
-			} else {
-				// Fallback to text location if no structured location is linked
-				venue = {
-					name: internal.location
-				};
-			}
+		// Try to find structured location data first
+		const [locationMapping] = await db
+			.select({ location: locationTable })
+			.from(eventLocationTable)
+			.innerJoin(locationTable, eq(eventLocationTable.locationId, locationTable.id))
+			.where(eq(eventLocationTable.eventId, internal.id))
+			.limit(1);
+
+		if (locationMapping) {
+			venueId = locationMapping.location.id; // Store internal ID
+			venue = {
+				name: locationMapping.location.name,
+				address: locationMapping.location.street ? `${locationMapping.location.street} ${locationMapping.location.houseNumber || ''}`.trim() : undefined,
+				city: locationMapping.location.city ?? undefined,
+				country: locationMapping.location.country ?? undefined,
+				zip: locationMapping.location.zip ?? undefined,
+				// Province/State not strictly typed in location schema but often part of address
+				province: locationMapping.location.state ?? undefined,
+			};
+		} else if (internal.location) {
+			// Fallback to text location if no structured location is linked
+			venue = {
+				name: internal.location
+			};
 		}
 
 		// Resolve Organizer (Contact with "Employee" tag)
 		let organizer: ExternalEvent['organizer'] | undefined;
+		let organizerId: string | undefined;
 
 		// Find associated contacts who are employees
 		for (const contact of associatedContacts) {
@@ -897,6 +899,7 @@ export class SyncService {
 
 			if (isEmployee) {
 				// Use the first employee found as organizer
+				organizerId = contact.id;
 				const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
 					(contact as any).emails?.[0]?.value;
 				const phone = (contact as any).phones?.find((p: any) => p.primary)?.value ||
@@ -911,16 +914,67 @@ export class SyncService {
 			}
 		}
 
+		// Resolve Tags
+		const tags: Array<{ id: string; name: string }> = [];
+		// Fetch tags linked to this event
+		const eventTags = await db
+			.select({ tag: tagTable })
+			.from(eventTag) // Assuming eventTag is imported (might need to check imports)
+			.innerJoin(tagTable, eq(eventTag.tagId, tagTable.id))
+			.where(eq(eventTag.eventId, internal.id));
+
+		if (eventTags.length > 0) {
+			tags.push(...eventTags.map(t => ({ id: t.tag.id, name: t.tag.name })));
+		}
+
+		// Helper to resolve absolute URLs
+		const baseUrl = env.BETTER_AUTH_URL || 'https://localhost:5173';
+		const resolveUrl = (url: string | null | undefined) => {
+			if (!url) return undefined;
+			if (url.startsWith('http')) return url;
+			return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+		};
+
+		// Map Image (First Attachment)
+		let image: ExternalEvent['image'] | undefined;
+		if (internal.attachments && internal.attachments.length > 0) {
+			const firstAttachment = internal.attachments[0];
+			if (firstAttachment.fileUrl) {
+				image = {
+					url: resolveUrl(firstAttachment.fileUrl)!,
+					title: firstAttachment.title
+				};
+			}
+		}
+
+		// Fallback: Extract image from content if no attachment
+		let description = internal.description ?? undefined;
+		if (!image && description) {
+			const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
+			if (imgMatch && imgMatch[1]) {
+				image = {
+					url: resolveUrl(imgMatch[1])!,
+					title: internal.summary // Use event title as fallback
+				};
+			}
+		}
+
+		// Ensure all content URLs are absolute
+		if (description) {
+			description = description.replace(
+				/(src|href)="(\/[^"]+)"/g,
+				(match, attr, path) => `${attr}="${resolveUrl(path)}"`
+			);
+		}
+
 		return {
 			externalId: '',
 			providerId,
 			summary: internal.summary,
-			description: internal.description ?? undefined,
+			description: description,
 			location: internal.location ?? undefined,
-			startDate: internal.startDate ?? undefined,
 			startDateTime: internal.startDateTime ?? undefined,
 			startTimeZone: internal.startTimeZone ?? undefined,
-			endDate: internal.endDate ?? undefined,
 			endDateTime: internal.endDateTime ?? undefined,
 			endTimeZone: internal.endTimeZone ?? undefined,
 			attendees: attendees.length > 0 ? attendees : undefined,
@@ -929,11 +983,16 @@ export class SyncService {
 			source: (internal.source as any) ?? undefined,
 			ticketPrice: internal.ticketPrice ?? undefined,
 			venue,
+			venueId,
 			organizer,
+			tags,
+			image,
 			metadata: {
 				eventId: internal.id,
 				seriesId: (internal as any).seriesId ?? undefined,
-				app_event_id: internal.id // Pass internal ID to provider for loop prevention
+				app_event_id: internal.id, // Pass internal ID to provider for loop prevention
+				organizerId: organizerId,
+				locationId: venueId
 			}
 		};
 	}
@@ -1130,16 +1189,13 @@ export class SyncService {
 					}
 				}
 
-				// Delete the mappings from our database
-				await db
-					.delete(syncMappingTable)
-					.where(
-						and(
-							eq(syncMappingTable.syncConfigId, config.id),
-							inArray(syncMappingTable.eventId, eventIds)
-						)
-					);
 			}
+
+			// Delete ALL mappings from our database for these events unconditionally
+			// We do this outside the loop to ensure even orphaned mappings are destroyed
+			await db
+				.delete(syncMappingTable)
+				.where(inArray(syncMappingTable.eventId, eventIds));
 
 
 		} catch (error: any) {

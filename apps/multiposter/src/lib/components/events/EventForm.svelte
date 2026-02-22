@@ -5,7 +5,7 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "@ac/ui";
+    import { Button } from "$lib/components/ui/button";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import type { updateExistingEvent } from "../../../routes/events/[id]/update.remote";
     import type { createNewEvent } from "../../../routes/events/new/create.remote";
@@ -38,43 +38,26 @@
     } = $props();
 
     // State derived from initialData
-    // svelte-ignore state_referenced_locally
-    let isAllDay = $state(
-        initialData?.startDateTime || initialData?.startDate
-            ? !initialData.startDateTime && !!initialData.startDate
-            : false,
-    );
+    let isAllDay = $state(initialData?.isAllDay ?? false);
 
-    // svelte-ignore state_referenced_locally
-    let hasEndTime = $state(
-        initialData?.endDateTime || initialData?.endDate
-            ? !!(initialData.endDateTime || initialData.endDate)
-            : true,
-    );
-    // svelte-ignore state_referenced_locally
+    let hasEndTime = $state(initialData ? !!initialData.endDateTime : true);
     let useDefaultReminders = $state(
         initialData?.reminders?.useDefault ?? true,
     );
-    // svelte-ignore state_referenced_locally
     let reminders = $state(
         initialData?.reminders?.overrides ?? [{ method: "popup", minutes: 10 }],
     );
 
-    // svelte-ignore state_referenced_locally
     let guestsCanInviteOthers = $state(
-        initialData?.guestsCanInviteOthers ?? true,
+        initialData?.guestsCanInviteOthers ?? false,
     );
-    // svelte-ignore state_referenced_locally
     let guestsCanModify = $state(initialData?.guestsCanModify ?? false);
-    // svelte-ignore state_referenced_locally
     let guestsCanSeeOtherGuests = $state(
         initialData?.guestsCanSeeOtherGuests ?? false,
     );
-    // svelte-ignore state_referenced_locally
-    let isPublic = $state(initialData?.isPublic ?? false);
+    let isPublic = $state(initialData?.isPublic ?? true);
 
     // Recurrence State
-    // svelte-ignore state_referenced_locally
     let recurrence = $state<string[]>(initialData?.recurrence || []);
     // We only support creating single rule recurrences in UI for now
     let recurrenceRule = $state<string | null>(recurrence[0] || null);
@@ -82,7 +65,6 @@
 
     // Tags State
     // Initial tags are string[] from read.remote.ts
-    // svelte-ignore state_referenced_locally
     let tags = $state<string[]>(initialData?.tags || []);
     let tagsString = $state(tags.join(", "));
 
@@ -105,11 +87,8 @@
     // Resource and location state
     let resourcesPromise = listResourcesWithHierarchy();
     let locationsPromise = listLocations();
-    // svelte-ignore state_referenced_locally
     let selectedResourceIds = $state<string[]>(initialData?.resourceIds || []);
-    // svelte-ignore state_referenced_locally
     let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
-    // svelte-ignore state_referenced_locally
     let freeTextLocation = $state(initialData?.location || "");
 
     // Helper to find location ID from text (for initial matching)
@@ -126,7 +105,6 @@
         return match ? match.id : "";
     }
 
-    // svelte-ignore state_referenced_locally
     let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
     $effect(() => {
         if (initialData?.locationIds && initialData.locationIds.length > 0) {
@@ -163,13 +141,11 @@
         "Vermischtes",
     ];
 
-    // svelte-ignore state_referenced_locally
     let useFreeTextLocation = $state(
         !!initialData?.location &&
             (!initialData?.locationIds || initialData.locationIds.length === 0),
     );
 
-    // svelte-ignore state_referenced_locally
     let descriptionValue = $state(
         getField("description").value() ?? initialData?.description ?? "",
     );
@@ -177,6 +153,18 @@
 
     // Date/Time handling
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezones = Intl.supportedValuesOf
+        ? Intl.supportedValuesOf("timeZone")
+        : [];
+
+    let startTimeZoneInput = $state(
+        initialData?.startTimeZone || browserTimezone,
+    );
+    let endTimeZoneInput = $state(
+        initialData?.endTimeZone ||
+            initialData?.startTimeZone ||
+            browserTimezone,
+    );
 
     const remindersJson = $derived(
         JSON.stringify({
@@ -204,23 +192,22 @@
         }
     }
 
-    // svelte-ignore state_referenced_locally
-    const startParsed = parseDateTime(
-        initialData?.startDateTime || initialData?.startDate,
-    );
-    // svelte-ignore state_referenced_locally
-    const endParsed = parseDateTime(
-        initialData?.endDateTime || initialData?.endDate,
-    );
+    const startParsed = parseDateTime(initialData?.startDateTime);
+    const endParsed = parseDateTime(initialData?.endDateTime);
 
-    // svelte-ignore state_referenced_locally
-    let startDateInput = $state(
-        startParsed.date || new Date().toISOString().split("T")[0],
-    );
-    // svelte-ignore state_referenced_locally
-    let startTimeInput = $state(
-        startParsed.time || new Date().toTimeString().slice(0, 5),
-    );
+    function getLocalNow() {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const hours = String(d.getHours()).padStart(2, "0");
+        const minutes = String(d.getMinutes()).padStart(2, "0");
+        return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+    }
+    const localNow = getLocalNow();
+
+    let startDateInput = $state(startParsed.date || localNow.date);
+    let startTimeInput = $state(startParsed.time || localNow.time);
 
     // Initialize end date/time: if no initial data, set to 1 hour after start
     function getInitialEndDateTime() {
@@ -229,10 +216,8 @@
             return { date: endParsed.date, time: endParsed.time || "" };
 
         // Otherwise, calculate 1 hour after start
-        const startDate =
-            startParsed.date || new Date().toISOString().split("T")[0];
-        const startTime =
-            startParsed.time || new Date().toTimeString().slice(0, 5);
+        const startDate = startParsed.date || localNow.date;
+        const startTime = startParsed.time || localNow.time;
         const start = new Date(`${startDate}T${startTime}:00`);
         if (isNaN(start.getTime())) return { date: "", time: "" };
 
@@ -247,9 +232,7 @@
     }
 
     const initialEnd = getInitialEndDateTime();
-    // svelte-ignore state_referenced_locally
     let endDateInput = $state(initialEnd.date);
-    // svelte-ignore state_referenced_locally
     let endTimeInput = $state(initialEnd.time);
 
     // Sync default end time when start time changes if end time is empty
@@ -279,27 +262,6 @@
     }
 
     // Derived values for the hidden fields
-    const computedStart = $derived(
-        isAllDay
-            ? startDateInput
-            : startDateInput && startTimeInput
-              ? new Date(`${startDateInput}T${startTimeInput}:00`).toISOString()
-              : "",
-    );
-    const computedEnd = $derived(
-        hasEndTime
-            ? isAllDay
-                ? endDateInput || startDateInput
-                : endDateInput && endTimeInput
-                  ? new Date(`${endDateInput}T${endTimeInput}:00`).toISOString()
-                  : startDateInput && endTimeInput
-                    ? new Date(
-                          `${startDateInput}T${endTimeInput}:00`,
-                      ).toISOString()
-                    : ""
-            : "",
-    );
-
     function getField(name: string) {
         if (!(remoteFunction as any).fields) return {};
         const parts = name.split(".");
@@ -427,18 +389,17 @@
             })}
         class="space-y-6"
     >
+        <datalist id="timezones">
+            {#each timezones as tz}
+                <option value={tz}></option>
+            {/each}
+        </datalist>
+
         {#if isUpdating && initialData}
             <input {...getField("id").as("hidden", initialData.id)} />
         {/if}
-
-        {#if computedStart}
-            <input {...getField("start").as("hidden", computedStart)} />
-        {/if}
-        {#if computedEnd}
-            <input {...getField("end").as("hidden", computedEnd)} />
-        {/if}
-
         <input {...getField("remindersJson").as("hidden", remindersJson)} />
+        <input {...getField("isAllDay").as("hidden", isAllDay.toString())} />
         <input {...getField("isPublic").as("hidden", isPublic.toString())} />
         <input
             {...getField("guestsCanInviteOthers").as(
@@ -691,87 +652,124 @@
                 >
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label
-                        for="startDateInput"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >Start Date <span class="text-red-500">*</span></label
-                    >
-                    <input
-                        type="date"
-                        required
-                        bind:value={startDateInput}
-                        onchange={updateEndDateTime}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    />
-                </div>
-                {#if !isAllDay}
+            <div class="grid grid-cols-1 gap-6">
+                <!-- Start Block -->
+                <div class="space-y-4">
                     <div>
                         <label
-                            for="startTimeInput"
+                            for="startDateInput"
                             class="block text-sm font-medium text-gray-700 mb-1"
-                            >Start Time <span class="text-red-500">*</span
+                            >Start Date <span class="text-red-500">*</span
                             ></label
                         >
                         <input
-                            type="time"
-                            required
-                            bind:value={startTimeInput}
-                            onchange={updateEndDateTime}
-                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                        />
-                    </div>
-                {/if}
-            </div>
-
-            <div class="flex items-center gap-2">
-                <input
-                    id="hasEndTime"
-                    type="checkbox"
-                    checked={hasEndTime}
-                    onclick={() => (hasEndTime = !hasEndTime)}
-                    class="w-4 h-4 text-blue-600"
-                />
-                <label
-                    for="hasEndTime"
-                    class="text-sm font-medium text-gray-700"
-                    >Add end time</label
-                >
-            </div>
-
-            {#if hasEndTime}
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label
-                            for="endDateInput"
-                            class="block text-sm font-medium text-gray-700 mb-1"
-                            >End Date</label
-                        >
-                        <input
+                            name="startDate"
                             type="date"
-                            bind:value={endDateInput}
-                            placeholder={startDateInput}
+                            required
+                            bind:value={startDateInput}
+                            onchange={updateEndDateTime}
                             class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                         />
                     </div>
                     {#if !isAllDay}
                         <div>
                             <label
-                                for="endTimeInput"
+                                for="startTimeInput"
                                 class="block text-sm font-medium text-gray-700 mb-1"
-                                >End Time</label
+                                >Start Time <span class="text-red-500">*</span
+                                ></label
                             >
                             <input
+                                name="startTime"
                                 type="time"
-                                bind:value={endTimeInput}
-                                placeholder={getDefaultEndTime()}
+                                required
+                                bind:value={startTimeInput}
+                                onchange={updateEndDateTime}
+                                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                            />
+                        </div>
+                    {/if}
+                    <div>
+                        <label
+                            for="startTimeZoneInput"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Timezone</label
+                        >
+                        <input
+                            name="startTimeZone"
+                            list="timezones"
+                            bind:value={startTimeZoneInput}
+                            placeholder={browserTimezone}
+                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                        />
+                    </div>
+                </div>
+
+                <!-- End Block -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 h-6 md:mb-1">
+                        <input
+                            id="hasEndTime"
+                            type="checkbox"
+                            checked={hasEndTime}
+                            onclick={() => (hasEndTime = !hasEndTime)}
+                            class="w-4 h-4 text-blue-600"
+                        />
+                        <label
+                            for="hasEndTime"
+                            class="text-sm font-medium text-gray-700"
+                            >Add end time</label
+                        >
+                    </div>
+
+                    {#if hasEndTime}
+                        <div>
+                            <label
+                                for="endDateInput"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >End Date</label
+                            >
+                            <input
+                                name="endDate"
+                                type="date"
+                                bind:value={endDateInput}
+                                placeholder={startDateInput}
+                                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                            />
+                        </div>
+                        {#if !isAllDay}
+                            <div>
+                                <label
+                                    for="endTimeInput"
+                                    class="block text-sm font-medium text-gray-700 mb-1"
+                                    >End Time</label
+                                >
+                                <input
+                                    name="endTime"
+                                    type="time"
+                                    bind:value={endTimeInput}
+                                    placeholder={getDefaultEndTime()}
+                                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                                />
+                            </div>
+                        {/if}
+                        <div>
+                            <label
+                                for="endTimeZoneInput"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >End Timezone</label
+                            >
+                            <input
+                                name="endTimeZone"
+                                list="timezones"
+                                bind:value={endTimeZoneInput}
+                                placeholder={startTimeZoneInput}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                             />
                         </div>
                     {/if}
                 </div>
-            {/if}
+            </div>
 
             <!-- Recurrence Button -->
             <div class="pt-4 border-t">

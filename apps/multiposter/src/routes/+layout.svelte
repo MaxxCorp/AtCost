@@ -8,7 +8,7 @@
 	import { kioskState } from "$lib/stores/kiosk.svelte";
 	import { slide } from "svelte/transition";
 
-	let { children, data } = $props();
+	let { children } = $props();
 
 	onMount(() => {
 		if (browser && "serviceWorker" in navigator) {
@@ -27,7 +27,7 @@
 
 {#if !kioskState.isKiosk || kioskState.isHeaderVisible}
 	<div transition:slide class="relative z-50">
-		<AuthHeader user={data.user} />
+		<AuthHeader />
 	</div>
 {/if}
 

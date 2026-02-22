@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { authClient } from '$lib/auth-client';
 	import DashboardCard from '$lib/components/ui/DashboardCard.svelte';
-	import { hasAccess, parseRoles, parseClaims } from '$lib/authorization-utils';
+	import { hasAccess, parseRoles, parseClaims } from '$lib/authorization';
 	import { FEATURES, getVisibleFeatures } from '$lib/features';
     import LoadingSection from '$lib/components/ui/LoadingSection.svelte';
 	

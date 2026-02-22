@@ -3,7 +3,7 @@
 	import { removeBulk } from "./[id]/delete.remote";
 	import { getEmailCampaigns } from "./email-campaigns.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import { Button } from "@ac/ui";
+	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import {
 		Calendar,

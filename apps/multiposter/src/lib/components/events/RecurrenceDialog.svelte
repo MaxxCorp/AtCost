@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { Dialog, Button } from "@ac/ui";
+    import * as Dialog from "$lib/components/ui/dialog";
+    import { Button } from "$lib/components/ui/button";
     import { RRule, Frequency } from "$lib/utils/rrule-compat";
     import { createEventDispatcher } from "svelte";
 

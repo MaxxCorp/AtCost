@@ -3,7 +3,7 @@
 	import { deleteLocation } from "./[id]/delete.remote";
 	import type { Location } from "./list.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import { Button } from "@ac/ui";
+	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import { MapPin, Pencil, Trash2 } from "@lucide/svelte";
 

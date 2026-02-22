@@ -36,10 +36,9 @@ export interface ExternalEvent {
 	status?: 'confirmed' | 'tentative' | 'cancelled';
 	description?: string;
 	location?: string;
-	startDate?: string;
+	isAllDay?: boolean;
 	startDateTime?: Date;
 	startTimeZone?: string;
-	endDate?: string;
 	endDateTime?: Date;
 	endTimeZone?: string;
 	attendees?: Array<{
@@ -64,6 +63,9 @@ export interface ExternalEvent {
 	};
 	ticketPrice?: string;
 
+	tags?: Array<{ id: string; name: string }>;
+	venueId?: string; // Internal ID reference for mapping lookups
+
 	// Enhanced sync fields
 	venue?: {
 		name: string;
@@ -80,6 +82,10 @@ export interface ExternalEvent {
 		email?: string;
 		phone?: string;
 		website?: string;
+	};
+	image?: {
+		url: string;
+		title?: string;
 	};
 }
 
@@ -113,6 +119,9 @@ export interface SyncMapping {
 	lastSyncedAt: Date;
 	etag?: string;
 	metadata?: Record<string, any>;
+	locationId?: string;
+	contactId?: string;
+	tagId?: string;
 }
 
 /**

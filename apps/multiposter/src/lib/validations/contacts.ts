@@ -9,8 +9,6 @@ const contactBaseSchema = v.object({
     honorificSuffix: v.optional(v.string()),
     birthday: v.optional(v.string()),
     notes: v.optional(v.string()),
-    company: v.optional(v.string()),
-    role: v.optional(v.string()),
     isPublic: v.optional(v.union([v.boolean(), v.string()])), // FormData doesn't have null
 });
 
@@ -78,7 +76,6 @@ export const createContactSchema = v.object({
         relationType: v.string(),
     }))),
     tagNames: v.optional(v.array(v.string())),
-    locationIds: v.optional(v.array(v.pipe(v.string(), v.uuid()))),
 
     // Serialized JSON fields for FormData transport
     emailsJson: v.optional(v.string()),
@@ -86,7 +83,6 @@ export const createContactSchema = v.object({
     addressesJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
-    locationIdsJson: v.optional(v.string()),
 });
 
 export const updateContactSchema = v.object({
@@ -102,14 +98,12 @@ export const updateContactSchema = v.object({
             relationType: v.string(),
         }))),
         tagNames: v.optional(v.array(v.string())),
-        locationIds: v.optional(v.array(v.pipe(v.string(), v.uuid()))),
     }),
     emailsJson: v.optional(v.string()),
     phonesJson: v.optional(v.string()),
     addressesJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
-    locationIdsJson: v.optional(v.string()),
 });
 
 export const associationSchema = v.object({

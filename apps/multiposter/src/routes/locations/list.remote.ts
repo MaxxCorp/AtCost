@@ -1,4 +1,3 @@
-import * as v from 'valibot';
 import { type InferSelectModel } from 'drizzle-orm';
 import { query } from '$app/server';
 import { location } from '$lib/server/db/schema';
@@ -9,7 +8,7 @@ export type Location = InferSelectModel<typeof location>;
 /**
  * Query: List all locations for the current user
  */
-export const listLocations = query(v.void_(), async (): Promise<Location[]> => {
+export const listLocations = query(async (): Promise<Location[]> => {
     const results = await listQuery({
         table: location,
         featureName: 'locations',

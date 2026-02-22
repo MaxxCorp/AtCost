@@ -11,7 +11,6 @@ import QRCode from 'qrcode';
 import ICAL from 'ical.js';
 import { getStorageProvider } from './blob-storage';
 import { env } from '$env/dynamic/private';
-import { error } from '@sveltejs/kit';
 
 /**
  * Backend logic for managing contacts and their associations.
@@ -21,7 +20,7 @@ import { error } from '@sveltejs/kit';
 /**
  * Generate vCard and QR Code for a contact
  */
-export async function generateContactAssets(contactId: string, origin?: string) {
+async function generateContactAssets(contactId: string, origin?: string) {
     const data = await db.query.contact.findFirst({
         where: (table, { eq }) => eq(table.id, contactId),
         with: {
@@ -166,14 +165,334 @@ export interface ContactData {
     addresses?: (Omit<typeof contactAddress.$inferInsert, 'contactId'> & { contactId?: string })[];
     relationIds?: { targetContactId: string, relationType: string }[];
     tagNames?: string[];
-    locationIds?: string[];
 }
 
+/**
+ * Create a new contact with related fields
+ */
+export async function createContact(data: ContactData) {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'contacts');
+
+    const contactId = await db.transaction(async (tx) => {
+
+
+        // Insert main contact
+        const [newContact] = await tx.insert(contact).values({
+            userId: user.id,
+            displayName: data.contact.displayName,
+            givenName: data.contact.givenName || null,
+            familyName: data.contact.familyName || null,
+            middleName: data.contact.middleName || null,
+            honorificPrefix: data.contact.honorificPrefix || null,
+            honorificSuffix: data.contact.honorificSuffix || null,
+            birthday: data.contact.birthday || null,
+            gender: data.contact.gender || null,
+            notes: data.contact.notes || null,
+            isPublic: data.contact.isPublic || false
+        }).returning({ id: contact.id });
+
+        const id = newContact.id;
+
+        // Insert emails
+        if (data.emails && data.emails.length > 0) {
+
+            const emailsToInsert = data.emails.map(e => ({
+                contactId: id,
+                value: e.value,
+                type: e.type || 'other',
+                primary: !!e.primary
+            }));
+
+            await tx.insert(contactEmail).values(emailsToInsert);
+        }
+
+        // Insert phones
+        if (data.phones && data.phones.length > 0) {
+
+            const phonesToInsert = data.phones.map(p => ({
+                contactId: id,
+                value: p.value,
+                type: p.type || 'other',
+                primary: !!p.primary
+            }));
+            await tx.insert(contactPhone).values(phonesToInsert);
+        }
+
+        // Insert addresses
+        if (data.addresses && data.addresses.length > 0) {
+
+            const addressesToInsert = data.addresses.map(a => ({
+                contactId: id,
+                street: a.street || null,
+                houseNumber: a.houseNumber || null,
+                addressSuffix: a.addressSuffix || null,
+                zip: a.zip || null,
+                city: a.city || null,
+                state: a.state || null,
+                country: a.country || null,
+                type: a.type || 'other',
+                primary: !!a.primary
+            }));
+            await tx.insert(contactAddress).values(addressesToInsert);
+        }
+
+        // Insert relations
+        if (data.relationIds && data.relationIds.length > 0) {
+
+            const relationsToInsert = data.relationIds.map(r => ({
+                contactId: id,
+                targetContactId: r.targetContactId,
+                relationType: r.relationType
+            }));
+            await tx.insert(contactRelation).values(relationsToInsert);
+        }
+
+        // Insert tags
+        if (data.tagNames && data.tagNames.length > 0) {
+
+            for (const tagName of data.tagNames) {
+                // Find or create tag
+                let tagId: string;
+                const existingTag = await tx.query.tag.findFirst({
+                    where: (t, { eq }) => eq(t.name, tagName)
+                });
+
+                if (existingTag) {
+                    tagId = existingTag.id;
+                } else {
+                    const [newTag] = await tx.insert(tag).values({
+                        name: tagName,
+                        userId: user.id
+                    }).returning({ id: tag.id });
+                    tagId = newTag.id;
+                }
+
+                await tx.insert(contactTag).values({
+                    contactId: id,
+                    tagId
+                });
+            }
+        }
+
+        return id;
+    });
+
+    // Generate assets after transaction
+    // Generate assets after transaction
+    let origin: string | undefined;
+    try {
+        origin = getRequestEvent()?.url.origin;
+    } catch (e) { /* ignore */ }
+    await generateContactAssets(contactId, origin);
+
+    return contactId;
+}
+
+/**
+ * Update an existing contact
+ */
+export async function updateContact(id: string, data: Partial<ContactData>) {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'contacts');
 
 
 
+    const isAdmin = parseRoles(user).includes('admin');
+
+    await db.transaction(async (tx) => {
 
 
+        // Update main contact
+        if (data.contact) {
+
+            const updateSet: any = {
+                updatedAt: new Date()
+            };
+            if (data.contact.displayName !== undefined) updateSet.displayName = data.contact.displayName;
+            if (data.contact.givenName !== undefined) updateSet.givenName = data.contact.givenName;
+            if (data.contact.familyName !== undefined) updateSet.familyName = data.contact.familyName;
+            if (data.contact.middleName !== undefined) updateSet.middleName = data.contact.middleName;
+            if (data.contact.honorificPrefix !== undefined) updateSet.honorificPrefix = data.contact.honorificPrefix;
+            if (data.contact.honorificSuffix !== undefined) updateSet.honorificSuffix = data.contact.honorificSuffix;
+            if (data.contact.birthday !== undefined) updateSet.birthday = data.contact.birthday;
+            if (data.contact.gender !== undefined) updateSet.gender = data.contact.gender;
+            if (data.contact.notes !== undefined) updateSet.notes = data.contact.notes;
+            if (data.contact.isPublic !== undefined) updateSet.isPublic = data.contact.isPublic;
+
+            const query = tx.update(contact).set(updateSet);
+            await query.where(eq(contact.id, id));
+        }
+
+
+        // Surgical update for related fields
+
+
+        // Emails
+        if (data.emails !== undefined) {
+
+            await tx.delete(contactEmail).where(eq(contactEmail.contactId, id));
+
+            if (data.emails.length > 0) {
+                await tx.insert(contactEmail).values(
+                    data.emails.map(e => ({
+                        contactId: id,
+                        value: e.value,
+                        type: e.type || 'other',
+                        primary: !!e.primary
+                    }))
+                );
+            }
+        }
+
+        // Phones
+        if (data.phones !== undefined) {
+
+            await tx.delete(contactPhone).where(eq(contactPhone.contactId, id));
+
+            if (data.phones.length > 0) {
+                await tx.insert(contactPhone).values(
+                    data.phones.map(p => ({
+                        contactId: id,
+                        value: p.value,
+                        type: p.type || 'other',
+                        primary: !!p.primary
+                    }))
+                );
+            }
+        }
+
+        // Addresses
+        if (data.addresses !== undefined) {
+
+            // Addresses are harder to diff by value, so we'll stick to delete-reinsert but only if they changed
+            await tx.delete(contactAddress).where(eq(contactAddress.contactId, id));
+            const targetAddresses = data.addresses || [];
+            if (targetAddresses.length > 0) {
+                await tx.insert(contactAddress).values(
+                    targetAddresses.map(a => ({
+                        contactId: id,
+                        street: a.street || null,
+                        houseNumber: a.houseNumber || null,
+                        addressSuffix: a.addressSuffix || null,
+                        zip: a.zip || null,
+                        city: a.city || null,
+                        state: a.state || null,
+                        country: a.country || null,
+                        type: a.type || 'other',
+                        primary: !!a.primary
+                    }))
+                );
+            }
+        }
+
+        // Relations
+        if (data.relationIds !== undefined) {
+
+            const currentRelations = await tx.select().from(contactRelation).where(eq(contactRelation.contactId, id));
+            const currentTargetIds = currentRelations.map(r => r.targetContactId);
+
+            const targetRelationIds = data.relationIds || [];
+            const targetIds = targetRelationIds.map(r => r.targetContactId);
+
+            const toDelete = currentRelations.filter(r => !targetIds.includes(r.targetContactId));
+            if (toDelete.length > 0) {
+                await tx.delete(contactRelation).where(and(
+                    eq(contactRelation.contactId, id),
+                    inArray(contactRelation.targetContactId, toDelete.map(r => r.targetContactId))
+                ));
+            }
+
+            const toAdd = targetRelationIds.filter(r => !currentTargetIds.includes(r.targetContactId));
+            if (toAdd.length > 0) {
+                await tx.insert(contactRelation).values(
+                    toAdd.map(r => ({
+                        contactId: id,
+                        targetContactId: r.targetContactId,
+                        relationType: r.relationType
+                    }))
+                );
+            }
+        }
+
+        // Tags
+        if (data.tagNames !== undefined) {
+
+            const currentTagAssociations = await tx.query.contactTag.findMany({
+                where: (ct, { eq }) => eq(ct.contactId, id),
+                with: { tag: true }
+            });
+            const currentTagNames = currentTagAssociations.map(ct => ct.tag.name);
+            const targetTagNames = data.tagNames || [];
+
+            // Delete removed tags
+            const toRemove = currentTagAssociations.filter(ct => !targetTagNames.includes(ct.tag.name));
+            if (toRemove.length > 0) {
+                await tx.delete(contactTag).where(and(
+                    eq(contactTag.contactId, id),
+                    inArray(contactTag.tagId, toRemove.map(ct => ct.tagId))
+                ));
+            }
+
+            // Add new tags
+            const toAdd = targetTagNames.filter(name => !currentTagNames.includes(name));
+            for (const tagName of toAdd) {
+                let tagId: string;
+                const existingTag = await tx.query.tag.findFirst({
+                    where: (t, { eq }) => eq(t.name, tagName)
+                });
+
+                if (existingTag) {
+                    tagId = existingTag.id;
+                } else {
+                    const [newTag] = await tx.insert(tag).values({
+                        name: tagName,
+                        userId: user.id
+                    }).returning({ id: tag.id });
+                    tagId = newTag.id;
+                }
+
+                await tx.insert(contactTag).values({
+                    contactId: id,
+                    tagId
+                });
+            }
+        }
+
+    });
+
+    // Re-generate assets
+    // Re-generate assets
+    let origin: string | undefined;
+    try {
+        origin = getRequestEvent()?.url.origin;
+    } catch (e) { /* ignore */ }
+    await generateContactAssets(id, origin);
+
+    return id;
+}
+
+/**
+ * Delete a contact and all its associations
+ */
+export async function deleteContact(id: string) {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'contacts');
+
+    // Clean up files if we have the URLs
+    const data = await db.query.contact.findFirst({
+        where: (table, { eq }) => eq(table.id, id)
+    });
+
+    if (data) {
+        const storage = getStorageProvider();
+        if (data.vCardPath) await storage.delete(data.vCardPath);
+        if (data.qrCodePath) await storage.delete(data.qrCodePath);
+    }
+
+    return await db.delete(contact)
+        .where(eq(contact.id, id));
+}
 
 /**
  * Associate a contact with an entity (user, location, resource, event)
@@ -208,7 +527,35 @@ export async function associateContact(type: 'user' | 'location' | 'resource' | 
     }).onConflictDoNothing();
 }
 
+/**
+ * Read a single contact by ID
+ */
+export async function getContact(id: string) {
+    const contactRecord = await db.query.contact.findFirst({
+        where: (table, { eq }) => eq(table.id, id),
+        with: {
+            emails: true,
+            phones: true,
+            addresses: true,
+            relations: {
+                with: {
+                    targetContact: true
+                }
+            },
+            tags: {
+                with: {
+                    tag: true
+                }
+            }
+        }
+    });
 
+    if (!contactRecord) return null;
+
+    return contactRecord;
+
+    return contactRecord;
+}
 
 /**
  * Dissociate a contact from an entity
@@ -252,7 +599,7 @@ export async function getEntityContacts(type: 'user' | 'location' | 'resource' |
 
         // Allow users with 'contacts' access OR 'events' access if fetching event contacts
         if (!hasAccess(user, 'contacts') && !(type === 'event' && hasAccess(user, 'events')) && !(type === 'announcement' && hasAccess(user, 'announcements'))) {
-            error(401, 'Forbidden');
+            throw new Error('Forbidden');
         }
     }
 

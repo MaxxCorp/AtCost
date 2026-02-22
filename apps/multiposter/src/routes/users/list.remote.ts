@@ -2,7 +2,7 @@ import { type InferSelectModel } from 'drizzle-orm';
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { user } from '$lib/server/db/schema';
-import { getAuthenticatedUser, parseRoles } from '$lib/authorization';
+import { ensureAccess, getAuthenticatedUser, parseRoles } from '$lib/authorization';
 import { desc } from 'drizzle-orm';
 
 export type User = InferSelectModel<typeof user>;

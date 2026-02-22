@@ -1,5 +1,5 @@
 {
-  "id": "6e263f4b-420a-4dfe-a1f4-f2f33c99d1eb",
+  "id": "bf2c96de-9cad-4047-afe5-9d5672b088c8",
   "prevId": "6044536e-2a97-45c2-9746-1abed3561c1a",
   "version": "7",
   "dialect": "postgresql",
@@ -546,12 +546,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "impersonated_by": {
-          "name": "impersonated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -644,25 +638,6 @@
         "claims": {
           "name": "claims",
           "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banned": {
-          "name": "banned",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "ban_reason": {
-          "name": "ban_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ban_expires": {
-          "name": "ban_expires",
-          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -3766,6 +3741,24 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tag_id": {
+          "name": "tag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3774,6 +3767,51 @@
           "columns": [
             {
               "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sync_mapping_location_id_idx": {
+          "name": "sync_mapping_location_id_idx",
+          "columns": [
+            {
+              "expression": "location_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sync_mapping_contact_id_idx": {
+          "name": "sync_mapping_contact_id_idx",
+          "columns": [
+            {
+              "expression": "contact_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sync_mapping_tag_id_idx": {
+          "name": "sync_mapping_tag_id_idx",
+          "columns": [
+            {
+              "expression": "tag_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

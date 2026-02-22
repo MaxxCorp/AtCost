@@ -10,7 +10,7 @@
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import { toast } from "svelte-sonner";
     import { updateLocationSchema } from "$lib/validations/locations";
-    import { Button } from "@ac/ui";
+    import { Button } from "$lib/components/ui/button";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import ContactManager from "$lib/components/contacts/ContactManager.svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
@@ -66,14 +66,6 @@
                         isUpdating={true}
                         initialData={location}
                     />
-
-                    <div class="mt-8 border-t pt-8">
-                        <h2 class="text-xl font-bold mb-4">Contacts</h2>
-                        <ContactManager
-                            type="location"
-                            entityId={location.id}
-                        />
-                    </div>
                 </div>
             </div>
         {:else}

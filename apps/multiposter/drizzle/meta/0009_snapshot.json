@@ -1,6 +1,6 @@
 {
-  "id": "f631c43d-94e3-4d23-b6f1-b65c76a10568",
-  "prevId": "6e263f4b-420a-4dfe-a1f4-f2f33c99d1eb",
+  "id": "a13dfbdc-714e-4ab4-a2dd-6bde44baa0d8",
+  "prevId": "bf2c96de-9cad-4047-afe5-9d5672b088c8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -546,12 +546,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "impersonated_by": {
-          "name": "impersonated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -644,25 +638,6 @@
         "claims": {
           "name": "claims",
           "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banned": {
-          "name": "banned",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "ban_reason": {
-          "name": "ban_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ban_expires": {
-          "name": "ban_expires",
-          "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
@@ -1431,18 +1406,6 @@
         },
         "notes": {
           "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "company": {
-          "name": "company",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "role": {
-          "name": "role",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2532,26 +2495,21 @@
           "notNull": true,
           "default": "'confirmed'"
         },
-        "start_date": {
-          "name": "start_date",
-          "type": "text",
+        "is_all_day": {
+          "name": "is_all_day",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": false
         },
         "start_date_time": {
           "name": "start_date_time",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "start_time_zone": {
           "name": "start_time_zone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "end_date": {
-          "name": "end_date",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -3778,6 +3736,24 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tag_id": {
+          "name": "tag_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3786,6 +3762,51 @@
           "columns": [
             {
               "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sync_mapping_location_id_idx": {
+          "name": "sync_mapping_location_id_idx",
+          "columns": [
+            {
+              "expression": "location_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sync_mapping_contact_id_idx": {
+          "name": "sync_mapping_contact_id_idx",
+          "columns": [
+            {
+              "expression": "contact_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sync_mapping_tag_id_idx": {
+          "name": "sync_mapping_tag_id_idx",
+          "columns": [
+            {
+              "expression": "tag_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
