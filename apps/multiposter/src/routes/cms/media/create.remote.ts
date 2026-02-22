@@ -1,7 +1,7 @@
-import { command } from '$app/server';
+﻿import { command } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { getStorageProvider } from '$lib/server/blob-storage';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { uploadImageSchema } from '$lib/validations/cms';
 
 export const uploadMedia = command(uploadImageSchema, async (data) => {

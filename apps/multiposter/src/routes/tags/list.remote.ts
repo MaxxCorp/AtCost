@@ -1,8 +1,8 @@
-import { query } from '$app/server';
+﻿import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { tag } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { getAuthenticatedUser } from '$lib/authorization';
+import { getAuthenticatedUser } from '$lib/server/authorization';
 
 export const listTags = query(async () => {
     const user = getAuthenticatedUser();

@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Announcement } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 
 import { getRequestEvent } from '$app/server';

@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { kiosk, kioskLocation, location } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 
 export const getKiosk = query(v.string(), async (id: string) => {

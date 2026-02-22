@@ -13,7 +13,6 @@ export const locationBaseSchema = v.object({
     latitude: v.optional(v.string()),
     longitude: v.optional(v.string()),
     what3words: v.optional(v.string()),
-    type: v.fallback(v.string(), 'Other'),
     inclusivitySupport: v.optional(v.string()),
 });
 

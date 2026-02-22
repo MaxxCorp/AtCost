@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
 import { readResource } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateResourceSchema } from '$lib/validations/resources';
 
 export const updateResource = form(updateResourceSchema, async (data) => {

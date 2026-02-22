@@ -1,4 +1,4 @@
-import { type InferSelectModel } from 'drizzle-orm';
+﻿import { type InferSelectModel } from 'drizzle-orm';
 import { query } from '$app/server';
 import { resource } from '$lib/server/db/schema';
 import { listQuery } from '$lib/server/db/query-helpers';

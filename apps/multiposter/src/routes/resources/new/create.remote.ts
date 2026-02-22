@@ -1,9 +1,9 @@
-import { form } from '$app/server';
+﻿import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { resource, resourceRelation } from '$lib/server/db/schema';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createResourceSchema } from '$lib/validations/resources';
 
 export const createResource = form(createResourceSchema, async (data) => {

@@ -1,11 +1,11 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import type { Campaign } from "$lib/server/db/schema/campaigns";
+    import type { Campaign } from "../../../routes/campaigns/[id]/read.remote";
     import { deleteCampaigns } from "../../../routes/campaigns/[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "@ac/ui";
+    import { Button } from "$lib/components/ui/button";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import type { updateCampaign } from "../../../routes/campaigns/[id]/update.remote";
     import type { createCampaign } from "../../../routes/campaigns/new/create.remote";

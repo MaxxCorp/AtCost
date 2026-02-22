@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import type { Campaign } from '$lib/server/db/schema';
 import { readCampaign } from './read.remote';
 import { listCampaigns } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateCampaignSchema } from '$lib/validations/campaigns';
 
 export const updateCampaign = form(updateCampaignSchema, async (data) => {
@@ -40,12 +40,17 @@ export const updateCampaign = form(updateCampaignSchema, async (data) => {
 		error(500, 'Failed to update campaign');
 	}
 
-	const updatedCampaign: Campaign = updated;
+	const updatedCampaign = {
+		...updated,
+		createdAt: updated.createdAt.toISOString(),
+		updatedAt: updated.updatedAt.toISOString()
+	};
 
 	// Update both queries
+	// @ts-ignore - The type mismatch between DbCampaign and the remote query's Campaign type
 	await readCampaign(data.id).set(updatedCampaign);
 	await listCampaigns().refresh();
 
-	return { updatedCampaign, campaign: updatedCampaign, success: true };
+	return { updatedCampaign, success: true };
 });
 

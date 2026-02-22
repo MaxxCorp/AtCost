@@ -1,11 +1,10 @@
-import { form } from '$app/server';
+﻿import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation } from '$lib/server/db/schema';
 import { createAnnouncementSchema } from '$lib/validations/announcements';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
 import { listAnnouncements } from '../list.remote';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Command: Create a new announcement
@@ -15,7 +14,7 @@ export const createNewAnnouncement = form(createAnnouncementSchema, async (input
         const user = getAuthenticatedUser();
         ensureAccess(user, 'announcements');
 
-        const announcementId = uuidv4();
+        let announcementId: string = '';
         const now = new Date();
 
         // Parse IDs
@@ -42,15 +41,16 @@ export const createNewAnnouncement = form(createAnnouncementSchema, async (input
 
         await db.transaction(async (tx) => {
             // Insert Announcement
-            await tx.insert(announcement).values({
-                id: announcementId,
+            const [newAnnouncement] = await tx.insert(announcement).values({
                 userId: user.id,
                 title: input.title,
                 content: input.content,
                 isPublic: isPublic,
                 createdAt: now,
                 updatedAt: now,
-            });
+            }).returning({ id: announcement.id });
+
+            announcementId = newAnnouncement.id;
 
             // Insert Tags
             const finalTagIds = new Set<string>(tagIds);

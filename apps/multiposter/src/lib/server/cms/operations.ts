@@ -2,7 +2,7 @@ import { db } from '$lib/server/db';
 import { cmsBlock, cmsSlot, cmsContentVersion, cmsPage } from '$lib/server/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 /**
  * Get content for a specific page slot.

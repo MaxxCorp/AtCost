@@ -1,4 +1,4 @@
-import { query } from '$app/server';
+﻿import { query } from '$app/server';
 import { event } from '$lib/server/db/schema';
 import { listQuery } from '$lib/server/db/query-helpers';
 

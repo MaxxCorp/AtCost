@@ -2,7 +2,7 @@
     import { goto } from "$app/navigation";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import { Button } from "@ac/ui";
+    import Button from "$lib/components/ui/button/button.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
@@ -27,26 +27,21 @@
         initialData?: any;
     } = $props();
 
-    // svelte-ignore state_referenced_locally
     let contentValue = $state(
         getField("content").value() ?? initialData?.content ?? "",
     );
 
     // Initialize tags string from tagNames (edit mode) or default to "News" (create mode)
-    // svelte-ignore state_referenced_locally
     let tagsString = $state(
         isUpdating && initialData?.tagNames
             ? initialData.tagNames.join(", ")
             : "News",
     );
 
-    // svelte-ignore state_referenced_locally
     let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
-    // svelte-ignore state_referenced_locally
     let isPublic = $state(initialData?.isPublic ?? false);
 
     let locations = $state<Location[]>([]);
-    // svelte-ignore state_referenced_locally
     let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
 
     onMount(async () => {
@@ -212,11 +207,10 @@
             <div class="flex items-center gap-2 mt-4">
                 <input
                     type="checkbox"
-                    id="isPublic"
                     bind:checked={isPublic}
                     class="w-4 h-4 text-blue-600"
                 />
-                <label for="isPublic" class="text-sm text-gray-700"
+                <label class="text-sm text-gray-700"
                     >Make this announcement public</label
                 >
             </div>

@@ -4,7 +4,7 @@ import { user } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { listUsers } from '../list.remote';
 import { readUser } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateUserSchema } from '$lib/validations/users';
 import { error } from '@sveltejs/kit';
 

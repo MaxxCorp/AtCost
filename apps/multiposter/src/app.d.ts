@@ -4,16 +4,16 @@ declare global {
 	namespace App {
 		// interface Error {}
 		interface Locals {
-			session: typeof import("$lib/auth").auth.$Infer.Session.session | null;
-			user: typeof import("$lib/auth").auth.$Infer.Session.user | null;
+				session: import('better-auth').Session | null;
+				user: import('better-auth').User | null;
 		}
-		interface PageData {
-			session: typeof import("$lib/auth").auth.$Infer.Session.session | null;
-			user: typeof import("$lib/auth").auth.$Infer.Session.user | null;
-		}
+			interface PageData {
+				session: import('better-auth').Session | null;
+				user: import('better-auth').User | null;
+			}
 		// interface PageState {}
 		// interface Platform {}
 	}
 }
 
-export { };
+export {};

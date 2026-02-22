@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Event } from '../list.remote';
-import { getOptionalUser, hasAccess } from '$lib/authorization';
+import { getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 

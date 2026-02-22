@@ -1,4 +1,4 @@
-import { query } from '$app/server';
+﻿import { query } from '$app/server';
 import { announcement } from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 import { eq, desc } from 'drizzle-orm';

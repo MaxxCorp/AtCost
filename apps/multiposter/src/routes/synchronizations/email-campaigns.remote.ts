@@ -1,5 +1,5 @@
-import { query } from '$app/server';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+﻿import { query } from '$app/server';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { syncService } from '$lib/server/sync/service';
 import { getEmailCampaignsSchema } from '$lib/validations/synchronizations';
 

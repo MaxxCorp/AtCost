@@ -1,5 +1,5 @@
 import { form } from '$app/server';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { db } from '$lib/server/db';
 import { syncConfig } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';

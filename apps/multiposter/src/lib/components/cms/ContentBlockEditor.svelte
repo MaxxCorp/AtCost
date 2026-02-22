@@ -1,6 +1,6 @@
 <script lang="ts">
     import RichTextEditor from "./RichTextEditor.svelte";
-    import { Button } from "@ac/ui";
+    import { Button } from "$lib/components/ui/button";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import type { readContent } from "../../../routes/imprint/read.remote";
@@ -34,9 +34,7 @@
 
     // Initialize state from props immediately
     let isEditing = $state(false);
-    // svelte-ignore state_referenced_locally
     let language = $state(currentResult?.content?.language ?? "en");
-    // svelte-ignore state_referenced_locally
     let branch = $state(currentResult?.content?.branch ?? "draft"); // Default to draft usually for editing?
     // Actually, if we view published, we see published. If we edit, we probably want to start from what we see,
     // BUT we should be explicit. If I view published 'en', I start editing 'en' 'published'?

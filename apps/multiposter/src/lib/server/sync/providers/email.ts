@@ -6,7 +6,7 @@ import type {
 	SyncDirection,
 	WebhookSubscription
 } from '../types';
-import { getAuthenticatedUser } from '$lib/authorization';
+import { getAuthenticatedUser } from '$lib/server/authorization';
 import { getEntityContacts } from '../../contacts';
 import { resolveEventContact } from '../../contact-resolution';
 import { db } from '../../db';
@@ -313,9 +313,7 @@ export class EmailProvider implements SyncProvider {
 			event: {
 				summary: event.summary,
 				description: event.description,
-				startDate: event.startDate,
 				startDateTime: event.startDateTime,
-				endDate: event.endDate,
 				endDateTime: event.endDateTime,
 				location: event.location,
 				recurrence: event.recurrence

@@ -3,7 +3,7 @@ import { command } from '$app/server';
 import { db } from '$lib/server/db';
 import { contact } from '$lib/server/db/schema';
 import { inArray, and, eq } from 'drizzle-orm';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { listContacts } from '../list.remote';
 import { getStorageProvider } from '$lib/server/blob-storage';
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button } from "@ac/ui";
+	import { Button } from "$lib/components/ui/button";
 	import AsyncButton from "./AsyncButton.svelte";
 
 	interface Props {

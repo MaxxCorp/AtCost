@@ -1,7 +1,7 @@
-import { form } from '$app/server';
+﻿import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { kiosk, kioskLocation } from '$lib/server/db/schema';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createKioskSchema } from '$lib/validations/kiosks';
 import { listKiosks } from '../list.remote';
 import { error } from '@sveltejs/kit';

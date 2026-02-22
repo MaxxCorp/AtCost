@@ -4,7 +4,7 @@
 	import { deleteEvents } from "./delete.remote";
 	import { deleteSeries } from "./[id]/delete-series.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import { Button } from "@ac/ui";
+	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
 	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
@@ -21,7 +21,7 @@
 		ChevronDown,
 		RefreshCw,
 	} from "@lucide/svelte";
-	import { DropdownMenu } from "@ac/ui";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
@@ -83,14 +83,19 @@
 	}
 
 	function formatEventTime(event: Event): string {
-		// Check if this is an all-day event (has startDate but no startDateTime)
-		const isAllDay = event.startDate && !event.startDateTime;
-
-		if (isAllDay) {
-			if (event.endDate && event.endDate !== event.startDate) {
-				return `All day: ${event.startDate} - ${event.endDate}`;
+		if (event.isAllDay && event.startDateTime) {
+			const startDateStr = new Date(
+				event.startDateTime,
+			).toLocaleDateString();
+			if (event.endDateTime) {
+				const endDateStr = new Date(
+					event.endDateTime,
+				).toLocaleDateString();
+				if (startDateStr !== endDateStr) {
+					return `All day: ${startDateStr} - ${endDateStr}`;
+				}
 			}
-			return `All day on ${event.startDate}`;
+			return `All day on ${startDateStr}`;
 		}
 
 		if (event.startDateTime) {

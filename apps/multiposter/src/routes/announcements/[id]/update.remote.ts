@@ -2,7 +2,7 @@ import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation } from '$lib/server/db/schema';
 import { updateAnnouncementSchema } from '$lib/validations/announcements';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
 import { listAnnouncements } from '../list.remote';
 import { readAnnouncement } from './read.remote';

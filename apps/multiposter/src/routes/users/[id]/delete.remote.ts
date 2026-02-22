@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { user } from '$lib/server/db/schema';
 import { inArray } from 'drizzle-orm';
 import { listUsers } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { error } from '@sveltejs/kit';
 

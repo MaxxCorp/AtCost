@@ -1,4 +1,4 @@
-import { auth } from "$lib/auth";
+import { auth } from "$lib/server/auth";
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = ({ request }) => auth.handler(request);

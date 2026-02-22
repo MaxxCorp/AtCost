@@ -23,8 +23,6 @@ export const contact = pgTable("contact", {
     birthday: timestamp("birthday"),
     gender: text("gender"),
     notes: text("notes"),
-    company: text("company"),
-    role: text("role"),
     isPublic: boolean("is_public").default(false).notNull(),
     vCardPath: text("vcard_path"),
     qrCodePath: text("qrcode_path"),

@@ -3,7 +3,7 @@ import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { eq, inArray } from 'drizzle-orm';
 import { campaign } from '$lib/server/db/schema';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { listCampaigns } from '../list.remote';
 import { deleteCampaignSchema } from '$lib/validations/campaigns';
 

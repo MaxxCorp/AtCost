@@ -133,6 +133,10 @@
 
             items = enrichedItems;
 
+            if (items.length > 1) {
+                startLoop();
+            }
+
             const storageKey = `kiosk_items_${kioskId}`;
             localStorage.setItem(storageKey, JSON.stringify(enrichedItems));
 
@@ -200,8 +204,11 @@
                         const e = item as PublicEvent;
                         // Simple check: is endDateTime in future?
                         if (e.endDateTime) return new Date(e.endDateTime) > now;
-                        if (e.endDate)
-                            return new Date(e.endDate + "T23:59:59") > now;
+                        if (e.startDateTime && e.isAllDay) {
+                            const d = new Date(e.startDateTime);
+                            d.setHours(23, 59, 59, 999);
+                            return d > now;
+                        }
                         return false;
                     }
                     // Announcements always valid
@@ -209,6 +216,9 @@
                 });
 
                 items = validItems;
+                if (items.length > 1) {
+                    startLoop();
+                }
                 // Update storage to remove old ones
                 localStorage.setItem(storageKey, JSON.stringify(validItems));
                 isOffline = true;
@@ -254,10 +264,6 @@
         // initCache will be called by fetchData on failure, or we can look for basic cache first
         // await initCache();
         // Let's rely on fetchData to drive this.
-
-        if (items.length > 0) {
-            startLoop();
-        }
 
         if (browser) {
             // @ts-ignore

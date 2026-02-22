@@ -1,6 +1,6 @@
 import { command, query } from '$app/server';
 import * as v from 'valibot';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { syncService } from '$lib/server/sync/service';
 import { view as viewSyncConfig } from './view.remote';
 

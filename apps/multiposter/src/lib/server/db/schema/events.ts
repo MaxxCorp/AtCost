@@ -1,8 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, index, uuid, primaryKey } from "drizzle-orm/pg-core";
-import { relations } from 'drizzle-orm';
 import { user } from "./auth";
-import { eventResource, location } from './resources';
-import { eventContact, tag } from './contacts';
+
 
 /**
  * Recurring series table - single source of truth for recurrence rules
@@ -62,12 +60,11 @@ export const event = pgTable("event", {
     status: text("status").default("confirmed").notNull(), // confirmed, tentative, cancelled
 
     // Time information
-    startDate: text("start_date"), // For all-day events: "yyyy-mm-dd"
-    startDateTime: timestamp("start_date_time"), // For timed events
+    isAllDay: boolean("is_all_day").default(false).notNull(), // Unified flag for full day events
+    startDateTime: timestamp("start_date_time").notNull(), // Unified
     startTimeZone: text("start_time_zone"), // IANA timezone name
 
-    endDate: text("end_date"), // For all-day events: "yyyy-mm-dd"
-    endDateTime: timestamp("end_date_time"), // For timed events
+    endDateTime: timestamp("end_date_time"), // Unified
     endTimeZone: text("end_time_zone"), // IANA timezone name
     endTimeUnspecified: boolean("end_time_unspecified").default(false),
 
@@ -236,69 +233,6 @@ export const event = pgTable("event", {
     index("event_user_id_idx").on(table.userId),
     index("event_series_id_idx").on(table.seriesId),
 ]);
-
-export const eventLocation = pgTable("event_location", {
-    eventId: uuid("event_id")
-        .notNull()
-        .references(() => event.id, { onDelete: "cascade" }),
-    locationId: uuid("location_id")
-        .notNull()
-        .references(() => location.id, { onDelete: "cascade" }),
-}, (table) => [
-    primaryKey({ columns: [table.eventId, table.locationId] }),
-    index("event_location_event_idx").on(table.eventId),
-    index("event_location_location_idx").on(table.locationId),
-]);
-
-export const recurringSeriesRelations = relations(recurringSeries, ({ many }) => ({
-    events: many(event),
-}));
-
-export const eventRelations = relations(event, ({ many, one }) => ({
-    resources: many(eventResource),
-    contacts: many(eventContact),
-    locations: many(eventLocation),
-    tags: many(eventTag),
-    series: one(recurringSeries, {
-        fields: [event.seriesId],
-        references: [recurringSeries.id],
-    }),
-}));
-
-export const eventLocationRelations = relations(eventLocation, ({ one }) => ({
-    event: one(event, {
-        fields: [eventLocation.eventId],
-        references: [event.id],
-    }),
-    location: one(location, {
-        fields: [eventLocation.locationId],
-        references: [location.id],
-    }),
-}));
-
-export const eventTag = pgTable("event_tag", {
-    eventId: uuid("event_id")
-        .notNull()
-        .references(() => event.id, { onDelete: "cascade" }),
-    tagId: uuid("tag_id")
-        .notNull()
-        .references(() => tag.id, { onDelete: "cascade" }),
-}, (table) => [
-    primaryKey({ columns: [table.eventId, table.tagId] }),
-    index("event_tag_event_idx").on(table.eventId),
-    index("event_tag_tag_idx").on(table.tagId),
-]);
-
-export const eventTagRelations = relations(eventTag, ({ one }) => ({
-    event: one(event, {
-        fields: [eventTag.eventId],
-        references: [event.id],
-    }),
-    tag: one(tag, {
-        fields: [eventTag.tagId],
-        references: [tag.id],
-    }),
-}));
 
 export type Event = typeof event.$inferSelect;
 export type NewEvent = typeof event.$inferInsert;

@@ -1,7 +1,7 @@
-import { type InferSelectModel } from 'drizzle-orm';
+﻿import { type InferSelectModel } from 'drizzle-orm';
 import { query } from '$app/server';
 import { resource, resourceRelation } from '$lib/server/db/schema';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { db } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 

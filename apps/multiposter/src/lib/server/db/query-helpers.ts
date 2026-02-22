@@ -2,7 +2,7 @@
  * Reusable utility for common database query patterns
  */
 import { db } from '$lib/server/db';
-import { getAuthenticatedUser, ensureAccess, type Feature } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess, type Feature } from '$lib/server/authorization';
 import { eq, desc, type SQL } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 

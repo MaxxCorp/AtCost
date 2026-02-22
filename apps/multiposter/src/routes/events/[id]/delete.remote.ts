@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { event } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { listEvents } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';

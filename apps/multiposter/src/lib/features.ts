@@ -1,5 +1,5 @@
 import { ICONS } from '$lib/icons';
-import type { Feature } from '$lib/authorization-utils';
+import type { Feature } from '$lib/authorization';
 
 export interface FeatureMeta {
   key: Feature;

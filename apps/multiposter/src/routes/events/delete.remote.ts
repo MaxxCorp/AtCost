@@ -1,9 +1,9 @@
-import { command } from '$app/server';
+﻿import { command } from '$app/server';
 import { db } from '$lib/server/db';
 import { event } from '$lib/server/db/schema';
 import { inArray, eq, and } from 'drizzle-orm';
 import { listEvents } from './list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 
 /**

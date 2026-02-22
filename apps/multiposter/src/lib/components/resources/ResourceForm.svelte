@@ -1,7 +1,7 @@
 <script lang="ts">
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "@ac/ui";
+    import { Button } from "$lib/components/ui/button";
     import { goto } from "$app/navigation";
     import type { createResource } from "../../../routes/resources/new/create.remote";
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";

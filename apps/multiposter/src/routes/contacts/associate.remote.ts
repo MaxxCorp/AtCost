@@ -1,4 +1,4 @@
-import { command, query } from '$app/server';
+﻿import { command, query } from '$app/server';
 import { associateContact, dissociateContact, getEntityContacts } from '$lib/server/contacts';
 import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '$lib/validations/contacts';
 

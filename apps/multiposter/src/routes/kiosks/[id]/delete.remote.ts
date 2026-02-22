@@ -2,7 +2,7 @@ import { command } from '$app/server';
 import { db } from '$lib/server/db';
 import { kiosk } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { listKiosks } from '../list.remote';
 

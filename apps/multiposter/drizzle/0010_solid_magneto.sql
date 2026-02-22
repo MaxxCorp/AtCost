@@ -1,1 +1,0 @@
-ALTER TABLE "location" ADD COLUMN "type" text DEFAULT 'Other' NOT NULL;

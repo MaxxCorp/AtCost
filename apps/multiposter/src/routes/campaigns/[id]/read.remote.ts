@@ -1,10 +1,15 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { campaign } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
-import type { Campaign } from '$lib/server/db/schema';
-import { getAuthenticatedUser, ensureAccess } from '$lib/authorization';
+import { eq } from 'drizzle-orm';
+import type { Campaign as DbCampaign } from '$lib/server/db/schema';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
+
+export type Campaign = Omit<DbCampaign, 'createdAt' | 'updatedAt'> & {
+	createdAt: string;
+	updatedAt: string;
+};
 
 /**
  * Query: Read a campaign by ID
@@ -17,5 +22,12 @@ export const readCampaign = query(v.string(), async (campaignId: string): Promis
 		.select()
 		.from(campaign)
 		.where(eq(campaign.id, campaignId));
-	return result || null;
+
+	if (!result) return null;
+
+	return {
+		...result,
+		createdAt: result.createdAt.toISOString(),
+		updatedAt: result.updatedAt.toISOString(),
+	};
 });
