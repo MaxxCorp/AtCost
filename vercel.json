@@ -1,0 +1,22 @@
+{
+    "installCommand": "pnpm install",
+    "buildCommand": "pnpm --filter multiposter build",
+    "outputDirectory": "apps/multiposter/.vercel/output",
+    "crons": [
+        {
+            "path": "/api/sync/renew-webhooks",
+            "schedule": "0 0 * * *"
+        }
+    ],
+    "headers": [
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "no-store, max-age=0"
+                }
+            ]
+        }
+    ]
+}
