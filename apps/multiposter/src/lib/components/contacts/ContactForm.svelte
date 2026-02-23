@@ -19,10 +19,11 @@
 
     interface Props {
         initialData?: any;
-        remoteFunction?: any; // Optional superforms object
-        schema?: any; // Optional
+        remoteFunction?: any;
+        schema?: any;
 
         onSuccess?: (result: any) => void;
+        onCancel?: () => void;
         cancelHref?: string;
         contactId?: string;
         loading?: boolean;
@@ -33,6 +34,7 @@
         remoteFunction,
         schema,
         onSuccess,
+        onCancel,
         cancelHref = "/contacts",
         contactId,
         loading = false,
@@ -651,9 +653,15 @@
     </div>
 
     <div class="flex justify-end gap-3 pt-6 border-t">
-        <Button href={cancelHref} variant="secondary" type="button"
-            >Cancel</Button
-        >
+        {#if onCancel}
+            <Button variant="secondary" type="button" onclick={onCancel}
+                >Cancel</Button
+            >
+        {:else}
+            <Button href={cancelHref} variant="secondary" type="button"
+                >Cancel</Button
+            >
+        {/if}
         <AsyncButton
             type="submit"
             loading={(remoteFunction && remoteFunction.pending) || loading}

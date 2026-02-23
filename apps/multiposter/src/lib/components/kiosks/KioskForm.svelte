@@ -3,7 +3,7 @@
     import type { Location } from "../../../routes/locations/list.remote";
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import LocationSelector from "$lib/components/locations/LocationSelector.svelte";
+    import LocationManager from "$lib/components/locations/LocationManager.svelte";
     import { onMount } from "svelte";
     import { toast } from "svelte-sonner";
     import { goto } from "$app/navigation";
@@ -21,6 +21,8 @@
         initialData?: any;
         isUpdating?: boolean;
     } = $props();
+
+    const type = "kiosk";
 
     let locations = $state<Location[]>([]);
     let loaded = $state(false);
@@ -126,9 +128,14 @@
             {#if !loaded}
                 <div class="animate-pulse h-10 bg-gray-100 rounded"></div>
             {:else}
-                <LocationSelector
-                    {locations}
-                    bind:selectedIds={selectedLocationIds}
+                <LocationManager
+                    {type}
+                    entityId={initialData?.id}
+                    initialItems={locations.filter((l: any) =>
+                        selectedLocationIds.includes(l.id),
+                    )}
+                    onchange={(ids: string[]) => (selectedLocationIds = ids)}
+                    embedded={true}
                 />
                 <!-- Hidden input for submission -->
                 <input

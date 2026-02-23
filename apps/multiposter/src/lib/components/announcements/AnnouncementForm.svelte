@@ -8,7 +8,7 @@
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import ContactManager from "$lib/components/contacts/ContactManager.svelte";
     import TagInput from "$lib/components/ui/TagInput.svelte";
-    import LocationSelector from "$lib/components/locations/LocationSelector.svelte";
+    import LocationManager from "$lib/components/locations/LocationManager.svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
     import type { Location } from "../../../routes/locations/list.remote";
     import { onMount } from "svelte";
@@ -20,12 +20,9 @@
         validationSchema,
         isUpdating = false,
         initialData = null,
-    }: {
-        remoteFunction: any;
-        validationSchema: any;
-        isUpdating?: boolean;
-        initialData?: any;
     } = $props();
+
+    const type = "announcement";
 
     let contentValue = $state(
         getField("content").value() ?? initialData?.content ?? "",
@@ -191,10 +188,14 @@
             </div>
 
             <div>
-                <LocationSelector
-                    {locations}
-                    bind:selectedIds={selectedLocationIds}
-                    label="Locations (Optional)"
+                <LocationManager
+                    {type}
+                    entityId={initialData?.id}
+                    initialItems={locations.filter((l: any) =>
+                        selectedLocationIds.includes(l.id),
+                    )}
+                    onchange={(ids: string[]) => (selectedLocationIds = ids)}
+                    embedded={true}
                 />
                 <input
                     {...getField("locationIds").as(
@@ -219,9 +220,10 @@
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">Contacts</h2>
             <ContactManager
-                type="announcement"
+                {type}
                 entityId={initialData?.id}
                 onchange={(ids: string[]) => (selectedContactIds = ids)}
+                embedded={true}
             />
         </div>
 

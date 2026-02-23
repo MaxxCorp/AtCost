@@ -18,7 +18,7 @@
         type Location,
     } from "../../../routes/locations/list.remote";
     import ContactManager from "$lib/components/contacts/ContactManager.svelte";
-    import LocationSelector from "$lib/components/locations/LocationSelector.svelte";
+    import LocationManager from "$lib/components/locations/LocationManager.svelte";
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
     import TagInput from "$lib/components/ui/TagInput.svelte";
@@ -36,6 +36,8 @@
         isUpdating?: boolean;
         initialData?: Event | null;
     } = $props();
+
+    const type = "event";
 
     // State derived from initialData
     let isAllDay = $state(initialData?.isAllDay ?? false);
@@ -614,9 +616,15 @@
                         </p>
                     {:then locations}
                         <!-- Using Multi-Location Selector -->
-                        <LocationSelector
-                            {locations}
-                            bind:selectedIds={selectedLocationIds}
+                        <LocationManager
+                            {type}
+                            entityId={initialData?.id}
+                            initialItems={locations.filter((l: any) =>
+                                selectedLocationIds.includes(l.id),
+                            )}
+                            onchange={(ids: string[]) =>
+                                (selectedLocationIds = ids)}
+                            embedded={true}
                         />
                         <!-- Populate freeTextLocation based on selection if needed, or leave independent -->
                     {/await}
@@ -912,20 +920,18 @@
             </div>
         </div>
 
-        <div class="bg-white shadow rounded-lg p-6 space-y-4">
-            <h2 class="text-xl font-semibold mb-4 border-b pb-2">Contacts</h2>
-            <ContactManager
-                type="event"
-                entityId={initialData?.id}
-                onchange={(ids: string[]) => (selectedContactIds = ids)}
-            />
-            <input
-                {...getField("contactIds").as(
-                    "hidden",
-                    JSON.stringify(selectedContactIds ?? []),
-                )}
-            />
-        </div>
+        <ContactManager
+            type="event"
+            entityId={initialData?.id}
+            onchange={(ids: string[]) => (selectedContactIds = ids)}
+            embedded={true}
+        />
+        <input
+            {...getField("contactIds").as(
+                "hidden",
+                JSON.stringify(selectedContactIds ?? []),
+            )}
+        />
 
         <div class="flex gap-3 pt-4">
             <AsyncButton

@@ -12,11 +12,17 @@
         validationSchema,
         isUpdating = false,
         initialData = null,
+        onSuccess = undefined,
+        onCancel = undefined,
+        cancelHref = "/locations",
     }: {
         remoteFunction: typeof updateLocation | typeof createLocation;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: any;
+        onSuccess?: (result: any) => void;
+        onCancel?: () => void;
+        cancelHref?: string;
     } = $props();
 
     function getField(name: string) {
@@ -46,7 +52,8 @@
                     return;
                 }
                 toast.success("Successfully Saved!");
-                await goto("/locations");
+                if (onSuccess) onSuccess(result);
+                else await goto(cancelHref);
             } catch (error: unknown) {
                 const err = error as { message?: string };
                 toast.error(err?.message || "Oh no! Something went wrong");
@@ -217,7 +224,7 @@
         <ContactManager type="location" entityId={initialData.id} />
     {/if}
 
-    <div class="flex gap-3 mt-6">
+    <div class="flex justify-end gap-3 mt-6">
         <AsyncButton
             type="submit"
             loadingLabel={isUpdating ? "Saving..." : "Creating..."}
@@ -225,8 +232,19 @@
         >
             {isUpdating ? "Save Changes" : "Create Location"}
         </AsyncButton>
-        <Button variant="secondary" href="/locations" size="default">
-            Cancel
-        </Button>
+        {#if onCancel}
+            <Button
+                variant="secondary"
+                type="button"
+                size="default"
+                onclick={onCancel}
+            >
+                Cancel
+            </Button>
+        {:else}
+            <Button variant="secondary" href={cancelHref} size="default">
+                Cancel
+            </Button>
+        {/if}
     </div>
 </form>
