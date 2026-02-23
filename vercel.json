@@ -1,6 +1,6 @@
 {
     "installCommand": "pnpm install",
-    "buildCommand": "pnpm --filter multiposter build",
+    "buildCommand": "pnpm --filter ac-multiposter build",
     "outputDirectory": "apps/multiposter/.vercel/output",
     "crons": [
         {
