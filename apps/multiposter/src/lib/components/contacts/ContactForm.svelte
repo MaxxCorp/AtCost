@@ -55,9 +55,9 @@
         familyName: d(initialData.contact?.familyName, ""),
         birthday: d(
             initialData.contact?.birthday
-                ? (initialData.contact.birthday instanceof Date
-                      ? initialData.contact.birthday.toISOString().split("T")[0]
-                      : String(initialData.contact.birthday).split("T")[0])
+                ? initialData.contact.birthday instanceof Date
+                    ? initialData.contact.birthday.toISOString().split("T")[0]
+                    : String(initialData.contact.birthday).split("T")[0]
                 : "",
             "",
         ),
@@ -195,17 +195,17 @@
 </script>
 
 <form
-    {...remoteFunction?.preflight?.(schema).enhance(async ({ submit }: any) => {
-        console.log("--- ContactForm submission started ---");
+    {...remoteFunction.preflight(schema).enhance(async ({ submit }: any) => {
         try {
-            const result: any = await submit();
+            await submit();
+            const result = (remoteFunction as any).result;
+
             console.log(
-                "--- ContactForm submission result ---",
-                JSON.stringify(result, null, 2),
+                "--- ContactForm submit() finished --- captured result:",
+                result,
             );
 
             if (result?.success === false || result?.error) {
-                // Check specifically for the structured error I added
                 const msg =
                     result?.error?.message ||
                     result?.error ||
@@ -218,19 +218,19 @@
             if (onSuccess) onSuccess(result);
             else goto(cancelHref);
         } catch (error: any) {
-            console.error("--- ContactForm submission catch ---", error);
-            toast.error(error?.message || "Oh no! Something went wrong");
+            console.error("--- ContactForm submit() catch ---", error);
+            toast.error(error.message || "Oh no! Something went wrong");
         }
-    }) || remoteFunction}
+    })}
     class="space-y-8"
     method="POST"
 >
-    <!-- Hidden ID field for updates (Superforms) -->
+    <!-- Hidden ID field for updates (Remote functions) -->
     {#if contactId}
         <input type="hidden" name="id" value={contactId} />
     {/if}
 
-    <!-- Hidden JSON fields for arrays (Superforms) -->
+    <!-- Hidden JSON fields for arrays (Remote functions) -->
     <input type="hidden" name="emailsJson" value={emailsJson} />
     <input type="hidden" name="phonesJson" value={phonesJson} />
     <input type="hidden" name="addressesJson" value={addressesJson} />

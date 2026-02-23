@@ -1,7 +1,7 @@
 ﻿import { form } from '$app/server';
-import { createContact } from '$lib/server/contacts';
+import { createContact, getContact } from '$lib/server/contacts';
 import { listContacts } from '../list.remote';
-import { createContactSchema } from '$lib/validations/contacts';
+import { createContactSchema, type Contact } from '$lib/validations/contacts';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 export const createNewContact = form(createContactSchema, async (input) => {
@@ -56,16 +56,32 @@ export const createNewContact = form(createContactSchema, async (input) => {
             tagNames,
         });
 
-        console.log('Contact created with ID:', contactId);
+        const newContact = await getContact(contactId);
+        if (!newContact) throw new Error("Created contact not found");
 
-        try {
-            await listContacts().refresh();
-        } catch (err) {
-            console.error("Failed to refresh contact list:", err);
-        }
+        // Transform the same way as listContacts
+        const transformed: Contact = {
+            ...newContact,
+            createdAt: newContact.createdAt.toISOString(),
+            updatedAt: newContact.updatedAt.toISOString(),
+            birthday: newContact.birthday ? newContact.birthday.toISOString() : null,
+            emails: newContact.emails || [],
+            phones: newContact.phones || [],
+            addresses: newContact.addresses || [],
+            relations: (newContact.relations || []).map((rel: any) => ({
+                id: rel.id,
+                targetContactId: rel.targetContactId,
+                relationType: rel.relationType,
+                targetContact: rel.targetContact
+            })),
+            tags: (newContact.tags || []).map((t: any) => ({
+                id: (t as any).tag.id,
+                name: (t as any).tag.name
+            }))
+        } as Contact;
 
-        console.log('--- createNewContact SUCCESS ---');
-        return { success: true, id: contactId };
+        console.log('--- createNewContact SUCCESS --- returning contact:', transformed.id);
+        return { success: true, id: contactId, contact: transformed };
 
     } catch (err: any) {
         console.error('--- createNewContact ERROR ---', err);

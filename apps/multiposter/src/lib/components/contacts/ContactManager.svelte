@@ -8,6 +8,7 @@
         ExternalLink,
         Pencil,
         X,
+        Trash2,
     } from "@lucide/svelte";
 
     import Button from "../ui/button/button.svelte";
@@ -20,9 +21,16 @@
         updateAssociationStatus as updateAssociationStatusRemote,
     } from "../../../routes/contacts/associate.remote";
     import ContactForm from "./ContactForm.svelte";
+    import * as Dialog from "../ui/dialog";
 
     import { createNewContact } from "../../../routes/contacts/new/create.remote";
     import { updateExistingContact } from "../../../routes/contacts/[id]/update.remote";
+    import {
+        createContactSchema,
+        updateContactSchema,
+    } from "$lib/validations/contacts";
+    import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import { toast } from "svelte-sonner";
 
     let { type, entityId = null, onchange = null } = $props();
@@ -46,7 +54,7 @@
 
     async function toggleSelector() {
         showSelector = !showSelector;
-        if (showSelector && allContacts.length === 0) {
+        if (showSelector) {
             loadingSearch = true;
             allContacts = await (listContacts as any)();
             loadingSearch = false;
@@ -95,49 +103,113 @@
     }
 
     async function handleQuickCreateSuccess(result: any) {
-        if (result.id) {
+        console.log("--- handleQuickCreateSuccess START ---", {
+            hasResult: !!result,
+            resultId: result?.id,
+            hasContact: !!result?.contact,
+            entityId,
+        });
+        showQuickCreate = false;
+
+        if (result?.id) {
             if (entityId) {
-                // Automatically associate the new contact
-                // Note: Ideally this should be handled by the server action if we pass context,
-                // but for now we do it here.
                 await (addAssociation as any)({
                     type,
                     entityId,
                     contactId: result.id,
                 });
+                // Re-fetch associated contacts to be sure
+                associatedContacts = await (fetchEntityContacts as any)({
+                    type,
+                    entityId,
+                });
             }
-            const newContact = (await (listContacts as any)()).find(
-                (c: Contact) => c.id === result.id,
-            );
-            if (newContact) {
-                associatedContacts = [...associatedContacts, newContact];
-                allContacts = [newContact, ...allContacts];
-                if (onchange) onchange(associatedContacts.map((c) => c.id));
+
+            // Also update allContacts so it shows up in search
+            if (result.contact) {
+                allContacts = [result.contact, ...allContacts];
+                // If not in entity mode, maybe we manually add it to the other list too
+                if (!entityId) {
+                    associatedContacts = [
+                        result.contact,
+                        ...associatedContacts,
+                    ];
+                }
+            } else {
+                // Fallback to fetch
+                const contacts = await (listContacts as any)();
+                const newContact = contacts.find(
+                    (c: Contact) => c.id === result.id,
+                );
+                if (newContact) {
+                    allContacts = [newContact, ...allContacts];
+                    if (!entityId)
+                        associatedContacts = [
+                            newContact,
+                            ...associatedContacts,
+                        ];
+                }
             }
-            showQuickCreate = false;
+
+            if (onchange) onchange(associatedContacts.map((c) => c.id));
             toast.success("Contact created and associated");
+        } else {
+            console.warn("handleQuickCreateSuccess called without result.id");
         }
     }
 
     async function handleInPlaceUpdateSuccess(result: any) {
-        if (!editingContact) return;
-        const targetId = editingContact.id;
+        console.log("--- handleInPlaceUpdateSuccess START ---", {
+            hasResult: !!result,
+            hasContact: !!result?.contact,
+            editingContactId: editingContact?.id,
+        });
+        const targetId = editingContact?.id;
+        editingContact = null;
 
-        // Refresh local state
-        const updatedContact = (await (listContacts as any)()).find(
-            (c: Contact) => c.id === targetId,
-        );
-        if (updatedContact) {
-            associatedContacts = associatedContacts.map((ac) =>
-                ac.id === updatedContact.id ? updatedContact : ac,
-            );
-            allContacts = allContacts.map((c) =>
-                c.id === updatedContact.id ? updatedContact : c,
-            );
+        if (!targetId) return;
+
+        let updatedContact = result?.contact;
+
+        if (!updatedContact) {
+            // Fallback to fetch
+            const contacts = await (listContacts as any)();
+            updatedContact = contacts.find((c: Contact) => c.id === targetId);
         }
 
-        editingContact = null;
+        if (updatedContact) {
+            associatedContacts = associatedContacts.map((c) =>
+                c.id === targetId ? updatedContact : c,
+            );
+            allContacts = allContacts.map((c) =>
+                c.id === targetId ? updatedContact : c,
+            );
+            if (onchange) onchange(associatedContacts.map((c) => c.id));
+        }
         toast.success("Contact updated");
+    }
+
+    async function deleteContact(contact: Contact) {
+        if (!contact.id) {
+            toast.error("Cannot delete contact without ID");
+            return;
+        }
+
+        const success = await handleDelete({
+            ids: [contact.id as string],
+            deleteFn: deleteExistingContact,
+            itemName: "contact",
+        });
+
+        if (success) {
+            // Remove from local lists
+            allContacts = allContacts.filter((c) => c.id !== contact.id);
+            associatedContacts = associatedContacts.filter(
+                (ac) => ac.id !== contact.id,
+            );
+            // Trigger onchange since association might have changed
+            if (onchange) onchange(associatedContacts.map((c) => c.id));
+        }
     }
 
     async function updateStatus(contact: Contact, status: string) {
@@ -282,70 +354,85 @@
                         {@const isAssociated = associatedContacts.some(
                             (ac) => ac.id === contact.id,
                         )}
-                        <button
-                            type="button"
-                            class="w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors {isAssociated
-                                ? 'bg-blue-50 text-blue-700'
+                        <div
+                            class="flex items-center gap-1 group/item transition-colors rounded-md {isAssociated
+                                ? 'bg-blue-50'
                                 : 'hover:bg-gray-100'}"
-                            onclick={() => toggleAssociation(contact)}
                         >
-                            <span class="text-sm"
-                                >{contact.displayName ||
-                                    `${contact.givenName || ""} ${contact.familyName || ""}`}</span
+                            <button
+                                type="button"
+                                class="flex-1 flex items-center justify-between px-3 py-2 text-left {isAssociated
+                                    ? 'text-blue-700 font-medium'
+                                    : 'text-gray-700'}"
+                                onclick={() => toggleAssociation(contact)}
                             >
-                            {#if isAssociated}
-                                <Check size={14} />
-                            {/if}
-                        </button>
+                                <span class="text-sm">
+                                    {contact.displayName ||
+                                        `${contact.givenName || ""} ${contact.familyName || ""}`}
+                                </span>
+                                {#if isAssociated}
+                                    <Check size={14} />
+                                {/if}
+                            </button>
+                            <button
+                                type="button"
+                                class="p-2 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover/item:opacity-100"
+                                onclick={() => deleteContact(contact)}
+                                title="Delete contact forever"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     {/each}
                 {/if}
             </div>
         </div>
     {/if}
 
-    {#if showQuickCreate || editingContact}
-        <div
-            class="bg-white border rounded-lg p-4 shadow-lg animate-in fade-in slide-in-from-top-2"
-        >
-            <div class="flex justify-between items-center mb-4">
-                <h4 class="font-bold text-gray-900">
+    <Dialog.Root
+        open={showQuickCreate || editingContact !== null}
+        onOpenChange={(open) => {
+            if (!open) {
+                showQuickCreate = false;
+                editingContact = null;
+            }
+        }}
+    >
+        <Dialog.Content class="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+            <Dialog.Header class="mb-4">
+                <Dialog.Title class="text-xl font-bold">
                     {editingContact
                         ? `Edit ${editingContact.displayName || "Contact"}`
                         : "Quick Create Contact"}
-                </h4>
-                <button
-                    type="button"
-                    onclick={() => {
-                        showQuickCreate = false;
-                        editingContact = null;
-                    }}
-                >
-                    <X size={20} class="text-gray-400 hover:text-gray-600" />
-                </button>
-            </div>
+                </Dialog.Title>
+            </Dialog.Header>
 
-            {#if editingContact}
-                <ContactForm
-                    remoteFunction={updateExistingContact}
-                    initialData={{
-                        contact: editingContact,
-                        emails: editingContact.emails,
-                        phones: editingContact.phones,
-                        addresses: editingContact.addresses,
-                        relations: editingContact.relations,
-                        tags: editingContact.tags,
-                    }}
-                    contactId={editingContact.id}
-                    onSuccess={handleInPlaceUpdateSuccess}
-                    cancelHref="#"
-                />
-            {:else}
-                <ContactForm
-                    remoteFunction={createNewContact}
-                    onSuccess={handleQuickCreateSuccess}
-                    cancelHref="#"
-                />
-            {/if}
-        </div>
-    {/if}
+            <div class="mt-2">
+                {#if editingContact}
+                    <ContactForm
+                        remoteFunction={updateExistingContact}
+                        schema={updateContactSchema}
+                        initialData={{
+                            contact: editingContact,
+                            emails: editingContact.emails,
+                            phones: editingContact.phones,
+                            addresses: editingContact.addresses,
+                            relations: editingContact.relations,
+                            tags: editingContact.tags,
+                        }}
+                        contactId={editingContact.id}
+                        onSuccess={handleInPlaceUpdateSuccess}
+                        cancelHref="#"
+                    />
+                {:else if showQuickCreate}
+                    <ContactForm
+                        remoteFunction={createNewContact}
+                        schema={createContactSchema}
+                        onSuccess={handleQuickCreateSuccess}
+                        cancelHref="#"
+                    />
+                {/if}
+            </div>
+        </Dialog.Content>
+    </Dialog.Root>
 </div>

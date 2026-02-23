@@ -1,8 +1,8 @@
 import { form } from '$app/server';
-import { updateContact } from '$lib/server/contacts';
+import { updateContact, getContact } from '$lib/server/contacts';
 import { listContacts } from '../list.remote';
 import { readContact } from './read.remote';
-import { updateContactSchema } from '$lib/validations/contacts';
+import { updateContactSchema, type Contact } from '$lib/validations/contacts';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 export const updateExistingContact = form(updateContactSchema, async (input) => {
@@ -64,13 +64,31 @@ export const updateExistingContact = form(updateContactSchema, async (input) => 
             tagNames,
         } as any);
 
-        console.log('Update result:', result);
+        const updated = await getContact(id);
+        if (!updated) throw new Error("Updated contact not found");
 
-        await readContact(id).refresh();
-        await listContacts().refresh();
+        const transformed: Contact = {
+            ...updated,
+            createdAt: updated.createdAt.toISOString(),
+            updatedAt: updated.updatedAt.toISOString(),
+            birthday: updated.birthday ? updated.birthday.toISOString() : null,
+            emails: updated.emails || [],
+            phones: updated.phones || [],
+            addresses: updated.addresses || [],
+            relations: (updated.relations || []).map((rel: any) => ({
+                id: rel.id,
+                targetContactId: rel.targetContactId,
+                relationType: rel.relationType,
+                targetContact: rel.targetContact
+            })),
+            tags: (updated.tags || []).map((t: any) => ({
+                id: (t as any).tag.id,
+                name: (t as any).tag.name
+            }))
+        } as Contact;
 
         console.log('--- updateExistingContact SUCCESS ---');
-        return { success: true, contact: result };
+        return { success: true, contact: transformed };
 
     } catch (err: any) {
         console.error('--- updateExistingContact ERROR ---', err);

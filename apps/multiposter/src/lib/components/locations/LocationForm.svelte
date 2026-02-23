@@ -35,9 +35,10 @@
     class="space-y-4"
     {...remoteFunction
         .preflight(validationSchema)
-        .enhance(async ({ submit }) => {
+        .enhance(async ({ submit }: any) => {
             try {
-                const result: any = await submit();
+                await submit();
+                const result = (remoteFunction as any).result;
                 if (result?.error) {
                     toast.error(
                         result.error.message || "Oh no! Something went wrong",
