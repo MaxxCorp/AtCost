@@ -1,12 +1,16 @@
 {
     "name": "@ac/monorepo",
     "private": true,
+    "packageManager": "pnpm@10.30.0",
+    "engines": {
+        "node": ">=20.0.0"
+    },
     "scripts": {
         "dev": "pnpm --filter \"./apps/**\" run dev",
         "build": "pnpm --filter \"./apps/**\" run build",
         "check": "pnpm --filter \"./apps/**\" run check"
     },
     "devDependencies": {
-        "typescript": "^5.9.3"
+        "typescript": "^5.7.3"
     }
 }
