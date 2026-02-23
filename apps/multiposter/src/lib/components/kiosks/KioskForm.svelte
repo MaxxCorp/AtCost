@@ -3,7 +3,17 @@
     import type { Location } from "../../../routes/locations/list.remote";
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import LocationManager from "$lib/components/locations/LocationManager.svelte";
+    import EntityManager from "$lib/components/ui/EntityManager.svelte";
+    import LocationForm from "$lib/components/locations/LocationForm.svelte";
+    import { createLocation } from "../../../routes/locations/new/create.remote";
+    import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import {
+        createLocationSchema,
+        updateLocationSchema,
+    } from "$lib/validations/locations";
+    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { MapPin } from "@lucide/svelte";
     import { onMount } from "svelte";
     import { toast } from "svelte-sonner";
     import { goto } from "$app/navigation";
@@ -128,7 +138,9 @@
             {#if !loaded}
                 <div class="animate-pulse h-10 bg-gray-100 rounded"></div>
             {:else}
-                <LocationManager
+                <EntityManager
+                    title="Locations"
+                    icon={MapPin}
                     {type}
                     entityId={initialData?.id}
                     initialItems={locations.filter((l: any) =>
@@ -136,7 +148,51 @@
                     )}
                     onchange={(ids: string[]) => (selectedLocationIds = ids)}
                     embedded={true}
-                />
+                    listItemsRemote={listLocations as any}
+                    deleteItemRemote={async (id: string) => {
+                        return await handleDelete({
+                            ids: [id],
+                            deleteFn: deleteLocation,
+                            itemName: "location",
+                        });
+                    }}
+                    createRemote={createLocation}
+                    createSchema={createLocationSchema}
+                    updateRemote={updateLocation}
+                    updateSchema={updateLocationSchema}
+                    getFormData={(l: Location) => l}
+                    searchPredicate={(l: Location, q: string) => {
+                        return (
+                            l.name.toLowerCase().includes(q.toLowerCase()) ||
+                            (l.roomId
+                                ?.toLowerCase()
+                                .includes(q.toLowerCase()) ??
+                                false)
+                        );
+                    }}
+                >
+                    {#snippet renderItemLabel(location)}
+                        {location.name}
+                        {location.roomId ? `(${location.roomId})` : ""}
+                    {/snippet}
+                    {#snippet renderForm({
+                        remoteFunction: rf,
+                        schema,
+                        id,
+                        initialData: formData,
+                        onSuccess,
+                        onCancel,
+                    })}
+                        <LocationForm
+                            remoteFunction={rf}
+                            validationSchema={schema}
+                            isUpdating={!!id}
+                            initialData={formData}
+                            {onSuccess}
+                            {onCancel}
+                        />
+                    {/snippet}
+                </EntityManager>
                 <!-- Hidden input for submission -->
                 <input
                     {...getField("locationIds").as(

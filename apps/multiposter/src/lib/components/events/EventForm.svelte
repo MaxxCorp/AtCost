@@ -17,13 +17,36 @@
         listLocations,
         type Location,
     } from "../../../routes/locations/list.remote";
-    import ContactManager from "$lib/components/contacts/ContactManager.svelte";
-    import LocationManager from "$lib/components/locations/LocationManager.svelte";
+    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import LocationForm from "$lib/components/locations/LocationForm.svelte";
+    import EntityManager from "$lib/components/ui/EntityManager.svelte";
+    import { listContacts } from "../../../routes/contacts/list.remote";
+    import { type Contact } from "$lib/validations/contacts";
+    import {
+        addAssociation,
+        removeAssociation,
+        fetchEntityContacts,
+        updateAssociationStatus as updateAssociationStatusRemote,
+    } from "../../../routes/contacts/associate.remote";
+    import { createNewContact } from "../../../routes/contacts/new/create.remote";
+    import { updateExistingContact } from "../../../routes/contacts/[id]/update.remote";
+    import {
+        createContactSchema,
+        updateContactSchema,
+    } from "$lib/validations/contacts";
+    import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { createLocation } from "../../../routes/locations/new/create.remote";
+    import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import {
+        createLocationSchema,
+        updateLocationSchema,
+    } from "$lib/validations/locations";
+    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
     import TagInput from "$lib/components/ui/TagInput.svelte";
     import { RRule } from "$lib/utils/rrule-compat";
-    import { CalendarClock } from "@lucide/svelte";
+    import { CalendarClock, User, MapPin, ExternalLink } from "@lucide/svelte";
 
     let {
         remoteFunction,
@@ -616,7 +639,9 @@
                         </p>
                     {:then locations}
                         <!-- Using Multi-Location Selector -->
-                        <LocationManager
+                        <EntityManager
+                            title="Locations"
+                            icon={MapPin}
                             {type}
                             entityId={initialData?.id}
                             initialItems={locations.filter((l: any) =>
@@ -625,7 +650,54 @@
                             onchange={(ids: string[]) =>
                                 (selectedLocationIds = ids)}
                             embedded={true}
-                        />
+                            listItemsRemote={listLocations as any}
+                            deleteItemRemote={async (id: string) => {
+                                return await handleDelete({
+                                    ids: [id],
+                                    deleteFn: deleteLocation,
+                                    itemName: "location",
+                                });
+                            }}
+                            createRemote={createLocation}
+                            createSchema={createLocationSchema}
+                            updateRemote={updateLocation}
+                            updateSchema={updateLocationSchema}
+                            getFormData={(l: Location) => l}
+                            searchPredicate={(l: Location, q: string) => {
+                                return (
+                                    l.name
+                                        .toLowerCase()
+                                        .includes(q.toLowerCase()) ||
+                                    (l.roomId
+                                        ?.toLowerCase()
+                                        .includes(q.toLowerCase()) ??
+                                        false)
+                                );
+                            }}
+                        >
+                            {#snippet renderItemLabel(location)}
+                                {location.name}
+                                {location.roomId ? `(${location.roomId})` : ""}
+                            {/snippet}
+
+                            {#snippet renderForm({
+                                remoteFunction: rf,
+                                schema,
+                                id,
+                                initialData: formData,
+                                onSuccess,
+                                onCancel,
+                            })}
+                                <LocationForm
+                                    remoteFunction={rf}
+                                    validationSchema={schema}
+                                    isUpdating={!!id}
+                                    initialData={formData}
+                                    {onSuccess}
+                                    {onCancel}
+                                />
+                            {/snippet}
+                        </EntityManager>
                         <!-- Populate freeTextLocation based on selection if needed, or leave independent -->
                     {/await}
                 {/if}
@@ -920,12 +992,97 @@
             </div>
         </div>
 
-        <ContactManager
+        <EntityManager
+            title="Contacts"
+            icon={User}
             type="event"
             entityId={initialData?.id}
             onchange={(ids: string[]) => (selectedContactIds = ids)}
             embedded={true}
-        />
+            listItemsRemote={listContacts as any}
+            fetchAssociationsRemote={fetchEntityContacts as any}
+            addAssociationRemote={async (p: any) =>
+                addAssociation({ ...p, contactId: p.itemId } as any)}
+            removeAssociationRemote={async (p: any) =>
+                removeAssociation({ ...p, contactId: p.itemId } as any)}
+            deleteItemRemote={async (id: string) => {
+                return await handleDelete({
+                    ids: [id],
+                    deleteFn: deleteExistingContact,
+                    itemName: "contact",
+                });
+            }}
+            createRemote={createNewContact}
+            createSchema={createContactSchema}
+            updateRemote={updateExistingContact}
+            updateSchema={updateContactSchema}
+            getFormData={(c: Contact) => ({
+                contact: c,
+                emails: c.emails,
+                phones: c.phones,
+                addresses: c.addresses,
+                relations: c.relations,
+                tags: c.tags,
+            })}
+            searchPredicate={(c: Contact, q: string) => {
+                const name = (
+                    c.displayName ||
+                    `${c.givenName || ""} ${c.familyName || ""}`
+                ).toLowerCase();
+                return name.includes(q.toLowerCase());
+            }}
+        >
+            {#snippet renderItemLabel(contact)}
+                {contact.displayName ||
+                    `${contact.givenName || ""} ${contact.familyName || ""}`}
+            {/snippet}
+
+            {#snippet participationSnippet(contact)}
+                <select
+                    value={contact.participationStatus || "needsAction"}
+                    onchange={(e) => {
+                        const newStatus = e.currentTarget.value;
+                        if (initialData?.id) {
+                            updateAssociationStatusRemote({
+                                type: "event",
+                                entityId: initialData.id,
+                                contactId: contact.id,
+                                status: newStatus,
+                            } as any).catch((err: any) =>
+                                toast.error(
+                                    err.message || "Failed to update status",
+                                ),
+                            );
+                        }
+                        contact.participationStatus = newStatus;
+                    }}
+                    class="text-xs bg-transparent border-0 focus:ring-0 cursor-pointer text-gray-500 hover:text-blue-600 font-medium"
+                >
+                    <option value="needsAction">Needs Action</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="declined">Declined</option>
+                    <option value="tentative">Tentative</option>
+                </select>
+            {/snippet}
+
+            {#snippet renderForm({
+                remoteFunction: rf,
+                schema,
+                initialData: formData,
+                onSuccess,
+                onCancel,
+                id,
+            })}
+                <ContactForm
+                    remoteFunction={rf}
+                    {schema}
+                    initialData={formData}
+                    {onSuccess}
+                    {onCancel}
+                    contactId={id}
+                />
+            {/snippet}
+        </EntityManager>
         <input
             {...getField("contactIds").as(
                 "hidden",

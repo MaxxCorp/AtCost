@@ -12,7 +12,6 @@
     import { updateLocationSchema } from "$lib/validations/locations";
     import { Button } from "$lib/components/ui/button";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-    import ContactManager from "$lib/components/contacts/ContactManager.svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
 </script>
 
