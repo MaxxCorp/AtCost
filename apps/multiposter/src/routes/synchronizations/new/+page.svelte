@@ -20,6 +20,7 @@
 		| "google-calendar"
 		| "microsoft-calendar"
 		| "berlin-de-main-calendar"
+		| "berlin-de-mh-calendar"
 		| "wp-the-events-calendar"
 		| "eventbrite"
 		| "meetup"
@@ -37,11 +38,14 @@
 	let wpBaseUrl = $state("");
 	let wpUsername = $state("");
 	let wpAppPassword = $state("");
+	let mhUsername = $state("");
+	let mhPassword = $state("");
 
 	// Set default direction based on provider
 	$effect(() => {
 		if (
 			selectedProvider === "berlin-de-main-calendar" ||
+			selectedProvider === "berlin-de-mh-calendar" ||
 			selectedProvider === "wp-the-events-calendar" ||
 			selectedProvider === "eventbrite" ||
 			selectedProvider === "meetup" ||
@@ -72,6 +76,13 @@
 			id: "berlin-de-main-calendar" as const,
 			name: "Berlin.de (Main Calendar)",
 			description: "Push events to main Berlin.de event calendar",
+			icon: Calendar,
+			available: true,
+		},
+		{
+			id: "berlin-de-mh-calendar" as const,
+			name: "Berlin.de (Marzahn-Hellersdorf)",
+			description: "Push events to Berlin.de MH district calendar",
 			icon: Calendar,
 			available: true,
 		},
@@ -331,6 +342,41 @@
 						</div>
 					{/if}
 
+					{#if selectedProvider === "berlin-de-mh-calendar"}
+						<div>
+							<label
+								for="mhUsername"
+								class="block text-sm font-medium text-gray-700 mb-1"
+							>
+								Login Username
+							</label>
+							<input
+								{...getField("credentials.username").as("text")}
+								id="mhUsername"
+								bind:value={mhUsername}
+								placeholder="Username"
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							/>
+						</div>
+						<div>
+							<label
+								for="mhPassword"
+								class="block text-sm font-medium text-gray-700 mb-1"
+							>
+								Login Password
+							</label>
+							<input
+								{...getField("credentials.password").as(
+									"password",
+								)}
+								id="mhPassword"
+								bind:value={mhPassword}
+								placeholder="Password"
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							/>
+						</div>
+					{/if}
+
 					{#if selectedProvider === "wp-the-events-calendar"}
 						<div>
 							<label
@@ -427,6 +473,7 @@
 								? 'border-blue-600 bg-blue-50'
 								: 'border-gray-200 hover:border-gray-300'} {(selectedProvider ===
 								'berlin-de-main-calendar' ||
+								selectedProvider === 'berlin-de-mh-calendar' ||
 								selectedProvider === 'wp-the-events-calendar' ||
 								selectedProvider === 'seniorennetz-berlin' ||
 								selectedProvider === 'email') &&
@@ -447,6 +494,8 @@
 								disabled={(selectedProvider ===
 									"berlin-de-main-calendar" ||
 									selectedProvider ===
+										"berlin-de-mh-calendar" ||
+									selectedProvider ===
 										"wp-the-events-calendar" ||
 									selectedProvider ===
 										"seniorennetz-berlin" ||
@@ -464,18 +513,21 @@
 								<div class="text-sm text-gray-600">
 									{dir.description}
 								</div>
-								{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email") && dir.value !== "push"}
+								{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "berlin-de-mh-calendar" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email") && dir.value !== "push"}
 									<div class="text-xs text-orange-600 mt-1">
 										Not supported for {selectedProvider ===
 										"berlin-de-main-calendar"
 											? "Berlin.de"
 											: selectedProvider ===
-												  "wp-the-events-calendar"
-												? "WordPress Events Calendar"
+												  "berlin-de-mh-calendar"
+												? "Berlin.de (MH)"
 												: selectedProvider ===
-													  "seniorennetz-berlin"
-													? "Seniorennetz Berlin"
-													: "Email (Brevo)"}
+													  "wp-the-events-calendar"
+													? "WordPress Events Calendar"
+													: selectedProvider ===
+														  "seniorennetz-berlin"
+														? "Seniorennetz Berlin"
+														: "Email (Brevo)"}
 									</div>
 								{/if}
 							</div>

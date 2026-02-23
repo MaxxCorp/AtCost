@@ -29,6 +29,7 @@ import { resolveEventContact } from '../contact-resolution';
 import { eq, and, isNull, lt, gt, gte, lte, or, inArray, desc } from 'drizzle-orm';
 import { GoogleCalendarProvider } from './providers/google-calendar';
 import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
+import { BerlinDeMhCalendarProvider } from './providers/berlin-de-mh-calendar';
 import { WpTheEventsCalendarProvider } from './providers/wp-the-events-calendar';
 import { EventbriteProvider } from './providers/eventbrite';
 import { MeetupProvider } from './providers/meetup';
@@ -50,6 +51,7 @@ export class SyncService {
 		// Register built-in providers
 		this.registerProvider('google-calendar', GoogleCalendarProvider);
 		this.registerProvider('berlin-de-main-calendar', BerlinDeMainCalendarProvider);
+		this.registerProvider('berlin-de-mh-calendar', BerlinDeMhCalendarProvider);
 		this.registerProvider('wp-the-events-calendar', WpTheEventsCalendarProvider);
 		this.registerProvider('eventbrite', EventbriteProvider);
 		this.registerProvider('meetup', MeetupProvider);

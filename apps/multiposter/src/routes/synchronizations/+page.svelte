@@ -88,6 +88,8 @@
 		if (providerType === "microsoft-calendar") return "Microsoft Calendar";
 		if (providerType === "berlin-de-main-calendar")
 			return "Berlin.de (Main Calendar)";
+		if (providerType === "berlin-de-mh-calendar")
+			return "Berlin.de (Marzahn-Hellersdorf)";
 		if (providerType === "wp-the-events-calendar")
 			return "WP The Events Calendar";
 		if (providerType === "email") return "E-Mail (Brevo)";
