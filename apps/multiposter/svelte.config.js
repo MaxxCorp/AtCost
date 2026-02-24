@@ -17,8 +17,8 @@ const config = {
 			runtime: 'nodejs20.x',
 			// Split API routes from pages for better performance
 			split: false,
-			// Set maxDuration for all functions (free tier: 10s, pro: 60s)
-			maxDuration: 30
+			// Set maxDuration for all functions (free tier: 60s)
+			maxDuration: 60
 		}),
 		experimental: {
 			remoteFunctions: true

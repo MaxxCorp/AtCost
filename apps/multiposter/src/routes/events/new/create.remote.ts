@@ -275,7 +275,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 		if (newEvent) {
 			await publishEventChange('create', [newEvent.id]);
 			// Trigger background sync to external providers
-			syncService.triggerPushSync(user.id, newEvent.id);
+			await syncService.triggerPushSync(user.id, newEvent.id);
 		}
 
 		await listEvents().refresh();

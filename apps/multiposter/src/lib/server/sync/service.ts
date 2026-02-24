@@ -1042,6 +1042,17 @@ export class SyncService {
 			for (const configRow of pushConfigs) {
 				const config = this.rowToConfig(configRow);
 
+				// Create operation record for transparency
+				const [operationRow] = await db.insert(syncOperationTable).values({
+					syncConfigId: config.id,
+					operation: 'push',
+					status: 'pending',
+					entityType: 'event',
+					startedAt: new Date(),
+					entityId: eventIds.length === 1 ? eventIds[0] : null,
+				}).returning({ id: syncOperationTable.id });
+
+				const operationId = operationRow.id;
 
 				try {
 					const provider = await this.getProviderInstance(config);
@@ -1049,8 +1060,28 @@ export class SyncService {
 					for (const eventId of eventIds) {
 						await this.syncSingleEvent(config, provider, eventId);
 					}
+
+					// Update operation status
+					await db
+						.update(syncOperationTable)
+						.set({
+							status: 'completed',
+							completedAt: new Date()
+						})
+						.where(eq(syncOperationTable.id, operationId));
+
 				} catch (error: any) {
 					console.error(`[SyncService] Failed to sync with config ${config.id}:`, error);
+					
+					// Update operation status
+					await db
+						.update(syncOperationTable)
+						.set({
+							status: 'failed',
+							completedAt: new Date(),
+							error: `${error.message}\n\nStack:\n${error.stack}`
+						})
+						.where(eq(syncOperationTable.id, operationId));
 					// Continue with other configs even if one fails
 				}
 			}
