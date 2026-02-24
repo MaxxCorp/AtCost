@@ -23,6 +23,7 @@ export const updateExistingContact = form(updateContactSchema, async (input) => 
         let addresses = data.addresses;
         let relationIds = data.relationIds;
         let tagNames = data.tagNames;
+        let locationIds: string[] | undefined;
 
         try {
             if (anyInput.emailsJson) emails = JSON.parse(anyInput.emailsJson);
@@ -30,6 +31,7 @@ export const updateExistingContact = form(updateContactSchema, async (input) => 
             if (anyInput.addressesJson) addresses = JSON.parse(anyInput.addressesJson);
             if (anyInput.relationsJson) relationIds = JSON.parse(anyInput.relationsJson);
             if (anyInput.tagsJson) tagNames = JSON.parse(anyInput.tagsJson);
+            if (anyInput.locationIdsJson) locationIds = JSON.parse(anyInput.locationIdsJson);
         } catch (e) {
             console.error('JSON parsing error:', e);
         }
@@ -62,6 +64,7 @@ export const updateExistingContact = form(updateContactSchema, async (input) => 
             addresses,
             relationIds,
             tagNames,
+            locationIds,
         } as any);
 
         const updated = await getContact(id);

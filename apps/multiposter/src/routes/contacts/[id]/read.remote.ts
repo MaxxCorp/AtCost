@@ -24,6 +24,11 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
             emails: true,
             phones: true,
             addresses: true,
+            locationAssociations: {
+                with: {
+                    location: true
+                }
+            },
             relations: {
                 with: {
                     targetContact: true

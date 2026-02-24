@@ -71,6 +71,9 @@
                             addresses: contact.addresses,
                             tags: contact.tags,
                             relations: contact.relations,
+                            locationIds: (
+                                contact.locationAssociations || []
+                            ).map((la: any) => la.locationId),
                         }}
                     />
                 </div>

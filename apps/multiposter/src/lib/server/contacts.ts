@@ -165,6 +165,7 @@ export interface ContactData {
     addresses?: (Omit<typeof contactAddress.$inferInsert, 'contactId'> & { contactId?: string })[];
     relationIds?: { targetContactId: string, relationType: string }[];
     tagNames?: string[];
+    locationIds?: string[];
 }
 
 /**
@@ -273,6 +274,16 @@ export async function createContact(data: ContactData) {
                     tagId
                 });
             }
+        }
+
+        // Insert location associations
+        if (data.locationIds && data.locationIds.length > 0) {
+            await tx.insert(locationContact).values(
+                data.locationIds.map(locationId => ({
+                    locationId,
+                    contactId: id
+                }))
+            );
         }
 
         return id;
@@ -459,6 +470,19 @@ export async function updateContact(id: string, data: Partial<ContactData>) {
             }
         }
 
+        // Location associations
+        if (data.locationIds !== undefined) {
+            await tx.delete(locationContact).where(eq(locationContact.contactId, id));
+            if (data.locationIds.length > 0) {
+                await tx.insert(locationContact).values(
+                    data.locationIds.map(locationId => ({
+                        locationId,
+                        contactId: id
+                    }))
+                );
+            }
+        }
+
     });
 
     // Re-generate assets
@@ -537,6 +561,11 @@ export async function getContact(id: string) {
             emails: true,
             phones: true,
             addresses: true,
+            locationAssociations: {
+                with: {
+                    location: true
+                }
+            },
             relations: {
                 with: {
                     targetContact: true

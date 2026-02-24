@@ -13,6 +13,19 @@
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { toast } from "svelte-sonner";
     import TagInput from "../ui/TagInput.svelte";
+    import EntityManager from "../ui/EntityManager.svelte";
+    import LocationForm from "../locations/LocationForm.svelte";
+    import { listLocations } from "../../../routes/locations/list.remote";
+    import type { Location } from "../../../routes/locations/list.remote";
+    import { createLocation } from "../../../routes/locations/new/create.remote";
+    import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import {
+        createLocationSchema,
+        updateLocationSchema,
+    } from "$lib/validations/locations";
+    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { onMount } from "svelte";
 
     import Button from "../ui/button/button.svelte";
     import AsyncButton from "../ui/AsyncButton.svelte";
@@ -72,7 +85,10 @@
     // svelte-ignore state_referenced_locally
     let phones = $state([...d(initialData.phones, [])]);
     // svelte-ignore state_referenced_locally
-    let addresses = $state([...d(initialData.addresses, [])]);
+    let selectedLocationIds = $state<string[]>([
+        ...d(initialData.locationIds, []),
+    ]);
+    let locations = $state<Location[]>([]);
     // svelte-ignore state_referenced_locally
     let relations = $state([...d(initialData.relations, [])]);
     // svelte-ignore state_referenced_locally
@@ -117,6 +133,14 @@
         });
     });
 
+    onMount(async () => {
+        try {
+            locations = await listLocations();
+        } catch (e) {
+            console.error("Failed to load locations", e);
+        }
+    });
+
     function addEmail() {
         emails = [...emails, { value: "", type: "work", primary: false }];
     }
@@ -129,16 +153,6 @@
     }
     function removePhone(index: number) {
         phones = phones.filter((_, i) => i !== index);
-    }
-
-    function addAddress() {
-        addresses = [
-            ...addresses,
-            { street: "", city: "", type: "other", primary: false },
-        ];
-    }
-    function removeAddress(index: number) {
-        addresses = addresses.filter((_, i) => i !== index);
     }
 
     function addRelation(targetContact: any) {
@@ -162,9 +176,7 @@
     // JSON derived values for form submission
     const emailsJson = $derived(JSON.stringify(emails.filter((e) => e.value)));
     const phonesJson = $derived(JSON.stringify(phones.filter((p) => p.value)));
-    const addressesJson = $derived(
-        JSON.stringify(addresses.filter((a) => a.street || a.city)),
-    );
+    const locationIdsJson = $derived(JSON.stringify(selectedLocationIds));
     const relationsJson = $derived(JSON.stringify(relations));
     const tagsJson = $derived(
         JSON.stringify(
@@ -235,7 +247,7 @@
     <!-- Hidden JSON fields for arrays (Remote functions) -->
     <input type="hidden" name="emailsJson" value={emailsJson} />
     <input type="hidden" name="phonesJson" value={phonesJson} />
-    <input type="hidden" name="addressesJson" value={addressesJson} />
+    <input type="hidden" name="locationIdsJson" value={locationIdsJson} />
     <input type="hidden" name="relationsJson" value={relationsJson} />
     <input type="hidden" name="tagsJson" value={tagsJson} />
 
@@ -545,111 +557,59 @@
         {/each}
     </div>
 
-    <div class="space-y-4">
-        <div class="flex justify-between items-center">
-            <h3 class="text-lg font-medium flex items-center gap-2">
-                <MapPin size={20} class="text-red-500" />
-                Physical Addresses
-            </h3>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onclick={addAddress}
-            >
-                <Plus size={16} class="mr-1" /> Add Address
-            </Button>
-        </div>
-        {#each addresses as addr, i}
-            <div
-                class="p-4 border border-gray-100 rounded-lg space-y-4 bg-gray-50 relative"
-            >
-                <button
-                    type="button"
-                    class="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                    onclick={() => removeAddress(i)}
-                    aria-label={`Remove address ${i + 1}`}
-                >
-                    <Trash2 size={16} />
-                </button>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="md:col-span-2">
-                        <span
-                            class="block text-xs font-medium text-gray-500 uppercase mb-1"
-                            >Street & Number</span
-                        >
-                        <div class="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="Street"
-                                bind:value={addr.street}
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                aria-label="Street"
-                            />
-                            <input
-                                type="text"
-                                placeholder="No."
-                                bind:value={addr.houseNumber}
-                                class="w-20 block px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                aria-label="House Number"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <span
-                            class="block text-xs font-medium text-gray-500 uppercase mb-1"
-                            >ZIP & City</span
-                        >
-                        <div class="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="ZIP"
-                                bind:value={addr.zip}
-                                class="w-24 block px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                aria-label="ZIP Code"
-                            />
-                            <input
-                                type="text"
-                                placeholder="City"
-                                bind:value={addr.city}
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                aria-label="City"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label
-                            for={`country-${i}`}
-                            class="block text-xs font-medium text-gray-500 uppercase"
-                            >Country</label
-                        >
-                        <input
-                            type="text"
-                            id={`country-${i}`}
-                            placeholder="Country"
-                            bind:value={addr.country}
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div>
-                        <label
-                            for={`type-${i}`}
-                            class="block text-xs font-medium text-gray-500 uppercase"
-                            >Type</label
-                        >
-                        <select
-                            id={`type-${i}`}
-                            bind:value={addr.type}
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="home">Home</option>
-                            <option value="work">Work</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        {/each}
+    <div>
+        <EntityManager
+            title="Locations"
+            icon={MapPin}
+            type="contact"
+            entityId={contactId}
+            initialItems={locations.filter((l) =>
+                selectedLocationIds.includes(l.id),
+            )}
+            onchange={(ids) => (selectedLocationIds = ids)}
+            embedded={true}
+            listItemsRemote={listLocations}
+            deleteItemRemote={async (id) => {
+                return await handleDelete({
+                    ids: [id],
+                    deleteFn: deleteLocation,
+                    itemName: "location",
+                });
+            }}
+            createRemote={createLocation}
+            createSchema={createLocationSchema}
+            updateRemote={updateLocation}
+            updateSchema={updateLocationSchema}
+            getFormData={(l) => l}
+            searchPredicate={(l, q) => {
+                return (
+                    l.name.toLowerCase().includes(q.toLowerCase()) ||
+                    (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false)
+                );
+            }}
+        >
+            {#snippet renderItemLabel(location)}
+                {location.name}
+                {location.roomId ? `(${location.roomId})` : ""}
+            {/snippet}
+            {#snippet renderForm({
+                remoteFunction: rf,
+                schema,
+                id,
+                initialData: formData,
+                onSuccess,
+                onCancel,
+            })}
+                <LocationForm
+                    remoteFunction={rf}
+                    validationSchema={schema}
+                    isUpdating={!!id}
+                    initialData={formData}
+                    {onSuccess}
+                    {onCancel}
+                />
+            {/snippet}
+        </EntityManager>
     </div>
 
     <div class="flex justify-end gap-3 pt-6 border-t">

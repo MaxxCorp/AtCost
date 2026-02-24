@@ -20,6 +20,7 @@ export const createNewContact = form(createContactSchema, async (input) => {
         let addresses = data.addresses;
         let relationIds = data.relationIds;
         let tagNames = data.tagNames;
+        let locationIds: string[] = [];
 
         try {
             if (data.emailsJson) emails = JSON.parse(data.emailsJson);
@@ -27,6 +28,7 @@ export const createNewContact = form(createContactSchema, async (input) => {
             if (data.addressesJson) addresses = JSON.parse(data.addressesJson);
             if (data.relationsJson) relationIds = JSON.parse(data.relationsJson);
             if (data.tagsJson) tagNames = JSON.parse(data.tagsJson);
+            if (data.locationIdsJson) locationIds = JSON.parse(data.locationIdsJson);
         } catch (e) {
             console.error('JSON parsing error:', e);
             // Continue with potentially unparsed or default values, or throw?
@@ -54,6 +56,7 @@ export const createNewContact = form(createContactSchema, async (input) => {
             addresses,
             relationIds,
             tagNames,
+            locationIds,
         });
 
         const newContact = await getContact(contactId);
