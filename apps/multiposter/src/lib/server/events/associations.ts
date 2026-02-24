@@ -64,7 +64,7 @@ export async function updateEventAssociations({
             for (const name of uniqueTags) {
                 // Find or create tag
                 // Note: Sequential to avoid race conditions
-                let [existingTag] = await db.select().from(tag).where(and(eq(tag.name, name), eq(tag.userId, userId)));
+                let [existingTag] = await db.select().from(tag).where(eq(tag.name, name));
                 if (!existingTag) {
                     [existingTag] = await db.insert(tag).values({ name, userId }).returning();
                 }

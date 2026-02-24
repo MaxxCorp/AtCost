@@ -72,6 +72,11 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				},
 			});
 
+			if (!response.ok) {
+				const text = await response.text();
+				console.error(`[WP-Provider] Connection validation failed: ${response.status} ${response.statusText}`, text);
+			}
+
 			return response.ok;
 		} catch (error) {
 			console.error('Failed to validate WordPress Events Calendar connection:', error);
@@ -116,6 +121,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			if (searchResponse.ok) {
 				const searchResult = await searchResponse.json();
+				console.log(`[WP-Sync] Search returned ${searchResult.events?.length || 0} results.`);
 				if (searchResult.events && searchResult.events.length > 0) {
 					// We intentionally only check for title match here because the search param already filtered by title
 					// We additionally check date match if multiple results came back or to be sure
@@ -193,6 +199,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			if (!response.ok) {
 				const errorText = await response.text();
+				console.error(`[WP-Sync] POST event failed: ${response.status} ${response.statusText}`, errorText);
 				throw new Error(`WordPress API error: ${response.status} ${response.statusText} - ${errorText}`);
 			}
 
