@@ -193,7 +193,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 				for (const name of tagNames) {
 					// Find or create tag
 					// Note: This is sequential to avoid race conditions on create, potentially slow but safe
-					let [existingTag] = await db.select().from(tag).where(and(eq(tag.name, name), eq(tag.userId, user.id)));
+					let [existingTag] = await db.select().from(tag).where(eq(tag.name, name));
 					if (!existingTag) {
 						[existingTag] = await db.insert(tag).values({ name, userId: user.id }).returning();
 					}
@@ -275,7 +275,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 		if (newEvent) {
 			await publishEventChange('create', [newEvent.id]);
 			// Trigger background sync to external providers
-			syncService.triggerPushSync(user.id, newEvent.id);
+			await syncService.triggerPushSync(user.id, newEvent.id);
 		}
 
 		await listEvents().refresh();

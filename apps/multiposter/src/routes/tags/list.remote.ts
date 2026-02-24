@@ -6,7 +6,5 @@ import { getAuthenticatedUser } from '$lib/server/authorization';
 
 export const listTags = query(async () => {
     const user = getAuthenticatedUser();
-    return db.query.tag.findMany({
-        where: eq(tag.userId, user.id)
-    });
+    return db.query.tag.findMany();
 });

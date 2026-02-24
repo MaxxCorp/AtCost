@@ -1017,31 +1017,37 @@ export class SyncService {
 
 
 		try {
-			// Get all enabled sync configs for this user that support push
-			const configs = await db
+			// Get all enabled sync configs that support push (Global sweep)
+			const pushConfigs = await db
 				.select()
 				.from(syncConfigTable)
 				.where(
-					and(
-						eq(syncConfigTable.userId, userId),
-						eq(syncConfigTable.enabled, true)
-					)
+					eq(syncConfigTable.enabled, true)
 				);
 
-			const pushConfigs = configs.filter(
-				(c) => c.direction === 'push' || c.direction === 'bidirectional'
-			);
-
 			if (pushConfigs.length === 0) {
-
+				console.log(`[SyncService] No push/bidirectional configs found in the system.`);
 				return;
 			}
+
+			console.log(`[SyncService] Found ${pushConfigs.length} push configs. Processing eventIds:`, eventIds);
 
 
 
 			for (const configRow of pushConfigs) {
 				const config = this.rowToConfig(configRow);
 
+				// Create operation record for transparency
+				const [operationRow] = await db.insert(syncOperationTable).values({
+					syncConfigId: config.id,
+					operation: 'push',
+					status: 'pending',
+					entityType: 'event',
+					startedAt: new Date(),
+					entityId: eventIds.length === 1 ? eventIds[0] : null,
+				}).returning({ id: syncOperationTable.id });
+
+				const operationId = operationRow.id;
 
 				try {
 					const provider = await this.getProviderInstance(config);
@@ -1049,8 +1055,28 @@ export class SyncService {
 					for (const eventId of eventIds) {
 						await this.syncSingleEvent(config, provider, eventId);
 					}
+
+					// Update operation status
+					await db
+						.update(syncOperationTable)
+						.set({
+							status: 'completed',
+							completedAt: new Date()
+						})
+						.where(eq(syncOperationTable.id, operationId));
+
 				} catch (error: any) {
 					console.error(`[SyncService] Failed to sync with config ${config.id}:`, error);
+
+					// Update operation status
+					await db
+						.update(syncOperationTable)
+						.set({
+							status: 'failed',
+							completedAt: new Date(),
+							error: `${error.message}\n\nStack:\n${error.stack}`
+						})
+						.where(eq(syncOperationTable.id, operationId));
 					// Continue with other configs even if one fails
 				}
 			}
@@ -1073,11 +1099,11 @@ export class SyncService {
 
 
 		try {
-			// Check if event exists
+			// Check if event exists - BROADEN SEARCH to debug identity issues
 			const [eventRow] = await db
 				.select()
 				.from(eventTable)
-				.where(and(eq(eventTable.id, eventId), eq(eventTable.userId, config.userId)));
+				.where(eq(eventTable.id, eventId));
 
 			// Check for existing mapping
 			const [mapping] = await db
@@ -1091,14 +1117,13 @@ export class SyncService {
 				);
 
 			if (!eventRow) {
-				// Event was deleted
-				if (mapping) {
-					console.log(`[SyncService] Deleting event ${eventId} from provider`);
-					await provider.deleteEvent(mapping.externalId);
-					await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
-				}
+				console.warn(`[SyncService] Event ${eventId} not found in database at all.`);
 				return;
 			}
+
+			console.log(`[SyncService] Syncing event ${eventId} ("${eventRow.summary}") to provider: ${config.providerType}. Status: ${mapping ? 'update' : 'create'}`);
+
+			console.log(`[SyncService] Found event ${eventId} (User: ${eventRow.userId}). Proceeding with sync to ${config.providerType} (${config.id}).`);
 
 			if (mapping) {
 				// Update existing event
@@ -1123,6 +1148,7 @@ export class SyncService {
 				const externalEvent = await this.mapInternalToExternal(eventRow, config.providerType);
 				const { externalId, etag } = await provider.pushEvent(externalEvent);
 
+				console.log(`[SyncService] Created mapping for event ${eventId} → external ${externalId}`);
 				// Create mapping immediately to prevent duplicates if webhook fires quickly
 				await db.insert(syncMappingTable).values({
 					syncConfigId: config.id,
@@ -1132,8 +1158,7 @@ export class SyncService {
 					etag: etag ?? null,
 					lastSyncedAt: new Date()
 				});
-
-				console.log(`[SyncService] Created mapping for event ${eventId} → external ${externalId}`);
+				console.log(`[SyncService] Successfully saved mapping to database for event ${eventId}`);
 			}
 
 
@@ -1150,11 +1175,10 @@ export class SyncService {
 
 
 		try {
-			// Get all sync configs for this user
+			// Get all sync configs (Global sweep)
 			const configs = await db
 				.select()
-				.from(syncConfigTable)
-				.where(eq(syncConfigTable.userId, userId));
+				.from(syncConfigTable);
 
 			for (const configRow of configs) {
 				const config = this.rowToConfig(configRow);
@@ -1270,15 +1294,12 @@ export class SyncService {
 				return;
 			}
 
-			// Find all enabled sync configs for this user with push direction
+			// Find all enabled sync configs with push direction (Global sweep)
 			const configs = await db
 				.select()
 				.from(syncConfigTable)
 				.where(
-					and(
-						eq(syncConfigTable.userId, userId),
-						eq(syncConfigTable.enabled, true)
-					)
+					eq(syncConfigTable.enabled, true)
 				);
 
 			for (const configRow of configs) {
