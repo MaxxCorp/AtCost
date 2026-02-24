@@ -197,9 +197,11 @@
                 </label>
                 <div class="prose max-w-none">
                     <RichTextEditor bind:value={contentValue} />
-                    <input
-                        {...getField("content").as("hidden", contentValue)}
-                    />
+                    {#if contentValue}
+                        <input
+                            {...getField("content").as("hidden", contentValue)}
+                        />
+                    {/if}
                 </div>
                 {#each getField("content").issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -276,11 +278,12 @@
 
             <div class="flex items-center gap-2 mt-4">
                 <input
+                    id="isPublic"
                     type="checkbox"
                     bind:checked={isPublic}
                     class="w-4 h-4 text-blue-600"
                 />
-                <label class="text-sm text-gray-700"
+                <label for="isPublic" class="text-sm text-gray-700"
                     >Make this announcement public</label
                 >
             </div>
