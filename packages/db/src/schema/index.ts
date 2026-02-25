@@ -1,3 +1,4 @@
-export * from "./auth.js";
-export * from "./contacts.js";
-export * from "./resources.js";
+export * from "./auth";
+export * from "./contacts";
+export * from "./resources";
+

@@ -47,22 +47,24 @@
 
     const type = "announcement";
 
-    let contentValue = $state(
-        getField("content").value() ?? initialData?.content ?? "",
-    );
-
-    // Initialize tags string from tagNames (edit mode) or default to "News" (create mode)
-    let tagsString = $state(
-        isUpdating && initialData?.tagNames
-            ? initialData.tagNames.join(", ")
-            : "News",
-    );
-
-    let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
-    let isPublic = $state(initialData?.isPublic ?? false);
-
+    let contentValue = $state("");
+    let tagsString = $state("");
+    let selectedContactIds = $state<string[]>([]);
+    let isPublic = $state(false);
     let locations = $state<Location[]>([]);
-    let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
+    let selectedLocationIds = $state<string[]>([]);
+
+    $effect(() => {
+        contentValue =
+            getField("content").value() ?? initialData?.content ?? "";
+        tagsString =
+            isUpdating && initialData?.tagNames
+                ? initialData.tagNames.join(", ")
+                : "News";
+        selectedContactIds = initialData?.contactIds || [];
+        isPublic = initialData?.isPublic ?? false;
+        selectedLocationIds = initialData?.locationIds || [];
+    });
 
     onMount(async () => {
         try {

@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, boolean, index, primaryKey, uuid } from "drizzle-orm/pg-core";
 import { relations } from 'drizzle-orm';
-import { user } from "./auth.js";
-import { location, resource } from "./resources.js";
+import { user } from "./auth";
+import { location, resource } from "./resources";
 
 export const contact = pgTable("contact", {
     id: uuid("id").primaryKey().defaultRandom(),

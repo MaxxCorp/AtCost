@@ -80,6 +80,7 @@ export const createContactSchema = v.object({
     emailsJson: v.optional(v.string()),
     phonesJson: v.optional(v.string()),
     addressesJson: v.optional(v.string()),
+    locationIdsJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
 });
@@ -101,9 +102,11 @@ export const updateContactSchema = v.object({
     emailsJson: v.optional(v.string()),
     phonesJson: v.optional(v.string()),
     addressesJson: v.optional(v.string()),
+    locationIdsJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
 });
+
 
 export const associationSchema = v.object({
     type: v.picklist(['event', 'user', 'location', 'resource', 'announcement']),

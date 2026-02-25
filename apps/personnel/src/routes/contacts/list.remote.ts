@@ -29,7 +29,13 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
                         targetContact: true
                     }
                 },
+                locationAssociations: {
+                    with: {
+                        location: true
+                    }
+                },
                 tags: {
+
                     with: {
                         tag: true
                     }

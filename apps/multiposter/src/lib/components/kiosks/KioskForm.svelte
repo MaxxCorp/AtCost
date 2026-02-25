@@ -36,20 +36,21 @@
 
     let locations = $state<Location[]>([]);
     let loaded = $state(false);
-    let selectedLocationIds = $state<string[]>(
-        initialData?.locationIds ||
-            (initialData?.locationId ? [initialData.locationId] : []),
-    );
+    let selectedLocationIds = $state<string[]>([]);
+    let lookAheadDays = $state(28);
+    let lookPastDays = $state(0);
 
-    // Initial state setup for 'Days' convenience fields
-    let initialDays = {
-        lookAhead: initialData?.lookAhead
+    $effect(() => {
+        selectedLocationIds =
+            initialData?.locationIds ||
+            (initialData?.locationId ? [initialData.locationId] : []);
+        lookAheadDays = initialData?.lookAhead
             ? Math.round(initialData.lookAhead / 86400)
-            : 28,
-        lookPast: initialData?.lookPast
+            : 28;
+        lookPastDays = initialData?.lookPast
             ? Math.round(initialData.lookPast / 86400)
-            : 0,
-    };
+            : 0;
+    });
 
     onMount(async () => {
         try {
@@ -239,8 +240,7 @@
                 >
                 <input
                     {...getField("lookAheadDays").as("number")}
-                    value={getField("lookAheadDays").value() ??
-                        initialDays.lookAhead}
+                    value={getField("lookAheadDays").value() ?? lookAheadDays}
                     min="0"
                     required
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
@@ -258,8 +258,7 @@
                 >
                 <input
                     {...getField("lookPastDays").as("number")}
-                    value={getField("lookPastDays").value() ??
-                        initialDays.lookPast}
+                    value={getField("lookPastDays").value() ?? lookPastDays}
                     min="0"
                     required
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"

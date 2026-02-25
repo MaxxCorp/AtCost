@@ -129,12 +129,9 @@
                                     {new Date(u.createdAt).toLocaleDateString()}
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <a
-                                        href="/users/{u.id}"
-                                        class="text-rose-600 hover:text-rose-800 font-medium text-sm"
+                                    <span class="text-gray-400 text-xs italic"
+                                        >View Only</span
                                     >
-                                        Edit
-                                    </a>
                                 </td>
                             </tr>
                         {/each}

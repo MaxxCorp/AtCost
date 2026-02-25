@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Button } from "../button";
+	import Button from "./button/button.svelte";
+
 	import type { Snippet } from "svelte";
 	import { LoaderCircle } from "@lucide/svelte";
 

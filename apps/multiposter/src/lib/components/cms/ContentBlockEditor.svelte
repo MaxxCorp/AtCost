@@ -34,8 +34,9 @@
 
     // Initialize state from props immediately
     let isEditing = $state(false);
-    let language = $state(currentResult?.content?.language ?? "en");
-    let branch = $state(currentResult?.content?.branch ?? "draft"); // Default to draft usually for editing?
+    let language = $state("en");
+    let branch = $state("draft");
+
     // Actually, if we view published, we see published. If we edit, we probably want to start from what we see,
     // BUT we should be explicit. If I view published 'en', I start editing 'en' 'published'?
     // Usually you edit a draft. If I edit published, I am creating a NEW draft or overwriting published?

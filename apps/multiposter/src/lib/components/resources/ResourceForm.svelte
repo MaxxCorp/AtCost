@@ -80,12 +80,15 @@
         allocationCalendars = allocationCalendars.filter((_, i) => i !== index);
     }
 
-    // Parent resources logic
-    // Initial parents are derived from initialData.parentResourceIds or similar relations
-    // But wait, the create form logic for "hasParent" was client-side only state.
-    // For update, we need to know existing parents.
-    // Assuming initialData has `parentResourceIds` which is array of strings.
-    let hasParent = $state((initialData?.parentResourceIds?.length || 0) > 0);
+    let hasParent = $state(false);
+
+    // Sync state from props
+    $effect(() => {
+        if (initialData?.allocationCalendars) {
+            allocationCalendars = initialData.allocationCalendars;
+        }
+        hasParent = (initialData?.parentResourceIds?.length || 0) > 0;
+    });
 </script>
 
 <form

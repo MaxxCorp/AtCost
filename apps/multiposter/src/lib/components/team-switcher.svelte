@@ -7,10 +7,16 @@
 
 	// This should be `Component` after @lucide/svelte updates types
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let { teams }: { teams: { name: string; logo: any; plan: string }[] } = $props();
+	let { teams }: { teams: { name: string; logo: any; plan: string }[] } =
+		$props();
 	const sidebar = useSidebar();
 
 	let activeTeam = $state(teams[0]);
+	$effect(() => {
+		if (!teams.find((t) => t.name === activeTeam?.name)) {
+			activeTeam = teams[0];
+		}
+	});
 </script>
 
 <Sidebar.Menu>
@@ -28,11 +34,15 @@
 						>
 							<activeTeam.logo class="size-4" />
 						</div>
-						<div class="grid flex-1 text-start text-sm leading-tight">
+						<div
+							class="grid flex-1 text-start text-sm leading-tight"
+						>
 							<span class="truncate font-medium">
 								{activeTeam.name}
 							</span>
-							<span class="truncate text-xs">{activeTeam.plan}</span>
+							<span class="truncate text-xs"
+								>{activeTeam.plan}</span
+							>
 						</div>
 						<ChevronsUpDownIcon class="ms-auto" />
 					</Sidebar.MenuButton>
@@ -44,14 +54,23 @@
 				side={sidebar.isMobile ? "bottom" : "right"}
 				sideOffset={4}
 			>
-				<DropdownMenu.Label class="text-muted-foreground text-xs">Teams</DropdownMenu.Label>
+				<DropdownMenu.Label class="text-muted-foreground text-xs"
+					>Teams</DropdownMenu.Label
+				>
 				{#each teams as team, index (team.name)}
-					<DropdownMenu.Item onSelect={() => (activeTeam = team)} class="gap-2 p-2">
-						<div class="flex size-6 items-center justify-center rounded-md border">
+					<DropdownMenu.Item
+						onSelect={() => (activeTeam = team)}
+						class="gap-2 p-2"
+					>
+						<div
+							class="flex size-6 items-center justify-center rounded-md border"
+						>
 							<team.logo class="size-3.5 shrink-0" />
 						</div>
 						{team.name}
-						<DropdownMenu.Shortcut>⌘{index + 1}</DropdownMenu.Shortcut>
+						<DropdownMenu.Shortcut
+							>⌘{index + 1}</DropdownMenu.Shortcut
+						>
 					</DropdownMenu.Item>
 				{/each}
 				<DropdownMenu.Separator />
@@ -61,7 +80,9 @@
 					>
 						<PlusIcon class="size-4" />
 					</div>
-					<div class="text-muted-foreground font-medium">Add team</div>
+					<div class="text-muted-foreground font-medium">
+						Add team
+					</div>
 				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
