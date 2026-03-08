@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { contact, contactEmail, contactPhone, contactTag, locationContact, contactRelation, tag } from '$lib/server/db/schema';
+import { contact, contactEmail, contactPhone, contactTag, contactRelation, tag } from '$lib/server/db/schema';
 import { listContacts } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createContactSchema } from '@ac/validations/contacts';
@@ -11,11 +11,10 @@ export const createNewContact = form(createContactSchema, async (data) => {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'contacts');
 
-        const { contact: contactFields, emailsJson, phonesJson, locationIdsJson, relationsJson, tagsJson } = data;
+        const { contact: contactFields, emailsJson, phonesJson, relationsJson, tagsJson } = data;
 
         const emails = emailsJson ? JSON.parse(emailsJson) : [];
         const phones = phonesJson ? JSON.parse(phonesJson) : [];
-        const locationIds = locationIdsJson ? JSON.parse(locationIdsJson) : [];
         const relations = relationsJson ? JSON.parse(relationsJson) : [];
         const tags = tagsJson ? JSON.parse(tagsJson) : [];
 
@@ -38,9 +37,7 @@ export const createNewContact = form(createContactSchema, async (data) => {
             if (phones.length > 0) {
                 await tx.insert(contactPhone).values(phones.map((p: any) => ({ ...p, contactId: newContact.id })));
             }
-            if (locationIds.length > 0) {
-                await tx.insert(locationContact).values(locationIds.map((lid: string) => ({ contactId: newContact.id, locationId: lid })));
-            }
+            // Location associations are handled by EntityManager after creation
             if (relations.length > 0) {
                 await tx.insert(contactRelation).values(relations.map((r: any) => ({
                     contactId: newContact.id,

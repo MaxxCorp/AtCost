@@ -41,11 +41,18 @@ async function performAssociation(type: string, entityId: string, contactId: str
 }
 
 export const addAssociation = command(associationSchema, async (data) => {
-    const { type, entityId, contactId } = data;
-    await performAssociation(type, entityId, contactId, false);
-    await fetchEntityContacts({ type, entityId }).refresh();
-    await fetchContactLocations(contactId).refresh();
-    return { success: true };
+    try {
+        const { type, entityId, contactId } = data;
+        console.log('[SERVER] addAssociation START', data);
+        await performAssociation(type, entityId, contactId, false);
+        await fetchEntityContacts({ type, entityId }).refresh();
+        await fetchContactLocations(contactId).refresh();
+        console.log('[SERVER] addAssociation SUCCESS');
+        return { success: true };
+    } catch (e: any) {
+        console.error('[SERVER] addAssociation ERROR:', e);
+        return { success: false, error: e.message };
+    }
 });
 
 export const removeAssociation = command(associationSchema, async (data) => {

@@ -48,7 +48,6 @@
         loading = false,
         listContactsRemote,
         children,
-        locationIds = $bindable(),
         tags = $bindable(),
     }: Props = $props();
 
@@ -118,16 +117,6 @@
     });
 
     $effect(() => {
-        if (
-            locationIds &&
-            locationIds.length === 0 &&
-            initialData.locationIds
-        ) {
-            locationIds = [...initialData.locationIds];
-        }
-    });
-
-    $effect(() => {
         if (initialData.tags) {
             tagsInput = initialData.tags.map((t: any) => t.name).join(", ");
         }
@@ -176,17 +165,16 @@
                 .filter(Boolean),
         ),
     );
-    const locationIdsJson = $derived(JSON.stringify(locationIds));
 
     function getField(name: string) {
         if (!remoteFunction?.fields) return {};
         const parts = name.split(".");
-        let current = remoteFunction.fields;
+        let current: any = remoteFunction.fields;
         for (const part of parts) {
-            if (!current) return {};
+            if (!current?.[part]) return {};
             current = current[part];
         }
-        return current || {};
+        return current;
     }
 
     const prefix = $derived(contactId ? "data.contact" : "contact");
@@ -214,17 +202,15 @@
         }
     })}
     class="space-y-8"
-    method="POST"
 >
     {#if contactId}
-        <input type="hidden" name="id" value={contactId} />
+        <input {...getField("id").as("hidden", contactId)} />
     {/if}
 
-    <input type="hidden" name="emailsJson" value={emailsJson} />
-    <input type="hidden" name="phonesJson" value={phonesJson} />
-    <input type="hidden" name="relationsJson" value={relationsJson} />
-    <input type="hidden" name="tagsJson" value={tagsJson} />
-    <input type="hidden" name="locationIdsJson" value={locationIdsJson} />
+    <input {...getField("emailsJson").as("hidden", emailsJson ?? "[]")} />
+    <input {...getField("phonesJson").as("hidden", phonesJson ?? "[]")} />
+    <input {...getField("relationsJson").as("hidden", relationsJson ?? "[]")} />
+    <input {...getField("tagsJson").as("hidden", tagsJson ?? "[]")} />
 
     <div class="space-y-4">
         <h3 class="text-lg font-medium flex items-center gap-2">

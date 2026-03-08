@@ -52,13 +52,6 @@
               }
             : null,
     );
-
-    let locationIds = $state<string[]>([]);
-    $effect(() => {
-        if (initialData?.locationIds) {
-            locationIds = [...initialData.locationIds];
-        }
-    });
 </script>
 
 <div class="max-w-4xl mx-auto px-4 py-8">
@@ -83,7 +76,6 @@
                 schema={updateContactSchema}
                 {initialData}
                 contactId={id}
-                bind:locationIds
                 cancelHref="/contacts"
                 listContactsRemote={listContacts}
             >
@@ -112,7 +104,6 @@
                             } as any)}
                         fetchAssociationsRemote={async (p) =>
                             fetchContactLocations(p.entityId)}
-                        onchange={(ids: string[]) => (locationIds = ids)}
                         deleteItemRemote={(ids) =>
                             deleteLocation(Array.isArray(ids) ? ids : [ids])}
                         createRemote={createLocation}

@@ -12,11 +12,10 @@ export const updateExistingContact = form(updateContactSchema, async (data) => {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'contacts');
 
-        const { id, data: updateData, emailsJson, phonesJson, locationIdsJson, relationsJson, tagsJson } = data;
+        const { id, data: updateData, emailsJson, phonesJson, relationsJson, tagsJson } = data;
         console.log('[SERVER] updateExistingContact:', id, {
             hasEmails: !!emailsJson,
             hasPhones: !!phonesJson,
-            locationIdsJson,
             hasRelations: !!relationsJson,
             hasTags: !!tagsJson
         });
@@ -25,8 +24,6 @@ export const updateExistingContact = form(updateContactSchema, async (data) => {
 
         const emails = emailsJson ? JSON.parse(emailsJson) : [];
         const phones = phonesJson ? JSON.parse(phonesJson) : [];
-        const locationIds = locationIdsJson ? JSON.parse(locationIdsJson) : [];
-        console.log('[SERVER] Parsed locationIds:', locationIds);
         const relations = relationsJson ? JSON.parse(relationsJson) : [];
         const tags = tagsJson ? JSON.parse(tagsJson) : [];
 
@@ -59,15 +56,6 @@ export const updateExistingContact = form(updateContactSchema, async (data) => {
             await tx.delete(contactPhone).where(eq(contactPhone.contactId, id));
             if (phones.length > 0) {
                 await tx.insert(contactPhone).values(phones.map((p: any) => ({ ...p, contactId: id })));
-            }
-
-            // Sync locations
-            await tx.delete(locationContact).where(eq(locationContact.contactId, id));
-            if (locationIds.length > 0) {
-                await tx.insert(locationContact).values(locationIds.map((locId: string) => ({
-                    contactId: id,
-                    locationId: locId
-                })));
             }
 
 

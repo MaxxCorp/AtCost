@@ -12,5 +12,10 @@
     },
     "devDependencies": {
         "typescript": "^5.9.3"
+    },
+    "pnpm": {
+        "overrides": {
+            "drizzle-orm": "0.45.1"
+        }
     }
 }

@@ -57,6 +57,7 @@ export const contactSchema = v.intersect([
         emails: v.optional(v.array(emailSchemaPure)),
         phones: v.optional(v.array(phoneSchemaPure)),
         addresses: v.optional(v.array(addressSchemaPure)),
+        locationAssociations: v.optional(v.array(v.object({ location: v.any() }))),
         relations: v.optional(v.array(contactRelationSchemaPure)),
         tags: v.optional(v.array(tagSchemaPure)),
         participationStatus: v.optional(v.string()),
@@ -66,6 +67,7 @@ export const contactSchema = v.intersect([
 export type Contact = v.InferOutput<typeof contactSchema>;
 
 export const createContactSchema = v.object({
+    id: v.optional(v.pipe(v.string(), v.uuid())),
     contact: contactBaseSchema,
     emails: v.optional(v.array(v.omit(emailSchemaPure, ['id']))),
     phones: v.optional(v.array(v.omit(phoneSchemaPure, ['id']))),
@@ -80,7 +82,6 @@ export const createContactSchema = v.object({
     emailsJson: v.optional(v.string()),
     phonesJson: v.optional(v.string()),
     addressesJson: v.optional(v.string()),
-    locationIdsJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
 });
@@ -102,7 +103,6 @@ export const updateContactSchema = v.object({
     emailsJson: v.optional(v.string()),
     phonesJson: v.optional(v.string()),
     addressesJson: v.optional(v.string()),
-    locationIdsJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
 });

@@ -50,6 +50,7 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
             emails: contactData.emails,
             phones: contactData.phones,
             addresses: contactData.addresses,
+            locationAssociations: contactData.locationAssociations,
             relations: (contactData.relations || []).map(r => ({
                 id: r.id,
                 targetContactId: r.targetContactId,

@@ -32,6 +32,7 @@ export const readContact = query(v.string(), async (id: string) => {
         }
     });
 
+
     if (!contactData) return null;
 
     return {
