@@ -229,6 +229,15 @@ export class GoogleCalendarProvider implements SyncProvider {
 
 		const gcalEvent = this.mapToGoogleEvent(event);
 
+		// Use deterministic ID if available to prevent race conditions with webhooks
+		const internalId = event.metadata?.app_event_id;
+		if (internalId) {
+			// Google Event ID requirements: [a-v0-9]{5,1024}
+			// UUIDs have dashes which are not allowed. 
+			// We'll use 'mp' prefix + dashless uuid
+			gcalEvent.id = `mp${internalId.replace(/-/g, '').toLowerCase()}`;
+		}
+
 		const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(this.calendarId)}/events?sendUpdates=all`;
 
 		const response = await this.makeRequest<{

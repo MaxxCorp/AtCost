@@ -381,24 +381,16 @@ export class SyncService {
 
 		if (externalEvent.status === 'cancelled') {
 			if (mapping && mapping.eventId) {
-				// Delete the local event
-				// Note: This might trigger a delete hook if we had one, but we don't.
-				// However, we should be careful not to trigger a push-back loop if we add one later.
 				await db.delete(eventTable).where(eq(eventTable.id, mapping.eventId));
-
-				// Mapping should be deleted by cascade if foreign key exists, but let's be safe
 				await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
-
 			}
 			return;
 		}
-
 
 		if (mapping) {
 			if (!mapping.eventId) return;
 			// Update existing event
 
-			// Get current event to check timestamps
 			const [currentEvent] = await db
 				.select()
 				.from(eventTable)
@@ -406,10 +398,8 @@ export class SyncService {
 
 			if (currentEvent) {
 				// Skip update if we just modified it locally (within last 30 seconds)
-				// This prevents echo loops in bidirectional sync
 				const timeSinceUpdate = Date.now() - currentEvent.updatedAt.getTime();
 				if (timeSinceUpdate < 30000) {
-					// Still update the mapping timestamp to prevent re-processing
 					await db
 						.update(syncMappingTable)
 						.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
@@ -418,11 +408,11 @@ export class SyncService {
 				}
 			}
 
-			const internalEvent = await this.mapExternalToInternalWithContacts(externalEvent, config.userId);
+			const updateParts = await this.mapExternalToInternalWithContacts(externalEvent, config.userId);
 
 			await db
 				.update(eventTable)
-				.set({ ...internalEvent, updatedAt: new Date() })
+				.set(updateParts)
 				.where(eq(eventTable.id, mapping.eventId));
 
 			await db
@@ -462,16 +452,28 @@ export class SyncService {
 		} else {
 			// Check if this is an "echo" of an event we created/pushed
 			const appEventId = externalEvent.metadata?.app_event_id;
+			let identifiedInternalId: string | undefined = appEventId;
 
-			if (appEventId) {
+			// Support deterministic Google IDs (mp + dashless uuid)
+			if (!identifiedInternalId && externalEvent.externalId.startsWith('mp')) {
+				const dashless = externalEvent.externalId.substring(2);
+				if (dashless.length === 32) {
+					// Reconstruct UUID format
+					identifiedInternalId = `${dashless.substring(0, 8)}-${dashless.substring(8, 12)}-${dashless.substring(12, 16)}-${dashless.substring(16, 20)}-${dashless.substring(20)}`;
+					console.log(`[SyncService] Identified internal ID ${identifiedInternalId} from deterministic external ID ${externalEvent.externalId}`);
+				}
+			}
+
+			if (identifiedInternalId) {
 				const [existingEvent] = await db
 					.select()
 					.from(eventTable)
-					.where(eq(eventTable.id, appEventId));
+					.where(eq(eventTable.id, identifiedInternalId));
 
 				if (existingEvent) {
-					console.log(`[SyncService] Identified echo for event ${appEventId} via metadata. Healing mapping.`);
+					console.log(`[SyncService] Identified echo for event ${identifiedInternalId}. Healing/Updating mapping.`);
 
+					// Idempotent mapping creation
 					await db.insert(syncMappingTable).values({
 						syncConfigId: config.id,
 						eventId: existingEvent.id,
@@ -481,21 +483,19 @@ export class SyncService {
 						lastSyncedAt: new Date(),
 						announcementId: null,
 						metadata: null
+					}).onConflictDoUpdate({
+						target: [syncMappingTable.syncConfigId, syncMappingTable.externalId],
+						set: { lastSyncedAt: new Date(), etag: externalEvent.etag ?? null }
 					});
 
 					return;
 				} else {
-					// We created it, but we can't find it locally. 
-					// Limit: 5. It must have been deleted locally.
-					// Ignorance is bliss - prevent resurrection.
-					console.log(`[SyncService] Detected echo for deleted event ${appEventId}. Ignoring to prevent resurrection.`);
+					console.log(`[SyncService] Detected echo for deleted event ${identifiedInternalId}. Ignoring to prevent resurrection.`);
 					return;
 				}
 			}
 
 			// Before creating a new event, check if we already have a local event with similar properties
-			// that was just created (within last 30 seconds). This prevents duplicates when:
-			// 1. User creates event locally → pushes to Google → webhook fires → tries to pull back
 			const timeWindow = 2 * 60 * 1000; // 2 minutes
 			let startTimeCheck = undefined;
 
@@ -511,35 +511,23 @@ export class SyncService {
 				.select()
 				.from(eventTable)
 				.where(
-					// Use OR to find events that match EITHER by strict summary OR by time window
-					// This handles cases where summary formatting differs (e.g. smart quotes) but it's the same event
 					or(
 						eq(eventTable.summary, externalEvent.summary),
 						startTimeCheck
 					)
 				);
 
-			// Check if any recent event matches this external event
-			console.log(`[SyncService] No match found for external ${externalEvent.externalId}. Checking ${recentEvents.length} recent events for fuzzy match:`, {
-				externalTitle: externalEvent.summary,
-				externalStart: externalEvent.startDateTime
-			});
-
 			for (const recentEvent of recentEvents) {
-				// Compare times more robustly
 				let startTimesMatch = false;
 
 				if (recentEvent.startDateTime && externalEvent.startDateTime) {
-					// Compare timestamps to handle timezone differences
 					const t1 = recentEvent.startDateTime.getTime();
 					const t2 = externalEvent.startDateTime.getTime();
-					// Allow 1 second difference
 					startTimesMatch = Math.abs(t1 - t2) < 1000;
 				}
 
 				if (startTimesMatch) {
 					console.log(`[SyncService] Fuzzy match found! healing mapping for event ${recentEvent.id}`);
-					// Create mapping to link this local event to the external one
 					await db.insert(syncMappingTable).values({
 						syncConfigId: config.id,
 						eventId: recentEvent.id,
@@ -549,64 +537,71 @@ export class SyncService {
 						lastSyncedAt: new Date(),
 						announcementId: null,
 						metadata: null
+					}).onConflictDoUpdate({
+						target: [syncMappingTable.syncConfigId, syncMappingTable.externalId],
+						set: { lastSyncedAt: new Date(), etag: externalEvent.etag ?? null }
 					});
 
 					return; // Don't create duplicate
 				}
 			}
-		}
 
-		// Create new event - no matching local event found
-		const internalEvent = await this.mapExternalToInternalWithContacts(externalEvent, config.userId);
-		const [newEvent] = await db.insert(eventTable).values(internalEvent).returning({ id: eventTable.id });
+			// Create new event - no matching local event found
+			const mappedFields = await this.mapExternalToInternalWithContacts(externalEvent, config.userId);
+			const [newEvent] = await db.insert(eventTable).values({
+				...mappedFields,
+				createdAt: new Date(),
+				summary: mappedFields.summary || externalEvent.summary || 'Untitled Event',
+				userId: mappedFields.userId || config.userId,
+				startDateTime: mappedFields.startDateTime || externalEvent.startDateTime || new Date()
+			} as any).returning({ id: eventTable.id });
 
-		await db.insert(syncMappingTable).values({
-			syncConfigId: config.id,
-			eventId: newEvent.id,
-			externalId: externalEvent.externalId,
-			providerId: config.providerId,
-			etag: externalEvent.etag ?? null,
-			lastSyncedAt: new Date(),
-			announcementId: null,
-			metadata: null
-		});
+			await db.insert(syncMappingTable).values({
+				syncConfigId: config.id,
+				eventId: newEvent.id,
+				externalId: externalEvent.externalId,
+				providerId: config.providerId,
+				etag: externalEvent.etag ?? null,
+				lastSyncedAt: new Date(),
+				announcementId: null,
+				metadata: null
+			});
 
-		await publishEventChange('create', [newEvent.id]);
+			await publishEventChange('create', [newEvent.id]);
 
-		// Update event contacts associations and their status
-		if (externalEvent.attendees) {
-			for (const attendee of externalEvent.attendees) {
-				// Find or create person contact for this attendee
-				const [contactRecord] = await db.query.contact.findMany({
-					where: (c, { eq, exists }) => exists(
-						db.select().from(contactEmailTable)
-							.where(and(
-								eq(contactEmailTable.contactId, c.id),
-								eq(contactEmailTable.value, attendee.email)
-							))
-					),
-					limit: 1
-				});
-
-				if (contactRecord) {
-					await db.insert(eventContactTable).values({
-						eventId: newEvent.id,
-						contactId: contactRecord.id,
-						participationStatus: attendee.responseStatus || 'needsAction'
-					}).onConflictDoUpdate({
-						target: [eventContactTable.eventId, eventContactTable.contactId],
-						set: { participationStatus: attendee.responseStatus || 'needsAction' }
+			// Update event contacts associations and their status
+			if (externalEvent.attendees) {
+				for (const attendee of externalEvent.attendees) {
+					const [contactRecord] = await db.query.contact.findMany({
+						where: (c, { eq, exists }) => exists(
+							db.select().from(contactEmailTable)
+								.where(and(
+									eq(contactEmailTable.contactId, c.id),
+									eq(contactEmailTable.value, attendee.email)
+								))
+						),
+						limit: 1
 					});
+
+					if (contactRecord) {
+						await db.insert(eventContactTable).values({
+							eventId: newEvent.id,
+							contactId: contactRecord.id,
+							participationStatus: attendee.responseStatus || 'needsAction'
+						}).onConflictDoUpdate({
+							target: [eventContactTable.eventId, eventContactTable.contactId],
+							set: { participationStatus: attendee.responseStatus || 'needsAction' }
+						});
+					}
 				}
 			}
 		}
-
 	}
 
 	/**
 	 * Handle incoming webhook notification
 	 */
-	async handleWebhook(
+	public async handleWebhook(
 		providerId: ProviderType,
 		payload: any
 	): Promise<{ configId: string; processed: boolean }> {
@@ -794,7 +789,7 @@ export class SyncService {
 	private async mapExternalToInternalWithContacts(
 		external: ExternalEvent,
 		defaultUserId: string
-	): Promise<typeof eventTable.$inferInsert> {
+	): Promise<Partial<typeof eventTable.$inferInsert>> {
 		let resolvedUserId = defaultUserId;
 
 		// Attempt to resolve owner via contact email
@@ -811,21 +806,23 @@ export class SyncService {
 			}
 		}
 
-		return {
+		const result: Partial<typeof eventTable.$inferInsert> = {
 			userId: resolvedUserId,
 			summary: external.summary,
-			description: external.description ?? null,
-			location: external.location ?? null,
-			startDateTime: external.startDateTime ?? new Date(0),
-			startTimeZone: external.startTimeZone ?? null,
-			endDateTime: external.endDateTime ?? null,
-			endTimeZone: external.endTimeZone ?? null,
-			attendees: external.attendees ?? null,
-			recurrence: external.recurrence ?? null,
-			reminders: external.reminders ?? null,
-			createdAt: new Date(),
 			updatedAt: new Date()
 		};
+
+		if (external.description !== undefined) result.description = external.description;
+		if (external.location !== undefined) result.location = external.location;
+		if (external.startDateTime !== undefined) result.startDateTime = external.startDateTime;
+		if (external.startTimeZone !== undefined) result.startTimeZone = external.startTimeZone;
+		if (external.endDateTime !== undefined) result.endDateTime = external.endDateTime;
+		if (external.endTimeZone !== undefined) result.endTimeZone = external.endTimeZone;
+		if (external.attendees !== undefined) result.attendees = external.attendees as any;
+		if (external.recurrence !== undefined) result.recurrence = external.recurrence;
+		if (external.reminders !== undefined) result.reminders = external.reminders as any;
+
+		return result;
 	}
 
 	/**
