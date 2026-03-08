@@ -1,7 +1,7 @@
-﻿import { form } from '$app/server';
+import { form } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '$lib/server/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries } from '$lib/server/db/schema';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -123,11 +123,25 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 		const eventId = crypto.randomUUID();
 		console.log('Generated Event ID:', eventId);
 
+        // Handle SyncIds & Campaign
+        let syncIds: string[] = [];
+        if (data.syncIds) {
+            syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
+        }
+
+        // Create Campaign for the event
+        const [newCampaign] = await db.insert(campaign).values({
+            userId: user.id,
+            name: `Campaign for ${data.summary}`,
+            content: { syncIds }
+        }).returning();
+
 		// Insert Master Event
 		console.log('Inserting event into DB...');
 		const [newEvent] = await db.insert(event).values({
 			id: eventId,
 			userId: user.id,
+            campaignId: newCampaign?.id,
 			summary: data.summary,
 			description: data.description || null,
 			location: data.location || null,
@@ -219,6 +233,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 					await db.insert(event).values({
 						id: instanceId,
 						userId: user.id,
+                        campaignId: newCampaign?.id,
 						summary: data.summary,
 						description: data.description || null,
 						location: data.location || null,

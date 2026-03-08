@@ -11,6 +11,7 @@ import * as v from 'valibot';
  * Command for bulk deleting announcements
  */
 export const deleteAnnouncements = command(v.array(v.string()), async (ids: string[]) => {
+    console.log('DELETING ANNOUNCEMENTS:', ids);
     const user = getAuthenticatedUser();
     ensureAccess(user, 'announcements');
 
@@ -24,6 +25,6 @@ export const deleteAnnouncements = command(v.array(v.string()), async (ids: stri
     // Notify listeners
     await publishAnnouncementChange('delete', ids);
 
-    await (listAnnouncements() as any).refresh();
+    await listAnnouncements().refresh();
     return { success: true };
 });

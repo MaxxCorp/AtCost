@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact } from '$lib/server/db/schema';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact, campaign } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Announcement } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -133,6 +133,18 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         resolvedContact = await fetchContactInfo(chosenContactId);
     }
 
+    // Fetch Campaign
+    let syncIds: string[] = [];
+    if (result.campaignId) {
+        const [c] = await db
+            .select({ content: campaign.content })
+            .from(campaign)
+            .where(eq(campaign.id, result.campaignId));
+        if (c && c.content) {
+            syncIds = (c.content as any).syncIds || [];
+        }
+    }
+
     return {
         ...result,
         createdAt: result.createdAt.toISOString(),
@@ -141,6 +153,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         tagNames: tags.map(t => t.name).filter(n => n !== null) as string[],
         contactIds: contacts.map(c => c.id),
         locationIds: locations.map(l => l.id),
+        syncIds,
         resolvedContact,
     } as Announcement;
 });

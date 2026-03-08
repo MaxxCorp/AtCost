@@ -21,3 +21,14 @@ export const updateLocationSchema = v.intersect([
     locationBaseSchema,
     v.object({ id: v.pipe(v.string(), v.uuid()) })
 ]);
+
+export const locationAssociationSchema = v.object({
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk']),
+    entityId: v.string(),
+    locationId: v.pipe(v.string(), v.uuid()),
+});
+
+export const getLocationAssociationsSchema = v.object({
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk']),
+    entityId: v.string(),
+});

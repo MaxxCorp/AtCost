@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation } from '$lib/server/db/schema';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '$lib/server/db/schema';
 import { updateAnnouncementSchema } from '$lib/validations/announcements';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
@@ -29,9 +29,7 @@ export const updateExistingAnnouncement = form(updateAnnouncementSchema, async (
 
         let contactIds: string[] | undefined;
         if (input.contactIds !== undefined) {
-            if (typeof input.contactIds === 'string') {
-                try { contactIds = JSON.parse(input.contactIds); } catch (e) { }
-            }
+            contactIds = typeof input.contactIds === 'string' ? JSON.parse(input.contactIds) : input.contactIds;
         }
 
         // Parse tagNames (new approach)
@@ -47,14 +45,35 @@ export const updateExistingAnnouncement = form(updateAnnouncementSchema, async (
 
         await db.transaction(async (tx) => {
             // Update Announcement
-            await tx.update(announcement)
+            const [updatedAnnouncement] = await tx.update(announcement)
                 .set({
                     title: input.title,
                     content: input.content,
                     ...(isPublic !== undefined ? { isPublic } : {}),
                     updatedAt: now,
                 })
-                .where(eq(announcement.id, announcementId));
+                .where(eq(announcement.id, announcementId))
+                .returning();
+
+            // Handle SyncIds & Campaign update
+            if (input.syncIds !== undefined) {
+                const syncIds = typeof input.syncIds === 'string' ? JSON.parse(input.syncIds) : input.syncIds;
+                if (updatedAnnouncement?.campaignId) {
+                    await tx.update(campaign).set({
+                        content: { syncIds },
+                        updatedAt: new Date()
+                    }).where(eq(campaign.id, updatedAnnouncement.campaignId));
+                } else if (updatedAnnouncement) {
+                    const [newCampaign] = await tx.insert(campaign).values({
+                        userId: user.id,
+                        name: `Campaign for ${input.title}`,
+                        content: { syncIds }
+                    }).returning();
+                    if (newCampaign) {
+                        await tx.update(announcement).set({ campaignId: newCampaign.id }).where(eq(announcement.id, announcementId));
+                    }
+                }
+            }
 
             // Update Tags if provided (either via IDs or Names)
             if (tagIds !== undefined || tagNames !== undefined) {
@@ -110,13 +129,17 @@ export const updateExistingAnnouncement = form(updateAnnouncementSchema, async (
 
             // Update Locations if provided
             if (input.locationIds !== undefined) {
-                const locationIds = typeof input.locationIds === 'string' ? JSON.parse(input.locationIds) : input.locationIds;
+                let locationIds: string[] = [];
+                if (input.locationIds) {
+                    locationIds = typeof input.locationIds === 'string' ? JSON.parse(input.locationIds) : input.locationIds;
+                }
+
                 // Delete existing
                 await tx.delete(announcementLocation).where(eq(announcementLocation.announcementId, announcementId));
                 // Insert new
-                if (locationIds && Array.isArray(locationIds) && locationIds.length > 0) {
+                if (locationIds.length > 0) {
                     await tx.insert(announcementLocation).values(
-                        (locationIds as string[]).map(locationId => ({
+                        locationIds.map(locationId => ({
                             announcementId: announcementId,
                             locationId: locationId
                         }))

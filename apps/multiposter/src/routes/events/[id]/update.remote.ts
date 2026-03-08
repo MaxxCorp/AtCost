@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries } from '$lib/server/db/schema';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '$lib/server/db/schema';
 import { eq, and, or, ne } from 'drizzle-orm';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
@@ -128,6 +128,27 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 			error(404, 'Event not found');
 		}
 
+        // Handle SyncIds & Campaign update
+        if (data.syncIds !== undefined) {
+            const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
+            if (updatedEvent.campaignId) {
+                await db.update(campaign).set({
+                    content: { syncIds },
+                    updatedAt: new Date()
+                }).where(eq(campaign.id, updatedEvent.campaignId));
+            } else {
+                const [newCampaign] = await db.insert(campaign).values({
+                    userId: user.id,
+                    name: `Campaign for ${updatedEvent.summary}`,
+                    content: { syncIds }
+                }).returning();
+                if (newCampaign) {
+                    await db.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, updatedEvent.id));
+                    updatedEvent.campaignId = newCampaign.id;
+                }
+            }
+        }
+
 		// Prepare data for association updates
 		const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
 		const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
@@ -238,6 +259,7 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 					await db.insert(event).values({
 						id: instanceId,
 						userId: user.id,
+                        campaignId: updatedEvent.campaignId,
 						summary: updatedEvent.summary,
 						description: updatedEvent.description,
 						location: updatedEvent.location,

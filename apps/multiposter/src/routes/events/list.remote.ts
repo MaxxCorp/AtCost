@@ -1,4 +1,4 @@
-﻿import { query } from '$app/server';
+import { query } from '$app/server';
 import { event } from '$lib/server/db/schema';
 import { listQuery } from '$lib/server/db/query-helpers';
 
@@ -19,6 +19,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	contactIds?: string[];
 	locationIds?: string[];
 	tags?: string[];
+	syncIds?: string[];
 	participationStatuses?: Record<string, string>;
 	maxOccupancy?: number | null;
 	resolvedContact?: {
@@ -35,7 +36,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
  * List all events for the authenticated user
  */
 import { inArray, eq } from 'drizzle-orm';
-import { eventTag, tag } from '$lib/server/db/schema';
+import { eventTag, tag, campaign } from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
 
 /**
@@ -80,9 +81,23 @@ export const listEvents = query(async (): Promise<Event[]> => {
 		}
 	}
 
-	// Attach tags to results
+	// Fetch campaigns for all events
+	const campaignIds = results.map((e) => e.campaignId).filter(Boolean) as string[];
+	const campaignsMap = new Map<string, string[]>();
+	if (campaignIds.length > 0) {
+		const campaigns = await db
+			.select({ id: campaign.id, content: campaign.content })
+			.from(campaign)
+			.where(inArray(campaign.id, campaignIds));
+		for (const c of campaigns) {
+			campaignsMap.set(c.id, (c.content as any)?.syncIds || []);
+		}
+	}
+
+	// Attach tags and syncIds to results
 	return results.map((event) => ({
 		...event,
 		tags: tagsMap.get(event.id) || [],
+		syncIds: event.campaignId ? campaignsMap.get(event.campaignId) || [] : [],
 	}));
 });

@@ -52,6 +52,7 @@ export const eventBaseSchema = v.object({
 	categoryBerlinDotDe: v.optional(v.string()),
 	ticketPrice: v.optional(v.string()),
 	tags: v.optional(v.string()),
+	syncIds: v.optional(v.union([v.array(v.string()), v.string()])),
 });
 
 /**

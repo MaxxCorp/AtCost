@@ -22,11 +22,16 @@ export async function handleDelete({
     const plural = ids.length === 1 ? '' : 's';
     if (!confirm(`Delete ${ids.length} ${itemName}${plural}?`)) return false;
     try {
-        await deleteFn(ids);
+        const result = await deleteFn(ids);
+        // Commands return a result object. If it has success: false, it failed.
+        if (result && result.success === false) {
+            toast.error(result.error || `Failed to delete ${itemName}${plural}`);
+            return false;
+        }
         toast.success(`${ids.length} ${itemName}${plural} deleted successfully!`);
         return true;
     } catch (e) {
-        toast.error(`Failed to delete ${itemName}${plural}`);
+        toast.error(`Error deleting ${itemName}${plural}`);
         return false;
     }
 }

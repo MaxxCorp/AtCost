@@ -8,6 +8,7 @@ export const announcementBaseSchema = v.object({
     contactIds: v.optional(v.string()), // JSON string of IDs
     locationIds: v.optional(v.union([v.array(v.string()), v.string()])), // JSON string or array of IDs
     tagNames: v.optional(v.string()), // JSON string of tag names (for creation)
+    syncIds: v.optional(v.union([v.array(v.string()), v.string()])), // JSON string or array of sync config IDs
 });
 
 export const createAnnouncementSchema = announcementBaseSchema;

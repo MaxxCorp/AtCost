@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, index, uuid, primaryKey } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { campaign } from "./campaigns";
 
 
 /**
@@ -72,6 +73,10 @@ export const event = pgTable("event", {
     seriesId: uuid("series_id")
         .references(() => recurringSeries.id, { onDelete: "set null" }), // Link to recurring_series
     isException: boolean("is_exception").default(false), // True if this instance was modified from the series
+
+    // Linked campaign for synchronization settings
+    campaignId: uuid("campaign_id")
+        .references(() => campaign.id, { onDelete: "set null" }),
 
     // Legacy recurrence fields (kept for backward compatibility during migration)
     recurrence: jsonb("recurrence").$type<string[]>(), // Array of RRULE, EXRULE, RDATE, EXDATE

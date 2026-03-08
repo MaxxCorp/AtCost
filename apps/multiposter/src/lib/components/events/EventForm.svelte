@@ -4,6 +4,7 @@
     import { deleteEvents as deleteEventAction } from "../../../routes/events/[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
@@ -1067,6 +1068,11 @@
                 "hidden",
                 JSON.stringify(selectedContactIds ?? []),
             )}
+        />
+
+        <SyncCheckboxBlock 
+            syncFieldConfig={getField("syncIds")}
+            initialSelectedIds={initialData?.syncIds || []} 
         />
 
         <div class="flex gap-3 pt-4">

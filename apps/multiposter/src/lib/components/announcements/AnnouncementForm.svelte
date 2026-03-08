@@ -3,6 +3,7 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import Button from "$lib/components/ui/button/button.svelte";
+    import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
@@ -19,6 +20,11 @@
         updateLocationSchema,
     } from "$lib/validations/locations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import { 
+        fetchEntityLocations, 
+        addLocationAssociation, 
+        removeLocationAssociation 
+    } from "../../../routes/locations/associate.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "$lib/validations/contacts";
     import {
@@ -47,23 +53,28 @@
 
     const type = "announcement";
 
-    let contentValue = $state("");
-    let tagsString = $state("");
-    let selectedContactIds = $state<string[]>([]);
-    let isPublic = $state(false);
+    // svelte-ignore state_referenced_locally
+    let contentValue = $state(
+        getField("content").value() ?? initialData?.content ?? "",
+    );
+    // svelte-ignore state_referenced_locally
+    let tagsString = $state(
+        isUpdating && initialData?.tagNames
+            ? initialData.tagNames.join(", ")
+            : "News",
+    );
+    // svelte-ignore state_referenced_locally
+    let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
+    let isPublic = $state(initialData?.isPublic ?? false);
     let locations = $state<Location[]>([]);
-    let selectedLocationIds = $state<string[]>([]);
+    // svelte-ignore state_referenced_locally
+    let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
 
+    // Keep contentValue in sync with form state ONLY IF it's empty (initial load)
     $effect(() => {
-        contentValue =
-            getField("content").value() ?? initialData?.content ?? "";
-        tagsString =
-            isUpdating && initialData?.tagNames
-                ? initialData.tagNames.join(", ")
-                : "News";
-        selectedContactIds = initialData?.contactIds || [];
-        isPublic = initialData?.isPublic ?? false;
-        selectedLocationIds = initialData?.locationIds || [];
+        if (!contentValue && initialData?.content) {
+            contentValue = initialData.content;
+        }
     });
 
     onMount(async () => {
@@ -215,61 +226,80 @@
             </div>
 
             <div>
-                <EntityManager
-                    title="Locations"
-                    icon={MapPin}
-                    {type}
-                    entityId={initialData?.id}
-                    initialItems={locations.filter((l: any) =>
-                        selectedLocationIds.includes(l.id),
-                    )}
-                    onchange={(ids: string[]) => (selectedLocationIds = ids)}
-                    embedded={true}
-                    listItemsRemote={listLocations as any}
-                    deleteItemRemote={async (id: string) => {
-                        return await handleDelete({
-                            ids: [id],
-                            deleteFn: deleteLocation,
-                            itemName: "location",
-                        });
-                    }}
-                    createRemote={createLocation}
-                    createSchema={createLocationSchema}
-                    updateRemote={updateLocation}
-                    updateSchema={updateLocationSchema}
-                    getFormData={(l: Location) => l}
-                    searchPredicate={(l: Location, q: string) => {
-                        return (
-                            l.name.toLowerCase().includes(q.toLowerCase()) ||
-                            (l.roomId
-                                ?.toLowerCase()
-                                .includes(q.toLowerCase()) ??
-                                false)
-                        );
-                    }}
-                >
-                    {#snippet renderItemLabel(location)}
-                        {location.name}
-                        {location.roomId ? `(${location.roomId})` : ""}
-                    {/snippet}
-                    {#snippet renderForm({
-                        remoteFunction: rf,
-                        schema,
-                        id,
-                        initialData: formData,
-                        onSuccess,
-                        onCancel,
-                    })}
-                        <LocationForm
-                            remoteFunction={rf}
-                            validationSchema={schema}
-                            isUpdating={!!id}
-                            initialData={formData}
-                            {onSuccess}
-                            {onCancel}
-                        />
-                    {/snippet}
-                </EntityManager>
+                {#if locations.length > 0}
+                    <EntityManager
+                        title="Locations"
+                        icon={MapPin}
+                        {type}
+                        entityId={initialData?.id}
+                        initialItems={locations.filter((l: any) =>
+                            selectedLocationIds.includes(l.id),
+                        )}
+                        onchange={(ids: string[]) => (selectedLocationIds = ids)}
+                        embedded={true}
+                        listItemsRemote={listLocations as any}
+                        fetchAssociationsRemote={fetchEntityLocations as any}
+                        addAssociationRemote={async (p: any) =>
+                            addLocationAssociation({
+                                ...p,
+                                locationId: p.itemId,
+                            } as any)}
+                        removeAssociationRemote={async (p: any) =>
+                            removeLocationAssociation({
+                                ...p,
+                                locationId: p.itemId,
+                            } as any)}
+                        deleteItemRemote={async (id: string) => {
+                            return await handleDelete({
+                                ids: [id],
+                                deleteFn: deleteLocation,
+                                itemName: "location",
+                            });
+                        }}
+                        createRemote={createLocation}
+                        createSchema={createLocationSchema}
+                        updateRemote={updateLocation}
+                        updateSchema={updateLocationSchema}
+                        getFormData={(l: Location) => l}
+                        searchPredicate={(l: Location, q: string) => {
+                            return (
+                                l.name.toLowerCase().includes(q.toLowerCase()) ||
+                                (l.roomId
+                                    ?.toLowerCase()
+                                    .includes(q.toLowerCase()) ??
+                                    false)
+                            );
+                        }}
+                    >
+                        {#snippet renderItemLabel(location)}
+                            {location.name}
+                            {location.roomId ? `(${location.roomId})` : ""}
+                        {/snippet}
+                        {#snippet renderForm({
+                            remoteFunction: rf,
+                            schema,
+                            id,
+                            initialData: formData,
+                            onSuccess,
+                            onCancel,
+                        })}
+                            <LocationForm
+                                remoteFunction={rf}
+                                validationSchema={schema}
+                                isUpdating={!!id}
+                                initialData={formData}
+                                {onSuccess}
+                                {onCancel}
+                            />
+                        {/snippet}
+                    </EntityManager>
+                {:else}
+                    <div
+                        class="p-4 border border-dashed rounded-lg text-sm text-gray-500 text-center"
+                    >
+                        Loading locations...
+                    </div>
+                {/if}
                 <input
                     {...getField("locationIds").as(
                         "hidden",
@@ -353,6 +383,11 @@
                 />
             {/snippet}
         </EntityManager>
+
+        <SyncCheckboxBlock 
+            syncFieldConfig={getField("syncIds")}
+            initialSelectedIds={initialData?.syncIds || []} 
+        />
 
         <div class="flex justify-end pt-4">
             <AsyncButton

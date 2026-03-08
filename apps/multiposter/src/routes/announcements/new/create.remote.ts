@@ -1,6 +1,6 @@
-﻿import { form } from '$app/server';
+import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation } from '$lib/server/db/schema';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '$lib/server/db/schema';
 import { createAnnouncementSchema } from '$lib/validations/announcements';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
@@ -32,17 +32,31 @@ export const createNewAnnouncement = form(createAnnouncementSchema, async (input
         }
 
         let contactIds: string[] = [];
-        if (typeof input.contactIds === 'string') {
-            try { contactIds = JSON.parse(input.contactIds); } catch (e) { }
+        if (input.contactIds) {
+            contactIds = typeof input.contactIds === 'string' ? JSON.parse(input.contactIds) : input.contactIds;
         }
 
         // Handle isPublic boolean/string conversion
         const isPublic = input.isPublic === true || input.isPublic === 'true';
 
+        // Handle SyncIds & Campaign
+        let syncIds: string[] = [];
+        if (input.syncIds) {
+            syncIds = typeof input.syncIds === 'string' ? JSON.parse(input.syncIds) : input.syncIds;
+        }
+
         await db.transaction(async (tx) => {
+            // Create Campaign for the announcement
+            const [newCampaign] = await tx.insert(campaign).values({
+                userId: user.id,
+                name: `Campaign for ${input.title}`,
+                content: { syncIds }
+            }).returning();
+
             // Insert Announcement
             const [newAnnouncement] = await tx.insert(announcement).values({
                 userId: user.id,
+                campaignId: newCampaign?.id,
                 title: input.title,
                 content: input.content,
                 isPublic: isPublic,
@@ -94,10 +108,14 @@ export const createNewAnnouncement = form(createAnnouncementSchema, async (input
             }
 
             // Insert Locations
-            const locationIds = typeof input.locationIds === 'string' ? JSON.parse(input.locationIds) : input.locationIds;
-            if (locationIds && Array.isArray(locationIds) && locationIds.length > 0) {
+            let locationIds: string[] = [];
+            if (input.locationIds) {
+                locationIds = typeof input.locationIds === 'string' ? JSON.parse(input.locationIds) : input.locationIds;
+            }
+
+            if (locationIds.length > 0) {
                 await tx.insert(announcementLocation).values(
-                    (locationIds as string[]).map(locationId => ({
+                    locationIds.map(locationId => ({
                         announcementId: announcementId,
                         locationId: locationId
                     }))

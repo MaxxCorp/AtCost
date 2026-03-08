@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag } from '$lib/server/db/schema';
+import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag, campaign } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Event } from '../list.remote';
 import { getOptionalUser, hasAccess } from '$lib/server/authorization';
@@ -154,6 +154,18 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		.innerJoin(tag, eq(eventTag.tagId, tag.id))
 		.where(eq(eventTag.eventId, eventId));
 
+	// Fetch Campaign
+	let syncIds: string[] = [];
+	if (result.campaignId) {
+		const [c] = await db
+			.select({ content: campaign.content })
+			.from(campaign)
+			.where(eq(campaign.id, result.campaignId));
+		if (c && c.content) {
+			syncIds = (c.content as any).syncIds || [];
+		}
+	}
+
 	return {
 		...result,
 		createdAt: result.createdAt.toISOString(),
@@ -166,6 +178,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		contactIds: contacts.map(c => c.id),
 		locationIds: locations.map(l => l.id),
 		tags: tags.map(t => t.name),
+		syncIds,
 		resolvedContact,
 	} as Event;
 });

@@ -4,7 +4,8 @@ import { event, recurringSeries } from "./events";
 import { resource, location } from "./resources";
 import { announcement } from "./announcements";
 import { kiosk } from "./kiosks";
-import { contact, tag } from "./contacts";
+import { contact, tag, eventContact } from "./contacts";
+import { announcementContact, announcementTag } from "./announcements";
 
 /**
  * Event <-> Location Junction
@@ -90,7 +91,7 @@ export const kioskLocation = pgTable("kiosk_location", {
 
 export const eventRelations = relations(event, ({ many, one }) => ({
     resources: many(eventResource),
-    contacts: many(contact), // Assuming many-to-many or direct? Let's check original
+    contacts: many(eventContact), // FIXED: should point to the junction table
     locations: many(eventLocation),
     tags: many(eventTag),
     series: one(recurringSeries, {
@@ -116,6 +117,8 @@ export const resourceRelations = relations(resource, ({ one, many }) => ({
 
 export const announcementRelations = relations(announcement, ({ many }) => ({
     locations: many(announcementLocation),
+    contacts: many(announcementContact), // Added
+    tags: many(announcementTag), // Added
 }));
 
 export const kioskRelations = relations(kiosk, ({ many }) => ({
@@ -163,5 +166,27 @@ export const kioskLocationRelations = relations(kioskLocation, ({ one }) => ({
     location: one(location, {
         fields: [kioskLocation.locationId],
         references: [location.id],
+    }),
+}));
+
+export const announcementTagRelations = relations(announcementTag, ({ one }) => ({
+    announcement: one(announcement, {
+        fields: [announcementTag.announcementId],
+        references: [announcement.id],
+    }),
+    tag: one(tag, {
+        fields: [announcementTag.tagId],
+        references: [tag.id],
+    }),
+}));
+
+export const announcementContactRelations = relations(announcementContact, ({ one }) => ({
+    announcement: one(announcement, {
+        fields: [announcementContact.announcementId],
+        references: [announcement.id],
+    }),
+    contact: one(contact, {
+        fields: [announcementContact.contactId],
+        references: [contact.id],
     }),
 }));

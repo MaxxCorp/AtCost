@@ -1,9 +1,10 @@
 import { pgTable, text, timestamp, boolean, uuid, index, primaryKey } from "drizzle-orm/pg-core";
 import { relations } from 'drizzle-orm';
 import { user } from "./auth";
+import { campaign } from "./campaigns";
 
-import { tag } from "./contacts"; // Reusing tag from contacts or should I move tag to a shared place? tag is in contacts.ts
-import { contact } from "./contacts";
+import { tag, contact } from "./contacts";
+// announcementLocation removed to break circular dependency
 
 export const announcement = pgTable("announcement", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -15,6 +16,10 @@ export const announcement = pgTable("announcement", {
     content: text("content").notNull(),
 
     isPublic: boolean("is_public").default(false).notNull(),
+
+    // Linked campaign for synchronization settings
+    campaignId: uuid("campaign_id")
+        .references(() => campaign.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

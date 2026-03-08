@@ -1,7 +1,7 @@
-﻿import { query } from '$app/server';
-import { announcement } from '$lib/server/db/schema';
+import { query } from '$app/server';
+import { announcement, campaign } from '$lib/server/db/schema';
 import { db } from '$lib/server/db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import { listQuery } from '$lib/server/db/query-helpers';
 import type { Announcement as DbAnnouncement } from '$lib/server/db/schema';
 
@@ -13,6 +13,7 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
     updatedAt: string;
     tagIds?: string[];
     tagNames?: string[];
+    syncIds?: string[];
     contactIds?: string[];
     locationIds?: string[];
     resolvedContact?: {
@@ -36,8 +37,23 @@ export const listAnnouncements = query(async (): Promise<Announcement[]> => {
             updatedAt: row.updatedAt.toISOString(),
         }),
     });
+    // Fetch campaigns for all announcements
+    const campaignIds = results.map((a) => a.campaignId).filter(Boolean) as string[];
+    const campaignsMap = new Map<string, string[]>();
+    if (campaignIds.length > 0) {
+        const campaigns = await db
+            .select({ id: campaign.id, content: campaign.content })
+            .from(campaign)
+            .where(inArray(campaign.id, campaignIds));
+        for (const c of campaigns) {
+            campaignsMap.set(c.id, (c.content as any)?.syncIds || []);
+        }
+    }
 
-    return results;
+    return results.map((announcement) => ({
+        ...announcement,
+        syncIds: announcement.campaignId ? campaignsMap.get(announcement.campaignId) || [] : [],
+    }));
 });
 
 /**

@@ -51,13 +51,27 @@
 		...rest
 	}: Props = $props();
 
+	let internalLoading = $state(false);
+
 	// Normalize loading state (handle both boolean and number from remote function pending count)
 	const isLoading = $derived(
-		typeof loading === "number" ? loading > 0 : loading,
+		(typeof loading === "number" ? loading > 0 : loading) || internalLoading,
 	);
 
 	// Determine if button should be disabled
 	const isDisabled = $derived(isLoading || disabled);
+
+	async function handleClick(e: MouseEvent) {
+		if (isDisabled) return;
+		if (onclick) {
+			internalLoading = true;
+			try {
+				await onclick(e);
+			} finally {
+				internalLoading = false;
+			}
+		}
+	}
 </script>
 
 <Button
@@ -66,7 +80,7 @@
 	{size}
 	class={className}
 	disabled={isDisabled}
-	{onclick}
+	onclick={handleClick}
 	{...rest}
 >
 	{#if isLoading}

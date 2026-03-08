@@ -22,7 +22,8 @@ import {
 	location as locationTable,
 	eventLocation as eventLocationTable,
 	eventTag as eventTag,
-	recurringSeries as recurringSeries
+	recurringSeries as recurringSeries,
+	campaign as campaignTable
 } from '../db/schema';
 import { getEntityContacts } from '../contacts';
 import { resolveEventContact } from '../contact-resolution';
@@ -263,8 +264,8 @@ export class SyncService {
 
 		try {
 			// Find local events that need to be pushed (no mapping exists for THIS config)
-			const unmappedEvents = await db
-				.select({ event: eventTable })
+			const unmappedEventsRaw = await db
+				.select({ event: eventTable, campaign: campaignTable })
 				.from(eventTable)
 				.leftJoin(
 					syncMappingTable,
@@ -273,7 +274,14 @@ export class SyncService {
 						eq(syncMappingTable.syncConfigId, config.id)
 					)
 				)
+				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
 				.where(isNull(syncMappingTable.id));
+
+			const unmappedEvents = unmappedEventsRaw.filter(({ campaign }) => {
+				if (!campaign || !campaign.content) return false;
+				const syncIds = (campaign.content as any).syncIds || [];
+				return syncIds.includes(config.id);
+			});
 
 			for (const { event } of unmappedEvents) {
 				try {
@@ -301,14 +309,32 @@ export class SyncService {
 			}
 
 			// Push updates to already-mapped events
-			const mappedEvents = await db
-				.select({ event: eventTable, mapping: syncMappingTable })
+			const mappedEventsRaw = await db
+				.select({ event: eventTable, mapping: syncMappingTable, campaign: campaignTable })
 				.from(eventTable)
 				.innerJoin(syncMappingTable, eq(eventTable.id, syncMappingTable.eventId))
+				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
 				.where(eq(syncMappingTable.syncConfigId, config.id));
 
-			for (const { event, mapping } of mappedEvents) {
+			for (const { event, mapping, campaign } of mappedEventsRaw) {
 				try {
+					const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
+					const shouldBeSynced = syncIds.includes(config.id);
+
+					if (!shouldBeSynced) {
+						// The event was previously mapped but has now been deselected from this sync config
+						try {
+							await provider.deleteEvent(mapping.externalId);
+							await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
+						} catch (e: any) {
+							result.errors.push({
+								entityId: event.id,
+								message: `Failed to un-publish event ${event.id}: ${e.message}`
+							});
+						}
+						continue;
+					}
+
 					// Skip if not modified since last sync
 					if (mapping.lastSyncedAt && event.updatedAt <= mapping.lastSyncedAt) {
 						continue;
@@ -1115,6 +1141,35 @@ export class SyncService {
 						eq(syncMappingTable.syncConfigId, config.id)
 					)
 				);
+
+			// Check granular sync settings (campaign-based)
+			const [eventWithCampaign] = await db
+				.select({ campaign: campaignTable })
+				.from(eventTable)
+				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+				.where(eq(eventTable.id, eventId))
+				.limit(1);
+
+			const syncIds = eventWithCampaign?.campaign?.content ? ((eventWithCampaign.campaign.content as any).syncIds || []) : [];
+			const shouldBeSynced = syncIds.includes(config.id);
+
+			if (!shouldBeSynced && !mapping) {
+				// Not selected for this sync and no existing mapping to clean up
+				console.log(`[SyncService] Skipping event ${eventId}: not selected for synchronization config ${config.id}`);
+				return;
+			}
+
+			if (!shouldBeSynced && mapping) {
+				// The event was previously mapped but has now been deselected
+				console.log(`[SyncService] Un-publishing event ${eventId} from provider: has been deselected for config ${config.id}`);
+				try {
+					await provider.deleteEvent(mapping.externalId);
+					await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
+				} catch (e: any) {
+					console.error(`[SyncService] Failed to un-publish event ${eventId}:`, e);
+				}
+				return;
+			}
 
 			if (!eventRow) {
 				console.warn(`[SyncService] Event ${eventId} not found in database at all.`);
