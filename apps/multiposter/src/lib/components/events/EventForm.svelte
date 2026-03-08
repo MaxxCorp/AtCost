@@ -62,43 +62,24 @@
 
     const type = "event";
 
-    // State derived from initialData
-    let isAllDay = $state(false);
-    let hasEndTime = $state(true);
-    let useDefaultReminders = $state(true);
-    let reminders = $state([{ method: "popup", minutes: 10 }]);
-
-    let guestsCanInviteOthers = $state(false);
-    let guestsCanModify = $state(false);
-    let guestsCanSeeOtherGuests = $state(false);
-    let isPublic = $state(true);
-
-    // Recurrence State
-    let recurrence = $state<string[]>([]);
-    let recurrenceRule = $state<string | null>(null);
-    let showRecurrenceDialog = $state(false);
-
-    // Tags State
-    let tags = $state<string[]>([]);
-    let tagsString = $state("");
-
-    // Resource and location state
-    let resourcesPromise = listResourcesWithHierarchy();
-    let locationsPromise = listLocations();
-    let selectedResourceIds = $state<string[]>([]);
-    let selectedContactIds = $state<string[]>([]);
-    let freeTextLocation = $state("");
-    let startTimeZoneInput = $state(
-        Intl.DateTimeFormat().resolvedOptions().timeZone,
-    );
-    let endTimeZoneInput = $state(
-        Intl.DateTimeFormat().resolvedOptions().timeZone,
-    );
-    let descriptionValue = $state("");
-    let startDateInput = $state("");
-    let startTimeInput = $state("");
-    let endDateInput = $state("");
-    let endTimeInput = $state("");
+    function parseDateTime(dt: string | null | undefined) {
+        if (!dt) return { date: "", time: "" };
+        try {
+            const d = new Date(dt);
+            if (isNaN(d.getTime())) return { date: "", time: "" };
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const hours = String(d.getHours()).padStart(2, "0");
+            const minutes = String(d.getMinutes()).padStart(2, "0");
+            return {
+                date: `${year}-${month}-${day}`,
+                time: `${hours}:${minutes}`,
+            };
+        } catch {
+            return { date: "", time: "" };
+        }
+    }
 
     function getLocalNow() {
         const d = new Date();
@@ -109,6 +90,76 @@
         const minutes = String(d.getMinutes()).padStart(2, "0");
         return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
     }
+
+    function getInitialEndDateTime(startParsed: any, endParsed: any, localNow: any) {
+        if (endParsed.date) return { date: endParsed.date, time: endParsed.time || "" };
+
+        const startDate = startParsed.date || localNow.date;
+        const startTime = startParsed.time || localNow.time;
+        const start = new Date(`${startDate}T${startTime}:00`);
+        if (isNaN(start.getTime())) return { date: "", time: "" };
+
+        const end = new Date(start.getTime() + 60 * 60000);
+        const year = end.getFullYear();
+        const month = String(end.getMonth() + 1).padStart(2, "0");
+        const day = String(end.getDate()).padStart(2, "0");
+        const hours = String(end.getHours()).padStart(2, "0");
+        const minutes = String(end.getMinutes()).padStart(2, "0");
+
+        return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+    }
+
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const startParsed = parseDateTime(initialData?.startDateTime);
+    const endParsed = parseDateTime(initialData?.endDateTime);
+    const localNow = getLocalNow();
+    const initialEnd = getInitialEndDateTime(startParsed, endParsed, localNow);
+
+    function getField(name: string) {
+        if (!(remoteFunction as any).fields) return {};
+        const parts = name.split(".");
+        let current = (remoteFunction as any).fields;
+        for (const part of parts) {
+            if (!current) return {};
+            current = current[part];
+        }
+        return current || {};
+    }
+
+    // State derived from initialData
+    let isAllDay = $state(initialData?.isAllDay ?? false);
+    let hasEndTime = $state(initialData ? !!initialData.endDateTime : true);
+    let useDefaultReminders = $state(initialData?.reminders?.useDefault ?? true);
+    let reminders = $state(initialData?.reminders?.overrides ?? [{ method: "popup", minutes: 10 }]);
+
+    let guestsCanInviteOthers = $state(initialData?.guestsCanInviteOthers ?? false);
+    let guestsCanModify = $state(initialData?.guestsCanModify ?? false);
+    let guestsCanSeeOtherGuests = $state(initialData?.guestsCanSeeOtherGuests ?? false);
+    let isPublic = $state(initialData?.isPublic ?? true);
+
+    // Recurrence State
+    let recurrence = $state<string[]>(initialData?.recurrence || []);
+    let recurrenceRule = $state<string | null>(recurrence[0] || null);
+    let showRecurrenceDialog = $state(false);
+
+    // Tags State
+    let tags = $state<string[]>(initialData?.tags || []);
+    let tagsString = $state(tags.join(", "));
+
+    // Resource and location state
+    let resourcesPromise = listResourcesWithHierarchy();
+    let locationsPromise = listLocations();
+    let selectedResourceIds = $state<string[]>(initialData?.resourceIds || []);
+    let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
+    let freeTextLocation = $state(initialData?.location || "");
+    let startTimeZoneInput = $state(initialData?.startTimeZone || browserTimezone);
+    let endTimeZoneInput = $state(initialData?.endTimeZone || initialData?.startTimeZone || browserTimezone);
+    let descriptionValue = $state(getField("description").value() ?? initialData?.description ?? "");
+    let startDateInput = $state(startParsed.date || localNow.date);
+    let startTimeInput = $state(startParsed.time || localNow.time);
+    let endDateInput = $state(initialEnd.date);
+    let endTimeInput = $state(initialEnd.time);
 
     // Helper to format RRule text
     const recurrenceText = $derived(
@@ -126,47 +177,7 @@
     const hiddenRecurrenceRule = $derived(recurrenceRule ?? "");
     const hiddenTagsString = $derived(tagsString ?? "");
 
-    $effect(() => {
-        isAllDay = initialData?.isAllDay ?? false;
-        hasEndTime = initialData ? !!initialData.endDateTime : true;
-        useDefaultReminders = initialData?.reminders?.useDefault ?? true;
-        reminders = initialData?.reminders?.overrides ?? [
-            { method: "popup", minutes: 10 },
-        ];
-        guestsCanInviteOthers = initialData?.guestsCanInviteOthers ?? false;
-        guestsCanModify = initialData?.guestsCanModify ?? false;
-        guestsCanSeeOtherGuests = initialData?.guestsCanSeeOtherGuests ?? false;
-        isPublic = initialData?.isPublic ?? true;
-        recurrence = initialData?.recurrence || [];
-        recurrenceRule = recurrence[0] || null;
-        tags = initialData?.tags || [];
-        tagsString = tags.join(", ");
-        selectedResourceIds = initialData?.resourceIds || [];
-        selectedContactIds = initialData?.contactIds || [];
-        freeTextLocation = initialData?.location || "";
 
-        descriptionValue =
-            getField("description").value() ?? initialData?.description ?? "";
-        startTimeZoneInput = initialData?.startTimeZone || browserTimezone;
-        endTimeZoneInput =
-            initialData?.endTimeZone ||
-            initialData?.startTimeZone ||
-            browserTimezone;
-
-        const startParsed = parseDateTime(initialData?.startDateTime);
-        const endParsed = parseDateTime(initialData?.endDateTime);
-        const localNow = getLocalNow();
-        const initialEnd = getInitialEndDateTime(
-            startParsed,
-            endParsed,
-            localNow,
-        );
-
-        startDateInput = startParsed.date || localNow.date;
-        startTimeInput = startParsed.time || localNow.time;
-        endDateInput = initialEnd.date;
-        endTimeInput = initialEnd.time;
-    });
 
     // Helper to find location ID from text (for initial matching)
     async function findInitialLocationId() {
@@ -226,7 +237,6 @@
     const hiddenDescription = $derived(descriptionValue ?? "");
 
     // Date/Time handling
-    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezones = Intl.supportedValuesOf
         ? Intl.supportedValuesOf("timeZone")
         : [];
@@ -238,49 +248,6 @@
         }),
     );
 
-    function parseDateTime(dt: string | null | undefined) {
-        if (!dt) return { date: "", time: "" };
-        try {
-            const d = new Date(dt);
-            if (isNaN(d.getTime())) return { date: "", time: "" };
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, "0");
-            const day = String(d.getDate()).padStart(2, "0");
-            const hours = String(d.getHours()).padStart(2, "0");
-            const minutes = String(d.getMinutes()).padStart(2, "0");
-            return {
-                date: `${year}-${month}-${day}`,
-                time: `${hours}:${minutes}`,
-            };
-        } catch {
-            return { date: "", time: "" };
-        }
-    }
-
-    function getInitialEndDateTime(
-        startParsed: any,
-        endParsed: any,
-        localNow: any,
-    ) {
-        // If we have initial end data, use it
-        if (endParsed.date)
-            return { date: endParsed.date, time: endParsed.time || "" };
-
-        // Otherwise, calculate 1 hour after start
-        const startDate = startParsed.date || localNow.date;
-        const startTime = startParsed.time || localNow.time;
-        const start = new Date(`${startDate}T${startTime}:00`);
-        if (isNaN(start.getTime())) return { date: "", time: "" };
-
-        const end = new Date(start.getTime() + 60 * 60000);
-        const year = end.getFullYear();
-        const month = String(end.getMonth() + 1).padStart(2, "0");
-        const day = String(end.getDate()).padStart(2, "0");
-        const hours = String(end.getHours()).padStart(2, "0");
-        const minutes = String(end.getMinutes()).padStart(2, "0");
-
-        return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
-    }
 
     // Sync default end time when start time changes if end time is empty
     function updateEndDateTime() {
@@ -308,17 +275,7 @@
         return end.toTimeString().slice(0, 5);
     }
 
-    // Derived values for the hidden fields
-    function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
-        const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
-        for (const part of parts) {
-            if (!current) return {};
-            current = current[part];
-        }
-        return current || {};
-    }
+
 
     async function toggleResource(resourceId: string) {
         if (selectedResourceIds.includes(resourceId)) {
