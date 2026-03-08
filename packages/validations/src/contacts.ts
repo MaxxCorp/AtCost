@@ -84,6 +84,7 @@ export const createContactSchema = v.object({
     addressesJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
+    locationIdsJson: v.optional(v.string()),
 });
 
 export const updateContactSchema = v.object({
@@ -105,6 +106,7 @@ export const updateContactSchema = v.object({
     addressesJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
+    locationIdsJson: v.optional(v.string()),
 });
 
 

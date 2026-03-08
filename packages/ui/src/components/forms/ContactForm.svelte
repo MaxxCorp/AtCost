@@ -28,13 +28,12 @@
         contactId?: string;
         loading?: boolean;
 
-        locationIds?: string[];
         tags?: string[];
 
         // Injected dependencies to keep it shared
         listContactsRemote: () => Promise<any[]>;
-        // Optional snippet for additional sections (like Location EntityManager)
-        children?: Snippet;
+        // Optional snippet for additional sections
+        children?: Snippet<[{ onLocationsChange: (ids: string[]) => void }]>;
     }
 
     let {
@@ -53,6 +52,10 @@
 
     const d = (val: any, def: any) =>
         val === undefined || val === null ? def : val;
+
+    // svelte-ignore state_referenced_locally
+    let locationIds = $state<string[]>((initialData?.locationAssociations || []).map((la: any) => la.locationId || la.location?.id));
+    const locationIdsJson = $derived(JSON.stringify(locationIds));
 
     // svelte-ignore state_referenced_locally
     let contactData = $state({
@@ -501,8 +504,10 @@
     </div>
 
     {#if children}
-        {@render children()}
+        {@render children({ onLocationsChange: (ids: string[]) => locationIds = ids })}
     {/if}
+
+    <input {...getField("locationIdsJson").as("hidden", locationIdsJson)} />
 
     <div class="flex justify-end gap-3 pt-6 border-t">
         {#if onCancel}

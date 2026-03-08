@@ -64,5 +64,7 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
         };
     }));
 
+    console.log('[SERVER list.remote.ts] Returning contacts:', JSON.stringify(contactsWithRelations.map(c => ({ id: c.id, name: c.displayName, locations: c.locationAssociations })), null, 2));
+
     return contactsWithRelations as Contact[];
 });

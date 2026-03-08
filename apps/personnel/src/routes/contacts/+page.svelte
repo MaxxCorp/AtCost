@@ -24,6 +24,7 @@
         addAssociation,
         removeAssociation,
         fetchEntityContacts,
+        fetchContactLocations,
     } from "./associate.remote";
 
     breadcrumbState.set({ feature: "contacts" });
@@ -65,15 +66,18 @@
         createSchema={createContactSchema}
         updateRemote={updateExistingContact}
         updateSchema={updateContactSchema}
-        getFormData={(c) => ({
-            contact: c,
-            emails: c.emails,
-            phones: c.phones,
-            addresses: c.addresses,
-            relations: c.relations,
-            tags: c.tags,
-            locationAssociations: c.locationAssociations,
-        })}
+        getFormData={(c) => {
+            console.log('[DEBUG UI] Contact in list:', c.id, c.displayName, c.locationAssociations);
+            return {
+                contact: c,
+                emails: c.emails,
+                phones: c.phones,
+                addresses: c.addresses,
+                relations: c.relations,
+                tags: c.tags,
+                locationAssociations: c.locationAssociations,
+            };
+        }}
         {searchPredicate}
     >
         {#snippet renderItemLabel(contact)}
@@ -108,33 +112,36 @@
                 contactId={id}
                 listContactsRemote={listContacts}
             >
-                <div class="mt-8 border-t pt-8">
-                    <EntityManager
-                        title="Locations"
-                        icon={MapPin}
-                        type="location"
-                        entityId={id}
-                        initialItems={(
-                            initialData?.locationAssociations || []
-                        ).map((la: any) => la.location)}
-                        embedded={true}
-                        listItemsRemote={listLocations}
-                        addAssociationRemote={async (p: any) =>
-                            addAssociation({
-                                type: "location",
-                                entityId: p.itemId,
-                                contactId: p.entityId,
-                            } as any)}
-                        removeAssociationRemote={async (p: any) =>
-                            removeAssociation({
-                                type: "location",
-                                entityId: p.itemId,
-                                contactId: p.entityId,
-                            } as any)}
-                        fetchAssociationsRemote={fetchEntityContacts as any}
-                        deleteItemRemote={(ids) =>
-                            deleteLocation(Array.isArray(ids) ? ids : [ids])}
-                        createRemote={createLocation}
+                {#snippet children({ onLocationsChange })}
+                    <div class="mt-8 border-t pt-8">
+                        <EntityManager
+                            title="Locations"
+                            icon={MapPin}
+                            type="location"
+                            entityId={id}
+                            initialItems={(
+                                initialData?.locationAssociations || []
+                            ).map((la: any) => la.location)}
+                            embedded={true}
+                            listItemsRemote={listLocations}
+                            onchange={onLocationsChange}
+                            addAssociationRemote={async (p: any) =>
+                                addAssociation({
+                                    type: "location",
+                                    entityId: p.itemId,
+                                    contactId: p.entityId,
+                                } as any)}
+                            removeAssociationRemote={async (p: any) =>
+                                removeAssociation({
+                                    type: "location",
+                                    entityId: p.itemId,
+                                    contactId: p.entityId,
+                                } as any)}
+                            fetchAssociationsRemote={async (p: any) =>
+                                fetchContactLocations(p.entityId)}
+                            deleteItemRemote={(ids) =>
+                                deleteLocation(Array.isArray(ids) ? ids : [ids])}
+                            createRemote={createLocation}
                         createSchema={createLocationSchema}
                         updateRemote={updateLocation}
                         updateSchema={updateLocationSchema}
@@ -174,6 +181,7 @@
                         {/snippet}
                     </EntityManager>
                 </div>
+                {/snippet}
             </ContactForm>
         {/snippet}
     </EntityManager>
