@@ -20,8 +20,7 @@
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import EmptyState from "$lib/components/ui/EmptyState.svelte";
 
-    let itemsPromise = $state<Promise<Contact[]>>(listContacts());
-    let resolvedItems = $state<Contact[]>([]);
+    const query = listContacts();
     let selectedIds = $state<Set<string>>(new Set());
 
     function isSelected(id: string) {
@@ -45,13 +44,6 @@
         selectedIds = new Set();
     }
 
-    $effect(() => {
-        itemsPromise
-            .then((items) => {
-                resolvedItems = items;
-            })
-            .catch(() => {});
-    });
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -65,8 +57,8 @@
                 <div class="flex-1 flex justify-end w-full md:w-auto">
                     <BulkActionToolbar
                         selectedCount={selectedIds.size}
-                        totalCount={resolvedItems.length}
-                        onSelectAll={() => selectAll(resolvedItems)}
+                        totalCount={query.current?.length ?? 0}
+                        onSelectAll={() => selectAll(query.current ?? [])}
                         onDeselectAll={deselectAll}
                         onDelete={async () => {
                             await handleDelete({
@@ -76,7 +68,6 @@
                                 itemName: "contact",
                             });
                             deselectAll();
-                            itemsPromise = listContacts();
                         }}
                         newItemHref="/contacts/new"
                         newItemLabel="+ New Contact"
@@ -84,11 +75,18 @@
                 </div>
             </div>
 
-            {#await itemsPromise}
+            {#if query.loading}
                 <LoadingSection message="Loading contacts..." />
-            {:then items}
+            {:else if query.error}
+                <ErrorSection
+                    headline="Failed to load contacts"
+                    message={query.error?.message || "An unexpected error occurred."}
+                    href="/contacts"
+                    button="Retry"
+                />
+            {:else if query.current}
                 <div class="grid gap-4">
-                    {#if items.length === 0}
+                    {#if query.current.length === 0}
                         <EmptyState
                             icon={UserIcon}
                             title="No Contacts"
@@ -97,7 +95,7 @@
                             actionHref="/contacts/new"
                         />
                     {:else}
-                        {#each items as contact (contact.id)}
+                        {#each query.current as contact (contact.id)}
                             <div
                                 class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow"
                             >
@@ -229,7 +227,6 @@
                                             });
                                             if (success) {
                                                 deselectAll();
-                                                itemsPromise = listContacts();
                                             }
                                         }}
                                     >
@@ -240,14 +237,7 @@
                         {/each}
                     {/if}
                 </div>
-            {:catch error}
-                <ErrorSection
-                    headline="Failed to load contacts"
-                    message={error?.message || "An unexpected error occurred."}
-                    href="/contacts"
-                    button="Retry"
-                />
-            {/await}
+            {/if}
         </div>
     </div>
 </div>

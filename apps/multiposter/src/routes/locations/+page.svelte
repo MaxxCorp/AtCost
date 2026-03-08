@@ -13,8 +13,7 @@
 	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
 	import EmptyState from "$lib/components/ui/EmptyState.svelte";
 
-	let itemsPromise = $state<Promise<Location[]>>(listLocations());
-	let initializedItems = $state<Location[]>([]);
+	const query = listLocations();
 	let selectedIds = $state<Set<string>>(new Set());
 
 	function isSelected(id: string) {
@@ -48,8 +47,8 @@
 				<div class="flex-1 flex justify-end w-full md:w-auto">
 					<BulkActionToolbar
 						selectedCount={selectedIds.size}
-						totalCount={initializedItems.length}
-						onSelectAll={() => selectAll(initializedItems)}
+						totalCount={query.current?.length ?? 0}
+						onSelectAll={() => selectAll(query.current ?? [])}
 						onDeselectAll={deselectAll}
 						onDelete={async () => {
 							await handleDelete({
@@ -58,7 +57,6 @@
 								itemName: "location",
 							});
 							deselectAll();
-							itemsPromise = listLocations();
 						}}
 						newItemHref="/locations/new"
 						newItemLabel="+ New Location"
@@ -66,16 +64,18 @@
 				</div>
 			</div>
 
-			{#await itemsPromise}
+			{#if query.loading}
 				<LoadingSection message="Loading locations..." />
-			{:then items}
-				{@html (() => {
-					initializedItems = items;
-					return "";
-				})()}
-
+			{:else if query.error}
+				<ErrorSection
+					headline="Failed to load locations"
+					message={query.error?.message || "An unexpected error occurred."}
+					href="/locations"
+					button="Retry"
+				/>
+			{:else if query.current}
 				<div class="grid gap-4">
-					{#if items.length === 0}
+					{#if query.current.length === 0}
 						<EmptyState
 							icon={MapPin}
 							title="No Locations"
@@ -84,7 +84,7 @@
 							actionHref="/locations/new"
 						/>
 					{:else}
-						{#each items as location (location.id)}
+						{#each query.current as location (location.id)}
 							<div class="mb-6 last:mb-0">
 								<div
 									class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow"
@@ -192,8 +192,6 @@
 													});
 												if (success) {
 													deselectAll();
-													itemsPromise =
-														listLocations();
 												}
 											}}
 										>
@@ -205,14 +203,7 @@
 						{/each}
 					{/if}
 				</div>
-			{:catch error}
-				<ErrorSection
-					headline="Failed to load locations"
-					message={error?.message || "An unexpected error occurred."}
-					href="/locations"
-					button="Retry"
-				/>
-			{/await}
+			{/if}
 		</div>
 	</div>
 </div>

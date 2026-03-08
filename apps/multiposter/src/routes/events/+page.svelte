@@ -29,8 +29,7 @@
 	// import * as Ably from "ably"; // Removing static import
 	import { toast } from "svelte-sonner";
 
-	let itemsPromise = $state<Promise<Event[]>>(listEvents());
-	let resolvedItems = $state<Event[]>([]);
+	const query = listEvents();
 	let selectedIds = $state<Set<string>>(new Set());
 
 	let realtime: any; // Declare realtime at a higher scope
@@ -46,7 +45,7 @@
 						realtime.channels.get("event-changes");
 					eventsChannel.subscribe("change", (message: any) => {
 						console.log("Event update received:", message.data);
-						itemsPromise = listEvents();
+						query.refresh();
 						toast.info("Events updated", {
 							description: "Refreshing list...",
 						});
@@ -127,15 +126,6 @@
 		);
 	}
 
-	$effect(() => {
-		itemsPromise
-			.then((items) => {
-				resolvedItems = items;
-			})
-			.catch(() => {
-				// Error handling is done in the {#await} block
-			});
-	});
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -149,8 +139,8 @@
 				<div class="flex-1 flex justify-end w-full md:w-auto">
 					<BulkActionToolbar
 						selectedCount={selectedIds.size}
-						totalCount={resolvedItems.length}
-						onSelectAll={() => selectAll(resolvedItems)}
+						totalCount={query.current?.length ?? 0}
+						onSelectAll={() => selectAll(query.current ?? [])}
 						onDeselectAll={deselectAll}
 						onDelete={async () => {
 							await handleDelete({
@@ -166,11 +156,18 @@
 				</div>
 			</div>
 
-			{#await itemsPromise}
+			{#if query.loading}
 				<LoadingSection message="Loading events..." />
-			{:then items}
+			{:else if query.error}
+				<ErrorSection
+					headline="Failed to load events"
+					message={query.error?.message || "An unexpected error occurred."}
+					href="/events"
+					button="Retry"
+				/>
+			{:else if query.current}
 				<div class="grid gap-4">
-					{#if items.length === 0}
+					{#if query.current.length === 0}
 						<EmptyState
 							icon={Calendar}
 							title="No Events"
@@ -179,7 +176,7 @@
 							actionHref="/events/new"
 						/>
 					{:else}
-						{#each items as event (event.id)}
+						{#each query.current as event (event.id)}
 							<div class="mb-6 last:mb-0">
 								<div
 									class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow"
@@ -199,12 +196,12 @@
 												<h2
 													class="text-xl font-semibold break-all text-pretty"
 												>
-													<a
-														href={`/events/${event.id}/view`}
-														class="hover:underline text-blue-600"
-													>
-														{event.summary}
-													</a>
+												<a
+													href={`/events/${event.id}/view`}
+													class="hover:underline text-blue-600"
+												>
+													{event.summary}
+												</a>
 												</h2>
 											</div>
 										</div>
@@ -363,8 +360,7 @@
 															toast.success(
 																"Series deleted",
 															);
-															itemsPromise =
-																listEvents();
+															query.refresh();
 															deselectAll();
 														}}
 														><RefreshCw
@@ -411,14 +407,7 @@
 						{/each}
 					{/if}
 				</div>
-			{:catch error}
-				<ErrorSection
-					headline="Failed to load events"
-					message={error?.message || "An unexpected error occurred."}
-					href="/events"
-					button="Retry"
-				/>
-			{/await}
+			{/if}
 		</div>
 	</div>
 </div>

@@ -12,8 +12,7 @@
     import EmptyState from "$lib/components/ui/EmptyState.svelte";
     import { Megaphone, Calendar, Earth, Pencil, Trash2 } from "@lucide/svelte";
 
-    let itemsPromise = $state<Promise<Announcement[]>>(listAnnouncements());
-    let resolvedItems = $state<Announcement[]>([]);
+    const query = listAnnouncements();
     let selectedIds = $state<Set<string>>(new Set());
 
     function isSelected(id: string) {
@@ -33,16 +32,6 @@
     function deselectAll() {
         selectedIds = new Set();
     }
-
-    $effect(() => {
-        itemsPromise
-            .then((items) => {
-                resolvedItems = items;
-            })
-            .catch(() => {
-                // Error handling via #await
-            });
-    });
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -56,8 +45,8 @@
                 <div class="flex-1 flex justify-end w-full md:w-auto">
                     <BulkActionToolbar
                         selectedCount={selectedIds.size}
-                        totalCount={resolvedItems.length}
-                        onSelectAll={() => selectAll(resolvedItems)}
+                        totalCount={query.current?.length ?? 0}
+                        onSelectAll={() => selectAll(query.current ?? [])}
                         onDeselectAll={deselectAll}
                         onDelete={async () => {
                             await handleDelete({
@@ -73,11 +62,18 @@
                 </div>
             </div>
 
-            {#await itemsPromise}
+            {#if query.loading}
                 <LoadingSection message="Loading announcements..." />
-            {:then items}
+            {:else if query.error}
+                <ErrorSection
+                    headline="Failed to load announcements"
+                    message={query.error?.message || "An unexpected error occurred."}
+                    href="/announcements"
+                    button="Retry"
+                />
+            {:else if query.current}
                 <div class="grid gap-4">
-                    {#if items.length === 0}
+                    {#if query.current.length === 0}
                         <EmptyState
                             icon={Megaphone}
                             title="No Announcements"
@@ -86,7 +82,7 @@
                             actionHref="/announcements/new"
                         />
                     {:else}
-                        {#each items as announcement (announcement.id)}
+                        {#each query.current as announcement (announcement.id)}
                             <div class="mb-6 last:mb-0">
                                 <div
                                     class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow"
@@ -194,14 +190,7 @@
                         {/each}
                     {/if}
                 </div>
-            {:catch error}
-                <ErrorSection
-                    headline="Failed to load announcements"
-                    message={error?.message || "An unexpected error occurred."}
-                    href="/announcements"
-                    button="Retry"
-                />
-            {/await}
+            {/if}
         </div>
     </div>
 </div>
