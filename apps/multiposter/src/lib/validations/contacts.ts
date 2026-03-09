@@ -7,6 +7,9 @@ const contactBaseSchema = v.object({
     familyName: v.optional(v.string()),
     honorificPrefix: v.optional(v.string()),
     honorificSuffix: v.optional(v.string()),
+    company: v.optional(v.string()),
+    role: v.optional(v.string()),
+    department: v.optional(v.string()),
     birthday: v.optional(v.string()),
     notes: v.optional(v.string()),
     isPublic: v.optional(v.union([v.boolean(), v.string()])), // FormData doesn't have null

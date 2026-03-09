@@ -1,4 +1,4 @@
-﻿import { query } from '$app/server';
+import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { eq, and, or, gte, desc, isNull, inArray, ilike } from 'drizzle-orm';
 import { event, eventContact, contact, contactEmail, contactPhone, contactAddress, eventResource, resource, location, kiosk, kioskLocation, eventLocation, contactTag, tag, locationContact } from '$lib/server/db/schema';
@@ -8,6 +8,9 @@ import type { Event } from './list.remote';
 export type PublicEvent = Omit<Event, 'resolvedContact'> & {
     resolvedContact: {
         name: string;
+        company?: string | null;
+        role?: string | null;
+        department?: string | null;
         emails: { value: string; type: string | null; primary: boolean }[];
         phones: { value: string; type: string | null; primary: boolean }[];
         address: {
@@ -148,6 +151,9 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
             displayName: contact.displayName,
             givenName: contact.givenName,
             familyName: contact.familyName,
+            company: contact.company,
+            role: contact.role,
+            department: contact.department,
             qrCodePath: contact.qrCodePath,
         })
         .from(eventContact)
@@ -221,6 +227,9 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
                 displayName: contact.displayName,
                 givenName: contact.givenName,
                 familyName: contact.familyName,
+                company: contact.company,
+                role: contact.role,
+                department: contact.department,
                 qrCodePath: contact.qrCodePath,
             }).from(contact).where(inArray(contact.id, extraContactIds));
         }
@@ -292,6 +301,9 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
 
             resolvedContact = {
                 name: chosenContactDetails.displayName || `${chosenContactDetails.givenName || ''} ${chosenContactDetails.familyName || ''}`.trim(),
+                company: chosenContactDetails.company,
+                role: chosenContactDetails.role,
+                department: chosenContactDetails.department,
                 emails: workEmails.map(e => ({ value: e.value, type: e.type, primary: e.primary })),
                 phones: workPhones.map(p => ({ value: p.value, type: p.type, primary: p.primary })),
                 address: primaryAddress ? {

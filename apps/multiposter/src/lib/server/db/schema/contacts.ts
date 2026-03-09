@@ -20,6 +20,9 @@ export const contact = pgTable("contact", {
     honorificSuffix: text("honorific_suffix"),
 
     // Metadata
+    company: text("company"),
+    role: text("role"),
+    department: text("department"),
     birthday: timestamp("birthday"),
     gender: text("gender"),
     notes: text("notes"),

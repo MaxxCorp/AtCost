@@ -15,6 +15,20 @@
       "when": 1772973312456,
       "tag": "0001_odd_dorian_gray",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773039880858,
+      "tag": "0002_yummy_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773042830671,
+      "tag": "0003_moaning_zombie",
+      "breakpoints": true
     }
   ]
 }

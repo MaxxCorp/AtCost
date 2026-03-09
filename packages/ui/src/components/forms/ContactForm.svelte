@@ -54,7 +54,11 @@
         val === undefined || val === null ? def : val;
 
     // svelte-ignore state_referenced_locally
-    let locationIds = $state<string[]>((initialData?.locationAssociations || []).map((la: any) => la.locationId || la.location?.id));
+    let locationIds = $state<string[]>(
+        (initialData?.locationAssociations || []).map(
+            (la: any) => la.locationId || la.location?.id,
+        ),
+    );
     const locationIdsJson = $derived(JSON.stringify(locationIds));
 
     // svelte-ignore state_referenced_locally
@@ -62,6 +66,9 @@
         displayName: d(initialData.contact?.displayName, ""),
         givenName: d(initialData.contact?.givenName, ""),
         familyName: d(initialData.contact?.familyName, ""),
+        company: d(initialData.contact?.company, ""),
+        role: d(initialData.contact?.role, ""),
+        department: d(initialData.contact?.department, ""),
         birthday: d(
             initialData.contact?.birthday
                 ? initialData.contact.birthday instanceof Date
@@ -266,6 +273,41 @@
                 <input
                     {...getField(`${prefix}.birthday`).as("date")}
                     bind:value={contactData.birthday}
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+            <div>
+                <label
+                    for="company"
+                    class="block text-sm font-medium text-gray-700"
+                    >Company</label
+                >
+                <input
+                    {...getField(`${prefix}.company`).as("text")}
+                    bind:value={contactData.company}
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+            <div>
+                <label
+                    for="department"
+                    class="block text-sm font-medium text-gray-700"
+                    >Department</label
+                >
+                <input
+                    {...getField(`${prefix}.department`).as("text")}
+                    bind:value={contactData.department}
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+            <div>
+                <label
+                    for="role"
+                    class="block text-sm font-medium text-gray-700">Role</label
+                >
+                <input
+                    {...getField(`${prefix}.role`).as("text")}
+                    bind:value={contactData.role}
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
             </div>
@@ -504,7 +546,9 @@
     </div>
 
     {#if children}
-        {@render children({ onLocationsChange: (ids: string[]) => locationIds = ids })}
+        {@render children({
+            onLocationsChange: (ids: string[]) => (locationIds = ids),
+        })}
     {/if}
 
     <input {...getField("locationIdsJson").as("hidden", locationIdsJson)} />

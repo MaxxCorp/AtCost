@@ -123,6 +123,18 @@
                                         {contact.honorificSuffix || ""}
                                     </p>
                                 {/if}
+                                {#if contact.company}
+                                    <p class="text-gray-900 text-lg font-semibold mt-1">
+                                        {contact.company}
+                                    </p>
+                                {/if}
+                                {#if contact.role || contact.department}
+                                    <p class="text-gray-600 text-lg font-medium {contact.company ? '' : 'mt-1'}">
+                                        {contact.role || ""}
+                                        {#if contact.role && contact.department} - {/if}
+                                        {contact.department || ""}
+                                    </p>
+                                {/if}
                                 {#if contact.notes}
                                     <p class="mt-4 text-gray-600 italic">
                                         {contact.notes}

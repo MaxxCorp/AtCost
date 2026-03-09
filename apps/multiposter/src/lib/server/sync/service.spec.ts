@@ -80,7 +80,7 @@ describe('SyncService - processExternalEvent deduplication', () => {
 		await service.processExternalEvent(mockConfig, externalEvent);
 
 		// Verify it tried to fetch the event by UUID
-		expect(db.where).toHaveBeenCalledWith(eq(eventTable.id, internalUuid));
+		expect((db as any).where).toHaveBeenCalledWith(eq(eventTable.id, internalUuid));
 		
 		// Verify mapping was healed/created
 		expect(db.insert).toHaveBeenCalledWith(syncMappingTable);

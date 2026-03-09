@@ -99,15 +99,30 @@
                                 {event.resolvedContact.name}
                             </p>
 
-                            {#if event.resolvedContact.address}
-                                <p class="text-sm text-gray-600 mt-1">
-                                    {event.resolvedContact.address.street}
-                                    {event.resolvedContact.address
-                                        .houseNumber}<br />
-                                    {event.resolvedContact.address.zip}
-                                    {event.resolvedContact.address.city}<br />
-                                    {event.resolvedContact.address.country}
+                            {#if event.resolvedContact.company}
+                                <p class="text-sm text-gray-800 font-medium mt-1">
+                                    {event.resolvedContact.company}
                                 </p>
+                            {/if}
+                            {#if event.resolvedContact.role || event.resolvedContact.department}
+                                <p class="text-sm text-gray-600 {event.resolvedContact.company ? '' : 'mt-1'}">
+                                    {event.resolvedContact.role || ""}
+                                    {#if event.resolvedContact.role && event.resolvedContact.department} - {/if}
+                                    {event.resolvedContact.department || ""}
+                                </p>
+                            {/if}
+
+                            {#if event.resolvedContact}
+                                {@const resolvedContactAny = event.resolvedContact as any}
+                                {@const mainAddress = resolvedContactAny.address || resolvedContactAny.addresses?.find((a: any) => a.primary) || resolvedContactAny.addresses?.[0]}
+                            {#if mainAddress}
+                                <p class="text-sm text-gray-600 mt-1">
+                                    {mainAddress.street || ""} {mainAddress.houseNumber || ""}<br />
+                                    {#if mainAddress.zip || mainAddress.city}
+                                        {mainAddress.zip || ""} {mainAddress.city || ""}
+                                    {/if}
+                                </p>
+                            {/if}
                             {/if}
 
                             <div class="mt-2 space-y-1">
@@ -115,7 +130,7 @@
                                     <p class="text-sm text-gray-600">
                                         <a
                                             href="mailto:{email.value}"
-                                            class="hover:text-blue-600"
+                                            class="hover:text-blue-600 break-all"
                                             >{email.value}</a
                                         >
                                         {#if email.type}<span
