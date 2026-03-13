@@ -573,6 +573,9 @@ export class SyncService {
 				metadata: null
 			});
 
+			// Generate assets for the new event
+			await import('$lib/server/events/assets').then(m => m.generateEventAssets(newEvent.id));
+
 			await publishEventChange('create', [newEvent.id]);
 
 			// Update event contacts associations and their status

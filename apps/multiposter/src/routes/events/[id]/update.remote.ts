@@ -196,6 +196,13 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 			// Also delete by legacy recurringEventId for backward compatibility
 			await db.delete(event).where(eq(event.recurringEventId, data.id));
 
+			// 2b. Handle series record
+			let origin: string | undefined;
+			try {
+				const { getRequestEvent } = await import('$app/server');
+				origin = getRequestEvent()?.url.origin;
+			} catch (e) { /* ignore */ }
+
 			// 2. Handle series record
 			let seriesId = updatedEvent.seriesId;
 			// Normalize recurrence to string (form can send string or string[])
@@ -294,6 +301,9 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 						contactIds,
 						tags: tagNames
 					});
+
+					// Generate assets for instance
+					await generateEventAssets(instanceId, origin);
 				}
 			} else {
 				// Recurrence was cleared - delete series record if exists
@@ -307,12 +317,7 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 			}
 		}
 
-		console.log('Regenerating assets via update.remote...');
-		let origin: string | undefined;
-		try {
-			const { getRequestEvent } = await import('$app/server');
-			origin = getRequestEvent()?.url.origin;
-		} catch (e) { /* ignore */ }
+		console.log('Regenerating assets for master event via update.remote...');
 		await generateEventAssets(data.id, origin);
 
 		console.log('Event updated successfully, refreshing list...');

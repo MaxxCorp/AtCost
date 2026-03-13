@@ -221,6 +221,13 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 		// Link associations for master event
 		await linkAssociations(newEvent.id);
 
+		// Determine origin for asset generation (shared by instances and master)
+		let origin: string | undefined;
+		try {
+			const { getRequestEvent } = await import('$app/server');
+			origin = getRequestEvent()?.url.origin;
+		} catch (e) { /* ignore */ }
+
 		// Handle Instances
 		if (recurrenceRule) {
 			try {
@@ -262,10 +269,8 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 					// Link associations for instance
 					await linkAssociations(instanceId);
 
-					// Assets for instance
-					// await generateEventAssets(instanceId, origin); // Optional for instances, maybe on demand?
-					// Actually, assets might be needed for each instance if they have unique QR codes.
-					// Let's generate them.
+					// Generate assets for instance
+					await generateEventAssets(instanceId, origin);
 				}
 			} catch (e) {
 				console.error('Error expanding recurrence:', e);
@@ -273,12 +278,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 			}
 		}
 
-		console.log('Generating assets via create.remote...');
-		let origin: string | undefined;
-		try {
-			const { getRequestEvent } = await import('$app/server');
-			origin = getRequestEvent()?.url.origin;
-		} catch (e) { /* ignore */ }
+		console.log('Generating assets for master event via create.remote...');
 		await generateEventAssets(newEvent.id, origin);
 
 		// Note: We are not generating assets for all instances synchronously to avoid timeout.
