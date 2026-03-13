@@ -14,7 +14,13 @@ import {
 	syncMapping as syncMappingTable,
 	webhookSubscription as webhookSubscriptionTable,
 	event as eventTable,
+	announcement as announcementTable,
+	announcementLocation as announcementLocation,
+	announcementTag as announcementTag,
 	eventContact as eventContactTable,
+
+
+
 	tag as tagTable,
 	contactTag as contactTagTable,
 	user as userTable,
@@ -829,16 +835,23 @@ export class SyncService {
 	 * Map internal event to external event format
 	 */
 	private async mapInternalToExternal(
-		internal: typeof eventTable.$inferSelect,
+		internal: any,
 		providerId: ProviderType
 	): Promise<ExternalEvent> {
+
+		const isEvent = 'summary' in internal;
+		const entityType = isEvent ? 'event' : 'announcement';
+
+		const summary = internal.summary || internal.title || '';
+		const descriptionRaw = internal.description || internal.content || '';
+
 		// Fetch recurrence from series table if seriesId is present
 		let recurrenceRules: string[] | undefined = undefined;
-		if ((internal as any).seriesId) {
+		if (internal.seriesId) {
 			const [series] = await db
 				.select()
 				.from(recurringSeries)
-				.where(eq(recurringSeries.id, (internal as any).seriesId));
+				.where(eq(recurringSeries.id, internal.seriesId));
 			if (series?.rrule) {
 				recurrenceRules = [series.rrule];
 			}
@@ -848,14 +861,15 @@ export class SyncService {
 			recurrenceRules = internal.recurrence as string[];
 		}
 
+
 		// Fetch associated contacts
-		const associatedContacts = await getEntityContacts('event', internal.id);
+		const associatedContacts = await getEntityContacts(entityType, internal.id);
 
 		// Filter out contacts with "Employee" tag
 		const attendees = [];
 		for (const contact of associatedContacts) {
 			const contactTags = (contact as any).tags || [];
-			const isEmployee = contactTags.some((ct: any) => ct.tag.name.toLowerCase() === 'employee');
+			const isEmployee = contactTags.some((ct: any) => ct.tag.name.toLowerCase() === 'employee' || ct.tag.name.toLowerCase() === 'employees');
 
 			if (!isEmployee) {
 				// Get primary email
@@ -864,23 +878,29 @@ export class SyncService {
 
 				if (email) {
 					// Find the association to get participation status
-					const [assoc] = await db
-						.select()
-						.from(eventContactTable)
-						.where(and(
-							eq(eventContactTable.eventId, internal.id),
-							eq(eventContactTable.contactId, contact.id)
-						))
-						.limit(1);
+					let participationStatus: string | null = null;
+
+					if (isEvent) {
+						const [assoc] = await db
+							.select()
+							.from(eventContactTable)
+							.where(and(
+								eq(eventContactTable.eventId, internal.id),
+								eq(eventContactTable.contactId, contact.id)
+							))
+							.limit(1);
+						participationStatus = assoc?.participationStatus || null;
+					}
 
 					attendees.push({
 						email,
 						displayName: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
-						responseStatus: assoc?.participationStatus || 'needsAction'
+						responseStatus: participationStatus || 'needsAction'
 					});
 				}
 			}
 		}
+
 
 
 		// Resolve Venue (Location)
@@ -888,11 +908,14 @@ export class SyncService {
 		let venueId: string | undefined;
 
 		// Try to find structured location data first
+		const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
+		const whereClause = isEvent ? eq(eventLocationTable.eventId, internal.id) : eq(announcementLocation.announcementId, internal.id);
+
 		const [locationMapping] = await db
 			.select({ location: locationTable })
-			.from(eventLocationTable)
-			.innerJoin(locationTable, eq(eventLocationTable.locationId, locationTable.id))
-			.where(eq(eventLocationTable.eventId, internal.id))
+			.from(locationTableToUse as any)
+			.innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id))
+			.where(whereClause as any)
 			.limit(1);
 
 		if (locationMapping) {
@@ -903,7 +926,6 @@ export class SyncService {
 				city: locationMapping.location.city ?? undefined,
 				country: locationMapping.location.country ?? undefined,
 				zip: locationMapping.location.zip ?? undefined,
-				// Province/State not strictly typed in location schema but often part of address
 				province: locationMapping.location.state ?? undefined,
 			};
 		} else if (internal.location) {
@@ -939,47 +961,54 @@ export class SyncService {
 			}
 		}
 
+
 		// Resolve Tags
 		const tags: Array<{ id: string; name: string }> = [];
-		// Fetch tags linked to this event
-		const eventTags = await db
-			.select({ tag: tagTable })
-			.from(eventTag) // Assuming eventTag is imported (might need to check imports)
-			.innerJoin(tagTable, eq(eventTag.tagId, tagTable.id))
-			.where(eq(eventTag.eventId, internal.id));
+		const tagTableToUse = isEvent ? eventTag : announcementTag;
+		const tagWhereClause = isEvent ? eq(eventTag.eventId, internal.id) : eq(announcementTag.announcementId, internal.id);
 
-		if (eventTags.length > 0) {
-			tags.push(...eventTags.map(t => ({ id: t.tag.id, name: t.tag.name })));
+		const entityTags = await db
+			.select({ tag: tagTable })
+			.from(tagTableToUse as any)
+			.innerJoin(tagTable, eq((tagTableToUse as any).tagId, tagTable.id))
+			.where(tagWhereClause as any);
+
+		if (entityTags.length > 0) {
+			tags.push(...entityTags.map(t => ({ id: t.tag.id, name: t.tag.name })));
 		}
 
 		// Helper to resolve absolute URLs
-		const baseUrl = env.BETTER_AUTH_URL || 'https://localhost:5173';
 		const resolveUrl = (url: string | null | undefined) => {
 			if (!url) return undefined;
 			if (url.startsWith('http')) return url;
-			return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+			// Use env.BETTER_AUTH_URL if available (from imports)
+			const authUrl = (typeof env !== 'undefined' && (env as any).BETTER_AUTH_URL) || 
+							(typeof process !== 'undefined' && process.env?.BETTER_AUTH_URL) || 
+							'http://localhost:5173';
+			return `${authUrl}${url.startsWith('/') ? '' : '/'}${url}`;
 		};
 
 		// Map Image (First Attachment)
 		let image: ExternalEvent['image'] | undefined;
-		if (internal.attachments && internal.attachments.length > 0) {
-			const firstAttachment = internal.attachments[0];
+		const attachments = internal.attachments || [];
+		if (attachments.length > 0) {
+			const firstAttachment = attachments[0];
 			if (firstAttachment.fileUrl) {
 				image = {
 					url: resolveUrl(firstAttachment.fileUrl)!,
-					title: firstAttachment.title
+					title: firstAttachment.title || summary
 				};
 			}
 		}
 
-		// Fallback: Extract image from content if no attachment
-		let description = internal.description ?? undefined;
+		// Fallback: Extract image from description if no attachment
+		let description = descriptionRaw || undefined;
 		if (!image && description) {
 			const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
 			if (imgMatch && imgMatch[1]) {
 				image = {
 					url: resolveUrl(imgMatch[1])!,
-					title: internal.summary // Use event title as fallback
+					title: summary
 				};
 			}
 		}
@@ -988,20 +1017,20 @@ export class SyncService {
 		if (description) {
 			description = description.replace(
 				/(src|href)="(\/[^"]+)"/g,
-				(match, attr, path) => `${attr}="${resolveUrl(path)}"`
+				(match: string, attr: string, path: string) => `${attr}="${resolveUrl(path)}"`
 			);
 		}
 
 		return {
 			externalId: '',
 			providerId,
-			summary: internal.summary,
-			description: description,
-			location: internal.location ?? undefined,
-			startDateTime: internal.startDateTime ?? undefined,
-			startTimeZone: internal.startTimeZone ?? undefined,
-			endDateTime: internal.endDateTime ?? undefined,
-			endTimeZone: internal.endTimeZone ?? undefined,
+			summary,
+			description,
+			location: venue?.name || internal.location || undefined,
+			startDateTime: internal.startDateTime || internal.createdAt || new Date(),
+			startTimeZone: internal.startTimeZone || 'UTC',
+			endDateTime: internal.endDateTime || null,
+			endTimeZone: internal.endTimeZone || 'UTC',
 			attendees: attendees.length > 0 ? attendees : undefined,
 			recurrence: recurrenceRules,
 			reminders: (internal.reminders as any) ?? undefined,
@@ -1015,11 +1044,12 @@ export class SyncService {
 			metadata: {
 				eventId: internal.id,
 				seriesId: (internal as any).seriesId ?? undefined,
-				app_event_id: internal.id, // Pass internal ID to provider for loop prevention
+				app_event_id: internal.id,
 				organizerId: organizerId,
 				locationId: venueId
 			}
 		};
+
 	}
 
 	/**
@@ -1033,10 +1063,10 @@ export class SyncService {
 	}
 
 	/**
-	 * Sync specific events to all configured bidirectional or push sync providers
+	 * Sync specific items to all configured bidirectional or push sync providers
 	 * Used after create/update/delete operations to immediately push changes
 	 */
-	async syncSpecificEvents(userId: string, eventIds: string[]): Promise<void> {
+	async syncItems(userId: string, itemIds: string[], entityType: 'event' | 'announcement' = 'event'): Promise<void> {
 
 
 		try {
@@ -1053,7 +1083,7 @@ export class SyncService {
 				return;
 			}
 
-			console.log(`[SyncService] Found ${pushConfigs.length} push configs. Processing eventIds:`, eventIds);
+			console.log(`[SyncService] Found ${pushConfigs.length} push configs. Processing ${entityType}Ids:`, itemIds);
 
 
 
@@ -1065,9 +1095,9 @@ export class SyncService {
 					syncConfigId: config.id,
 					operation: 'push',
 					status: 'pending',
-					entityType: 'event',
+					entityType: entityType,
 					startedAt: new Date(),
-					entityId: eventIds.length === 1 ? eventIds[0] : null,
+					entityId: itemIds.length === 1 ? itemIds[0] : null,
 				}).returning({ id: syncOperationTable.id });
 
 				const operationId = operationRow.id;
@@ -1075,8 +1105,8 @@ export class SyncService {
 				try {
 					const provider = await this.getProviderInstance(config);
 
-					for (const eventId of eventIds) {
-						await this.syncSingleEvent(config, provider, eventId);
+					for (const itemId of itemIds) {
+						await this.syncSingleItem(config, provider, itemId, entityType);
 					}
 
 					// Update operation status
@@ -1106,119 +1136,114 @@ export class SyncService {
 
 
 		} catch (error: any) {
-			console.error(`[SyncService] Error in syncSpecificEvents:`, error);
+			console.error(`[SyncService] Error in syncItems:`, error);
 			// Don't throw - sync failures shouldn't break CRUD operations
 		}
 	}
 
+
 	/**
 	 * Sync a single event to a provider (create, update, or delete)
 	 */
-	private async syncSingleEvent(
+	private async syncSingleItem(
 		config: SyncConfig,
 		provider: SyncProvider,
-		eventId: string
+		itemId: string,
+		entityType: 'event' | 'announcement' = 'event'
 	): Promise<void> {
 
-
 		try {
-			// Check if event exists - BROADEN SEARCH to debug identity issues
-			const [eventRow] = await db
+			// Check if item exists
+			const table = entityType === 'event' ? eventTable : announcementTable;
+			const [itemRow] = await db
 				.select()
-				.from(eventTable)
-				.where(eq(eventTable.id, eventId));
+				.from(table)
+				.where(eq(table.id, itemId));
 
 			// Check for existing mapping
+			// The syncMappingTable has separate columns for eventId and announcementId
+			const mappingWhere = entityType === 'event'
+				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+				: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
+
 			const [mapping] = await db
 				.select()
 				.from(syncMappingTable)
-				.where(
-					and(
-						eq(syncMappingTable.eventId, eventId),
-						eq(syncMappingTable.syncConfigId, config.id)
-					)
-				);
+				.where(mappingWhere);
 
 			// Check granular sync settings (campaign-based)
-			const [eventWithCampaign] = await db
+			const [itemWithCampaign] = await db
 				.select({ campaign: campaignTable })
-				.from(eventTable)
-				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-				.where(eq(eventTable.id, eventId))
+				.from(table)
+				.leftJoin(campaignTable, eq(table.campaignId, campaignTable.id))
+				.where(eq(table.id, itemId))
 				.limit(1);
 
-			const syncIds = eventWithCampaign?.campaign?.content ? ((eventWithCampaign.campaign.content as any).syncIds || []) : [];
+			const syncIds = itemWithCampaign?.campaign?.content ? ((itemWithCampaign.campaign.content as any).syncIds || []) : [];
 			const shouldBeSynced = syncIds.includes(config.id);
 
 			if (!shouldBeSynced && !mapping) {
 				// Not selected for this sync and no existing mapping to clean up
-				console.log(`[SyncService] Skipping event ${eventId}: not selected for synchronization config ${config.id}`);
+				console.log(`[SyncService] Skipping ${entityType} ${itemId}: not selected for synchronization config ${config.id}`);
 				return;
 			}
 
 			if (!shouldBeSynced && mapping) {
-				// The event was previously mapped but has now been deselected
-				console.log(`[SyncService] Un-publishing event ${eventId} from provider: has been deselected for config ${config.id}`);
+				// The item was previously mapped but has now been deselected
+				console.log(`[SyncService] Un-publishing ${entityType} ${itemId} from provider: has been deselected for config ${config.id}`);
 				try {
-					await provider.deleteEvent(mapping.externalId);
+					await provider.deleteEvent(mapping.externalId); // Provider currently only has deleteEvent
 					await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
 				} catch (e: any) {
-					console.error(`[SyncService] Failed to un-publish event ${eventId}:`, e);
+					console.error(`[SyncService] Failed to un-publish ${entityType} ${itemId}:`, e);
 				}
 				return;
 			}
 
-			if (!eventRow) {
-				console.warn(`[SyncService] Event ${eventId} not found in database at all.`);
+			if (!itemRow) {
+				console.warn(`[SyncService] ${entityType} ${itemId} not found in database at all.`);
 				return;
 			}
 
-			console.log(`[SyncService] Syncing event ${eventId} ("${eventRow.summary}") to provider: ${config.providerType}. Status: ${mapping ? 'update' : 'create'}`);
+			console.log(`[SyncService] Syncing ${entityType} ${itemId} ("${(itemRow as any).summary || (itemRow as any).title}") to provider: ${config.providerType}. Status: ${mapping ? 'update' : 'create'}`);
 
-			console.log(`[SyncService] Found event ${eventId} (User: ${eventRow.userId}). Proceeding with sync to ${config.providerType} (${config.id}).`);
+			console.log(`[SyncService] Found ${entityType} ${itemId} (User: ${itemRow.userId}). Proceeding with sync to ${config.providerType} (${config.id}).`);
 
 			if (mapping) {
-				// Update existing event
-
-
-				// Check if this event was recently synced from provider (within last 30 seconds)
-				// This prevents echo loops where: provider → pull → local update → push back
-				// REMOVED: This check blocks legitimate user updates immediately after a sync/creation.
-				// Since SyncService updates DB directly without triggering 'triggerPushSync', 
-				// the echo loop risk is minimal for user-initiated actions.
-
-				const externalEvent = await this.mapInternalToExternal(eventRow, config.providerType);
-				const { etag } = await provider.updateEvent(mapping.externalId, externalEvent);
+				// Update existing item
+				const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
+				const { etag } = await provider.updateEvent(mapping.externalId, externalItem);
 
 				await db
 					.update(syncMappingTable)
 					.set({ etag: etag ?? null, lastSyncedAt: new Date() })
 					.where(eq(syncMappingTable.id, mapping.id));
 			} else {
-				// Create new event
+				// Create new item
+				const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
+				const { externalId, etag } = await provider.pushEvent(externalItem);
 
-				const externalEvent = await this.mapInternalToExternal(eventRow, config.providerType);
-				const { externalId, etag } = await provider.pushEvent(externalEvent);
-
-				console.log(`[SyncService] Created mapping for event ${eventId} → external ${externalId}`);
+				console.log(`[SyncService] Created mapping for ${entityType} ${itemId} → external ${externalId}`);
 				// Create mapping immediately to prevent duplicates if webhook fires quickly
 				await db.insert(syncMappingTable).values({
 					syncConfigId: config.id,
-					eventId: eventRow.id,
+					eventId: entityType === 'event' ? itemRow.id : null,
+					announcementId: entityType === 'announcement' ? itemRow.id : null,
 					externalId: externalId,
 					providerId: config.providerId,
 					etag: etag ?? null,
 					lastSyncedAt: new Date()
 				});
-				console.log(`[SyncService] Successfully saved mapping to database for event ${eventId}`);
+				console.log(`[SyncService] Successfully saved mapping to database for ${entityType} ${itemId}`);
 			}
 
 
 		} catch (error: any) {
-			console.error(`[SyncService] Failed to sync event ${eventId}:`, error);
-			// Log but don't throw - we want to continue with other events
+			console.error(`[SyncService] Failed to sync ${entityType} ${itemId}:`, error);
+			// Log but don't throw - we want to continue with other items
 		}
 	}
+
 
 	/**
 	 * Delete event mappings for specific events (called after event deletion)
@@ -1338,13 +1363,14 @@ export class SyncService {
 	 * Trigger push sync for a user
 	 * Should be called when a user creates/updates an event locally
 	 */
-	async triggerPushSync(userId: string, eventId?: string): Promise<void> {
+	async triggerPushSync(userId: string, itemId?: string, entityType: 'event' | 'announcement' = 'event'): Promise<void> {
 		try {
-			if (eventId) {
-				// optimized path: sync only the specific event
-				await this.syncSpecificEvents(userId, [eventId]);
+			if (itemId) {
+				// optimized path: sync only the specific item
+				await this.syncItems(userId, [itemId], entityType);
 				return;
 			}
+
 
 			// Find all enabled sync configs with push direction (Global sweep)
 			const configs = await db

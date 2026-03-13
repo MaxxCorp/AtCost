@@ -7,6 +7,8 @@ import { publishAnnouncementChange } from '$lib/server/realtime';
 import { listAnnouncements } from '../list.remote';
 import { readAnnouncement } from './read.remote';
 import { eq } from 'drizzle-orm';
+import { syncService } from '$lib/server/sync/service';
+
 
 /**
  * Command: Update an existing announcement
@@ -155,7 +157,11 @@ export const updateExistingAnnouncement = form(updateAnnouncementSchema, async (
         await (listAnnouncements() as any).refresh();
         await (readAnnouncement as any).refresh(announcementId);
 
+        // Trigger background sync to external providers
+        await syncService.triggerPushSync(user.id, announcementId, 'announcement');
+
         return {
+
             success: true,
             id: announcementId
         };

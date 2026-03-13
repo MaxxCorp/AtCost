@@ -1,6 +1,6 @@
 import { getRequestEvent } from '$app/server';
 import type { UserWithRolesAndClaims } from '../auth.d';
-import { hasAccess as sharedHasAccess } from '../authorization';
+import { hasAccess as sharedHasAccess, type Feature, type AccessLevel } from '../authorization';
 
 export * from '../authorization';
 
@@ -25,8 +25,9 @@ export function getOptionalUser(): UserWithRolesAndClaims | null {
 	return event.locals.user as UserWithRolesAndClaims | null;
 }
 
-export function ensureAccess(user: UserWithRolesAndClaims, feature: any) {
-	if (sharedHasAccess(user, feature)) return;
+export function ensureAccess(user: UserWithRolesAndClaims, feature: Feature, level: AccessLevel = 'admin') {
+	if (sharedHasAccess(user, feature, level)) return;
 	throw new Error('Forbidden');
 }
+
 

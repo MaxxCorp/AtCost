@@ -5,6 +5,8 @@ import { createAnnouncementSchema } from '$lib/validations/announcements';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
 import { listAnnouncements } from '../list.remote';
+import { syncService } from '$lib/server/sync/service';
+
 
 /**
  * Command: Create a new announcement
@@ -129,7 +131,11 @@ export const createNewAnnouncement = form(createAnnouncementSchema, async (input
         // Refresh list cache if applicable
         await (listAnnouncements() as any).refresh();
 
+        // Trigger background sync to external providers
+        await syncService.triggerPushSync(user.id, announcementId, 'announcement');
+
         return {
+
             success: true,
             id: announcementId
         };

@@ -33,16 +33,34 @@ export function parseClaims<T extends Record<string, unknown> = Record<string, u
 	return null;
 }
 
-export function hasAccess(user: UserWithRolesAndClaims, feature: Feature): boolean {
+export type AccessLevel = 'use' | 'admin';
+
+export function hasAccess(user: UserWithRolesAndClaims | null | undefined, feature: Feature, level: AccessLevel = 'admin'): boolean {
+	if (!user) return false;
+
 	const roles = parseRoles(user);
 	if (roles.includes('admin')) return true;
-	const claims = parseClaims<Record<string, boolean>>(user);
 
-	// Check for the current claim key
-	if (claims?.[feature]) return true;
+	const claims = parseClaims<Record<string, any>>(user);
+	if (!claims) return false;
 
-	// Backward compatibility: check for old 'calendarSyncs' key if checking 'synchronizations'
-	if (feature === 'synchronizations' && claims?.['calendarSyncs']) return true;
+	const claimValue = claims[feature];
 
-	return false;
+	// If the claim is explicitly true, the user has full (admin) access
+	if (claimValue === true) return true;
+
+	// Handle feature-specific granular levels
+	if (feature === 'synchronizations') {
+		if (level === 'use') {
+			// 'admin' level also implies 'use' level
+			return claimValue === 'use' || claimValue === 'admin' || claims['calendarSyncs'] === true;
+		}
+		if (level === 'admin') {
+			return claimValue === 'admin' || claims['calendarSyncs'] === true;
+		}
+	}
+
+	// Default: check for the feature key (boolean or truthy)
+	return !!claimValue;
 }
+

@@ -63,18 +63,18 @@
             : {};
 
     // svelte-ignore state_referenced_locally
-    const initialClaimsMap: Record<string, boolean> = {};
+    const initialClaimsMap: Record<string, any> = {};
     FEATURES.forEach((f) => {
-        if (initialClaims[f.key]) initialClaimsMap[f.key] = true;
+        if (initialClaims[f.key]) initialClaimsMap[f.key] = initialClaims[f.key];
     });
 
     let isAdmin = $state(initialIsAdmin);
     let claimsMap = $state(initialClaimsMap);
 
     let claimsJson = $derived.by(() => {
-        const c: Record<string, boolean> = {};
+        const c: Record<string, any> = {};
         for (const [k, v] of Object.entries(claimsMap)) {
-            if (v) c[k] = true;
+            if (v) c[k] = v;
         }
         return JSON.stringify(c);
     });
@@ -160,21 +160,46 @@
         <h3 class="text-lg font-medium text-gray-900 mb-2">
             Claims (Feature Access)
         </h3>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             {#each FEATURES as feature}
-                <label class="flex items-center space-x-2">
-                    <input
-                        type="checkbox"
-                        checked={claimsMap[feature.key]}
-                        onchange={(e) => {
-                            claimsMap[feature.key] = e.currentTarget.checked;
-                        }}
-                        class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                    />
-                    <span class="text-sm text-gray-700">{feature.title}</span>
-                </label>
+                <div class="space-y-2">
+                    <span class="text-sm font-medium text-gray-900">{feature.title}</span>
+                    {#if feature.key === 'synchronizations'}
+                        <select
+                            value={claimsMap[feature.key] === true ? 'admin' : (claimsMap[feature.key] || 'none')}
+                            onchange={(e) => {
+                                const val = e.currentTarget.value;
+                                if (val === 'none') {
+                                    const next = { ...claimsMap };
+                                    delete next[feature.key];
+                                    claimsMap = next;
+                                } else {
+                                    claimsMap[feature.key] = val;
+                                }
+                            }}
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        >
+                            <option value="none">None (No Access)</option>
+                            <option value="use">Use Only (Select Syncs for Items)</option>
+                            <option value="admin">Administrator (Full Access)</option>
+                        </select>
+                    {:else}
+                        <label class="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 border border-transparent cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={!!claimsMap[feature.key]}
+                                onchange={(e) => {
+                                    claimsMap[feature.key] = e.currentTarget.checked;
+                                }}
+                                class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                            />
+                            <span class="text-sm text-gray-700">Enabled</span>
+                        </label>
+                    {/if}
+                </div>
             {/each}
         </div>
+
     </div>
 
     {#if isUpdating && initialData?.id}

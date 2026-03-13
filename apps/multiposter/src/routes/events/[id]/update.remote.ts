@@ -320,7 +320,8 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 		if (updatedEvent) {
 			await publishEventChange('update', [updatedEvent.id]);
 			// Trigger background sync to external providers
-			await syncService.triggerPushSync(user.id, updatedEvent.id);
+			await syncService.triggerPushSync(user.id, updatedEvent.id, 'event');
+
 		}
 
 		await listEvents().refresh();

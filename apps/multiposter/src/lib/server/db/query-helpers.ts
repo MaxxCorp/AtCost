@@ -2,7 +2,7 @@
  * Reusable utility for common database query patterns
  */
 import { db } from '$lib/server/db';
-import { getAuthenticatedUser, ensureAccess, type Feature } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess, type Feature, type AccessLevel } from '$lib/server/authorization';
 import { eq, desc, type SQL } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 
@@ -11,6 +11,8 @@ export interface ListQueryConfig<T extends PgTable> {
 	table: T;
 	/** The feature name for access control (e.g., "events", "campaigns") */
 	featureName: Feature;
+	/** Optional access level (defaults to 'admin') */
+	accessLevel?: AccessLevel;
 	/** Optional custom order by clause (defaults to desc(table.createdAt)) */
 	orderBy?: SQL;
 	/** Optional data transformer function */
@@ -26,10 +28,10 @@ export interface ListQueryConfig<T extends PgTable> {
  * 5. Return results
  */
 export async function listQuery<T extends PgTable>(config: ListQueryConfig<T>): Promise<any[]> {
-	const { table, featureName, orderBy: customOrderBy, transform } = config;
+	const { table, featureName, accessLevel = 'admin', orderBy: customOrderBy, transform } = config;
 
 	const user = getAuthenticatedUser();
-	ensureAccess(user, featureName);
+	ensureAccess(user, featureName, accessLevel);
 
 	const query = db
 		.select()
@@ -57,6 +59,8 @@ export interface GetQueryConfig<T extends PgTable> {
 	table: T;
 	/** The feature name for access control (e.g., "events", "campaigns") */
 	featureName: Feature;
+	/** Optional access level (defaults to 'admin') */
+	accessLevel?: AccessLevel;
 	/** The ID of the item to fetch */
 	id: string;
 	/** Optional data transformer function */
@@ -71,15 +75,16 @@ export interface GetQueryConfig<T extends PgTable> {
  * 4. Return result or null
  */
 export async function getQuery<T extends PgTable>(config: GetQueryConfig<T>): Promise<any | null> {
-	const { table, featureName, id, transform } = config;
+	const { table, featureName, accessLevel = 'admin', id, transform } = config;
 
 	const user = getAuthenticatedUser();
-	ensureAccess(user, featureName);
+	ensureAccess(user, featureName, accessLevel);
 
 	const results = await db
 		.select()
 		.from(table as any)
 		.where(eq((table as any).id, id))
+
 		.limit(1);
 
 	if (results.length === 0) return null;
