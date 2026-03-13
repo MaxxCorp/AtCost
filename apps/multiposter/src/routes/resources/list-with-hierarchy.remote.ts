@@ -1,11 +1,11 @@
-﻿import { type InferSelectModel } from 'drizzle-orm';
+import { type InferSelectModel, eq, getTableColumns, inArray, and } from 'drizzle-orm';
 import { query } from '$app/server';
-import { resource, resourceRelation } from '$lib/server/db/schema';
+import { resource, resourceRelation, location, resourceLocation } from '$lib/server/db/schema';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { db } from '$lib/server/db';
-import { eq } from 'drizzle-orm';
 
 export type ResourceWithHierarchy = InferSelectModel<typeof resource> & {
+    locationName?: string | null;
     parentIds: string[];
     childIds: string[];
     level: number; // Depth in hierarchy (0 = root)
@@ -20,8 +20,36 @@ export const listResourcesWithHierarchy = query(async (): Promise<ResourceWithHi
 
     // Fetch all resources
     const resources = await db
-        .select()
+        .select({
+            ...getTableColumns(resource),
+        })
         .from(resource);
+
+    // Fetch all location associations for these resources
+    const resourceIds = resources.map(r => r.id);
+    const locationMap = new Map<string, string[]>();
+
+    if (resourceIds.length > 0) {
+        const locAssociations = await db
+            .select({
+                resourceId: resourceLocation.resourceId,
+                locationName: location.name,
+            })
+            .from(resourceLocation)
+            .innerJoin(location, eq(resourceLocation.locationId, location.id))
+            .where(and(inArray(resourceLocation.resourceId, resourceIds)));
+
+        locAssociations.forEach(assoc => {
+            const names = locationMap.get(assoc.resourceId) || [];
+            names.push(assoc.locationName);
+            locationMap.set(assoc.resourceId, names);
+        });
+    }
+
+    const resourcesWithLocation = resources.map(r => ({
+        ...r,
+        locationName: locationMap.get(r.id)?.join(', ') || null,
+    }));
 
     // Fetch all relationships
     const relations = await db
@@ -34,7 +62,7 @@ export const listResourcesWithHierarchy = query(async (): Promise<ResourceWithHi
     const childMap = new Map<string, string[]>(); // parentId -> childIds[]
 
     // Initialize maps
-    resources.forEach(r => {
+    resourcesWithLocation.forEach(r => {
         resourceMap.set(r.id, {
             ...r,
             parentIds: [],

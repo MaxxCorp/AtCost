@@ -87,6 +87,22 @@ export const kioskLocation = pgTable("kiosk_location", {
     index("kiosk_location_location_idx").on(table.locationId),
 ]);
 
+/**
+ * Resource <-> Location Junction
+ */
+export const resourceLocation = pgTable("resource_location", {
+    resourceId: uuid("resource_id")
+        .notNull()
+        .references(() => resource.id, { onDelete: "cascade" }),
+    locationId: uuid("location_id")
+        .notNull()
+        .references(() => location.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.resourceId, table.locationId] }),
+    index("resource_location_resource_idx").on(table.resourceId),
+    index("resource_location_location_idx").on(table.locationId),
+]);
+
 // --- RELATIONS ---
 
 export const eventRelations = relations(event, ({ many, one }) => ({
@@ -105,6 +121,7 @@ export const locationRelations = relations(location, ({ many }) => ({
     eventLocations: many(eventLocation),
     announcementLocations: many(announcementLocation),
     kioskLocations: many(kioskLocation),
+    resourceLocations: many(resourceLocation),
 }));
 
 export const resourceRelations = relations(resource, ({ one, many }) => ({
@@ -113,6 +130,7 @@ export const resourceRelations = relations(resource, ({ one, many }) => ({
         references: [location.id],
     }),
     eventResources: many(eventResource),
+    locations: many(resourceLocation),
 }));
 
 export const announcementRelations = relations(announcement, ({ many }) => ({
@@ -188,5 +206,16 @@ export const announcementContactRelations = relations(announcementContact, ({ on
     contact: one(contact, {
         fields: [announcementContact.contactId],
         references: [contact.id],
+    }),
+}));
+
+export const resourceLocationRelations = relations(resourceLocation, ({ one }) => ({
+    resource: one(resource, {
+        fields: [resourceLocation.resourceId],
+        references: [resource.id],
+    }),
+    location: one(location, {
+        fields: [resourceLocation.locationId],
+        references: [location.id],
     }),
 }));

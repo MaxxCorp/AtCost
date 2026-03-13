@@ -1,6 +1,6 @@
 import { command, query } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcementLocation, eventLocation, kioskLocation, location } from '$lib/server/db/schema';
+import { announcementLocation, eventLocation, kioskLocation, location, resourceLocation } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '$lib/validations/locations';
 
@@ -20,6 +20,11 @@ export const addLocationAssociation = command(locationAssociationSchema, async (
     } else if (type === 'kiosk') {
         await db.insert(kioskLocation).values({
             kioskId: entityId,
+            locationId
+        }).onConflictDoNothing();
+    } else if (type === 'resource') {
+        await db.insert(resourceLocation).values({
+            resourceId: entityId,
             locationId
         }).onConflictDoNothing();
     }
@@ -46,6 +51,11 @@ export const removeLocationAssociation = command(locationAssociationSchema, asyn
             eq(kioskLocation.kioskId, entityId),
             eq(kioskLocation.locationId, locationId)
         ));
+    } else if (type === 'resource') {
+        await db.delete(resourceLocation).where(and(
+            eq(resourceLocation.resourceId, entityId),
+            eq(resourceLocation.locationId, locationId)
+        ));
     }
     
     await fetchEntityLocations({ type, entityId }).refresh();
@@ -71,6 +81,11 @@ export const fetchEntityLocations = query(getLocationAssociationsSchema, async (
             .from(kioskLocation)
             .innerJoin(location, eq(kioskLocation.locationId, location.id))
             .where(eq(kioskLocation.kioskId, entityId));
+    } else if (type === 'resource') {
+        results = await db.select({ location: location })
+            .from(resourceLocation)
+            .innerJoin(location, eq(resourceLocation.locationId, location.id))
+            .where(eq(resourceLocation.resourceId, entityId));
     }
     
     return results.map(r => r.location);

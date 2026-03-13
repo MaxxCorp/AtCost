@@ -119,6 +119,14 @@
                                                 >
                                                 {resource.type}
                                             </p>
+                                            {#if resource.locationName}
+                                                <p class="text-sm mt-1">
+                                                    <span class="font-medium"
+                                                        >Location:</span
+                                                    >
+                                                    {resource.locationName}
+                                                </p>
+                                            {/if}
                                             {#if resource.description}
                                                 <p class="text-sm mt-1">
                                                     {resource.description}

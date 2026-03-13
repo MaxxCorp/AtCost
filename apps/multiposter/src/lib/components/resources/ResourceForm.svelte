@@ -23,7 +23,21 @@
     } from "$lib/validations/contacts";
     import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-    import { User } from "@lucide/svelte";
+    import { User, MapPin } from "@lucide/svelte";
+    import LocationForm from "$lib/components/locations/LocationForm.svelte";
+    import { listLocations } from "../../../routes/locations/list.remote";
+    import {
+        addLocationAssociation,
+        removeLocationAssociation,
+        fetchEntityLocations,
+    } from "../../../routes/locations/associate.remote";
+    import { createLocation } from "../../../routes/locations/new/create.remote";
+    import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import {
+        createLocationSchema,
+        updateLocationSchema,
+    } from "$lib/validations/locations";
+    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
 
     let {
         remoteFunction,
@@ -53,16 +67,19 @@
     }
 
     // Allocation calendars management
-    let allocationCalendars = $state<AllocationCalendar[]>(
-        initialData?.allocationCalendars || [],
-    );
+    let allocationCalendars = $state<AllocationCalendar[]>([]);
     let newProvider = $state("google-calendar");
     let newCalendarId = $state("");
 
-    // Initialize allocationCalendars from initialData if present
+    // Initialize state from initialData
     $effect(() => {
+        console.log('ResourceForm syncing initialData:', JSON.stringify(initialData, null, 2));
         if (initialData?.allocationCalendars) {
             allocationCalendars = initialData.allocationCalendars;
+        }
+        hasParent = (initialData?.parentResourceIds?.length || 0) > 0;
+        if (initialData?.locationIds) {
+            selectedLocationIds = initialData.locationIds;
         }
     });
 
@@ -83,12 +100,9 @@
     let hasParent = $state(false);
 
     // Sync state from props
-    $effect(() => {
-        if (initialData?.allocationCalendars) {
-            allocationCalendars = initialData.allocationCalendars;
-        }
-        hasParent = (initialData?.parentResourceIds?.length || 0) > 0;
-    });
+    let selectedContactIds = $state<string[]>([]);
+    let selectedLocationIds = $state<string[]>([]);
+
 </script>
 
 <form
@@ -120,6 +134,7 @@
         <span class="text-sm font-medium text-gray-700 mb-2">Name</span>
         <input
             {...getField("name").as("text")}
+            value={getField("name").value() ?? initialData?.name ?? ""}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
                 'name',
             ).issues()?.length ?? 0) > 0
@@ -127,7 +142,6 @@
                 : 'border-gray-300'}"
             placeholder="Enter resource name"
             onblur={() => remoteFunction.validate()}
-            value={initialData?.name ?? ""}
         />
         {#each getField("name").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -138,6 +152,7 @@
         <span class="text-sm font-medium text-gray-700 mb-2">Type</span>
         <input
             {...getField("type").as("text")}
+            value={getField("type").value() ?? initialData?.type ?? ""}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
                 'type',
             ).issues()?.length ?? 0) > 0
@@ -145,7 +160,6 @@
                 : 'border-gray-300'}"
             placeholder="e.g. room, equipment, vehicle"
             onblur={() => remoteFunction.validate()}
-            value={initialData?.type ?? ""}
         />
         {#each getField("type").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -156,10 +170,10 @@
         <span class="text-sm font-medium text-gray-700 mb-2">Description</span>
         <textarea
             {...getField("description").as("text")}
+            value={getField("description").value() ?? initialData?.description ?? ""}
             rows="3"
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter description"
-            value={initialData?.description ?? ""}
         ></textarea>
     </label>
 
@@ -168,27 +182,72 @@
         >
         <input
             {...getField("maxOccupancy").as("number")}
+            value={getField("maxOccupancy").value() ?? initialData?.maxOccupancy ?? ""}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter max occupancy"
-            value={initialData?.maxOccupancy ?? ""}
         />
     </label>
 
-    <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2"
-            >Location (Optional)</span
+    <div class="block">
+        <span class="text-sm font-medium text-gray-700 mb-2">Locations</span>
+        <EntityManager
+            title="Locations"
+            icon={MapPin}
+            type="resource"
+            entityId={isUpdating ? initialData?.id : null}
+            initialItems={initialData?.locationIds ? locations.filter(l => initialData.locationIds.includes(l.id)) : []}
+            onchange={(ids) => (selectedLocationIds = ids)}
+            listItemsRemote={listLocations as any}
+            fetchAssociationsRemote={fetchEntityLocations as any}
+            addAssociationRemote={async (p: any) =>
+                addLocationAssociation({ ...p, locationId: p.itemId } as any)}
+            removeAssociationRemote={async (p: any) =>
+                removeLocationAssociation({ ...p, locationId: p.itemId } as any)}
+            deleteItemRemote={async (id: string) => {
+                return await handleDelete({
+                    ids: [id],
+                    deleteFn: deleteLocation,
+                    itemName: "location",
+                });
+            }}
+            createRemote={createLocation}
+            createSchema={createLocationSchema}
+            updateRemote={updateLocation}
+            updateSchema={updateLocationSchema}
+            getFormData={(l: any) => l}
+            searchPredicate={(l: any, q: string) => {
+                return l.name.toLowerCase().includes(q.toLowerCase()) || 
+                       (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false);
+            }}
+            embedded={true}
         >
-        <select
-            {...getField("locationId").as("select")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={initialData?.locationId ?? ""}
-        >
-            <option value="">-- Select a location --</option>
-            {#each locations as location}
-                <option value={location.id}>{location.name}</option>
-            {/each}
-        </select>
-    </label>
+            {#snippet renderItemLabel(location)}
+                {location.name} {location.roomId ? `(${location.roomId})` : ""}
+            {/snippet}
+            {#snippet renderForm({
+                remoteFunction: rf,
+                schema,
+                initialData: formData,
+                onSuccess,
+                onCancel,
+                id,
+            })}
+                <LocationForm
+                    remoteFunction={rf}
+                    validationSchema={schema}
+                    initialData={formData}
+                    {onSuccess}
+                    {onCancel}
+                    isUpdating={!!id}
+                />
+            {/snippet}
+        </EntityManager>
+        <input
+            type="hidden"
+            name="locationIds"
+            value={JSON.stringify(selectedLocationIds)}
+        />
+    </div>
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2"
@@ -307,12 +366,12 @@
         />
     </div>
 
-    {#if isUpdating && initialData?.id}
         <EntityManager
             title="Contacts"
             icon={User}
             type="resource"
-            entityId={initialData.id}
+            entityId={isUpdating ? initialData?.id : null}
+            onchange={(ids) => (selectedContactIds = ids)}
             listItemsRemote={listContacts as any}
             fetchAssociationsRemote={fetchEntityContacts as any}
             addAssociationRemote={async (p: any) =>
@@ -368,6 +427,13 @@
                 />
             {/snippet}
         </EntityManager>
+
+    {#if !isUpdating}
+        <input
+            type="hidden"
+            name="contactIds"
+            value={JSON.stringify(selectedContactIds)}
+        />
     {/if}
 
     <div class="flex gap-3 mt-6">

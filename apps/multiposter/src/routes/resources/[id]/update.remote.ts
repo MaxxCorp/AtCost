@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { resource, resourceRelation } from '$lib/server/db/schema';
+import { resource, resourceRelation, resourceLocation as resourceLocationTable } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
@@ -14,50 +14,84 @@ export const updateResource = form(updateResourceSchema, async (data) => {
 
     try {
         const user = getAuthenticatedUser();
+        if (!user || !user.id) {
+            throw new Error('User not authenticated correctly');
+        }
         ensureAccess(user, 'resources');
-        console.log('User authenticated:', user.id);
+        console.log('User ID:', user.id);
 
-        const maxOccupancy = data.maxOccupancy ? Number(data.maxOccupancy) : null;
+        const maxOccupancy = (data.maxOccupancy !== undefined && data.maxOccupancy !== null && data.maxOccupancy !== '') 
+            ? Number(data.maxOccupancy) 
+            : null;
+
+        // Manual parsing for fields simplified in schema
+        let allocationCalendars = [];
+        if (typeof data.allocationCalendars === 'string') {
+            try { allocationCalendars = JSON.parse(data.allocationCalendars); } catch { allocationCalendars = []; }
+        } else if (Array.isArray(data.allocationCalendars)) {
+            allocationCalendars = data.allocationCalendars;
+        }
 
         const updateData: any = {
             name: data.name,
             description: data.description || null,
             type: data.type,
             maxOccupancy: isNaN(maxOccupancy as any) ? null : maxOccupancy,
-            locationId: data.locationId || null,
+            locationId: (data.locationId && data.locationId !== '') ? data.locationId : null,
+            allocationCalendars: allocationCalendars,
             updatedAt: new Date(),
         };
 
-        console.log('Update payload:', updateData);
+        console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
-        const result = await db.update(resource)
-            .set(updateData)
-            .where(eq(resource.id, data.id))
-            .returning();
+        const updated = await db.transaction(async (tx) => {
+            const result = await tx.update(resource)
+                .set(updateData)
+                .where(eq(resource.id, data.id))
+                .returning();
 
-        if (result.length === 0) {
-            console.error('No rows updated. ID might be wrong or missing.');
-            return { success: false, error: { message: 'Resource not found or update failed' } };
-        }
+            if (!result || result.length === 0) {
+                throw new Error('Resource not found or update failed');
+            }
 
-        const updated = result[0];
+            // 1. Sync parent relations
+            await tx.delete(resourceRelation)
+                .where(eq(resourceRelation.childResourceId, data.id));
 
-        // Sync parent relations
-        // 1. Delete all existing parent relations for this child
-        await db.delete(resourceRelation)
-            .where(eq(resourceRelation.childResourceId, data.id));
-
-        // 2. Insert new ones if any
-        if (data.parentResourceIds && data.parentResourceIds.length > 0) {
-            console.log('Updating parent relations:', data.parentResourceIds);
-            await db.insert(resourceRelation).values(
-                data.parentResourceIds.map((parentId) => ({
+            const parentResourceIds = data.parentResourceIds as any;
+            if (parentResourceIds && Array.isArray(parentResourceIds) && parentResourceIds.length > 0) {
+                const relationData = parentResourceIds.map((parentId: string) => ({
                     parentResourceId: parentId,
                     childResourceId: data.id,
-                }))
-            );
-        }
+                }));
+                await tx.insert(resourceRelation).values(relationData);
+            }
 
+            // 2. Sync location associations
+            await tx.delete(resourceLocationTable)
+                .where(eq(resourceLocationTable.resourceId, data.id));
+
+            let locationIds = [];
+            if (typeof data.locationIds === 'string') {
+                try { locationIds = JSON.parse(data.locationIds); } catch { locationIds = []; }
+            } else if (Array.isArray(data.locationIds)) {
+                locationIds = data.locationIds;
+            }
+
+            if (locationIds.length > 0) {
+                const locationData = locationIds.map((locId: string) => ({
+                    resourceId: data.id,
+                    locationId: locId,
+                }));
+                await tx.insert(resourceLocationTable).values(locationData);
+            }
+
+            return result[0];
+        });
+
+        console.log('Update success');
+
+        console.log('Refreshing queries...');
         await readResource(data.id).refresh();
         await listResources().refresh();
         await listResourcesWithHierarchy().refresh();
@@ -65,7 +99,8 @@ export const updateResource = form(updateResourceSchema, async (data) => {
         console.log('--- updateResource SUCCESS ---');
         return { success: true, resource: updated };
     } catch (err: any) {
-        console.error('--- updateResource ERROR ---', err);
+        console.error('--- updateResource ERROR ---');
+        console.error(err);
         return { success: false, error: { message: err.message || 'Update failed' } };
     }
 });

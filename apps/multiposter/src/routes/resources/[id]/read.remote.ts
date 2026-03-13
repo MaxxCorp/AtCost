@@ -1,22 +1,25 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { resource } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { resource, location, resourceRelation, resourceLocation } from '$lib/server/db/schema';
+import { eq, and, getTableColumns } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
-
-import { resourceRelation } from '$lib/server/db/schema';
 
 export const readResource = query(v.string(), async (id: string) => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'resources');
 
-	const [result] = await db
-		.select()
+	const [result] = (await db
+		.select({
+			...getTableColumns(resource),
+			locationName: location.name,
+		})
 		.from(resource)
-		.where(eq(resource.id, id));
+		.leftJoin(location, eq(resource.locationId, location.id))
+		.where(eq(resource.id, id))) as any[];
 
 	if (!result) return null;
+	console.log('readResource result:', JSON.stringify(result, null, 2));
 
 	// Fetch parent relations
 	const relations = await db
@@ -24,8 +27,15 @@ export const readResource = query(v.string(), async (id: string) => {
 		.from(resourceRelation)
 		.where(eq(resourceRelation.childResourceId, id));
 
+	// Fetch location associations
+	const locations = await db
+		.select({ locationId: resourceLocation.locationId })
+		.from(resourceLocation)
+		.where(eq(resourceLocation.resourceId, id));
+
 	return {
 		...result,
-		parentResourceIds: relations.map(r => r.parentId)
+		parentResourceIds: relations.map((r: any) => r.parentId),
+		locationIds: locations.map((l: any) => l.locationId)
 	};
 });
