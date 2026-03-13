@@ -13,11 +13,13 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'kiosks');
 
-        const { id, lookAheadDays, lookPastDays, ...updates } = data;
+        const { id, lookAheadDays, lookPastDays, startDate, endDate, locationIds: _, ...updates } = data;
 
         const dbUpdates: any = { ...updates };
         if (lookAheadDays !== undefined) dbUpdates.lookAhead = Math.round(lookAheadDays * 86400);
         if (lookPastDays !== undefined) dbUpdates.lookPast = Math.round(lookPastDays * 86400);
+        if (startDate !== undefined) dbUpdates.startDate = startDate ? new Date(startDate) : null;
+        if (endDate !== undefined) dbUpdates.endDate = endDate ? new Date(endDate) : null;
 
         const [updated] = await db.update(kiosk)
             .set({

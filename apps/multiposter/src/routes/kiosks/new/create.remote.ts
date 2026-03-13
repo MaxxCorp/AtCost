@@ -1,4 +1,4 @@
-﻿import { form } from '$app/server';
+import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { kiosk, kioskLocation } from '$lib/server/db/schema';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -9,14 +9,16 @@ import { error } from '@sveltejs/kit';
 export const createKiosk = form(createKioskSchema, async (data) => {
     try {
         const user = getAuthenticatedUser();
-        ensureAccess(user, 'events');
+        ensureAccess(user, 'kiosks');
 
-        const { lookAheadDays, lookPastDays, ...rest } = data;
+        const { lookAheadDays, lookPastDays, startDate, endDate, locationIds: _, ...rest } = data;
 
         const [newKiosk] = await db.insert(kiosk).values({
             ...rest,
             lookAhead: Math.round(lookAheadDays * 86400),
             lookPast: Math.round(lookPastDays * 86400),
+            startDate: startDate ? new Date(startDate) : null,
+            endDate: endDate ? new Date(endDate) : null,
             userId: user.id
         }).returning();
 

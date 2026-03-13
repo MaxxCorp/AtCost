@@ -15,14 +15,18 @@ export const createKioskSchema = v.object({
         numberCoerce,
         v.minValue(3, 'Loop duration must be at least 3 seconds')
     ),
-    lookAheadDays: v.pipe(
+    lookAheadDays: v.optional(v.pipe(
         numberCoerce,
         v.minValue(0, 'Look ahead cannot be negative')
-    ),
-    lookPastDays: v.pipe(
+    ), 28),
+    lookPastDays: v.optional(v.pipe(
         numberCoerce,
         v.minValue(0, 'Look past cannot be negative')
-    )
+    ), 0),
+    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table')])),
+    rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string())
 });
 
 export const updateKioskSchema = v.object({
@@ -32,7 +36,11 @@ export const updateKioskSchema = v.object({
     locationIds: v.optional(v.union([v.array(v.string()), v.string()])),
     loopDuration: v.optional(v.pipe(numberCoerce, v.minValue(3))),
     lookAheadDays: v.optional(v.pipe(numberCoerce, v.minValue(0))),
-    lookPastDays: v.optional(v.pipe(numberCoerce, v.minValue(0)))
+    lookPastDays: v.optional(v.pipe(numberCoerce, v.minValue(0))),
+    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table')])),
+    rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string())
 });
 
 export type CreateKioskSchema = v.InferInput<typeof createKioskSchema>;

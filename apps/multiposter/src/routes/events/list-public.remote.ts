@@ -1,7 +1,7 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { eq, and, or, gte, desc, isNull, inArray, ilike } from 'drizzle-orm';
-import { event, eventContact, contact, contactEmail, contactPhone, contactAddress, eventResource, resource, location, kiosk, kioskLocation, eventLocation, contactTag, tag, locationContact } from '$lib/server/db/schema';
+import { eq, and, or, gte, lte, desc, isNull, inArray, ilike } from 'drizzle-orm';
+import { event, eventContact, contact, contactEmail, contactPhone, contactAddress, eventResource, resource, location, kiosk, kioskLocation, eventLocation, contactTag, tag, locationContact, eventTag } from '$lib/server/db/schema';
 import * as v from 'valibot';
 import type { Event } from './list.remote';
 
@@ -28,6 +28,9 @@ export type PublicEvent = Omit<Event, 'resolvedContact'> & {
     confirmedParticipants?: number;
     maxOccupancy?: number | null;
     inclusivityInformation?: string[];
+    roomTitle?: string | null;
+    tags?: string[];
+    locationIds?: string[];
 };
 
 export const listPublicEvents = query(async (): Promise<PublicEvent[]> => {
@@ -67,14 +70,26 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
     const kioskLocationIds = kioskLocations.map(l => l.id);
 
     const now = new Date();
-    const lookPastDate = new Date(now.getTime() - (kioskData.lookPast * 1000));
-    const lookPastDateStr = lookPastDate.toISOString().split('T')[0];
 
     // 2. Build Filter Criteria
     const conditions = [
         eq(event.isPublic, true),
-        gte(event.endDateTime, lookPastDate)
     ];
+
+    if (kioskData.rangeMode === 'fixed') {
+        if (kioskData.startDate) {
+            conditions.push(gte(event.endDateTime, kioskData.startDate));
+        }
+        if (kioskData.endDate) {
+            conditions.push(lte(event.startDateTime, kioskData.endDate));
+        }
+    } else {
+        const lookPastDate = new Date(now.getTime() - (kioskData.lookPast * 1000));
+        const lookAheadDate = new Date(now.getTime() + (kioskData.lookAhead * 1000));
+        
+        conditions.push(gte(event.endDateTime, lookPastDate));
+        conditions.push(lte(event.startDateTime, lookAheadDate));
+    }
 
     // 3. Apply Location Filtering if Kiosk has locations
     if (kioskLocationIds.length > 0) {
@@ -127,7 +142,9 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
             eventId: eventResource.eventId,
             maxOccupancy: resource.maxOccupancy,
             inclusivitySupport: location.inclusivitySupport,
-            locationId: location.id
+            locationId: location.id,
+            resourceName: resource.name,
+            resourceType: resource.type
         })
         .from(eventResource)
         .innerJoin(resource, eq(eventResource.resourceId, resource.id))
@@ -142,6 +159,16 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
         })
         .from(eventLocation)
         .where(inArray(eventLocation.eventId, eventIds));
+
+    // Fetch event tags
+    const eventTagsData = await db
+        .select({
+            eventId: eventTag.eventId,
+            tagName: tag.name
+        })
+        .from(eventTag)
+        .innerJoin(tag, eq(eventTag.tagId, tag.id))
+        .where(inArray(eventTag.eventId, eventIds));
 
     const contactsData = await db
         .select({
@@ -329,7 +356,15 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
             contactIds: evtContacts.map(c => c.contactId),
             confirmedParticipants: acceptedCount,
             maxOccupancy: totalCapacity > 0 ? totalCapacity : null,
-            inclusivityInformation: inclusivity.length > 0 ? [...new Set(inclusivity)] : undefined
+            inclusivityInformation: inclusivity.length > 0 ? [...new Set(inclusivity)] : undefined,
+            roomTitle: evtResources.find(r => r.resourceType === 'room')?.resourceName || evtResources[0]?.resourceName || null,
+            tags: eventTagsData.filter(t => t.eventId === row.id).map(t => t.tagName).filter((t): t is string => !!t),
+            locationIds: [
+                ...new Set([
+                    ...evtResources.filter(r => r.locationId).map(r => r.locationId!),
+                    ...directLocationData.filter(l => l.eventId === row.id).map(l => l.locationId)
+                ])
+            ]
         };
     });
 }

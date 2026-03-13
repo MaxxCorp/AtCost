@@ -1,7 +1,7 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { kiosk, kioskLocation, location } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 
@@ -35,14 +35,57 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
 
     if (!result) return null;
 
-    const locations = await db
-        .select({ name: location.name })
-        .from(kioskLocation)
-        .innerJoin(location, eq(kioskLocation.locationId, location.id))
-        .where(eq(kioskLocation.kioskId, id));
+    const locations = await db.query.location.findMany({
+        where: inArray(
+            location.id,
+            db.select({ id: kioskLocation.locationId })
+                .from(kioskLocation)
+                .where(eq(kioskLocation.kioskId, id))
+        ),
+        with: {
+            locationContacts: {
+                with: {
+                    contact: {
+                        with: {
+                            emails: { limit: 1 },
+                            phones: { limit: 1 },
+                            tags: {
+                                with: {
+                                    tag: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
 
     return {
         ...result,
-        locations: locations.map(l => l.name),
+        locations: locations.map(l => {
+            // Find the contact with the "Employee" tag
+            const employeeLocContact = l.locationContacts.find(lc => 
+                lc.contact.tags.some(t => t.tag.name === 'Employee')
+            ) || l.locationContacts[0]; // Fallback to first contact if no Employee tag found
+
+            const contactDetails = employeeLocContact?.contact;
+
+            return {
+                id: l.id,
+                name: l.name,
+                street: l.street,
+                houseNumber: l.houseNumber,
+                zip: l.zip,
+                city: l.city,
+                country: l.country,
+                contact: contactDetails ? {
+                    name: contactDetails.displayName || `${contactDetails.givenName || ''} ${contactDetails.familyName || ''}`.trim(),
+                    email: contactDetails.emails[0]?.value,
+                    phone: contactDetails.phones[0]?.value,
+                    qrCodePath: contactDetails.qrCodePath,
+                } : null
+            };
+        }),
     };
 });

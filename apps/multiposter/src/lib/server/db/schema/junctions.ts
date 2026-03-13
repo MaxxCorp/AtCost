@@ -4,7 +4,7 @@ import { event, recurringSeries } from "./events";
 import { resource, location } from "./resources";
 import { announcement } from "./announcements";
 import { kiosk } from "./kiosks";
-import { contact, tag, eventContact } from "./contacts";
+import { contact, tag, eventContact, locationContact } from "./contacts";
 import { announcementContact, announcementTag } from "./announcements";
 
 /**
@@ -122,6 +122,7 @@ export const locationRelations = relations(location, ({ many }) => ({
     announcementLocations: many(announcementLocation),
     kioskLocations: many(kioskLocation),
     resourceLocations: many(resourceLocation),
+    locationContacts: many(locationContact),
 }));
 
 export const resourceRelations = relations(resource, ({ one, many }) => ({

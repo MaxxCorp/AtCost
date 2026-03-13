@@ -5,6 +5,7 @@
     import { kioskState } from "$lib/stores/kiosk.svelte";
     import EventView from "$lib/components/events/EventView.svelte";
     import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
+    import KioskTableView from "$lib/components/kiosks/KioskTableView.svelte";
     import type { PublicEvent } from "../../../events/list-public.remote";
     import type { Announcement } from "../../../announcements/list.remote";
     import { browser } from "$app/environment";
@@ -78,6 +79,10 @@
         resetLoop();
     }
 
+    function getItemDate(item: PublicEvent | Announcement) {
+        return ("startDateTime" in item ? item.startDateTime : item.updatedAt) || new Date().toISOString();
+    }
+
     async function fetchData() {
         if (!kioskId) return;
         try {
@@ -94,10 +99,9 @@
 
             const freshItems = [...eventsData, ...announcementsData].sort(
                 (a, b) => {
-                    return (
-                        new Date(a.updatedAt).getTime() -
-                        new Date(b.updatedAt).getTime()
-                    );
+                    const dateA = new Date(getItemDate(a));
+                    const dateB = new Date(getItemDate(b));
+                    return dateA.getTime() - dateB.getTime();
                 },
             );
 
@@ -344,6 +348,8 @@
                     : "All Locations"}
             </p>
         </div>
+    {:else if kiosk?.uiMode === "table"}
+        <KioskTableView {items} {kiosk} />
     {:else}
         {#key currentIndex}
             <div

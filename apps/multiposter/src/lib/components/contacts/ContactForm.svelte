@@ -48,77 +48,81 @@
     {loading}
     listContactsRemote={listContacts}
 >
-    <div class="mt-8 border-t pt-8">
-        <EntityManager
-            title="Locations"
-            icon={MapPin}
-            type="location"
-            entityId={contactId}
-            initialItems={(initialData.locationAssociations || []).map(
-                (la: any) => la.location,
-            )}
-            embedded={true}
-            listItemsRemote={listLocations}
-            addAssociationRemote={async (p: any) => {
-                const { addAssociation } = await import(
-                    "../../../routes/contacts/associate.remote"
-                );
-                return await addAssociation({
-                    type: "location",
-                    entityId: p.itemId,
-                    contactId: p.entityId,
-                });
-            }}
-            removeAssociationRemote={async (p: any) => {
-                const { removeAssociation } = await import(
-                    "../../../routes/contacts/associate.remote"
-                );
-                return await removeAssociation({
-                    type: "location",
-                    entityId: p.itemId,
-                    contactId: p.entityId,
-                });
-            }}
-            deleteItemRemote={async (ids) => {
-                return await handleDelete({
-                    ids: Array.isArray(ids) ? ids : [ids],
-                    deleteFn: deleteLocation,
-                    itemName: "location",
-                });
-            }}
-            createRemote={createLocation}
-            createSchema={createLocationSchema}
-            updateRemote={updateLocation}
-            updateSchema={updateLocationSchema}
-            getFormData={(l) => l}
-            searchPredicate={(l, q) => {
-                return (
-                    l.name.toLowerCase().includes(q.toLowerCase()) ||
-                    (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false)
-                );
-            }}
-        >
-            {#snippet renderItemLabel(location)}
-                {location.name}
-                {location.roomId ? `(${location.roomId})` : ""}
-            {/snippet}
-            {#snippet renderForm({
-                remoteFunction: rf,
-                schema,
-                id,
-                initialData: formData,
-                onSuccess,
-                onCancel,
-            })}
-                <LocationForm
-                    remoteFunction={rf}
-                    validationSchema={schema}
-                    isUpdating={!!id}
-                    initialData={formData}
-                    {onSuccess}
-                    {onCancel}
-                />
-            {/snippet}
-        </EntityManager>
-    </div>
+    {#snippet children({ onLocationsChange }: { onLocationsChange: (ids: string[]) => void })}
+        <div class="mt-8 border-t pt-8">
+            <EntityManager
+                title="Locations"
+                icon={MapPin}
+                type="location"
+                entityId={contactId}
+                initialItems={(initialData.locationAssociations || []).map(
+                    (la: any) => la.location,
+                )}
+                embedded={true}
+                onchange={onLocationsChange}
+                listItemsRemote={listLocations}
+                addAssociationRemote={async (p: any) => {
+                    const { addAssociation } = await import(
+                        "../../../routes/contacts/associate.remote"
+                    );
+                    return await addAssociation({
+                        type: "location",
+                        entityId: p.itemId,
+                        contactId: p.entityId,
+                    });
+                }}
+                removeAssociationRemote={async (p: any) => {
+                    const { removeAssociation } = await import(
+                        "../../../routes/contacts/associate.remote"
+                    );
+                    return await removeAssociation({
+                        type: "location",
+                        entityId: p.itemId,
+                        contactId: p.entityId,
+                    });
+                }}
+                deleteItemRemote={async (ids) => {
+                    return await handleDelete({
+                        ids: Array.isArray(ids) ? ids : [ids],
+                        deleteFn: deleteLocation,
+                        itemName: "location",
+                    });
+                }}
+                createRemote={createLocation}
+                createSchema={createLocationSchema}
+                updateRemote={updateLocation}
+                updateSchema={updateLocationSchema}
+                getFormData={(l) => l}
+                searchPredicate={(l, q) => {
+                    return (
+                        l.name.toLowerCase().includes(q.toLowerCase()) ||
+                        (l.roomId?.toLowerCase().includes(q.toLowerCase()) ??
+                            false)
+                    );
+                }}
+            >
+                {#snippet renderItemLabel(location)}
+                    {location.name}
+                    {location.roomId ? `(${location.roomId})` : ""}
+                {/snippet}
+                {#snippet renderForm({
+                    remoteFunction: rf,
+                    schema,
+                    id,
+                    initialData: formData,
+                    onSuccess,
+                    onCancel,
+                })}
+                    <LocationForm
+                        remoteFunction={rf}
+                        validationSchema={schema}
+                        isUpdating={!!id}
+                        initialData={formData}
+                        {onSuccess}
+                        {onCancel}
+                    />
+                {/snippet}
+            </EntityManager>
+        </div>
+    {/snippet}
 </SharedContactForm>

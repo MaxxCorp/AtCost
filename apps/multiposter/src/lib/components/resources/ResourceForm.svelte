@@ -428,13 +428,11 @@
             {/snippet}
         </EntityManager>
 
-    {#if !isUpdating}
-        <input
-            type="hidden"
-            name="contactIds"
-            value={JSON.stringify(selectedContactIds)}
-        />
-    {/if}
+    <input
+        type="hidden"
+        name="contactIds"
+        value={JSON.stringify(selectedContactIds)}
+    />
 
     <div class="flex gap-3 mt-6">
         <AsyncButton

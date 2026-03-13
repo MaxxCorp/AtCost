@@ -86,6 +86,26 @@ export const updateResource = form(updateResourceSchema, async (data) => {
                 await tx.insert(resourceLocationTable).values(locationData);
             }
 
+            // 3. Sync contact associations
+            const { resourceContact: resourceContactTable } = await import('$lib/server/db/schema');
+            await tx.delete(resourceContactTable)
+                .where(eq(resourceContactTable.resourceId, data.id));
+
+            let contactIds = [];
+            if (typeof data.contactIds === 'string') {
+                try { contactIds = JSON.parse(data.contactIds); } catch { contactIds = []; }
+            } else if (Array.isArray(data.contactIds)) {
+                contactIds = data.contactIds;
+            }
+
+            if (contactIds.length > 0) {
+                const contactData = contactIds.map((cId: string) => ({
+                    resourceId: data.id,
+                    contactId: cId,
+                }));
+                await tx.insert(resourceContactTable).values(contactData);
+            }
+
             return result[0];
         });
 

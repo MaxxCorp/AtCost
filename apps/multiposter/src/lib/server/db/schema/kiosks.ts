@@ -13,6 +13,10 @@ export const kiosk = pgTable("kiosk", {
     loopDuration: integer("loop_duration").default(5).notNull(), // Seconds per slide
     lookAhead: integer("look_ahead").default(2419200).notNull(), // Seconds (4 weeks default)
     lookPast: integer("look_past").default(0).notNull(), // Seconds (0 default)
+    uiMode: text("ui_mode").default("carousel").notNull(),
+    rangeMode: text("range_mode").default("rolling").notNull(),
+    startDate: timestamp("start_date"),
+    endDate: timestamp("end_date"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
