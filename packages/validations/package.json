@@ -19,6 +19,10 @@
         "./users": {
             "types": "./src/users.ts",
             "default": "./src/users.ts"
+        },
+        "./talents": {
+            "types": "./src/talents.ts",
+            "default": "./src/talents.ts"
         }
     },
     "dependencies": {

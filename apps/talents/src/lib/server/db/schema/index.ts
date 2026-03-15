@@ -9,6 +9,7 @@ export {
     contactAddressRelations, userContactRelations,
     locationContactRelations, resourceContactRelations,
     location, resource, resourceRelation,
+    talent, talentTimelineEntry, talentRelations, talentTimelineEntryRelations,
 } from '@ac/db';
 
 // App-specific relations for auth tables

@@ -18,12 +18,12 @@ export interface FeatureMeta {
 
 export const FEATURES: readonly FeatureMeta[] = [
     {
-        key: 'contacts',
-        title: 'Employees',
-        description: 'Manage employee records, personal data, and contact information.',
-        href: '/contacts',
-        buttonText: 'Manage Employees',
-        claim: 'contacts',
+        key: 'talents',
+        title: 'Talents',
+        description: 'Manage talent records, history timeline, and contact information.',
+        href: '/talents',
+        buttonText: 'Manage Talents',
+        claim: 'talents',
         icon: 'users',
         gradientFrom: 'from-indigo-50',
         gradientTo: 'to-blue-50',

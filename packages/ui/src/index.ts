@@ -9,4 +9,8 @@ export { cn, type WithoutChild, type WithoutChildren, type WithoutChildrenOrChil
 export { ICONS, type IconDef } from "./icons.js";
 
 // Hooks
+export { default as EntityManager } from './components/EntityManager.svelte';
+export { default as ContactManager } from './components/ContactManager.svelte';
+export { default as TalentTimeline } from './components/talents/TalentTimeline.svelte';
+export { default as TimelineEntryDialog } from './components/talents/TimelineEntryDialog.svelte';
 export { IsMobile } from "./hooks/is-mobile.svelte.js";

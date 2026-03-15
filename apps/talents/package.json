@@ -53,6 +53,7 @@
         "@ac/validations": "workspace:*",
         "better-auth": "^1.5.5",
         "bits-ui": "^2.16.3",
+        "date-fns": "^4.1.0",
         "drizzle-valibot": "^0.4.2",
         "pg": "^8.20.0",
         "valibot": "^1.2.0"

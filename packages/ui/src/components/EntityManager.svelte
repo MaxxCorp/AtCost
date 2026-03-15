@@ -1,4 +1,4 @@
-<script lang="ts">
+<script lang="ts" generics="T extends { id: string }">
     import { onMount, type Component, type Snippet } from "svelte";
     import {
         Search,
