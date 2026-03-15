@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { listEvents } from "./list.remote";
+	import * as m from "$lib/paraglide/messages.js";
 	import type { Event } from "./list.remote";
 	import { deleteEvents } from "./delete.remote";
 	import { deleteSeries } from "./[id]/delete-series.remote";
@@ -46,8 +47,8 @@
 					eventsChannel.subscribe("change", (message: any) => {
 						console.log("Event update received:", message.data);
 						query.refresh();
-						toast.info("Events updated", {
-							description: "Refreshing list...",
+						toast.info(m.events_updated(), {
+							description: m.refreshing_list(),
 						});
 					});
 				})
@@ -91,10 +92,10 @@
 					event.endDateTime,
 				).toLocaleDateString();
 				if (startDateStr !== endDateStr) {
-					return `All day: ${startDateStr} - ${endDateStr}`;
+					return `${m.all_day()}: ${startDateStr} - ${endDateStr}`;
 				}
 			}
-			return `All day on ${startDateStr}`;
+			return `${m.all_day()} ${m.on()} ${startDateStr}`;
 		}
 
 		if (event.startDateTime) {
@@ -114,7 +115,7 @@
 			}
 			return `${dateStr}, ${startTime}`;
 		}
-		return "Time not specified";
+		return m.loading(); // Fallback
 	}
 
 	// Check if an event is part of a recurring series
@@ -135,7 +136,7 @@
 			<div
 				class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
 			>
-				<h1 class="text-3xl font-bold flex-shrink-0">Events</h1>
+				<h1 class="text-3xl font-bold flex-shrink-0">{m.feature_events_title()}</h1>
 				<div class="flex-1 flex justify-end w-full md:w-auto">
 					<BulkActionToolbar
 						selectedCount={selectedIds.size}
@@ -146,33 +147,33 @@
 							await handleDelete({
 								ids: [...selectedIds],
 								deleteFn: deleteEvents,
-								itemName: "event",
+								itemName: m.event_label(),
 							});
 							deselectAll();
 						}}
 						newItemHref="/events/new"
-						newItemLabel="+ New Event"
+						newItemLabel={m.create_new({ item: m.feature_events_title() })}
 					/>
 				</div>
 			</div>
 
 			{#if query.loading}
-				<LoadingSection message="Loading events..." />
+				<LoadingSection message={m.loading_item({ item: m.feature_events_title().toLowerCase() })} />
 			{:else if query.error}
 				<ErrorSection
-					headline="Failed to load events"
-					message={query.error?.message || "An unexpected error occurred."}
+					headline={m.failed_to_load({ item: m.feature_events_title().toLowerCase() })}
+					message={query.error?.message || m.something_went_wrong()}
 					href="/events"
-					button="Retry"
+					button={m.retry()}
 				/>
 			{:else if query.current}
 				<div class="grid gap-4">
 					{#if query.current.length === 0}
 						<EmptyState
 							icon={Calendar}
-							title="No Events"
-							description="Get started by creating your first event"
-							actionLabel="Create Your First Event"
+							title={m.no_items({ items: m.feature_events_title() })}
+							description={m.get_started_creating({ item: m.feature_events_title().toLowerCase() })}
+							actionLabel={m.create_first({ item: m.feature_events_title().toLowerCase() })}
 							actionHref="/events/new"
 						/>
 					{:else}
@@ -247,7 +248,7 @@
 														/>
 														<span
 															class="text-[10px] text-green-700 font-medium"
-															>Public</span
+															>{m.public()}</span
 														>
 													</div>
 												{/if}
@@ -278,7 +279,7 @@
 														class="flex items-center gap-2 w-[120px] justify-start"
 														><Pencil size={16} />
 														<span class="ml-auto"
-															>Edit</span
+															>{m.edit()}</span
 														>
 														<ChevronDown
 															size={14}
@@ -297,7 +298,7 @@
 														><Pencil
 															size={14}
 															class="mr-2"
-														/> Edit Instance</DropdownMenu.Item
+														/> {m.edit_item({ item: m.instance() })}</DropdownMenu.Item
 													>
 													<DropdownMenu.Item
 														onclick={() =>
@@ -307,7 +308,7 @@
 														><RefreshCw
 															size={14}
 															class="mr-2"
-														/> Edit Series</DropdownMenu.Item
+														/> {m.edit_item({ item: m.series() })}</DropdownMenu.Item
 													>
 												</DropdownMenu.Content>
 											</DropdownMenu.Root>
@@ -319,7 +320,7 @@
 														class="flex items-center gap-2 w-[120px] justify-start"
 														><Trash2 size={16} />
 														<span class="ml-auto"
-															>Delete</span
+															>{m.delete()}</span
 														>
 														<ChevronDown
 															size={14}
@@ -337,20 +338,20 @@
 																deleteFn:
 																	deleteEvents,
 																itemName:
-																	"event",
+																	m.instance().toLowerCase(),
 															});
 															deselectAll();
 														}}
 														><Trash2
 															size={14}
 															class="mr-2"
-														/> Delete Instance</DropdownMenu.Item
+														/> {m.delete()} {m.instance()}</DropdownMenu.Item
 													>
 													<DropdownMenu.Item
 														onclick={async () => {
 															if (
 																!confirm(
-																	"Delete all events in this series?",
+																	m.delete_series_confirm(),
 																)
 															)
 																return;
@@ -358,7 +359,7 @@
 																event.id,
 															);
 															toast.success(
-																"Series deleted",
+																m.series_deleted(),
 															);
 															query.refresh();
 															deselectAll();
@@ -366,7 +367,7 @@
 														><RefreshCw
 															size={14}
 															class="mr-2"
-														/> Delete Series</DropdownMenu.Item
+														/> {m.delete()} {m.series()}</DropdownMenu.Item
 													>
 												</DropdownMenu.Content>
 											</DropdownMenu.Root>
@@ -377,13 +378,13 @@
 												size="default"
 												class="flex items-center gap-2 w-[120px] justify-center"
 											>
-												<Pencil size={16} /> Edit
+												<Pencil size={16} /> {m.edit()}
 											</Button>
 											<AsyncButton
 												variant="destructive"
 												size="default"
 												loading={false}
-												loadingLabel="Deleting..."
+												loadingLabel={m.deleting()}
 												class="flex items-center gap-2 w-[120px] justify-center"
 												onclick={async () => {
 													const success =
@@ -391,14 +392,14 @@
 															ids: [event.id],
 															deleteFn:
 																deleteEvents,
-															itemName: "event",
+															itemName: m.event_label(),
 														});
 													if (success) {
 														deselectAll();
 													}
 												}}
 											>
-												<Trash2 size={16} /> Delete
+												<Trash2 size={16} /> {m.delete()}
 											</AsyncButton>
 										{/if}
 									</div>

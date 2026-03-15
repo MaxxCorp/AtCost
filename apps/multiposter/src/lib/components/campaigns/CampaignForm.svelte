@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages.js";
     import { goto } from "$app/navigation";
     import type { Campaign } from "../../../routes/campaigns/[id]/read.remote";
     import { deleteCampaigns } from "../../../routes/campaigns/[id]/delete.remote";
@@ -29,24 +30,24 @@
     }
 </script>
 
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl mx-auto text-left">
     <Breadcrumb
         feature="campaigns"
-        current={initialData?.name ?? "New Campaign"}
+        current={initialData?.name ?? m.create_new({ item: m.campaign_label() })}
     />
     <div class="bg-white shadow rounded-lg p-6 space-y-4">
         <div class="flex justify-between items-start mb-6">
             <div>
                 <h1 class="text-3xl font-bold mb-2">
-                    {initialData?.name ?? "New Campaign"}
+                    {initialData?.name ?? m.create_new({ item: m.campaign_label() })}
                 </h1>
                 {#if initialData}
                     <p class="text-sm text-gray-500">
-                        Created: {new Date(
+                        {m.created()}: {new Date(
                             initialData.createdAt,
                         ).toLocaleString()}
                         {#if initialData.updatedAt !== initialData.createdAt}
-                            • Updated: {new Date(
+                            • {m.updated()}: {new Date(
                                 initialData.updatedAt,
                             ).toLocaleString()}
                         {/if}
@@ -57,26 +58,26 @@
                 <div class="flex gap-2">
                     <AsyncButton
                         type="button"
-                        loadingLabel="Deleting..."
+                        loadingLabel={m.deleting()}
                         loading={deleteCampaigns.pending}
                         variant="destructive"
                         onclick={async () => {
                             await handleDelete({
                                 ids: [initialData.id],
                                 deleteFn: deleteCampaigns,
-                                itemName: "campaign",
+                                itemName: m.feature_campaigns_title().toLowerCase(),
                             });
                             goto("/campaigns");
                         }}
                     >
-                        Delete
+                        {m.delete()}
                     </AsyncButton>
                 </div>
             {/if}
         </div>
 
         <h2 class="text-xl font-semibold mb-4">
-            {isUpdating ? "Edit Campaign" : "Create Campaign"}
+            {isUpdating ? m.edit_item({ item: m.campaign_label() }) : m.create_new({ item: m.campaign_label() })}
         </h2>
 
         <form
@@ -88,16 +89,16 @@
                         if (result?.error) {
                             toast.error(
                                 result.error.message ||
-                                    "Oh no! Something went wrong",
+                                    m.something_went_wrong(),
                             );
                             return;
                         }
-                        toast.success("Successfully saved!");
+                        toast.success(m.successfully_saved());
                         goto("/campaigns");
                     } catch (error: unknown) {
                         const err = error as { message?: string };
                         toast.error(
-                            err?.message || "Oh no! Something went wrong",
+                            err?.message || m.something_went_wrong(),
                         );
                     }
                 })}
@@ -109,7 +110,7 @@
 
             <label class="block">
                 <span class="text-sm font-medium text-gray-700 mb-2"
-                    >Campaign Name</span
+                    >{m.campaign_name()}</span
                 >
                 <input
                     {...getField("name").as("text")}
@@ -118,7 +119,7 @@
                     ).issues()?.length ?? 0) > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
-                    placeholder="Enter campaign name"
+                    placeholder={m.enter_campaign_name()}
                     value={isUpdating ? initialData?.name : ""}
                     onblur={() => remoteFunction.validate()}
                 />
@@ -131,7 +132,7 @@
 
             <label class="block">
                 <span class="text-sm font-medium text-gray-700 mb-2"
-                    >Content (JSON)</span
+                    >{m.content_json()}</span
                 >
                 <textarea
                     {...getField("content").as("text")}
@@ -153,20 +154,20 @@
                     </p>
                 {/each}
                 <p class="mt-1 text-sm text-gray-500">
-                    Enter campaign content as JSON
+                    {m.enter_campaign_content_json()}
                 </p>
             </label>
 
             <div class="flex gap-3 mt-6">
                 <AsyncButton
                     type="submit"
-                    loadingLabel="Saving..."
+                    loadingLabel={m.loading()}
                     loading={remoteFunction.pending}
                 >
-                    {isUpdating ? "Save Changes" : "Create Campaign"}
+                    {isUpdating ? m.save_changes() : m.create_new({ item: m.campaign_label() })}
                 </AsyncButton>
                 <Button variant="secondary" href="/campaigns" size="default">
-                    Cancel
+                    {m.cancel()}
                 </Button>
             </div>
         </form>

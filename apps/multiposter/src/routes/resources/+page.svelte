@@ -1,5 +1,6 @@
 <script lang="ts">
     import { listResources } from "./list.remote";
+    import * as m from "$lib/paraglide/messages";
     import { deleteResource } from "./[id]/delete.remote";
     import type { Resource } from "./list.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
@@ -43,7 +44,7 @@
             <div
                 class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
             >
-                <h1 class="text-3xl font-bold flex-shrink-0">Resources</h1>
+                <h1 class="text-3xl font-bold flex-shrink-0">{m.resources()}</h1>
                 <div class="flex-1 flex justify-end w-full md:w-auto">
                     <BulkActionToolbar
                         selectedCount={selectedIds.size}
@@ -54,19 +55,19 @@
                             await handleDelete({
                                 ids: [...selectedIds],
                                 deleteFn: deleteResource,
-                                itemName: "resource",
+                                itemName: m.resources(),
                             });
                             deselectAll();
                             itemsPromise = listResources();
                         }}
                         newItemHref="/resources/new"
-                        newItemLabel="+ New Resource"
+                        newItemLabel={m.create_new({ item: m.resources() })}
                     />
                 </div>
             </div>
 
             {#await itemsPromise}
-                <LoadingSection message="Loading resources..." />
+                <LoadingSection message={m.loading_resources()} />
             {:then items}
                 {@html (() => {
                     initializedItems = items;
@@ -77,9 +78,9 @@
                     {#if items.length === 0}
                         <EmptyState
                             icon={Box}
-                            title="No Resources"
-                            description="Get started by creating your first resource"
-                            actionLabel="Create Your First Resource"
+                            title={m.no_resources()}
+                            description={m.get_started_resource()}
+                            actionLabel={m.create_first_resource()}
                             actionHref="/resources/new"
                         />
                     {:else}
@@ -115,14 +116,14 @@
                                         <div class="mt-2 text-gray-600">
                                             <p class="text-sm">
                                                 <span class="font-medium"
-                                                    >Type:</span
+                                                    >{m.type_label()}</span
                                                 >
                                                 {resource.type}
                                             </p>
                                             {#if resource.locationName}
                                                 <p class="text-sm mt-1">
                                                     <span class="font-medium"
-                                                        >Location:</span
+                                                        >{m.location_label()}</span
                                                     >
                                                     {resource.locationName}
                                                 </p>
@@ -137,7 +138,7 @@
                                             <p
                                                 class="text-xs text-gray-500 mt-3"
                                             >
-                                                Created: {new Date(
+                                                {m.created_label()} {new Date(
                                                     resource.createdAt,
                                                 ).toLocaleString()}
                                             </p>
@@ -150,13 +151,13 @@
                                             size="default"
                                             class="flex items-center gap-2 w-[120px] justify-center"
                                         >
-                                            <Pencil size={16} /> Edit
+                                            <Pencil size={16} /> {m.edit()}
                                         </Button>
                                         <AsyncButton
                                             variant="destructive"
                                             size="default"
                                             loading={false}
-                                            loadingLabel="Deleting..."
+                                            loadingLabel={m.deleting()}
                                             class="flex items-center gap-2 w-[120px] justify-center"
                                             onclick={async () => {
                                                 const success =
@@ -164,7 +165,7 @@
                                                         ids: [resource.id],
                                                         deleteFn:
                                                             deleteResource,
-                                                        itemName: "resource",
+                                                        itemName: m.resources(),
                                                     });
                                                 if (success) {
                                                     deselectAll();
@@ -173,7 +174,7 @@
                                                 }
                                             }}
                                         >
-                                            <Trash2 size={16} /> Delete
+                                            <Trash2 size={16} /> {m.delete()}
                                         </AsyncButton>
                                     </div>
                                 </div>
@@ -183,10 +184,10 @@
                 </div>
             {:catch error}
                 <ErrorSection
-                    headline="Failed to load resources"
-                    message={error?.message || "An unexpected error occurred."}
+                    headline={m.failed_to_load_resources()}
+                    message={error?.message || m.something_went_wrong()}
                     href="/resources"
-                    button="Retry"
+                    button={m.retry()}
                 />
             {/await}
         </div>

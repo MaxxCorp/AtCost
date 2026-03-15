@@ -9,13 +9,14 @@
     import { renameBlockFunction } from "./rename.remote";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
+    import * as m from "$lib/paraglide/messages.js";
 
     let contentPromise = $state(readContent({}));
 </script>
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto">
-        <h1 class="text-3xl font-bold mb-6">Data Privacy (GDPR)</h1>
+        <h1 class="text-3xl font-bold mb-6">{m.gdpr_title()}</h1>
 
         {#await contentPromise}
             <LoadingSection />
@@ -33,7 +34,7 @@
             />
         {:catch error}
             <ErrorSection
-                headline="Error loading GDPR"
+                headline={m.error_loading_gdpr()}
                 message={error.message}
             />
         {/await}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from "$lib/paraglide/messages.js";
 	import { listCampaigns } from "./list.remote";
 	import { deleteCampaigns } from "./[id]/delete.remote";
 	import type { Campaign } from "./list.remote";
@@ -42,7 +43,7 @@
 			<div
 				class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
 			>
-				<h1 class="text-3xl font-bold flex-shrink-0">Campaigns</h1>
+				<h1 class="text-3xl font-bold flex-shrink-0">{m.feature_campaigns_title()}</h1>
 				<div class="flex-1 flex justify-end w-full md:w-auto">
 					<BulkActionToolbar
 						selectedCount={selectedIds.size}
@@ -53,33 +54,33 @@
 							await handleDelete({
 								ids: [...selectedIds],
 								deleteFn: deleteCampaigns,
-								itemName: "campaign",
+								itemName: m.feature_campaigns_title().toLowerCase(),
 							});
 							deselectAll();
 						}}
 						newItemHref="/campaigns/new"
-						newItemLabel="+ New Campaign"
+						newItemLabel={"+ " + m.create_item({ item: m.campaign_label() })}
 					/>
 				</div>
 			</div>
 
 			{#if query.loading}
-				<LoadingSection message="Loading campaigns..." />
+				<LoadingSection message={m.loading_item({ item: m.feature_campaigns_title() })} />
 			{:else if query.error}
 				<ErrorSection
-					headline="Failed to load campaigns"
-					message={query.error?.message || "An unexpected error occurred."}
+					headline={m.failed_to_load({ item: m.feature_campaigns_title() })}
+					message={query.error?.message || m.something_went_wrong()}
 					href="/campaigns"
-					button="Retry"
+					button={m.retry()}
 				/>
 			{:else if query.current}
 				<div class="grid gap-4">
 					{#if query.current.length === 0}
 						<EmptyState
 							icon={Megaphone}
-							title="No Campaigns"
-							description="Get started by creating your first campaign"
-							actionLabel="Create Your First Campaign"
+							title={m.no_items({ items: m.feature_campaigns_title() })}
+							description={m.get_started_campaign()}
+							actionLabel={m.create_first({ item: m.campaign_label() })}
 							actionHref="/campaigns/new"
 						/>
 					{:else}
@@ -116,7 +117,7 @@
 											<p
 												class="text-xs text-gray-500 mt-3"
 											>
-												Created: {new Date(
+												{m.created()}: {new Date(
 													campaign.createdAt,
 												).toLocaleString()}
 											</p>
@@ -129,13 +130,13 @@
 											size="default"
 											class="flex items-center gap-2 w-[120px] justify-center"
 										>
-											<Pencil size={16} /> Edit
+											<Pencil size={16} /> {m.edit()}
 										</Button>
 										<AsyncButton
 											variant="destructive"
 											size="default"
 											loading={false}
-											loadingLabel="Deleting..."
+											loadingLabel={m.deleting()}
 											class="flex items-center gap-2 w-[120px] justify-center"
 											onclick={async () => {
 												const success =
@@ -143,14 +144,14 @@
 														ids: [campaign.id],
 														deleteFn:
 															deleteCampaigns,
-														itemName: "campaign",
+														itemName: m.feature_campaigns_title().toLowerCase(),
 													});
 												if (success) {
 													deselectAll();
 												}
 											}}
 										>
-											<Trash2 size={16} /> Delete
+											<Trash2 size={16} /> {m.delete()}
 										</AsyncButton>
 									</div>
 								</div>

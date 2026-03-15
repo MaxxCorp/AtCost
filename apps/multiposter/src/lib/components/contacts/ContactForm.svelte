@@ -1,8 +1,10 @@
 <script lang="ts">
     import { MapPin } from "@lucide/svelte";
-    import SharedContactForm from "@ac/ui/components/forms/ContactForm.svelte";
+    import * as m from "$lib/paraglide/messages";
+    import { onMount } from "svelte";
+    import ContactForm from "@ac/ui/components/forms/ContactForm.svelte";
     import EntityManager from "../ui/EntityManager.svelte";
-    import LocationForm from "../locations/LocationForm.svelte";
+    // import LocationForm from "../locations/LocationForm.svelte"; // Circular dependency
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
@@ -35,9 +37,15 @@
         contactId,
         loading = false,
     }: Props = $props();
+
+    let LocationFormComp = $state<any>(null);
+    onMount(async () => {
+        LocationFormComp = (await import("../locations/LocationForm.svelte"))
+            .default;
+    });
 </script>
 
-<SharedContactForm
+<ContactForm
     {initialData}
     {remoteFunction}
     {schema}
@@ -47,11 +55,50 @@
     {contactId}
     {loading}
     listContactsRemote={listContacts}
+    labels={{
+        basicInformation: m.basic_information(),
+        displayName: m.display_name(),
+        givenName: m.given_name(),
+        familyName: m.family_name(),
+        birthday: m.birthday(),
+        company: m.company(),
+        department: m.department(),
+        role: m.role(),
+        notes: m.notes(),
+        isPublicLabel: m.public_profile(),
+        isPublicDescription: m.public_profile_description(),
+        tagsPlaceholder: m.tag_placeholder(),
+        relations: m.relations(),
+        contactSearchPlaceholder: m.search_contact_to_link(),
+        emailAddresses: m.email_addresses(),
+        addEmail: m.add_email(),
+        emailPlaceholder: m.email_address(),
+        home: m.home_label(),
+        work: m.work_label(),
+        mobile: m.mobile_label(),
+        other: m.other_label(),
+        primary: m.primary(),
+        phoneNumbers: m.phone_numbers(),
+        addPhone: m.add_phone(),
+        phonePlaceholder: m.phone_number(),
+        saveContact: m.save_contact(),
+        cancel: m.cancel(),
+        saving: m.loading(),
+        errorSomethingWentWrong: m.something_went_wrong(),
+        successfullySaved: m.successfully_saved(),
+        reportsTo: m.reports_to(),
+        cooperatesWith: m.cooperates_with(),
+        managerOf: m.manager_of(),
+    }}
 >
-    {#snippet children({ onLocationsChange }: { onLocationsChange: (ids: string[]) => void })}
+    {#snippet children({
+        onLocationsChange,
+    }: {
+        onLocationsChange: (ids: string[]) => void;
+    })}
         <div class="mt-8 border-t pt-8">
             <EntityManager
-                title="Locations"
+                title={m.feature_locations_title()}
                 icon={MapPin}
                 type="location"
                 entityId={contactId}
@@ -85,7 +132,7 @@
                     return await handleDelete({
                         ids: Array.isArray(ids) ? ids : [ids],
                         deleteFn: deleteLocation,
-                        itemName: "location",
+                        itemName: m.location().toLowerCase(),
                     });
                 }}
                 createRemote={createLocation}
@@ -113,16 +160,19 @@
                     onSuccess,
                     onCancel,
                 })}
-                    <LocationForm
-                        remoteFunction={rf}
-                        validationSchema={schema}
-                        isUpdating={!!id}
-                        initialData={formData}
-                        {onSuccess}
-                        {onCancel}
-                    />
+                    {#if LocationFormComp}
+                        <svelte:component
+                            this={LocationFormComp}
+                            remoteFunction={rf}
+                            validationSchema={schema}
+                            isUpdating={!!id}
+                            initialData={formData}
+                            {onSuccess}
+                            {onCancel}
+                        />
+                    {/if}
                 {/snippet}
             </EntityManager>
         </div>
     {/snippet}
-</SharedContactForm>
+</ContactForm>

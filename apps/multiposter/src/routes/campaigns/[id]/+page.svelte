@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from "$lib/paraglide/messages.js";
 	import { page } from "$app/state";
 	import { readCampaign } from "./read.remote";
 	import { updateCampaign } from "./update.remote";
@@ -9,7 +10,7 @@
 </script>
 
 {#await readCampaign(page.params.id ?? "")}
-	<LoadingSection message="Loading campaign..." />
+	<LoadingSection message={m.loading_item({ item: m.feature_campaigns_title() })} />
 {:then campaign}
 	{#if campaign}
 		<CampaignForm
@@ -20,10 +21,10 @@
 		/>
 	{:else}
 		<ErrorSection
-			headline="Campaign Not Found"
-			message="Campaign Not Found"
+			headline={m.not_found({ item: m.feature_campaigns_title() })}
+			message={m.not_found_message({ item: m.feature_campaigns_title() })}
 		/>
 	{/if}
 {:catch error}
-	<ErrorSection headline="An error occurred" message={error.message} />
+	<ErrorSection headline={m.something_went_wrong()} message={error.message} />
 {/await}

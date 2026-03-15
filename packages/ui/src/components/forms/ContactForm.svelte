@@ -34,6 +34,42 @@
         listContactsRemote: () => Promise<any[]>;
         // Optional snippet for additional sections
         children?: Snippet<[{ onLocationsChange: (ids: string[]) => void }]>;
+
+        labels?: {
+            basicInformation?: string;
+            displayName?: string;
+            givenName?: string;
+            familyName?: string;
+            birthday?: string;
+            company?: string;
+            department?: string;
+            role?: string;
+            notes?: string;
+            isPublicLabel?: string;
+            isPublicDescription?: string;
+            tagsPlaceholder?: string;
+            relations?: string;
+            contactSearchPlaceholder?: string;
+            emailAddresses?: string;
+            addEmail?: string;
+            emailPlaceholder?: string;
+            home?: string;
+            work?: string;
+            mobile?: string;
+            other?: string;
+            primary?: string;
+            phoneNumbers?: string;
+            addPhone?: string;
+            phonePlaceholder?: string;
+            saveContact?: string;
+            cancel?: string;
+            saving?: string;
+            errorSomethingWentWrong?: string;
+            successfullySaved?: string;
+            reportsTo?: string;
+            cooperatesWith?: string;
+            managerOf?: string;
+        };
     }
 
     let {
@@ -48,7 +84,44 @@
         listContactsRemote,
         children,
         tags = $bindable(),
+        labels,
     }: Props = $props();
+
+    const i18n = $derived({
+        basicInformation: labels?.basicInformation ?? "Basic Information",
+        displayName: labels?.displayName ?? "Display Name",
+        givenName: labels?.givenName ?? "Given Name",
+        familyName: labels?.familyName ?? "Family Name",
+        birthday: labels?.birthday ?? "Birthday",
+        company: labels?.company ?? "Company",
+        department: labels?.department ?? "Department",
+        role: labels?.role ?? "Role",
+        notes: labels?.notes ?? "Notes",
+        isPublicLabel: labels?.isPublicLabel ?? "Public Profile",
+        isPublicDescription: labels?.isPublicDescription ?? "Allow unauthenticated viewing",
+        tagsPlaceholder: labels?.tagsPlaceholder ?? "e.g. Customer, Lead, Priority",
+        relations: labels?.relations ?? "Relations",
+        contactSearchPlaceholder: labels?.contactSearchPlaceholder ?? "Search for a contact to link...",
+        emailAddresses: labels?.emailAddresses ?? "Email Addresses",
+        addEmail: labels?.addEmail ?? "Add Email",
+        emailPlaceholder: labels?.emailPlaceholder ?? "Email Address",
+        home: labels?.home ?? "Home",
+        work: labels?.work ?? "Work",
+        mobile: labels?.mobile ?? "Mobile",
+        other: labels?.other ?? "Other",
+        primary: labels?.primary ?? "Primary",
+        phoneNumbers: labels?.phoneNumbers ?? "Phone Numbers",
+        addPhone: labels?.addPhone ?? "Add Phone",
+        phonePlaceholder: labels?.phonePlaceholder ?? "Phone Number",
+        saveContact: labels?.saveContact ?? "Save Contact",
+        cancel: labels?.cancel ?? "Cancel",
+        saving: labels?.saving ?? "Saving...",
+        errorSomethingWentWrong: labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong",
+        successfullySaved: labels?.successfullySaved ?? "Successfully Saved!",
+        reportsTo: labels?.reportsTo ?? "reports to",
+        cooperatesWith: labels?.cooperatesWith ?? "cooperates with",
+        managerOf: labels?.managerOf ?? "manager of",
+    });
 
     const d = (val: any, def: any) =>
         val === undefined || val === null ? def : val;
@@ -153,7 +226,7 @@
             ...relations,
             {
                 targetContactId: targetContact.id,
-                relationType: "cooperates with",
+                relationType: i18n.cooperatesWith,
                 targetContact,
             },
         ];
@@ -199,16 +272,16 @@
                 const msg =
                     result?.error?.message ||
                     result?.error ||
-                    "Oh no! Something went wrong";
+                    i18n.errorSomethingWentWrong;
                 toast.error(msg);
                 return;
             }
 
-            toast.success("Successfully Saved!");
+            toast.success(i18n.successfullySaved);
             if (onSuccess) onSuccess(result);
             else goto(cancelHref);
         } catch (error: any) {
-            toast.error(error.message || "Oh no! Something went wrong");
+            toast.error(error.message || i18n.errorSomethingWentWrong);
         }
     })}
     class="space-y-8"
@@ -225,14 +298,14 @@
     <div class="space-y-4">
         <h3 class="text-lg font-medium flex items-center gap-2">
             <User size={20} class="text-blue-500" />
-            Basic Information
+            {i18n.basicInformation}
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label
                     for="displayName"
                     class="block text-sm font-medium text-gray-700"
-                    >Display Name <span class="text-red-500">*</span></label
+                    >{i18n.displayName} <span class="text-red-500">*</span></label
                 >
                 <input
                     {...getField(`${prefix}.displayName`).as("text")}
@@ -244,7 +317,7 @@
                 <label
                     for="givenName"
                     class="block text-sm font-medium text-gray-700"
-                    >Given Name</label
+                    >{i18n.givenName}</label
                 >
                 <input
                     {...getField(`${prefix}.givenName`).as("text")}
@@ -256,7 +329,7 @@
                 <label
                     for="familyName"
                     class="block text-sm font-medium text-gray-700"
-                    >Family Name</label
+                    >{i18n.familyName}</label
                 >
                 <input
                     {...getField(`${prefix}.familyName`).as("text")}
@@ -268,7 +341,7 @@
                 <label
                     for="birthday"
                     class="block text-sm font-medium text-gray-700"
-                    >Birthday</label
+                    >{i18n.birthday}</label
                 >
                 <input
                     {...getField(`${prefix}.birthday`).as("date")}
@@ -280,7 +353,7 @@
                 <label
                     for="company"
                     class="block text-sm font-medium text-gray-700"
-                    >Company</label
+                    >{i18n.company}</label
                 >
                 <input
                     {...getField(`${prefix}.company`).as("text")}
@@ -292,7 +365,7 @@
                 <label
                     for="department"
                     class="block text-sm font-medium text-gray-700"
-                    >Department</label
+                    >{i18n.department}</label
                 >
                 <input
                     {...getField(`${prefix}.department`).as("text")}
@@ -303,7 +376,7 @@
             <div>
                 <label
                     for="role"
-                    class="block text-sm font-medium text-gray-700">Role</label
+                    class="block text-sm font-medium text-gray-700">{i18n.role}</label
                 >
                 <input
                     {...getField(`${prefix}.role`).as("text")}
@@ -314,7 +387,7 @@
         </div>
         <div>
             <label for="notes" class="block text-sm font-medium text-gray-700"
-                >Notes</label
+                >{i18n.notes}</label
             >
             <textarea
                 {...getField(`${prefix}.notes`).as("textarea")}
@@ -333,14 +406,14 @@
                 class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
             />
             <label for="isPublic" class="text-sm font-medium text-gray-700">
-                Public Profile (Allow unauthenticated viewing)
+                {i18n.isPublicLabel} ({i18n.isPublicDescription})
             </label>
         </div>
 
         <div>
             <TagInput
                 bind:value={tagsInput}
-                placeholder="e.g. Customer, Lead, Priority"
+                placeholder={i18n.tagsPlaceholder}
             />
         </div>
     </div>
@@ -348,7 +421,7 @@
     <div class="space-y-4">
         <h3 class="text-lg font-medium flex items-center gap-2">
             <LinkIcon size={20} class="text-pink-500" />
-            Relations
+            {i18n.relations}
         </h3>
 
         <div class="space-y-4">
@@ -359,7 +432,7 @@
                     <Search size={18} class="text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Search for a contact to link..."
+                        placeholder={i18n.contactSearchPlaceholder}
                         bind:value={contactSearch}
                         class="flex-1 outline-none"
                     />
@@ -405,15 +478,15 @@
                                     class="block w-full text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 >
                                     <option value="reports to"
-                                        >reports to</option
+                                        >{i18n.reportsTo}</option
                                     >
                                     <option value="cooperates with"
-                                        >cooperates with</option
+                                        >{i18n.cooperatesWith}</option
                                     >
                                     <option value="manager of"
-                                        >manager of</option
+                                        >{i18n.managerOf}</option
                                     >
-                                    <option value="other">other</option>
+                                    <option value="other">{i18n.other}</option>
                                 </select>
                             </div>
                             <AsyncButton
@@ -436,7 +509,7 @@
         <div class="flex justify-between items-center">
             <h3 class="text-lg font-medium flex items-center gap-2">
                 <Mail size={20} class="text-green-500" />
-                Email Addresses
+                {i18n.emailAddresses}
             </h3>
             <Button
                 type="button"
@@ -444,7 +517,7 @@
                 size="sm"
                 onclick={addEmail}
             >
-                <Plus size={16} class="mr-1" /> Add Email
+                <Plus size={16} class="mr-1" /> {i18n.addEmail}
             </Button>
         </div>
         {#each emails as email, i}
@@ -452,19 +525,18 @@
                 <div class="flex-1">
                     <input
                         type="email"
-                        placeholder="Email Address"
+                        placeholder={i18n.emailPlaceholder}
                         bind:value={email.value}
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
                 <div class="w-32">
                     <select
-                        bind:value={email.type}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onclick={addEmail}
                     >
-                        <option value="home">Home</option>
-                        <option value="work">Work</option>
-                        <option value="other">Other</option>
+                        <option value="home">{i18n.home}</option>
+                        <option value="work">{i18n.work}</option>
+                        <option value="other">{i18n.other}</option>
                     </select>
                 </div>
                 <label class="flex items-center gap-1 mb-2">
@@ -473,7 +545,7 @@
                         bind:checked={email.primary}
                         class="rounded text-blue-600"
                     />
-                    <span class="text-xs text-gray-500">Primary</span>
+                    <span class="text-sm text-gray-500">{i18n.primary}</span>
                 </label>
                 <Button
                     type="button"
@@ -492,7 +564,7 @@
         <div class="flex justify-between items-center">
             <h3 class="text-lg font-medium flex items-center gap-2">
                 <Phone size={20} class="text-purple-500" />
-                Phone Numbers
+                {i18n.phoneNumbers}
             </h3>
             <Button
                 type="button"
@@ -500,7 +572,7 @@
                 size="sm"
                 onclick={addPhone}
             >
-                <Plus size={16} class="mr-1" /> Add Phone
+                <Plus size={16} class="mr-1" /> {i18n.addPhone}
             </Button>
         </div>
         {#each phones as phone, i}
@@ -508,7 +580,7 @@
                 <div class="flex-1">
                     <input
                         type="text"
-                        placeholder="Phone Number"
+                        placeholder={i18n.phonePlaceholder}
                         bind:value={phone.value}
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -518,10 +590,10 @@
                         bind:value={phone.type}
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                        <option value="mobile">Mobile</option>
-                        <option value="home">Home</option>
-                        <option value="work">Work</option>
-                        <option value="other">Other</option>
+                        <option value="mobile">{i18n.mobile}</option>
+                        <option value="home">{i18n.home}</option>
+                        <option value="work">{i18n.work}</option>
+                        <option value="other">{i18n.other}</option>
                     </select>
                 </div>
                 <label class="flex items-center gap-1 mb-2">
@@ -530,7 +602,7 @@
                         bind:checked={phone.primary}
                         class="rounded text-blue-600"
                     />
-                    <span class="text-xs text-gray-500">Primary</span>
+                    <span class="text-sm text-gray-500">{i18n.primary}</span>
                 </label>
                 <Button
                     type="button"
@@ -556,19 +628,19 @@
     <div class="flex justify-end gap-3 pt-6 border-t">
         {#if onCancel}
             <Button variant="secondary" type="button" onclick={onCancel}
-                >Cancel</Button
+                >{i18n.cancel}</Button
             >
         {:else}
             <Button href={cancelHref} variant="secondary" type="button"
-                >Cancel</Button
+                >{i18n.cancel}</Button
             >
         {/if}
         <AsyncButton
             type="submit"
             loading={(remoteFunction && remoteFunction.pending) || loading}
-            loadingLabel="Saving..."
+            loadingLabel={i18n.saving}
         >
-            Save Contact
+            {i18n.saveContact}
         </AsyncButton>
     </div>
 </form>

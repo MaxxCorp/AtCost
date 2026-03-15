@@ -11,5 +11,21 @@
 	"locales": [
 		"en",
 		"de"
-	]
+	],
+	"languageNegotiation": {
+		"strategies": [
+			{
+				"name": "preferredLanguage"
+			},
+			{
+				"name": "url"
+			},
+			{
+				"name": "cookie"
+			},
+			{
+				"name": "baseLocale"
+			}
+		]
+	}
 }

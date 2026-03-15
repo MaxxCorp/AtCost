@@ -9,6 +9,7 @@
     import { renameBlockFunction } from "./rename.remote";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
+    import * as m from "$lib/paraglide/messages.js";
 
     // Client-side call to read content
     // We can also pass data from server load if we wanted SSR, but remote pattern implies client fetch often.
@@ -33,7 +34,7 @@
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto">
-        <h1 class="text-3xl font-bold mb-6">Imprint</h1>
+        <h1 class="text-3xl font-bold mb-6">{m.imprint_title()}</h1>
 
         {#await contentPromise}
             <LoadingSection />
@@ -51,7 +52,7 @@
             />
         {:catch error}
             <ErrorSection
-                headline="Error loading Imprint"
+                headline={m.error_loading_imprint()}
                 message={error.message}
             />
         {/await}

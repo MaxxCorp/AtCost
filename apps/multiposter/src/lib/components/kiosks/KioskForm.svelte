@@ -1,6 +1,7 @@
 <script lang="ts">
     import { listLocations } from "../../../routes/locations/list.remote";
     import type { Location } from "../../../routes/locations/list.remote";
+    import * as m from "$lib/paraglide/messages";
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import EntityManager from "$lib/components/ui/EntityManager.svelte";
@@ -57,7 +58,7 @@
             ? new Date(initialData.endDate).toISOString().slice(0, 16)
             : "")
     );
-
+ 
     $effect(() => {
         // Update state if initialData changes (e.g. from null to loaded)
         if (!initialData) return;
@@ -70,17 +71,17 @@
         startDate = initialData.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : "";
         endDate = initialData.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : "";
     });
-
+ 
     onMount(async () => {
         try {
             locations = await listLocations();
             loaded = true;
         } catch (e) {
             console.error("Failed to load locations", e);
-            toast.error("Failed to load locations");
+            toast.error(m.failed_to_load({ item: m.feature_locations_title().toLowerCase() }));
         }
     });
-
+ 
     // Helper to access form field helpers from the remote function
     function getField(name: string) {
         if (!(remoteFunction as any).fields) return {};
@@ -92,7 +93,7 @@
         }
         return current || {};
     }
-
+ 
     function formatForInput(date: Date) {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -101,7 +102,7 @@
         const minutes = String(date.getMinutes()).padStart(2, "0");
         return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
-
+ 
     function setQuickRange(days: number) {
         const now = new Date();
         const start = new Date(
@@ -118,11 +119,11 @@
             23,
             59,
         );
-
+ 
         startDate = formatForInput(start);
         endDate = formatForInput(end);
     }
-
+ 
     function setNextWeek() {
         const now = new Date();
         const day = now.getDay();
@@ -134,7 +135,7 @@
         startDate = formatForInput(nextMonday);
         endDate = formatForInput(nextSunday);
     }
-
+ 
     function setNextMonth() {
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0);
@@ -157,12 +158,12 @@
                         return;
                     }
                     toast.success(
-                        isUpdating ? "Kiosk updated!" : "Kiosk created!",
+                        isUpdating ? m.kiosk_updated() : m.kiosk_created(),
                     );
                     goto("/kiosks");
                 } catch (error: any) {
                     toast.error(
-                        error?.message || "An unexpected error occurred",
+                        error?.message || m.something_went_wrong(),
                     );
                 }
             })}
@@ -174,12 +175,12 @@
 
         <div class="space-y-2">
             <label for="name" class="block text-sm font-medium text-gray-700"
-                >Kiosk Name</label
+                >{m.kiosk_name()}</label
             >
             <input
                 {...getField("name").as("text")}
                 value={getField("name").value() ?? initialData?.name ?? ""}
-                placeholder="e.g. Main Lobby Screen"
+                placeholder={m.kiosk_name_placeholder()}
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 onblur={() => remoteFunction.validate()}
             />
@@ -192,7 +193,7 @@
             <label
                 for="description"
                 class="block text-sm font-medium text-gray-700"
-                >Description (Optional)</label
+                >{m.description()} ({m.other_label()})</label
             >
             <textarea
                 {...getField("description").as("text")}
@@ -210,7 +211,7 @@
                 <div class="animate-pulse h-10 bg-gray-100 rounded"></div>
             {:else}
                 <EntityManager
-                    title="Locations"
+                    title={m.feature_locations_title()}
                     icon={MapPin}
                     {type}
                     entityId={initialData?.id}
@@ -224,7 +225,7 @@
                         return await handleDelete({
                             ids: [id],
                             deleteFn: deleteLocation,
-                            itemName: "location",
+                            itemName: m.location(),
                         });
                     }}
                     createRemote={createLocation}
@@ -276,13 +277,13 @@
                 {/each}
             {/if}
             <p class="text-xs text-gray-500">
-                Events linked to this location will be displayed.
+                {m.linked_events_description()}
             </p>
         </div>
 
         <div class="space-y-4 border-t pt-6">
             <h3 class="text-lg font-medium text-gray-900">
-                Display Configuration
+                {m.display_configuration()}
             </h3>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -290,15 +291,15 @@
                     <label
                         for="uiMode"
                         class="block text-sm font-medium text-gray-700"
-                        >Visualization</label
+                        >{m.visualization()}</label
                     >
                     <select
                         {...getField("uiMode").as("text")}
                         bind:value={uiMode}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
-                        <option value="carousel">Carousel (Full Screen)</option>
-                        <option value="table">Table View (List)</option>
+                        <option value="carousel">{m.carousel_full_screen()}</option>
+                        <option value="table">{m.table_view_list()}</option>
                     </select>
                 </div>
 
@@ -306,15 +307,15 @@
                     <label
                         for="rangeMode"
                         class="block text-sm font-medium text-gray-700"
-                        >Time Range Mode</label
+                        >{m.time_range_mode()}</label
                     >
                     <select
                         {...getField("rangeMode").as("text")}
                         bind:value={rangeMode}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
-                        <option value="rolling">Rolling Window</option>
-                        <option value="fixed">Fixed Date Range</option>
+                        <option value="rolling">{m.rolling_window()}</option>
+                        <option value="fixed">{m.fixed_date_range()}</option>
                     </select>
                 </div>
             </div>
@@ -324,7 +325,7 @@
                 <label
                     for="loopDuration"
                     class="block text-sm font-medium text-gray-700"
-                    >Loop Duration (s)</label
+                    >{m.loop_duration_seconds()}</label
                 >
                 <input
                     {...getField("loopDuration").as("number")}
@@ -335,7 +336,7 @@
                     required
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 />
-                <p class="text-xs text-gray-500">Time per slide/page.</p>
+                <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
                 {#each getField("loopDuration").issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
@@ -346,7 +347,7 @@
                     <label
                         for="lookAheadDays"
                         class="block text-sm font-medium text-gray-700"
-                        >Look Ahead (Days)</label
+                        >{m.look_ahead_days()}</label
                     >
                     <input
                         {...getField("lookAheadDays").as("number")}
@@ -367,7 +368,7 @@
                     <label
                         for="lookPastDays"
                         class="block text-sm font-medium text-gray-700"
-                        >Look Past (Days)</label
+                        >{m.look_past_days()}</label
                     >
                     <input
                         {...getField("lookPastDays").as("number")}
@@ -385,7 +386,7 @@
             {:else}
                 <div class="space-y-3 col-span-3 border-t pt-4">
                     <span class="block text-sm font-medium text-gray-700"
-                        >Quick Selectors</span
+                        >{m.quick_selectors()}</span
                     >
                     <div class="flex gap-2">
                         <button
@@ -393,14 +394,14 @@
                             class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
                             onclick={() => setNextWeek()}
                         >
-                            Next Week
+                            {m.next_week()}
                         </button>
                         <button
                             type="button"
                             class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
                             onclick={() => setNextMonth()}
                         >
-                            Next Month
+                            {m.next_month()}
                         </button>
                         <button
                             type="button"
@@ -417,7 +418,7 @@
                                 startDate = formatForInput(start);
                             }}
                         >
-                            Reset Start Time (00:00)
+                            {m.reset_start_time()}
                         </button>
                         <button
                             type="button"
@@ -430,11 +431,12 @@
                                     val.getDate(),
                                     23,
                                     59,
+                                    33,
                                 );
                                 endDate = formatForInput(end);
                             }}
                         >
-                            Reset End Time (23:59)
+                            {m.reset_end_time()}
                         </button>
                     </div>
                 </div>
@@ -443,7 +445,7 @@
                     <label
                         for="startDate"
                         class="block text-sm font-medium text-gray-700"
-                        >Start Date</label
+                        >{m.start_date()}</label
                     >
                     <input
                         {...getField("startDate").as("datetime-local")}
@@ -457,7 +459,7 @@
                     <label
                         for="endDate"
                         class="block text-sm font-medium text-gray-700"
-                        >End Date</label
+                        >{m.end_date()}</label
                     >
                     <input
                         {...getField("endDate").as("datetime-local")}
@@ -471,10 +473,10 @@
 
         <div class="pt-4 flex justify-end gap-3">
             <Button href="/kiosks" variant="outline" type="button"
-                >Cancel</Button
+                >{m.cancel()}</Button
             >
             <AsyncButton type="submit" loading={remoteFunction.pending}>
-                {isUpdating ? "Save Changes" : "Create Kiosk"}
+                {isUpdating ? m.save_changes() : m.create_kiosk()}
             </AsyncButton>
         </div>
     </form>

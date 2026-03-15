@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from "$lib/paraglide/messages.js";
 	import { list } from "./list.remote";
 	import { removeBulk } from "./[id]/delete.remote";
 	import { getEmailCampaigns } from "./email-campaigns.remote";
@@ -73,7 +74,7 @@
 	}
 
 	function formatDate(date: Date | null) {
-		if (!date) return "Never";
+		if (!date) return m.never();
 		return new Date(date).toLocaleString();
 	}
 
@@ -87,7 +88,7 @@
 		if (providerType === "google-calendar") return "Google Calendar";
 		if (providerType === "microsoft-calendar") return "Microsoft Calendar";
 		if (providerType === "berlin-de-main-calendar")
-			return "Berlin.de (Main Calendar)";
+			return "Berlin.de (" + m.main_calendar() + ")";
 		if (providerType === "berlin-de-mh-calendar")
 			return "Berlin.de (Marzahn-Hellersdorf)";
 		if (providerType === "wp-the-events-calendar")
@@ -96,9 +97,9 @@
 		return providerType;
 	}
 	function getDirectionLabel(direction: string) {
-		if (direction === "pull") return "Pull Only";
-		if (direction === "push") return "Push Only";
-		if (direction === "bidirectional") return "Bidirectional";
+		if (direction === "pull") return m.pull_only();
+		if (direction === "push") return m.push_only();
+		if (direction === "bidirectional") return m.bidirectional();
 		return direction;
 	}
 
@@ -208,23 +209,23 @@
 	function formatEventType(eventType: string) {
 		switch (eventType) {
 			case "delivered":
-				return "Delivered";
+				return m.delivered();
 			case "opened":
-				return "Opened";
+				return m.opened();
 			case "click":
 			case "clicked":
-				return "Clicked";
+				return m.clicked();
 			case "hardBounce":
-				return "Hard Bounce";
+				return m.hard_bounce();
 			case "softBounce":
-				return "Soft Bounce";
+				return m.soft_bounce();
 			case "bounced":
-				return "Bounced";
+				return m.bounced();
 			case "spam":
 			case "complained":
-				return "Spam / Complained";
+				return m.spam_complained();
 			case "unsubscribed":
-				return "Unsubscribed";
+				return m.unsubscribed();
 			default:
 				return eventType;
 		}
@@ -232,7 +233,7 @@
 </script>
 
 <svelte:head>
-	<title>Synchronizations</title>
+	<title>{m.feature_synchronizations_title()}</title>
 </svelte:head>
 
 <div class="max-w-4xl mx-auto">
@@ -241,7 +242,7 @@
 		<div
 			class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
 		>
-			<h1 class="text-3xl font-bold flex-shrink-0">Synchronizations</h1>
+			<h1 class="text-3xl font-bold flex-shrink-0">{m.feature_synchronizations_title()}</h1>
 			<div class="flex-1 flex justify-end w-full md:w-auto">
 				<BulkActionToolbar
 					selectedCount={selectedIds.size}
@@ -252,12 +253,12 @@
 						await handleDelete({
 							ids: [...selectedIds],
 							deleteFn: removeBulk,
-							itemName: "synchronization",
+							itemName: m.feature_synchronizations_title().toLowerCase(),
 						});
 						deselectAll();
 					}}
 					newItemHref="/synchronizations/new"
-					newItemLabel="+ New Sync"
+					newItemLabel={"+ " + m.create_item({ item: "Sync" })}
 				/>
 			</div>
 		</div>
@@ -274,9 +275,9 @@
 				{#if items.length === 0}
 					<EmptyState
 						icon={Calendar}
-						title="No Synchronizations"
-						description="Get started by connecting your first calendar service"
-						actionLabel="Add Your First Sync"
+						title={m.no_items({ items: m.feature_synchronizations_title() })}
+						description={m.get_started_sync()}
+						actionLabel={m.create_first({ item: "Sync" })}
 						actionHref="/synchronizations/new"
 					/>
 				{:else}
@@ -330,7 +331,7 @@
 									<div class="space-y-1 text-sm mt-2">
 										<div class="flex gap-2">
 											<span class="text-gray-600"
-												>Direction:</span
+												>{m.direction()}:</span
 											>
 											<span class="font-medium"
 												>{getDirectionLabel(
@@ -340,19 +341,19 @@
 										</div>
 										<div class="flex gap-2">
 											<span class="text-gray-600"
-												>Status:</span
+												>{m.status()}:</span
 											>
 											<span
 												class={`font-medium ${config.enabled ? "text-green-600" : "text-gray-400"}`}
 											>
 												{config.enabled
-													? "Enabled"
-													: "Disabled"}
+													? m.enabled()
+													: m.disabled()}
 											</span>
 										</div>
 										<div class="flex gap-2">
 											<span class="text-gray-600"
-												>Last Sync:</span
+												>{m.last_sync()}:</span
 											>
 											<span class="font-medium"
 												>{formatDate(
@@ -380,7 +381,7 @@
 														class="h-4 w-4"
 													/>
 												{/if}
-												Campaigns
+												{m.campaigns()}
 											</button>
 
 											{#if expandedCampaigns.has(config.id)}
@@ -393,8 +394,7 @@
 														<p
 															class="text-sm text-gray-500"
 														>
-															No campaigns sent
-															yet.
+															{m.no_campaigns_sent()}
 														</p>
 													{:else}
 														{#each campaignData?.campaigns || [] as campaign}
@@ -477,10 +477,9 @@
 																		loadCampaigns(
 																			config.id,
 																			true,
-																		)}
+																			)}
 																>
-																	Load More
-																	Campaigns
+																	{m.load_more_items({ items: m.campaigns() })}
 																</Button>
 															</div>
 														{/if}
@@ -502,26 +501,26 @@
 										size="default"
 										class="flex items-center gap-2 w-[120px] justify-center"
 									>
-										<Pencil size={16} /> Edit
+										<Pencil size={16} /> {m.edit()}
 									</Button>
 									<AsyncButton
 										variant="destructive"
 										size="default"
 										loading={false}
-										loadingLabel="Deleting..."
+										loadingLabel={m.deleting()}
 										class="flex items-center gap-2 w-[120px] justify-center"
 										onclick={async () => {
 											const success = await handleDelete({
 												ids: [config.id],
 												deleteFn: removeBulk,
-												itemName: "synchronization",
+												itemName: m.feature_synchronizations_title().toLowerCase(),
 											});
 											if (success) {
 												deselectAll();
 											}
 										}}
 									>
-										<Trash2 size={16} /> Delete
+										<Trash2 size={16} /> {m.delete()}
 									</AsyncButton>
 								</div>
 							</div>
@@ -531,10 +530,10 @@
 			</div>
 		{:catch error}
 			<ErrorSection
-				headline="Failed to load synchronizations"
-				message={error?.message || "An unexpected error occurred."}
+				headline={m.failed_to_load({ item: m.feature_synchronizations_title() })}
+				message={error?.message || m.something_went_wrong()}
 				href="/synchronizations"
-				button="Retry"
+				button={m.retry()}
 			/>
 		{/await}
 	</div>

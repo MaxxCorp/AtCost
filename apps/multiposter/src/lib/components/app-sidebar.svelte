@@ -12,6 +12,8 @@
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import LogInIcon from "@lucide/svelte/icons/log-in";
 	import UserPlusIcon from "@lucide/svelte/icons/user-plus";
+	import * as m from "$lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
 
 	let {
 		ref = $bindable(null),
@@ -29,7 +31,7 @@
 
 			const platformFeatures = getVisibleFeatures(user, hasAccess).map(
 				(f) => ({
-					title: f.title,
+					title: f.title(),
 					url: f.href,
 					iconPath: ICONS[f.icon].path,
 				}),
@@ -37,7 +39,7 @@
 
 			navMain = [
 				{
-					title: "Features",
+					title: m.features(),
 					url: "#",
 					icon: LayersIcon,
 					isActive: true,
@@ -68,7 +70,7 @@
 							>
 								<span
 									class="truncate font-semibold text-lg text-gray-900"
-									>Multiposter</span
+									>{m.multiposter()}</span
 								>
 							</div>
 						</a>
@@ -85,21 +87,21 @@
 	<Sidebar.Footer>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton tooltipContent="Imprint">
+				<Sidebar.MenuButton tooltipContent={m.imprint()}>
 					{#snippet child({ props })}
 						<a href="/imprint" {...props}>
 							<FileTextIcon />
-							<span>Imprint</span>
+							<span>{m.imprint()}</span>
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton tooltipContent="Data Privacy">
+				<Sidebar.MenuButton tooltipContent={m.data_privacy()}>
 					{#snippet child({ props })}
 						<a href="/GDPR" {...props}>
 							<FileTextIcon />
-							<span>Data Privacy</span>
+							<span>{m.data_privacy()}</span>
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>
@@ -117,21 +119,21 @@
 		{:else}
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent="Log In">
+					<Sidebar.MenuButton tooltipContent={m.log_in()}>
 						{#snippet child({ props })}
 							<a href="/login" {...props}>
 								<LogInIcon />
-								<span>Log In</span>
+								<span>{m.log_in()}</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent="Sign Up">
+					<Sidebar.MenuButton tooltipContent={m.sign_up()}>
 						{#snippet child({ props })}
 							<a href="/signup" {...props}>
 								<UserPlusIcon />
-								<span>Sign Up</span>
+								<span>{m.sign_up()}</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>

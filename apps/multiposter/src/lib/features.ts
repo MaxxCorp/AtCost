@@ -1,12 +1,13 @@
 import { ICONS } from '$lib/icons';
 import type { Feature } from '$lib/authorization';
+import * as m from '$lib/paraglide/messages.js';
 
 export interface FeatureMeta {
   key: Feature;
-  title: string;
-  description: string;
+  title: () => string;
+  description: () => string;
   href: string;
-  buttonText: string;
+  buttonText: () => string;
   claim: Feature; // claim matches key for now
   icon: keyof typeof ICONS;
   gradientFrom: string;
@@ -19,10 +20,10 @@ export interface FeatureMeta {
 export const FEATURES: readonly FeatureMeta[] = [
   {
     key: 'synchronizations',
-    title: 'Synchronizations',
-    description: 'Connect and sync your Google Calendar and Microsoft 365 calendars.',
+    title: () => m.feature_synchronizations_title(),
+    description: () => m.feature_synchronizations_description(),
     href: '/synchronizations',
-    buttonText: 'Manage Syncs',
+    buttonText: () => m.feature_synchronizations_button(),
     claim: 'synchronizations',
     icon: 'calendar',
     gradientFrom: 'from-blue-50',
@@ -33,10 +34,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'events',
-    title: 'Events',
-    description: 'Create, edit, and manage your events across multiple calendars.',
+    title: () => m.feature_events_title(),
+    description: () => m.feature_events_description(),
     href: '/events',
-    buttonText: 'Manage Events',
+    buttonText: () => m.feature_events_button(),
     claim: 'events',
     icon: 'plus',
     gradientFrom: 'from-purple-50',
@@ -47,10 +48,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'announcements',
-    title: 'Announcements',
-    description: 'Manage and publish announcements, news, and updates.',
+    title: () => m.feature_announcements_title(),
+    description: () => m.feature_announcements_description(),
     href: '/announcements',
-    buttonText: 'Manage Announcements',
+    buttonText: () => m.feature_announcements_button(),
     claim: 'announcements',
     icon: 'megaphone',
     gradientFrom: 'from-amber-50',
@@ -61,10 +62,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'campaigns',
-    title: 'Campaigns',
-    description: 'Create and manage message campaigns to post across your connected calendars.',
+    title: () => m.feature_campaigns_title(),
+    description: () => m.feature_campaigns_description(),
     href: '/campaigns',
-    buttonText: 'Manage Campaigns',
+    buttonText: () => m.feature_campaigns_button(),
     claim: 'campaigns',
     icon: 'checkSquare',
     gradientFrom: 'from-green-50',
@@ -75,10 +76,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'locations',
-    title: 'Locations',
-    description: 'Manage physical locations where resources can be found or events take place.',
+    title: () => m.feature_locations_title(),
+    description: () => m.feature_locations_description(),
     href: '/locations',
-    buttonText: 'Manage Locations',
+    buttonText: () => m.feature_locations_button(),
     claim: 'locations',
     icon: 'mapPin',
     gradientFrom: 'from-orange-50',
@@ -89,10 +90,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'resources',
-    title: 'Resources',
-    description: 'Manage bookable resources like rooms, equipment, and inventory items.',
+    title: () => m.feature_resources_title(),
+    description: () => m.feature_resources_description(),
     href: '/resources',
-    buttonText: 'Manage Resources',
+    buttonText: () => m.feature_resources_button(),
     claim: 'resources',
     icon: 'box',
     gradientFrom: 'from-teal-50',
@@ -103,10 +104,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'users',
-    title: 'Users',
-    description: 'Manage users, roles, and access permissions.',
+    title: () => m.feature_users_title(),
+    description: () => m.feature_users_description(),
     href: '/users',
-    buttonText: 'Manage Users',
+    buttonText: () => m.feature_users_button(),
     claim: 'users',
     icon: 'users',
     gradientFrom: 'from-rose-50',
@@ -117,10 +118,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'contacts',
-    title: 'Contacts',
-    description: 'Manage your contact information, including emails, phones, and addresses.',
+    title: () => m.feature_contacts_title(),
+    description: () => m.feature_contacts_description(),
     href: '/contacts',
-    buttonText: 'Manage Contacts',
+    buttonText: () => m.feature_contacts_button(),
     claim: 'contacts',
     icon: 'users',
     gradientFrom: 'from-indigo-50',
@@ -131,10 +132,10 @@ export const FEATURES: readonly FeatureMeta[] = [
   },
   {
     key: 'kiosks',
-    title: 'Kiosks',
-    description: 'Configure public displays to cycle through events for specific locations.',
+    title: () => m.feature_kiosks_title(),
+    description: () => m.feature_kiosks_description(),
     href: '/kiosks',
-    buttonText: 'Manage Kiosks',
+    buttonText: () => m.feature_kiosks_button(),
     claim: 'kiosks',
     icon: 'monitor',
     gradientFrom: 'from-gray-50',

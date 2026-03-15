@@ -1,5 +1,6 @@
 <script lang="ts">
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import * as m from "$lib/paraglide/messages";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
     import { goto } from "$app/navigation";
@@ -8,7 +9,7 @@
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import EntityManager from "$lib/components/ui/EntityManager.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact } from "$lib/validations/contacts";
+    import type { Contact } from "$lib/validations/contacts";
     import {
         addAssociation,
         removeAssociation,
@@ -90,15 +91,15 @@
                 const result = (remoteFunction as any).result;
                 if (result?.error) {
                     toast.error(
-                        result.error.message || "Oh no! Something went wrong",
+                        result.error.message || m.something_went_wrong(),
                     );
                     return;
                 }
-                toast.success("Successfully Saved!");
+                toast.success(m.successfully_saved());
                 await goto("/users");
             } catch (error: unknown) {
                 const err = error as { message?: string };
-                toast.error(err?.message || "Oh no! Something went wrong");
+                toast.error(err?.message || m.something_went_wrong());
             }
         })}
 >
@@ -109,7 +110,7 @@
     <input {...getField("claims").as("hidden", claimsJson)} />
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Name</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
         <input
             {...getField("name").as("text")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
@@ -126,7 +127,7 @@
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Email</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.email_address()}</span>
         <input
             {...getField("email").as("email")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
@@ -143,7 +144,7 @@
     </label>
 
     <div class="border-t pt-4 mt-4">
-        <h3 class="text-lg font-medium text-gray-900 mb-2">Roles</h3>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">{m.roles()}</h3>
         <label class="flex items-center space-x-2">
             <input
                 {...getField("roles").as("checkbox", "admin")}
@@ -152,13 +153,13 @@
                 onchange={(e) => (isAdmin = e.currentTarget.checked)}
                 class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
             />
-            <span class="text-sm text-gray-700">Admin</span>
+            <span class="text-sm text-gray-700">{m.admin()}</span>
         </label>
     </div>
 
     <div class="border-t pt-4 mt-4">
         <h3 class="text-lg font-medium text-gray-900 mb-2">
-            Claims (Feature Access)
+            {m.claims_access()}
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             {#each FEATURES as feature}
@@ -179,9 +180,9 @@
                             }}
                             class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                         >
-                            <option value="none">None (No Access)</option>
-                            <option value="use">Use Only (Select Syncs for Items)</option>
-                            <option value="admin">Administrator (Full Access)</option>
+                            <option value="none">{m.none_access()}</option>
+                            <option value="use">{m.use_only_access()}</option>
+                            <option value="admin">{m.administrator_access()}</option>
                         </select>
                     {:else}
                         <label class="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 border border-transparent cursor-pointer">
@@ -193,7 +194,7 @@
                                 }}
                                 class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                             />
-                            <span class="text-sm text-gray-700">Enabled</span>
+                            <span class="text-sm text-gray-700">{m.enabled()}</span>
                         </label>
                     {/if}
                 </div>
@@ -204,7 +205,7 @@
 
     {#if isUpdating && initialData?.id}
         <EntityManager
-            title="Contacts"
+            title={m.feature_contacts_title()}
             icon={User}
             type="user"
             entityId={initialData.id}
@@ -218,7 +219,7 @@
                 return await handleDelete({
                     ids: [id],
                     deleteFn: deleteExistingContact,
-                    itemName: "contact",
+                    itemName: m.feature_contacts_title(),
                 });
             }}
             createRemote={createNewContact}
@@ -268,11 +269,11 @@
     <div class="flex gap-3 mt-6">
         <AsyncButton
             type="submit"
-            loadingLabel={isUpdating ? "Saving..." : "Creating..."}
+            loadingLabel={isUpdating ? m.loading() : m.creating()}
             loading={remoteFunction.pending}
         >
-            {isUpdating ? "Save Changes" : "Create User"}
+            {isUpdating ? m.save_changes() : m.create_user()}
         </AsyncButton>
-        <Button variant="secondary" href="/users" size="default">Cancel</Button>
+        <Button variant="secondary" href="/users" size="default">{m.cancel()}</Button>
     </div>
 </form>

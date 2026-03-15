@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { readLocation } from "./read.remote";
@@ -17,7 +18,7 @@
 
 <div class="container mx-auto px-4 py-8">
     {#await readLocation(page.params.id || "")}
-        <LoadingSection message="Loading location..." />
+        <LoadingSection message={m.loading_item({ item: m.feature_locations_title() })} />
     {:then location}
         {#if location}
             <div class="max-w-2xl mx-auto">
@@ -29,11 +30,11 @@
                                 {location.name}
                             </h1>
                             <p class="text-sm text-gray-500">
-                                Created: {new Date(
+                                {m.created()}: {new Date(
                                     location.createdAt,
                                 ).toLocaleString()}
                                 {#if location.updatedAt !== location.createdAt}
-                                    • Updated: {new Date(
+                                    • {m.updated()}: {new Date(
                                         location.updatedAt,
                                     ).toLocaleString()}
                                 {/if}
@@ -42,23 +43,23 @@
                         <div class="flex gap-2">
                             <AsyncButton
                                 type="button"
-                                loadingLabel="Deleting..."
+                                loadingLabel={m.deleting()}
                                 loading={deleteLocation.pending}
                                 variant="destructive"
                                 onclick={async () => {
                                     await handleDelete({
                                         ids: [location.id],
                                         deleteFn: deleteLocation,
-                                        itemName: "location",
+                                        itemName: m.location().toLowerCase(),
                                     });
                                     goto("/locations");
                                 }}
                             >
-                                Delete
+                                {m.delete()}
                             </AsyncButton>
                         </div>
                     </div>
-                    <h2 class="text-xl font-semibold mb-4">Edit Location</h2>
+                    <h2 class="text-xl font-semibold mb-4">{m.edit_item({ item: m.feature_locations_title() })}</h2>
                     <LocationForm
                         remoteFunction={updateLocation}
                         validationSchema={updateLocationSchema}
@@ -69,20 +70,20 @@
             </div>
         {:else}
             <ErrorSection
-                headline="Location Not Found"
-                message="The location you are looking for does not exist."
+                headline={m.not_found({ item: m.feature_locations_title() })}
+                message={m.not_found_message({ item: m.feature_locations_title() })}
                 href="/locations"
-                button="Back to Locations"
+                button={m.back_to_list()}
             />
         {/if}
     {:catch error}
         <ErrorSection
-            headline="Error"
+            headline={m.something_went_wrong()}
             message={error instanceof Error
                 ? error.message
-                : "Failed to load location"}
+                : m.failed_to_load({ item: m.feature_locations_title() })}
             href="/locations"
-            button="Back to Locations"
+            button={m.back_to_list()}
         />
     {/await}
 </div>

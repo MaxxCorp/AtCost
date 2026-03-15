@@ -1,5 +1,6 @@
 <script lang="ts">
     import { deleteUser } from "./[id]/delete.remote";
+    import * as m from "$lib/paraglide/messages";
 
     import type { User } from "./list.remote";
     import Button from "$lib/components/ui/button/button.svelte";
@@ -35,7 +36,7 @@
 
     function formatRoles(user: User) {
         const roles = Array.isArray(user.roles) ? user.roles : [];
-        if (roles.length === 0) return "User";
+        if (roles.length === 0) return m.role_user();
         return roles.join(", ");
     }
 </script>
@@ -44,7 +45,7 @@
     <div
         class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
     >
-        <h1 class="text-3xl font-bold flex-shrink-0">Users</h1>
+        <h1 class="text-3xl font-bold flex-shrink-0">{m.users()}</h1>
         <div class="flex-1 flex justify-end w-full md:w-auto">
             <BulkActionToolbar
                 selectedCount={selectedIds.size}
@@ -55,7 +56,7 @@
                     await handleDelete({
                         ids: [...selectedIds],
                         deleteFn: deleteUser,
-                        itemName: "user",
+                        itemName: m.users(),
                     });
                     deselectAll();
                     onRefresh();
@@ -68,8 +69,8 @@
         {#if items.length === 0}
             <EmptyState
                 icon={UserIcon}
-                title="No Users"
-                description="No users found."
+                title={m.no_users()}
+                description={m.no_users_found()}
                 actionLabel=""
                 actionHref=""
             />
@@ -125,7 +126,7 @@
                             </div>
                             <div class="mt-3">
                                 <p class="text-xs text-gray-500 mt-3">
-                                    Joined: {new Date(
+                                    {m.joined_label()} {new Date(
                                         user.createdAt,
                                     ).toLocaleDateString()}
                                 </p>
@@ -138,18 +139,18 @@
                                 size="default"
                                 class="text-center"
                             >
-                                Edit
+                                {m.edit()}
                             </Button>
                             <AsyncButton
                                 variant="destructive"
                                 size="default"
                                 loading={false}
-                                loadingLabel="Deleting..."
+                                loadingLabel={m.deleting()}
                                 onclick={async () => {
                                     const success = await handleDelete({
                                         ids: [user.id],
                                         deleteFn: deleteUser,
-                                        itemName: "user",
+                                        itemName: m.users(),
                                     });
                                     if (success) {
                                         deselectAll();
@@ -157,7 +158,7 @@
                                     }
                                 }}
                             >
-                                Delete
+                                {m.delete()}
                             </AsyncButton>
                         </div>
                     </div>

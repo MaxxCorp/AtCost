@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages";
     import { page } from "$app/state";
     import { readContact } from "../read.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
@@ -39,7 +40,7 @@
         try {
             await navigator.share({
                 title: fullName,
-                text: contact.notes || `Contact details for ${fullName}`,
+                text: contact.notes || m.contact_details_for({ name: fullName }),
                 url: window.location.href,
             });
         } catch (err) {
@@ -57,7 +58,7 @@
             <div
                 class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
             >
-                <LoadingSection message="Loading contact profile..." />
+                <LoadingSection message={m.loading_item({ item: m.contact_profile() })} />
             </div>
         {:then contact}
             {#if !contact}
@@ -66,17 +67,17 @@
                     class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
                 >
                     <ErrorSection
-                        headline="Contact not found"
-                        message="The contact you are looking for does not exist or you don't have access."
+                        headline={m.not_found({ item: m.contact() })}
+                        message={m.not_found_message({ item: m.contact() })}
                         href="/contacts"
-                        button="Back to Contacts"
+                        button={m.back_to_list()}
                     />
                 </div>
             {:else}
                 {@const fullName =
                     contact.displayName ||
                     `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
-                    "Unnamed Contact"}
+                    m.unnamed_contact()}
                 <Breadcrumb
                     feature="contacts"
                     current={contact.displayName || undefined}
@@ -103,7 +104,7 @@
                                         <span
                                             class="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center gap-1"
                                         >
-                                            <Earth size={12} /> Public
+                                            <Earth size={12} /> {m.public()}
                                         </span>
                                     {/if}
                                     {#if contact.tags && contact.tags.length > 0}
@@ -148,13 +149,13 @@
                                 >
                                     <img
                                         src={contact.qrCodePath}
-                                        alt="Scan to view contact"
+                                        alt={m.scan_to_view_contact()}
                                         class="w-32 h-32"
                                     />
                                     <p
                                         class="text-[10px] text-center text-gray-400 mt-1 uppercase tracking-wider font-bold"
                                     >
-                                        Scan to share
+                                        {m.scan_to_share()}
                                     </p>
                                 </div>
                             {/if}
@@ -168,7 +169,7 @@
                                         <h3
                                             class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
                                         >
-                                            <Mail size={16} /> Emails
+                                            <Mail size={16} /> {m.email_addresses()}
                                         </h3>
                                         <ul class="space-y-3">
                                             {#each contact.emails as email}
@@ -198,7 +199,7 @@
                                         <h3
                                             class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
                                         >
-                                            <Phone size={16} /> Phone Numbers
+                                            <Phone size={16} /> {m.phone_numbers()}
                                         </h3>
                                         <ul class="space-y-3">
                                             {#each contact.phones as phone}
@@ -231,7 +232,7 @@
                                         <h3
                                             class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
                                         >
-                                            <MapPin size={16} /> Addresses
+                                            <MapPin size={16} /> {m.addresses()}
                                         </h3>
                                         <div class="space-y-4">
                                             {#each contact.addresses as addr}
@@ -275,7 +276,7 @@
                                     class="flex items-center gap-2"
                                     variant="outline"
                                 >
-                                    <Download size={18} /> Download vCard
+                                    <Download size={18} /> {m.download_vcard()}
                                 </Button>
                             {/if}
 
@@ -286,7 +287,7 @@
                                     onclick={() =>
                                         handleShare(contact, fullName)}
                                 >
-                                    <Share2 size={18} /> Share
+                                    <Share2 size={18} /> {m.share()}
                                 </Button>
                             {/if}
 
@@ -297,7 +298,7 @@
                                     onclick={() =>
                                         goto(`/contacts/${contact.id}`)}
                                 >
-                                    <Pencil size={18} /> Edit Contact
+                                    <Pencil size={18} /> {m.edit_contact()}
                                 </Button>
                             {/if}
                         </div>
@@ -310,10 +311,10 @@
                 class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
             >
                 <ErrorSection
-                    headline="Error loading contact"
+                    headline={m.error_loading_item({ item: m.contact() })}
                     message={error.message}
                     href="/contacts"
-                    button="Back to Contacts"
+                    button={m.back_to_list()}
                 />
             </div>
         {/await}

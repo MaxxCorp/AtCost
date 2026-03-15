@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages";
     import {
         checkStatus,
         register,
@@ -54,11 +55,11 @@
             if (previousStatus.active) {
                 const newStatus = await unregister(configId);
                 status = newStatus;
-                toast.success("Webhook unregistered successfully");
+                toast.success(m.webhook_unregistered_successfully());
             } else {
                 const newStatus = await register(configId);
                 status = newStatus;
-                toast.success("Webhook registered successfully");
+                toast.success(m.webhook_registered_successfully());
             }
 
             // Refresh parent page data if on a synchronization page
@@ -66,8 +67,8 @@
         } catch (error: any) {
             // Revert on error
             status = previousStatus;
-            const action = previousStatus.active ? "unregister" : "register";
-            toast.error(`Failed to ${action} webhook: ${error.message}`);
+            const errorMsg = previousStatus.active ? m.failed_to_unregister_webhook() : m.failed_to_register_webhook();
+            toast.error(`${errorMsg}: ${error.message}`);
         } finally {
             actionLoading = false;
         }
@@ -80,30 +81,30 @@
             variant="default"
             size="sm"
             loading={true}
-            loadingLabel="Loading..."
+            loadingLabel={m.loading()}
             disabled
             class="w-full flex items-center justify-center gap-2"
         >
-            <span>Loading...</span>
+            <span>{m.loading()}</span>
         </AsyncButton>
     {:else}
         <AsyncButton
             variant={status?.active ? "outline" : "default"}
             size="sm"
             loading={actionLoading}
-            loadingLabel="Updating..."
+            loadingLabel={m.updating()}
             onclick={toggleWebhook}
             class="w-full flex items-center justify-center gap-2"
             title={status?.active
-                ? "Webhook Active - Click to unregister"
-                : "Webhook Inactive - Click to register"}
+                ? m.webhook_active_click_to_unregister()
+                : m.webhook_inactive_click_to_register()}
         >
             {#if status?.active}
                 <Bell class="h-4 w-4 text-green-600" />
-                <span class="text-green-600">Active</span>
+                <span class="text-green-600">{m.active()}</span>
             {:else}
                 <BellOff class="h-4 w-4" />
-                <span>Activate</span>
+                <span>{m.activate()}</span>
             {/if}
         </AsyncButton>
     {/if}

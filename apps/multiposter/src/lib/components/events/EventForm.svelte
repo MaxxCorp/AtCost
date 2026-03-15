@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import * as m from "$lib/paraglide/messages.js";
     import type { Event } from "../../../routes/events/list.remote";
     import { deleteEvents as deleteEventAction } from "../../../routes/events/[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
@@ -10,19 +11,15 @@
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import type { updateExistingEvent } from "../../../routes/events/[id]/update.remote";
     import type { createNewEvent } from "../../../routes/events/new/create.remote";
-    import {
-        listResourcesWithHierarchy,
-        type ResourceWithHierarchy,
-    } from "../../../routes/resources/list-with-hierarchy.remote";
-    import {
-        listLocations,
-        type Location,
-    } from "../../../routes/locations/list.remote";
+    import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
+    import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
+    import { listLocations } from "../../../routes/locations/list.remote";
+    import type { Location } from "../../../routes/locations/list.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
     import EntityManager from "$lib/components/ui/EntityManager.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact } from "$lib/validations/contacts";
+    import type { Contact } from "$lib/validations/contacts";
     import {
         addAssociation,
         removeAssociation,
@@ -169,10 +166,10 @@
                   try {
                       return RRule.fromString(recurrenceRule).toText();
                   } catch {
-                      return "Custom Recurrence";
+                      return m.custom_recurrence();
                   }
               })()
-            : "Does not repeat",
+            : m.recurrence(),
     );
 
     const hiddenRecurrenceRule = $derived(recurrenceRule ?? "");
@@ -336,15 +333,15 @@
     }
 </script>
 
-<div class="max-w-3xl mx-auto px-4 py-8">
+<div class="max-w-3xl mx-auto px-4 py-8 text-left">
     <Breadcrumb
         feature="events"
-        current={initialData?.summary ?? "New Event"}
+        current={initialData?.summary ?? m.create_new({ item: m.feature_events_title() })}
     />
 
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">
-            {isUpdating ? "Edit Event" : "Create New Event"}
+            {isUpdating ? m.edit_item({ item: m.feature_events_title() }) : m.create_new({ item: m.feature_events_title() })}
         </h1>
         {#if isUpdating && initialData}
             <AsyncButton
@@ -355,12 +352,12 @@
                     await handleDelete({
                         ids: [initialData.id],
                         deleteFn: deleteEventAction,
-                        itemName: "event",
+                        itemName: m.event_label(),
                     });
                     goto("/events");
                 }}
             >
-                Delete
+                {m.delete()}
             </AsyncButton>
         {/if}
     </div>
@@ -379,16 +376,16 @@
                     if (result?.error) {
                         toast.error(
                             result.error.message ||
-                                "Oh no! Something went wrong",
+                                m.something_went_wrong(),
                         );
                         return;
                     }
-                    toast.success("Successfully Saved!");
+                    toast.success(m.successfully_saved());
                     goto("/events");
                 } catch (error: any) {
                     console.error("--- EventForm submission catch ---", error);
                     toast.error(
-                        error?.message || "Oh no! Something went wrong",
+                        error?.message || m.something_went_wrong(),
                     );
                 }
             })}
@@ -439,7 +436,7 @@
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">
-                Basic Information
+                {m.basic_information()}
             </h2>
 
             <div>
@@ -447,7 +444,7 @@
                     for="summary"
                     class="block text-sm font-medium text-gray-700 mb-1"
                 >
-                    Title <span class="text-red-500">*</span>
+                    {m.title()} <span class="text-red-500">*</span>
                 </label>
                 <input
                     {...getField("summary").as("text")}
@@ -460,7 +457,7 @@
                     ).issues()?.length ?? 0) > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
-                    placeholder="Event title"
+                    placeholder={m.title()}
                     onblur={() => remoteFunction.validate()}
                 />
                 {#each getField("summary").issues() ?? [] as issue}
@@ -472,7 +469,7 @@
                 <label
                     for="description"
                     class="block text-sm font-medium text-gray-700 mb-1"
-                    >Description</label
+                    >{m.description()}</label
                 >
                 <div class="prose max-w-none">
                     <RichTextEditor bind:value={descriptionValue} />
@@ -490,17 +487,17 @@
             <div>
                 <TagInput
                     bind:value={tagsString}
-                    label="Tags"
-                    placeholder="e.g. Series, Workshop, Marketing"
+                    label={m.tags()}
+                    placeholder={m.tags_placeholder_events()}
                 />
             </div>
 
             <div>
                 <span class="block text-sm font-medium text-gray-700 mb-2"
-                    >Resources (Optional)</span
+                    >{m.feature_resources_title()} ({m.optional()})</span
                 >
                 {#await resourcesPromise}
-                    <p class="text-sm text-gray-500">Loading resources...</p>
+                    <p class="text-sm text-gray-500">{m.loading_item({ item: m.feature_resources_title().toLowerCase() })}</p>
                 {:then resources}
                     <div
                         class="space-y-1 border rounded-md p-4 max-h-64 overflow-y-auto bg-gray-50"
@@ -530,7 +527,7 @@
                                     >{resource.name}</span
                                 >
                                 <span class="text-xs text-gray-500"
-                                    >({resource.type})</span
+                                    >({resource.type === "room" ? m.room_type_suffix() : m.equipment_type_suffix()})</span
                                 >
                             </label>
                         {/each}
@@ -550,7 +547,7 @@
                         for="categoryBerlinDotDe"
                         class="block text-sm font-medium text-gray-700 mb-1"
                     >
-                        Berlin.de Category
+                        {m.berlin_de_category()}
                     </label>
                     <select
                         {...getField("categoryBerlinDotDe").as("text")}
@@ -559,7 +556,7 @@
                             ""}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     >
-                        <option value="">-- Select Category --</option>
+                        <option value="">{m.select_category()}</option>
                         {#each BERLIN_DE_CATEGORIES as cat}
                             <option value={cat}>{cat}</option>
                         {/each}
@@ -570,7 +567,7 @@
                         for="ticketPrice"
                         class="block text-sm font-medium text-gray-700 mb-1"
                     >
-                        Ticket Price
+                        {m.ticket_price()}
                     </label>
                     <input
                         {...getField("ticketPrice").as("text")}
@@ -578,14 +575,14 @@
                             initialData?.ticketPrice ??
                             ""}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                        placeholder="e.g. 15.00 EUR"
+                        placeholder={m.ticket_price_placeholder()}
                     />
                 </div>
             </div>
 
             <div>
                 <span class="block text-sm font-medium text-gray-700 mb-2"
-                    >Location</span
+                    >{m.location()}</span
                 >
                 <div class="flex items-center gap-2 mb-2">
                     <input
@@ -599,7 +596,7 @@
                     <label
                         for="useFreeTextLocation"
                         class="text-sm text-gray-700"
-                        >Use custom location text</label
+                        >{m.use_custom_location()}</label
                     >
                 </div>
                 {#if useFreeTextLocation}
@@ -609,18 +606,18 @@
                         oninput={(e) =>
                             (freeTextLocation = e.currentTarget.value)}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                        placeholder="Enter custom location"
+                        placeholder={m.enter_custom_location()}
                         onblur={() => remoteFunction.validate()}
                     />
                 {:else}
                     {#await locationsPromise}
                         <p class="text-sm text-gray-500">
-                            Loading locations...
+                            {m.loading_item({ item: m.feature_locations_title().toLowerCase() })}
                         </p>
                     {:then locations}
                         <!-- Using Multi-Location Selector -->
                         <EntityManager
-                            title="Locations"
+                            title={m.feature_locations_title()}
                             icon={MapPin}
                             {type}
                             entityId={initialData?.id}
@@ -635,7 +632,7 @@
                                 return await handleDelete({
                                     ids: [id],
                                     deleteFn: deleteLocation,
-                                    itemName: "location",
+                                    itemName: m.location_label().toLowerCase(),
                                 });
                             }}
                             createRemote={createLocation}
@@ -696,7 +693,7 @@
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">
-                Date & Time
+                {m.date_and_time()}
             </h2>
 
             <div class="flex items-center gap-2">
@@ -708,7 +705,7 @@
                     class="w-4 h-4 text-blue-600"
                 />
                 <label for="isAllDay" class="text-sm font-medium text-gray-700"
-                    >All-day event</label
+                    >{m.all_day()} {m.event_label()}</label
                 >
             </div>
 
@@ -719,7 +716,7 @@
                         <label
                             for="startDateInput"
                             class="block text-sm font-medium text-gray-700 mb-1"
-                            >Start Date <span class="text-red-500">*</span
+                            >{m.start_date()} <span class="text-red-500">*</span
                             ></label
                         >
                         <input
@@ -736,7 +733,7 @@
                             <label
                                 for="startTimeInput"
                                 class="block text-sm font-medium text-gray-700 mb-1"
-                                >Start Time <span class="text-red-500">*</span
+                                >{m.start_time()} <span class="text-red-500">*</span
                                 ></label
                             >
                             <input
@@ -753,7 +750,7 @@
                         <label
                             for="startTimeZoneInput"
                             class="block text-sm font-medium text-gray-700 mb-1"
-                            >Timezone</label
+                            >{m.timezone()}</label
                         >
                         <input
                             name="startTimeZone"
@@ -778,7 +775,7 @@
                         <label
                             for="hasEndTime"
                             class="text-sm font-medium text-gray-700"
-                            >Add end time</label
+                            >{m.add_item({ item: m.end_time() })}</label
                         >
                     </div>
 
@@ -787,7 +784,7 @@
                             <label
                                 for="endDateInput"
                                 class="block text-sm font-medium text-gray-700 mb-1"
-                                >End Date</label
+                                >{m.end_date()}</label
                             >
                             <input
                                 name="endDate"
@@ -802,7 +799,7 @@
                                 <label
                                     for="endTimeInput"
                                     class="block text-sm font-medium text-gray-700 mb-1"
-                                    >End Time</label
+                                    >{m.end_time()}</label
                                 >
                                 <input
                                     name="endTime"
@@ -817,7 +814,7 @@
                             <label
                                 for="endTimeZoneInput"
                                 class="block text-sm font-medium text-gray-700 mb-1"
-                                >End Timezone</label
+                                >{m.end_time()} {m.timezone()}</label
                             >
                             <input
                                 name="endTimeZone"
@@ -851,7 +848,7 @@
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">
-                Guest Options & Reminders
+                {m.guest_options()}
             </h2>
 
             <div class="space-y-3">
@@ -862,7 +859,7 @@
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
-                        >Guests can invite others</span
+                        >{m.guests_invite()}</span
                     >
                 </label>
                 <label class="flex items-center gap-2">
@@ -872,7 +869,7 @@
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
-                        >Guests can modify event</span
+                        >{m.guests_modify()}</span
                     >
                 </label>
                 <label class="flex items-center gap-2">
@@ -882,7 +879,7 @@
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
-                        >Guests can see other guests</span
+                        >{m.guests_see_others()}</span
                     >
                 </label>
                 <label class="flex items-center gap-2">
@@ -892,14 +889,14 @@
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
-                        >Make this event public</span
+                        >{m.public()} {m.event_label()}</span
                     >
                 </label>
             </div>
 
             <div class="mt-6">
                 <h3 class="text-sm font-medium text-gray-700 mb-2">
-                    Reminders
+                    {m.reminders()}
                 </h3>
                 <label class="flex items-center gap-2 mb-4">
                     <input
@@ -908,7 +905,7 @@
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
-                        >Use default reminders</span
+                        >{m.use_default_reminders()}</span
                     >
                 </label>
 
@@ -929,9 +926,9 @@
                                         class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="popup"
-                                            >Notification</option
+                                            >{m.notification()}</option
                                         >
-                                        <option value="email">Email</option>
+                                        <option value="email">{m.email()}</option>
                                     </select>
                                 </div>
                                 <div class="flex-1">
@@ -965,7 +962,7 @@
                                 ];
                             }}
                         >
-                            + Add reminder
+                            + {m.add_item({ item: m.reminder_label() })}
                         </button>
                     </div>
                 {/if}
@@ -973,7 +970,7 @@
         </div>
 
         <EntityManager
-            title="Contacts"
+            title={m.feature_contacts_title()}
             icon={User}
             type="event"
             entityId={initialData?.id}
@@ -989,7 +986,7 @@
                 return await handleDelete({
                     ids: [id],
                     deleteFn: deleteExistingContact,
-                    itemName: "contact",
+                    itemName: m.contact_label().toLowerCase(),
                 });
             }}
             createRemote={createNewContact}
@@ -1030,7 +1027,7 @@
                                 status: newStatus,
                             } as any).catch((err: any) =>
                                 toast.error(
-                                    err.message || "Failed to update status",
+                                    err.message || m.failed_to_update_status(),
                                 ),
                             );
                         }
@@ -1038,10 +1035,10 @@
                     }}
                     class="text-xs bg-transparent border-0 focus:ring-0 cursor-pointer text-gray-500 hover:text-blue-600 font-medium"
                 >
-                    <option value="needsAction">Needs Action</option>
-                    <option value="accepted">Accepted</option>
-                    <option value="declined">Declined</option>
-                    <option value="tentative">Tentative</option>
+                    <option value="needsAction">{m.needs_action()}</option>
+                    <option value="accepted">{m.accepted()}</option>
+                    <option value="declined">{m.declined()}</option>
+                    <option value="tentative">{m.tentative()}</option>
                 </select>
             {/snippet}
 
@@ -1078,14 +1075,14 @@
         <div class="flex gap-3 pt-4">
             <AsyncButton
                 type="submit"
-                loadingLabel="Saving..."
+                loadingLabel={m.saving()}
                 loading={remoteFunction.pending}
                 class="px-8"
             >
-                {isUpdating ? "Save Changes" : "Create Event"}
+                {isUpdating ? m.save_changes() : m.create_item({ item: m.feature_events_title() })}
             </AsyncButton>
             <Button variant="secondary" href="/events" size="default">
-                Cancel
+                {m.cancel()}
             </Button>
         </div>
     </form>

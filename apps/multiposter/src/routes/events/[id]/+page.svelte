@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from "$lib/paraglide/messages.js";
 	import { page } from "$app/state";
 	import { readEvent } from "./read.remote";
 	import { updateExistingEvent } from "./update.remote";
@@ -9,7 +10,7 @@
 </script>
 
 {#await readEvent(page.params.id ?? "")}
-	<LoadingSection message="Loading event data..." />
+	<LoadingSection message={m.loading_event_data()} />
 {:then event}
 	{#if event}
 		<EventForm
@@ -20,19 +21,19 @@
 		/>
 	{:else}
 		<ErrorSection
-			headline="Event Not Found"
-			message="The event you are looking for does not exist."
+			headline={m.event_not_found()}
+			message={m.event_not_found_message()}
 			href="/events"
-			button="Back to Events"
+			button={m.back_to_events()}
 		/>
 	{/if}
 {:catch error}
 	<ErrorSection
-		headline="Error"
+		headline={m.error()}
 		message={error instanceof Error
 			? error.message
-			: "Failed to load event data"}
+			: m.failed_to_load_event()}
 		href="/events"
-		button="Back to Events"
+		button={m.back_to_events()}
 	/>
 {/await}

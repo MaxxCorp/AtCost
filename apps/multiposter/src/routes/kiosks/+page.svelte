@@ -1,5 +1,6 @@
 <script lang="ts">
     import { listKiosks, type Kiosk } from "./list.remote";
+    import * as m from "$lib/paraglide/messages";
     import { deleteKiosk } from "./[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import Button from "$lib/components/ui/button/button.svelte";
@@ -46,7 +47,7 @@
             <div
                 class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
             >
-                <h1 class="text-3xl font-bold flex-shrink-0">Kiosks</h1>
+                <h1 class="text-3xl font-bold flex-shrink-0">{m.kiosks()}</h1>
                 <div class="flex-1 flex justify-end w-full md:w-auto">
                     <BulkActionToolbar
                         selectedCount={selectedIds.size}
@@ -57,19 +58,19 @@
                             await handleDelete({
                                 ids: [...selectedIds],
                                 deleteFn: deleteKiosk,
-                                itemName: "kiosk",
+                                itemName: m.kiosks(),
                             });
                             deselectAll();
                             refresh();
                         }}
                         newItemHref="/kiosks/new"
-                        newItemLabel="+ New Kiosk"
+                        newItemLabel={m.new_kiosk()}
                     />
                 </div>
             </div>
 
             {#await itemsPromise}
-                <LoadingSection message="Loading kiosks..." />
+                <LoadingSection message={m.loading_kiosks()} />
             {:then items}
                 {@html (() => {
                     initializedItems = items;
@@ -80,9 +81,9 @@
                     {#if items.length === 0}
                         <EmptyState
                             icon={Monitor}
-                            title="No Kiosks"
-                            description="Configure your first kiosk location display."
-                            actionLabel="Create Kiosk"
+                            title={m.no_kiosks()}
+                            description={m.configure_first_kiosk()}
+                            actionLabel={m.create_kiosk()}
                             actionHref="/kiosks/new"
                         />
                     {:else}
@@ -129,7 +130,7 @@
                                         >
                                             <div>
                                                 <span class="text-gray-500 mr-1"
-                                                    >Loop:</span
+                                                    >{m.loop_label()}</span
                                                 >
                                                 <span class="font-medium"
                                                     >{kiosk.loopDuration}s</span
@@ -137,29 +138,25 @@
                                             </div>
                                             <div>
                                                 <span class="text-gray-500 mr-1"
-                                                    >Look Ahead:</span
+                                                    >{m.look_ahead_label()}</span
                                                 >
                                                 <span class="font-medium"
-                                                    >{Math.round(
-                                                        kiosk.lookAhead / 86400,
-                                                    )} days</span
+                                                    >{m.days_count({ count: Math.round(kiosk.lookAhead / 86400) })}</span
                                                 >
                                             </div>
                                             <div>
                                                 <span class="text-gray-500 mr-1"
-                                                    >Look Past:</span
+                                                    >{m.look_past_label()}</span
                                                 >
                                                 <span class="font-medium"
-                                                    >{Math.round(
-                                                        kiosk.lookPast / 86400,
-                                                    )} days</span
+                                                    >{m.days_count({ count: Math.round(kiosk.lookPast / 86400) })}</span
                                                 >
                                             </div>
                                         </div>
 
                                         <div class="mt-4">
                                             <p class="text-xs text-gray-400">
-                                                Created: {new Date(
+                                                {m.created()}: {new Date(
                                                     kiosk.createdAt,
                                                 ).toLocaleString()}
                                             </p>
@@ -173,25 +170,25 @@
                                             size="default"
                                             class="flex items-center gap-2 w-[120px] justify-center"
                                         >
-                                            <Pencil size={16} /> Edit
+                                            <Pencil size={16} /> {m.edit()}
                                         </Button>
                                         <AsyncButton
                                             variant="destructive"
                                             size="default"
                                             loading={false}
-                                            loadingLabel="Deleting..."
+                                            loadingLabel={m.deleting()}
                                             class="flex items-center gap-2 w-[120px] justify-center"
                                             onclick={async () => {
                                                 const success =
                                                     await handleDelete({
                                                         ids: [kiosk.id],
                                                         deleteFn: deleteKiosk,
-                                                        itemName: "kiosk",
+                                                        itemName: m.kiosks(),
                                                     });
                                                 if (success) refresh();
                                             }}
                                         >
-                                            <Trash2 size={16} /> Delete
+                                            <Trash2 size={16} /> {m.delete()}
                                         </AsyncButton>
                                     </div>
                                 </div>
@@ -201,10 +198,10 @@
                 </div>
             {:catch error}
                 <ErrorSection
-                    headline="Failed to load kiosks"
-                    message={error?.message || "An unexpected error occurred."}
+                    headline={m.failed_to_load_kiosks()}
+                    message={error?.message || m.something_went_wrong()}
                     href="/kiosks"
-                    button="Retry"
+                    button={m.retry()}
                 />
             {/await}
         </div>

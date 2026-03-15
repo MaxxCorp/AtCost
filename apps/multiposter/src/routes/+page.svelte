@@ -4,6 +4,7 @@
 	import { hasAccess, parseRoles, parseClaims } from "$lib/authorization";
 	import { FEATURES, getVisibleFeatures } from "$lib/features";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
+	import * as m from "$lib/paraglide/messages.js";
 
 	// Use a promise to handle session loading asynchronously
 	let sessionPromise = $state(loadSession());
@@ -21,7 +22,7 @@
 
 <div class="space-y-8">
 	{#await sessionPromise}
-		<LoadingSection message="Loading your dashboard..." />
+		<LoadingSection message={m.loading_dashboard()} />
 	{:then { user, userRoles, userClaims }}
 		{#if user}
 			<div
@@ -31,11 +32,10 @@
 					class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6"
 				>
 					<h3 class="font-semibold text-blue-900 mb-2">
-						Welcome to AC Multiposter!
+						{m.welcome_title()}
 					</h3>
 					<p class="text-blue-800 text-sm">
-						You're successfully signed in. This is your dashboard
-						where you can manage your synchronizations and events.
+						{m.welcome_message()}
 					</p>
 				</div>
 				<div
@@ -43,10 +43,10 @@
 				>
 					{#each getVisibleFeatures(user, hasAccess) as f (f.key)}
 						<DashboardCard
-							title={f.title}
-							description={f.description}
+							title={f.title()}
+							description={f.description()}
 							href={f.href}
-							buttonText={f.buttonText}
+							buttonText={f.buttonText()}
 							visible={true}
 							gradientFrom={f.gradientFrom}
 							gradientTo={f.gradientTo}
@@ -80,15 +80,13 @@
 					/>
 				</svg>
 				<h2 class="text-2xl font-bold text-gray-900 mb-2">
-					Welcome to AC Multiposter
+					{m.welcome_landing_title()}
 				</h2>
 				<p class="text-gray-600 mb-6">
-					Sign in using the button in the top right to get started
-					with your calendar management.
+					{m.welcome_landing_message()}
 				</p>
 				<p class="text-sm text-gray-500">
-					AC Multiposter helps you manage and sync your Google
-					Calendar and Microsoft 365 calendars in one place.
+					{m.welcome_landing_submessage()}
 				</p>
 			</div>
 		{/if}
@@ -97,13 +95,13 @@
 			class="bg-white rounded-lg shadow-sm border border-red-200 p-12 text-center"
 		>
 			<p class="text-red-600 mb-3">
-				{error?.message || "Failed to load session"}
+				{error?.message || m.loading_dashboard()}
 			</p>
 			<button
 				onclick={() => (sessionPromise = loadSession())}
 				class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
 			>
-				Retry
+				{m.retry()}
 			</button>
 		</div>
 	{/await}

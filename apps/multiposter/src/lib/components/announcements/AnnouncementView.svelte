@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages";
     import { Calendar } from "@lucide/svelte";
     import type { Announcement } from "../../../routes/announcements/list.remote";
 
@@ -14,13 +15,15 @@
             {#if announcement.isPublic}
                 <span
                     class="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded-full"
-                    >Public</span
+                    >{m.public()}</span
                 >
             {/if}
         </div>
         <div class="text-sm text-gray-500 flex items-center gap-2 mt-2">
             <Calendar size={14} />
-            Updated on {new Date(announcement.updatedAt).toLocaleDateString()}
+            {m.updated_on({
+                date: new Date(announcement.updatedAt).toLocaleDateString(),
+            })}
         </div>
     </div>
 

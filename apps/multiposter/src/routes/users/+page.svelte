@@ -1,5 +1,6 @@
 <script lang="ts">
     import { listUsers } from "./list.remote";
+    import * as m from "$lib/paraglide/messages";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
@@ -17,15 +18,15 @@
         <Breadcrumb feature="users" />
 
         {#await itemsPromise}
-            <LoadingSection message="Loading users..." />
+            <LoadingSection message={m.loading_users()} />
         {:then items}
             <UserList {items} onRefresh={refresh} />
         {:catch error}
             <ErrorSection
-                headline="Failed to load users"
-                message={error?.message || "An unexpected error occurred."}
+                headline={m.failed_to_load_users()}
+                message={error?.message || m.something_went_wrong()}
                 href="/users"
-                button="Retry"
+                button={m.retry()}
             />
         {/await}
     </div>

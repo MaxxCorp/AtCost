@@ -16,6 +16,7 @@
     import * as Dialog from "./dialog";
     import EmptyState from "./EmptyState.svelte";
     import { toast } from "svelte-sonner";
+    import * as m from "$lib/paraglide/messages";
 
     interface Props<T extends { id: string }> {
         title: string;
@@ -333,17 +334,17 @@
                             : selectAll}
                     >
                         {selectedIds.size === displayedItems.length
-                            ? "Deselect All"
-                            : "Select All"}
+                            ? m.deselect_all()
+                            : m.select_all()}
                     </Button>
                     <AsyncButton
                         onclick={bulkDelete}
                         variant="destructive"
                         class="px-4 py-2"
                         loading={bulkDeleting}
-                        loadingLabel="Deleting..."
+                        loadingLabel={m.deleting()}
                     >
-                        Delete Selected ({selectedIds.size})
+                        {m.delete_selected({ count: selectedIds.size })}
                     </AsyncButton>
                 {/if}
                 {#if createRemote && renderForm}
@@ -354,7 +355,7 @@
                         onclick={() => (showQuickCreate = true)}
                     >
                         <Plus size={16} class="mr-1" />
-                        New {title.replace(/s$/, "")}
+                        {m.new_item({ item: title.replace(/s$/, "") })}
                     </Button>
                 {/if}
             </div>
@@ -368,7 +369,7 @@
             />
             <input
                 type="text"
-                placeholder={`Search ${title.toLowerCase()}...`}
+                placeholder={m.search_placeholder({ item: title.toLowerCase() })}
                 bind:value={searchQuery}
                 class="pl-9 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -377,7 +378,7 @@
         <!-- Items list -->
         {#if loadingItems}
             <div class="text-center py-12 text-gray-400">
-                Loading {title.toLowerCase()}...
+                {m.loading_item({ item: title.toLowerCase() })}
             </div>
         {:else if associatedItems.length === 0}
             <EmptyState
@@ -391,7 +392,7 @@
             />
         {:else if displayedItems.length === 0}
             <div class="text-center py-8 text-gray-400 text-sm">
-                No {title.toLowerCase()} match your search.
+                {m.no_items_match_search({ item: title.toLowerCase() })}
             </div>
         {:else}
             <div class="grid gap-3">
@@ -431,7 +432,7 @@
                                         editingItem = item;
                                         showQuickCreate = false;
                                     }}
-                                    title="Edit"
+                                    title={m.edit()}
                                 >
                                     <Pencil size={16} />
                                 </button>
@@ -445,7 +446,7 @@
                                     loading={deletingItemId === item.id}
                                     loadingLabel=""
                                     onclick={() => deleteItem(item)}
-                                    title="Delete"
+                                    title={m.delete()}
                                 >
                                     <Trash2 size={16} />
                                 </AsyncButton>
@@ -468,7 +469,7 @@
                 class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2"
             >
                 <Icon size={16} />
-                {showSelector ? `Link ${title}` : `Associated ${title}`}
+                {showSelector ? m.link_item_label({ item: title }) : m.associated_item_label({ item: title })}
             </h3>
             <div class="flex gap-2 flex-wrap">
                 <Button
@@ -480,12 +481,12 @@
                 >
                     {#if showSelector}
                         <X size={16} />
-                        <span class="hidden sm:inline">Close Search</span>
-                        <span class="sm:hidden">Close</span>
+                        <span class="hidden sm:inline">{m.close_search()}</span>
+                        <span class="sm:hidden">{m.close()}</span>
                     {:else}
                         <Link size={16} />
-                        <span class="hidden sm:inline">Link {title}</span>
-                        <span class="sm:hidden">Link</span>
+                        <span class="hidden sm:inline">{m.link_item_label({ item: title })}</span>
+                        <span class="sm:hidden">{m.link()}</span>
                     {/if}
                 </Button>
                 {#if renderForm}
@@ -497,8 +498,8 @@
                         class="flex items-center gap-1"
                     >
                         <Plus size={16} />
-                        <span class="hidden sm:inline">Quick Create</span>
-                        <span class="sm:hidden">Create</span>
+                        <span class="hidden sm:inline">{m.quick_create()}</span>
+                        <span class="sm:hidden">{m.add()}</span>
                     </Button>
                 {/if}
             </div>
@@ -514,7 +515,7 @@
                     />
                     <input
                         type="text"
-                        placeholder={`Search ${title.toLowerCase()}...`}
+                        placeholder={m.search_placeholder({ item: title.toLowerCase() })}
                         bind:value={searchQuery}
                         class="pl-9 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -523,11 +524,11 @@
                 <div class="max-h-64 overflow-y-auto space-y-1">
                     {#if loadingSearch}
                         <div class="text-xs text-center py-4 text-gray-400">
-                            Loading {title.toLowerCase()}...
+                            {m.loading_item({ item: title.toLowerCase() })}
                         </div>
                     {:else if filteredItems.length === 0}
                         <div class="text-xs text-center py-4 text-gray-400">
-                            No {title.toLowerCase()} found.
+                            {m.no_items_found({ item: title.toLowerCase() })}
                         </div>
                     {:else}
                         {#each filteredItems as item}
@@ -558,7 +559,7 @@
                                         loading={linkingItemId === item.id}
                                         loadingLabel=""
                                         onclick={() => toggleAssociation(item)}
-                                        title={isAssociated ? "Unlink" : "Link"}
+                                        title={isAssociated ? m.unlink() : m.link()}
                                     >
                                         {#if isAssociated}
                                             <Unlink size={14} />
@@ -614,7 +615,7 @@
                                             showQuickCreate = false;
                                             showSelector = false;
                                         }}
-                                        title="Edit in place"
+                                        title={m.edit()}
                                     >
                                         <Pencil size={14} />
                                     </button>
@@ -627,7 +628,7 @@
                                     loading={linkingItemId === item.id}
                                     loadingLabel=""
                                     onclick={() => toggleAssociation(item)}
-                                    title="Remove link"
+                                    title={m.unlink()}
                                 >
                                     <Unlink size={14} />
                                 </AsyncButton>
@@ -650,8 +651,8 @@
                     {/each}
                 </div>
             {:else}
-                <p class="text-sm text-gray-500 italic">
-                    No {title.toLowerCase()} associated yet.
+                <p class="text-sm text-gray-500 py-4 text-center">
+                    {m.no_items_found({ item: title })}
                 </p>
             {/if}
         {/if}
@@ -673,8 +674,8 @@
             <Dialog.Header class="mb-4">
                 <Dialog.Title class="text-xl font-bold">
                     {editingItem
-                        ? `Edit ${title.replace(/s$/, "")}`
-                        : `New ${title.replace(/s$/, "")}`}
+                        ? m.edit_item({ item: title.replace(/s$/, "") })
+                        : m.new_item({ item: title.replace(/s$/, "") })}
                 </Dialog.Title>
             </Dialog.Header>
 

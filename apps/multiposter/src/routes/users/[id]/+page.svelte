@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import * as m from "$lib/paraglide/messages";
     import { goto } from "$app/navigation";
     import { readUser } from "./read.remote";
     import { updateUser } from "./update.remote";
@@ -19,7 +20,7 @@
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
         {#await readUser(userId)}
-            <LoadingSection message="Loading user..." />
+            <LoadingSection message={m.loading_user()} />
         {:then user}
             {#if user}
                 <Breadcrumb feature="users" current={user.name} />
@@ -34,24 +35,24 @@
                         <div class="flex gap-2">
                             <AsyncButton
                                 type="button"
-                                loadingLabel="Deleting..."
+                                loadingLabel={m.deleting()}
                                 loading={deleteUser.pending}
                                 variant="destructive"
                                 onclick={async () => {
                                     await handleDelete({
                                         ids: [user.id],
                                         deleteFn: deleteUser,
-                                        itemName: "user",
+                                        itemName: m.users(),
                                     });
                                     goto("/users");
                                 }}
                             >
-                                Delete
+                                {m.delete()}
                             </AsyncButton>
                         </div>
                     </div>
 
-                    <h2 class="text-xl font-semibold mb-4">Edit User</h2>
+                    <h2 class="text-xl font-semibold mb-4">{m.edit_user()}</h2>
                     <UserForm
                         remoteFunction={updateUser}
                         validationSchema={updateUserSchema}
@@ -61,10 +62,10 @@
                 </div>
             {:else}
                 <ErrorSection
-                    headline="User Not Found"
-                    message="The user you are looking for does not exist."
+                    headline={m.user_not_found()}
+                    message={m.user_not_found_message()}
                     href="/users"
-                    button="Back to Users"
+                    button={m.back_to_users()}
                 />
             {/if}
         {:catch error}
@@ -72,9 +73,9 @@
                 headline="Error"
                 message={error instanceof Error
                     ? error.message
-                    : "Failed to load user"}
+                    : m.failed_to_load_user()}
                 href="/users"
-                button="Back to Users"
+                button={m.back_to_users()}
             />
         {/await}
     </div>

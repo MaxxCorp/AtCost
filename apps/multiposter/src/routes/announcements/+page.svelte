@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages";
     import { listAnnouncements } from "./list.remote";
     import type { Announcement } from "./list.remote";
     import { deleteAnnouncements } from "./[id]/delete.remote";
@@ -41,7 +42,9 @@
             <div
                 class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
             >
-                <h1 class="text-3xl font-bold flex-shrink-0">Announcements</h1>
+                <h1 class="text-3xl font-bold flex-shrink-0">
+                    {m.announcements()}
+                </h1>
                 <div class="flex-1 flex justify-end w-full md:w-auto">
                     <BulkActionToolbar
                         selectedCount={selectedIds.size}
@@ -52,33 +55,36 @@
                             await handleDelete({
                                 ids: [...selectedIds],
                                 deleteFn: deleteAnnouncements,
-                                itemName: "announcement",
+                                itemName: m.announcement().toLowerCase(),
                             });
                             deselectAll();
                         }}
                         newItemHref="/announcements/new"
-                        newItemLabel="+ New Announcement"
+                        newItemLabel={"+ " +
+                            m.create_item({ item: m.announcement() })}
                     />
                 </div>
             </div>
 
             {#if query.loading}
-                <LoadingSection message="Loading announcements..." />
+                <LoadingSection
+                    message={m.loading_item({ item: m.announcements() })}
+                />
             {:else if query.error}
                 <ErrorSection
-                    headline="Failed to load announcements"
-                    message={query.error?.message || "An unexpected error occurred."}
+                    headline={m.failed_to_load({ item: m.announcements() })}
+                    message={query.error?.message || m.something_went_wrong()}
                     href="/announcements"
-                    button="Retry"
+                    button={m.retry()}
                 />
             {:else if query.current}
                 <div class="grid gap-4">
                     {#if query.current.length === 0}
                         <EmptyState
                             icon={Megaphone}
-                            title="No Announcements"
-                            description="Get started by creating your first announcement."
-                            actionLabel="Create Your First Announcement"
+                            title={m.no_items({ items: m.announcements() })}
+                            description={m.get_started_announcement()}
+                            actionLabel={m.create_first_announcement()}
                             actionHref="/announcements/new"
                         />
                     {:else}
@@ -123,9 +129,11 @@
                                                 <span
                                                     class="text-xs text-gray-500"
                                                 >
-                                                    Updated on {new Date(
-                                                        announcement.updatedAt,
-                                                    ).toLocaleDateString()}
+                                                    {m.updated_on({
+                                                        date: new Date(
+                                                            announcement.updatedAt,
+                                                        ).toLocaleDateString(),
+                                                    })}
                                                 </span>
                                             </div>
                                             {#if announcement.isPublic}
@@ -138,7 +146,7 @@
                                                     />
                                                     <span
                                                         class="text-xs text-green-600 font-medium"
-                                                        >Public</span
+                                                        >{m.public()}</span
                                                     >
                                                 </div>
                                             {:else}
@@ -147,7 +155,7 @@
                                                 >
                                                     <span
                                                         class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full"
-                                                        >Draft</span
+                                                        >{m.draft()}</span
                                                     >
                                                 </div>
                                             {/if}
@@ -160,13 +168,13 @@
                                             size="default"
                                             class="flex items-center gap-2 w-[120px] justify-center"
                                         >
-                                            <Pencil size={16} /> Edit
+                                            <Pencil size={16} /> {m.edit()}
                                         </Button>
                                         <AsyncButton
                                             variant="destructive"
                                             size="default"
                                             loading={false}
-                                            loadingLabel="Deleting..."
+                                            loadingLabel={m.deleting()}
                                             class="flex items-center gap-2 w-[120px] justify-center"
                                             onclick={async () => {
                                                 const success =
@@ -175,14 +183,14 @@
                                                         deleteFn:
                                                             deleteAnnouncements,
                                                         itemName:
-                                                            "announcement",
+                                                            m.announcement().toLowerCase(),
                                                     });
                                                 if (success) {
                                                     deselectAll();
                                                 }
                                             }}
                                         >
-                                            <Trash2 size={16} /> Delete
+                                            <Trash2 size={16} /> {m.delete()}
                                         </AsyncButton>
                                     </div>
                                 </div>

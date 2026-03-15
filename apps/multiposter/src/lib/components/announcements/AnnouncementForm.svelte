@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages";
     import { goto } from "$app/navigation";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
@@ -26,7 +27,7 @@
         removeLocationAssociation 
     } from "../../../routes/locations/associate.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact } from "$lib/validations/contacts";
+    import type { Contact } from "$lib/validations/contacts";
     import {
         addAssociation,
         removeAssociation,
@@ -110,12 +111,15 @@
 <div class="max-w-3xl mx-auto px-4 py-8">
     <Breadcrumb
         feature="announcements"
-        current={initialData?.title ?? "New Announcement"}
+        current={initialData?.title ??
+            m.create_item({ item: m.announcement() })}
     />
 
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">
-            {isUpdating ? "Edit Announcement" : "New Announcement"}
+            {isUpdating
+                ? m.edit_item({ item: m.announcement() })
+                : m.create_item({ item: m.announcement() })}
         </h1>
         {#if isUpdating && initialData}
             <AsyncButton
@@ -126,12 +130,12 @@
                     await handleDelete({
                         ids: [initialData.id],
                         deleteFn: deleteAnnouncementAction,
-                        itemName: "announcement",
+                        itemName: m.announcement().toLowerCase(),
                     });
                     goto("/announcements");
                 }}
             >
-                Delete
+                {m.delete()}
             </AsyncButton>
         {/if}
     </div>
@@ -144,16 +148,15 @@
                     const result: any = await submit();
                     if (result?.error) {
                         toast.error(
-                            result.error.message ||
-                                "Oh no! Something went wrong",
+                            result.error.message || m.something_went_wrong(),
                         );
                         return;
                     }
-                    toast.success("Successfully Saved!");
+                    toast.success(m.successfully_saved());
                     goto("/announcements");
                 } catch (error: any) {
                     toast.error(
-                        error?.message || "Oh no! Something went wrong",
+                        error?.message || m.something_went_wrong(),
                     );
                 }
             })}
@@ -177,7 +180,7 @@
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">
-                Basic Information
+                {m.basic_information()}
             </h2>
 
             <div>
@@ -185,7 +188,7 @@
                     for="title"
                     class="block text-sm font-medium text-gray-700 mb-1"
                 >
-                    Title <span class="text-red-500">*</span>
+                    {m.title()} <span class="text-red-500">*</span>
                 </label>
                 <input
                     {...getField("title").as("text")}
@@ -194,7 +197,7 @@
                         initialData?.title ??
                         ""}
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    placeholder="Announcement Title"
+                    placeholder={m.announcement_title_placeholder()}
                 />
                 {#each getField("title").issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -206,7 +209,7 @@
                     for="content"
                     class="block text-sm font-medium text-gray-700 mb-1"
                 >
-                    Content <span class="text-red-500">*</span>
+                    {m.content()} <span class="text-red-500">*</span>
                 </label>
                 <div class="prose max-w-none">
                     <RichTextEditor bind:value={contentValue} />
@@ -222,13 +225,17 @@
             </div>
 
             <div>
-                <TagInput bind:value={tagsString} />
+                <TagInput 
+                    bind:value={tagsString} 
+                    label={m.tags()}
+                    placeholder={m.tags_comma_separated()}
+                />
             </div>
 
             <div>
                 {#if locations.length > 0}
                     <EntityManager
-                        title="Locations"
+                        title={m.associated_locations()}
                         icon={MapPin}
                         {type}
                         entityId={initialData?.id}
@@ -243,17 +250,19 @@
                             addLocationAssociation({
                                 ...p,
                                 locationId: p.itemId,
+                              // @ts-ignore
                             } as any)}
                         removeAssociationRemote={async (p: any) =>
                             removeLocationAssociation({
                                 ...p,
                                 locationId: p.itemId,
+                              // @ts-ignore
                             } as any)}
                         deleteItemRemote={async (id: string) => {
                             return await handleDelete({
                                 ids: [id],
                                 deleteFn: deleteLocation,
-                                itemName: "location",
+                                itemName: m.location().toLowerCase(),
                             });
                         }}
                         createRemote={createLocation}
@@ -297,7 +306,7 @@
                     <div
                         class="p-4 border border-dashed rounded-lg text-sm text-gray-500 text-center"
                     >
-                        Loading locations...
+                        {m.loading_item({ item: m.locations() })}
                     </div>
                 {/if}
                 <input
@@ -316,13 +325,13 @@
                     class="w-4 h-4 text-blue-600"
                 />
                 <label for="isPublic" class="text-sm text-gray-700"
-                    >Make this announcement public</label
+                    >{m.make_announcement_public()}</label
                 >
             </div>
         </div>
 
         <EntityManager
-            title="Contacts"
+            title={m.contacts()}
             icon={User}
             {type}
             entityId={initialData?.id}
@@ -338,13 +347,13 @@
                 return await handleDelete({
                     ids: [id],
                     deleteFn: deleteExistingContact,
-                    itemName: "contact",
+                    itemName: m.contact().toLowerCase(),
                 });
             }}
             createRemote={createNewContact}
             createSchema={createContactSchema}
             updateRemote={updateExistingContact}
-            updateSchema={updateContactSchema}
+            updateSchema={updateExistingContact}
             getFormData={(c: Contact) => ({
                 contact: c,
                 emails: c.emails,
@@ -395,7 +404,7 @@
                 loading={remoteFunction.pending}
                 class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
             >
-                {isUpdating ? "Save Changes" : "Create Announcement"}
+                {isUpdating ? m.save_changes() : m.create_item({ item: m.announcement() })}
             </AsyncButton>
             <Button
                 variant="secondary"
@@ -403,7 +412,7 @@
                 size="default"
                 class="ml-3"
             >
-                Cancel
+                {m.cancel()}
             </Button>
         </div>
     </form>

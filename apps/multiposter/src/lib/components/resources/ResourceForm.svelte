@@ -1,15 +1,16 @@
 <script lang="ts">
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import * as m from "$lib/paraglide/messages";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
     import { goto } from "$app/navigation";
     import type { createResource } from "../../../routes/resources/new/create.remote";
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
-    import { type AllocationCalendar } from "$lib/validations/resources";
+    import type { AllocationCalendar } from "$lib/validations/resources";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import EntityManager from "$lib/components/ui/EntityManager.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact } from "$lib/validations/contacts";
+    import type { Contact } from "$lib/validations/contacts";
     import {
         addAssociation,
         removeAssociation,
@@ -23,7 +24,7 @@
     } from "$lib/validations/contacts";
     import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-    import { User, MapPin } from "@lucide/svelte";
+    import { User, MapPin, Box } from "@lucide/svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
     import {
@@ -114,15 +115,15 @@
                 const result: any = await submit();
                 if (result?.error) {
                     toast.error(
-                        result.error.message || "Oh no! Something went wrong",
+                        result.error.message || m.something_went_wrong(),
                     );
                     return;
                 }
-                toast.success("Successfully Saved!");
+                toast.success(m.successfully_saved());
                 await goto("/resources");
             } catch (error: unknown) {
                 const err = error as { message?: string };
-                toast.error(err?.message || "Oh no! Something went wrong");
+                toast.error(err?.message || m.something_went_wrong());
             }
         })}
 >
@@ -131,7 +132,7 @@
     {/if}
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Name</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
         <input
             {...getField("name").as("text")}
             value={getField("name").value() ?? initialData?.name ?? ""}
@@ -140,7 +141,7 @@
             ).issues()?.length ?? 0) > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            placeholder="Enter resource name"
+            placeholder={m.enter_location_name()}
             onblur={() => remoteFunction.validate()}
         />
         {#each getField("name").issues() ?? [] as issue}
@@ -149,7 +150,7 @@
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Type</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.direction()}</span>
         <input
             {...getField("type").as("text")}
             value={getField("type").value() ?? initialData?.type ?? ""}
@@ -158,7 +159,7 @@
             ).issues()?.length ?? 0) > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            placeholder="e.g. room, equipment, vehicle"
+            placeholder={m.resource_type_placeholder()}
             onblur={() => remoteFunction.validate()}
         />
         {#each getField("type").issues() ?? [] as issue}
@@ -167,31 +168,31 @@
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Description</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.description()}</span>
         <textarea
             {...getField("description").as("text")}
             value={getField("description").value() ?? initialData?.description ?? ""}
             rows="3"
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter description"
+            placeholder={m.description()}
         ></textarea>
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Max Occupancy</span
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.max_occupancy()}</span
         >
         <input
             {...getField("maxOccupancy").as("number")}
             value={getField("maxOccupancy").value() ?? initialData?.maxOccupancy ?? ""}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter max occupancy"
+            placeholder={m.enter_max_occupancy()}
         />
     </label>
 
     <div class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Locations</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.feature_locations_title()}</span>
         <EntityManager
-            title="Locations"
+            title={m.feature_locations_title()}
             icon={MapPin}
             type="resource"
             entityId={isUpdating ? initialData?.id : null}
@@ -207,7 +208,7 @@
                 return await handleDelete({
                     ids: [id],
                     deleteFn: deleteLocation,
-                    itemName: "location",
+                    itemName: m.location_label(),
                 });
             }}
             createRemote={createLocation}
@@ -251,7 +252,7 @@
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2"
-            >Parent Resources (Optional)</span
+            >{m.parent_resources()}</span
         >
         <div class="mt-2 space-y-2">
             <label class="flex items-center gap-2">
@@ -261,7 +262,7 @@
                     onclick={() => (hasParent = !hasParent)}
                     class="w-4 h-4 text-blue-600"
                 />
-                <span class="text-sm">Assign to existing parent(s)</span>
+                <span class="text-sm">{m.assign_to_parent()}</span>
             </label>
             {#if hasParent}
                 <div
@@ -289,7 +290,7 @@
                     {/each}
                     {#if allResources.length === 0}
                         <p class="text-sm text-gray-500">
-                            No resources available
+                            {m.no_resources_available()}
                         </p>
                     {/if}
                 </div>
@@ -299,11 +300,10 @@
 
     <div class="block">
         <span class="text-sm font-medium text-gray-700 mb-2"
-            >Allocation Calendars (Optional)</span
+            >{m.allocation_calendars()}</span
         >
         <p class="text-xs text-gray-500 mb-3">
-            Track resource allocation via synced calendars from different
-            providers
+            {m.track_allocation_description()}
         </p>
 
         {#if allocationCalendars.length > 0}
@@ -322,7 +322,7 @@
                             onclick={() => removeAllocationCalendar(index)}
                             class="text-red-600 hover:text-red-800 text-sm"
                         >
-                            Remove
+                            {m.remove()}
                         </button>
                     </div>
                 {/each}
@@ -334,13 +334,13 @@
                 bind:value={newProvider}
                 class="px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-                <option value="google-calendar">Google Calendar</option>
-                <option value="microsoft-calendar">Microsoft Calendar</option>
+                <option value="google-calendar">{m.google_calendar()}</option>
+                <option value="microsoft-calendar">{m.microsoft_calendar()}</option>
             </select>
             <input
                 type="text"
                 bind:value={newCalendarId}
-                placeholder="Calendar ID"
+                placeholder={m.calendar_id()}
                 class="flex-1 px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 onkeydown={(e) => {
                     if (e.key === "Enter") {
@@ -354,7 +354,7 @@
                 onclick={addAllocationCalendar}
                 class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-                Add
+                {m.add()}
             </button>
         </div>
 
@@ -367,7 +367,7 @@
     </div>
 
         <EntityManager
-            title="Contacts"
+            title={m.feature_contacts_title()}
             icon={User}
             type="resource"
             entityId={isUpdating ? initialData?.id : null}
@@ -382,7 +382,7 @@
                 return await handleDelete({
                     ids: [id],
                     deleteFn: deleteExistingContact,
-                    itemName: "contact",
+                    itemName: m.feature_contacts_title(),
                 });
             }}
             createRemote={createNewContact}
@@ -437,13 +437,13 @@
     <div class="flex gap-3 mt-6">
         <AsyncButton
             type="submit"
-            loadingLabel={isUpdating ? "Saving..." : "Creating..."}
+            loadingLabel={isUpdating ? m.loading() : m.creating()}
             loading={remoteFunction.pending}
         >
-            {isUpdating ? "Save Changes" : "Create Resource"}
+            {isUpdating ? m.save_changes() : m.create_resource()}
         </AsyncButton>
         <Button variant="secondary" href="/resources" size="default">
-            Cancel
+            {m.cancel()}
         </Button>
     </div>
 </form>

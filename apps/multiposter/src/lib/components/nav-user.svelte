@@ -5,7 +5,10 @@
 	import { useSidebar } from "$lib/components/ui/sidebar/index.js";
 	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
 	import LogOutIcon from "@lucide/svelte/icons/log-out";
+	import GlobeIcon from "@lucide/svelte/icons/globe";
 	import { authClient } from "$lib/auth";
+	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
+	import * as m from "$lib/paraglide/messages.js";
 
 	let { user }: { user: { name: string; email: string; avatar?: string } } =
 		$props();
@@ -85,9 +88,27 @@
 					</div>
 				</DropdownMenu.Label>
 				<DropdownMenu.Separator />
+				<DropdownMenu.Group>
+					<DropdownMenu.Label class="text-xs text-muted-foreground px-2 py-1.5">{m.language()}</DropdownMenu.Label>
+					<DropdownMenu.Item onclick={() => setLocale('en')} class={getLocale() === 'en' ? 'bg-accent' : ''}>
+						<GlobeIcon class="size-4 mr-2" />
+						<span>English</span>
+						{#if getLocale() === 'en'}
+							<span class="ml-auto text-blue-600">✓</span>
+						{/if}
+					</DropdownMenu.Item>
+					<DropdownMenu.Item onclick={() => setLocale('de')} class={getLocale() === 'de' ? 'bg-accent' : ''}>
+						<GlobeIcon class="size-4 mr-2" />
+						<span>Deutsch</span>
+						{#if getLocale() === 'de'}
+							<span class="ml-auto text-blue-600">✓</span>
+						{/if}
+					</DropdownMenu.Item>
+				</DropdownMenu.Group>
+				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={handleSignOut}>
 					<LogOutIcon />
-					Log out
+					{m.sign_out()}
 				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>

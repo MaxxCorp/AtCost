@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as m from "$lib/paraglide/messages.js";
 	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { view, getOperations } from "./view.remote";
@@ -52,17 +53,17 @@
 			syncError = null;
 			await sync(configId);
 			version++; // Trigger re-fetch
-			toast.success("Sync completed successfully!");
+			toast.success(m.sync_completed_successfully());
 		} catch (e: any) {
 			syncError = e.message;
-			toast.error("Sync failed: " + e.message);
+			toast.error(m.sync_failed() + ": " + e.message);
 		} finally {
 			isSyncing = false;
 		}
 	}
 
 	function formatDate(date: Date | null) {
-		if (!date) return "Never";
+		if (!date) return m.never();
 		return new Date(date).toLocaleString();
 	}
 
@@ -73,9 +74,9 @@
 	}
 
 	function getDirectionLabel(direction: string) {
-		if (direction === "pull") return "Pull Only";
-		if (direction === "push") return "Push Only";
-		if (direction === "bidirectional") return "Bidirectional";
+		if (direction === "pull") return m.pull_only();
+		if (direction === "push") return m.push_only();
+		if (direction === "bidirectional") return m.bidirectional();
 		return direction;
 	}
 
@@ -93,11 +94,18 @@
 	}
 
 	function getOperationLabel(operation: string) {
-		if (operation === "pull") return "Pull";
-		if (operation === "push") return "Push";
-		if (operation === "delete") return "Delete";
+		if (operation === "pull") return m.pull();
+		if (operation === "push") return m.push();
+		if (operation === "delete") return m.delete();
 		return operation;
 	}
+
+    function formatStatus(status: string) {
+        if (status === "completed") return m.completed();
+        if (status === "failed") return m.failed();
+        if (status === "pending") return m.pending();
+        return status;
+    }
 </script>
 
 <svelte:head>
@@ -115,7 +123,7 @@
 <div class="container mx-auto px-4 py-8">
 	{#await configPromise}
 		<Breadcrumb feature="synchronizations" />
-		<LoadingSection message="Loading sync configuration..." />
+		<LoadingSection message={m.loading_item({ item: m.feature_synchronizations_title() })} />
 	{:then config}
 		{#if config}
 			<div class="max-w-4xl mx-auto">
@@ -144,7 +152,7 @@
 							<AsyncButton
 								variant="default"
 								loading={isSyncing}
-								loadingLabel="Syncing..."
+								loadingLabel={m.syncing()}
 								onclick={triggerSync}
 							>
 								<RefreshCw
@@ -152,7 +160,7 @@
 										? 'animate-spin'
 										: ''}"
 								/>
-								Sync Now
+								{m.sync_now()}
 							</AsyncButton>
 							<form
 								{...update
@@ -162,12 +170,12 @@
 										if (result?.error) {
 											toast.error(
 												result.error.message ||
-													"Failed to update status",
+													m.failed_to_update_status(),
 											);
 											return;
 										}
 										version++; // Trigger re-fetch
-										toast.success("Status updated");
+										toast.success(m.status_updated());
 									})}
 								class="inline-block"
 							>
@@ -182,25 +190,25 @@
 										: "default"}
 									loading={update.pending}
 									loadingLabel={config.enabled
-										? "Disabling..."
-										: "Enabling..."}
+										? m.disabling()
+										: m.enabling()}
 									type="submit"
 									class={config.enabled
 										? "bg-gray-600 text-white hover:bg-gray-700"
 										: "bg-green-600 text-white hover:bg-green-700"}
 								>
-									{config.enabled ? "Disable" : "Enable"}
+									{config.enabled ? m.disable() : m.enable()}
 								</AsyncButton>
 							</form>
 							<AsyncButton
 								variant="destructive"
 								loading={false}
-								loadingLabel="Deleting..."
+								loadingLabel={m.deleting()}
 								onclick={async () => {
 									const success = await handleDelete({
 										ids: [configId],
 										deleteFn: removeBulk,
-										itemName: "synchronization",
+										itemName: m.feature_synchronizations_title().toLowerCase(),
 									});
 									if (success) {
 										await goto("/synchronizations");
@@ -208,7 +216,7 @@
 								}}
 							>
 								<Trash2 class="h-4 w-4 mr-2" />
-								Delete
+								{m.delete()}
 							</AsyncButton>
 						</div>
 					</div>
@@ -220,23 +228,23 @@
 								class="text-lg font-semibold mb-4 flex items-center gap-2"
 							>
 								<Settings class="h-5 w-5" />
-								Configuration
+								{m.configuration()}
 							</h2>
 							<div class="space-y-3 text-sm">
 								<div class="flex justify-between">
-									<span class="text-gray-600">Status:</span>
+									<span class="text-gray-600">{m.status()}:</span>
 									<span
 										class="font-medium {config.enabled
 											? 'text-green-600'
 											: 'text-gray-400'}"
 									>
 										{config.enabled
-											? "Enabled"
-											: "Disabled"}
+											? m.enabled()
+											: m.disabled()}
 									</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-gray-600">Direction:</span
+									<span class="text-gray-600">{m.direction()}:</span
 									>
 									<span class="font-medium"
 										>{getDirectionLabel(
@@ -255,23 +263,23 @@
 								</div>
 								<div class="flex justify-between">
 									<span class="text-gray-600"
-										>Sync Interval:</span
+										>{m.sync_interval()}:</span
 									>
 									<span class="font-medium">
-										{(config.settings as SyncSettings)
-											?.syncIntervalMinutes || 60} minutes
+										{m.sync_interval_minutes({ minutes: (config.settings as SyncSettings)
+											?.syncIntervalMinutes || 60 })}
 									</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-gray-600">Webhooks:</span>
+									<span class="text-gray-600">{m.webhooks()}:</span>
 									<span
 										class="font-medium {config.webhookId
 											? 'text-green-600'
 											: 'text-gray-400'}"
 									>
 										{config.webhookId
-											? "Active"
-											: "Inactive"}
+											? m.active()
+											: m.inactive()}
 									</span>
 								</div>
 							</div>
@@ -282,31 +290,31 @@
 								class="text-lg font-semibold mb-4 flex items-center gap-2"
 							>
 								<Clock class="h-5 w-5" />
-								Sync Status
+								{m.status()}
 							</h2>
 							<div class="space-y-3 text-sm">
 								<div class="flex justify-between">
-									<span class="text-gray-600">Last Sync:</span
+									<span class="text-gray-600">{m.last_sync()}:</span
 									>
 									<span class="font-medium"
 										>{formatDate(config.lastSyncAt)}</span
 									>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-gray-600">Next Sync:</span
+									<span class="text-gray-600">{m.next_sync()}:</span
 									>
 									<span class="font-medium"
 										>{formatDate(config.nextSyncAt)}</span
 									>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-gray-600">Created:</span>
+									<span class="text-gray-600">{m.created()}:</span>
 									<span class="font-medium"
 										>{formatDate(config.createdAt)}</span
 									>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-gray-600">Updated:</span>
+									<span class="text-gray-600">{m.updated()}:</span>
 									<span class="font-medium"
 										>{formatDate(config.updatedAt)}</span
 									>
@@ -327,7 +335,7 @@
 
 								<div class="flex-1">
 									<p class="font-semibold mb-1">
-										Sync failed
+										{m.sync_failed()}
 									</p>
 									<p class="text-sm">{syncError}</p>
 									{#if syncError.includes("refresh token") || syncError.includes("re-authenticate")}
@@ -335,24 +343,19 @@
 											class="mt-3 pt-3 border-t border-red-200"
 										>
 											<p class="text-sm font-medium mb-2">
-												How to fix this:
+												{m.how_to_fix_this()}
 											</p>
 											<ol
 												class="text-sm space-y-1 list-decimal list-inside"
 											>
 												<li>
-													Delete this synchronization
-													configuration
+													{m.delete_sync_step()}
 												</li>
 												<li>
-													Sign out and sign back in to
-													your Google account
+													{m.sign_out_in_google_step()}
 												</li>
 												<li>
-													Create a new synchronization
-													- make sure to grant
-													calendar access when
-													prompted
+													{m.create_new_sync_step()}
 												</li>
 											</ol>
 										</div>
@@ -362,10 +365,9 @@
 						</div>
 					{/if}
 
-					<!-- Recent Operations -->
 					<div class="bg-white shadow rounded-lg p-6 space-y-4">
 						<h2 class="text-lg font-semibold mb-4">
-							Recent Sync Operations
+							{m.recent_sync_operations()}
 						</h2>
 						{#await operationsPromise}
 							<div class="flex justify-center py-8">
@@ -376,7 +378,7 @@
 						{:then operations}
 							{#if operations && operations.length === 0}
 								<p class="text-gray-500 text-center py-8">
-									No sync operations yet
+									{m.no_sync_operations_yet()}
 								</p>
 							{:else if operations}
 								<div class="space-y-2">
@@ -429,13 +431,13 @@
 													<span
 														class={`font-medium ${statusColor}`}
 													>
-														{operation.status}
+														{formatStatus(operation.status)}
 													</span>
 													{#if operation.retryCount > 0}
 														<span
 															class="text-gray-500 ml-2"
 														>
-															(retried {operation.retryCount}x)
+															({m.retried_x_times({ count: operation.retryCount })})
 														</span>
 													{/if}
 												</div>
@@ -447,7 +449,7 @@
 													<div
 														class="font-semibold mb-1"
 													>
-														Error Details:
+														{m.error_details()}
 													</div>
 													<pre
 														class="whitespace-pre-wrap font-mono text-xs">{operation.error}</pre>
@@ -475,19 +477,19 @@
 		{:else}
 			<Breadcrumb feature="synchronizations" />
 			<ErrorSection
-				headline="Sync Configuration Not Found"
-				message="The synchronization configuration you are looking for does not exist."
+				headline={m.sync_configuration_not_found()}
+				message={m.sync_configuration_not_found_message()}
 				href="/synchronizations"
-				button="Back to List"
+				button={m.back_to_list()}
 			/>
 		{/if}
 	{:catch error}
 		<Breadcrumb feature="synchronizations" />
 		<ErrorSection
-			headline="Failed to load sync configuration"
+			headline={m.failed_to_load({ item: "Sync" })}
 			message={error instanceof Error ? error.message : String(error)}
 			href="/synchronizations"
-			button="Back to List"
+			button={m.back_to_list()}
 		/>
 	{/await}
 </div>

@@ -13,16 +13,25 @@
 	import { page } from "$app/stores";
 	import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 	import { FEATURES } from "$lib/features";
+	import * as m from "$lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
 
 	let { children } = $props();
 
 	onMount(() => {
-		if (browser && "serviceWorker" in navigator) {
-			navigator.serviceWorker.getRegistrations().then((registrations) => {
-				for (const registration of registrations) {
-					registration.unregister();
-				}
-			});
+		if (browser) {
+			console.log("[Language Debug] onMount started");
+			console.log("[Language Debug] navigator.language:", navigator.language);
+			console.log("[Language Debug] current getLocale():", getLocale());
+
+			// Service worker cleanup
+			if ("serviceWorker" in navigator) {
+				navigator.serviceWorker.getRegistrations().then((registrations) => {
+					for (const registration of registrations) {
+						registration.unregister();
+					}
+				});
+			}
 		}
 	});
 
@@ -42,13 +51,13 @@
 		() =>
 			breadcrumbState.segments ??
 			(featureMeta
-				? [{ label: featureMeta.title, href: featureMeta.href }]
+				? [{ label: featureMeta.title(), href: featureMeta.href }]
 				: []),
 	);
 </script>
 
 <svelte:head>
-	<title>Multiposter</title>
+	<title>{m.multiposter()}</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
@@ -80,7 +89,7 @@
 							<Breadcrumb.List>
 								<Breadcrumb.Item>
 									<Breadcrumb.Link href="/"
-										>Home</Breadcrumb.Link
+										>{m.home()}</Breadcrumb.Link
 									>
 								</Breadcrumb.Item>
 

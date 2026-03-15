@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import * as m from "$lib/paraglide/messages";
     import { readResource } from "./read.remote";
     import { listLocations } from "../../locations/list.remote";
     import { listResources } from "../list.remote";
@@ -21,13 +22,13 @@
 
 <div class="container mx-auto px-4 py-8">
     {#await dataPromise}
-        <LoadingSection message="Loading resource..." />
+        <LoadingSection message={m.loading_resource()} />
     {:then [resource, locations, allResources]}
         {#if resource}
             <div class="max-w-2xl mx-auto">
                 <Breadcrumb feature="resources" current={resource.name} />
                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
-                    <h1 class="text-3xl font-bold mb-6">Edit Resource</h1>
+                    <h1 class="text-3xl font-bold mb-6">{m.edit_resource()}</h1>
                     <ResourceForm
                         remoteFunction={updateResource}
                         validationSchema={updateResourceSchema}
@@ -40,10 +41,10 @@
             </div>
         {:else}
             <ErrorSection
-                headline="Resource Not Found"
-                message="The resource you are looking for does not exist."
+                headline={m.resource_not_found()}
+                message={m.resource_not_found_message()}
                 href="/resources"
-                button="Back to Resources"
+                button={m.back_to_resources()}
             />
         {/if}
     {:catch error}
@@ -51,9 +52,9 @@
             headline="Error"
             message={error instanceof Error
                 ? error.message
-                : "Failed to load resource"}
+                : m.failed_to_load_resource()}
             href="/resources"
-            button="Back to Resources"
+            button={m.back_to_resources()}
         />
     {/await}
 </div>

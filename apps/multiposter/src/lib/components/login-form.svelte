@@ -3,6 +3,7 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { cn, type WithElementRef } from "$lib/utils.js";
 	import type { HTMLAttributes } from "svelte/elements";
+	import * as m from "$lib/paraglide/messages.js";
 
 	let {
 		ref = $bindable(null),
@@ -28,9 +29,9 @@
 
 <div class={cn("flex flex-col gap-6", className)} bind:this={ref} {...restProps}>
 	<div class="flex flex-col items-center gap-2 text-center">
-		<h1 class="text-2xl font-bold">Login to your account</h1>
+		<h1 class="text-2xl font-bold">{m.login_title()}</h1>
 		<p class="text-muted-foreground text-sm text-balance">
-			Choose your identity provider to continue
+			{m.login_description()}
 		</p>
 	</div>
 
@@ -60,7 +61,7 @@
 					d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
 				/>
 			</svg>
-			Sign in with Google
+			{m.sign_in_google()}
 		</Button>
 		<Button
 			variant="outline"
@@ -75,17 +76,17 @@
 				<rect y="12" width="11" height="11" fill="#00A4EF" />
 				<rect x="12" y="12" width="11" height="11" fill="#FFB900" />
 			</svg>
-			Sign in with Microsoft
+			{m.sign_in_microsoft()}
 		</Button>
 	</div>
 
 	<div class="text-center text-sm text-muted-foreground mt-2">
-		Don't have an account?
-		<a href="/signup" class="underline underline-offset-4 hover:text-primary">Sign up</a>
+		{m.dont_have_account()}
+		<a href="/signup" class="underline underline-offset-4 hover:text-primary">{m.sign_up()}</a>
 	</div>
 
 	<div class="text-center text-xs text-muted-foreground mt-4 px-4">
-		By clicking continue, you agree to our
-		<a href="/GDPR" class="underline underline-offset-4 hover:text-primary">Terms of Service and Privacy Policy</a>.
+		{m.terms_prefix()}
+		<a href="/GDPR" class="underline underline-offset-4 hover:text-primary">{m.terms_and_privacy()}</a>.
 	</div>
 </div>

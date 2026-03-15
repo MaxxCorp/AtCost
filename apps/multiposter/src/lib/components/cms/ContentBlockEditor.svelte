@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages";
     import RichTextEditor from "./RichTextEditor.svelte";
     import { Button } from "$lib/components/ui/button";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
@@ -110,7 +111,7 @@
             const msg =
                 e?.message ||
                 (typeof e === "object" ? JSON.stringify(e) : String(e));
-            toast.error(`Load Error: ${msg}`);
+            toast.error(`${m.load_error()}: ${msg}`);
         }
     }
 
@@ -144,11 +145,11 @@
                 content: editorContent,
             });
             if (result?.success) {
-                toast.success(`Saved (${language}/${branch})`);
+                toast.success(`${m.successfully_saved()} (${language}/${branch})`);
                 await invalidateAll();
                 isEditing = false;
             } else {
-                toast.error(result?.error?.message ?? "Failed to save");
+                toast.error(result?.error?.message ?? m.something_went_wrong());
             }
         } catch (e: any) {
             toast.error(e.message);
@@ -159,7 +160,7 @@
         if (!currentBlock) return;
         if (
             !confirm(
-                "Overwrite the PUBLISHED version with current editor content?",
+                m.confirm_publish(),
             )
         )
             return;
@@ -172,7 +173,7 @@
                 content: editorContent,
             });
             if (result?.success) {
-                toast.success("Published successfully!");
+                toast.success(m.successfully_saved());
                 await invalidateAll();
                 isEditing = false;
             }
@@ -182,15 +183,15 @@
     }
 
     async function handleCreateBlock() {
-        const name = prompt("Enter new block name:");
+        const name = prompt(m.create_new_item({ item: m.announcement() })); // Using announcement as item placeholder or similar
         if (!name) return;
         try {
             const result = await remoteCreate({
                 name,
-                description: `Created for slot ${slotName}`,
+                description: `${m.created()} ${m.slot()} ${slotName}`,
             });
             if (result?.success) {
-                toast.success("Block created and linked!");
+                toast.success(m.block_created_and_linked());
                 await invalidateAll();
                 // We could auto-start editing, but we need to wait for reload.
             }
@@ -201,7 +202,7 @@
 
     async function handleRenameBlock() {
         if (!currentBlock || !remoteRename) return;
-        const newName = prompt("Enter new name:", currentBlock.name);
+        const newName = prompt(m.rename(), currentBlock.name);
         if (!newName || newName === currentBlock.name) return;
 
         try {
@@ -210,7 +211,7 @@
                 newName,
             });
             if (result?.success) {
-                toast.success("Renamed successfully");
+                toast.success(m.renamed_successfully());
                 await invalidateAll();
             }
         } catch (e: any) {
@@ -224,7 +225,7 @@
             availableBlocks = await remoteList();
             showSwitchModal = true;
         } catch (e: any) {
-            toast.error("Failed to load blocks");
+            toast.error(m.failed_to_load({ item: m.announcements() }));
         }
     }
 
@@ -233,7 +234,7 @@
         try {
             const result = await remoteLink({ blockId: selectedBlockId });
             if (result?.success) {
-                toast.success("Block switched!");
+                toast.success(m.block_switched());
                 await invalidateAll();
                 showSwitchModal = false;
             }
@@ -245,13 +246,13 @@
     async function handleDeleteBlock() {
         if (
             !currentBlock ||
-            !confirm("Unlink and delete this block? This cannot be undone.")
+            !confirm(m.confirm_delete_block())
         )
             return;
         try {
             const result = await remoteDelete({ blockId: currentBlock.id });
             if (result?.success) {
-                toast.success("Block deleted");
+                toast.success(m.block_deleted());
                 await invalidateAll();
             }
         } catch (e: any) {
@@ -265,15 +266,15 @@
         <div
             class="p-8 text-center bg-gray-50 border border-dashed border-gray-300 rounded-lg"
         >
-            <h3 class="text-lg font-medium text-gray-900">No Content Linked</h3>
-            <p class="mt-1 text-sm text-gray-500">Slot: {slotName}</p>
+            <h3 class="text-lg font-medium text-gray-900">{m.no_content_linked()}</h3>
+            <p class="mt-1 text-sm text-gray-500">{m.slot()}: {slotName}</p>
             <div class="mt-6 flex justify-center gap-4">
                 <AsyncButton onclick={handleCreateBlock}
-                    >Create New Block</AsyncButton
+                    >{m.create_new_block()}</AsyncButton
                 >
                 {#if remoteList}
                     <Button variant="outline" onclick={openSwitchModal}
-                        >Link Existing Block</Button
+                        >{m.link_existing_block()}</Button
                     >
                 {/if}
             </div>
@@ -292,13 +293,13 @@
                 </div>
                 <div class="flex gap-2">
                     <Button variant="outline" size="sm" onclick={startEditing}
-                        >Edit</Button
+                        >{m.edit()}</Button
                     >
                     {#if remoteList}
                         <Button
                             variant="ghost"
                             size="sm"
-                            onclick={openSwitchModal}>Switch</Button
+                            onclick={openSwitchModal}>{m.switch()}</Button
                         >
                     {/if}
                 </div>
@@ -320,7 +321,7 @@
                     <!-- Language Selector -->
                     <div class="flex items-center gap-1">
                         <span class="text-xs font-medium text-gray-500"
-                            >Lang:</span
+                            >{m.lang()}:</span
                         >
                         <select
                             bind:value={language}
@@ -335,14 +336,14 @@
                     <!-- Branch Selector -->
                     <div class="flex items-center gap-1">
                         <span class="text-xs font-medium text-gray-500"
-                            >Branch:</span
+                            >{m.branch()}:</span
                         >
                         <select
                             bind:value={branch}
                             class="border rounded px-2 py-1 text-sm bg-gray-50"
                         >
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
+                            <option value="draft">{m.draft()}</option>
+                            <option value="published">{m.published()}</option>
                         </select>
                     </div>
 
@@ -356,7 +357,7 @@
                             <button
                                 onclick={handleRenameBlock}
                                 class="text-xs text-blue-600 hover:underline"
-                                >Rename</button
+                                >{m.rename()}</button
                             >
                         {/if}
                     </div>
@@ -366,7 +367,7 @@
                     <AsyncButton
                         variant="destructive"
                         size="sm"
-                        onclick={handleDeleteBlock}>Delete Block</AsyncButton
+                        onclick={handleDeleteBlock}>{m.delete_block()}</AsyncButton
                     >
                 </div>
             </div>
@@ -377,16 +378,16 @@
 
             <div class="flex gap-3 justify-end items-center pt-2 border-t">
                 <span class="text-xs text-gray-400 mr-auto">
-                    Editing: {language} / {branch}
+                    {m.editing()}: {language} / {branch}
                 </span>
-                <Button variant="ghost" onclick={cancelEditing}>Cancel</Button>
+                <Button variant="ghost" onclick={cancelEditing}>{m.cancel()}</Button>
                 <AsyncButton variant="outline" onclick={handleSave}
-                    >Save Draft</AsyncButton
+                    >{m.save_draft()}</AsyncButton
                 >
                 <AsyncButton
                     onclick={handlePublish}
                     class="bg-green-600 hover:bg-green-700 text-white"
-                    >Publish</AsyncButton
+                    >{m.publish()}</AsyncButton
                 >
             </div>
         </div>
@@ -396,21 +397,21 @@
     <Dialog.Root bind:open={showSwitchModal}>
         <Dialog.Content>
             <Dialog.Header>
-                <Dialog.Title>Link Existing Block</Dialog.Title>
+                <Dialog.Title>{m.link_existing_block()}</Dialog.Title>
                 <Dialog.Description
-                    >Select a content block to display in this slot.</Dialog.Description
+                    >{m.content_block_description()}</Dialog.Description
                 >
             </Dialog.Header>
 
             <div class="py-4">
                 {#if availableBlocks.length === 0}
-                    <p class="text-sm text-gray-500">No other blocks found.</p>
+                    <p class="text-sm text-gray-500">{m.no_other_blocks_found()}.</p>
                 {:else}
                     <select
                         bind:value={selectedBlockId}
                         class="w-full border rounded p-2"
                     >
-                        <option value="">-- Select a block --</option>
+                        <option value="">-- {m.select_a_block()} --</option>
                         {#each availableBlocks as block}
                             <option value={block.id}>{block.name}</option>
                         {/each}
@@ -421,11 +422,11 @@
             <Dialog.Footer>
                 <Button
                     variant="outline"
-                    onclick={() => (showSwitchModal = false)}>Cancel</Button
+                    onclick={() => (showSwitchModal = false)}>{m.cancel()}</Button
                 >
                 <AsyncButton
                     onclick={handleSwitchBlock}
-                    disabled={!selectedBlockId}>Link Block</AsyncButton
+                    disabled={!selectedBlockId}>{m.link_block()}</AsyncButton
                 >
             </Dialog.Footer>
         </Dialog.Content>

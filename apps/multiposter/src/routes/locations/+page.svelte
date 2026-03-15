@@ -1,17 +1,20 @@
 <script lang="ts">
+	import * as m from "$lib/paraglide/messages";
 	import { listLocations } from "./list.remote";
 	import { deleteLocation } from "./[id]/delete.remote";
-	import type { Location } from "./list.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-	import { MapPin, Pencil, Trash2 } from "@lucide/svelte";
+	import { MapPin, Pencil, Trash2, Home, Hash } from "@lucide/svelte";
 
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
 	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
 	import BulkActionToolbar from "$lib/components/ui/BulkActionToolbar.svelte";
 	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
 	import EmptyState from "$lib/components/ui/EmptyState.svelte";
+
+	// Type definition for the list items
+	type Location = Awaited<ReturnType<typeof listLocations>>[number];
 
 	const query = listLocations();
 	let selectedIds = $state<Set<string>>(new Set());
@@ -43,7 +46,7 @@
 			<div
 				class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
 			>
-				<h1 class="text-3xl font-bold flex-shrink-0">Locations</h1>
+				<h1 class="text-3xl font-bold flex-shrink-0">{m.feature_locations_title()}</h1>
 				<div class="flex-1 flex justify-end w-full md:w-auto">
 					<BulkActionToolbar
 						selectedCount={selectedIds.size}
@@ -54,119 +57,101 @@
 							await handleDelete({
 								ids: [...selectedIds],
 								deleteFn: deleteLocation,
-								itemName: "location",
+								itemName: m.location().toLowerCase(),
 							});
 							deselectAll();
 						}}
 						newItemHref="/locations/new"
-						newItemLabel="+ New Location"
+						newItemLabel={"+ " + m.create_item({ item: m.location() })}
 					/>
 				</div>
 			</div>
 
 			{#if query.loading}
-				<LoadingSection message="Loading locations..." />
+				<LoadingSection message={m.loading_item({ item: m.feature_locations_title() })} />
 			{:else if query.error}
 				<ErrorSection
-					headline="Failed to load locations"
-					message={query.error?.message || "An unexpected error occurred."}
+					headline={m.failed_to_load({ item: m.feature_locations_title() })}
+					message={query.error?.message || m.something_went_wrong()}
 					href="/locations"
-					button="Retry"
+					button={m.retry()}
 				/>
 			{:else if query.current}
 				<div class="grid gap-4">
 					{#if query.current.length === 0}
 						<EmptyState
 							icon={MapPin}
-							title="No Locations"
-							description="Get started by creating your first location"
-							actionLabel="Create Your First Location"
+							title={m.no_items({ items: m.feature_locations_title() })}
+							description={m.get_started_creating({ item: m.location() })}
+							actionLabel={m.create_first({ item: m.location() })}
 							actionHref="/locations/new"
 						/>
 					{:else}
 						{#each query.current as location (location.id)}
-							<div class="mb-6 last:mb-0">
-								<div
-									class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow"
-								>
-									<input
-										type="checkbox"
-										checked={isSelected(location.id)}
-										onchange={() =>
-											toggleSelection(location.id)}
-										class="mt-1 w-4 h-4 text-blue-600"
-									/>
-									<div class="flex-1">
+							<div
+								class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow"
+							>
+								<input
+									type="checkbox"
+									checked={isSelected(location.id)}
+									onchange={() =>
+										toggleSelection(location.id)}
+									class="mt-1 w-4 h-4 text-blue-600 rounded"
+								/>
+								<div class="flex-1 min-w-0">
+									<div class="flex items-start gap-3 mb-2">
 										<div
-											class="flex items-start gap-3 mb-2"
+											class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0"
 										>
-											<div class="flex-1">
-												<h2
-													class="text-xl font-semibold"
-												>
-													<a
-														href={`/locations/${location.id}`}
-														class="hover:underline text-blue-600"
-													>
-														{location.name}
-													</a>
-												</h2>
-											</div>
+											<MapPin size={20} />
 										</div>
-										<div class="mt-2 text-gray-600">
-											<p>
-												{[
-													[
-														location.street,
-														location.houseNumber,
-													]
-														.filter(Boolean)
-														.join(" "),
-													location.addressSuffix,
-												]
-													.filter(Boolean)
-													.join(", ")}
-											</p>
-											{#if location.zip || location.city}
-												<p>
-													{[
-														location.zip,
-														location.city,
-													]
-														.filter(Boolean)
-														.join(" ")}
-												</p>
-											{/if}
-											{#if location.state || location.country}
-												<p
-													class="text-sm text-gray-500"
+										<div class="min-w-0 flex-1">
+											<h2
+												class="text-xl font-semibold break-words"
+											>
+												<a
+													href={`/locations/${location.id}`}
+													class="hover:underline text-blue-600"
 												>
-													{[
-														location.state,
-														location.country,
-													]
-														.filter(Boolean)
-														.join(", ")}
-												</p>
-											{/if}
+													{location.name}
+												</a>
+											</h2>
 											{#if location.roomId}
 												<p
-													class="text-sm text-gray-500"
+													class="text-sm text-gray-500 flex items-center gap-1"
 												>
-													Room: {location.roomId}
+													<Hash size={14} />
+													{m.room()}: {location.roomId}
 												</p>
 											{/if}
 										</div>
-										<div class="mt-3">
-											<p
-												class="text-xs text-gray-500 mt-3"
-											>
-												Created: {new Date(
-													location.createdAt,
-												).toLocaleString()}
-											</p>
+									</div>
+
+									<div
+										class="flex items-start gap-2 mt-4 text-gray-600"
+									>
+										<Home
+											size={16}
+											class="text-gray-400 mt-1"
+										/>
+										<div class="flex flex-col text-sm">
+											<span>
+												{location.street}
+												{location.houseNumber}
+											</span>
+											<span>
+												{location.zip}
+												{location.city}
+											</span>
+											{#if location.state || location.country}
+												<span class="text-gray-400">
+													{location.state || ""}, {location.country ||
+														""}
+												</span>
+											{/if}
 										</div>
 									</div>
+								</div>
 									<div class="flex flex-col gap-2 shrink-0">
 										<Button
 											href={`/locations/${location.id}`}
@@ -174,13 +159,13 @@
 											size="default"
 											class="flex items-center gap-2 w-[120px] justify-center"
 										>
-											<Pencil size={16} /> Edit
+											<Pencil size={16} /> {m.edit()}
 										</Button>
 										<AsyncButton
 											variant="destructive"
 											size="default"
 											loading={false}
-											loadingLabel="Deleting..."
+											loadingLabel={m.deleting()}
 											class="flex items-center gap-2 w-[120px] justify-center"
 											onclick={async () => {
 												const success =
@@ -188,18 +173,17 @@
 														ids: [location.id],
 														deleteFn:
 															deleteLocation,
-														itemName: "location",
+														itemName: m.feature_locations_title().toLowerCase(),
 													});
 												if (success) {
 													deselectAll();
 												}
 											}}
 										>
-											<Trash2 size={16} /> Delete
+											<Trash2 size={16} /> {m.delete()}
 										</AsyncButton>
 									</div>
 								</div>
-							</div>
 						{/each}
 					{/if}
 				</div>

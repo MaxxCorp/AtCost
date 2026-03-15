@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { authClient } from "$lib/auth";
 	import { onMount } from "svelte";
+	import * as m from "$lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
 
 	let user = $state<any>(null);
 	let loading = $state(true);
@@ -74,7 +76,7 @@
 					<span class="text-white font-bold text-sm">AC</span>
 				</div>
 				<h1 class="text-xl font-semibold text-gray-900">
-					AC Multiposter
+					{m.ac_multiposter()}
 				</h1>
 			</a>
 
@@ -82,19 +84,39 @@
 				<a
 					href="/imprint"
 					class="text-sm font-medium text-gray-500 hover:text-gray-900"
-					>Imprint</a
+					>{m.imprint()}</a
 				>
 				<a
 					href="/GDPR"
 					class="text-sm font-medium text-gray-500 hover:text-gray-900"
-					>Data Privacy</a
+					>{m.data_privacy()}</a
 				>
 			</nav>
 		</div>
 
 		<div class="flex items-center gap-4">
+			<div class="flex items-center gap-1 mr-2 border-r border-gray-200 pr-4">
+				<button
+					onclick={() => setLocale("en")}
+					class="px-2 py-1 text-xs font-medium rounded hover:bg-gray-100 transition-colors {getLocale() ===
+					'en'
+						? 'text-blue-600 bg-blue-50'
+						: 'text-gray-500'}"
+				>
+					EN
+				</button>
+				<button
+					onclick={() => setLocale("de")}
+					class="px-2 py-1 text-xs font-medium rounded hover:bg-gray-100 transition-colors {getLocale() ===
+					'de'
+						? 'text-blue-600 bg-blue-50'
+						: 'text-gray-500'}"
+				>
+					DE
+				</button>
+			</div>
 			{#if loading}
-				<div class="text-sm text-gray-600">Loading...</div>
+				<div class="text-sm text-gray-600">{m.loading()}</div>
 			{:else if user}
 				<div class="relative">
 					<button
@@ -150,7 +172,7 @@
 								</p>
 								{#if user.emailVerified}
 									<p class="text-xs text-green-600 mt-1">
-										✓ Verified
+										✓ {m.verified()}
 									</p>
 								{/if}
 							</div>
@@ -172,7 +194,7 @@
 										d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
 									/>
 								</svg>
-								Sign Out
+								{m.sign_out()}
 							</button>
 						</div>
 					{/if}
@@ -198,9 +220,9 @@
 									d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
 								/>
 							</svg>
-							Signing In...
+							{m.signing_in()}
 						{:else}
-							Sign In
+							{m.sign_in()}
 						{/if}
 						<svg
 							class="w-4 h-4 transition-transform {showProviderMenu
@@ -285,6 +307,23 @@
 								</svg>
 								Microsoft
 							</button>
+							<div class="border-t border-gray-100 mt-2 pt-2 px-4">
+								<p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{m.language()}</p>
+								<div class="flex gap-2">
+									<button
+										onclick={() => setLocale("en")}
+										class="flex-1 px-2 py-1 text-xs font-medium rounded border {getLocale() === 'en' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition-colors"
+									>
+										EN
+									</button>
+									<button
+										onclick={() => setLocale("de")}
+										class="flex-1 px-2 py-1 text-xs font-medium rounded border {getLocale() === 'de' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition-colors"
+									>
+										DE
+									</button>
+								</div>
+							</div>
 						</div>
 					{/if}
 				</div>
