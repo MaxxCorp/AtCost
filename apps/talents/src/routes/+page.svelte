@@ -30,7 +30,7 @@
                     class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6"
                 >
                     <h3 class="font-semibold text-emerald-900 mb-2">
-                        Welcome to AC Personnel!
+                        Welcome to AC Talents!
                     </h3>
                     <p class="text-emerald-800 text-sm">
                         You're successfully signed in. This is your HR
@@ -80,14 +80,14 @@
                     />
                 </svg>
                 <h2 class="text-2xl font-bold text-gray-900 mb-2">
-                    Welcome to AC Personnel
+                    Welcome to AC Talents
                 </h2>
                 <p class="text-gray-600 mb-6">
                     Sign in using the sidebar to get started with your HR
                     management.
                 </p>
                 <p class="text-sm text-gray-500">
-                    AC Personnel helps you manage employees, locations, and
+                    AC Talents helps you manage employees, locations, and
                     organizational access in one place.
                 </p>
             </div>

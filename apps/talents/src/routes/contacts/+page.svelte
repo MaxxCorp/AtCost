@@ -29,7 +29,7 @@
 
     breadcrumbState.set({ feature: "contacts" });
 
-    // Personnel specific search logic
+    // Talents specific search logic
     const searchPredicate = (c: any, q: string) => {
         const query = q.toLowerCase();
         const displayName = (c.displayName || "").toLowerCase();
@@ -48,7 +48,7 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Personnel</h1>
+            <h1 class="text-2xl font-bold text-gray-900">Talents</h1>
             <p class="text-sm text-gray-500 mt-1">
                 Manage your team, employees, and external contacts
             </p>

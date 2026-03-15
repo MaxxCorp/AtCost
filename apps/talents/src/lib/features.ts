@@ -1,13 +1,13 @@
 import { ICONS } from '@ac/ui';
-import type { PersonnelFeature } from '$lib/authorization';
+import type { TalentFeature } from '$lib/authorization';
 
 export interface FeatureMeta {
-    key: PersonnelFeature;
+    key: TalentFeature;
     title: string;
     description: string;
     href: string;
     buttonText: string;
-    claim: PersonnelFeature;
+    claim: TalentFeature;
     icon: keyof typeof ICONS;
     gradientFrom: string;
     gradientTo: string;
@@ -61,6 +61,6 @@ export const FEATURES: readonly FeatureMeta[] = [
     },
 ] as const;
 
-export function getVisibleFeatures(user: any, hasAccessFn: (u: any, f: PersonnelFeature) => boolean): FeatureMeta[] {
+export function getVisibleFeatures(user: any, hasAccessFn: (u: any, f: TalentFeature) => boolean): FeatureMeta[] {
     return FEATURES.filter(f => hasAccessFn(user, f.key)).sort((a, b) => a.order - b.order);
 }

@@ -41,7 +41,7 @@
 </script>
 
 <svelte:head>
-	<title>AC Personnel</title>
+	<title>AC Talents</title>
 </svelte:head>
 
 {#if isAuthPage}

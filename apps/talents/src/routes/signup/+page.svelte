@@ -1,5 +1,5 @@
 <script lang="ts">
-    import LoginForm from "$lib/components/login-form.svelte";
+    import SignupForm from "$lib/components/signup-form.svelte";
 </script>
 
 <div class="grid min-h-svh lg:grid-cols-2">
@@ -12,13 +12,13 @@
                     <span class="text-white font-bold text-sm">AC</span>
                 </div>
                 <span class="text-xl font-semibold text-gray-900"
-                    >AC Personnel</span
+                    >AC Talents</span
                 >
             </a>
         </div>
         <div class="flex flex-1 items-center justify-center">
             <div class="w-full max-w-xs">
-                <LoginForm />
+                <SignupForm />
             </div>
         </div>
     </div>

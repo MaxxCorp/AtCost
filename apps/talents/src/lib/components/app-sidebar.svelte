@@ -67,7 +67,7 @@
 							>
 								<span
 									class="truncate font-semibold text-lg text-gray-900"
-									>Personnel</span
+									>Talents</span
 								>
 							</div>
 						</a>

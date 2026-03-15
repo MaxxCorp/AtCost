@@ -39,7 +39,7 @@
             href="/contacts"
             class="flex items-center text-sm text-gray-500 hover:text-gray-900"
         >
-            <ArrowLeft size={16} class="mr-1" /> Back to Personnel
+            <ArrowLeft size={16} class="mr-1" /> Back to Talents
         </a>
         <a href="/contacts/{id}">
             <Button variant="outline" size="sm">
