@@ -26,7 +26,12 @@ async function generateContactAssets(contactId: string, origin?: string) {
         with: {
             emails: true,
             phones: true,
-            addresses: true
+            addresses: true,
+            locationAssociations: {
+                with: {
+                    location: true
+                }
+            }
         }
     });
 
@@ -75,6 +80,24 @@ async function generateContactAssets(contactId: string, origin?: string) {
         if (a.type) prop.setParameter('type', a.type.toLowerCase());
     });
 
+    // Add associated locations to full vCard
+    data.locationAssociations?.forEach((la: any) => {
+        const l = la.location;
+        if (!l) return;
+        const adrValue = [
+            '',
+            l.addressSuffix || '',
+            `${l.street || ''} ${l.houseNumber || ''}`.trim(),
+            l.city || '',
+            l.state || '',
+            l.zip || '',
+            l.country || ''
+        ];
+        const prop = card.addPropertyWithValue('adr', adrValue);
+        prop.setParameter('type', 'work'); // Associated locations are usually work-related
+        if (l.name) prop.setParameter('label', l.name);
+    });
+
     if (data.notes) {
         card.addPropertyWithValue('note', data.notes);
     }
@@ -91,17 +114,17 @@ async function generateContactAssets(contactId: string, origin?: string) {
         data.honorificSuffix || ''
     ]);
 
-    data.emails?.filter((e: any) => e.type?.toLowerCase() === 'work').forEach((e: any) => {
+    data.emails?.filter((e: any) => e.type?.toLowerCase() === 'work' || e.primary).forEach((e: any) => {
         const prop = publicCard.addPropertyWithValue('email', e.value);
         if (e.type) prop.setParameter('type', e.type.toLowerCase());
     });
 
-    data.phones?.filter((p: any) => p.type?.toLowerCase() === 'work').forEach((p: any) => {
+    data.phones?.filter((p: any) => p.type?.toLowerCase() === 'work' || p.primary).forEach((p: any) => {
         const prop = publicCard.addPropertyWithValue('tel', p.value);
         if (p.type) prop.setParameter('type', p.type.toLowerCase());
     });
 
-    data.addresses?.filter((a: any) => a.type?.toLowerCase() === 'work').forEach((a: any) => {
+    data.addresses?.filter((a: any) => a.type?.toLowerCase() === 'work' || a.primary).forEach((a: any) => {
         const adrValue = [
             '',
             a.addressSuffix || '',
@@ -113,6 +136,23 @@ async function generateContactAssets(contactId: string, origin?: string) {
         ];
         const prop = publicCard.addPropertyWithValue('adr', adrValue);
         if (a.type) prop.setParameter('type', a.type.toLowerCase());
+    });
+
+    // Add public associated locations to public vCard
+    data.locationAssociations?.filter((la: any) => la.location?.isPublic).forEach((la: any) => {
+        const l = la.location;
+        const adrValue = [
+            '',
+            l.addressSuffix || '',
+            `${l.street || ''} ${l.houseNumber || ''}`.trim(),
+            l.city || '',
+            l.state || '',
+            l.zip || '',
+            l.country || ''
+        ];
+        const prop = publicCard.addPropertyWithValue('adr', adrValue);
+        prop.setParameter('type', 'work');
+        if (l.name) prop.setParameter('label', l.name);
     });
 
     const storage = getStorageProvider();

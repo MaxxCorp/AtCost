@@ -31,6 +31,16 @@ export type PublicEvent = Omit<Event, 'resolvedContact'> & {
     roomTitle?: string | null;
     tags?: string[];
     locationIds?: string[];
+    locations?: {
+        id: string;
+        name: string;
+        street: string | null;
+        houseNumber: string | null;
+        zip: string | null;
+        city: string | null;
+        country: string | null;
+        isPublic: boolean;
+    }[];
 };
 
 export const listPublicEvents = query(async (): Promise<PublicEvent[]> => {
@@ -207,6 +217,15 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
     resourceData.forEach(r => { if (r.locationId) allLocationIds.add(r.locationId); });
     directLocationData.forEach(l => allLocationIds.add(l.locationId));
 
+    // Fetch full location details
+    let fullLocations: any[] = [];
+    if (allLocationIds.size > 0) {
+        fullLocations = await db
+            .select()
+            .from(location)
+            .where(inArray(location.id, Array.from(allLocationIds)));
+    }
+
     // Fetch 'Employee' contacts for these locations
     const locationEmployeeContacts: Record<string, string> = {}; // locationId -> contactId (first found)
     if (allLocationIds.size > 0) {
@@ -364,7 +383,21 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
                     ...evtResources.filter(r => r.locationId).map(r => r.locationId!),
                     ...directLocationData.filter(l => l.eventId === row.id).map(l => l.locationId)
                 ])
-            ]
+            ],
+            locations: fullLocations.filter(l => 
+                (evtResources.some(er => er.eventId === row.id && er.locationId === l.id) ||
+                directLocationData.some(dl => dl.eventId === row.id && dl.locationId === l.id)) &&
+                l.isPublic
+            ).map(l => ({
+                id: l.id,
+                name: l.name,
+                street: l.street,
+                houseNumber: l.houseNumber,
+                zip: l.zip,
+                city: l.city,
+                country: l.country,
+                isPublic: l.isPublic
+            }))
         };
     });
 }

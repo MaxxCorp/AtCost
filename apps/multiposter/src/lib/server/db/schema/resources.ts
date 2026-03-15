@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, doublePrecision, primaryKey, index, jsonb, integer, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, doublePrecision, primaryKey, index, jsonb, integer, uuid, boolean } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 /**
@@ -23,6 +23,7 @@ export const location = pgTable("location", {
     longitude: doublePrecision("longitude"),
     what3words: text("what3words"), // e.g., "filled.count.soap"
     inclusivitySupport: text("inclusivity_support"), // Accessibility and inclusivity information
+    isPublic: boolean("is_public").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
         .defaultNow()

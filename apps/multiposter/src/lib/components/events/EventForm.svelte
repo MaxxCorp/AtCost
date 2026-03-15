@@ -1000,6 +1000,7 @@
                 addresses: c.addresses,
                 relations: c.relations,
                 tags: c.tags,
+                locationAssociations: c.locationAssociations,
             })}
             searchPredicate={(c: Contact, q: string) => {
                 const name = (
@@ -1057,7 +1058,91 @@
                     {onSuccess}
                     {onCancel}
                     contactId={id}
-                />
+                >
+                    {#snippet children({ onLocationsChange })}
+                        <div class="mt-8 border-t pt-8">
+                            <EntityManager
+                                title={m.feature_locations_title()}
+                                icon={MapPin}
+                                type="location"
+                                entityId={id}
+                                initialItems={(
+                                    formData.locationAssociations || []
+                                ).map((la: any) => la.location)}
+                                embedded={true}
+                                onchange={onLocationsChange}
+                                listItemsRemote={listLocations as any}
+                                addAssociationRemote={async (p: any) => {
+                                    return await addAssociation({
+                                        type: "location",
+                                        entityId: p.itemId,
+                                        contactId: p.entityId,
+                                    });
+                                }}
+                                removeAssociationRemote={async (p: any) => {
+                                    return await removeAssociation({
+                                        type: "location",
+                                        entityId: p.itemId,
+                                        contactId: p.entityId,
+                                    });
+                                }}
+                                deleteItemRemote={async (ids) => {
+                                    return await handleDelete({
+                                        ids: Array.isArray(ids)
+                                            ? ids
+                                            : [ids],
+                                        deleteFn: deleteLocation,
+                                        itemName: m
+                                            .location()
+                                            .toLowerCase(),
+                                    });
+                                }}
+                                createRemote={createLocation}
+                                createSchema={createLocationSchema}
+                                updateRemote={updateLocation}
+                                updateSchema={updateLocationSchema}
+                                getFormData={(l: any) => l}
+                                searchPredicate={(l: any, q: string) => {
+                                    return (
+                                        l.name
+                                            .toLowerCase()
+                                            .includes(q.toLowerCase()) ||
+                                        (l.roomId
+                                            ?.toLowerCase()
+                                            .includes(
+                                                q.toLowerCase(),
+                                            ) ??
+                                            false)
+                                    );
+                                }}
+                            >
+                                {#snippet renderItemLabel(location)}
+                                    {location.name}
+                                    {location.roomId
+                                        ? `(${location.roomId})`
+                                        : ""}
+                                {/snippet}
+                                {#snippet renderForm({
+                                    remoteFunction: rf,
+                                    schema,
+                                    id,
+                                    initialData: formData,
+                                    onSuccess,
+                                    onCancel,
+                                })}
+                                    <LocationForm
+                                        remoteFunction={rf}
+                                        validationSchema={schema}
+                                        isUpdating={!!id}
+                                        initialData={formData}
+                                        {onSuccess}
+                                        {onCancel}
+                                    />
+                                {/snippet}
+                            </EntityManager>
+                        </div>
+                    {/snippet}
+                </ContactForm>
             {/snippet}
         </EntityManager>
         <input

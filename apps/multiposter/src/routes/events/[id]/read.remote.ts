@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag, campaign } from '$lib/server/db/schema';
+import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag, campaign, location } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Event } from '../list.remote';
 import { getOptionalUser, hasAccess } from '$lib/server/authorization';
@@ -57,8 +57,18 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 
 	// Fetch related locations
 	const locations = await db
-		.select({ id: eventLocation.locationId })
+		.select({
+			id: location.id,
+			name: location.name,
+			street: location.street,
+			houseNumber: location.houseNumber,
+			zip: location.zip,
+			city: location.city,
+			country: location.country,
+			isPublic: location.isPublic,
+		})
 		.from(eventLocation)
+		.innerJoin(location, eq(eventLocation.locationId, location.id))
 		.where(eq(eventLocation.eventId, eventId));
 
 	// Resolve primary contact details
@@ -177,6 +187,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		resourceIds: resources.map(r => r.id),
 		contactIds: contacts.map(c => c.id),
 		locationIds: locations.map(l => l.id),
+		locations: locations.map(l => ({
+			...l,
+		})),
 		tags: tags.map(t => t.name),
 		syncIds,
 		resolvedContact,

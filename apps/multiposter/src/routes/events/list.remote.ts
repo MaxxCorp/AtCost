@@ -18,6 +18,16 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	resourceIds?: string[];
 	contactIds?: string[];
 	locationIds?: string[];
+	locations?: {
+		id: string;
+		name: string;
+		street: string | null;
+		houseNumber: string | null;
+		zip: string | null;
+		city: string | null;
+		country: string | null;
+		isPublic: boolean;
+	}[];
 	tags?: string[];
 	syncIds?: string[];
 	participationStatuses?: Record<string, string>;

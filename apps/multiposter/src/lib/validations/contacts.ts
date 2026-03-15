@@ -62,6 +62,7 @@ export const contactSchema = v.intersect([
         addresses: v.optional(v.array(addressSchemaPure)),
         relations: v.optional(v.array(contactRelationSchemaPure)),
         tags: v.optional(v.array(tagSchemaPure)),
+        locationAssociations: v.optional(v.array(v.any())),
         participationStatus: v.optional(v.string()),
     })
 ]);

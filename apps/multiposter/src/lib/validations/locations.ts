@@ -14,6 +14,7 @@ export const locationBaseSchema = v.object({
     longitude: v.optional(v.string()),
     what3words: v.optional(v.string()),
     inclusivitySupport: v.optional(v.string()),
+    isPublic: v.optional(v.boolean()),
 });
 
 export const createLocationSchema = locationBaseSchema;

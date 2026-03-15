@@ -39,6 +39,7 @@
             longitude?: string;
             what3words?: string;
             inclusivitySupport?: string;
+            isPublic?: string;
             saveChanges?: string;
             createLocation?: string;
             cancel?: string;
@@ -76,6 +77,7 @@
         longitude: labels?.longitude ?? "Longitude",
         what3words: labels?.what3words ?? "what3words",
         inclusivitySupport: labels?.inclusivitySupport ?? "Inclusivity Support",
+        isPublic: labels?.isPublic ?? "Public",
         saveChanges: labels?.saveChanges ?? "Save Changes",
         createLocation: labels?.createLocation ?? "Create Location",
         cancel: labels?.cancel ?? "Cancel",
@@ -291,6 +293,16 @@
             rows="3"
             value={initialData?.inclusivitySupport ?? ""}
         ></textarea>
+    </label>
+
+    <label class="flex items-center gap-2 cursor-pointer py-2">
+        <input
+            {...getField("isPublic").as("checkbox")}
+            type="checkbox"
+            class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            checked={initialData?.isPublic ?? true}
+        />
+        <span class="text-sm font-medium text-gray-700">{i18n.isPublic}</span>
     </label>
 
     {#if children}

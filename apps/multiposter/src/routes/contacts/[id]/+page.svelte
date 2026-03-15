@@ -1,14 +1,29 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import * as m from "$lib/paraglide/messages";
     import { readContact } from "./read.remote";
     import { updateExistingContact } from "./update.remote";
+    import { deleteExistingContact } from "./delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
+    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { goto } from "$app/navigation";
 
     import { updateContactSchema } from "$lib/validations/contacts";
+    import EntityManager from "$lib/components/ui/EntityManager.svelte";
+    import { MapPin } from "@lucide/svelte";
+    import { listLocations } from "../../locations/list.remote";
+    import { createLocation } from "../../locations/new/create.remote";
+    import { updateLocation } from "../../locations/[id]/update.remote";
+    import { deleteLocation } from "../../locations/[id]/delete.remote";
+    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import {
+        createLocationSchema,
+        updateLocationSchema,
+    } from "$lib/validations/locations";
+    import LocationForm from "$lib/components/locations/LocationForm.svelte";
 
     const contactId = page.params.id || "";
     let itemsPromise = $state(readContact(contactId));
@@ -52,12 +67,22 @@
                 >
                     <div class="flex justify-between items-center mb-4">
                         <h1 class="text-2xl font-bold">Edit Contact</h1>
-                        <button
-                            class="text-sm text-gray-500 hover:text-gray-700 underline"
-                            onclick={() => goto(`/contacts/${contactId}/view`)}
+                        <AsyncButton
+                            type="button"
+                            loadingLabel={m.deleting()}
+                            loading={deleteExistingContact.pending}
+                            variant="destructive"
+                            onclick={async () => {
+                                await handleDelete({
+                                    ids: [contact.id],
+                                    deleteFn: deleteExistingContact,
+                                    itemName: m.contacts().toLowerCase(),
+                                });
+                                goto("/contacts");
+                            }}
                         >
-                            Cancel Edit
-                        </button>
+                            {m.delete()}
+                        </AsyncButton>
                     </div>
                     <ContactForm
                         remoteFunction={updateExistingContact}
@@ -75,7 +100,90 @@
                                 contact.locationAssociations || []
                             ).map((la: any) => la.locationId),
                         }}
-                    />
+                    >
+                        {#snippet children({ onLocationsChange })}
+                            <div class="mt-8 border-t pt-8">
+                                <EntityManager
+                                    title={m.feature_locations_title()}
+                                    icon={MapPin}
+                                    type="location"
+                                    entityId={contactId}
+                                    initialItems={(
+                                        contact.locationAssociations || []
+                                    ).map((la: any) => la.location)}
+                                    embedded={true}
+                                    onchange={onLocationsChange}
+                                    listItemsRemote={listLocations}
+                                    addAssociationRemote={async (p: any) => {
+                                        const { addAssociation } = await import(
+                                            "../associate.remote"
+                                        );
+                                        return await addAssociation({
+                                            type: "location",
+                                            entityId: p.itemId,
+                                            contactId: p.entityId,
+                                        });
+                                    }}
+                                    removeAssociationRemote={async (p: any) => {
+                                        const {
+                                            removeAssociation,
+                                        } = await import("../associate.remote");
+                                        return await removeAssociation({
+                                            type: "location",
+                                            entityId: p.itemId,
+                                            contactId: p.entityId,
+                                        });
+                                    }}
+                                    deleteItemRemote={async (ids) => {
+                                        return await handleDelete({
+                                            ids: Array.isArray(ids)
+                                                ? ids
+                                                : [ids],
+                                            deleteFn: deleteLocation,
+                                            itemName: m
+                                                .location()
+                                                .toLowerCase(),
+                                        });
+                                    }}
+                                    createRemote={createLocation}
+                                    createSchema={createLocationSchema}
+                                    updateRemote={updateLocation}
+                                    updateSchema={updateLocationSchema}
+                                    getFormData={(l) => l}
+                                    searchPredicate={(l, q) => {
+                                        return (
+                                            l.name
+                                                .toLowerCase()
+                                                .includes(q.toLowerCase()) ||
+                                            (l.roomId
+                                                ?.toLowerCase()
+                                                .includes(
+                                                    q.toLowerCase(),
+                                                ) ??
+                                                false)
+                                        );
+                                    }}
+                                >
+                                    {#snippet renderItemLabel(location)}
+                                        {location.name}
+                                        {location.roomId
+                                            ? `(${location.roomId})`
+                                            : ""}
+                                    {/snippet}
+                                    {#snippet renderForm({ remoteFunction: rf, schema, id, initialData: formData, onSuccess, onCancel })}
+                                        <LocationForm
+                                            remoteFunction={rf}
+                                            validationSchema={schema}
+                                            isUpdating={!!id}
+                                            initialData={formData}
+                                            {onSuccess}
+                                            {onCancel}
+                                        />
+                                    {/snippet}
+                                </EntityManager>
+                            </div>
+                        {/snippet}
+                    </ContactForm>
                 </div>
             {/if}
         {:catch error}

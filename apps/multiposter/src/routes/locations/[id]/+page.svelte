@@ -5,15 +5,36 @@
     import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { deleteLocation } from "./delete.remote";
+    import { toast } from "svelte-sonner";
+    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import { toast } from "svelte-sonner";
-    import { updateLocationSchema } from "$lib/validations/locations";
-    import { Button } from "$lib/components/ui/button";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
+    import EntityManager from "$lib/components/ui/EntityManager.svelte";
+    import { User, MapPin } from "@lucide/svelte";
+    import {
+        createContactSchema,
+        updateContactSchema,
+        type Contact,
+    } from "$lib/validations/contacts";
+    import {
+        addAssociation,
+        removeAssociation,
+        fetchEntityContacts,
+    } from "../../contacts/associate.remote";
+    import { createNewContact } from "../../contacts/new/create.remote";
+    import { updateExistingContact } from "../../contacts/[id]/update.remote";
+    import { deleteExistingContact } from "../../contacts/[id]/delete.remote";
+    import { listContacts } from "../../contacts/list.remote";
+    import {
+        createLocationSchema,
+        updateLocationSchema,
+    } from "$lib/validations/locations";
+    import { listLocations } from "../list.remote";
+    import { createLocation } from "../new/create.remote";
+    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -65,7 +86,198 @@
                         validationSchema={updateLocationSchema}
                         isUpdating={true}
                         initialData={location}
-                    />
+                    >
+                        {#snippet children()}
+                            <div class="mt-8 border-t pt-8">
+                                <EntityManager
+                                    title={m.contacts()}
+                                    icon={User}
+                                    type="location"
+                                    entityId={location.id}
+                                    listItemsRemote={listContacts as any}
+                                    fetchAssociationsRemote={fetchEntityContacts as any}
+                                    addAssociationRemote={async (p: any) =>
+                                        addAssociation({
+                                            ...p,
+                                            contactId: p.itemId,
+                                        } as any)}
+                                    removeAssociationRemote={async (p: any) =>
+                                        removeAssociation({
+                                            ...p,
+                                            contactId: p.itemId,
+                                        } as any)}
+                                    deleteItemRemote={async (id: string) => {
+                                        return await handleDelete({
+                                            ids: [id],
+                                            deleteFn: deleteExistingContact,
+                                            itemName: m
+                                                .contacts()
+                                                .toLowerCase(),
+                                        });
+                                    }}
+                                    createRemote={createNewContact}
+                                    createSchema={createContactSchema}
+                                    updateRemote={updateExistingContact}
+                                    updateSchema={updateContactSchema}
+                                    getFormData={(c: Contact) => ({
+                                        contact: c,
+                                        emails: c.emails,
+                                        phones: c.phones,
+                                        addresses: c.addresses,
+                                        relations: c.relations,
+                                        tags: c.tags,
+                                        locationAssociations: c.locationAssociations,
+                                    })}
+                                    searchPredicate={(
+                                        c: Contact,
+                                        q: string,
+                                    ) => {
+                                        const name = (
+                                            c.displayName ||
+                                            `${c.givenName || ""} ${c.familyName || ""}`
+                                        ).toLowerCase();
+                                        return name.includes(
+                                            q.toLowerCase(),
+                                        );
+                                    }}
+                                >
+                                    {#snippet renderItemLabel(contact)}
+                                        {contact.displayName ||
+                                            `${contact.givenName || ""} ${contact.familyName || ""}` ||
+                                            m.unnamed_contact()}
+                                    {/snippet}
+                                    {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id })}
+                                        <ContactForm
+                                            remoteFunction={rf}
+                                            {schema}
+                                            initialData={formData}
+                                            {onSuccess}
+                                            {onCancel}
+                                            contactId={id}
+                                        >
+                                            {#snippet children({ onLocationsChange })}
+                                                <div
+                                                    class="mt-8 border-t pt-8"
+                                                >
+                                                    <EntityManager
+                                                        title={m.feature_locations_title()}
+                                                        icon={MapPin}
+                                                        type="location"
+                                                        entityId={id}
+                                                        initialItems={(
+                                                            formData.locationAssociations ||
+                                                            []
+                                                        ).map(
+                                                            (la: any) =>
+                                                                la.location,
+                                                        )}
+                                                        embedded={true}
+                                                        onchange={onLocationsChange}
+                                                        listItemsRemote={listLocations as any}
+                                                        addAssociationRemote={async (
+                                                            p: any,
+                                                        ) => {
+                                                            return await addAssociation(
+                                                                {
+                                                                    type: "location",
+                                                                    entityId:
+                                                                        p.itemId,
+                                                                    contactId:
+                                                                        p.entityId,
+                                                                },
+                                                            );
+                                                        }}
+                                                        removeAssociationRemote={async (
+                                                            p: any,
+                                                        ) => {
+                                                            return await removeAssociation(
+                                                                {
+                                                                    type: "location",
+                                                                    entityId:
+                                                                        p.itemId,
+                                                                    contactId:
+                                                                        p.entityId,
+                                                                },
+                                                            );
+                                                        }}
+                                                        deleteItemRemote={async (
+                                                            ids,
+                                                        ) => {
+                                                            return await handleDelete(
+                                                                {
+                                                                    ids: Array.isArray(
+                                                                        ids,
+                                                                    )
+                                                                        ? ids
+                                                                        : [ids],
+                                                                    deleteFn:
+                                                                        deleteLocation,
+                                                                    itemName: m
+                                                                        .location()
+                                                                        .toLowerCase(),
+                                                                },
+                                                            );
+                                                        }}
+                                                        createRemote={createLocation}
+                                                        createSchema={createLocationSchema}
+                                                        updateRemote={updateLocation}
+                                                        updateSchema={updateLocationSchema}
+                                                        getFormData={(
+                                                            l: any,
+                                                        ) => l}
+                                                        searchPredicate={(
+                                                            l: any,
+                                                            q: string,
+                                                        ) => {
+                                                            return (
+                                                                l.name
+                                                                    .toLowerCase()
+                                                                    .includes(
+                                                                        q.toLowerCase(),
+                                                                    ) ||
+                                                                (l.roomId
+                                                                    ?.toLowerCase()
+                                                                    .includes(
+                                                                        q.toLowerCase(),
+                                                                    ) ??
+                                                                    false)
+                                                            );
+                                                        }}
+                                                    >
+                                                        {#snippet renderItemLabel(location)}
+                                                            {location.name}
+                                                            {location.roomId
+                                                                ? `(${location.roomId})`
+                                                                : ""}
+                                                        {/snippet}
+                                                        {#snippet renderForm({
+                                                            remoteFunction:
+                                                                rf,
+                                                            schema,
+                                                            id,
+                                                            initialData:
+                                                                formData,
+                                                            onSuccess,
+                                                            onCancel,
+                                                        })}
+                                                            <LocationForm
+                                                                remoteFunction={rf}
+                                                                validationSchema={schema}
+                                                                isUpdating={!!id}
+                                                                initialData={formData}
+                                                                {onSuccess}
+                                                                {onCancel}
+                                                            />
+                                                        {/snippet}
+                                                    </EntityManager>
+                                                </div>
+                                            {/snippet}
+                                        </ContactForm>
+                                    {/snippet}
+                                </EntityManager>
+                            </div>
+                        {/snippet}
+                    </LocationForm>
                 </div>
             </div>
         {:else}

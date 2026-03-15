@@ -270,6 +270,38 @@
                                             </a>
                                         </li>
                                     {/if}
+
+                                    {#if event.locations && event.locations.length > 0}
+                                        {#each event.locations as loc}
+                                            <li
+                                                class="flex items-start gap-3 text-gray-700"
+                                            >
+                                                <MapPin
+                                                    size={18}
+                                                    class="text-red-500 flex-shrink-0 mt-0.5"
+                                                />
+                                                <div>
+                                                    <a
+                                                        href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(
+                                                            `${loc.name} ${loc.street} ${loc.houseNumber} ${loc.zip} ${loc.city}`,
+                                                        )}"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        class="hover:underline text-blue-600 font-medium"
+                                                    >
+                                                        {loc.name}
+                                                    </a>
+                                                    <div
+                                                        class="text-sm text-gray-500"
+                                                    >
+                                                        {loc.street}
+                                                        {loc.houseNumber}, {loc.zip}
+                                                        {loc.city}
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        {/each}
+                                    {/if}
                                     {#if event.categoryBerlinDotDe}
                                         <li
                                             class="flex items-center gap-3 text-gray-700"
@@ -335,7 +367,7 @@
                                                         href="tel:{event
                                                             .resolvedContact
                                                             .phone}"
-                                                        class="flex items-center gap-2 text-blue-600 hover:underline"
+                                                        class="flex items-center gap-2 text-blue-600 hover:underline break-all text-pretty"
                                                     >
                                                         <Phone size={14} />
                                                         {event.resolvedContact
@@ -347,7 +379,7 @@
                                                         href="mailto:{event
                                                             .resolvedContact
                                                             .email}"
-                                                        class="flex items-center gap-2 text-blue-600 hover:underline"
+                                                        class="flex items-center gap-2 text-blue-600 hover:underline break-all text-pretty"
                                                     >
                                                         <Mail size={14} />
                                                         {event.resolvedContact

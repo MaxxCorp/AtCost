@@ -1,4 +1,4 @@
-﻿import * as v from 'valibot';
+import * as v from 'valibot';
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { contact } from '$lib/server/db/schema';
@@ -34,6 +34,11 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
                     with: {
                         tag: true
                     }
+                },
+                locationAssociations: {
+                    with: {
+                        location: true
+                    }
                 }
             }
         });
@@ -55,6 +60,7 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
                 id: t.tag.id,
                 name: t.tag.name
             })),
+            locationAssociations: contactData.locationAssociations || [],
         };
     }));
 

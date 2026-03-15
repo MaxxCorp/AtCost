@@ -16,6 +16,16 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
     syncIds?: string[];
     contactIds?: string[];
     locationIds?: string[];
+    locations?: {
+        id: string;
+        name: string;
+        street: string | null;
+        houseNumber: string | null;
+        zip: string | null;
+        city: string | null;
+        country: string | null;
+        isPublic: boolean;
+    }[];
     resolvedContact?: {
         name: string;
         email: string;
@@ -63,11 +73,29 @@ export const listKioskAnnouncements = query(async (): Promise<Announcement[]> =>
     const results = await db.query.announcement.findMany({
         where: eq(announcement.isPublic, true),
         orderBy: [desc(announcement.updatedAt)],
+        with: {
+            locations: {
+                with: {
+                    location: true
+                }
+            }
+        }
     });
 
     return results.map(row => ({
         ...row,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
+        locationIds: row.locations?.map((al: any) => al.locationId) || [],
+        locations: row.locations?.filter((al: any) => al.location?.isPublic).map((al: any) => ({
+            id: al.location.id,
+            name: al.location.name,
+            street: al.location.street,
+            houseNumber: al.location.houseNumber,
+            zip: al.location.zip,
+            city: al.location.city,
+            country: al.location.country,
+            isPublic: al.location.isPublic
+        })) || []
     }));
 });

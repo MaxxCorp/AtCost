@@ -40,7 +40,8 @@
         try {
             await navigator.share({
                 title: fullName,
-                text: contact.notes || m.contact_details_for({ name: fullName }),
+                text:
+                    contact.notes || m.contact_details_for({ name: fullName }),
                 url: window.location.href,
             });
         } catch (err) {
@@ -58,7 +59,9 @@
             <div
                 class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
             >
-                <LoadingSection message={m.loading_item({ item: m.contact_profile() })} />
+                <LoadingSection
+                    message={m.loading_item({ item: m.contact_profile() })}
+                />
             </div>
         {:then contact}
             {#if !contact}
@@ -104,7 +107,8 @@
                                         <span
                                             class="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center gap-1"
                                         >
-                                            <Earth size={12} /> {m.public()}
+                                            <Earth size={12} />
+                                            {m.public()}
                                         </span>
                                     {/if}
                                     {#if contact.tags && contact.tags.length > 0}
@@ -125,14 +129,22 @@
                                     </p>
                                 {/if}
                                 {#if contact.company}
-                                    <p class="text-gray-900 text-lg font-semibold mt-1">
+                                    <p
+                                        class="text-gray-900 text-lg font-semibold mt-1"
+                                    >
                                         {contact.company}
                                     </p>
                                 {/if}
                                 {#if contact.role || contact.department}
-                                    <p class="text-gray-600 text-lg font-medium {contact.company ? '' : 'mt-1'}">
+                                    <p
+                                        class="text-gray-600 text-lg font-medium {contact.company
+                                            ? ''
+                                            : 'mt-1'}"
+                                    >
                                         {contact.role || ""}
-                                        {#if contact.role && contact.department} - {/if}
+                                        {#if contact.role && contact.department}
+                                            -
+                                        {/if}
                                         {contact.department || ""}
                                     </p>
                                 {/if}
@@ -169,14 +181,16 @@
                                         <h3
                                             class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
                                         >
-                                            <Mail size={16} /> {m.email_addresses()}
+                                            <Mail size={16} />
+                                            {m.email_addresses()}
                                         </h3>
                                         <ul class="space-y-3">
                                             {#each contact.emails as email}
                                                 <li
                                                     class="flex items-center justify-between group flex-wrap"
                                                 >
-                                                    <span class="text-gray-700"
+                                                    <span
+                                                        class="text-gray-700 break-all text-pretty"
                                                         ><a
                                                             href="mailto:{email.value}"
                                                             class="flex items-center gap-2 text-blue-600 hover:underline break-all text-pretty"
@@ -199,7 +213,8 @@
                                         <h3
                                             class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
                                         >
-                                            <Phone size={16} /> {m.phone_numbers()}
+                                            <Phone size={16} />
+                                            {m.phone_numbers()}
                                         </h3>
                                         <ul class="space-y-3">
                                             {#each contact.phones as phone}
@@ -232,7 +247,8 @@
                                         <h3
                                             class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
                                         >
-                                            <MapPin size={16} /> {m.addresses()}
+                                            <MapPin size={16} />
+                                            {m.addresses()}
                                         </h3>
                                         <div class="space-y-4">
                                             {#each contact.addresses as addr}
@@ -265,6 +281,58 @@
                                     </section>
                                 {/if}
                             </div>
+
+                            <!-- Associated Locations -->
+                            <div class="space-y-6">
+                                {#if contact.locationAssociations && contact.locationAssociations.length > 0}
+                                    <section>
+                                        <h3
+                                            class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
+                                        >
+                                            <MapPin size={16} />
+                                            {m.locations()}
+                                        </h3>
+                                        <div class="space-y-4">
+                                            {#each contact.locationAssociations as la}
+                                                {@const loc = la.location}
+                                                {#if loc}
+                                                    <div
+                                                        class="bg-gray-50 p-4 rounded-lg relative"
+                                                    >
+                                                        <div
+                                                            class="flex items-center justify-between mb-1"
+                                                        >
+                                                            <span
+                                                                class="font-medium text-gray-900"
+                                                                >{loc.name}</span
+                                                            >
+                                                            {#if loc.isPublic}
+                                                                <span
+                                                                    class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-bold uppercase"
+                                                                    >{m.public()}</span
+                                                                >
+                                                            {/if}
+                                                        </div>
+                                                        <p
+                                                            class="text-gray-800 text-sm"
+                                                        >
+                                                            {loc.street || ""}
+                                                            {loc.houseNumber ||
+                                                                ""}
+                                                        </p>
+                                                        <p
+                                                            class="text-gray-600 text-sm"
+                                                        >
+                                                            {loc.zip || ""}
+                                                            {loc.city || ""}
+                                                        </p>
+                                                    </div>
+                                                {/if}
+                                            {/each}
+                                        </div>
+                                    </section>
+                                {/if}
+                            </div>
                         </div>
 
                         <!-- Actions -->
@@ -276,7 +344,8 @@
                                     class="flex items-center gap-2"
                                     variant="outline"
                                 >
-                                    <Download size={18} /> {m.download_vcard()}
+                                    <Download size={18} />
+                                    {m.download_vcard()}
                                 </Button>
                             {/if}
 
@@ -287,7 +356,8 @@
                                     onclick={() =>
                                         handleShare(contact, fullName)}
                                 >
-                                    <Share2 size={18} /> {m.share()}
+                                    <Share2 size={18} />
+                                    {m.share()}
                                 </Button>
                             {/if}
 
@@ -298,7 +368,8 @@
                                     onclick={() =>
                                         goto(`/contacts/${contact.id}`)}
                                 >
-                                    <Pencil size={18} /> {m.edit_contact()}
+                                    <Pencil size={18} />
+                                    {m.edit_contact()}
                                 </Button>
                             {/if}
                         </div>
