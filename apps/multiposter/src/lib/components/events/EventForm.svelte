@@ -109,9 +109,12 @@
 
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+    // svelte-ignore state_referenced_locally
     const startParsed = parseDateTime(initialData?.startDateTime);
+    // svelte-ignore state_referenced_locally
     const endParsed = parseDateTime(initialData?.endDateTime);
     const localNow = getLocalNow();
+    // svelte-ignore state_referenced_locally
     const initialEnd = getInitialEndDateTime(startParsed, endParsed, localNow);
 
     function getField(name: string) {
@@ -126,37 +129,58 @@
     }
 
     // State derived from initialData
+    // svelte-ignore state_referenced_locally
     let isAllDay = $state(initialData?.isAllDay ?? false);
+    // svelte-ignore state_referenced_locally
     let hasEndTime = $state(initialData ? !!initialData.endDateTime : true);
+    // svelte-ignore state_referenced_locally
     let useDefaultReminders = $state((initialData?.reminders as any)?.useDefault ?? true);
+    // svelte-ignore state_referenced_locally
     let reminders = $state((initialData?.reminders as any)?.overrides ?? [{ method: "popup", minutes: 10 }]);
 
+    // svelte-ignore state_referenced_locally
     let guestsCanInviteOthers = $state(initialData?.guestsCanInviteOthers ?? false);
+    // svelte-ignore state_referenced_locally
     let guestsCanModify = $state(initialData?.guestsCanModify ?? false);
+    // svelte-ignore state_referenced_locally
     let guestsCanSeeOtherGuests = $state(initialData?.guestsCanSeeOtherGuests ?? false);
+    // svelte-ignore state_referenced_locally
     let isPublic = $state(initialData?.isPublic ?? true);
 
     // Recurrence State
+    // svelte-ignore state_referenced_locally
     let recurrence = $state<string[]>((initialData?.recurrence as any) || []);
+    // svelte-ignore state_referenced_locally
     let recurrenceRule = $state<string | null>(recurrence[0] || null);
     let showRecurrenceDialog = $state(false);
 
-    // Tags State
+    // svelte-ignore state_referenced_locally
     let tags = $state<string[]>(initialData?.tags || []);
+    // svelte-ignore state_referenced_locally
     let tagsString = $state(tags.join(", "));
 
     // Resource and location state
     let resourcesPromise = listResourcesWithHierarchy();
     let locationsPromise = listLocations();
+    // svelte-ignore state_referenced_locally
     let selectedResourceIds = $state<string[]>(initialData?.resourceIds || []);
+    // svelte-ignore state_referenced_locally
     let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
+    // svelte-ignore state_referenced_locally
     let freeTextLocation = $state(initialData?.location || "");
+    // svelte-ignore state_referenced_locally
     let startTimeZoneInput = $state(initialData?.startTimeZone || browserTimezone);
+    // svelte-ignore state_referenced_locally
     let endTimeZoneInput = $state(initialData?.endTimeZone || initialData?.startTimeZone || browserTimezone);
+    // svelte-ignore state_referenced_locally
     let descriptionValue = $state(getField("description").value() ?? initialData?.description ?? "");
+    // svelte-ignore state_referenced_locally
     let startDateInput = $state(startParsed.date || localNow.date);
+    // svelte-ignore state_referenced_locally
     let startTimeInput = $state(startParsed.time || localNow.time);
+    // svelte-ignore state_referenced_locally
     let endDateInput = $state(initialEnd.date);
+    // svelte-ignore state_referenced_locally
     let endTimeInput = $state(initialEnd.time);
 
     // Helper to format RRule text
@@ -191,6 +215,7 @@
         return match ? match.id : "";
     }
 
+    // svelte-ignore state_referenced_locally
     let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
     $effect(() => {
         if (initialData?.locationIds && initialData.locationIds.length > 0) {
@@ -227,6 +252,7 @@
         "Vermischtes",
     ];
 
+    // svelte-ignore state_referenced_locally
     let useFreeTextLocation = $state(
         !!initialData?.location &&
             (!initialData?.locationIds || initialData.locationIds.length === 0),
@@ -336,6 +362,7 @@
 <div class="max-w-3xl mx-auto px-4 py-8 text-left">
     <Breadcrumb
         feature="events"
+        // svelte-ignore state_referenced_locally
         current={initialData?.summary ?? m.create_new({ item: m.feature_events_title() })}
     />
 

@@ -240,6 +240,8 @@
 	"back_to_resources": "Zurück zu Ressourcen",
 	"failed_to_load_resource": "Fehler beim Laden der Ressource",
 	"max_occupancy": "Maximale Belegung",
+	"inventory_number": "Inventarnummer",
+	"enter_inventory_number": "Inventarnummer eingeben",
 	"enter_max_occupancy": "Maximale Belegung eingeben",
 	"parent_resources": "Übergeordnete Ressourcen (optional)",
 	"assign_to_parent": "Bestehenden übergeordneten Ressource(n) zuweisen",

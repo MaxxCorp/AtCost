@@ -168,6 +168,24 @@
     </label>
 
     <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.inventory_number()}</span>
+        <input
+            {...getField("inventoryNumber").as("text")}
+            value={getField("inventoryNumber").value() ?? initialData?.inventoryNumber ?? ""}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
+                'inventoryNumber',
+            ).issues()?.length ?? 0) > 0
+                ? 'border-red-500'
+                : 'border-gray-300'}"
+            placeholder={m.enter_inventory_number()}
+            onblur={() => remoteFunction.validate()}
+        />
+        {#each getField("inventoryNumber").issues() ?? [] as issue}
+            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+        {/each}
+    </label>
+
+    <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.description()}</span>
         <textarea
             {...getField("description").as("text")}

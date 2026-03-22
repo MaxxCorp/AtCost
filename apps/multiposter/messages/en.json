@@ -240,6 +240,8 @@
 	"back_to_resources": "Back to Resources",
 	"failed_to_load_resource": "Failed to load resource",
 	"max_occupancy": "Max Occupancy",
+	"inventory_number": "Inventory Number",
+	"enter_inventory_number": "Enter inventory number",
 	"enter_max_occupancy": "Enter max occupancy",
 	"parent_resources": "Parent Resources (Optional)",
 	"assign_to_parent": "Assign to existing parent(s)",

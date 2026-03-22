@@ -34,6 +34,7 @@ export const resource = pgTable("resource", {
     status: text("status").default("available").notNull(),
     maxOccupancy: integer("max_occupancy"),
     allocationCalendars: jsonb("allocation_calendars"),
+    inventoryNumber: text("inventory_number"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

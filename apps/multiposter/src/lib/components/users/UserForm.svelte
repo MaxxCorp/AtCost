@@ -69,7 +69,9 @@
         if (initialClaims[f.key]) initialClaimsMap[f.key] = initialClaims[f.key];
     });
 
+    // svelte-ignore state_referenced_locally
     let isAdmin = $state(initialIsAdmin);
+    // svelte-ignore state_referenced_locally
     let claimsMap = $state(initialClaimsMap);
 
     let claimsJson = $derived.by(() => {

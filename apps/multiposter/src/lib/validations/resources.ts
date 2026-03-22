@@ -11,6 +11,7 @@ export const resourceBaseSchema = v.object({
     type: v.pipe(v.string(), v.minLength(1, 'Resource type is required')),
     maxOccupancy: v.optional(v.union([v.number(), v.string()])), 
     locationId: v.optional(v.string()),
+    inventoryNumber: v.optional(v.string()),
     locationIds: v.optional(v.union([v.string(), v.array(v.string())])),
     allocationCalendars: v.optional(v.union([v.string(), v.array(v.any())])),
     parentResourceIds: v.optional(v.union([v.string(), v.array(v.string())])),

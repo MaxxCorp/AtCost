@@ -66,6 +66,7 @@
     );
     // svelte-ignore state_referenced_locally
     let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
+    // svelte-ignore state_referenced_locally
     let isPublic = $state(initialData?.isPublic ?? false);
     let locations = $state<Location[]>([]);
     // svelte-ignore state_referenced_locally
