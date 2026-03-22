@@ -1,0 +1,1 @@
+ALTER TABLE "resource" ADD COLUMN "inventory_number" text;
