@@ -1,8 +1,8 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { campaign } from '$lib/server/db/schema';
+import { campaign } from '@ac/db';
 import { eq } from 'drizzle-orm';
-import type { Campaign as DbCampaign } from '$lib/server/db/schema';
+import type { Campaign as DbCampaign } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 

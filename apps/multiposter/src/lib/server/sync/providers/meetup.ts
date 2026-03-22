@@ -7,7 +7,7 @@ import type {
 } from '../types';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
-import { account } from '$lib/server/db/schema';
+import { account } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 
 /**

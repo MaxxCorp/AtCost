@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { cmsBlock, cmsSlot, cmsContentVersion, cmsPage } from '$lib/server/db/schema';
+import { cmsBlock, cmsSlot, cmsContentVersion, cmsPage } from '@ac/db';
 import { eq, and, desc } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

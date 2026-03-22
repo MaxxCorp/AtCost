@@ -153,13 +153,13 @@ function renderSvelteComponent(Component: any, props: any): string {
     </div>
 
     <div class="qr-code">
-        <p><strong>QR-Code für schnellen Zugriff:</strong></p>
+        <p><strong>QR-Code fÃ¼r schnellen Zugriff:</strong></p>
         <img src="cid:event-qr-code" alt="Event QR Code" style="max-width: 200px;">
     </div>
 
     <div class="footer">
         <p>Diese E-Mail wurde automatisch von AC-Multiposter generiert.</p>
-        <p>Anhänge: ${props.isAnnouncement ? '' : 'iCal-Datei (.ics) für Kalender-Import und '}vCard (.vcf) für Kontaktdaten.</p>
+        <p>AnhÃ¤nge: ${props.isAnnouncement ? '' : 'iCal-Datei (.ics) fÃ¼r Kalender-Import und '}vCard (.vcf) fÃ¼r Kontaktdaten.</p>
     </div>
 </body>
 </html>`;

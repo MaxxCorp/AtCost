@@ -2,9 +2,8 @@
     import { listUsers } from "./list.remote";
     import * as m from "$lib/paraglide/messages";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-    import UserList from "./UserList.svelte";
+    import { LoadingSection, ErrorSection, UserList } from "@ac/ui";
+    import { deleteUser } from "./[id]/delete.remote";
 
     let itemsPromise = $state(listUsers());
 
@@ -20,7 +19,7 @@
         {#await itemsPromise}
             <LoadingSection message={m.loading_users()} />
         {:then items}
-            <UserList {items} onRefresh={refresh} />
+            <UserList {items} onRefresh={refresh} deleteUserFn={async (id) => await deleteUser(id)} {m} />
         {:catch error}
             <ErrorSection
                 headline={m.failed_to_load_users()}

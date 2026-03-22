@@ -96,7 +96,7 @@ export class SyncService {
 		return {
 			id: row.id,
 			userId: row.userId,
-			providerId: row.providerId,
+			providerId: row.providerId ?? '',
 			providerType: row.providerType as ProviderType,
 			direction: row.direction as SyncDirection,
 			enabled: row.enabled,
@@ -662,7 +662,7 @@ export class SyncService {
 			const subscription = await provider.setupWebhook(callbackUrl);
 
 			if (subscription) {
-				await db.insert(webhookSubscriptionTable).values(subscription);
+				await db.insert(webhookSubscriptionTable).values(subscription as any);
 				await db
 					.update(syncConfigTable)
 					.set({ webhookId: subscription.id })
@@ -697,7 +697,7 @@ export class SyncService {
 		for (const sub of existingSubscriptions) {
 			try {
 				if (provider && provider.cancelWebhook) {
-					await provider.cancelWebhook(sub);
+					await provider.cancelWebhook(sub as any);
 				}
 			} catch (error) {
 				console.error('Failed to cancel existing webhook:', error);
@@ -727,11 +727,11 @@ export class SyncService {
 		}
 
 		const now = new Date();
-		if (subscription.expiresAt < now) {
+		if (subscription.expiresAt && subscription.expiresAt < now) {
 			return { active: false, expiresAt: subscription.expiresAt };
 		}
 
-		return { active: true, expiresAt: subscription.expiresAt };
+		return { active: true, expiresAt: subscription.expiresAt ?? undefined };
 	}
 
 	/**
@@ -769,7 +769,7 @@ export class SyncService {
 					continue;
 				}
 
-				const newSubscription = await provider.renewWebhook(subscription);
+				const newSubscription = await provider.renewWebhook(subscription as any);
 
 				if (newSubscription) {
 					// Delete old subscription
@@ -778,7 +778,7 @@ export class SyncService {
 						.where(eq(webhookSubscriptionTable.id, subscription.id));
 
 					// Insert new subscription
-					await db.insert(webhookSubscriptionTable).values(newSubscription);
+					await db.insert(webhookSubscriptionTable).values(newSubscription as any);
 
 					// Update sync config with new webhook ID
 					await db
@@ -1226,7 +1226,7 @@ export class SyncService {
 				const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
 				const { externalId, etag } = await provider.pushEvent(externalItem);
 
-				console.log(`[SyncService] Created mapping for ${entityType} ${itemId} → external ${externalId}`);
+				console.log(`[SyncService] Created mapping for ${entityType} ${itemId} â†’ external ${externalId}`);
 				// Create mapping immediately to prevent duplicates if webhook fires quickly
 				await db.insert(syncMappingTable).values({
 					syncConfigId: config.id,
@@ -1343,7 +1343,7 @@ export class SyncService {
 
 			// Cancel webhook with provider
 			if (provider.supportsWebhooks && provider.cancelWebhook) {
-				await provider.cancelWebhook(subscription);
+				await provider.cancelWebhook(subscription as any);
 			}
 
 			// Delete subscription from database

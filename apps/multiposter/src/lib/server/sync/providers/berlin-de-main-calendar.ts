@@ -6,7 +6,7 @@ import type {
 	SyncDirection
 } from '../types';
 import { db } from '$lib/server/db';
-import { user, eventResource } from '$lib/server/db/schema';
+import { user, eventResource } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { resolveEventContact } from '$lib/server/contact-resolution';
 import { env } from '$env/dynamic/private';
@@ -33,7 +33,7 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 		'hausnummer': 'houseNumber',
 		'plz': 'zip',
 		'ort': 'city',
-		'gewünschte_kategorie': 'categoryBerlinDotDe',
+		'gewuenschte_kategorie': 'categoryBerlinDotDe',
 		'termin': 'startDate',
 		'uhrzeit': 'startTime',
 		'weitere_termine': 'additionalDates',
@@ -159,7 +159,7 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 
 		// Category
 		if (event.metadata?.categoryBerlinDotDe) {
-			formData[this.fieldMappings.gewünschte_kategorie] = event.metadata.categoryBerlinDotDe;
+			formData[this.fieldMappings.gewuenschte_kategorie] = event.metadata.categoryBerlinDotDe;
 		}
 
 		// Date and time

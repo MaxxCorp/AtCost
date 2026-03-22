@@ -1,7 +1,7 @@
-﻿import * as v from 'valibot';
+import * as v from 'valibot';
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { campaign } from '$lib/server/db/schema';
+import { campaign } from '@ac/db';
 import { listCampaigns } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createCampaignSchema } from '$lib/validations/campaigns';

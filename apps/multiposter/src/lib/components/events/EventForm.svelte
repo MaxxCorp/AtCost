@@ -128,8 +128,8 @@
     // State derived from initialData
     let isAllDay = $state(initialData?.isAllDay ?? false);
     let hasEndTime = $state(initialData ? !!initialData.endDateTime : true);
-    let useDefaultReminders = $state(initialData?.reminders?.useDefault ?? true);
-    let reminders = $state(initialData?.reminders?.overrides ?? [{ method: "popup", minutes: 10 }]);
+    let useDefaultReminders = $state((initialData?.reminders as any)?.useDefault ?? true);
+    let reminders = $state((initialData?.reminders as any)?.overrides ?? [{ method: "popup", minutes: 10 }]);
 
     let guestsCanInviteOthers = $state(initialData?.guestsCanInviteOthers ?? false);
     let guestsCanModify = $state(initialData?.guestsCanModify ?? false);
@@ -137,7 +137,7 @@
     let isPublic = $state(initialData?.isPublic ?? true);
 
     // Recurrence State
-    let recurrence = $state<string[]>(initialData?.recurrence || []);
+    let recurrence = $state<string[]>((initialData?.recurrence as any) || []);
     let recurrenceRule = $state<string | null>(recurrence[0] || null);
     let showRecurrenceDialog = $state(false);
 
@@ -209,8 +209,8 @@
 
     const BERLIN_DE_CATEGORIES = [
         "Ausstellungen",
-        "Bälle & Galas",
-        "Bildung & Vorträge",
+        "BÃ¤lle & Galas",
+        "Bildung & VortrÃ¤ge",
         "Festivals",
         "Jazz & Blues",
         "Kabarett & Comedy",
@@ -329,7 +329,7 @@
     }
 
     function removeReminder(index: number) {
-        reminders = reminders.filter((_, i) => i !== index);
+        reminders = reminders.filter((_: any, i: number) => i !== index);
     }
 </script>
 
@@ -944,7 +944,7 @@
                                     class="p-2 text-red-600 hover:bg-red-50 rounded-md"
                                     onclick={() => {
                                         reminders = reminders.filter(
-                                            (_, idx) => idx !== i,
+                                            (_: any, idx: number) => idx !== i,
                                         );
                                     }}
                                 >

@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { db } from '$lib/server/db';
-import { resource } from '$lib/server/db/schema';
+import { resource } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';

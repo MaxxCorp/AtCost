@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { db } from '$lib/server/db';
-import { contact } from '$lib/server/db/schema';
+import { contact } from '@ac/db';
 import { inArray } from 'drizzle-orm';
 import { listContacts } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

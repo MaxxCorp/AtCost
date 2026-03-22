@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact, campaign } from '$lib/server/db/schema';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact, campaign } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Announcement } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

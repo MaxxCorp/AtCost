@@ -129,7 +129,7 @@
 			<div class="max-w-4xl mx-auto">
 				<Breadcrumb
 					feature="synchronizations"
-					current={config.providerId}
+					current={config.providerId ?? undefined}
 				/>
 
 				<div class="space-y-4">

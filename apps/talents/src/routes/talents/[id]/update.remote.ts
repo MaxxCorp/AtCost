@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { contact, contactEmail, contactPhone, contactTag, locationContact, contactRelation, tag } from '$lib/server/db/schema';
+import { contact, contactEmail, contactPhone, contactTag, locationContact, contactRelation, tag } from '@ac/db';
 import { listContacts } from '../list.remote';
 import { readContact } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

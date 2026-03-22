@@ -6,15 +6,30 @@
     import { updateUser } from "./update.remote";
     import { deleteUser } from "./delete.remote";
     import { updateUserSchema } from "$lib/validations/users";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
 
+
+    import { UserForm, EntityManager, ErrorSection, LoadingSection, AsyncButton, handleDelete } from "@ac/ui";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-    import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import UserForm from "$lib/components/users/UserForm.svelte";
+    import { FEATURES } from "$lib/features";
+
+    import { listContacts } from "../../contacts/list.remote";
+    import { addAssociation, removeAssociation, fetchEntityContacts } from "../../contacts/associate.remote";
+    import { createNewContact } from "../../contacts/new/create.remote";
+    import { updateExistingContact } from "../../contacts/[id]/update.remote";
+    import { createContactSchema, updateContactSchema } from "$lib/validations/contacts";
+    import { deleteExistingContact } from "../../contacts/[id]/delete.remote";
+    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import { User as UserIcon } from "@lucide/svelte";
 
     const userId = page.params.id || "";
+
+    const appConfigList = [
+        {
+            namespace: "multiposter",
+            name: "Multiposter App",
+            features: FEATURES as any[]
+        }
+    ];
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -41,7 +56,7 @@
                                 onclick={async () => {
                                     await handleDelete({
                                         ids: [user.id],
-                                        deleteFn: deleteUser,
+                                        deleteFn: async (ids: string[]) => deleteUser(ids),
                                         itemName: m.users(),
                                     });
                                     goto("/users");
@@ -58,7 +73,67 @@
                         validationSchema={updateUserSchema}
                         isUpdating={true}
                         initialData={user}
-                    />
+                        {m}
+                        {appConfigList}
+                        onSuccess={() => goto("/users")}
+                        onCancel={() => goto("/users")}
+                    >
+                        {#snippet extraEntities(data: any)}
+                            <EntityManager
+                                title={m.feature_contacts_title()}
+                                icon={UserIcon}
+                                type="user"
+                                entityId={data.id}
+                                listItemsRemote={listContacts as any}
+                                fetchAssociationsRemote={fetchEntityContacts as any}
+                                addAssociationRemote={async (p: any) =>
+                                    addAssociation({ ...p, contactId: p.itemId } as any)}
+                                removeAssociationRemote={async (p: any) =>
+                                    removeAssociation({ ...p, contactId: p.itemId } as any)}
+                                deleteItemRemote={async (ids: string[]) => {
+                                    return await handleDelete({
+                                        ids: ids,
+                                        deleteFn: async (ids: string[]) => deleteExistingContact(ids),
+                                        itemName: m.feature_contacts_title(),
+                                    });
+                                }}
+                                createRemote={createNewContact}
+                                createSchema={createContactSchema}
+                                updateRemote={updateExistingContact}
+                                updateSchema={updateContactSchema}
+                                getFormData={(c: any) => ({
+                                    contact: c,
+                                    emails: c.emails,
+                                    phones: c.phones,
+                                    addresses: c.addresses,
+                                    relations: c.relations,
+                                    tags: c.tags,
+                                })}
+                                searchPredicate={(c: any, q: string) => {
+                                    const name = (
+                                        c.displayName ||
+                                        `${c.givenName || ""} ${c.familyName || ""}`
+                                    ).toLowerCase();
+                                    return name.includes(q.toLowerCase());
+                                }}
+                            >
+                                {#snippet renderItemLabel(contact: any)}
+                                    {contact.displayName ||
+                                        `${contact.givenName || ""} ${contact.familyName || ""}`}
+                                {/snippet}
+                                {#snippet renderForm(props: any)}
+                                    <ContactForm
+                                        remoteFunction={props.remoteFunction}
+                                        schema={props.schema}
+                                        initialData={props.initialData}
+                                        onSuccess={props.onSuccess as any}
+                                        onCancel={props.onCancel as any}
+                                        contactId={props.id}
+                                    />
+                                {/snippet}
+                            </EntityManager>
+                        {/snippet}
+                    </UserForm>
                 </div>
             {:else}
                 <ErrorSection

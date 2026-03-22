@@ -1,7 +1,7 @@
-﻿import { query } from '$app/server';
+import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { eq, desc } from 'drizzle-orm';
-import { kiosk, type Kiosk } from '$lib/server/db/schema';
+import { kiosk, type Kiosk } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 export type { Kiosk };

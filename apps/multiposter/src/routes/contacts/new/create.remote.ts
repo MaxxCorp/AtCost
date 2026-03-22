@@ -1,4 +1,4 @@
-﻿import { form } from '$app/server';
+import { form } from '$app/server';
 import { createContact, getContact } from '$lib/server/contacts';
 import { listContacts } from '../list.remote';
 import { createContactSchema, type Contact } from '$lib/validations/contacts';

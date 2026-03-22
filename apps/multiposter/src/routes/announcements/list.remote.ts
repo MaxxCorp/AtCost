@@ -1,9 +1,9 @@
 import { query } from '$app/server';
-import { announcement, campaign } from '$lib/server/db/schema';
+import { announcement, campaign } from '@ac/db';
 import { db } from '$lib/server/db';
 import { eq, desc, inArray } from 'drizzle-orm';
 import { listQuery } from '$lib/server/db/query-helpers';
-import type { Announcement as DbAnnouncement } from '$lib/server/db/schema';
+import type { Announcement as DbAnnouncement } from '@ac/db';
 
 /**
  * Announcement interface matching the database schema, with dates serialized to strings

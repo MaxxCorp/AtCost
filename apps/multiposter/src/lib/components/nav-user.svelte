@@ -94,14 +94,14 @@
 						<GlobeIcon class="size-4 mr-2" />
 						<span>English</span>
 						{#if getLocale() === 'en'}
-							<span class="ml-auto text-blue-600">✓</span>
+							<span class="ml-auto text-blue-600">âœ“</span>
 						{/if}
 					</DropdownMenu.Item>
 					<DropdownMenu.Item onclick={() => setLocale('de')} class={getLocale() === 'de' ? 'bg-accent' : ''}>
 						<GlobeIcon class="size-4 mr-2" />
 						<span>Deutsch</span>
 						{#if getLocale() === 'de'}
-							<span class="ml-auto text-blue-600">✓</span>
+							<span class="ml-auto text-blue-600">âœ“</span>
 						{/if}
 					</DropdownMenu.Item>
 				</DropdownMenu.Group>

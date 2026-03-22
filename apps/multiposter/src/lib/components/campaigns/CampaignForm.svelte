@@ -47,7 +47,7 @@
                             initialData.createdAt,
                         ).toLocaleString()}
                         {#if initialData.updatedAt !== initialData.createdAt}
-                            • {m.updated()}: {new Date(
+                            â€¢ {m.updated()}: {new Date(
                                 initialData.updatedAt,
                             ).toLocaleString()}
                         {/if}

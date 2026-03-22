@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import * as v from 'valibot';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { db } from '$lib/server/db';
-import { syncConfig, syncOperation } from '$lib/server/db/schema';
+import { syncConfig, syncOperation } from '@ac/db';
 import { eq, and, desc } from 'drizzle-orm';
 
 /**

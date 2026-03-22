@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { kiosk, kioskLocation } from '$lib/server/db/schema';
+import { kiosk, kioskLocation } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateKioskSchema } from '$lib/validations/kiosks';

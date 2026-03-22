@@ -1,5 +1,11 @@
 export * from "./auth";
 export * from "./contacts";
 export * from "./resources";
+export * from "./events";
+export * from "./announcements";
+export * from "./campaigns";
+export * from "./kiosks";
+export * from "./sync";
 export * from "./talents";
-
+export * from "./cms";
+export * from "./relations";

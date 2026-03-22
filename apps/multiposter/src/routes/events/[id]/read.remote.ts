@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag, campaign, location } from '$lib/server/db/schema';
+import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag, campaign, location } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Event } from '../list.remote';
 import { getOptionalUser, hasAccess } from '$lib/server/authorization';

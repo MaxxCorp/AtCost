@@ -448,13 +448,18 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			// 4. Save mapping
 			if (externalId && internalId) {
-				// Check again if mapping was created concurrently (safe guard)
-				// Or just insert
 				await db.insert(syncMapping).values({
+					id: crypto.randomUUID(),
 					syncConfigId: this.config.id,
 					externalId: externalId,
 					providerId: this.config.providerId,
 					locationId: internalId,
+					contactId: null,
+					eventId: null,
+					announcementId: null,
+					tagId: null,
+					etag: null,
+					metadata: null,
 					lastSyncedAt: new Date()
 				});
 			}
@@ -572,10 +577,17 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// 4. Save mapping
 			if (externalId && internalId) {
 				await db.insert(syncMapping).values({
+					id: crypto.randomUUID(),
 					syncConfigId: this.config.id,
 					externalId: externalId,
 					providerId: this.config.providerId,
 					contactId: internalId,
+					locationId: null,
+					eventId: null,
+					announcementId: null,
+					tagId: null,
+					etag: null,
+					metadata: null,
 					lastSyncedAt: new Date()
 				});
 			}
@@ -652,10 +664,17 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// 4. Save mapping
 			if (externalId) {
 				await db.insert(syncMapping).values({
+					id: crypto.randomUUID(),
 					syncConfigId: this.config.id,
 					externalId: externalId,
 					providerId: this.config.providerId,
 					tagId: tag.id,
+					locationId: null,
+					contactId: null,
+					eventId: null,
+					announcementId: null,
+					etag: null,
+					metadata: null,
 					lastSyncedAt: new Date()
 				});
 			}

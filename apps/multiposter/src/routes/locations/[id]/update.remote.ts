@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { location } from '$lib/server/db/schema';
+import { location } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';

@@ -1,4 +1,4 @@
-﻿import { command } from '$app/server';
+import { command } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { getStorageProvider } from '$lib/server/blob-storage';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

@@ -1,18 +1,32 @@
 <script lang="ts">
-    import { deleteUser } from "./[id]/delete.remote";
-    import * as m from "$lib/paraglide/messages";
-
-    import type { User } from "./list.remote";
-    import Button from "$lib/components/ui/button/button.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    // No @ac/db import needed
+    import Button from "../../components/button/button.svelte";
+    import AsyncButton from "../../components/AsyncButton.svelte";
     import { User as UserIcon } from "@lucide/svelte";
+    import BulkActionToolbar from "../../components/BulkActionToolbar.svelte";
+    import EmptyState from "../../components/EmptyState.svelte";
+    import { handleDelete } from "../../hooks/handleDelete.svelte.js";
 
-    import BulkActionToolbar from "$lib/components/ui/BulkActionToolbar.svelte";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-    import EmptyState from "$lib/components/ui/EmptyState.svelte";
+    type UserListItem = {
+        id: string;
+        name: string;
+        email: string;
+        image?: string | null;
+        roles?: string[] | null;
+        createdAt: Date | string;
+    };
 
-    let { items, onRefresh }: { items: User[]; onRefresh: () => void } =
-        $props();
+    let { 
+        items, 
+        onRefresh, 
+        deleteUserFn, 
+        m 
+    }: { 
+        items: UserListItem[]; 
+        onRefresh: () => void; 
+        deleteUserFn: (ids: string[]) => Promise<any>; 
+        m: any; 
+    } = $props();
 
     let selectedIds = $state<Set<string>>(new Set());
 
@@ -27,14 +41,14 @@
         }
         selectedIds = new Set(selectedIds);
     }
-    function selectAll(currentItems: User[]) {
+    function selectAll(currentItems: UserListItem[]) {
         selectedIds = new Set(currentItems.map((item) => item.id));
     }
     function deselectAll() {
         selectedIds = new Set();
     }
 
-    function formatRoles(user: User) {
+    function formatRoles(user: UserListItem) {
         const roles = Array.isArray(user.roles) ? user.roles : [];
         if (roles.length === 0) return m.role_user();
         return roles.join(", ");
@@ -55,7 +69,7 @@
                 onDelete={async () => {
                     await handleDelete({
                         ids: [...selectedIds],
-                        deleteFn: deleteUser,
+                        deleteFn: async (ids: string[]) => deleteUserFn(ids),
                         itemName: m.users(),
                     });
                     deselectAll();
@@ -149,7 +163,7 @@
                                 onclick={async () => {
                                     const success = await handleDelete({
                                         ids: [user.id],
-                                        deleteFn: deleteUser,
+                                        deleteFn: async (ids: string[]) => deleteUserFn(ids),
                                         itemName: m.users(),
                                     });
                                     if (success) {

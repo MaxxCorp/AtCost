@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '$lib/server/db/schema';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
 import { eq, and, or, ne } from 'drizzle-orm';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';

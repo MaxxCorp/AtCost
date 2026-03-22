@@ -69,7 +69,7 @@
 						</div>
 						{team.name}
 						<DropdownMenu.Shortcut
-							>⌘{index + 1}</DropdownMenu.Shortcut
+							>âŒ˜{index + 1}</DropdownMenu.Shortcut
 						>
 					</DropdownMenu.Item>
 				{/each}

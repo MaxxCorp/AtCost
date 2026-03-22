@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { resource, resourceRelation, resourceLocation as resourceLocationTable } from '$lib/server/db/schema';
+import { resource, resourceRelation, resourceLocation as resourceLocationTable } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
@@ -63,6 +63,7 @@ export const updateResource = form(updateResourceSchema, async (data) => {
                 const relationData = parentResourceIds.map((parentId: string) => ({
                     parentResourceId: parentId,
                     childResourceId: data.id,
+                    type: 'parent-child',
                 }));
                 await tx.insert(resourceRelation).values(relationData);
             }
@@ -87,7 +88,7 @@ export const updateResource = form(updateResourceSchema, async (data) => {
             }
 
             // 3. Sync contact associations
-            const { resourceContact: resourceContactTable } = await import('$lib/server/db/schema');
+            const { resourceContact: resourceContactTable } = await import('@ac/db');
             await tx.delete(resourceContactTable)
                 .where(eq(resourceContactTable.resourceId, data.id));
 

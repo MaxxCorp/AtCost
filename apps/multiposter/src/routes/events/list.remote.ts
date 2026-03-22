@@ -1,11 +1,11 @@
 import { query } from '$app/server';
-import { event } from '$lib/server/db/schema';
+import { event } from '@ac/db';
 import { listQuery } from '$lib/server/db/query-helpers';
 
 /**
  * Event interface matching the database schema
  */
-import type { Event as DbEvent } from '$lib/server/db/schema';
+import type { Event as DbEvent } from '@ac/db';
 
 /**
  * Event interface matching the database schema, with dates serialized to strings
@@ -46,7 +46,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
  * List all events for the authenticated user
  */
 import { inArray, eq } from 'drizzle-orm';
-import { eventTag, tag, campaign } from '$lib/server/db/schema';
+import { eventTag, tag, campaign } from '@ac/db';
 import { db } from '$lib/server/db';
 
 /**

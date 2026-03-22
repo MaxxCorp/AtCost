@@ -1,6 +1,6 @@
 import { type InferSelectModel, eq, getTableColumns, inArray, and } from 'drizzle-orm';
 import { query } from '$app/server';
-import { resource, resourceRelation, location, resourceLocation } from '$lib/server/db/schema';
+import { resource, resourceRelation, location, resourceLocation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { db } from '$lib/server/db';
 

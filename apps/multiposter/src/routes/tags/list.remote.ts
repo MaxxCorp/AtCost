@@ -1,6 +1,6 @@
-﻿import { query } from '$app/server';
+import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { tag } from '$lib/server/db/schema';
+import { tag } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { getAuthenticatedUser } from '$lib/server/authorization';
 

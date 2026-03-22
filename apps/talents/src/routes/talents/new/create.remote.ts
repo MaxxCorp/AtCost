@@ -1,7 +1,8 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { contact, contactEmail, contactPhone, contactTag, contactRelation, tag, locationContact } from '$lib/server/db/schema';
+import { contact, contactEmail, contactPhone, contactTag, contactRelation, tag, locationContact, talent } from '@ac/db';
 import { listContacts } from '../list.remote';
+import { listTalents } from '../talents.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createContactSchema } from '@ac/validations/contacts';
 import { eq } from 'drizzle-orm';
@@ -61,10 +62,16 @@ export const createNewContact = form(createContactSchema, async (data) => {
                 }
             }
 
+            await tx.insert(talent).values({
+                contactId: newContact.id,
+                status: 'applicant'
+            });
+
             return newContact;
         });
 
         await listContacts().refresh();
+        await listTalents().refresh();
         return { success: true, id: result.id, contact: result };
     } catch (err: any) {
         console.error('createNewContact ERROR:', err);

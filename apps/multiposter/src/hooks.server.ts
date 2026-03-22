@@ -3,7 +3,7 @@ import type { Handle } from '@sveltejs/kit';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { auth } from "$lib/server/auth";
 import { svelteKitHandler } from "better-auth/svelte-kit";
-import { building } from '$app/environment'
+import { building, dev } from '$app/environment'
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	const result = await auth.api.getSession({ headers: event.request.headers });
@@ -11,6 +11,36 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	event.locals.session = session;
 	event.locals.user = result?.user ?? null;
 	return svelteKitHandler({ event, resolve, auth, building });
+};
+
+const handleMockAuth: Handle = async ({ event, resolve }) => {
+    // SECURITY: NEVER RUN IN PRODUCTION
+    if (!dev) return resolve(event);
+
+    // Inject mock user for debugging if not authenticated
+    const isStaticAsset = event.url.pathname.includes('.') || event.url.pathname.startsWith('/_') || event.url.pathname.startsWith('/favicon');
+    
+    if (!isStaticAsset && !event.locals.user) {
+        (event.locals as any).user = {
+            id: 'mock-user',
+            email: 'admin@example.com',
+            emailVerified: true,
+            name: 'Mock Admin',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            roles: '["admin"]'
+        };
+        (event.locals as any).session = {
+            id: 'mock-session',
+            userId: 'mock-user',
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+            token: 'mock-token',
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+    }
+
+    return resolve(event);
 };
 
 const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(event.request, ({ request, locale }) => {
@@ -21,4 +51,4 @@ const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(even
 	});
 });
 
-export const handle: Handle = sequence(handleBetterAuth, handleParaglide);
+export const handle: Handle = sequence(handleBetterAuth, handleMockAuth, handleParaglide);

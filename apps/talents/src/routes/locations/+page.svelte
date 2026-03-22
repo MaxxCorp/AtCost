@@ -47,7 +47,7 @@
                 <span class="font-medium">{loc.name}</span>
                 <span class="text-xs text-gray-500"
                     >{[loc.street, loc.houseNumber].filter(Boolean).join(" ") ||
-                        "No address"} · {loc.city || "No city"}</span
+                        "No address"} Â· {loc.city || "No city"}</span
                 >
             </div>
         {/snippet}

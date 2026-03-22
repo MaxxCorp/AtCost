@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button } from "../button";
+	import Button from "./button/button.svelte";
 	import AsyncButton from "./AsyncButton.svelte";
 
 	interface Props {

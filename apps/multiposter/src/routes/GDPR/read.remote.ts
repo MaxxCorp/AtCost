@@ -1,4 +1,4 @@
-﻿import { query } from '$app/server';
+import { query } from '$app/server';
 import { getContent } from '$lib/server/cms/operations';
 import { getRequestEvent } from '$app/server';
 import { readContentSchema } from '$lib/validations/cms';

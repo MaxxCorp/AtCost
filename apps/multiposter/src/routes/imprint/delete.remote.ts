@@ -1,4 +1,4 @@
-﻿import { command } from '$app/server';
+import { command } from '$app/server';
 import { deleteBlockSchema } from '$lib/validations/cms';
 import { deleteBlock } from '$lib/server/cms/operations';
 import { getAuthenticatedUser } from '$lib/server/authorization';

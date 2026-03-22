@@ -235,7 +235,7 @@
             <div>
                 {#if locations.length > 0}
                     <EntityManager
-                        title={m.associated_locations()}
+                        title={m.locations()}
                         icon={MapPin}
                         {type}
                         entityId={initialData?.id}

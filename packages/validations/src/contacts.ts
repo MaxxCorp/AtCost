@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 
 // Minimal pure Valibot schemas for contact sub-entities
-const contactBaseSchema = v.object({
+export const contactBaseSchema = v.object({
     displayName: v.pipe(v.string(), v.minLength(1, 'Display name is required')),
     givenName: v.optional(v.string()),
     familyName: v.optional(v.string()),
@@ -12,21 +12,21 @@ const contactBaseSchema = v.object({
     isPublic: v.optional(v.union([v.boolean(), v.string()])),
 });
 
-const emailSchemaPure = v.object({
+export const emailSchemaPure = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),
     value: v.union([v.pipe(v.string(), v.email()), v.pipe(v.string(), v.length(0))]),
     type: v.fallback(v.string(), 'work'),
     primary: v.fallback(v.boolean(), false),
 });
 
-const phoneSchemaPure = v.object({
+export const phoneSchemaPure = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),
     value: v.string(),
     type: v.fallback(v.string(), 'mobile'),
     primary: v.fallback(v.boolean(), false),
 });
 
-const addressSchemaPure = v.object({
+export const addressSchemaPure = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),
     street: v.optional(v.string()),
     houseNumber: v.optional(v.string()),
@@ -38,7 +38,7 @@ const addressSchemaPure = v.object({
     primary: v.fallback(v.boolean(), false),
 });
 
-const contactRelationSchemaPure = v.object({
+export const contactRelationSchemaPure = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),
     targetContactId: v.pipe(v.string(), v.uuid()),
     relationType: v.fallback(v.string(), 'cooperates with'),

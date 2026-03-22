@@ -1,7 +1,7 @@
 import { form } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '$lib/server/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '$lib/server/db/schema';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -113,7 +113,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 				anchorDate: start,
 				anchorEndDate: end,
 				userId: user.id,
-			}).returning();
+			} as any).returning();
 			if (newSeries) {
 				seriesId = newSeries.id;
 				console.log('Created recurring_series:', seriesId);
@@ -134,7 +134,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
             userId: user.id,
             name: `Campaign for ${data.summary}`,
             content: { syncIds }
-        }).returning();
+        } as any).returning();
 
 		// Insert Master Event
 		console.log('Inserting event into DB...');
@@ -163,7 +163,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 			guestsCanInviteOthers: data.guestsCanInviteOthers === 'true',
 			guestsCanModify: data.guestsCanModify === 'true',
 			guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true',
-		}).returning();
+		} as any).returning();
 
 		if (!newEvent) {
 			console.error('No event returned from insert stub');
@@ -264,7 +264,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 						guestsCanInviteOthers: data.guestsCanInviteOthers === 'true',
 						guestsCanModify: data.guestsCanModify === 'true',
 						guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true',
-					});
+					} as any);
 
 					// Link associations for instance
 					await linkAssociations(instanceId);

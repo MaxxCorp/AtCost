@@ -59,6 +59,20 @@ export const FEATURES: readonly FeatureMeta[] = [
         buttonClass: 'bg-rose-600 hover:bg-rose-700',
         order: 3
     },
+    {
+        key: 'timesheets',
+        title: 'Time Tracking',
+        description: 'Track work hours, manage shift plans, and approve time sheets.',
+        href: '/timesheets',
+        buttonText: 'Manage Time',
+        claim: 'timesheets',
+        icon: 'clock',
+        gradientFrom: 'from-emerald-50',
+        gradientTo: 'to-teal-50',
+        borderClass: 'border-emerald-100',
+        buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+        order: 4
+    },
 ] as const;
 
 export function getVisibleFeatures(user: any, hasAccessFn: (u: any, f: TalentFeature) => boolean): FeatureMeta[] {

@@ -10,7 +10,7 @@ import { calendar, type calendar_v3 } from '@googleapis/calendar';
 import { OAuth2Client, type Credentials } from 'google-auth-library';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
-import { account } from '$lib/server/db/schema';
+import { account } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 
 /**

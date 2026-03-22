@@ -1,6 +1,6 @@
-﻿import { query } from '$app/server';
-import { campaign } from '$lib/server/db/schema/campaigns';
-import { type Campaign } from '$lib/server/db/schema/campaigns';
+import { query } from '$app/server';
+import { campaign } from '@ac/db';
+import type { Campaign } from '@ac/db';
 export type { Campaign };
 import { listQuery } from '$lib/server/db/query-helpers';
 

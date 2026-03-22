@@ -10,7 +10,7 @@ export const auth = betterAuth({
         provider: "pg",
     }),
     secret: env.BETTER_AUTH_SECRET || "development-secret-only-for-build",
-    baseURL: env.BETTER_AUTH_URL || "http://localhost:5174",
+    baseURL: env.BETTER_AUTH_URL || "http://localhost:5175",
     basePath: "/api/auth",
     trustHost: true,
     session: {

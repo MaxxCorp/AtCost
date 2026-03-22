@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { db } from '$lib/server/db';
-import { kiosk } from '$lib/server/db/schema';
+import { kiosk } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';

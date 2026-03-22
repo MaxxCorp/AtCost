@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { db } from '$lib/server/db';
-import { location } from '$lib/server/db/schema';
+import { location } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

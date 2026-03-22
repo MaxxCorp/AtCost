@@ -1,16 +1,16 @@
-import { pgTable, text, timestamp, doublePrecision, primaryKey, index, jsonb, integer, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, integer } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { contact } from "./contacts";
 
-/**
- * Locations table
- * Stores physical locations where resources can be found or events can take place.
- */
+// --- RESOURCE TABLES ---
+
 export const location = pgTable("location", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-        .notNull()
-        .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    description: text("description"),
+    roomId: text("room_id"),
+    capacity: text("capacity"), 
     street: text("street"),
     houseNumber: text("house_number"),
     addressSuffix: text("address_suffix"),
@@ -18,58 +18,51 @@ export const location = pgTable("location", {
     city: text("city"),
     state: text("state"),
     country: text("country"),
-    roomId: text("room_id"),
-    latitude: doublePrecision("latitude"),
-    longitude: doublePrecision("longitude"),
-    what3words: text("what3words"),
+    isPublic: boolean("is_public").default(false).notNull(),
     inclusivitySupport: text("inclusivity_support"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-        .defaultNow()
-        .$onUpdate(() => new Date())
-        .notNull(),
-}, (table) => [
-    index("location_user_id_idx").on(table.userId),
-]);
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
 
-/**
- * Resources table
- * Stores bookable items like rooms, equipment, etc.
- */
 export const resource = pgTable("resource", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-        .notNull()
-        .references(() => user.id, { onDelete: "cascade" }),
-    locationId: uuid("location_id")
-        .references(() => location.id, { onDelete: "set null" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    locationId: uuid("location_id").references(() => location.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     description: text("description"),
     type: text("type").notNull(),
-    allocationCalendars: jsonb("allocation_calendars").$type<Array<{ provider: string; calendarId: string }>>(),
+    status: text("status").default("available").notNull(),
     maxOccupancy: integer("max_occupancy"),
+    allocationCalendars: jsonb("allocation_calendars"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-        .defaultNow()
-        .$onUpdate(() => new Date())
-        .notNull(),
-}, (table) => [
-    index("resource_user_id_idx").on(table.userId),
-    index("resource_location_id_idx").on(table.locationId),
-]);
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
 
-/**
- * Resource Relations table (Many-to-Many Hierarchy)
- */
+import { primaryKey, jsonb } from "drizzle-orm/pg-core";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
+
+export const resourceContact = pgTable("resource_contact", {
+    resourceId: uuid("resource_id").notNull().references(() => resource.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.resourceId, table.contactId] })]);
+
+export const locationContact = pgTable("location_contact", {
+    locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.locationId, table.contactId] })]);
+
+export const resourceLocation = pgTable("resource_location", {
+    resourceId: uuid("resource_id").notNull().references(() => resource.id, { onDelete: "cascade" }),
+    locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.resourceId, table.locationId] })]);
+
 export const resourceRelation = pgTable("resource_relation", {
-    parentResourceId: uuid("parent_resource_id")
-        .notNull()
-        .references(() => resource.id, { onDelete: "cascade" }),
-    childResourceId: uuid("child_resource_id")
-        .notNull()
-        .references(() => resource.id, { onDelete: "cascade" }),
-}, (table) => [
-    primaryKey({ columns: [table.parentResourceId, table.childResourceId] }),
-    index("resource_relation_parent_idx").on(table.parentResourceId),
-    index("resource_relation_child_idx").on(table.childResourceId),
-]);
+    parentResourceId: uuid("parent_id").notNull().references((): AnyPgColumn => resource.id, { onDelete: "cascade" }),
+    childResourceId: uuid("child_id").notNull().references((): AnyPgColumn => resource.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+}, (table) => [primaryKey({ columns: [table.parentResourceId, table.childResourceId] })]);
+
+export type Location = typeof location.$inferSelect;
+export type NewLocation = typeof location.$inferInsert;
+export type Resource = typeof resource.$inferSelect;
+export type NewResource = typeof resource.$inferInsert;

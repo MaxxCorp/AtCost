@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { db } from '$lib/server/db';
-import { event, recurringSeries } from '$lib/server/db/schema';
+import { event, recurringSeries } from '@ac/db';
 import { eq, or } from 'drizzle-orm';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

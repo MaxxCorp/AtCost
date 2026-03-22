@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { syncConfig } from '$lib/server/db/schema';
+import { syncConfig } from '@ac/db';
 import { listQuery } from '$lib/server/db/query-helpers';
 
 /**

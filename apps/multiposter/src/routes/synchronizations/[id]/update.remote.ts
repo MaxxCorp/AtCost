@@ -1,7 +1,7 @@
 import { form } from '$app/server';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { db } from '$lib/server/db';
-import { syncConfig } from '$lib/server/db/schema';
+import { syncConfig } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import { updateSynchronizationSchema, type UpdateSynchronizationInput } from '$lib/validations/synchronizations';
 export type { UpdateSynchronizationInput };

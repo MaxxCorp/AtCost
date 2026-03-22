@@ -1,29 +1,23 @@
 <script lang="ts">
-    import ContactForm from "@ac/ui/components/forms/ContactForm.svelte";
-    import { createNewContact } from "./create.remote";
-    import { createContactSchema } from "@ac/validations/contacts";
-    import { listContacts } from "../list.remote";
+    import TalentForm from "$lib/components/talent/TalentForm.svelte";
+    import { listTalents } from "../talents.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 
-    breadcrumbState.set({ feature: "contacts", current: "New Contact" });
+    breadcrumbState.set({ feature: "talents", current: "New Talent" });
 </script>
 
-<div class="max-w-4xl mx-auto px-4 py-8">
+<div class="max-w-5xl mx-auto px-4 py-8">
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900 line-clamp-1">
-            Create Contact
+        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">
+            Register New Talent
         </h1>
-        <p class="text-gray-500 mt-2">Add a new person to your network</p>
+        <p class="text-gray-500 mt-2">Add a new professional to your recruitment pipeline</p>
     </div>
 
-    <div
-        class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8"
-    >
-        <ContactForm
-            remoteFunction={createNewContact}
-            schema={createContactSchema}
-            cancelHref="/contacts"
-            listContactsRemote={listContacts}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-10">
+        <TalentForm
+            listContactsRemote={listTalents}
+            cancelHref="/talents"
         />
     </div>
 </div>

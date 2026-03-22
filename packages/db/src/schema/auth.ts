@@ -1,4 +1,6 @@
-import { pgTable, text, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, jsonb } from "drizzle-orm/pg-core";
+
+// --- AUTH TABLES ---
 
 export const user = pgTable("user", {
     id: text("id").primaryKey(),
@@ -11,11 +13,9 @@ export const user = pgTable("user", {
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
         .defaultNow()
-        .$onUpdate(() => /* @__PURE__ */ new Date())
+        .$onUpdate(() => new Date())
         .notNull(),
 });
-
-export type User = typeof user.$inferSelect;
 
 export const session = pgTable("session", {
     id: text("id").primaryKey(),
@@ -23,7 +23,7 @@ export const session = pgTable("session", {
     token: text("token").notNull().unique(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
-        .$onUpdate(() => /* @__PURE__ */ new Date())
+        .$onUpdate(() => new Date())
         .notNull(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
@@ -50,13 +50,10 @@ export const account = pgTable("account", {
     password: text("password"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
-        .$onUpdate(() => /* @__PURE__ */ new Date())
+        .$onUpdate(() => new Date())
         .notNull(),
 }, (table) => [
-    index("account_user_provider_id_idx").on(
-        table.userId,
-        table.providerId,
-    ),
+    index("account_user_provider_id_idx").on(table.userId, table.providerId),
 ]);
 
 export const verification = pgTable("verification", {
@@ -67,8 +64,11 @@ export const verification = pgTable("verification", {
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
         .defaultNow()
-        .$onUpdate(() => /* @__PURE__ */ new Date())
+        .$onUpdate(() => new Date())
         .notNull(),
 }, (table) => [
     index("verification_identifier_idx").on(table.identifier),
 ]);
+
+export type User = typeof user.$inferSelect;
+export type NewUser = typeof user.$inferInsert;

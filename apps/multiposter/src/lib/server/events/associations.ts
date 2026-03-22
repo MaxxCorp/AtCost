@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { eventLocation, eventResource, eventContact, eventTag, tag } from '$lib/server/db/schema';
+import { eventLocation, eventResource, eventContact, eventTag, tag } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 
 interface AssociationOptions {

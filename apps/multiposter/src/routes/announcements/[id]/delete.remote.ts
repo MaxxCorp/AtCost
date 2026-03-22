@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcement } from '$lib/server/db/schema';
+import { announcement } from '@ac/db';
 import { inArray } from 'drizzle-orm';
 import { listAnnouncements } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

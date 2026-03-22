@@ -172,7 +172,7 @@
 								</p>
 								{#if user.emailVerified}
 									<p class="text-xs text-green-600 mt-1">
-										✓ {m.verified()}
+										âœ“ {m.verified()}
 									</p>
 								{/if}
 							</div>

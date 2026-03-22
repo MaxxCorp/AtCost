@@ -1,7 +1,7 @@
 import { listKioskEvents } from '../../../events/list-public.remote';
 import { listKioskAnnouncements } from '../../../announcements/list.remote';
 import { db } from '$lib/server/db';
-import { kiosk, kioskLocation, location } from '$lib/server/db/schema';
+import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 

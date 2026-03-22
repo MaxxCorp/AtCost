@@ -28,6 +28,8 @@
         "./components/skeleton": "./src/components/skeleton/index.ts",
         "./components/sonner": "./src/components/sonner/index.ts",
         "./components/tooltip": "./src/components/tooltip/index.ts",
+        "./components/users/*.svelte": "./src/components/users/*.svelte",
+        "./hooks/*": "./src/hooks/*.ts",
         "./utils": {
             "types": "./src/utils.ts",
             "default": "./src/utils.ts"

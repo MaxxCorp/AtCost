@@ -50,7 +50,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         // Step 1: Login and get session
         await this.login();
 
-        // Step 2: Create a new event → get editid
+        // Step 2: Create a new event â†’ get editid
         const editId = await this.createEvent();
 
         // Step 3: Fill out each page
@@ -68,7 +68,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     }
 
     async updateEvent(_externalId: string, event: ExternalEvent): Promise<{ etag?: string }> {
-        // The admin form doesn't support clean updates via URL — treat as new submission
+        // The admin form doesn't support clean updates via URL â€” treat as new submission
         await this.pushEvent(event);
         return { etag: new Date().toISOString() };
     }
@@ -78,7 +78,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     }
 
     // ----------------------------------------------------------------
-    // Private helpers — session management
+    // Private helpers â€” session management
     // ----------------------------------------------------------------
 
     private getCredentials(): { username: string; password: string } {
@@ -126,7 +126,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         }
 
         if (cookieParts.length === 0) {
-            throw new Error('Berlin.de MH Calendar: login failed — no session cookie received');
+            throw new Error('Berlin.de MH Calendar: login failed â€” no session cookie received');
         }
 
         this.sessionCookie = cookieParts.join('; ');
@@ -186,7 +186,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     }
 
     // ----------------------------------------------------------------
-    // Private helpers — multi-page form flow
+    // Private helpers â€” multi-page form flow
     // ----------------------------------------------------------------
 
     private async createEvent(): Promise<string> {
@@ -204,7 +204,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             const body = await response.text();
             const bodyMatch = body.match(/editid=(\d+)/);
             if (!bodyMatch) {
-                throw new Error('Berlin.de MH Calendar: failed to create event — no editid in response');
+                throw new Error('Berlin.de MH Calendar: failed to create event â€” no editid in response');
             }
             return bodyMatch[1];
         }
@@ -329,7 +329,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             await this.authedFetch(this.editUrl(editId, 'image'), {
                 method: 'POST',
                 body: formData
-                // No Content-Type header — fetch sets it with boundary for FormData
+                // No Content-Type header â€” fetch sets it with boundary for FormData
             });
         } catch (error) {
             // Image upload failure shouldn't block the rest of the sync
@@ -343,15 +343,15 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
 
     /**
      * Determines if the event is free.
-     * If ticketPrice is a parseable number, the event has a cost → not free.
-     * Otherwise (text like "Free", empty, or absent) → free.
+     * If ticketPrice is a parseable number, the event has a cost â†’ not free.
+     * Otherwise (text like "Free", empty, or absent) â†’ free.
      */
     private isEventFree(event: ExternalEvent): boolean {
         const price = event.ticketPrice ?? event.metadata?.ticketPrice;
         if (!price) return true;
         const parsed = parseFloat(String(price));
-        if (isNaN(parsed)) return true; // Non-numeric → free
-        return parsed === 0; // Zero → free, any positive number → not free
+        if (isNaN(parsed)) return true; // Non-numeric â†’ free
+        return parsed === 0; // Zero â†’ free, any positive number â†’ not free
     }
 
     /** Format date as DD.MM.YYYY */

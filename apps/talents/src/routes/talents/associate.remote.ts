@@ -1,6 +1,6 @@
 import { command, query } from '$app/server';
 import { db } from '$lib/server/db';
-import { userContact, locationContact, resourceContact, contact, location } from '$lib/server/db/schema';
+import { userContact, locationContact, resourceContact, contact, location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, hasAccess } from '$lib/server/authorization';
 import { associationSchema, getAssociationsSchema, type Contact } from '@ac/validations/contacts';
 import { and, eq } from 'drizzle-orm';

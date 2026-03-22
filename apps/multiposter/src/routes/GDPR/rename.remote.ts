@@ -1,4 +1,4 @@
-﻿import { command } from '$app/server';
+import { command } from '$app/server';
 import { renameBlockSchema } from '$lib/validations/cms';
 import { renameBlock } from '$lib/server/cms/operations';
 import { getAuthenticatedUser } from '$lib/server/authorization';

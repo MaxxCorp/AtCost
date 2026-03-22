@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { contact } from '$lib/server/db/schema';
+import { contact } from '@ac/db';
 import { listQuery } from '$lib/server/db/query-helpers';
 import { contactSchema, type Contact } from '@ac/validations/contacts';
 

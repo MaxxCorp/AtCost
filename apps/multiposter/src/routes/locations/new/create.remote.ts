@@ -1,6 +1,6 @@
-﻿import { form } from '$app/server';
+import { form } from '$app/server';
 import { db } from '$lib/server/db';
-import { location } from '$lib/server/db/schema';
+import { location } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createLocationSchema } from '$lib/validations/locations';

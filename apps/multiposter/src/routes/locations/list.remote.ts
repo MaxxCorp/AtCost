@@ -1,6 +1,6 @@
 import { type InferSelectModel } from 'drizzle-orm';
 import { query } from '$app/server';
-import { location } from '$lib/server/db/schema';
+import { location } from '@ac/db';
 import { listQuery } from '$lib/server/db/query-helpers';
 import { getOptionalUser } from '$lib/server/authorization';
 
