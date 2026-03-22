@@ -138,7 +138,7 @@ ALTER TABLE "email_campaign" ALTER COLUMN "recipient_count" SET DEFAULT 0;--> st
 ALTER TABLE "cms_content_version" ALTER COLUMN "branch" SET DEFAULT 'published';--> statement-breakpoint
 ALTER TABLE "event" ALTER COLUMN "start_date_time" DROP NOT NULL;--> statement-breakpoint
 ALTER TABLE "event" ALTER COLUMN "is_exception" SET NOT NULL;--> statement-breakpoint
-ALTER TABLE "event" ALTER COLUMN "recurring_event_id" SET DATA TYPE uuid;--> statement-breakpoint
+ALTER TABLE "event" ALTER COLUMN "recurring_event_id" SET DATA TYPE uuid USING recurring_event_id::uuid;--> statement-breakpoint
 ALTER TABLE "event" ALTER COLUMN "guests_can_invite_others" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "event" ALTER COLUMN "guests_can_modify" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "event" ALTER COLUMN "guests_can_see_other_guests" SET DEFAULT true;--> statement-breakpoint
