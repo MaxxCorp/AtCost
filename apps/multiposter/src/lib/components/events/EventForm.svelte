@@ -560,6 +560,26 @@
 
             <div>
                 <label
+                    for="status"
+                    class="block text-sm font-medium text-gray-700 mb-1"
+                >
+                    {m.status()}
+                </label>
+                <select
+                    {...getField("status").as("text")}
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                    value={getField("status").value() ??
+                        initialData?.status ??
+                        "confirmed"}
+                >
+                    <option value="confirmed">{m.confirmed()}</option>
+                    <option value="tentative">{m.tentative()}</option>
+                    <option value="cancelled">{m.cancelled()}</option>
+                </select>
+            </div>
+
+            <div>
+                <label
                     for="description"
                     class="block text-sm font-medium text-gray-700 mb-1"
                     >{m.description()}</label

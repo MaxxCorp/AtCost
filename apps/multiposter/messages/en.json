@@ -139,6 +139,8 @@
 	"sync_configuration_not_found_message": "The synchronization configuration you are looking for does not exist.",
 	"sync_completed_successfully": "Sync completed successfully!",
 	"status_updated": "Status updated",
+	"confirmed": "Confirmed",
+	"cancelled": "Cancelled",
 	"sync_interval_minutes": "{minutes} minutes",
 	"pull": "Pull",
 	"push": "Push",

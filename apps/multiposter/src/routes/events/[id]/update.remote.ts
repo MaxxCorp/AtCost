@@ -42,6 +42,7 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 		if (data.summary !== undefined) updateData.summary = data.summary;
 		if (data.description !== undefined) updateData.description = data.description;
 		if (data.location !== undefined) updateData.location = data.location;
+		if (data.status !== undefined) updateData.status = data.status;
 		if (data.categoryBerlinDotDe !== undefined) updateData.categoryBerlinDotDe = data.categoryBerlinDotDe;
 		if (data.ticketPrice !== undefined) updateData.ticketPrice = data.ticketPrice;
 
@@ -115,66 +116,178 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
-		const [updatedEvent] = await db
-			.update(event)
-			.set(updateData)
-			.where(eq(event.id, data.id))
-			.returning();
+		const updatedEvent = await db.transaction(async (tx) => {
+			const [updatedEvent] = await tx
+				.update(event)
+				.set(updateData)
+				.where(eq(event.id, data.id))
+				.returning();
 
-		console.log('Update result:', updatedEvent);
+			if (!updatedEvent) {
+				error(404, 'Event not found');
+			}
 
-		if (!updatedEvent) {
-			console.error('Update failed, event not found or access denied');
-			error(404, 'Event not found');
-		}
-
-        // Handle SyncIds & Campaign update
-        if (data.syncIds !== undefined) {
-            const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
-            if (updatedEvent.campaignId) {
-                await db.update(campaign).set({
-                    content: { syncIds },
-                    updatedAt: new Date()
-                }).where(eq(campaign.id, updatedEvent.campaignId));
-            } else {
-                const [newCampaign] = await db.insert(campaign).values({
-                    userId: user.id,
-                    name: `Campaign for ${updatedEvent.summary}`,
-                    content: { syncIds }
-                }).returning();
-                if (newCampaign) {
-                    await db.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, updatedEvent.id));
-                    updatedEvent.campaignId = newCampaign.id;
-                }
-            }
-        }
-
-		// Prepare data for association updates
-		const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
-		const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
-		const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
-
-		let tagNames: string[] | undefined = undefined;
-		if (data.tags !== undefined) {
-			tagNames = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0) : [];
-			// Add Series tag if recurring (check both new seriesId and legacy recurrence)
-			if (updatedEvent.seriesId || (updatedEvent.recurrence && (updatedEvent.recurrence as string[]).length > 0) || updatedEvent.recurringEventId) {
-				if (!tagNames.includes('Series')) {
-					tagNames.push('Series');
+			// Handle SyncIds & Campaign update
+			if (data.syncIds !== undefined) {
+				const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
+				if (updatedEvent.campaignId) {
+					await tx.update(campaign).set({
+						content: { syncIds },
+						updatedAt: new Date()
+					}).where(eq(campaign.id, updatedEvent.campaignId));
+				} else {
+					const [newCampaign] = await tx.insert(campaign).values({
+						userId: user.id,
+						name: `Campaign for ${updatedEvent.summary}`,
+						content: { syncIds }
+					}).returning();
+					if (newCampaign) {
+						await tx.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, updatedEvent.id));
+						updatedEvent.campaignId = newCampaign.id;
+					}
 				}
 			}
-		}
 
-		const { updateEventAssociations } = await import('$lib/server/events/associations');
+			// Prepare data for association updates
+			const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
+			const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
+			const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
 
-		// Update Associations for Master Event
-		await updateEventAssociations({
-			eventId: data.id,
-			userId: user.id,
-			locationIds,
-			resourceIds,
-			contactIds,
-			tags: tagNames
+			let tagNames: string[] | undefined = undefined;
+			if (data.tags !== undefined) {
+				tagNames = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0) : [];
+				// Add Series tag if recurring
+				if (updatedEvent.seriesId || (updatedEvent.recurrence && (updatedEvent.recurrence as string[]).length > 0) || updatedEvent.recurringEventId) {
+					if (!tagNames.includes('Series')) {
+						tagNames.push('Series');
+					}
+				}
+			}
+
+			const { updateEventAssociations } = await import('$lib/server/events/associations');
+
+			// Update Associations for Master Event
+			await updateEventAssociations({
+				eventId: data.id,
+				userId: user.id,
+				locationIds,
+				resourceIds,
+				contactIds,
+				tags: tagNames,
+				tx
+			});
+
+			// Handle Recurrence Expansion/Update
+			if (data.recurrence !== undefined) {
+				console.log('Handling recurrence instances update...');
+
+				// 1. Delete existing instances
+				if (updatedEvent.seriesId) {
+					await tx.delete(event).where(
+						and(
+							eq(event.seriesId, updatedEvent.seriesId),
+							ne(event.id, data.id)
+						)
+					);
+				}
+				await tx.delete(event).where(eq(event.recurringEventId, data.id));
+
+				// 2. Handle series record
+				let seriesId = updatedEvent.seriesId;
+				let newRecurrenceRule: string | null = null;
+				if (data.recurrence) {
+					newRecurrenceRule = Array.isArray(data.recurrence) ? data.recurrence[0] : data.recurrence;
+				}
+
+				if (newRecurrenceRule) {
+					const start = updatedEvent.startDateTime ? new Date(updatedEvent.startDateTime) : new Date();
+					const end = updatedEvent.endDateTime ? new Date(updatedEvent.endDateTime) : null;
+
+					if (seriesId) {
+						await tx.update(recurringSeries)
+							.set({
+								rrule: newRecurrenceRule,
+								anchorDate: start,
+								anchorEndDate: end,
+								updatedAt: new Date(),
+							})
+							.where(eq(recurringSeries.id, seriesId));
+					} else {
+						const [newSeries] = await tx.insert(recurringSeries).values({
+							rrule: newRecurrenceRule,
+							anchorDate: start,
+							anchorEndDate: end,
+							userId: user.id,
+						}).returning();
+						if (newSeries) {
+							seriesId = newSeries.id;
+							await tx.update(event)
+								.set({ seriesId })
+								.where(eq(event.id, data.id));
+							updatedEvent.seriesId = seriesId;
+						}
+					}
+
+					// 3. Expand and create new instances
+					const { expandRecurrence } = await import('$lib/server/events/recurrence');
+
+					let start2: Date = updatedEvent.startDateTime ? new Date(updatedEvent.startDateTime) : new Date();
+					let end2: Date | null = updatedEvent.endDateTime ? new Date(updatedEvent.endDateTime) : null;
+
+					const instances = expandRecurrence(newRecurrenceRule, start2, end2);
+
+					for (const { date, end: instanceEnd } of instances) {
+						const instanceId = crypto.randomUUID();
+
+						await tx.insert(event).values({
+							id: instanceId,
+							userId: user.id,
+							campaignId: updatedEvent.campaignId,
+							summary: updatedEvent.summary,
+							description: updatedEvent.description,
+							location: updatedEvent.location,
+							categoryBerlinDotDe: updatedEvent.categoryBerlinDotDe,
+							ticketPrice: updatedEvent.ticketPrice,
+							isAllDay: updatedEvent.isAllDay,
+							status: updatedEvent.status,
+							startDateTime: date,
+							startTimeZone: updatedEvent.startTimeZone,
+							endDateTime: updatedEvent.endDateTime && instanceEnd ? instanceEnd : null,
+							endTimeZone: updatedEvent.endTimeZone,
+							seriesId: seriesId,
+							isException: false,
+							recurrence: updatedEvent.recurrence,
+							recurringEventId: updatedEvent.id,
+							originalStartTime: { dateTime: date.toISOString() },
+							attendees: updatedEvent.attendees,
+							reminders: updatedEvent.reminders,
+							isPublic: updatedEvent.isPublic,
+							guestsCanInviteOthers: updatedEvent.guestsCanInviteOthers,
+							guestsCanModify: updatedEvent.guestsCanModify,
+							guestsCanSeeOtherGuests: updatedEvent.guestsCanSeeOtherGuests,
+						});
+
+						await updateEventAssociations({
+							eventId: instanceId,
+							userId: user.id,
+							locationIds,
+							resourceIds,
+							contactIds,
+							tags: tagNames,
+							tx
+						});
+					}
+				} else {
+					if (seriesId) {
+						await tx.delete(recurringSeries).where(eq(recurringSeries.id, seriesId));
+						await tx.update(event)
+							.set({ seriesId: null })
+							.where(eq(event.id, data.id));
+						updatedEvent.seriesId = null;
+					}
+				}
+			}
+			return updatedEvent;
 		});
 
 		// Determine origin for asset generation
@@ -184,136 +297,19 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 			origin = getRequestEvent()?.url.origin;
 		} catch (e) { /* ignore */ }
 
-		// Handle Recurrence Expansion/Update
-		// We only expand if recurrence rule is updated or present and we want to regenerate.
-		// If data.recurrence is provided, we assume strictly we need to handle instances.
+		// Regenerate assets for all involved events (master + instances if updated)
+		console.log('Regenerating assets after update...');
+		await generateEventAssets(data.id, origin);
+
 		if (data.recurrence !== undefined) {
-			console.log('Handling recurrence instances update...');
-
-			// 1. Delete existing instances (support both seriesId and legacy recurringEventId)
-			if (updatedEvent.seriesId) {
-				await db.delete(event).where(
-					and(
-						eq(event.seriesId, updatedEvent.seriesId),
-						// Don't delete the event being updated (it becomes the new anchor/master)
-						ne(event.id, data.id)
-					)
-				);
-			}
-			// Also delete by legacy recurringEventId for backward compatibility
-			await db.delete(event).where(eq(event.recurringEventId, data.id));
-
-			// 2. Handle series record
-			let seriesId = updatedEvent.seriesId;
-			// Normalize recurrence to string (form can send string or string[])
-			let newRecurrenceRule: string | null = null;
-			if (data.recurrence) {
-				newRecurrenceRule = Array.isArray(data.recurrence) ? data.recurrence[0] : data.recurrence;
-			}
-
-			if (newRecurrenceRule) {
-				const start = updatedEvent.startDateTime ? new Date(updatedEvent.startDateTime) : new Date();
-				const end = updatedEvent.endDateTime ? new Date(updatedEvent.endDateTime) : null;
-
-				if (seriesId) {
-					// Update existing series record
-					await db.update(recurringSeries)
-						.set({
-							rrule: newRecurrenceRule,
-							anchorDate: start,
-							anchorEndDate: end,
-							updatedAt: new Date(),
-						})
-						.where(eq(recurringSeries.id, seriesId));
-				} else {
-					// Create new series record
-					const [newSeries] = await db.insert(recurringSeries).values({
-						rrule: newRecurrenceRule,
-						anchorDate: start,
-						anchorEndDate: end,
-						userId: user.id,
-					}).returning();
-					if (newSeries) {
-						seriesId = newSeries.id;
-						// Update master event with new seriesId
-						await db.update(event)
-							.set({ seriesId })
-							.where(eq(event.id, data.id));
-					}
-				}
-
-				// 3. Expand and create new instances
-				const { expandRecurrence } = await import('$lib/server/events/recurrence');
-
-				let start2: Date;
-				if (updatedEvent.startDateTime) {
-					start2 = new Date(updatedEvent.startDateTime as string | number | Date);
-				} else {
-					start2 = new Date();
-				}
-
-				let end2: Date | null = null;
-				if (updatedEvent.endDateTime) {
-					end2 = new Date(updatedEvent.endDateTime as string | number | Date);
-				}
-
-				const instances = expandRecurrence(newRecurrenceRule, start2, end2);
-
-				for (const { date, end: instanceEnd } of instances) {
-					const instanceId = crypto.randomUUID();
-
-					// Insert instance with new series-based fields
-					await db.insert(event).values({
-						id: instanceId,
-						userId: user.id,
-                        campaignId: updatedEvent.campaignId,
-						summary: updatedEvent.summary,
-						description: updatedEvent.description,
-						location: updatedEvent.location,
-						categoryBerlinDotDe: updatedEvent.categoryBerlinDotDe,
-						ticketPrice: updatedEvent.ticketPrice,
-						isAllDay: updatedEvent.isAllDay,
-						startDateTime: date,
-						startTimeZone: updatedEvent.startTimeZone,
-						endDateTime: updatedEvent.endDateTime && instanceEnd ? instanceEnd : null,
-						endTimeZone: updatedEvent.endTimeZone,
-						// New series-based recurrence
-						seriesId: seriesId,
-						isException: false,
-						// Legacy fields (kept for backward compatibility)
-						recurrence: updatedEvent.recurrence,
-						recurringEventId: updatedEvent.id,
-						originalStartTime: { dateTime: date.toISOString() },
-						attendees: updatedEvent.attendees,
-						reminders: updatedEvent.reminders,
-						isPublic: updatedEvent.isPublic,
-						guestsCanInviteOthers: updatedEvent.guestsCanInviteOthers,
-						guestsCanModify: updatedEvent.guestsCanModify,
-						guestsCanSeeOtherGuests: updatedEvent.guestsCanSeeOtherGuests,
-					});
-
-					// Copy associations to instance
-					await updateEventAssociations({
-						eventId: instanceId,
-						userId: user.id,
-						locationIds,
-						resourceIds,
-						contactIds,
-						tags: tagNames
-					});
-
-					// Generate assets for instance
-					await generateEventAssets(instanceId, origin);
-				}
-			} else {
-				// Recurrence was cleared - delete series record if exists
-				if (seriesId) {
-					await db.delete(recurringSeries).where(eq(recurringSeries.id, seriesId));
-					// Clear seriesId on master event
-					await db.update(event)
-						.set({ seriesId: null })
-						.where(eq(event.id, data.id));
-				}
+			const instances = await db.query.event.findMany({
+				where: (e, { eq, and, ne }) => and(
+					eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),
+					ne(e.id, data.id)
+				)
+			});
+			for (const inst of instances) {
+				await generateEventAssets(inst.id, origin);
 			}
 		}
 

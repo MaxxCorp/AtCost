@@ -12,6 +12,18 @@ import { env } from '$env/dynamic/private';
 export async function generateEventAssets(eventId: string, origin?: string) {
     const data = await db.query.event.findFirst({
         where: (table, { eq }) => eq(table.id, eventId),
+        with: {
+            locations: {
+                with: {
+                    location: true
+                }
+            },
+            contacts: {
+                with: {
+                    contact: true
+                }
+            }
+        }
     });
 
     if (!data) return;
@@ -26,7 +38,44 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     vevent.addPropertyWithValue('uid', data.iCalUID || eventId);
     vevent.addPropertyWithValue('summary', data.summary);
     if (data.description) vevent.addPropertyWithValue('description', data.description);
-    if (data.location) vevent.addPropertyWithValue('location', data.location);
+    
+    // Build location string from associations and free text
+    const locationParts: string[] = [];
+    if (data.location) locationParts.push(data.location);
+    
+    data.locations?.forEach((el: any) => {
+        const l = el.location;
+        if (l) {
+            let locStr = l.name;
+            if (l.roomId) locStr += ` (${l.roomId})`;
+            if (!locationParts.includes(locStr)) locationParts.push(locStr);
+        }
+    });
+
+    if (locationParts.length > 0) {
+        vevent.addPropertyWithValue('location', locationParts.join(', '));
+    }
+
+    // Add attendees from associations
+    data.contacts?.forEach((ec: any) => {
+        const c = ec.contact;
+        if (c) {
+            const name = c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim();
+            if (name) {
+                const attendee = vevent.addPropertyWithValue('attendee', 'MAILTO:no-reply@example.com');
+                attendee.setParameter('cn', name);
+                if (ec.participationStatus) {
+                    const statusMap: Record<string, string> = {
+                        'accepted': 'ACCEPTED',
+                        'declined': 'DECLINED',
+                        'tentative': 'TENTATIVE',
+                        'needsAction': 'NEEDS-ACTION'
+                    };
+                    attendee.setParameter('partstat', statusMap[ec.participationStatus] || 'NEEDS-ACTION');
+                }
+            }
+        }
+    });
 
     // Handle dates
     if (data.startDateTime) {
@@ -42,40 +91,18 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     vcalendar.addSubcomponent(vevent);
 
     const storage = getStorageProvider();
-    
-    // Create a robust slug for the summary
-    const summarySlug = data.summary
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
+    const summarySlug = data.summary.replace(/\s+/g, '_');
 
     const oldICalPath = data.iCalPath;
     const oldQRCodePath = data.qrCodePath;
 
-    // Use a timestamp in the filename for cache busting
-    const timestamp = Date.now();
-
     // iCal Upload
-    const iCalFileName = `events/${eventId}/event_${timestamp}.ics`;
+    const iCalFileName = `events/${eventId}/${summarySlug}.ics`;
     const iCalUrl = await storage.put(iCalFileName, vcalendar.toString(), 'text/calendar');
 
     // QR Code generation
-
-    let baseUrl = env.PUBLIC_BASE_URL || origin || "";
-    
-    // Fallback if still empty
-    if (!baseUrl) {
-        baseUrl = env.BETTER_AUTH_URL || "";
-    }
-
-    if (!baseUrl) {
-        console.warn(`[Assets] No PUBLIC_BASE_URL, BETTER_AUTH_URL or derivation origin found for event ${eventId}. QR code will have relative URL.`);
-    } else {
-        console.log(`[Assets] Using baseUrl: ${baseUrl} for event ${eventId}`);
-    }
-
-    const safeBaseUrl = baseUrl ? (baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl) : "";
-    const eventUrl = safeBaseUrl ? `${safeBaseUrl}/events/${eventId}/view` : `/events/${eventId}/view`;
+    const baseUrl = env.PUBLIC_BASE_URL || origin || "";
+    const eventUrl = `${baseUrl}/events/${eventId}/view`;
 
     // Generate QR as Buffer
     const qrBuffer = await QRCode.toBuffer(eventUrl, {
@@ -87,7 +114,7 @@ export async function generateEventAssets(eventId: string, origin?: string) {
         }
     });
 
-    const qrCodeFileName = `events/${eventId}/qr_${timestamp}.png`;
+    const qrCodeFileName = `events/${eventId}/qr.png`;
     const qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
 
     // Update paths in DB
