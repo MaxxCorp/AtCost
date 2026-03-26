@@ -42,13 +42,21 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     vcalendar.addSubcomponent(vevent);
 
     const storage = getStorageProvider();
-    const summarySlug = data.summary.replace(/\s+/g, '_');
+    
+    // Create a robust slug for the summary
+    const summarySlug = data.summary
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
 
     const oldICalPath = data.iCalPath;
     const oldQRCodePath = data.qrCodePath;
 
+    // Use a timestamp in the filename for cache busting
+    const timestamp = Date.now();
+
     // iCal Upload
-    const iCalFileName = `events/${eventId}/${summarySlug}.ics`;
+    const iCalFileName = `events/${eventId}/event_${timestamp}.ics`;
     const iCalUrl = await storage.put(iCalFileName, vcalendar.toString(), 'text/calendar');
 
     // QR Code generation
@@ -79,7 +87,7 @@ export async function generateEventAssets(eventId: string, origin?: string) {
         }
     });
 
-    const qrCodeFileName = `events/${eventId}/qr.png`;
+    const qrCodeFileName = `events/${eventId}/qr_${timestamp}.png`;
     const qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
 
     // Update paths in DB
