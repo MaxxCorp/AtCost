@@ -5,6 +5,8 @@ import { inArray, eq, and } from 'drizzle-orm';
 import { listEvents } from './list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
+import { syncService } from '$lib/server/sync/service';
+import { publishEventChange } from '$lib/server/realtime';
 
 import { getStorageProvider } from '$lib/server/blob-storage';
 
@@ -17,6 +19,9 @@ export const deleteEvents = command(v.array(v.string()), async (ids: string[]) =
 
   if (ids.length === 0) return { success: true };
 
+  // Trigger sync deletion first (before local event is gone)
+  await syncService.deleteEventMappings(user.id, ids);
+
   // Fetch events to get asset paths before deletion
   const eventsToDelete = await db.query.event.findMany({
     where: (table, { inArray }) => inArray(table.id, ids),
@@ -28,6 +33,9 @@ export const deleteEvents = command(v.array(v.string()), async (ids: string[]) =
   });
 
   await db.delete(event).where(inArray(event.id, ids));
+
+  // Notify of deletion
+  await publishEventChange('delete', ids);
 
   // Clean up assets from storage
   const storage = getStorageProvider();

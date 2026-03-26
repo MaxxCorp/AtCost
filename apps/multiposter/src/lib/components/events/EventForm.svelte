@@ -3,6 +3,7 @@
     import * as m from "$lib/paraglide/messages.js";
     import type { Event } from "../../../routes/events/list.remote";
     import { deleteEvents as deleteEventAction } from "../../../routes/events/[id]/delete.remote";
+    import { deleteSeries as deleteSeriesAction } from "../../../routes/events/[id]/delete-series.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
@@ -44,7 +45,8 @@
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
     import TagInput from "$lib/components/ui/TagInput.svelte";
     import { RRule } from "$lib/utils/rrule-compat";
-    import { CalendarClock, User, MapPin, ExternalLink } from "@lucide/svelte";
+    import { CalendarClock, User, MapPin, ExternalLink, Trash2, ChevronDown, RefreshCw } from "@lucide/svelte";
+    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
     let {
         remoteFunction,
@@ -214,6 +216,8 @@
 
     const hiddenRecurrenceRule = $derived(recurrenceRule ?? "");
     const hiddenTagsString = $derived(tagsString ?? "");
+
+    const isSeries = $derived(!!(initialData?.seriesId || initialData?.recurringEventId || (recurrenceRule && recurrenceRule.length > 0)));
 
 
 
@@ -387,21 +391,67 @@
             {isUpdating ? m.edit_item({ item: m.feature_events_title() }) : m.create_new({ item: m.feature_events_title() })}
         </h1>
         {#if isUpdating && initialData}
-            <AsyncButton
-                type="button"
-                variant="destructive"
-                loading={deleteEventAction.pending}
-                onclick={async () => {
-                    await handleDelete({
-                        ids: [initialData.id],
-                        deleteFn: deleteEventAction,
-                        itemName: m.event_label(),
-                    });
-                    goto("/events");
-                }}
-            >
-                {m.delete()}
-            </AsyncButton>
+            {#if isSeries}
+                <DropdownMenu.Root>
+                    <DropdownMenu.Trigger>
+                        <Button
+                            variant="destructive"
+                            class="flex items-center gap-2"
+                        >
+                            <Trash2 size={16} />
+                            {m.delete()}
+                            <ChevronDown size={14} />
+                        </Button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content align="end">
+                        <DropdownMenu.Item
+                            onclick={async () => {
+                                await handleDelete({
+                                    ids: [initialData.id],
+                                    deleteFn: deleteEventAction,
+                                    itemName: m.instance().toLowerCase(),
+                                });
+                                goto("/events");
+                            }}
+                        >
+                            <Trash2 size={14} class="mr-2" />
+                            {m.delete()} {m.instance()}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                            class="text-red-600"
+                            onclick={async () => {
+                                if (!confirm(m.delete_series_confirm())) return;
+                                try {
+                                    await deleteSeriesAction(initialData.id);
+                                    toast.success(m.series_deleted());
+                                    goto("/events");
+                                } catch (err: any) {
+                                    toast.error(err.message || "Failed to delete series");
+                                }
+                            }}
+                        >
+                            <RefreshCw size={14} class="mr-2" />
+                            {m.delete()} {m.series()}
+                        </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                </DropdownMenu.Root>
+            {:else}
+                <AsyncButton
+                    type="button"
+                    variant="destructive"
+                    loading={deleteEventAction.pending}
+                    onclick={async () => {
+                        await handleDelete({
+                            ids: [initialData.id],
+                            deleteFn: deleteEventAction,
+                            itemName: m.event_label(),
+                        });
+                        goto("/events");
+                    }}
+                >
+                    {m.delete()}
+                </AsyncButton>
+            {/if}
         {/if}
     </div>
 

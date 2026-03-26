@@ -87,18 +87,16 @@ export class EmailProvider implements SyncProvider {
 			throw new Error('User record not found');
 		}
 
-		// Get recipient email from config
-		const recipientEmail = this.config.settings?.recipientEmail;
-		if (!recipientEmail) {
-			throw new Error('Email provider requires recipientEmail in sync config settings');
+		// Get recipients (either from config or event contacts)
+		const recipients = await this.getRecipients(event);
+
+		if (recipients.length === 0) {
+			throw new Error('Email provider requires at least one recipient (either in sync config settings or from event contacts)');
 		}
 
 		// Generate email content and attachments
 		const emailContent = await this.generateEmailContent(event, userRecord);
 		const attachments = await this.generateAttachments(event, userRecord);
-
-		// Get recipient contacts
-		const recipients = await this.getRecipients(event);
 
 		// Create Brevo campaign
 		const campaignData = {
