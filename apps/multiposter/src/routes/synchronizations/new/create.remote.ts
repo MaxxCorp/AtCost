@@ -54,6 +54,7 @@ export const create = form(createSynchronizationSchema, async (input) => {
 
 		const insertData: any = {
 			userId: user.id,
+			name: input.name || input.providerId || 'Sync',
 			providerId: input.providerId,
 			providerType: input.providerType,
 			direction: input.direction,

@@ -273,23 +273,24 @@
 				<div class="space-y-4">
 					<div>
 						<label
-							for="providerId"
+							for="name"
 							class="block text-sm font-medium text-gray-700 mb-1"
 						>
 							Sync Name
 						</label>
 						<input
-							{...getField("providerId").as("text")}
+							{...getField("name").as("text")}
 							bind:value={providerId}
+							name="name"
 							placeholder="e.g., my-work-calendar"
 							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-								'providerId',
+								'name',
 							).issues()?.length ?? 0) > 0
 								? 'border-red-500'
 								: ''}"
 							onblur={() => create.validate()}
 						/>
-						{#each getField("providerId").issues() ?? [] as issue}
+						{#each getField("name").issues() ?? [] as issue}
 							<p class="text-xs text-red-600 mt-1">
 								{issue.message}
 							</p>

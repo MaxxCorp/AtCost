@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 
 export const synchronizationBaseSchema = v.object({
+    name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
     providerId: v.pipe(v.string(), v.minLength(1, 'Provider ID is required')),
     providerType: v.pipe(v.string(), v.minLength(1, 'Provider type is required')),
     direction: v.picklist(['pull', 'push', 'bidirectional']),
