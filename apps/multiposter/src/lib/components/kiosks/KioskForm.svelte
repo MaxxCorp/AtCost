@@ -295,7 +295,11 @@
                     >
                     <select
                         {...getField("uiMode").as("text")}
-                        bind:value={uiMode}
+                        value={uiMode}
+                        onchange={(e) => {
+                            uiMode = e.currentTarget.value;
+                            remoteFunction.validate();
+                        }}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="carousel">{m.carousel_full_screen()}</option>
@@ -311,7 +315,11 @@
                     >
                     <select
                         {...getField("rangeMode").as("text")}
-                        bind:value={rangeMode}
+                        value={rangeMode}
+                        onchange={(e) => {
+                            rangeMode = e.currentTarget.value as any;
+                            remoteFunction.validate();
+                        }}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="rolling">{m.rolling_window()}</option>
@@ -449,7 +457,11 @@
                     >
                     <input
                         {...getField("startDate").as("datetime-local")}
-                        bind:value={startDate}
+                        value={startDate}
+                        oninput={(e) => {
+                            startDate = e.currentTarget.value;
+                            remoteFunction.validate();
+                        }}
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
@@ -463,7 +475,11 @@
                     >
                     <input
                         {...getField("endDate").as("datetime-local")}
-                        bind:value={endDate}
+                        value={endDate}
+                        oninput={(e) => {
+                            endDate = e.currentTarget.value;
+                            remoteFunction.validate();
+                        }}
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />

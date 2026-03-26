@@ -172,17 +172,21 @@ export class EmailProvider implements SyncProvider {
 			throw new Error('Provider not initialized');
 		}
 
-		// Brevo webhooks are configured at the account level, not per campaign
-		// We'll create a webhook for email events if it doesn't exist
+		// Brevo webhooks require a public URL and won't work with localhost
+		if (callbackUrl.includes('localhost') || callbackUrl.includes('127.0.0.1')) {
+			throw new Error(`Brevo webhooks require a public URL. Your current URL is ${callbackUrl}. Please use a tunnel like Ngrok or deploy to a public server.`);
+		}
+
 		const webhookData = {
 			type: 'marketing',
-			events: ['delivered', 'opened', 'click', 'hardBounce', 'softBounce', 'spam', 'unsubscribed'],
+			events: ['sent', 'delivered', 'opened', 'clicked', 'hardBounce', 'softBounce', 'spam', 'unsubscribed'],
 			url: callbackUrl,
 			description: `Webhook for sync config ${this.config.id}`
 		};
-
+		console.log('[EmailProvider] Setting up Brevo webhook:', JSON.stringify(webhookData, null, 2));
 		try {
 			const response = await this.makeBrevoRequest('POST', '/webhooks', webhookData);
+			console.log('[EmailProvider] Brevo webhook setup response:', JSON.stringify(response, null, 2));
 
 			return {
 				syncConfigId: this.config.id,

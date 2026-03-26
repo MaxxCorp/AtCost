@@ -53,12 +53,21 @@ export async function generateEventAssets(eventId: string, origin?: string) {
 
     // QR Code generation
 
-    const baseUrl = env.PUBLIC_BASE_URL || origin || "";
+    let baseUrl = env.PUBLIC_BASE_URL || origin || "";
+    
+    // Fallback if still empty
     if (!baseUrl) {
-        console.warn(`[Assets] No PUBLIC_BASE_URL or derivation origin found for event ${eventId}. QR code will have relative URL.`);
+        baseUrl = env.BETTER_AUTH_URL || "";
     }
-    const safeBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const eventUrl = baseUrl ? `${safeBaseUrl}/events/${eventId}/view` : `/events/${eventId}/view`;
+
+    if (!baseUrl) {
+        console.warn(`[Assets] No PUBLIC_BASE_URL, BETTER_AUTH_URL or derivation origin found for event ${eventId}. QR code will have relative URL.`);
+    } else {
+        console.log(`[Assets] Using baseUrl: ${baseUrl} for event ${eventId}`);
+    }
+
+    const safeBaseUrl = baseUrl ? (baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl) : "";
+    const eventUrl = safeBaseUrl ? `${safeBaseUrl}/events/${eventId}/view` : `/events/${eventId}/view`;
 
     // Generate QR as Buffer
     const qrBuffer = await QRCode.toBuffer(eventUrl, {

@@ -142,6 +142,11 @@
             : associatedItems,
     );
 
+    $effect(() => {
+        // Keep associatedItems in sync with initialItems prop from parent
+        associatedItems = initialItems;
+    });
+
     onMount(async () => {
         if (isStandalone) {
             loadingItems = true;
