@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-const PORT = 4173;
+const PORT = 4175;
 const HOST = '127.0.0.1';
 
 export default defineConfig({

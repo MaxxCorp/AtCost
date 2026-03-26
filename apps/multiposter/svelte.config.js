@@ -14,7 +14,7 @@ const config = {
 		// Using Vercel adapter for deployment
 		adapter: adapter({
 			// Vercel configuration
-			runtime: 'nodejs20.x',
+			runtime: 'nodejs22.x',
 			// Split API routes from pages for better performance
 			split: false,
 			// Set maxDuration for all functions (free tier: 60s)

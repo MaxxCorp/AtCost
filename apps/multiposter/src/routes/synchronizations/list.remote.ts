@@ -12,6 +12,6 @@ export const list = query(async () => {
 		accessLevel: 'use',
 	});
 
-
+	console.log('--- listSynchronizations returning ---', configs.length);
 	return configs;
 });

@@ -11,8 +11,9 @@ import { list as listSynchronizations } from '../list.remote'; // New import
 
 
 export const create = form(createSynchronizationSchema, async (input) => {
-	console.log('--- createSynchronization START ---');
-	console.log('Data received:', JSON.stringify(input, null, 2));
+	console.log('--- createSynchronization START - VERSION 2 ---');
+	console.log('Input raw:', input);
+	console.log('Data received JSON:', JSON.stringify(input, null, 2));
 
 	try {
 		const user = getAuthenticatedUser();
@@ -55,7 +56,7 @@ export const create = form(createSynchronizationSchema, async (input) => {
 		const insertData: any = {
 			userId: user.id,
 			name: input.name || input.providerId || 'Sync',
-			providerId: input.providerId,
+			providerId: input.providerId || input.name,
 			providerType: input.providerType,
 			direction: input.direction,
 			enabled: true,
@@ -65,8 +66,8 @@ export const create = form(createSynchronizationSchema, async (input) => {
 			updatedAt: new Date()
 		};
 
-		console.log('Insert payload:', insertData);
-
+		console.log('Final insertData:', JSON.stringify(insertData, null, 2));
+		
 		const [config] = await db
 			.insert(syncConfig)
 			.values(insertData)
@@ -94,7 +95,10 @@ export const create = form(createSynchronizationSchema, async (input) => {
 		console.log('--- createSynchronization SUCCESS ---');
 		return { success: true, synchronization: config };
 	} catch (err: any) {
-		console.error('--- createSynchronization ERROR ---', err);
+		console.error('--- createSynchronization ERROR ---');
+		console.error('Error message:', err.message);
+		console.error('Error stack:', err.stack);
+		console.error('Error full:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
 		return { success: false, error: { message: err.message || 'Creation failed' } };
 	}
 });
