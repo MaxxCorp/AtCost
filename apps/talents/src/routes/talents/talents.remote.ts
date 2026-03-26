@@ -1,6 +1,6 @@
 import { query, form } from '$app/server';
 import { db } from '$lib/server/db';
-import { talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact } from '@ac/db';
+import { talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema } from '@ac/validations';
 import { eq, desc, inArray } from 'drizzle-orm';
@@ -27,22 +27,76 @@ export const listTalents = query(v.void_(), async () => {
         orderBy: [desc(talent.updatedAt)]
     });
 
-    return results.map(t => ({
-        ...t,
+
+    // Resolve linked users for each talent's contact
+    const contactIds = results.filter(t => t.contact != null).map(t => t.contact.id);
+    const userLinks = contactIds.length > 0
+        ? await db.select({ contactId: userContact.contactId, userId: userContact.userId })
+            .from(userContact)
+            .where(inArray(userContact.contactId, contactIds))
+        : [];
+    const linkedUsers = userLinks.length > 0
+        ? await db.select({ id: user.id, name: user.name, email: user.email })
+            .from(user)
+            .where(inArray(user.id, userLinks.map(ul => ul.userId)))
+        : [];
+
+    const userByContactId = new Map<string, { id: string; name: string; email: string }>();
+    for (const ul of userLinks) {
+        const u = linkedUsers.find(lu => lu.id === ul.userId);
+        if (u) userByContactId.set(ul.contactId, u);
+    }
+
+    return results.filter(t => t.contact != null).map(t => ({
+        id: t.id,
+        contactId: t.contactId,
+        status: t.status,
+        jobTitle: t.jobTitle,
+        salaryExpectation: t.salaryExpectation,
+        availabilityDate: t.availabilityDate?.toISOString() ?? null,
+        onboardingStatus: t.onboardingStatus,
+        resumeUrl: t.resumeUrl,
+        source: t.source,
+        internalNotes: t.internalNotes,
         createdAt: t.createdAt.toISOString(),
         updatedAt: t.updatedAt.toISOString(),
-        availabilityDate: t.availabilityDate?.toISOString(),
+        linkedUser: userByContactId.get(t.contact.id) ?? null,
         contact: {
-            ...t.contact,
+            id: t.contact.id,
+            displayName: t.contact.displayName,
+            givenName: t.contact.givenName,
+            familyName: t.contact.familyName,
+            company: t.contact.company,
+            role: t.contact.role,
+            department: t.contact.department,
+            birthday: t.contact.birthday?.toISOString() ?? null,
+            notes: t.contact.notes,
+            isPublic: t.contact.isPublic,
             createdAt: t.contact.createdAt.toISOString(),
             updatedAt: t.contact.updatedAt.toISOString(),
-            birthday: t.contact.birthday?.toISOString(),
             emails: t.contact.emails || [],
             phones: t.contact.phones || [],
             addresses: t.contact.addresses || [],
-            locationAssociations: t.contact.locationAssociations || [],
-            tags: t.contact.tags.map(ct => ct.tag.name)
-        }
+            locationAssociations: (t.contact.locationAssociations || []).map((la: any) => ({
+                locationId: la.locationId,
+                contactId: la.contactId,
+                location: la.location ? {
+                    id: la.location.id,
+                    name: la.location.name,
+                    roomId: la.location.roomId,
+                } : null,
+            })),
+            tags: (t.contact.tags || []).map((ct: any) => ct.tag?.name).filter(Boolean)
+        },
+        timelineEntries: (t.timelineEntries || []).map((te: any) => ({
+            id: te.id,
+            type: te.type,
+            title: te.title,
+            description: te.description,
+            date: te.date?.toISOString?.() ?? te.date,
+            timestamp: te.timestamp?.toISOString?.() ?? te.timestamp,
+            data: te.data,
+        })),
     }));
 });
 
@@ -69,22 +123,73 @@ export const readTalent = query(v.string(), async (id) => {
 
     if (!result) return null;
 
+    // Resolve linked user
+    const uc = await db.select({ userId: userContact.userId })
+        .from(userContact)
+        .where(eq(userContact.contactId, result.contact.id))
+        .limit(1);
+    let linkedUser: { id: string; name: string; email: string } | null = null;
+    if (uc[0]) {
+        const [u] = await db.select({ id: user.id, name: user.name, email: user.email })
+            .from(user)
+            .where(eq(user.id, uc[0].userId))
+            .limit(1);
+        if (u) linkedUser = u;
+    }
+
     return {
-        ...result,
+        id: result.id,
+        contactId: result.contactId,
+        status: result.status,
+        jobTitle: result.jobTitle,
+        salaryExpectation: result.salaryExpectation,
+        availabilityDate: result.availabilityDate?.toISOString() ?? null,
+        onboardingStatus: result.onboardingStatus,
+        resumeUrl: result.resumeUrl,
+        source: result.source,
+        internalNotes: result.internalNotes,
         createdAt: result.createdAt.toISOString(),
         updatedAt: result.updatedAt.toISOString(),
-        availabilityDate: result.availabilityDate?.toISOString(),
+        linkedUser,
         contact: {
-            ...result.contact,
+            id: result.contact.id,
+            displayName: result.contact.displayName,
+            givenName: result.contact.givenName,
+            familyName: result.contact.familyName,
+            company: result.contact.company,
+            role: result.contact.role,
+            department: result.contact.department,
+            birthday: result.contact.birthday?.toISOString() ?? null,
+            notes: result.contact.notes,
+            isPublic: result.contact.isPublic,
             createdAt: result.contact.createdAt.toISOString(),
             updatedAt: result.contact.updatedAt.toISOString(),
-            birthday: result.contact.birthday?.toISOString(),
             emails: result.contact.emails || [],
             phones: result.contact.phones || [],
             addresses: result.contact.addresses || [],
             locationAssociations: result.contact.locationAssociations || [],
-            tags: result.contact.tags.map(ct => ct.tag.name)
-        }
+            relations: (result.contact.relations || []).map((r: any) => ({
+                id: r.id,
+                targetContactId: r.targetContactId,
+                relationType: r.relationType,
+                targetContact: r.targetContact ? {
+                    id: r.targetContact.id,
+                    displayName: r.targetContact.displayName,
+                    givenName: r.targetContact.givenName,
+                    familyName: r.targetContact.familyName,
+                } : null,
+            })),
+            tags: (result.contact.tags || []).map((ct: any) => ct.tag?.name).filter(Boolean)
+        },
+        timelineEntries: (result.timelineEntries || []).map((te: any) => ({
+            id: te.id,
+            type: te.type,
+            title: te.title,
+            description: te.description,
+            date: te.date?.toISOString?.() ?? te.date,
+            timestamp: te.timestamp?.toISOString?.() ?? te.timestamp,
+            data: te.data,
+        })),
     };
 });
 
@@ -177,7 +282,7 @@ export const upsertTalent = form(unifiedTalentSchema as any, async (data: any) =
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
-    const { talent: talentData, contact: contactData, emailsJson, phonesJson, relationsJson, tagsJson, addressesJson, locationIdsJson } = data;
+    const { talent: talentData, contact: contactData, emailsJson, phonesJson, relationsJson, tagsJson, addressesJson, locationIdsJson, linkedUserId } = data;
     const emails = emailsJson ? JSON.parse(emailsJson) : [];
     const phones = phonesJson ? JSON.parse(phonesJson) : [];
     const relations = relationsJson ? JSON.parse(relationsJson) : [];
@@ -274,6 +379,15 @@ export const upsertTalent = form(unifiedTalentSchema as any, async (data: any) =
                 talentId = newTalent.id;
             }
 
+            // 4. Link User Account (userContact)
+            await tx.delete(userContact).where(eq(userContact.contactId, contactId));
+            if (linkedUserId) {
+                await tx.insert(userContact).values({
+                    userId: linkedUserId,
+                    contactId,
+                }).onConflictDoNothing();
+            }
+
             return { talentId, contactId };
         });
 
@@ -292,9 +406,7 @@ export const getMyTalentProfile = query(v.void_(), async () => {
     if (!authUser) return null;
 
     // Step 1: Get contact ID for user via userContact association
-    // We import userContact at the top now
-    const { userContact: ucTable } = await import('@ac/db');
-    const uc = await db.select().from(ucTable).where(eq(ucTable.userId, authUser.id)).limit(1);
+    const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
     if (!uc[0]) return null;
 
     // Step 2: Use readTalent with the found contact's linked talent
@@ -321,4 +433,14 @@ export const listEmployees = query(v.void_(), async () => {
         id: c.id,
         displayName: c.displayName || `${c.givenName} ${c.familyName}`
     }));
+});
+
+export const listSystemUsers = query(v.void_(), async () => {
+    ensureAccess(getAuthenticatedUser(), 'talents');
+    const results = await db.select({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+    }).from(user).orderBy(user.name);
+    return results;
 });

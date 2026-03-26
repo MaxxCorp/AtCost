@@ -57,7 +57,8 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     if (!baseUrl) {
         console.warn(`[Assets] No PUBLIC_BASE_URL or derivation origin found for event ${eventId}. QR code will have relative URL.`);
     }
-    const eventUrl = `${baseUrl}/events/${eventId}/view`;
+    const safeBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const eventUrl = baseUrl ? `${safeBaseUrl}/events/${eventId}/view` : `/events/${eventId}/view`;
 
     // Generate QR as Buffer
     const qrBuffer = await QRCode.toBuffer(eventUrl, {

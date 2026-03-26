@@ -18,7 +18,7 @@
     import { goto } from "$app/navigation";
     import { toast } from "svelte-sonner";
     import { onMount } from "svelte";
-    import { upsertTalent, listTalents } from "../../../routes/talents/talents.remote";
+    import { upsertTalent, listTalents, listSystemUsers } from "../../../routes/talents/talents.remote";
     import { unifiedTalentSchema, createLocationSchema, updateLocationSchema } from "@ac/validations";
     import { Button, AsyncButton, TagInput, ContactFields, EntityManager, handleDelete, LocationForm } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
@@ -109,6 +109,33 @@
         ),
     );
 
+    // --- State for Linked User Association ---
+    // svelte-ignore state_referenced_locally
+    let linkedUserId = $state(initialData.linkedUser?.id || "");
+    let systemUsers = $state<any[]>([]);
+    let autoLinked = $state(false);
+
+    onMount(async () => {
+        try {
+            systemUsers = await listSystemUsers();
+        } catch (e) {
+            console.error("Failed to load system users", e);
+        }
+    });
+
+    $effect(() => {
+        // Auto-match user by email for new talents
+        if (!initialData.id && !linkedUserId && !autoLinked && emails.length > 0 && emails[0].value && systemUsers.length > 0) {
+            const email = emails[0].value.toLowerCase();
+            const match = systemUsers.find(u => u.email?.toLowerCase() === email);
+            if (match) {
+                linkedUserId = match.id;
+                autoLinked = true;
+                toast.success(`Auto-linked user account: ${match.name}`);
+            }
+        }
+    });
+
     const emailsJson = $derived(JSON.stringify(emails.filter((e) => e.value)));
     const phonesJson = $derived(JSON.stringify(phones.filter((p) => p.value)));
     const relationsJson = $derived(JSON.stringify(relations.map(r => ({ targetContactId: r.targetContactId, relationType: r.relationType }))));
@@ -170,6 +197,7 @@
     <input {...getField("tagsJson").as("hidden", tagsJson)} />
     <input {...getField("addressesJson").as("hidden", addressesJson)} />
     <input {...getField("locationIdsJson").as("hidden", locationIdsJson)} />
+    <input {...getField("linkedUserId").as("hidden", linkedUserId)} />
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- LEFT: Contact Information (Shared UI) -->
@@ -260,6 +288,21 @@
                 </h3>
 
                 <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                        <label for="linkedUser" class="block text-xs font-semibold text-gray-600 mb-1">System User Account (Optional)</label>
+                        <select
+                            {...getField("linkedUserId").as("select")}
+                            bind:value={linkedUserId}
+                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        >
+                            <option value="">-- No linked account --</option>
+                            {#each systemUsers as su}
+                                <option value={su.id}>{su.name} ({su.email})</option>
+                            {/each}
+                        </select>
+                        <p class="text-[10px] text-gray-500 mt-1">Links this talent profile to a specific employee login account.</p>
+                    </div>
+
                     <div class="col-span-2">
                         <label for="jobTitle" class="block text-xs font-semibold text-gray-600 mb-1">Target Job Title</label>
                         <input

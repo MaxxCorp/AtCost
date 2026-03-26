@@ -10,15 +10,8 @@
         initialSelectedIds?: string[];
     } = $props();
 
-    let selectedIds = $state<string[]>([]);
-    let initialized = false;
-    $effect(() => {
-        // Sync initial data into local state once when it's available
-        if (!initialized && initialSelectedIds.length > 0) {
-            selectedIds = [...initialSelectedIds];
-            initialized = true;
-        }
-    });
+    // svelte-ignore state_referenced_locally
+    let selectedIds = $state<string[]>(initialSelectedIds?.length ? [...initialSelectedIds] : []);
     let configsPromise = list();
 
     function toggleConfig(id: string) {

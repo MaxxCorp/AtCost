@@ -177,6 +177,13 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 			tags: tagNames
 		});
 
+		// Determine origin for asset generation
+		let origin: string | undefined;
+		try {
+			const { getRequestEvent } = await import('$app/server');
+			origin = getRequestEvent()?.url.origin;
+		} catch (e) { /* ignore */ }
+
 		// Handle Recurrence Expansion/Update
 		// We only expand if recurrence rule is updated or present and we want to regenerate.
 		// If data.recurrence is provided, we assume strictly we need to handle instances.
@@ -195,13 +202,6 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 			}
 			// Also delete by legacy recurringEventId for backward compatibility
 			await db.delete(event).where(eq(event.recurringEventId, data.id));
-
-			// 2b. Handle series record
-			let origin: string | undefined;
-			try {
-				const { getRequestEvent } = await import('$app/server');
-				origin = getRequestEvent()?.url.origin;
-			} catch (e) { /* ignore */ }
 
 			// 2. Handle series record
 			let seriesId = updatedEvent.seriesId;
@@ -316,6 +316,7 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 				}
 			}
 		}
+
 
 		console.log('Regenerating assets for master event via update.remote...');
 		await generateEventAssets(data.id, origin);

@@ -160,8 +160,24 @@
     let tagsString = $state(tags.join(", "));
 
     // Resource and location state
-    let resourcesPromise = listResourcesWithHierarchy();
+    let locations = $state<Location[]>([]);
+    let resources = $state<ResourceWithHierarchy[]>([]);
+    let locationsLoaded = $state(false);
+    let resourcesLoaded = $state(false);
+
     let locationsPromise = listLocations();
+    let resourcesPromise = listResourcesWithHierarchy();
+
+    $effect(() => {
+        resourcesPromise.then((res) => {
+            resources = res as any;
+            resourcesLoaded = true;
+        });
+        locationsPromise.then((res) => {
+            locations = res as any;
+            locationsLoaded = true;
+        });
+    });
     // svelte-ignore state_referenced_locally
     let selectedResourceIds = $state<string[]>(initialData?.resourceIds || []);
     // svelte-ignore state_referenced_locally
@@ -204,8 +220,8 @@
     // Helper to find location ID from text (for initial matching)
     async function findInitialLocationId() {
         if (!initialData?.location) return "";
-        const locations = await locationsPromise;
-        const match = locations.find((l: Location) => {
+        const allLocs = await locationsPromise;
+        const match = allLocs.find((l: Location) => {
             const parts = [l.name];
             if (l.roomId) parts.push(l.roomId);
             // Simple check for start of string or full match
@@ -310,8 +326,8 @@
             selectedResourceIds = [...selectedResourceIds, resourceId];
             // Prefill location if empty
             if (selectedLocationIds.length === 0 && !useFreeTextLocation) {
-                const resources = await resourcesPromise;
-                const res = resources.find(
+                const allRes = await resourcesPromise;
+                const res = allRes.find(
                     (r: ResourceWithHierarchy) => r.id === resourceId,
                 );
                 if (
@@ -329,8 +345,8 @@
 
     async function onLocationSelect(id: string) {
         selectedLocationIds = [id];
-        const locations = await locationsPromise;
-        const l = locations.find((x: Location) => x.id === id);
+        const allLocs = await locationsPromise;
+        const l = allLocs.find((x: Location) => x.id === id);
         if (l) {
             const parts = [l.name];
             if (l.roomId) parts.push(l.roomId);
@@ -523,9 +539,9 @@
                 <span class="block text-sm font-medium text-gray-700 mb-2"
                     >{m.feature_resources_title()} ({m.optional()})</span
                 >
-                {#await resourcesPromise}
+                {#if !resourcesLoaded}
                     <p class="text-sm text-gray-500">{m.loading_item({ item: m.feature_resources_title().toLowerCase() })}</p>
-                {:then resources}
+                {:else}
                     <div
                         class="space-y-1 border rounded-md p-4 max-h-64 overflow-y-auto bg-gray-50"
                     >
@@ -559,7 +575,7 @@
                             </label>
                         {/each}
                     </div>
-                {/await}
+                {/if}
                 <input
                     {...getField("resourceIds").as(
                         "hidden",
@@ -637,11 +653,11 @@
                         onblur={() => remoteFunction.validate()}
                     />
                 {:else}
-                    {#await locationsPromise}
+                    {#if !locationsLoaded}
                         <p class="text-sm text-gray-500">
                             {m.loading_item({ item: m.feature_locations_title().toLowerCase() })}
                         </p>
-                    {:then locations}
+                    {:else}
                         <!-- Using Multi-Location Selector -->
                         <EntityManager
                             title={m.feature_locations_title()}
@@ -703,7 +719,7 @@
                             {/snippet}
                         </EntityManager>
                         <!-- Populate freeTextLocation based on selection if needed, or leave independent -->
-                    {/await}
+                    {/if}
                 {/if}
                 <input
                     {...getField("locationIds").as(

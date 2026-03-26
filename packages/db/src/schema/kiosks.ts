@@ -16,6 +16,7 @@ export const kiosk = pgTable("kiosk", {
     lookAhead: integer("look_ahead").default(604800).notNull(), // 7 days in seconds
     lookPast: integer("look_past").default(86400).notNull(), // 1 day in seconds
     loopDuration: integer("loop_duration").default(30).notNull(),
+    uiMode: text("ui_mode", { enum: ["carousel", "table"] }).default("carousel").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

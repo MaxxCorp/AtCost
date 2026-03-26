@@ -35,19 +35,29 @@ export const updateTalentSchema = v.intersect([
 ]);
 
 export const unifiedTalentSchema = v.object({
-    talent: v.intersect([
-        v.object({ id: v.optional(v.string()) }),
-        createTalentSchema
-    ]),
+    talent: v.object({
+        id: v.optional(v.string()),
+        contactId: v.optional(v.string()),
+        status: v.optional(v.picklist(["active", "inactive", "applicant"]), "applicant"),
+        jobTitle: v.optional(v.string()),
+        salaryExpectation: v.optional(v.string()),
+        availabilityDate: v.optional(v.string()),
+        onboardingStatus: v.optional(v.string()),
+        resumeUrl: v.optional(v.string()),
+        source: v.optional(v.string()),
+        internalNotes: v.optional(v.string()),
+    }),
     contact: v.object({
         id: v.optional(v.string()),
         displayName: v.pipe(v.string(), v.minLength(1)),
         givenName: v.optional(v.string()),
         familyName: v.optional(v.string()),
         birthday: v.optional(v.string()),
+        company: v.optional(v.string()),
         role: v.optional(v.string()),
         department: v.optional(v.string()),
         notes: v.optional(v.string()),
+        isPublic: v.optional(v.union([v.boolean(), v.string()])),
         emails: v.optional(v.array(v.omit(emailSchemaPure, ['id']))),
         phones: v.optional(v.array(v.omit(phoneSchemaPure, ['id']))),
         addresses: v.optional(v.array(v.omit(addressSchemaPure, ['id']))),
@@ -59,6 +69,9 @@ export const unifiedTalentSchema = v.object({
     phonesJson: v.optional(v.string()),
     relationsJson: v.optional(v.string()),
     tagsJson: v.optional(v.string()),
+    addressesJson: v.optional(v.string()),
+    locationIdsJson: v.optional(v.string()),
+    linkedUserId: v.optional(v.string()),
 });
 
 export const timeOffRequestSchema = v.object({
