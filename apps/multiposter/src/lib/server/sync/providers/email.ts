@@ -78,9 +78,8 @@ export class EmailProvider implements SyncProvider {
 		}
 
 		// Get user record for sender info
-		const user = getAuthenticatedUser();
 		const userRecord = await db.query.user.findFirst({
-			where: (u, { eq }) => eq(u.id, user.id)
+			where: (u, { eq }) => eq(u.id, this.config!.userId)
 		});
 
 		if (!userRecord) {

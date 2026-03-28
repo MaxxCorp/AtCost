@@ -37,6 +37,16 @@ export const cmsContentVersion = pgTable("cms_content_version", {
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const cmsMedia = pgTable("cms_media", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    url: text("url").notNull(),
+    path: text("path").notNull(),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    userId: text("user_id").references(() => user.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type CmsPage = typeof cmsPage.$inferSelect;
 export type NewCmsPage = typeof cmsPage.$inferInsert;
 export type CmsBlock = typeof cmsBlock.$inferSelect;
@@ -45,3 +55,5 @@ export type CmsSlot = typeof cmsSlot.$inferSelect;
 export type NewCmsSlot = typeof cmsSlot.$inferInsert;
 export type CmsContentVersion = typeof cmsContentVersion.$inferSelect;
 export type NewCmsContentVersion = typeof cmsContentVersion.$inferInsert;
+export type CmsMedia = typeof cmsMedia.$inferSelect;
+export type NewCmsMedia = typeof cmsMedia.$inferInsert;

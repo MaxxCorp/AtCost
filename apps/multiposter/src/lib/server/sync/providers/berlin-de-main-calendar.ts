@@ -50,14 +50,7 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 
 		// Set form URL based on environment
 
-		const isDevelopment = env.NODE_ENV === 'development' || !env.NODE_ENV;
-		if (isDevelopment) {
-			// In development, use internal testing endpoint
-			this.formUrl = 'http://localhost:5173/testing/api/berlin-de';
-		} else {
-			// In production, use Berlin.de
-			this.formUrl = 'https://www.berlin.de/tickets/6226271-2789889-datenerfassung.html';
-		}
+		this.formUrl = config.settings?.formUrl || 'https://www.berlin.de/tickets/6226271-2789889-datenerfassung.html';
 
 		// Override form URL if specified in settings
 		if (config.settings?.formUrl) {

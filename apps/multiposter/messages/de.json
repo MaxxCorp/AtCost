@@ -152,6 +152,7 @@
 	"get_started_creating": "Beginnen Sie mit der Erstellung Ihres ersten {item}",
 	"create_first": "Erstellen Sie Ihr erstes {item}",
 	"summary": "Zusammenfassung",
+	"hero_image": "Titelbild",
 	"description": "Beschreibung",
 	"location": "Standort",
 	"locations_label": "Standorte",

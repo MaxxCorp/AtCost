@@ -8,8 +8,6 @@ import type {
 import { resolveEventContact } from '$lib/server/contact-resolution';
 import { env } from '$env/dynamic/private';
 
-const BASE_URL = 'https://www.berlin.de/land/kalender/admin/index.php';
-
 /**
  * Berlin.de Marzahn-Hellersdorf Calendar sync provider
  * Pushes events to the Berlin.de Kalender admin panel for the MH district.
@@ -26,6 +24,10 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
 
     private config?: SyncConfig;
     private sessionCookie?: string;
+
+    private get baseUrl(): string {
+        return env.BERLIN_DE_MH_API_URL || 'https://www.berlin.de/land/kalender/admin/index.php';
+    }
 
     async initialize(config: SyncConfig): Promise<void> {
         this.config = config;
@@ -99,18 +101,20 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             loginusergroup: '0'
         });
 
-        const response = await fetch(BASE_URL, {
+        const loginUrl = `${this.baseUrl}?access=login`;
+
+        const response = await fetch(loginUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'AC-Multiposter/1.0'
+                'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: body.toString(),
+            body: body,
             redirect: 'manual' // capture Set-Cookie before redirect
         });
-
+        
         // Collect session cookie from response headers
         const setCookies = response.headers.getSetCookie?.() ?? [];
+        
         const cookieParts: string[] = [];
         for (const sc of setCookies) {
             const name = sc.split(';')[0];
@@ -192,28 +196,22 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     private async createEvent(): Promise<string> {
         // Navigate to action=new to create a blank event
         const response = await this.authedFetch(
-            `${BASE_URL}?modul=veranstaltungen&action=new`
+            `${this.baseUrl}?modul=veranstaltungen&action=new`
         );
 
         // After creation, the URL contains editid=XXXXX
         const finalUrl = response.url || '';
-        const editIdMatch = finalUrl.match(/editid=(\d+)/);
+        const editIdMatch = finalUrl.match(/editid=([^&]+)/);
 
         if (!editIdMatch) {
-            // Try to extract from response body as fallback
-            const body = await response.text();
-            const bodyMatch = body.match(/editid=(\d+)/);
-            if (!bodyMatch) {
-                throw new Error('Berlin.de MH Calendar: failed to create event â€” no editid in response');
-            }
-            return bodyMatch[1];
+            throw new Error('Berlin.de MH Calendar: failed to create event â€” no editid in response');
         }
 
         return editIdMatch[1];
     }
 
     private editUrl(editId: string, editAction: string): string {
-        return `${BASE_URL}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=${editAction}`;
+        return `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=${editAction}`;
     }
 
     /**

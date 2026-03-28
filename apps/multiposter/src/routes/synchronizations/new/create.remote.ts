@@ -48,6 +48,10 @@ export const create = form(createSynchronizationSchema, async (input) => {
 				refreshToken: userAccount.refreshToken,
 				expiresAt: userAccount.accessTokenExpiresAt?.getTime()
 			};
+		} else if (input.credentials) {
+			// Direct credentials (username/password)
+			credentials = typeof input.credentials === 'string' ? JSON.parse(input.credentials) : input.credentials;
+			console.log('Using direct credentials from input');
 		}
 
 		// Create sync config

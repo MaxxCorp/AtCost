@@ -3,6 +3,8 @@ import { error } from '@sveltejs/kit';
 import { getStorageProvider } from '$lib/server/blob-storage';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { uploadImageSchema } from '$lib/validations/cms';
+import { db } from '$lib/server/db';
+import { cmsMedia } from '@ac/db';
 
 export const uploadMedia = command(uploadImageSchema, async (data) => {
     try {
@@ -30,8 +32,18 @@ export const uploadMedia = command(uploadImageSchema, async (data) => {
         const provider = getStorageProvider();
         const url = await provider.put(path, buffer, contentType);
 
+        // Save to database
+        const [record] = await db.insert(cmsMedia).values({
+            url,
+            path,
+            filename,
+            contentType,
+            userId: user.id
+        }).returning();
+
         return {
             success: true,
+            id: record.id,
             urls: {
                 default: url
             }

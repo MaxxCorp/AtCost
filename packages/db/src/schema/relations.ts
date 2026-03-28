@@ -8,7 +8,7 @@ import { announcement, announcementContact, announcementTag, announcementLocatio
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
 import { syncConfig, syncOperation, syncMapping, webhookSubscription } from "./sync";
-import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion } from "./cms";
+import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion, cmsMedia } from "./cms";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -252,6 +252,10 @@ export const cmsSlotRelations = relations(cmsSlot, ({ one }) => ({
 export const cmsContentVersionRelations = relations(cmsContentVersion, ({ one }) => ({
     block: one(cmsBlock, { fields: [cmsContentVersion.blockId], references: [cmsBlock.id] }),
     author: one(user, { fields: [cmsContentVersion.createdBy], references: [user.id] }),
+}));
+
+export const cmsMediaRelations = relations(cmsMedia, ({ one }) => ({
+    user: one(user, { fields: [cmsMedia.userId], references: [user.id] }),
 }));
 
 export const campaignRelations = relations(campaign, ({ many, one }) => ({

@@ -56,3 +56,18 @@ export const uploadImageSchema = v.object({
     contentType: v.string(),
     content: v.string(), // Base64 string
 });
+
+/**
+ * Validates image deletion
+ */
+export const deleteImageSchema = v.object({
+    id: v.pipe(v.string(), v.uuid('Invalid image ID')),
+});
+
+/**
+ * Validates image metadata update
+ */
+export const updateImageSchema = v.object({
+    id: v.pipe(v.string(), v.uuid('Invalid image ID')),
+    filename: v.pipe(v.string(), v.minLength(1, 'Filename required')),
+});

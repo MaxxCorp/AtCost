@@ -15,13 +15,18 @@ import * as v from 'valibot';
  * - If event is private: only authenticated users with 'events' access can view
  */
 export const readEvent = query(v.string(), async (eventId: string): Promise<Event | null> => {
+	console.log(`[readEvent] Fetching event ${eventId}`);
 	// First, fetch the event to check if it's public
 	const [result] = await db
 		.select()
 		.from(event)
 		.where(eq(event.id, eventId));
 
-	if (!result) return null;
+	if (!result) {
+		console.log(`[readEvent] Event ${eventId} not found`);
+		return null;
+	}
+	console.log(`[readEvent] Found event: ${result.summary}`);
 
 	// Check access based on public flag
 	const user = getOptionalUser();
@@ -30,13 +35,16 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	if (!result.isPublic) {
 		// Private event: require authentication and authorization
 		if (!user) {
+			console.log(`[readEvent] Forbidden: No user`);
 			error(403, 'Authentication required to view this event');
 		}
 		if (!isAuthorized) {
+			console.log(`[readEvent] Forbidden: Not authorized`);
 			error(403, 'You do not have permission to view this event');
 		}
 	}
 
+	console.log(`[readEvent] Fetching resources, contacts, locations...`);
 	// Fetch related resources and contacts
 	const resources = await db
 		.select({ id: eventResource.resourceId })
@@ -71,6 +79,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		.innerJoin(location, eq(eventLocation.locationId, location.id))
 		.where(eq(eventLocation.eventId, eventId));
 
+	console.log(`[readEvent] Resolving contact info...`);
 	// Resolve primary contact details
 	let resolvedContact = null;
 
@@ -157,6 +166,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		resolvedContact = await fetchContactInfo(chosenContactId);
 	}
 
+	console.log(`[readEvent] Fetching tags and campaign...`);
 	// Fetch tags
 	const tags = await db
 		.select({ name: tag.name })
@@ -176,7 +186,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		}
 	}
 
-	return {
+	console.log(`[readEvent] Constructing final object...`);
+	const finalResult = {
 		...result,
 		createdAt: result.createdAt.toISOString(),
 		updatedAt: result.updatedAt.toISOString(),
@@ -194,4 +205,6 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		syncIds,
 		resolvedContact,
 	} as Event;
+	console.log(`[readEvent] Done.`);
+	return finalResult;
 });

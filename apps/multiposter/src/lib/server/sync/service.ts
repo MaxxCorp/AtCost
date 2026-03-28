@@ -18,9 +18,6 @@ import {
 	announcementLocation as announcementLocation,
 	announcementTag as announcementTag,
 	eventContact as eventContactTable,
-
-
-
 	tag as tagTable,
 	contactTag as contactTagTable,
 	user as userTable,
@@ -43,7 +40,6 @@ import { MeetupProvider } from './providers/meetup';
 import { SeniorennetzBerlinProvider } from './providers/seniorennetz-berlin';
 import { BewegungsatlasBerlinProvider } from './providers/bewegungsatlas-berlin';
 import { EmailProvider } from './providers/email';
-import crypto from 'crypto';
 import { env } from '$env/dynamic/private';
 import { publishEventChange } from '../realtime';
 
@@ -985,9 +981,9 @@ export class SyncService {
 			if (!url) return undefined;
 			if (url.startsWith('http')) return url;
 			// Use env.BETTER_AUTH_URL if available (from imports)
-			const authUrl = (typeof env !== 'undefined' && (env as any).BETTER_AUTH_URL) || 
-							(typeof process !== 'undefined' && process.env?.BETTER_AUTH_URL) || 
-							'http://localhost:5173';
+			const authUrl = (typeof env !== 'undefined' && (env as any).BETTER_AUTH_URL) ||
+				(typeof process !== 'undefined' && process.env?.BETTER_AUTH_URL) ||
+				'http://localhost:5173';
 			return `${authUrl}${url.startsWith('/') ? '' : '/'}${url}`;
 		};
 
@@ -1065,13 +1061,7 @@ export class SyncService {
 		return now;
 	}
 
-	/**
-	 * Sync specific items to all configured bidirectional or push sync providers
-	 * Used after create/update/delete operations to immediately push changes
-	 */
 	async syncItems(userId: string, itemIds: string[], entityType: 'event' | 'announcement' = 'event'): Promise<void> {
-
-
 		try {
 			// Get all enabled sync configs that support push (Global sweep)
 			const pushConfigs = await db
@@ -1080,15 +1070,6 @@ export class SyncService {
 				.where(
 					eq(syncConfigTable.enabled, true)
 				);
-
-			if (pushConfigs.length === 0) {
-				console.log(`[SyncService] No push/bidirectional configs found in the system.`);
-				return;
-			}
-
-			console.log(`[SyncService] Found ${pushConfigs.length} push configs. Processing ${entityType}Ids:`, itemIds);
-
-
 
 			for (const configRow of pushConfigs) {
 				const config = this.rowToConfig(configRow);

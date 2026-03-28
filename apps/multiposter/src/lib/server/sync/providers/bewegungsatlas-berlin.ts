@@ -68,9 +68,8 @@ export class BewegungsatlasBerlinProvider implements SyncProvider {
 		await this.ensureAuthenticated();
 
 		// Get user record for contact info fallback
-		const user = getAuthenticatedUser();
 		const userRecord = await db.query.user.findFirst({
-			where: (u, { eq }) => eq(u.id, user.id)
+			where: (u, { eq }) => eq(u.id, this.config!.userId)
 		});
 
 		if (!userRecord) {

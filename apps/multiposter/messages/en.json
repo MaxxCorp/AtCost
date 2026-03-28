@@ -152,6 +152,7 @@
 	"get_started_creating": "Get started by creating your first {item}",
 	"create_first": "Create Your First {item}",
 	"summary": "Summary",
+	"hero_image": "Hero Image",
 	"description": "Description",
 	"location": "Location",
 	"locations_label": "Locations",

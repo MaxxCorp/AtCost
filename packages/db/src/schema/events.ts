@@ -44,6 +44,7 @@ export const event = pgTable("event", {
     qrCodePath: text("qrcode_path"),
     iCalPath: text("ical_path"),
     iCalUID: text("ical_uid"),
+    heroImage: text("hero_image"),
     attendees: jsonb("attendees"),
     reminders: jsonb("reminders").$type<{ useDefault?: boolean; overrides?: any[] }>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

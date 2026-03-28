@@ -113,6 +113,7 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 		if (data.guestsCanInviteOthers !== undefined) updateData.guestsCanInviteOthers = data.guestsCanInviteOthers === 'true';
 		if (data.guestsCanModify !== undefined) updateData.guestsCanModify = data.guestsCanModify === 'true';
 		if (data.guestsCanSeeOtherGuests !== undefined) updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true';
+		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
@@ -128,8 +129,10 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 			}
 
 			// Handle SyncIds & Campaign update
+			console.log(`[Update Remote] Received syncIds:`, data.syncIds);
 			if (data.syncIds !== undefined) {
 				const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
+				console.log(`[Update Remote] Parsed syncIds:`, syncIds);
 				if (updatedEvent.campaignId) {
 					await tx.update(campaign).set({
 						content: { syncIds },

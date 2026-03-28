@@ -54,6 +54,7 @@ export const eventBaseSchema = v.object({
 	tags: v.optional(v.string()),
 	syncIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	status: v.optional(v.string()),
+	heroImage: v.optional(v.string()),
 });
 
 /**

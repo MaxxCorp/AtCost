@@ -42,6 +42,7 @@
     } from "$lib/validations/locations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
+    import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
     import TagInput from "$lib/components/ui/TagInput.svelte";
     import { RRule } from "$lib/utils/rrule-compat";
@@ -120,12 +121,21 @@
     const initialEnd = getInitialEndDateTime(startParsed, endParsed, localNow);
 
     function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
+        if (!(remoteFunction as any).fields) {
+            console.warn(`[EventForm] remoteFunction.fields is missing!`);
+            return {};
+        }
         const parts = name.split(".");
         let current = (remoteFunction as any).fields;
         for (const part of parts) {
-            if (!current) return {};
+            if (!current) {
+                console.warn(`[EventForm] field ${name} part ${part} is missing!`);
+                return {};
+            }
             current = current[part];
+        }
+        if (!current) {
+            console.warn(`[EventForm] field ${name} is missing!`);
         }
         return current || {};
     }
@@ -160,6 +170,8 @@
     let tags = $state<string[]>(initialData?.tags || []);
     // svelte-ignore state_referenced_locally
     let tagsString = $state(tags.join(", "));
+    // svelte-ignore state_referenced_locally
+    let heroImage = $state(initialData?.heroImage ?? "");
 
     // Resource and location state
     let locations = $state<Location[]>([]);
@@ -514,6 +526,9 @@
                 guestsCanSeeOtherGuests.toString(),
             )}
         />
+        {#if heroImage}
+            <input {...getField("heroImage").as("hidden", heroImage)} />
+        {/if}
 
         <!-- Recurrence Hidden Input -->
         {#if recurrenceRule}
@@ -577,6 +592,8 @@
                     <option value="cancelled">{m.cancelled()}</option>
                 </select>
             </div>
+
+            <ImageUploader bind:value={heroImage} label={m.hero_image()} />
 
             <div>
                 <label
