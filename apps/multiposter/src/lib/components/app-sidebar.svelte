@@ -8,10 +8,10 @@
 	import { authClient } from "$lib/auth";
 	import { onMount } from "svelte";
 	import { ICONS } from "$lib/icons";
-	import FileTextIcon from "@lucide/svelte/icons/file-text";
-	import LayersIcon from "@lucide/svelte/icons/layers";
-	import LogInIcon from "@lucide/svelte/icons/log-in";
-	import UserPlusIcon from "@lucide/svelte/icons/user-plus";
+	import FileTextIcon from "$lib/components/icons/file-text.svelte";
+	import LayersIcon from "$lib/components/icons/layers.svelte";
+	import LogInIcon from "$lib/components/icons/log-in.svelte";
+	import UserPlusIcon from "$lib/components/icons/user-plus.svelte";
 	import * as m from "$lib/paraglide/messages.js";
 	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
 

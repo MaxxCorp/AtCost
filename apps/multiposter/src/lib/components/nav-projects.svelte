@@ -2,10 +2,10 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import { useSidebar } from "$lib/components/ui/sidebar/context.svelte.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
-	import FolderIcon from "@lucide/svelte/icons/folder";
-	import ForwardIcon from "@lucide/svelte/icons/forward";
-	import Trash2Icon from "@lucide/svelte/icons/trash-2";
+	import EllipsisIcon from "$lib/components/icons/ellipsis.svelte";
+	import FolderIcon from "$lib/components/icons/folder.svelte";
+	import ForwardIcon from "$lib/components/icons/forward.svelte";
+	import Trash2Icon from "$lib/components/icons/trash-2.svelte";
 
 	let {
 		projects,

@@ -7,7 +7,8 @@
     } from "../../../routes/synchronizations/[id]/webhook.remote";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Bell, BellOff } from "@lucide/svelte";
+    import Bell from "$lib/components/icons/bell.svelte";
+    import BellOff from "$lib/components/icons/bell-off.svelte";
     import { invalidateAll } from "$app/navigation";
 
     let { configId, providerType, direction } = $props<{

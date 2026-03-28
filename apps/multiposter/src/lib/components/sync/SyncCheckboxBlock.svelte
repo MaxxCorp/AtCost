@@ -1,6 +1,6 @@
 <script lang="ts">
     import { list } from "../../../routes/synchronizations/list.remote";
-    import { RefreshCw } from "@lucide/svelte";
+    import RefreshCw from "$lib/components/icons/refresh-cw.svelte";
     
     let {
         syncFieldConfig,

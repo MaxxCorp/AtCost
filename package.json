@@ -14,8 +14,7 @@
         "typescript": "^6.0.2"
     },
     "overrides": {
-        "@tailwindcss/vite": {
-            "vite": "^8"
-        }
+        "typescript": "^6.0.2",
+        "vite": "^8.0.0"
     }
 }

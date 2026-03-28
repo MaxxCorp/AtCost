@@ -989,14 +989,23 @@ export class SyncService {
 
 		// Map Image (First Attachment)
 		let image: ExternalEvent['image'] | undefined;
-		const attachments = internal.attachments || [];
-		if (attachments.length > 0) {
-			const firstAttachment = attachments[0];
-			if (firstAttachment.fileUrl) {
-				image = {
-					url: resolveUrl(firstAttachment.fileUrl)!,
-					title: firstAttachment.title || summary
-				};
+
+		// Fallback: prefer heroImage field over attachments
+		if (internal.heroImage) {
+			image = {
+				url: resolveUrl(internal.heroImage)!,
+				title: summary
+			};
+		} else {
+			const attachments = internal.attachments || [];
+			if (attachments.length > 0) {
+				const firstAttachment = attachments[0];
+				if (firstAttachment.fileUrl) {
+					image = {
+						url: resolveUrl(firstAttachment.fileUrl)!,
+						title: firstAttachment.title || summary
+					};
+				}
 			}
 		}
 
@@ -1045,7 +1054,8 @@ export class SyncService {
 				seriesId: (internal as any).seriesId ?? undefined,
 				app_event_id: internal.id,
 				organizerId: organizerId,
-				locationId: venueId
+				locationId: venueId,
+				categoryBerlinDotDe: internal.categoryBerlinDotDe ?? undefined
 			}
 		};
 
