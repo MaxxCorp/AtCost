@@ -10,53 +10,13 @@
 		Mail,
 		Users,
 		MapPin,
+		Search,
 	} from "@lucide/svelte";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import { toast } from "svelte-sonner";
-
-	let selectedProvider = $state<
-		| "google-calendar"
-		| "microsoft-calendar"
-		| "berlin-de-main-calendar"
-		| "berlin-de-mh-calendar"
-		| "wp-the-events-calendar"
-		| "eventbrite"
-		| "meetup"
-		| "seniorennetz-berlin"
-		| "bewegungsatlas-berlin"
-		| "email"
-		| null
-	>(null);
-	let providerId = $state("");
-	let direction = $state<"pull" | "push" | "bidirectional">("bidirectional");
-	let calendarId = $state("primary");
-	let syncIntervalMinutes = $state(60);
-	let company = $state("");
-	let fieldMappings = $state<Record<string, string>>({});
-	let wpBaseUrl = $state("");
-	let wpUsername = $state("");
-	let wpAppPassword = $state("");
-	let mhUsername = $state("");
-	let mhPassword = $state("");
-
-	// Set default direction based on provider
-	$effect(() => {
-		if (
-			selectedProvider === "berlin-de-main-calendar" ||
-			selectedProvider === "berlin-de-mh-calendar" ||
-			selectedProvider === "wp-the-events-calendar" ||
-			selectedProvider === "eventbrite" ||
-			selectedProvider === "meetup" ||
-			selectedProvider === "seniorennetz-berlin" ||
-			selectedProvider === "bewegungsatlas-berlin" ||
-			selectedProvider === "email"
-		) {
-			direction = "push";
-		}
-	});
-
+ 
 	const providers = [
 		{
 			id: "google-calendar" as const,
@@ -129,6 +89,13 @@
 			icon: Mail,
 			available: true,
 		},
+		{
+			id: "nebenan-de" as const,
+			name: "Nebenan.de",
+			description: "Push events to Nebenan.de organisation profile",
+			icon: Users,
+			available: true,
+		},
 	];
 
 	const directions = [
@@ -151,6 +118,60 @@
 			icon: ArrowLeftRight,
 		},
 	];
+
+	let selectedProvider = $state<
+		| "google-calendar"
+		| "microsoft-calendar"
+		| "berlin-de-main-calendar"
+		| "berlin-de-mh-calendar"
+		| "wp-the-events-calendar"
+		| "eventbrite"
+		| "meetup"
+		| "seniorennetz-berlin"
+		| "bewegungsatlas-berlin"
+		| "email"
+		| "nebenan-de"
+		| null
+	>(null);
+	let searchTerm = $state("");
+	let filteredProviders = $derived(
+		providers.filter((p) =>
+			p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+			p.description.toLowerCase().includes(searchTerm.toLowerCase())
+		)
+	);
+	let providerId = $state("");
+	let direction = $state<"pull" | "push" | "bidirectional">("bidirectional");
+	let calendarId = $state("primary");
+	let syncIntervalMinutes = $state(60);
+	let company = $state("");
+	let fieldMappings = $state<Record<string, string>>({});
+	let wpBaseUrl = $state("");
+	let wpUsername = $state("");
+	let wpAppPassword = $state("");
+	let mhUsername = $state("");
+	let mhPassword = $state("");
+
+	// Set default direction based on provider
+	$effect(() => {
+		if (
+			selectedProvider === "berlin-de-main-calendar" ||
+			selectedProvider === "berlin-de-mh-calendar" ||
+			selectedProvider === "wp-the-events-calendar" ||
+			selectedProvider === "eventbrite" ||
+			selectedProvider === "meetup" ||
+			selectedProvider === "seniorennetz-berlin" ||
+			selectedProvider === "bewegungsatlas-berlin" ||
+			selectedProvider === "email" ||
+			selectedProvider === "nebenan-de"
+		) {
+			direction = "push";
+		}
+	});
+
+
+
+
 
 	function getField(name: string): any {
 		if (!(create as any).fields) return {};
@@ -218,14 +239,30 @@
 
 		<!-- Provider Selection -->
 		<div class="bg-white shadow rounded-lg p-6 space-y-4">
-			<h2 class="text-xl font-semibold mb-4">Select Calendar Provider</h2>
-			<div class="grid gap-4 md:grid-cols-2">
-				{#each providers as provider}
+			<div
+				class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4"
+			>
+				<h2 class="text-xl font-semibold">Select Calendar Provider</h2>
+				<div class="relative w-full md:w-64">
+					<Search
+						class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+					/>
+					<input
+						type="text"
+						bind:value={searchTerm}
+						placeholder="Filter providers..."
+						class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+					/>
+				</div>
+			</div>
+
+			<div class="grid gap-3 grid-cols-2 lg:grid-cols-3">
+				{#each filteredProviders as provider}
 					{@const Icon = provider.icon}
 					<button
 						type="button"
 						disabled={!provider.available}
-						class="text-left p-4 rounded-lg border-2 transition-all {selectedProvider ===
+						class="text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 {selectedProvider ===
 						provider.id
 							? 'border-blue-600 bg-blue-50'
 							: provider.available
@@ -235,34 +272,40 @@
 							provider.available &&
 							(selectedProvider = provider.id)}
 					>
-						<div class="flex items-start gap-3">
-							<div
-								class="rounded-lg p-2 {selectedProvider ===
-								provider.id
-									? 'bg-blue-200'
-									: 'bg-gray-100'}"
+						<div
+							class="rounded-lg p-1.5 shrink-0 {selectedProvider ===
+							provider.id
+								? 'bg-blue-200'
+								: 'bg-gray-100'}"
+						>
+							<Icon
+								class="h-5 w-5 {selectedProvider === provider.id
+									? 'text-blue-600'
+									: 'text-gray-600'}"
+							/>
+						</div>
+						<div class="flex-1 min-w-0">
+							<h3
+								class="font-semibold text-sm truncate"
+								title={provider.name}
 							>
-								<Icon
-									class="h-6 w-6 {selectedProvider ===
-									provider.id
-										? 'text-blue-600'
-										: 'text-gray-600'}"
-								/>
-							</div>
-							<div class="flex-1">
-								<h3 class="font-semibold">{provider.name}</h3>
-								<p class="text-sm text-gray-600">
-									{provider.description}
+								{provider.name}
+							</h3>
+							{#if !provider.available}
+								<p class="text-[10px] text-orange-600 font-medium uppercase tracking-wider">
+									Coming soon
 								</p>
-								{#if !provider.available}
-									<p class="text-xs text-orange-600 mt-1">
-										Coming soon
-									</p>
-								{/if}
-							</div>
+							{/if}
 						</div>
 					</button>
 				{/each}
+				{#if filteredProviders.length === 0}
+					<div
+						class="col-span-full py-8 text-center text-gray-500 text-sm italic"
+					>
+						No providers found matching "{searchTerm}"
+					</div>
+				{/if}
 			</div>
 		</div>
 
@@ -343,7 +386,6 @@
 							</p>
 						</div>
 					{/if}
-
 					{#if selectedProvider === "berlin-de-mh-calendar"}
 						<div>
 							<label
@@ -373,6 +415,39 @@
 								)}
 								id="mhPassword"
 								bind:value={mhPassword}
+								placeholder="Password"
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							/>
+						</div>
+					{/if}
+
+					{#if selectedProvider === "nebenan-de"}
+						<div>
+							<label
+								for="nebenanEmail"
+								class="block text-sm font-medium text-gray-700 mb-1"
+							>
+								Nebenan.de Email / Username
+							</label>
+							<input
+								{...getField("credentials.email").as("text")}
+								id="nebenanEmail"
+								placeholder="login@example.com"
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							/>
+						</div>
+						<div>
+							<label
+								for="nebenanPassword"
+								class="block text-sm font-medium text-gray-700 mb-1"
+							>
+								Nebenan.de Password
+							</label>
+							<input
+								{...getField("credentials.password").as(
+									"password",
+								)}
+								id="nebenanPassword"
 								placeholder="Password"
 								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 							/>
@@ -478,7 +553,11 @@
 								selectedProvider === 'berlin-de-mh-calendar' ||
 								selectedProvider === 'wp-the-events-calendar' ||
 								selectedProvider === 'seniorennetz-berlin' ||
-								selectedProvider === 'email') &&
+								selectedProvider === 'email' ||
+								selectedProvider === 'nebenan-de' ||
+								selectedProvider === 'bewegungsatlas-berlin' ||
+								selectedProvider === 'eventbrite' ||
+								selectedProvider === 'meetup') &&
 							dir.value !== 'push'
 								? 'opacity-50 cursor-not-allowed'
 								: ''}"
@@ -501,7 +580,11 @@
 										"wp-the-events-calendar" ||
 									selectedProvider ===
 										"seniorennetz-berlin" ||
-									selectedProvider === "email") &&
+									selectedProvider === "email" ||
+									selectedProvider === "nebenan-de" ||
+									selectedProvider === "bewegungsatlas-berlin" ||
+									selectedProvider === "eventbrite" ||
+									selectedProvider === "meetup") &&
 									dir.value !== "push"}
 								class="mt-1"
 							/>
@@ -515,7 +598,7 @@
 								<div class="text-sm text-gray-600">
 									{dir.description}
 								</div>
-								{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "berlin-de-mh-calendar" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email") && dir.value !== "push"}
+								{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "berlin-de-mh-calendar" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email" || selectedProvider === "nebenan-de" || selectedProvider === "bewegungsatlas-berlin" || selectedProvider === "eventbrite" || selectedProvider === "meetup") && dir.value !== "push"}
 									<div class="text-xs text-orange-600 mt-1">
 										Not supported for {selectedProvider ===
 										"berlin-de-main-calendar"
@@ -529,6 +612,18 @@
 													: selectedProvider ===
 														  "seniorennetz-berlin"
 														? "Seniorennetz Berlin"
+														: selectedProvider ===
+														  "nebenan-de"
+														? "Nebenan.de"
+														: selectedProvider ===
+														  "bewegungsatlas-berlin"
+														? "Bewegungsatlas Berlin"
+														: selectedProvider ===
+														  "eventbrite"
+														? "Eventbrite"
+														: selectedProvider ===
+														  "meetup"
+														? "Meetup"
 														: "Email (Brevo)"}
 									</div>
 								{/if}

@@ -48,5 +48,6 @@
  */
 import { getContext, setContext } from 'svelte';
 const LucideContext = Symbol('lucide-context');
+/** @param {any} globalProps */
 export const setLucideProps = (globalProps) => setContext(LucideContext, globalProps);
 export const getLucideContext = () => getContext(LucideContext);

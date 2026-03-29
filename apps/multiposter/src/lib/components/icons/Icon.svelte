@@ -7,7 +7,7 @@ const calculatedStrokeWidth = $derived(absoluteStrokeWidth ? (Number(strokeWidth
 </script>
 
 <svg
-  {...defaultAttributes}
+  {...(defaultAttributes as any)}
   {...!children && !hasA11yProp(props) && { 'aria-hidden': 'true' }}
   {...props}
   width={size}
