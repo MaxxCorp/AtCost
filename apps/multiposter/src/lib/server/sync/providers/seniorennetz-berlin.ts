@@ -6,6 +6,7 @@ import type {
 	SyncDirection
 } from '../types';
 import { env } from '$env/dynamic/private';
+import { htmlToPlainText } from '../utils/html';
 
 /**
  * Seniorennetz.Berlin sync provider implementation
@@ -130,7 +131,7 @@ export class SeniorennetzBerlinProvider implements SyncProvider {
 
 		// Basic event information
 		formData['title'] = event.summary;
-		formData['description'] = event.description || event.summary;
+		formData['description'] = htmlToPlainText(event.description || event.summary);
 
 		// Date and time handling
 		if (event.startDateTime) {

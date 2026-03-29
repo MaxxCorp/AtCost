@@ -1084,15 +1084,35 @@ export class SyncService {
 	async syncItems(userId: string, itemIds: string[], entityType: 'event' | 'announcement' = 'event'): Promise<void> {
 		try {
 			// Get all enabled sync configs that support push (Global sweep)
-			const pushConfigs = await db
+			const syncConfigs = await db
 				.select()
 				.from(syncConfigTable)
 				.where(
 					eq(syncConfigTable.enabled, true)
 				);
 
-			for (const configRow of pushConfigs) {
+			for (const configRow of syncConfigs) {
 				const config = this.rowToConfig(configRow);
+
+				// Only consider push/bidirectional for push sync
+				if (config.direction !== 'push' && config.direction !== 'bidirectional') {
+					continue;
+				}
+
+				// Pre-flight check: see if ANY of the items need sync for THIS config
+				// This avoids initializing providers (and their network/auth checks) if not needed.
+				const itemsToProcess: string[] = [];
+				for (const itemId of itemIds) {
+					const { needsSync } = await this.checkSyncRequirement(config, itemId, entityType);
+					if (needsSync) {
+						itemsToProcess.push(itemId);
+					}
+				}
+
+				if (itemsToProcess.length === 0) {
+					// None of the items are selected for this config and no mappings exist to clean up
+					continue;
+				}
 
 				// Create operation record for transparency
 				const [operationRow] = await db.insert(syncOperationTable).values({
@@ -1101,7 +1121,7 @@ export class SyncService {
 					status: 'pending',
 					entityType: entityType,
 					startedAt: new Date(),
-					entityId: itemIds.length === 1 ? itemIds[0] : null,
+					entityId: itemsToProcess.length === 1 ? itemsToProcess[0] : null,
 				}).returning({ id: syncOperationTable.id });
 
 				const operationId = operationRow.id;
@@ -1109,7 +1129,7 @@ export class SyncService {
 				try {
 					const provider = await this.getProviderInstance(config);
 
-					for (const itemId of itemIds) {
+					for (const itemId of itemsToProcess) {
 						await this.syncSingleItem(config, provider, itemId, entityType);
 					}
 
@@ -1143,6 +1163,57 @@ export class SyncService {
 			console.error(`[SyncService] Error in syncItems:`, error);
 			// Don't throw - sync failures shouldn't break CRUD operations
 		}
+	}
+
+	/**
+	 * Helper to check if an item actually needs processing for a specific sync config.
+	 * Returns true if the item is explicitly selected OR if a mapping exists (needs update/delete).
+	 */
+	private async checkSyncRequirement(
+		config: SyncConfig,
+		itemId: string,
+		entityType: 'event' | 'announcement'
+	): Promise<{ needsSync: boolean }> {
+		// Check for existing mapping
+		const mappingWhere = entityType === 'event'
+			? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+			: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
+
+		const [mapping] = await db
+			.select()
+			.from(syncMappingTable)
+			.where(mappingWhere);
+
+		// Check granular sync settings (campaign-based)
+		const table = entityType === 'event' ? eventTable : announcementTable;
+		const [itemWithCampaign] = await db
+			.select({
+				status: (table as any).status,
+				campaign: campaignTable
+			})
+			.from(table)
+			.leftJoin(campaignTable, eq(table.campaignId, campaignTable.id))
+			.where(eq(table.id, itemId))
+			.limit(1);
+
+		if (!itemWithCampaign) {
+			return { needsSync: !!mapping };
+		}
+
+		const syncIds = itemWithCampaign.campaign?.content ? ((itemWithCampaign.campaign.content as any).syncIds || []) : [];
+		let shouldBeSynced = syncIds.includes(config.id);
+
+		// Only sync events that are confirmed or cancelled
+		if (entityType === 'event' && shouldBeSynced) {
+			const status = itemWithCampaign.status;
+			if (status !== 'confirmed' && status !== 'cancelled') {
+				shouldBeSynced = false;
+			}
+		}
+
+		return {
+			needsSync: shouldBeSynced || !!mapping
+		};
 	}
 
 

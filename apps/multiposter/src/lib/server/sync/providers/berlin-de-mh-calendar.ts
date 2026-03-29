@@ -7,6 +7,7 @@ import type {
 } from '../types';
 import { resolveContactForEventId } from '$lib/server/contact-resolution';
 import { env } from '$env/dynamic/private';
+import { htmlToPlainText } from '../utils/html';
 
 /**
  * Berlin.de Marzahn-Hellersdorf Calendar sync provider
@@ -420,9 +421,9 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
      * Field names: update_name (title), update_text (description)
      */
     private async submitText(editId: string, event: ExternalEvent): Promise<void> {
-        // Strip HTML tags for plain text description
+        // Convert HTML description to readable plain text
         const rawDescription = event.description || event.summary;
-        const plainDescription = rawDescription.replace(/<[^>]+>/g, '').trim();
+        const plainDescription = htmlToPlainText(rawDescription);
 
         await this.postForm(this.editUrl(editId, 'text'), {
             update_name: event.summary,

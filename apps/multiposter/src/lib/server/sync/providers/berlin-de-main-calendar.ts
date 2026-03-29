@@ -10,6 +10,7 @@ import { user, eventResource } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { resolveEventContact } from '$lib/server/contact-resolution';
 import { env } from '$env/dynamic/private';
+import { htmlToPlainText } from '../utils/html';
 
 /**
  * Berlin.de Main Calendar sync provider implementation
@@ -141,7 +142,7 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 		// Map basic fields
 		formData[this.fieldMappings.titel] = event.summary;
 		if (event.description) {
-			formData[this.fieldMappings.beschreibung] = event.description;
+			formData[this.fieldMappings.beschreibung] = htmlToPlainText(event.description);
 		}
 		if (event.location) {
 			formData[this.fieldMappings.veranstaltungsort] = event.location;

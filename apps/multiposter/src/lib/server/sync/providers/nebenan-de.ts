@@ -6,6 +6,7 @@ import type {
     SyncDirection
 } from '../types';
 import { env } from '$env/dynamic/private';
+import { htmlToPlainText } from '../utils/html';
 
 /**
  * Nebenan.de Sync Provider
@@ -193,9 +194,9 @@ export class NebenanDeProvider implements SyncProvider {
     private formatEventPayload(event: ExternalEvent): Record<string, any> {
         const summary = event.summary || 'Untitled Event';
         
-        // Strip HTML tags for plain text description
+        // Convert HTML description to readable plain text
         const rawDescription = event.description || summary;
-        const plainDescription = rawDescription.replace(/<[^>]+>/g, '').trim();
+        const plainDescription = htmlToPlainText(rawDescription);
 
         const locationName = event.venue?.name || event.location || '';
         
