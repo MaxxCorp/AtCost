@@ -1,6 +1,7 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
-    import LocationForm from "@ac/ui/components/forms/LocationForm.svelte";
+    import { LocationForm } from "@ac/ui";
+    import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
     import type { Snippet } from "svelte";
 
     interface Props {
@@ -24,6 +25,20 @@
         cancelHref = "/locations",
         children,
     }: Props = $props();
+
+    // svelte-ignore state_referenced_locally
+    let heroImage = $state(initialData?.heroImage ?? "");
+
+    function getField(name: string) {
+        if (!(remoteFunction as any).fields) return {};
+        const parts = name.split(".");
+        let current = (remoteFunction as any).fields;
+        for (const part of parts) {
+            if (!current) return {};
+            current = current[part];
+        }
+        return current || {};
+    }
 </script>
 
 <LocationForm
@@ -50,6 +65,7 @@
         what3words: m.what3words(),
         inclusivitySupport: m.inclusivity_support(),
         isPublic: m.public(),
+        heroImage: m.hero_image(),
         saveChanges: m.save_changes(),
         createLocation: m.create_location(),
         cancel: m.cancel(),
@@ -71,4 +87,13 @@
         what3wordsPlaceholder: m.what3words_placeholder(),
         inclusivitySupportPlaceholder: m.accessibility_info(),
     }}
-/>
+>
+    {#snippet heroImageSlot()}
+        <div class="mb-4">
+            <ImageUploader bind:value={heroImage} label={m.hero_image()} />
+            {#if heroImage}
+                <input {...getField("heroImage").as("hidden", heroImage)} />
+            {/if}
+        </div>
+    {/snippet}
+</LocationForm>

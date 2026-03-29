@@ -29,6 +29,7 @@ export const createLocation = form(createLocationSchema, async (data) => {
             longitude: data.longitude ? parseFloat(data.longitude) : null,
             what3words: data.what3words || null,
             inclusivitySupport: data.inclusivitySupport || null,
+            heroImage: data.heroImage || null,
         };
 
         if (insertData.latitude && isNaN(insertData.latitude)) insertData.latitude = null;

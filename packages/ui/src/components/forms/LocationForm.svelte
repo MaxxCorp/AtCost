@@ -15,6 +15,7 @@
         cancelHref = "/locations",
         // Extra slots for flexibility (e.g. EntityManager for associations)
         children,
+        heroImageSlot,
         labels = {},
     }: {
         remoteFunction: any;
@@ -24,7 +25,8 @@
         onSuccess?: (result: any) => void;
         onCancel?: () => void;
         cancelHref?: string;
-        children?: Snippet;
+        children?: Snippet<[]>;
+        heroImageSlot?: Snippet<[]>;
         labels?: {
             name?: string;
             street?: string;
@@ -60,6 +62,7 @@
             longitudePlaceholder?: string;
             what3wordsPlaceholder?: string;
             inclusivitySupportPlaceholder?: string;
+            heroImage?: string;
         };
     } = $props();
 
@@ -98,6 +101,7 @@
         longitudePlaceholder: labels?.longitudePlaceholder ?? "Longitude",
         what3wordsPlaceholder: labels?.what3wordsPlaceholder ?? "e.g. filled.count.soap",
         inclusivitySupportPlaceholder: labels?.inclusivitySupportPlaceholder ?? "Accessibility and inclusivity information",
+        heroImage: labels?.heroImage ?? "Hero Image",
     });
 
     function getField(name: string) {
@@ -156,6 +160,10 @@
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
+
+    {#if heroImageSlot}
+        {@render heroImageSlot()}
+    {/if}
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{i18n.street}</span>

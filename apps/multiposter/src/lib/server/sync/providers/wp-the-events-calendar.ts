@@ -146,8 +146,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			if (event.venue) {
 				const venueId = await this.ensureVenue(event.venue, event.metadata?.locationId || event.venueId);
 				if (venueId) {
-					// API expects array of IDs
-					wpEventData.venue = [venueId];
+					wpEventData.venue = venueId;
 				}
 			}
 
@@ -766,7 +765,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		// Map our internal event format to WordPress Events Calendar REST API format
 		const wpEvent: any = {
 			title: event.summary,
-			content: event.description || '',
+			description: event.description || '',
 			status: 'publish', // Publish immediately
 			hide_from_listings: false,
 			show_map: 'true',

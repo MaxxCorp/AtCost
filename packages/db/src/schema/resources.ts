@@ -20,6 +20,7 @@ export const location = pgTable("location", {
     country: text("country"),
     isPublic: boolean("is_public").default(false).notNull(),
     inclusivitySupport: text("inclusivity_support"),
+    heroImage: text("hero_image"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

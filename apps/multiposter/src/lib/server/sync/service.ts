@@ -279,7 +279,10 @@ export class SyncService {
 					)
 				)
 				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-				.where(isNull(syncMappingTable.id));
+				.where(and(
+					isNull(syncMappingTable.id),
+					inArray(eventTable.status, ['confirmed', 'cancelled'])
+				));
 
 			const unmappedEvents = unmappedEventsRaw.filter(({ campaign }) => {
 				if (!campaign || !campaign.content) return false;
@@ -323,7 +326,12 @@ export class SyncService {
 			for (const { event, mapping, campaign } of mappedEventsRaw) {
 				try {
 					const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
-					const shouldBeSynced = syncIds.includes(config.id);
+					let shouldBeSynced = syncIds.includes(config.id);
+
+					// Only sync events that are confirmed or cancelled
+					if (shouldBeSynced && event.status !== 'confirmed' && event.status !== 'cancelled') {
+						shouldBeSynced = false;
+					}
 
 					if (!shouldBeSynced) {
 						// The event was previously mapped but has now been deselected from this sync config
@@ -989,30 +997,20 @@ export class SyncService {
 			return `${authUrl}${url.startsWith('/') ? '' : '/'}${url}`;
 		};
 
-		// Map Image (First Attachment)
+		// Map Image (Pick hero image OR first image from description)
 		let image: ExternalEvent['image'] | undefined;
 
-		// Fallback: prefer heroImage field over attachments
+		// 1. Use hero image if it exists
 		if (internal.heroImage) {
 			image = {
 				url: resolveUrl(internal.heroImage)!,
 				title: summary
 			};
-		} else {
-			const attachments = internal.attachments || [];
-			if (attachments.length > 0) {
-				const firstAttachment = attachments[0];
-				if (firstAttachment.fileUrl) {
-					image = {
-						url: resolveUrl(firstAttachment.fileUrl)!,
-						title: firstAttachment.title || summary
-					};
-				}
-			}
 		}
 
-		// Fallback: Extract image from description if no attachment
 		let description = descriptionRaw || undefined;
+
+		// 2. Fall back to the first image embedded in the description
 		if (!image && description) {
 			const imgMatch = description.match(/<img[^>]+src="([^">]+)"/);
 			if (imgMatch && imgMatch[1]) {
@@ -1022,6 +1020,16 @@ export class SyncService {
 				};
 			}
 		}
+
+		// 3. Fall back to the hero image of the associated location
+		if (!image && locationMapping?.location?.heroImage) {
+			image = {
+				url: resolveUrl(locationMapping.location.heroImage)!,
+				title: summary
+			};
+		}
+
+
 
 		// Ensure all content URLs are absolute
 		if (description) {
@@ -1176,7 +1184,16 @@ export class SyncService {
 				.limit(1);
 
 			const syncIds = itemWithCampaign?.campaign?.content ? ((itemWithCampaign.campaign.content as any).syncIds || []) : [];
-			const shouldBeSynced = syncIds.includes(config.id);
+			let shouldBeSynced = syncIds.includes(config.id);
+
+			// Only sync events that are confirmed or cancelled
+			if (entityType === 'event' && shouldBeSynced) {
+				const status = (itemRow as any).status;
+				if (status !== 'confirmed' && status !== 'cancelled') {
+					shouldBeSynced = false;
+				}
+			}
+
 
 			if (!shouldBeSynced && !mapping) {
 				// Not selected for this sync and no existing mapping to clean up
