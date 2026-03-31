@@ -10,6 +10,14 @@ import { env } from '$env/dynamic/private';
  * Generate iCal and QR Code for an event
  */
 export async function generateEventAssets(eventId: string, origin?: string) {
+    // Resolve origin from request context if not provided (matches contact generation pattern)
+    if (!origin) {
+        try {
+            const { getRequestEvent } = await import('$app/server');
+            origin = getRequestEvent()?.url.origin;
+        } catch (e) { /* not in request context (e.g. sync service) — ignore */ }
+    }
+
     const data = await db.query.event.findFirst({
         where: (table, { eq }) => eq(table.id, eventId),
         with: {
@@ -100,8 +108,8 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     const iCalFileName = `events/${eventId}/${summarySlug}.ics`;
     const iCalUrl = await storage.put(iCalFileName, vcalendar.toString(), 'text/calendar');
 
-    // QR Code generation
-    const baseUrl = env.PUBLIC_BASE_URL || origin || "";
+    // QR Code generation — resolve base URL with multiple fallbacks
+    const baseUrl = env.PUBLIC_BASE_URL || origin || env.BETTER_AUTH_URL || "";
     const eventUrl = `${baseUrl}/events/${eventId}/view`;
 
     // Generate QR as Buffer

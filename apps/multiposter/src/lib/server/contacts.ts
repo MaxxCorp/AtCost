@@ -168,8 +168,8 @@ async function generateContactAssets(contactId: string, origin?: string) {
     const publicVCardFileName = `contacts/${contactId}/${fullNameSlug}_public.vcf`;
     await storage.put(publicVCardFileName, publicCard.toString(), 'text/vcard');
 
-    // QR Code generation
-    const baseUrl = env.PUBLIC_BASE_URL || origin || "";
+    // QR Code generation — resolve base URL with multiple fallbacks
+    const baseUrl = env.PUBLIC_BASE_URL || origin || env.BETTER_AUTH_URL || "";
     const contactUrl = `${baseUrl}/contacts/${contactId}/view`;
 
     // Generate QR as Buffer
