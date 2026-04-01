@@ -142,13 +142,19 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// Ensure venue exists if provided
-			if (event.venue) {
-				const venueId = await this.ensureVenue(event.venue, event.metadata?.locationId || event.venueId);
-				if (venueId) {
-					// Ensure consistency - API documentation and common TEC patterns use arrays for linked posts
-					wpEventData.venue = [venueId];
-				}
+			// Ensure venues exist
+			const venueIds: number[] = [];
+			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
+			
+			for (const v of venuesToProcess) {
+				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
+				if (vId) venueIds.push(vId);
+			}
+
+			if (venueIds.length > 0) {
+				// Compatibility: Use single ID if only one venue, array if multiple 
+				// (Most TEC setups only support one unless Pro is installed)
+				wpEventData.venue = venueIds.length === 1 ? venueIds[0] : venueIds;
 			}
 
 			// Ensure organizer exists if provided
@@ -156,7 +162,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				const organizerId = await this.ensureOrganizer(event.organizer, event.metadata?.organizerId); // organizerId passed in metadata
 				if (organizerId) {
 					// API expects array of IDs
-					wpEventData.organizer = [organizerId];
+					wpEventData.organizer = organizerId;
 				}
 			}
 
@@ -237,13 +243,18 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		const wpEventData = this.mapEventToWpFormat(event);
 
 		try {
-			// Ensure venue exists if provided
-			if (event.venue) {
-				const venueId = await this.ensureVenue(event.venue, event.metadata?.locationId || event.venueId);
-				if (venueId) {
-					// API expects array of IDs
-					wpEventData.venue = [venueId];
-				}
+			// Ensure venues exist
+			const venueIds: number[] = [];
+			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
+			
+			for (const v of venuesToProcess) {
+				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
+				if (vId) venueIds.push(vId);
+			}
+
+			if (venueIds.length > 0) {
+				// Compatibility: Use single ID if only one venue, array if multiple
+				wpEventData.venue = venueIds.length === 1 ? venueIds[0] : venueIds;
 			}
 
 			// Ensure organizer exists if provided
@@ -371,6 +382,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 							zip: venue.zip,
 							phone: venue.phone,
 							website: venue.website,
+							show_map: true,
+							show_map_link: true,
 						};
 
 						await fetch(this.getApiUrl(`/tribe/events/v1/venues/${mapping.externalId}`), {
@@ -423,8 +436,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					zip: venue.zip,
 					phone: venue.phone,
 					website: venue.website,
-					show_map: 'true',
-					show_map_link: 'true',
+					show_map: true,
+					show_map_link: true,
 					status: 'publish', // Ensure it's available immediately
 				};
 

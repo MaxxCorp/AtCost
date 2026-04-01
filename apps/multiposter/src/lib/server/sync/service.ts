@@ -912,7 +912,8 @@ export class SyncService {
 
 
 
-		// Resolve Venue (Location)
+		// Resolve Venues (Locations)
+		let venues: ExternalEvent['venues'] | undefined;
 		let venue: ExternalEvent['venue'] | undefined;
 		let venueId: string | undefined;
 
@@ -920,28 +921,40 @@ export class SyncService {
 		const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
 		const whereClause = isEvent ? eq(eventLocationTable.eventId, internal.id) : eq(announcementLocation.announcementId, internal.id);
 
-		const [locationMapping] = await db
+		const locations = await db
 			.select({ location: locationTable })
 			.from(locationTableToUse as any)
 			.innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id))
-			.where(whereClause as any)
-			.limit(1);
+			.where(whereClause as any);
 
-		if (locationMapping) {
-			venueId = locationMapping.location.id; // Store internal ID
+		if (locations.length > 0) {
+			venues = locations.map(l => ({
+				id: l.location.id,
+				name: l.location.name,
+				address: l.location.street ? `${l.location.street} ${l.location.houseNumber || ''}`.trim() : undefined,
+				city: l.location.city ?? undefined,
+				country: l.location.country ?? undefined,
+				zip: l.location.zip ?? undefined,
+				province: l.location.state ?? undefined,
+			}));
+
+			// For backward compatibility, pick the first one as primary
+			const primary = locations[0].location;
+			venueId = primary.id;
 			venue = {
-				name: locationMapping.location.name,
-				address: locationMapping.location.street ? `${locationMapping.location.street} ${locationMapping.location.houseNumber || ''}`.trim() : undefined,
-				city: locationMapping.location.city ?? undefined,
-				country: locationMapping.location.country ?? undefined,
-				zip: locationMapping.location.zip ?? undefined,
-				province: locationMapping.location.state ?? undefined,
+				name: primary.name,
+				address: primary.street ? `${primary.street} ${primary.houseNumber || ''}`.trim() : undefined,
+				city: primary.city ?? undefined,
+				country: primary.country ?? undefined,
+				zip: primary.zip ?? undefined,
+				province: primary.state ?? undefined,
 			};
 		} else if (internal.location) {
 			// Fallback to text location if no structured location is linked
 			venue = {
 				name: internal.location
 			};
+			venues = [venue];
 		}
 
 		// Resolve Organizer (Contact with "Employee" tag)
@@ -1022,9 +1035,10 @@ export class SyncService {
 		}
 
 		// 3. Fall back to the hero image of the associated location
-		if (!image && locationMapping?.location?.heroImage) {
+		const primaryLocation = locations?.[0]?.location;
+		if (!image && primaryLocation?.heroImage) {
 			image = {
-				url: resolveUrl(locationMapping.location.heroImage)!,
+				url: resolveUrl(primaryLocation.heroImage)!,
 				title: summary
 			};
 		}
@@ -1055,6 +1069,7 @@ export class SyncService {
 			source: (internal.source as any) ?? undefined,
 			ticketPrice: internal.ticketPrice ?? undefined,
 			venue,
+			venues,
 			venueId,
 			organizer,
 			tags,

@@ -68,6 +68,7 @@ export interface ExternalEvent {
 
 	// Enhanced sync fields
 	venue?: {
+		id?: string;
 		name: string;
 		address?: string;
 		city?: string;
@@ -77,6 +78,17 @@ export interface ExternalEvent {
 		phone?: string;
 		website?: string;
 	};
+	venues?: Array<{
+		id?: string;
+		name: string;
+		address?: string;
+		city?: string;
+		country?: string;
+		province?: string;
+		zip?: string;
+		phone?: string;
+		website?: string;
+	}>;
 	organizer?: {
 		name: string;
 		email?: string;
