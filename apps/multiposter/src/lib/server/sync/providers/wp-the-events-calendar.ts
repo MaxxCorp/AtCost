@@ -64,7 +64,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	async validateConnection(): Promise<boolean> {
 		try {
 			// Test connection by fetching events endpoint
-			const response = await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/events?per_page=1`, {
+			const response = await fetch(this.getApiUrl('/tribe/events/v1/events', new URLSearchParams({ per_page: '1' })), {
 				method: 'GET',
 				headers: {
 					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -110,7 +110,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				searchParams.set('start_date', wpEventData.start_date);
 			}
 
-			const searchUrl = `${this.baseUrl}/wp-json/tribe/events/v1/events?${searchParams.toString()}`;
+			const searchUrl = this.getApiUrl('/tribe/events/v1/events', searchParams);
 			const searchResponse = await fetch(searchUrl, {
 				method: 'GET',
 				headers: {
@@ -146,7 +146,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			if (event.venue) {
 				const venueId = await this.ensureVenue(event.venue, event.metadata?.locationId || event.venueId);
 				if (venueId) {
-					wpEventData.venue = venueId;
+					// Ensure consistency - API documentation and common TEC patterns use arrays for linked posts
+					wpEventData.venue = [venueId];
 				}
 			}
 
@@ -187,7 +188,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			console.log(`[WP-Sync] Posting event to WordPress:`, JSON.stringify(wpEventData, null, 2));
 
 			// POST Event
-			const response = await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/events`, {
+			const response = await fetch(this.getApiUrl('/tribe/events/v1/events'), {
 				method: 'POST',
 				headers: {
 					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -207,7 +208,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// Post-link media if we have it
 			if (mediaData && createdEvent.id) {
 				console.log(`[WP-Sync] Linking media ${mediaData.id} to event ${createdEvent.id}`);
-				await fetch(`${this.baseUrl}/wp-json/wp/v2/media/${mediaData.id}`, {
+				await fetch(this.getApiUrl(`/wp/v2/media/${mediaData.id}`), {
 					method: 'POST',
 					headers: {
 						'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -277,7 +278,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			console.log(`[WP-Sync] Updating event ${externalId} in WordPress:`, JSON.stringify(wpEventData, null, 2));
 
-			const response = await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/events/${externalId}`, {
+			const response = await fetch(this.getApiUrl(`/tribe/events/v1/events/${externalId}`), {
 				method: 'PUT',
 				headers: {
 					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -296,7 +297,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// Post-link media if we have it
 			if (mediaData) {
 				console.log(`[WP-Sync] Linking media ${mediaData.id} to event ${externalId}`);
-				await fetch(`${this.baseUrl}/wp-json/wp/v2/media/${mediaData.id}`, {
+				await fetch(this.getApiUrl(`/wp/v2/media/${mediaData.id}`), {
 					method: 'POST',
 					headers: {
 						'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -321,7 +322,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		}
 
 		try {
-			const response = await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/events/${externalId}?force=true`, {
+			const response = await fetch(this.getApiUrl(`/tribe/events/v1/events/${externalId}`, new URLSearchParams({ force: 'true' })), {
 				method: 'DELETE',
 				headers: {
 					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -372,7 +373,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 							website: venue.website,
 						};
 
-						await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/venues/${mapping.externalId}`, {
+						await fetch(this.getApiUrl(`/tribe/events/v1/venues/${mapping.externalId}`), {
 							method: 'POST',
 							headers: {
 								'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -392,7 +393,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', venue.name);
 
-			const searchUrl = `${this.baseUrl}/wp-json/tribe/events/v1/venues?${searchParams.toString()}`;
+			const searchUrl = this.getApiUrl('/tribe/events/v1/venues', searchParams);
 			const searchResponse = await fetch(searchUrl, {
 				method: 'GET',
 				headers: {
@@ -427,7 +428,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					status: 'publish', // Ensure it's available immediately
 				};
 
-				const createResponse = await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/venues`, {
+				const createResponse = await fetch(this.getApiUrl('/tribe/events/v1/venues'), {
 					method: 'POST',
 					headers: {
 						'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -501,7 +502,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 							website: organizer.website,
 						};
 
-						await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/organizers/${mapping.externalId}`, {
+						await fetch(this.getApiUrl(`/tribe/events/v1/organizers/${mapping.externalId}`), {
 							method: 'POST',
 							headers: {
 								'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -521,7 +522,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', organizer.email || organizer.name);
 
-			const searchUrl = `${this.baseUrl}/wp-json/tribe/events/v1/organizers?${searchParams.toString()}`;
+			const searchUrl = this.getApiUrl('/tribe/events/v1/organizers', searchParams);
 			const searchResponse = await fetch(searchUrl, {
 				method: 'GET',
 				headers: {
@@ -556,7 +557,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					status: 'publish', // Ensure it's available immediately
 				};
 
-				const createResponse = await fetch(`${this.baseUrl}/wp-json/tribe/events/v1/organizers`, {
+				const createResponse = await fetch(this.getApiUrl('/tribe/events/v1/organizers'), {
 					method: 'POST',
 					headers: {
 						'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -624,7 +625,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// 2. Search
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', tag.name);
-			const searchUrl = `${this.baseUrl}/wp-json/wp/v2/tags?${searchParams.toString()}`;
+			const searchUrl = this.getApiUrl('/wp/v2/tags', searchParams);
 			const searchResponse = await fetch(searchUrl, {
 				method: 'GET',
 				headers: {
@@ -645,7 +646,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			// 3. Create
 			if (!externalId) {
-				const createResponse = await fetch(`${this.baseUrl}/wp-json/wp/v2/tags`, {
+				const createResponse = await fetch(this.getApiUrl('/wp/v2/tags'), {
 					method: 'POST',
 					headers: {
 						'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -717,7 +718,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			slugParams.set('slug', uniqueSlug);
 			slugParams.set('media_type', 'image');
 
-			const searchUrl = `${this.baseUrl}/wp-json/wp/v2/media?${slugParams.toString()}`;
+			const searchUrl = this.getApiUrl('/wp/v2/media', slugParams);
 			const searchResponse = await fetch(searchUrl, {
 				method: 'GET',
 				headers: {
@@ -736,7 +737,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			// 4. Upload if not found
 			console.log(`[WP-Sync] Image hash not found, uploading as: ${uploadFilename}`);
-			const uploadResponse = await fetch(`${this.baseUrl}/wp-json/wp/v2/media`, {
+			const uploadResponse = await fetch(this.getApiUrl('/wp/v2/media'), {
 				method: 'POST',
 				headers: {
 					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
@@ -863,5 +864,25 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		}
 
 		return wpEvent;
+	}
+
+	/**
+	 * Builds a WordPress REST API URL.
+	 * Handles both "Pretty" ( /wp-json/ ) and "Plain" ( ?rest_route=/ ) permalink structures.
+	 */
+	private getApiUrl(path: string, params?: URLSearchParams): string {
+		const cleanPath = path.startsWith('/') ? path : `/${path}`;
+		
+		// We use the rest_route format as it is universally supported regardless of permalink settings.
+		const url = new URL(this.baseUrl);
+		url.searchParams.set('rest_route', cleanPath);
+
+		if (params) {
+			for (const [key, value] of params.entries()) {
+				url.searchParams.append(key, value);
+			}
+		}
+
+		return url.toString();
 	}
 }
