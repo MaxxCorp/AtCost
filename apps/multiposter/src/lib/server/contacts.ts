@@ -80,6 +80,17 @@ async function generateContactAssets(contactId: string, origin?: string) {
         if (a.type) prop.setParameter('type', a.type.toLowerCase());
     });
 
+    if (data.company || data.department) {
+        const orgValue = [data.company || '', data.department || ''].filter(Boolean);
+        if (orgValue.length > 0) {
+            card.addPropertyWithValue('org', orgValue);
+        }
+    }
+
+    if (data.role) {
+        card.addPropertyWithValue('title', data.role);
+    }
+
     // Add associated locations to full vCard
     data.locationAssociations?.forEach((la: any) => {
         const l = la.location;
@@ -137,6 +148,17 @@ async function generateContactAssets(contactId: string, origin?: string) {
         const prop = publicCard.addPropertyWithValue('adr', adrValue);
         if (a.type) prop.setParameter('type', a.type.toLowerCase());
     });
+
+    if (data.company || data.department) {
+        const orgValue = [data.company || '', data.department || ''].filter(Boolean);
+        if (orgValue.length > 0) {
+            publicCard.addPropertyWithValue('org', orgValue);
+        }
+    }
+
+    if (data.role) {
+        publicCard.addPropertyWithValue('title', data.role);
+    }
 
     // Add public associated locations to public vCard
     data.locationAssociations?.filter((la: any) => la.location?.isPublic).forEach((la: any) => {
@@ -227,10 +249,13 @@ export async function createContact(data: ContactData) {
             middleName: data.contact.middleName || null,
             honorificPrefix: data.contact.honorificPrefix || null,
             honorificSuffix: data.contact.honorificSuffix || null,
+            company: data.contact.company || null,
+            role: data.contact.role || null,
+            department: data.contact.department || null,
             birthday: data.contact.birthday || null,
             gender: data.contact.gender || null,
             notes: data.contact.notes || null,
-            isPublic: data.contact.isPublic || false
+            isPublic: !!data.contact.isPublic
         }).returning({ id: contact.id });
 
         const id = newContact.id;
@@ -366,10 +391,13 @@ export async function updateContact(id: string, data: Partial<ContactData>) {
             if (data.contact.middleName !== undefined) updateSet.middleName = data.contact.middleName;
             if (data.contact.honorificPrefix !== undefined) updateSet.honorificPrefix = data.contact.honorificPrefix;
             if (data.contact.honorificSuffix !== undefined) updateSet.honorificSuffix = data.contact.honorificSuffix;
+            if (data.contact.company !== undefined) updateSet.company = data.contact.company;
+            if (data.contact.role !== undefined) updateSet.role = data.contact.role;
+            if (data.contact.department !== undefined) updateSet.department = data.contact.department;
             if (data.contact.birthday !== undefined) updateSet.birthday = data.contact.birthday;
             if (data.contact.gender !== undefined) updateSet.gender = data.contact.gender;
             if (data.contact.notes !== undefined) updateSet.notes = data.contact.notes;
-            if (data.contact.isPublic !== undefined) updateSet.isPublic = data.contact.isPublic;
+            if (data.contact.isPublic !== undefined) updateSet.isPublic = !!data.contact.isPublic;
 
             const query = tx.update(contact).set(updateSet);
             await query.where(eq(contact.id, id));

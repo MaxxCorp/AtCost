@@ -131,16 +131,17 @@
                                                         m.unnamed_contact()}
                                                 </a>
                                             </h2>
-                                            {#if contact.role || contact.company}
+                                            {#if contact.role || contact.company || contact.department}
                                                 <p
                                                     class="text-sm text-gray-500"
                                                 >
                                                     {[
                                                         contact.role,
+                                                        contact.department,
                                                         contact.company,
                                                     ]
                                                         .filter(Boolean)
-                                                        .join(" at ")}
+                                                        .join(" · ")}
                                                 </p>
                                             {/if}
                                         </div>

@@ -81,7 +81,8 @@
         saveContact: labels?.saveContact ?? "Save Contact",
         cancel: labels?.cancel ?? "Cancel",
         saving: labels?.saving ?? "Saving...",
-        errorSomethingWentWrong: labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong",
+        errorSomethingWentWrong:
+            labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong",
         successfullySaved: labels?.successfullySaved ?? "Successfully Saved!",
     });
 
@@ -140,7 +141,9 @@
     const emailsJson = $derived(JSON.stringify(emails.filter((e) => e.value)));
     const phonesJson = $derived(JSON.stringify(phones.filter((p) => p.value)));
     const relationsJson = $derived(JSON.stringify(relations));
-    const addressesJson = $derived(JSON.stringify(addresses.filter(a => a.street || a.city)));
+    const addressesJson = $derived(
+        JSON.stringify(addresses.filter((a) => a.street || a.city)),
+    );
     const tagsJson = $derived(
         JSON.stringify(
             tagsInput

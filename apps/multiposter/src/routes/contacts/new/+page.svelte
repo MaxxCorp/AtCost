@@ -20,8 +20,9 @@
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
 
     function handleSuccess(result: any) {
-        if (result?.id) {
-            goto(`/contacts/${result.id}`);
+        const finalId = result?.id || result?.contact?.id;
+        if (finalId) {
+            goto(`/contacts/${finalId}`);
         } else {
             goto("/contacts");
         }
