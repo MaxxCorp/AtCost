@@ -382,8 +382,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 							zip: venue.zip,
 							phone: venue.phone,
 							website: venue.website,
-							show_map: true,
-							show_map_link: true,
+							show_map: 'true',
+							show_map_link: 'true',
 						};
 
 						await fetch(this.getApiUrl(`/tribe/events/v1/venues/${mapping.externalId}`), {
@@ -436,8 +436,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					zip: venue.zip,
 					phone: venue.phone,
 					website: venue.website,
-					show_map: true,
-					show_map_link: true,
+					show_map: 'true',
+					show_map_link: 'true',
 					status: 'publish', // Ensure it's available immediately
 				};
 
