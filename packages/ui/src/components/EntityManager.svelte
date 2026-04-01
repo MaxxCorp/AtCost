@@ -664,7 +664,7 @@
 {#if renderForm}
     <Dialog.Root
         open={showQuickCreate || editingItem !== null}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
             if (!open) {
                 showQuickCreate = false;
                 editingItem = null;

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, jsonb, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, jsonb, doublePrecision, primaryKey } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { contact } from "./contacts";
 import { location } from "./resources";
@@ -100,6 +100,11 @@ export const timeOffBalance = pgTable("time_off_balance", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
+export const userTalent = pgTable("user_talent", {
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.userId, table.talentId] })]);
+
 export type Talent = typeof talent.$inferSelect;
 export type NewTalent = typeof talent.$inferInsert;
 export type TalentTimelineEntry = typeof talentTimelineEntry.$inferSelect;
@@ -114,3 +119,5 @@ export type TimeOffRequest = typeof timeOffRequest.$inferSelect;
 export type NewTimeOffRequest = typeof timeOffRequest.$inferInsert;
 export type TimeOffBalance = typeof timeOffBalance.$inferSelect;
 export type NewTimeOffBalance = typeof timeOffBalance.$inferInsert;
+export type UserTalent = typeof userTalent.$inferSelect;
+export type NewUserTalent = typeof userTalent.$inferInsert;

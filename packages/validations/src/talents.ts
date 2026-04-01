@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { contactBaseSchema, emailSchemaPure, phoneSchemaPure, addressSchemaPure, contactRelationSchemaPure } from './contacts';
+import { contactBaseSchema, emailSchemaPure, phoneSchemaPure, addressSchemaPure, contactRelationSchemaPure } from './contacts.js';
 
 export const timelineEntryType = v.picklist(["Interview", "Hiring", "Evaluation", "Termination"]);
 
@@ -91,4 +91,15 @@ export const timeOffBalanceSchema = v.object({
     totalDays: v.number(),
     usedDays: v.optional(v.number(), 0),
     pendingDays: v.optional(v.number(), 0),
+});
+
+export const talentAssociationSchema = v.object({
+    type: v.picklist(['user', 'event', 'location', 'resource', 'announcement']),
+    entityId: v.string(),
+    talentId: v.pipe(v.string(), v.uuid()),
+});
+
+export const getTalentAssociationsSchema = v.object({
+    type: v.picklist(['user', 'event', 'location', 'resource', 'announcement']),
+    entityId: v.string(),
 });

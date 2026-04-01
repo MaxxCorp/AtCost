@@ -10,17 +10,19 @@
         "build": "pnpm --filter \"./apps/**\" run build",
         "check": "pnpm --filter \"./apps/**\" run check"
     },
-    "devDependencies": {
-        "typescript": "^6.0.2"
-    },
-    "overrides": {
-        "typescript": "^6.0.2",
-        "vite": "^8.0.0",
-        "drizzle-orm": "0.45.2"
-    },
-    "pnpm": {
-        "overrides": {
-            "drizzle-orm": "0.45.2"
-        }
-    }
+	"devDependencies": {
+		"typescript": "~5.7.3"
+	},
+	"overrides": {
+		"typescript": "~5.7.3",
+		"vite": "^8.0.0",
+		"drizzle-orm": "0.45.2",
+		"drizzle-kit": "0.31.10"
+	},
+	"pnpm": {
+		"overrides": {
+			"drizzle-orm": "0.45.2",
+			"drizzle-kit": "0.31.10"
+		}
+	}
 }

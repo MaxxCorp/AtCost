@@ -21,6 +21,24 @@
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { User as UserIcon } from "@lucide/svelte";
 
+    import { listTalents } from "../../talents/talents.remote";
+    import * as talentAssociate from "../../talents/associate.remote";
+    import { createTalentSchema, updateTalentSchema } from "@ac/validations";
+    import { createTalent, updateTalent } from "../../talents/talents.remote";
+
+    const talentsOptions = {
+        listTalentsRemote: listTalents as any,
+        fetchAssociationsRemote: talentAssociate.fetchEntityTalents as any,
+        addAssociationRemote: async (p: any) => talentAssociate.addAssociation({ ...p, talentId: p.itemId } as any),
+        removeAssociationRemote: async (p: any) => talentAssociate.removeAssociation({ ...p, talentId: p.itemId } as any),
+        createRemote: createTalent,
+        createSchema: createTalentSchema,
+        updateRemote: updateTalent,
+        updateSchema: updateTalentSchema,
+    };
+
+    const talentsOptionsProp = $derived(talentsOptions);
+
     const userId = page.params.id || "";
 
     const appConfigList = [
@@ -77,6 +95,7 @@
                         {appConfigList}
                         onSuccess={() => goto("/users")}
                         onCancel={() => goto("/users")}
+                        talentsOptions={talentsOptionsProp}
                     >
                         {#snippet extraEntities(data: any)}
                             <EntityManager

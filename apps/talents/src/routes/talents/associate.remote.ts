@@ -1,145 +1,81 @@
 import { command, query } from '$app/server';
-import { db } from '$lib/server/db';
-import { userContact, locationContact, resourceContact, contact, location } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess, hasAccess } from '$lib/server/authorization';
-import { associationSchema, getAssociationsSchema, type Contact } from '@ac/validations/contacts';
-import { and, eq } from 'drizzle-orm';
-import * as v from 'valibot';
+import { db, userTalent } from '@ac/db';
+import { eq, and } from 'drizzle-orm';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { talentAssociationSchema, getTalentAssociationsSchema } from '@ac/validations';
 
-async function performAssociation(type: string, entityId: string, contactId: string, dissociate: boolean = false) {
-    const user = getAuthenticatedUser();
+export const addAssociation = command(talentAssociationSchema, async (data) => {
+    const authUser = getAuthenticatedUser();
+    ensureAccess(authUser, 'talents');
 
-    if (!hasAccess(user, 'contacts')) {
-        throw new Error('Forbidden');
-    }
-
-    const table = {
-        user: userContact,
-        location: locationContact,
-        resource: resourceContact
-    }[type as 'user' | 'location' | 'resource'];
-
-    if (!table) throw new Error(`Invalid type: ${type}`);
-
-    const entityField = {
-        user: 'userId',
-        location: 'locationId',
-        resource: 'resourceId'
-    }[type as 'user' | 'location' | 'resource'];
-
-    if (dissociate) {
-        await db.delete(table).where(and(
-            eq((table as any)[entityField], entityId),
-            eq(table.contactId, contactId)
-        ));
-    } else {
-        await (db.insert(table) as any).values({
-            [entityField]: entityId,
-            contactId
+    const { type, entityId, talentId } = data;
+    if (type === "user") {
+        await db.insert(userTalent).values({
+            userId: entityId,
+            talentId: talentId
         }).onConflictDoNothing();
     }
-}
-
-export const addAssociation = command(associationSchema, async (data) => {
-    try {
-        const { type, entityId, contactId } = data;
-        console.log('[SERVER] addAssociation START', data);
-        await performAssociation(type, entityId, contactId, false);
-        await fetchEntityContacts({ type, entityId }).refresh();
-        await fetchContactLocations(contactId).refresh();
-        console.log('[SERVER] addAssociation SUCCESS');
-        return { success: true };
-    } catch (e: any) {
-        console.error('[SERVER] addAssociation ERROR:', e);
-        return { success: false, error: e.message };
-    }
-});
-
-export const removeAssociation = command(associationSchema, async (data) => {
-    const { type, entityId, contactId } = data;
-    await performAssociation(type, entityId, contactId, true);
-    await fetchEntityContacts({ type, entityId }).refresh();
-    await fetchContactLocations(contactId).refresh();
+    
+    await fetchEntityTalents({ type, entityId }).refresh();
     return { success: true };
 });
 
-export const fetchEntityContacts = query(getAssociationsSchema, async (data): Promise<Contact[]> => {
-    const { type, entityId } = data;
-    const user = getAuthenticatedUser();
+export const removeAssociation = command(talentAssociationSchema, async (data) => {
+    const authUser = getAuthenticatedUser();
+    ensureAccess(authUser, 'talents');
 
-    if (!hasAccess(user, 'contacts')) {
-        throw new Error('Forbidden');
+    const { type, entityId, talentId } = data;
+    if (type === "user") {
+        await db.delete(userTalent).where(
+            and(
+                eq(userTalent.userId, entityId),
+                eq(userTalent.talentId, talentId)
+            )
+        );
     }
+    
+    await fetchEntityTalents({ type, entityId }).refresh();
+    return { success: true };
+});
 
-    const tableName = {
-        user: 'userContact',
-        location: 'locationContact',
-        resource: 'resourceContact'
-    }[type as 'user' | 'location' | 'resource'];
+export const fetchEntityTalents = query(getTalentAssociationsSchema, async (data) => {
+    const authUser = getAuthenticatedUser();
+    ensureAccess(authUser, 'talents');
 
-    const entityField = {
-        user: 'userId',
-        location: 'locationId',
-        resource: 'resourceId'
-    }[type as 'user' | 'location' | 'resource'];
-
-    const associations = await (db.query as any)[tableName].findMany({
-        where: (t: any, { eq }: any) => eq(t[entityField], entityId),
-        with: {
-            contact: {
-                with: {
-                    emails: true,
-                    phones: true,
-                    addresses: true,
-                    tags: {
-                        with: {
-                            tag: true
-                        }
-                    },
-                    relations: {
-                        with: {
-                            targetContact: true
+    const { type, entityId } = data;
+    if (type === "user") {
+        const results = await db.query.userTalent.findMany({
+            where: (table, { eq }) => eq(table.userId, entityId),
+            with: {
+                talent: {
+                    with: {
+                        contact: {
+                            with: {
+                                emails: true,
+                                phones: true
+                            }
                         }
                     }
                 }
             }
-        }
-    });
-
-    return associations.map((a: any) => ({
-        ...a.contact,
-        participationStatus: a.participationStatus || 'needsAction',
-        createdAt: a.contact.createdAt.toISOString(),
-        updatedAt: a.contact.updatedAt.toISOString(),
-        birthday: a.contact.birthday ? a.contact.birthday.toISOString() : null,
-        emails: a.contact.emails || [],
-        phones: a.contact.phones || [],
-        addresses: a.contact.addresses || [],
-        relations: (a.contact.relations || []).map((rel: any) => ({
-            id: rel.id,
-            targetContactId: rel.targetContactId,
-            relationType: rel.relationType,
-            targetContact: rel.targetContact
-        })),
-        tags: (a.contact.tags || []).map((t: any) => ({
-            id: t.tag.id,
-            name: t.tag.name
-        }))
-    })) as Contact[];
-});
-
-export const fetchContactLocations = query(v.string(), async (contactId: string) => {
-    const user = getAuthenticatedUser();
-    if (!hasAccess(user, 'contacts')) {
-        throw new Error('Forbidden');
+        });
+        
+        return (results as any[]).map(r => {
+            const t: any = r.talent;
+            if (!t) return null;
+            return {
+                ...(t as any),
+                createdAt: t.createdAt?.toISOString(),
+                updatedAt: t.updatedAt?.toISOString(),
+                availabilityDate: t.availabilityDate?.toISOString(),
+                contact: t.contact ? {
+                    ...(t.contact as any),
+                    birthday: t.contact.birthday?.toISOString(),
+                    createdAt: t.contact.createdAt?.toISOString(),
+                    updatedAt: t.contact.updatedAt?.toISOString(),
+                } : null
+            };
+        }).filter(Boolean);
     }
-
-    const associations = await db.select({
-        location: location
-    })
-        .from(locationContact)
-        .innerJoin(location, eq(locationContact.locationId, location.id))
-        .where(eq(locationContact.contactId, contactId));
-
-    return associations.map(a => a.location);
+    return [];
 });

@@ -1,4 +1,4 @@
-﻿{
+{
     "name": "@ac/db",
     "version": "0.0.1",
     "private": true,
@@ -16,11 +16,11 @@
         }
     },
     "dependencies": {
-        "drizzle-orm": "0.45.1",
+        "drizzle-orm": "0.45.2",
         "postgres": "^3.4.5"
     },
     "devDependencies": {
-        "typescript": "^5.9.3",
+        "typescript": "~5.7.3",
         "drizzle-kit": "^0.31.9",
         "@types/node": "^22.13.9"
     }

@@ -15,3 +15,5 @@ export {
 	type ButtonSize,
 	type ButtonVariant,
 };
+
+export default Root;

@@ -1,6 +1,6 @@
 import type { UserWithRolesAndClaims } from './auth.d';
 
-export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements';
+export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements' | 'talents';
 
 export function parseRoles(user: UserWithRolesAndClaims): string[] {
 	const raw = user?.roles;

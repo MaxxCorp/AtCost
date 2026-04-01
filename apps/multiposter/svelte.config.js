@@ -24,7 +24,10 @@ const config = {
 			remoteFunctions: true
 		},
 		alias: {
-			"@": "./src/lib"
+			"@": "./src/lib",
+			"@ac/validations": "../../packages/validations/src/index.ts",
+			"@ac/ui": "../../packages/ui/src/index.ts",
+			"@ac/db": "../../packages/db/src/index.ts"
 		}
 	},
 	compilerOptions: {
