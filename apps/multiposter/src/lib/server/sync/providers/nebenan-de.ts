@@ -213,8 +213,10 @@ export class NebenanDeProvider implements SyncProvider {
         const end = event.endDateTime?.toISOString();
 
         // The business profile ID (Gewerbeprofil)
-        // Hardcoded as identified during research, but could be made configurable.
-        const profileId = 'cbe780d1-9642-49e5-8928-d1c163698658';
+        const profileId = this.config?.settings?.profileId;
+        if (!profileId) {
+            throw new Error('Nebenan.de: profileId is required in sync configuration settings');
+        }
 
         return {
             subject: summary,

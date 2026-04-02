@@ -14,6 +14,7 @@ export const synchronizationBaseSchema = v.object({
         baseUrl: v.optional(v.string()),
         username: v.optional(v.string()),
         applicationPassword: v.optional(v.string()),
+        profileId: v.optional(v.string()),
     })),
 });
 

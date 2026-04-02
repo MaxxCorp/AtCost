@@ -474,6 +474,10 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const orgName = env.ORG_NAME;
         if (!orgName) return;
 
+        // Step 0: Reset organizer to start clean
+        const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstalter=0`;
+        await this.authedFetch(resetUrl);
+
         // Resolve the contact for this event
         const contact = await resolveContactForEventId(event.metadata?.eventId, true);
 
@@ -547,11 +551,16 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const orgName = env.ORG_NAME;
         if (!orgName) return;
 
-        const contact = await resolveContactForEventId(event.metadata?.eventId, true);
+        // Step 0: Reset venue to start clean
+        const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstaltungsort=0`;
+        await this.authedFetch(resetUrl);
+
+        // Resolve the venue/location for this event
+        const venue = event.venue;
+        const venueName = venue?.name || event.location;
 
         // Step 1+2: Search for venue
-        const contactName = contact?.name;
-        const searchString = contactName ? `${orgName} ${contactName}` : orgName;
+        const searchString = venueName ? `${orgName} ${venueName}` : orgName;
         console.log(`[Berlin.de MH Calendar] Searching for venue: ${searchString}`);
 
         const searchUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&subaction=veranstaltungsort`;
@@ -592,8 +601,8 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         // Step 5+6: Fill phone and save
         const data: Record<string, string> = {};
 
-        if (contact?.phone) {
-            data.update_vo_telefon = contact.phone;
+        if (venue?.phone) {
+            data.update_vo_telefon = venue.phone;
         }
 
         if (Object.keys(data).length > 0) {
