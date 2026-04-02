@@ -151,24 +151,54 @@ export class NebenanDeProvider implements SyncProvider {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'nope-client': NebenanDeProvider.NOPE_CLIENT
+                'nope-client': NebenanDeProvider.NOPE_CLIENT,
+                'Origin': 'https://gewerbe.nebenan.de',
+                'Referer': 'https://gewerbe.nebenan.de/'
             },
             body: JSON.stringify({ user: { email, password } })
         });
 
         if (!response.ok) {
-            throw new Error(`Nebenan.de login failed: ${response.status}`);
+            let errorDetail = '';
+            try {
+                const data = await response.json();
+                if (data.errors && Array.isArray(data.errors)) {
+                    errorDetail = data.errors.map((e: any) => `${e.field}: ${e.code}`).join(', ');
+                }
+            } catch { /* ignore if JSON parsing fails */ }
+
+            throw new Error(`Nebenan.de login failed: ${response.status} ${errorDetail}`);
         }
 
-        this.sessionToken = response.headers.get('x-auth-token') || undefined;
+        // 1. Try to find the token in headers
+        // Headers.get is case-insensitive, so 'x-auth-token' is standard.
+        this.sessionToken = 
+            response.headers.get('x-auth-token') || 
+            response.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') || 
+            response.headers.get('Auth-Token') || 
+            undefined;
+
         if (!this.sessionToken) {
-            // Check if it's in the response body (unlikely for x-auth-token but let's be safe)
+            // 2. Check the response body
             const data = await response.json();
-            this.sessionToken = data.token || data.user?.token;
-        }
-
-        if (!this.sessionToken) {
-            throw new Error('Nebenan.de: Failed to obtain session token after login');
+            this.sessionToken = 
+                data.token || 
+                data.user?.token || 
+                data.session_token || 
+                data.auth_token || 
+                data.authentication_token;
+            
+            if (!this.sessionToken) {
+                // Log context for debugging when a 2xx response is received but no token is found
+                const headerKeys = Array.from(response.headers.keys()).join(', ');
+                const bodyKeys = Object.keys(data).join(', ');
+                throw new Error(
+                    `Nebenan.de: Failed to obtain session token after login. ` +
+                    `Status: ${response.status}. ` +
+                    `Available headers: [${headerKeys}]. ` +
+                    `Available body keys: [${bodyKeys}].`
+                );
+            }
         }
     }
 
