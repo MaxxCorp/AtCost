@@ -26,32 +26,32 @@ export class NebenanDeProvider implements SyncProvider {
     private sessionToken?: string;
 
     private get baseUrl(): string {
-        // TODO: Replace with the actual API base URL observed in Network tab
-        return env.NEBENAN_DE_API_URL || 'https://api.nebenan.de/v1';
+        return env.NEBENAN_DE_API_URL || 'https://biz-nbn.nebenan.de/api';
     }
 
+    private static readonly NOPE_CLIENT = 'nope-web-v129.45.1';
+
     /**
-     * Map internal (berlin.de based) categories to Nebenan.de categories.
-     * Nebenan.de only supports a single category.
+     * Map internal categories to Nebenan.de numeric category IDs.
      */
-    private static readonly CATEGORY_MAPPING: Record<string, string> = {
-        'Ausstellungen': 'Kunst, Kultur & Musik',
-        'Bälle & Galas': 'Feste & Feiern',
-        'Bildung & Vorträge': 'Bildung & Erfahrung',
-        'Festivals': 'Feste & Feiern',
-        'Jazz & Blues': 'Kunst, Kultur & Musik',
-        'Kabarett & Comedy': 'Kunst, Kultur & Musik',
-        'Kinderveranstaltungen': 'Familien & Kinder',
-        'Klassische Konzerte': 'Kunst, Kultur & Musik',
-        'Literatur': 'Kunst, Kultur & Musik',
-        'Musical': 'Kunst, Kultur & Musik',
-        'Oper & Tanz': 'Kunst, Kultur & Musik',
-        'Pop, Rock & HipHop': 'Kunst, Kultur & Musik',
-        'Schlager & Volksmusik': 'Kunst, Kultur & Musik',
-        'Show': 'Kunst, Kultur & Musik',
-        'Sport': 'Sport & Bewegung',
-        'Theater': 'Kunst, Kultur & Musik',
-        'Vermischtes': 'Sonstiges',
+    private static readonly CATEGORY_MAPPING: Record<string, number> = {
+        'Ausstellungen': 19, // Kunst, Kultur & Musik
+        'Bälle & Galas': 23, // Feste & Feiern
+        'Bildung & Vorträge': 18, // Bildung & Erfahrung
+        'Festivals': 23, // Feste & Feiern
+        'Jazz & Blues': 19, // Kunst, Kultur & Musik
+        'Kabarett & Comedy': 19, // Kunst, Kultur & Musik
+        'Kinderveranstaltungen': 21, // Familien & Kinder
+        'Klassische Konzerte': 19, // Kunst, Kultur & Musik
+        'Literatur': 19, // Kunst, Kultur & Musik
+        'Musical': 19, // Kunst, Kultur & Musik
+        'Oper & Tanz': 19, // Kunst, Kultur & Musik
+        'Pop, Rock & HipHop': 19, // Kunst, Kultur & Musik
+        'Schlager & Volksmusik': 19, // Kunst, Kultur & Musik
+        'Show': 19, // Kunst, Kultur & Musik
+        'Sport': 27, // Sport & Bewegung
+        'Theater': 19, // Kunst, Kultur & Musik
+        'Vermischtes': 32, // Sonstiges
     };
 
     async initialize(config: SyncConfig): Promise<void> {
@@ -78,8 +78,7 @@ export class NebenanDeProvider implements SyncProvider {
 
         const payload = this.formatEventPayload(event);
 
-        // TODO: Replace with actual endpoint and handle response
-        const response = await this.authedFetch(`${this.baseUrl}/events`, {
+        const response = await this.authedFetch(`${this.baseUrl}/private/hood_messages`, {
             method: 'POST',
             body: JSON.stringify(payload)
         });
@@ -92,8 +91,8 @@ export class NebenanDeProvider implements SyncProvider {
         const data = await response.json();
         
         return {
-            externalId: data.id || 'PLACEHOLDER_ID',
-            etag: new Date().toISOString()
+            externalId: data.id?.toString() || 'PLACEHOLDER_ID',
+            etag: new Date(data.updated_at || new Date()).toISOString()
         };
     }
 
@@ -104,9 +103,8 @@ export class NebenanDeProvider implements SyncProvider {
 
         const payload = this.formatEventPayload(event);
 
-        // TODO: Replace with actual endpoint for updates (usually PUT or PATCH)
-        const response = await this.authedFetch(`${this.baseUrl}/events/${externalId}`, {
-            method: 'PUT',
+        const response = await this.authedFetch(`${this.baseUrl}/private/hood_messages/${externalId}`, {
+            method: 'PATCH',
             body: JSON.stringify(payload)
         });
 
@@ -123,8 +121,7 @@ export class NebenanDeProvider implements SyncProvider {
 
         await this.ensureLoggedIn();
 
-        // TODO: Replace with actual delete endpoint
-        const response = await this.authedFetch(`${this.baseUrl}/events/${externalId}`, {
+        const response = await this.authedFetch(`${this.baseUrl}/private/hood_messages/${externalId}`, {
             method: 'DELETE'
         });
 
@@ -150,26 +147,29 @@ export class NebenanDeProvider implements SyncProvider {
     private async login(): Promise<void> {
         const { email, password } = this.getCredentials();
 
-        // TODO: Replace with the actual login endpoint and payload format.
-        // Nebenan.de is an SPA, so it likely expects JSON or sends a JWT/Session cookie.
-        const response = await fetch(`${this.baseUrl}/login`, {
+        const response = await fetch(`${this.baseUrl}/sessions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            headers: { 
+                'Content-Type': 'application/json',
+                'nope-client': NebenanDeProvider.NOPE_CLIENT
+            },
+            body: JSON.stringify({ user: { email, password } })
         });
 
         if (!response.ok) {
             throw new Error(`Nebenan.de login failed: ${response.status}`);
         }
 
-        // Example: If they return a JWT token
-        // const data = await response.json();
-        // this.sessionToken = data.token;
-        
-        // Or if they use Set-Cookie, fetch handles it automatically given we 
-        // will preserve cookies, but Node fetch might need manual cookie jarring
-        // if we are instantiating fetch fresh every time.
-        this.sessionToken = 'DUMMY_TOKEN_UNTIL_VERIFIED'; 
+        this.sessionToken = response.headers.get('x-auth-token') || undefined;
+        if (!this.sessionToken) {
+            // Check if it's in the response body (unlikely for x-auth-token but let's be safe)
+            const data = await response.json();
+            this.sessionToken = data.token || data.user?.token;
+        }
+
+        if (!this.sessionToken) {
+            throw new Error('Nebenan.de: Failed to obtain session token after login');
+        }
     }
 
     private async ensureLoggedIn(): Promise<void> {
@@ -181,8 +181,8 @@ export class NebenanDeProvider implements SyncProvider {
         if (!this.sessionToken) throw new Error('Not logged in');
 
         const headers = new Headers(options.headers);
-        // TODO: Adjust standard auth header based on Nebenan API inspection
-        headers.set('Authorization', `Bearer ${this.sessionToken}`);
+        headers.set('x-auth-token', this.sessionToken);
+        headers.set('nope-client', NebenanDeProvider.NOPE_CLIENT);
         headers.set('Content-Type', 'application/json');
 
         return fetch(url, { ...options, headers });
@@ -202,48 +202,29 @@ export class NebenanDeProvider implements SyncProvider {
         
         // Map category
         const internalCategory = event.metadata?.categoryBerlinDotDe as string | undefined;
-        let mappedCategory = 'Sonstiges'; // Fallback
+        let mappedCategoryId = 32; // Fallback: Sonstiges
         
         if (internalCategory && internalCategory in NebenanDeProvider.CATEGORY_MAPPING) {
-            mappedCategory = NebenanDeProvider.CATEGORY_MAPPING[internalCategory];
+            mappedCategoryId = NebenanDeProvider.CATEGORY_MAPPING[internalCategory];
         }
 
-        // Round time to 30 mins
-        const roundTime = (date: Date): { day: string; time: string } => {
-            const minutes = date.getMinutes();
-            // simple rounding to nearest 30 min block
-            const roundedMinutes = minutes >= 15 && minutes < 45 ? 30 : 0;
-            let finalHours = date.getHours();
-            if (minutes >= 45) finalHours += 1;
-            
-            const dd = String(date.getDate()).padStart(2, '0');
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const yyyy = date.getFullYear();
-            
-            const hh = String(finalHours % 24).padStart(2, '0');
-            const minStr = String(roundedMinutes).padStart(2, '0');
+        // Nebenan.de expects ISO strings for starts_at and ends_at
+        const start = event.startDateTime?.toISOString();
+        const end = event.endDateTime?.toISOString();
 
-            return {
-                day: `${yyyy}-${mm}-${dd}`, // Placeholder format, check API!
-                time: `${hh}:${minStr}`
-            };
-        };
+        // The business profile ID (Gewerbeprofil)
+        // Hardcoded as identified during research, but could be made configurable.
+        const profileId = 'cbe780d1-9642-49e5-8928-d1c163698658';
 
-        const start = event.startDateTime ? roundTime(event.startDateTime) : undefined;
-        const end = event.endDateTime ? roundTime(event.endDateTime) : undefined;
-
-        // TODO: Verify the actual JSON payload structure of the POST request
         return {
-            name: summary,
+            subject: summary,
+            body: plainDescription,
+            starts_at: start,
+            ends_at: end,
             location: locationName,
-            description: plainDescription,
-            category: mappedCategory,
-            visibility: 'Nachbarschaft, Umgebung & Partner-Profil', // Default max visibility
-            start_date: start?.day,
-            start_time: start?.time,
-            end_date: end?.day,
-            end_time: end?.time,
-            // image upload handled via separate endpoint or base64 usually
+            category_id: mappedCategoryId,
+            profile_id: profileId,
+            visibility: 'neighborhood_surroundings_and_partner_profile' // Internal name for the maximum visibility option
         };
     }
 }
