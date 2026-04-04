@@ -4,7 +4,7 @@
 	import { hasAccess, parseRoles, parseClaims } from "$lib/authorization";
 	import { FEATURES, getVisibleFeatures } from "$lib/features";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "$lib/paraglide/messages";
 
 	// Use a promise to handle session loading asynchronously
 	let sessionPromise = $state(loadSession());
@@ -107,9 +107,4 @@
 	{/await}
 </div>
 
-<style>
-	:global(main) {
-		background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-		min-height: 100vh;
-	}
-</style>
+

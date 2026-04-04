@@ -452,6 +452,23 @@
 								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 							/>
 						</div>
+						<div>
+							<label
+								for="nebenanProfileId"
+								class="block text-sm font-medium text-gray-700 mb-1"
+							>
+								Business Profile ID (Gewerbeprofil-ID)
+							</label>
+							<input
+								{...getField("settings.profileId").as("text")}
+								id="nebenanProfileId"
+								placeholder="e.g. cbe780d1-9642-49e5-8928-d1c163698658"
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							/>
+							<p class="text-xs text-gray-500 mt-1">
+								The UUID of your business profile on Nebenan.de
+							</p>
+						</div>
 					{/if}
 
 					{#if selectedProvider === "wp-the-events-calendar"}

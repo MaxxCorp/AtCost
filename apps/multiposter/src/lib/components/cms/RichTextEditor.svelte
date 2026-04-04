@@ -211,42 +211,4 @@
     <div bind:this={editorElement} class="ck-content"></div>
 </div>
 
-<style>
-    .editor-container {
-        border: 1px solid #e2e8f0;
-        border-radius: 0.5rem;
-        min-height: 300px;
-        position: relative;
-    }
 
-    .loading-state,
-    .error-state {
-        padding: 1rem;
-        color: #64748b;
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: #f8fafc;
-        z-index: 10;
-    }
-
-    .error-state {
-        background: #fef2f2;
-        border: 1px solid #fecaca;
-    }
-
-    /* Reset some styles that might conflict */
-    :global(.ck-editor__editable) {
-        min-height: 300px;
-    }
-
-    :global(.ck.ck-editor__main > .ck-editor__editable:not(.ck-focused)) {
-        border-color: transparent;
-    }
-</style>

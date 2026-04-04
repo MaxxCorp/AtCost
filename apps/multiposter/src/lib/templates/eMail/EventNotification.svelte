@@ -48,21 +48,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neue Veranstaltung: {event.summary}</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .event-title { font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
-        .event-details { background-color: #ffffff; padding: 20px; border: 1px solid #dee2e6; border-radius: 8px; margin-bottom: 20px; }
-        .detail-row { margin-bottom: 15px; }
-        .detail-label { font-weight: bold; color: #495057; }
-        .contact-info { background-color: #e9ecef; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        .qr-code { text-align: center; margin: 20px 0; }
-        .footer { font-size: 12px; color: #6c757d; margin-top: 30px; border-top: 1px solid #dee2e6; padding-top: 20px; }
-        @media only screen and (max-width: 600px) {
-            body { padding: 10px; }
-            .header, .event-details, .contact-info { padding: 15px; }
-        }
-    </style>
+
 </head>
 <body>
     <div class="header">

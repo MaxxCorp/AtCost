@@ -1,4 +1,4 @@
-import EventNotificationHtml from '../../../static/templates/eMail/EventNotification.html.svelte';
+import EventNotificationHtml from '../templates/eMail/EventNotification.svelte';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

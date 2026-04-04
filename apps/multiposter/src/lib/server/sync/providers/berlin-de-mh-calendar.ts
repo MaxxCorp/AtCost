@@ -474,13 +474,21 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const orgName = env.ORG_NAME;
         if (!orgName) return;
 
+        // Step 0: Reset organizer to start clean
+        const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstalter=0`;
+        await this.authedFetch(resetUrl);
+
         // Resolve the contact for this event
         const contact = await resolveContactForEventId(event.metadata?.eventId, true);
 
         // Step 1+2: Search for organizer
+        const contactName = contact?.name;
+        const searchString = contactName ? `${orgName} ${contactName}` : orgName;
+        console.log(`[Berlin.de MH Calendar] Searching for organizer: ${searchString}`);
+
         const searchUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&subaction=veranstalter`;
         const searchResponse = await this.postForm(searchUrl, {
-            search_name: orgName,
+            search_name: searchString,
             subaction: 'veranstalter'
         });
 
@@ -490,10 +498,10 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const veranstalterLinks = [...searchHtml.matchAll(/set_veranstalter=(\d+)[^>]*>([^<]+)<\/a>/g)];
         let selectedId: string | undefined;
 
-        // Find the one matching ORG_NAME
+        // Find the one matching our search string (exact or inclusion)
         for (const match of veranstalterLinks) {
             const linkText = match[2].trim();
-            if (linkText.includes(orgName)) {
+            if (linkText === searchString || linkText.includes(searchString) || linkText.includes(orgName)) {
                 selectedId = match[1];
                 break;
             }
@@ -543,12 +551,21 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const orgName = env.ORG_NAME;
         if (!orgName) return;
 
-        const contact = await resolveContactForEventId(event.metadata?.eventId, true);
+        // Step 0: Reset venue to start clean
+        const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstaltungsort=0`;
+        await this.authedFetch(resetUrl);
+
+        // Resolve the venue/location for this event
+        const venue = event.venue;
+        const venueName = venue?.name || event.location;
 
         // Step 1+2: Search for venue
+        const searchString = venueName ? `${orgName} ${venueName}` : orgName;
+        console.log(`[Berlin.de MH Calendar] Searching for venue: ${searchString}`);
+
         const searchUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&subaction=veranstaltungsort`;
         const searchResponse = await this.postForm(searchUrl, {
-            search_name: orgName,
+            search_name: searchString,
             subaction: 'veranstaltungsort'
         });
 
@@ -558,13 +575,10 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const venueLinks = [...searchHtml.matchAll(/set_veranstaltungsort=(\d+)[^>]*>([^<]+)<\/a>/g)];
         let selectedId: string | undefined;
 
-        // Try to match ORG_NAME + location name
-        const locationName = event.venue?.name || event.location;
-        const searchString = locationName ? `${orgName} ${locationName}` : orgName;
-
+        // Find the one matching our search string (exact or inclusion)
         for (const match of venueLinks) {
             const linkText = match[2].trim();
-            if (linkText.includes(searchString) || linkText.includes(orgName)) {
+            if (linkText === searchString || linkText.includes(searchString) || linkText.includes(orgName)) {
                 selectedId = match[1];
                 break;
             }
@@ -587,8 +601,8 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         // Step 5+6: Fill phone and save
         const data: Record<string, string> = {};
 
-        if (contact?.phone) {
-            data.update_vo_telefon = contact.phone;
+        if (venue?.phone) {
+            data.update_vo_telefon = venue.phone;
         }
 
         if (Object.keys(data).length > 0) {

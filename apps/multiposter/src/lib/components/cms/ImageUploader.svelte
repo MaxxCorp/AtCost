@@ -10,7 +10,7 @@
         Loader2,
         Trash2,
     } from "@lucide/svelte";
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "$lib/paraglide/messages";
 
     let { value = $bindable(""), label = "", id = "image-uploader" } = $props();
 
@@ -142,7 +142,7 @@
         aria-label="Upload image"
         class="relative border-2 border-dashed rounded-lg transition-all duration-200 overflow-hidden bg-gray-50 min-h-[200px] flex items-center justify-center
         {isDragging
-            ? 'border-primary-500 bg-primary-50'
+            ? 'border-blue-500 bg-blue-50'
             : 'border-gray-300 hover:border-gray-400'}"
         ondragover={(e) => {
             e.preventDefault();
@@ -158,7 +158,7 @@
     >
         {#if isUploading}
             <div class="flex flex-col items-center space-y-2">
-                <Loader2 class="w-8 h-8 animate-spin text-primary-600" />
+                <Loader2 class="w-8 h-8 animate-spin text-blue-600" />
                 <p class="text-sm text-gray-500">Uploading...</p>
             </div>
         {:else if showCamera}
@@ -250,7 +250,7 @@
                 <div class="flex items-center gap-3">
                     <label class="cursor-pointer">
                         <div
-                            class="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md shadow-sm hover:bg-primary-700 font-medium text-sm transition-colors"
+                            class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 font-medium text-sm transition-colors"
                         >
                             <Upload class="w-4 h-4 mr-2" />
                             Select File
@@ -279,15 +279,4 @@
     </div>
 </div>
 
-<style>
-    /* Premium accents */
-    .bg-primary-50 {
-        background-color: #f0f7ff;
-    }
-    .border-primary-500 {
-        border-color: #3b82f6;
-    }
-    .bg-primary-600 {
-        background-color: #2563eb;
-    }
-</style>
+

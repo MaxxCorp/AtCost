@@ -3,7 +3,7 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { cn, type WithElementRef } from "$lib/utils.js";
 	import type { HTMLAttributes } from "svelte/elements";
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "$lib/paraglide/messages";
 
 	let {
 		ref = $bindable(null),

@@ -383,11 +383,11 @@
         {:else if associatedItems.length === 0}
             <EmptyState
                 icon={Icon}
-                title={emptyTitle || `No ${title}`}
+                title={emptyTitle || m.no_item_plural({ item: title })}
                 description={emptyDescription ||
-                    `Get started by creating your first ${title.toLowerCase().replace(/s$/, "")}`}
+                    m.get_started_item({ item: title.toLowerCase().replace(/s$/, "") })}
                 actionLabel={emptyActionLabel ||
-                    `Create ${title.replace(/s$/, "")}`}
+                    m.create_item({ item: title.replace(/s$/, "") })}
                 actionHref="#"
             />
         {:else if displayedItems.length === 0}
@@ -641,7 +641,7 @@
                                         loading={deletingItemId === item.id}
                                         loadingLabel=""
                                         onclick={() => deleteItem(item)}
-                                        title={`Delete ${title.toLowerCase()} forever`}
+                                        title={m.delete_forever({ item: title.toLowerCase() })}
                                     >
                                         <Trash2 size={14} />
                                     </AsyncButton>

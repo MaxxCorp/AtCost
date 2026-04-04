@@ -1,6 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "$lib/paraglide/messages";
     import type { Event } from "../../../routes/events/list.remote";
     import { deleteEvents as deleteEventAction } from "../../../routes/events/[id]/delete.remote";
     import { deleteSeries as deleteSeriesAction } from "../../../routes/events/[id]/delete-series.remote";

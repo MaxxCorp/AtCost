@@ -1,6 +1,6 @@
 import { ICONS } from '$lib/icons';
 import type { Feature } from '$lib/authorization';
-import * as m from '$lib/paraglide/messages.js';
+import * as m from '$lib/paraglide/messages';
 
 export interface FeatureMeta {
   key: Feature;

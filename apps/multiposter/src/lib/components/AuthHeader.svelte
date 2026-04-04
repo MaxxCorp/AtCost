@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { authClient } from "$lib/auth";
 	import { onMount } from "svelte";
-	import * as m from "$lib/paraglide/messages.js";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
+	import * as m from "$lib/paraglide/messages";
+	import { setLocale, getLocale } from "$lib/paraglide/runtime";
 
 	let user = $state<any>(null);
 	let loading = $state(true);
@@ -332,9 +332,4 @@
 	</nav>
 </header>
 
-<style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-	}
-</style>
+

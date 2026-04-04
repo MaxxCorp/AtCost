@@ -151,9 +151,4 @@
     {/await}
 </div>
 
-<style>
-    :global(main) {
-        background: #f8fafc;
-        min-height: 100vh;
-    }
-</style>
+
