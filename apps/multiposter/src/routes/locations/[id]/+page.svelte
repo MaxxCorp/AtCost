@@ -35,10 +35,11 @@
     import { listLocations } from "../list.remote";
     import { createLocation } from "../new/create.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+	const locationPromise = $state(readLocation(page.params.id || ""));
 </script>
 
 <div class="container mx-auto px-4 py-8">
-    {#await readLocation(page.params.id || "")}
+    {#await locationPromise}
         <LoadingSection message={m.loading_item({ item: m.feature_locations_title() })} />
     {:then location}
         {#if location}

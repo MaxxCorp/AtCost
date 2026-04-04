@@ -1,6 +1,6 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
-    import ContactForm from "@ac/ui/components/forms/ContactForm.svelte";
+    import SharedContactForm from "@ac/ui/components/forms/ContactForm.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import type { Snippet } from "svelte";
 
@@ -29,7 +29,7 @@
     }: Props = $props();
 </script>
 
-<ContactForm
+<SharedContactForm
     {initialData}
     {remoteFunction}
     {schema}

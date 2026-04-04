@@ -231,7 +231,7 @@
                         return await addAssociation({
                             type: "location",
                             entityId: p.itemId,
-                            contactId: p.entityId,
+                            talentId: talentData.id,
                         });
                     }}
                     removeAssociationRemote={async (p: any) => {
@@ -239,10 +239,10 @@
                         return await removeAssociation({
                             type: "location",
                             entityId: p.itemId,
-                            contactId: p.entityId,
+                            talentId: talentData.id,
                         });
                     }}
-                    deleteItemRemote={async (ids) => {
+                    deleteItemRemote={async (ids: any) => {
                         return await handleDelete({
                             ids: Array.isArray(ids) ? ids : [ids],
                             deleteFn: deleteLocation,
@@ -261,11 +261,11 @@
                         );
                     }}
                 >
-                    {#snippet renderItemLabel(location)}
+                    {#snippet renderItemLabel(location: any)}
                         {location.name}
                         {location.roomId ? `(${location.roomId})` : ""}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction: rf, schema, id, initialData: formData, onSuccess, onCancel })}
+                    {#snippet renderForm({ remoteFunction: rf, schema, id, initialData: formData, onSuccess, onCancel }: any)}
                         <LocationForm
                             remoteFunction={rf}
                             validationSchema={schema}

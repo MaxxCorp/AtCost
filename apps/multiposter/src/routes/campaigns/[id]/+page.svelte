@@ -7,9 +7,10 @@
 	import CampaignForm from "$lib/components/campaigns/CampaignForm.svelte";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
 	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
+	const campaignPromise = $state(readCampaign(page.params.id ?? ""));
 </script>
 
-{#await readCampaign(page.params.id ?? "")}
+{#await campaignPromise}
 	<LoadingSection message={m.loading_item({ item: m.feature_campaigns_title() })} />
 {:then campaign}
 	{#if campaign}

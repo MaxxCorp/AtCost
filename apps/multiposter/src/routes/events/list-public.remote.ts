@@ -77,7 +77,7 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
         .from(kioskLocation)
         .where(eq(kioskLocation.kioskId, kioskId));
 
-    const kioskLocationIds = kioskLocations.map(l => l.id);
+    const kioskLocationIds = kioskLocations.map((l: any) => l.id);
 
     const now = new Date();
 
@@ -96,7 +96,7 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
     } else {
         const lookPastDate = new Date(now.getTime() - (kioskData.lookPast * 1000));
         const lookAheadDate = new Date(now.getTime() + (kioskData.lookAhead * 1000));
-        
+
         conditions.push(gte(event.endDateTime, lookPastDate));
         conditions.push(lte(event.startDateTime, lookAheadDate));
     }
@@ -132,7 +132,7 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
 
     if (results.length === 0) return [];
 
-    const eventIds = results.map(e => e.id);
+    const eventIds = results.map((e: any) => e.id);
     const fullEvents = await db
         .select()
         .from(event)
@@ -144,7 +144,7 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
 
 // Helper for data hydration to stay DRY
 async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
-    const eventIds = events.map(e => e.id);
+    const eventIds = events.map((e: any) => e.id);
     if (eventIds.length === 0) return [];
 
     const resourceData = await db
@@ -197,7 +197,7 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
         .innerJoin(contact, eq(eventContact.contactId, contact.id))
         .where(inArray(eventContact.eventId, eventIds));
 
-    const contactIds = contactsData.map(c => c.contactId);
+    const contactIds = contactsData.map((c: any) => c.contactId);
 
     // Fetch tags for event contacts to identify 'Employee'
     let contactEmployeeTags = new Set<string>();
@@ -209,13 +209,13 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
                 inArray(contactTag.contactId, contactIds),
                 eq(tag.name, 'Employee')
             ));
-        tags.forEach(t => contactEmployeeTags.add(t.contactId));
+        tags.forEach((t: any) => contactEmployeeTags.add(t.contactId));
     }
 
     // Collect all location IDs (from resources and direct assignment)
     const allLocationIds = new Set<string>();
-    resourceData.forEach(r => { if (r.locationId) allLocationIds.add(r.locationId); });
-    directLocationData.forEach(l => allLocationIds.add(l.locationId));
+    resourceData.forEach((r: any) => { if (r.locationId) allLocationIds.add(r.locationId); });
+    directLocationData.forEach((l: any) => allLocationIds.add(l.locationId));
 
     // Fetch full location details
     let fullLocations: any[] = [];
@@ -281,7 +281,7 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
         }
     }
 
-    return events.map(row => {
+    return events.map((row: any) => {
         const transformedRow = {
             ...row,
             createdAt: row.createdAt.toISOString(),
@@ -300,15 +300,15 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
             inclusivityInformation: undefined
         };
 
-        const evtContacts = contactsData.filter(c => c.eventId === row.id);
-        const acceptedCount = evtContacts.filter(c => c.participationStatus === 'accepted').length;
+        const evtContacts = contactsData.filter((c: any) => c.eventId === row.id);
+        const acceptedCount = evtContacts.filter((c: any) => c.participationStatus === 'accepted').length;
 
         // Resolve Display Contact
         let chosenContactId: string | null = null;
         let chosenContactDetails: any = null;
 
         // 1. Event Contact with 'Employee' tag
-        const employeeContact = evtContacts.find(c => contactEmployeeTags.has(c.contactId));
+        const employeeContact = evtContacts.find((c: any) => contactEmployeeTags.has(c.contactId));
         if (employeeContact) {
             chosenContactId = employeeContact.contactId;
             chosenContactDetails = employeeContact;
@@ -318,16 +318,16 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
         if (!chosenContactId) {
             // Get locations for this event
             const evtLocIds = [
-                ...resourceData.filter(r => r.eventId === row.id && r.locationId).map(r => r.locationId!),
-                ...directLocationData.filter(l => l.eventId === row.id).map(l => l.locationId)
+                ...resourceData.filter((r: any) => r.eventId === row.id && r.locationId).map((r: any) => r.locationId!),
+                ...directLocationData.filter((l: any) => l.eventId === row.id).map((l: any) => l.locationId)
             ];
 
             for (const locId of evtLocIds) {
                 if (locationEmployeeContacts[locId]) {
                     chosenContactId = locationEmployeeContacts[locId];
                     // Find details
-                    chosenContactDetails = evtContacts.find(c => c.contactId === chosenContactId)
-                        || extraContactDetails.find(c => c.id === chosenContactId);
+                    chosenContactDetails = evtContacts.find((c: any) => c.contactId === chosenContactId)
+                        || extraContactDetails.find((c: any) => c.id === chosenContactId);
                     if (chosenContactDetails) break;
                 }
             }
@@ -363,32 +363,32 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
             };
         }
 
-        const evtResources = resourceData.filter(r => r.eventId === row.id);
-        const totalCapacity = evtResources.reduce((sum, r) => sum + (r.maxOccupancy || 0), 0);
+        const evtResources = resourceData.filter((r: any) => r.eventId === row.id);
+        const totalCapacity = evtResources.reduce((sum: number, r: any) => sum + (r.maxOccupancy || 0), 0);
         const inclusivity = evtResources
-            .map(r => r.inclusivitySupport)
-            .filter((i): i is string => !!i);
+            .map((r: any) => r.inclusivitySupport)
+            .filter((i: any): i is string => !!i);
 
         return {
             ...transformedRow,
             resolvedContact,
-            contactIds: evtContacts.map(c => c.contactId),
+            contactIds: evtContacts.map((c: any) => c.contactId),
             confirmedParticipants: acceptedCount,
             maxOccupancy: totalCapacity > 0 ? totalCapacity : null,
             inclusivityInformation: inclusivity.length > 0 ? [...new Set(inclusivity)] : undefined,
-            roomTitle: evtResources.find(r => r.resourceType === 'room')?.resourceName || evtResources[0]?.resourceName || null,
-            tags: eventTagsData.filter(t => t.eventId === row.id).map(t => t.tagName).filter((t): t is string => !!t),
+            roomTitle: evtResources.find((r: any) => r.resourceType === 'room')?.resourceName || evtResources[0]?.resourceName || null,
+            tags: eventTagsData.filter((t: any) => t.eventId === row.id).map((t: any) => t.tagName).filter((t: any): t is string => !!t),
             locationIds: [
                 ...new Set([
-                    ...evtResources.filter(r => r.locationId).map(r => r.locationId!),
-                    ...directLocationData.filter(l => l.eventId === row.id).map(l => l.locationId)
+                    ...evtResources.filter((r: any) => r.locationId).map((r: any) => r.locationId!),
+                    ...directLocationData.filter((l: any) => l.eventId === row.id).map((l: any) => l.locationId)
                 ])
             ],
-            locations: fullLocations.filter(l => 
-                (evtResources.some(er => er.eventId === row.id && er.locationId === l.id) ||
-                directLocationData.some(dl => dl.eventId === row.id && dl.locationId === l.id)) &&
+            locations: fullLocations.filter((l: any) =>
+                (evtResources.some((er: any) => er.eventId === row.id && er.locationId === l.id) ||
+                    directLocationData.some((dl: any) => dl.eventId === row.id && dl.locationId === l.id)) &&
                 l.isPublic
-            ).map(l => ({
+            ).map((l: any) => ({
                 id: l.id,
                 name: l.name,
                 street: l.street,

@@ -1,6 +1,6 @@
 import { query, form } from '$app/server';
 import { db } from '$lib/server/db';
-import { talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact } from '@ac/db';
+import { talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema } from '@ac/validations';
 import { eq, desc, inArray } from 'drizzle-orm';
@@ -405,17 +405,22 @@ export const getMyTalentProfile = query(v.void_(), async () => {
     const authUser = getAuthenticatedUser();
     if (!authUser) return null;
 
-    // Step 1: Get contact ID for user via userContact association
-    const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
-    if (!uc[0]) return null;
-
-    // Step 2: Use readTalent with the found contact's linked talent
-    const t = await db.query.talent.findFirst({
-        where: eq(talent.contactId, uc[0].contactId),
-    });
+    // Step 1: Get talent association for user directly via userTalent
+    const ut = await db.select().from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
     
-    if (!t) return null;
-    return await readTalent(t.id);
+    // Fallback: If not explicitly associated, check if linked via contact
+    if (!ut[0]) {
+        const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
+        if (uc[0]) {
+            const t = await db.query.talent.findFirst({
+                where: eq(talent.contactId, uc[0].contactId),
+            });
+            if (t) return await readTalent(t.id);
+        }
+        return null;
+    }
+
+    return await readTalent(ut[0].talentId);
 });
 
 export const listEmployees = query(v.void_(), async () => {

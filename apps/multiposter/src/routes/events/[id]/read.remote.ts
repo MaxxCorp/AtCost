@@ -130,14 +130,14 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	}
 
 	// Find first contact with 'Employee' tag
-	const employeeContact = Array.from(contactTagsMap.entries()).find(([_, tags]) => tags.includes('Employee'));
+	const employeeContact = Array.from(contactTagsMap.entries()).find(([_, tags]: [string, string[]]) => tags.includes('Employee'));
 	if (employeeContact) {
 		chosenContactId = employeeContact[0];
 	}
 
 	// 2. If no Event Employee Contact, check Location Employee Contacts
 	if (!chosenContactId && locations.length > 0) {
-		const locIds = locations.map(l => l.id);
+		const locIds = locations.map((l: any) => l.id);
 		const locationContacts = await db
 			.select({
 				contactId: locationContact.contactId,
@@ -151,7 +151,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		// Find first location contact with 'Employee' tag
 		// Note: The order isn't strictly defined by the prompt for multiple locations, 
 		// effectively "first found" in query order.
-		const locContact = locationContacts.find(row => row.tagName === 'Employee');
+		const locContact = locationContacts.find((row: any) => row.tagName === 'Employee');
 		if (locContact) {
 			chosenContactId = locContact.contactId;
 		}
@@ -195,13 +195,13 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		endDateTime: result.endDateTime?.toISOString() ?? null,
 		qrCodePath: result.qrCodePath,
 		iCalPath: result.iCalPath,
-		resourceIds: resources.map(r => r.id),
-		contactIds: contacts.map(c => c.id),
-		locationIds: locations.map(l => l.id),
-		locations: locations.map(l => ({
+		resourceIds: resources.map((r: any) => r.id),
+		contactIds: contacts.map((c: any) => c.id),
+		locationIds: locations.map((l: any) => l.id),
+		locations: locations.map((l: any) => ({
 			...l,
 		})),
-		tags: tags.map(t => t.name),
+		tags: tags.map((t: any) => t.name),
 		syncIds,
 		resolvedContact,
 	} as Event;

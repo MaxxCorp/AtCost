@@ -46,7 +46,15 @@
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
     import TagInput from "$lib/components/ui/TagInput.svelte";
     import { RRule } from "$lib/utils/rrule-compat";
-    import { CalendarClock, User, MapPin, ExternalLink, Trash2, ChevronDown, RefreshCw } from "@lucide/svelte";
+    import {
+        CalendarClock,
+        User,
+        MapPin,
+        ExternalLink,
+        Trash2,
+        ChevronDown,
+        RefreshCw,
+    } from "@lucide/svelte";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
     let {
@@ -92,8 +100,13 @@
         return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
     }
 
-    function getInitialEndDateTime(startParsed: any, endParsed: any, localNow: any) {
-        if (endParsed.date) return { date: endParsed.date, time: endParsed.time || "" };
+    function getInitialEndDateTime(
+        startParsed: any,
+        endParsed: any,
+        localNow: any,
+    ) {
+        if (endParsed.date)
+            return { date: endParsed.date, time: endParsed.time || "" };
 
         const startDate = startParsed.date || localNow.date;
         const startTime = startParsed.time || localNow.time;
@@ -129,7 +142,9 @@
         let current = (remoteFunction as any).fields;
         for (const part of parts) {
             if (!current) {
-                console.warn(`[EventForm] field ${name} part ${part} is missing!`);
+                console.warn(
+                    `[EventForm] field ${name} part ${part} is missing!`,
+                );
                 return {};
             }
             current = current[part];
@@ -146,16 +161,26 @@
     // svelte-ignore state_referenced_locally
     let hasEndTime = $state(initialData ? !!initialData.endDateTime : true);
     // svelte-ignore state_referenced_locally
-    let useDefaultReminders = $state((initialData?.reminders as any)?.useDefault ?? true);
+    let useDefaultReminders = $state(
+        (initialData?.reminders as any)?.useDefault ?? true,
+    );
     // svelte-ignore state_referenced_locally
-    let reminders = $state((initialData?.reminders as any)?.overrides ?? [{ method: "popup", minutes: 10 }]);
+    let reminders = $state(
+        (initialData?.reminders as any)?.overrides ?? [
+            { method: "popup", minutes: 10 },
+        ],
+    );
 
     // svelte-ignore state_referenced_locally
-    let guestsCanInviteOthers = $state(initialData?.guestsCanInviteOthers ?? false);
+    let guestsCanInviteOthers = $state(
+        initialData?.guestsCanInviteOthers ?? false,
+    );
     // svelte-ignore state_referenced_locally
     let guestsCanModify = $state(initialData?.guestsCanModify ?? false);
     // svelte-ignore state_referenced_locally
-    let guestsCanSeeOtherGuests = $state(initialData?.guestsCanSeeOtherGuests ?? false);
+    let guestsCanSeeOtherGuests = $state(
+        initialData?.guestsCanSeeOtherGuests ?? false,
+    );
     // svelte-ignore state_referenced_locally
     let isPublic = $state(initialData?.isPublic ?? true);
 
@@ -199,11 +224,19 @@
     // svelte-ignore state_referenced_locally
     let freeTextLocation = $state(initialData?.location || "");
     // svelte-ignore state_referenced_locally
-    let startTimeZoneInput = $state(initialData?.startTimeZone || browserTimezone);
+    let startTimeZoneInput = $state(
+        initialData?.startTimeZone || browserTimezone,
+    );
     // svelte-ignore state_referenced_locally
-    let endTimeZoneInput = $state(initialData?.endTimeZone || initialData?.startTimeZone || browserTimezone);
+    let endTimeZoneInput = $state(
+        initialData?.endTimeZone ||
+            initialData?.startTimeZone ||
+            browserTimezone,
+    );
     // svelte-ignore state_referenced_locally
-    let descriptionValue = $state(getField("description").value() ?? initialData?.description ?? "");
+    let descriptionValue = $state(
+        getField("description").value() ?? initialData?.description ?? "",
+    );
     // svelte-ignore state_referenced_locally
     let startDateInput = $state(startParsed.date || localNow.date);
     // svelte-ignore state_referenced_locally
@@ -229,9 +262,13 @@
     const hiddenRecurrenceRule = $derived(recurrenceRule ?? "");
     const hiddenTagsString = $derived(tagsString ?? "");
 
-    const isSeries = $derived(!!(initialData?.seriesId || initialData?.recurringEventId || (recurrenceRule && recurrenceRule.length > 0)));
-
-
+    const isSeries = $derived(
+        !!(
+            initialData?.seriesId ||
+            initialData?.recurringEventId ||
+            (recurrenceRule && recurrenceRule.length > 0)
+        ),
+    );
 
     // Helper to find location ID from text (for initial matching)
     async function findInitialLocationId() {
@@ -266,8 +303,8 @@
 
     const BERLIN_DE_CATEGORIES = [
         "Ausstellungen",
-        "BÃ¤lle & Galas",
-        "Bildung & VortrÃ¤ge",
+        "Bälle & Galas",
+        "Bildung & Vorträge",
         "Festivals",
         "Jazz & Blues",
         "Kabarett & Comedy",
@@ -304,7 +341,6 @@
         }),
     );
 
-
     // Sync default end time when start time changes if end time is empty
     function updateEndDateTime() {
         if (!startDateInput || !startTimeInput) return;
@@ -330,8 +366,6 @@
         const end = new Date(start.getTime() + 60 * 60000);
         return end.toTimeString().slice(0, 5);
     }
-
-
 
     async function toggleResource(resourceId: string) {
         if (selectedResourceIds.includes(resourceId)) {
@@ -395,12 +429,15 @@
     <Breadcrumb
         feature="events"
         // svelte-ignore state_referenced_locally
-        current={initialData?.summary ?? m.create_new({ item: m.feature_events_title() })}
+        current={initialData?.summary ??
+            m.create_new({ item: m.feature_events_title() })}
     />
 
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">
-            {isUpdating ? m.edit_item({ item: m.feature_events_title() }) : m.create_new({ item: m.feature_events_title() })}
+            {isUpdating
+                ? m.edit_item({ item: m.feature_events_title() })
+                : m.create_new({ item: m.feature_events_title() })}
         </h1>
         {#if isUpdating && initialData}
             {#if isSeries}
@@ -427,7 +464,8 @@
                             }}
                         >
                             <Trash2 size={14} class="mr-2" />
-                            {m.delete()} {m.instance()}
+                            {m.delete()}
+                            {m.instance()}
                         </DropdownMenu.Item>
                         <DropdownMenu.Item
                             class="text-red-600"
@@ -438,12 +476,16 @@
                                     toast.success(m.series_deleted());
                                     goto("/events");
                                 } catch (err: any) {
-                                    toast.error(err.message || "Failed to delete series");
+                                    toast.error(
+                                        err.message ||
+                                            "Failed to delete series",
+                                    );
                                 }
                             }}
                         >
                             <RefreshCw size={14} class="mr-2" />
-                            {m.delete()} {m.series()}
+                            {m.delete()}
+                            {m.series()}
                         </DropdownMenu.Item>
                     </DropdownMenu.Content>
                 </DropdownMenu.Root>
@@ -480,8 +522,7 @@
                     );
                     if (result?.error) {
                         toast.error(
-                            result.error.message ||
-                                m.something_went_wrong(),
+                            result.error.message || m.something_went_wrong(),
                         );
                         return;
                     }
@@ -489,9 +530,7 @@
                     goto("/events");
                 } catch (error: any) {
                     console.error("--- EventForm submission catch ---", error);
-                    toast.error(
-                        error?.message || m.something_went_wrong(),
-                    );
+                    toast.error(error?.message || m.something_went_wrong());
                 }
             })}
         class="space-y-6"
@@ -627,7 +666,11 @@
                     >{m.feature_resources_title()} ({m.optional()})</span
                 >
                 {#if !resourcesLoaded}
-                    <p class="text-sm text-gray-500">{m.loading_item({ item: m.feature_resources_title().toLowerCase() })}</p>
+                    <p class="text-sm text-gray-500">
+                        {m.loading_item({
+                            item: m.feature_resources_title().toLowerCase(),
+                        })}
+                    </p>
                 {:else}
                     <div
                         class="space-y-1 border rounded-md p-4 max-h-64 overflow-y-auto bg-gray-50"
@@ -657,7 +700,9 @@
                                     >{resource.name}</span
                                 >
                                 <span class="text-xs text-gray-500"
-                                    >({resource.type === "room" ? m.room_type_suffix() : m.equipment_type_suffix()})</span
+                                    >({resource.type === "room"
+                                        ? m.room_type_suffix()
+                                        : m.equipment_type_suffix()})</span
                                 >
                             </label>
                         {/each}
@@ -739,74 +784,74 @@
                         placeholder={m.enter_custom_location()}
                         onblur={() => remoteFunction.validate()}
                     />
+                {:else if !locationsLoaded}
+                    <p class="text-sm text-gray-500">
+                        {m.loading_item({
+                            item: m.feature_locations_title().toLowerCase(),
+                        })}
+                    </p>
                 {:else}
-                    {#if !locationsLoaded}
-                        <p class="text-sm text-gray-500">
-                            {m.loading_item({ item: m.feature_locations_title().toLowerCase() })}
-                        </p>
-                    {:else}
-                        <!-- Using Multi-Location Selector -->
-                        <EntityManager
-                            title={m.feature_locations_title()}
-                            icon={MapPin}
-                            {type}
-                            entityId={initialData?.id}
-                            initialItems={locations.filter((l: any) =>
-                                selectedLocationIds.includes(l.id),
-                            )}
-                            onchange={(ids: string[]) =>
-                                (selectedLocationIds = ids)}
-                            embedded={true}
-                            listItemsRemote={listLocations as any}
-                            deleteItemRemote={async (id: string) => {
-                                return await handleDelete({
-                                    ids: [id],
-                                    deleteFn: deleteLocation,
-                                    itemName: m.location_label().toLowerCase(),
-                                });
-                            }}
-                            createRemote={createLocation}
-                            createSchema={createLocationSchema}
-                            updateRemote={updateLocation}
-                            updateSchema={updateLocationSchema}
-                            getFormData={(l: Location) => l}
-                            searchPredicate={(l: Location, q: string) => {
-                                return (
-                                    l.name
-                                        .toLowerCase()
-                                        .includes(q.toLowerCase()) ||
-                                    (l.roomId
-                                        ?.toLowerCase()
-                                        .includes(q.toLowerCase()) ??
-                                        false)
-                                );
-                            }}
-                        >
-                            {#snippet renderItemLabel(location)}
-                                {location.name}
-                                {location.roomId ? `(${location.roomId})` : ""}
-                            {/snippet}
+                    <!-- Using Multi-Location Selector -->
+                    <EntityManager
+                        title={m.feature_locations_title()}
+                        icon={MapPin}
+                        {type}
+                        entityId={initialData?.id}
+                        initialItems={locations.filter((l: any) =>
+                            selectedLocationIds.includes(l.id),
+                        )}
+                        onchange={(ids: string[]) =>
+                            (selectedLocationIds = ids)}
+                        embedded={true}
+                        listItemsRemote={listLocations as any}
+                        deleteItemRemote={async (id: string) => {
+                            return await handleDelete({
+                                ids: [id],
+                                deleteFn: deleteLocation,
+                                itemName: m.location_label().toLowerCase(),
+                            });
+                        }}
+                        createRemote={createLocation}
+                        createSchema={createLocationSchema}
+                        updateRemote={updateLocation}
+                        updateSchema={updateLocationSchema}
+                        getFormData={(l: Location) => l}
+                        searchPredicate={(l: Location, q: string) => {
+                            return (
+                                l.name
+                                    .toLowerCase()
+                                    .includes(q.toLowerCase()) ||
+                                (l.roomId
+                                    ?.toLowerCase()
+                                    .includes(q.toLowerCase()) ??
+                                    false)
+                            );
+                        }}
+                    >
+                        {#snippet renderItemLabel(location)}
+                            {location.name}
+                            {location.roomId ? `(${location.roomId})` : ""}
+                        {/snippet}
 
-                            {#snippet renderForm({
-                                remoteFunction: rf,
-                                schema,
-                                id,
-                                initialData: formData,
-                                onSuccess,
-                                onCancel,
-                            })}
-                                <LocationForm
-                                    remoteFunction={rf}
-                                    validationSchema={schema}
-                                    isUpdating={!!id}
-                                    initialData={formData}
-                                    {onSuccess}
-                                    {onCancel}
-                                />
-                            {/snippet}
-                        </EntityManager>
-                        <!-- Populate freeTextLocation based on selection if needed, or leave independent -->
-                    {/if}
+                        {#snippet renderForm({
+                            remoteFunction: rf,
+                            schema,
+                            id,
+                            initialData: formData,
+                            onSuccess,
+                            onCancel,
+                        })}
+                            <LocationForm
+                                remoteFunction={rf}
+                                validationSchema={schema}
+                                isUpdating={!!id}
+                                initialData={formData}
+                                {onSuccess}
+                                {onCancel}
+                            />
+                        {/snippet}
+                    </EntityManager>
+                    <!-- Populate freeTextLocation based on selection if needed, or leave independent -->
                 {/if}
                 <input
                     {...getField("locationIds").as(
@@ -846,8 +891,8 @@
                         <label
                             for="startDateInput"
                             class="block text-sm font-medium text-gray-700 mb-1"
-                            >{m.start_date()} <span class="text-red-500">*</span
-                            ></label
+                            >{m.start_date()}
+                            <span class="text-red-500">*</span></label
                         >
                         <input
                             name="startDate"
@@ -863,8 +908,8 @@
                             <label
                                 for="startTimeInput"
                                 class="block text-sm font-medium text-gray-700 mb-1"
-                                >{m.start_time()} <span class="text-red-500">*</span
-                                ></label
+                                >{m.start_time()}
+                                <span class="text-red-500">*</span></label
                             >
                             <input
                                 name="startTime"
@@ -1058,7 +1103,9 @@
                                         <option value="popup"
                                             >{m.notification()}</option
                                         >
-                                        <option value="email">{m.email()}</option>
+                                        <option value="email"
+                                            >{m.email()}</option
+                                        >
                                     </select>
                                 </div>
                                 <div class="flex-1">
@@ -1218,13 +1265,9 @@
                                 }}
                                 deleteItemRemote={async (ids) => {
                                     return await handleDelete({
-                                        ids: Array.isArray(ids)
-                                            ? ids
-                                            : [ids],
+                                        ids: Array.isArray(ids) ? ids : [ids],
                                         deleteFn: deleteLocation,
-                                        itemName: m
-                                            .location()
-                                            .toLowerCase(),
+                                        itemName: m.location().toLowerCase(),
                                     });
                                 }}
                                 createRemote={createLocation}
@@ -1239,9 +1282,7 @@
                                             .includes(q.toLowerCase()) ||
                                         (l.roomId
                                             ?.toLowerCase()
-                                            .includes(
-                                                q.toLowerCase(),
-                                            ) ??
+                                            .includes(q.toLowerCase()) ??
                                             false)
                                     );
                                 }}
@@ -1259,7 +1300,7 @@
                                     initialData: formData,
                                     onSuccess,
                                     onCancel,
-                                })}
+                                }: any)}
                                     <LocationForm
                                         remoteFunction={rf}
                                         validationSchema={schema}
@@ -1282,9 +1323,9 @@
             )}
         />
 
-        <SyncCheckboxBlock 
+        <SyncCheckboxBlock
             syncFieldConfig={getField("syncIds")}
-            initialSelectedIds={initialData?.syncIds || []} 
+            initialSelectedIds={initialData?.syncIds || []}
         />
 
         <div class="flex gap-3 pt-4">
@@ -1294,7 +1335,9 @@
                 loading={remoteFunction.pending}
                 class="px-8"
             >
-                {isUpdating ? m.save_changes() : m.create_item({ item: m.feature_events_title() })}
+                {isUpdating
+                    ? m.save_changes()
+                    : m.create_item({ item: m.feature_events_title() })}
             </AsyncButton>
             <Button variant="secondary" href="/events" size="default">
                 {m.cancel()}

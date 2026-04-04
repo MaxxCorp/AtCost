@@ -7,7 +7,7 @@
     import AsyncButton from "../AsyncButton.svelte";
     import ContactFields from "./ContactFields.svelte";
 
-    interface Props {
+    export interface Props {
         initialData?: any;
         remoteFunction?: any;
         schema?: any;

@@ -96,12 +96,12 @@
                                 );
                             }}
                         >
-                            {#snippet renderItemLabel(contact)}
+                            {#snippet renderItemLabel(contact: any)}
                                 {contact.displayName ||
                                     `${contact.givenName || ""} ${contact.familyName || ""}` ||
                                     m.unnamed_contact()}
                             {/snippet}
-                            {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id })}
+                            {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id }: any)}
                                 <ContactForm
                                     remoteFunction={rf}
                                     {schema}
@@ -110,7 +110,7 @@
                                     {onCancel}
                                     contactId={id}
                                 >
-                                    {#snippet children({ onLocationsChange })}
+                                    {#snippet children({ onLocationsChange }: any)}
                                         <div class="mt-8 border-t pt-8">
                                             <EntityManager
                                                 title={m.feature_locations_title()}
@@ -151,7 +151,7 @@
                                                     );
                                                 }}
                                                 deleteItemRemote={async (
-                                                    ids,
+                                                    ids: any,
                                                 ) => {
                                                     return await handleDelete({
                                                         ids: Array.isArray(ids)
@@ -188,7 +188,7 @@
                                                     );
                                                 }}
                                             >
-                                                {#snippet renderItemLabel(location)}
+                                                {#snippet renderItemLabel(location: any)}
                                                     {location.name}
                                                     {location.roomId
                                                         ? `(${location.roomId})`
@@ -201,7 +201,7 @@
                                                     initialData: formData,
                                                     onSuccess,
                                                     onCancel,
-                                                })}
+                                                }: any)}
                                                     <LocationForm
                                                         remoteFunction={rf}
                                                         validationSchema={schema}

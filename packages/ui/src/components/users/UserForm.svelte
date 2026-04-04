@@ -16,6 +16,18 @@
         features: FeatureMeta[];
     };
 
+    export interface Props {
+        remoteFunction: any;
+        validationSchema: any;
+        isUpdating?: boolean;
+        initialData?: any;
+        m: any;
+        appConfigList: AppConfig[];
+        onSuccess: () => void;
+        onCancel: () => void;
+        extraEntities?: Snippet<[any]>;
+    }
+
     let {
         remoteFunction,
         validationSchema,
@@ -26,17 +38,7 @@
         onSuccess,
         onCancel,
         extraEntities,
-    }: {
-        remoteFunction: any;
-        validationSchema: any;
-        isUpdating?: boolean;
-        initialData?: any;
-        m: any;
-        appConfigList: AppConfig[];
-        onSuccess: () => void;
-        onCancel: () => void;
-        extraEntities?: Snippet<[any]>;
-    } = $props();
+    }: Props = $props();
 
     function getField(name: string) {
         if (!(remoteFunction as any).fields) return {};

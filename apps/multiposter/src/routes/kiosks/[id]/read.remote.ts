@@ -22,7 +22,7 @@ export const getKiosk = query(v.string(), async (id: string) => {
 
     return {
         ...result,
-        locationIds: locations.map(l => l.id),
+        locationIds: locations.map((l: any) => l.id),
     };
 });
 
@@ -63,10 +63,10 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
 
     return {
         ...result,
-        locations: locations.map(l => {
+        locations: locations.map((l: any) => {
             // Find the contact with the "Employee" tag
-            const employeeLocContact = l.locationContacts.find(lc => 
-                lc.contact.tags.some(t => t.tag.name === 'Employee')
+            const employeeLocContact = l.locationContacts.find((lc: any) => 
+                lc.contact.tags.some((t: any) => t.tag.name === 'Employee')
             ) || l.locationContacts[0]; // Fallback to first contact if no Employee tag found
 
             const contactDetails = employeeLocContact?.contact;

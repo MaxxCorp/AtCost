@@ -10,10 +10,13 @@ export default defineConfig({
 		sveltekit(),
 		paraglideVitePlugin({
 			project: './project.inlang',
-			outdir: './src/lib/paraglide/generated',
+			outdir: './src/lib/paraglide',
 			strategy: ['preferredLanguage', 'url', 'cookie', 'baseLocale']
 		})
 	] as any,
+	ssr: {
+		noExternal: ['@ac/ui', '@ac/validations', '@ac/db']
+	},
 	// test: {
 	// 	expect: { requireAssertions: true },
 	// 	projects: [

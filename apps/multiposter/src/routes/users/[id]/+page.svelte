@@ -26,18 +26,7 @@
     import { createTalentSchema, updateTalentSchema } from "@ac/validations";
     import { createTalent, updateTalent } from "../../talents/talents.remote";
 
-    const talentsOptions = {
-        listTalentsRemote: listTalents as any,
-        fetchAssociationsRemote: talentAssociate.fetchEntityTalents as any,
-        addAssociationRemote: async (p: any) => talentAssociate.addAssociation({ ...p, talentId: p.itemId } as any),
-        removeAssociationRemote: async (p: any) => talentAssociate.removeAssociation({ ...p, talentId: p.itemId } as any),
-        createRemote: createTalent,
-        createSchema: createTalentSchema,
-        updateRemote: updateTalent,
-        updateSchema: updateTalentSchema,
-    };
-
-    const talentsOptionsProp = $derived(talentsOptions);
+    import { browser } from "$app/environment";
 
     const userId = page.params.id || "";
 
@@ -52,9 +41,10 @@
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
-        {#await readUser(userId)}
-            <LoadingSection message={m.loading_user()} />
-        {:then user}
+        {#if browser}
+            {#await readUser(userId)}
+                <LoadingSection message={m.loading_user()} />
+            {:then user}
             {#if user}
                 <Breadcrumb feature="users" current={user.name} />
                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
@@ -95,7 +85,6 @@
                         {appConfigList}
                         onSuccess={() => goto("/users")}
                         onCancel={() => goto("/users")}
-                        talentsOptions={talentsOptionsProp}
                     >
                         {#snippet extraEntities(data: any)}
                             <EntityManager
@@ -172,5 +161,8 @@
                 button={m.back_to_users()}
             />
         {/await}
+        {:else}
+            <LoadingSection message={m.loading_user()} />
+        {/if}
     </div>
 </div>

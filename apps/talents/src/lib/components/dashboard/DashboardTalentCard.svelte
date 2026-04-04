@@ -40,7 +40,7 @@
     
     {#if talent?.contact?.emails?.length > 0}
         <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 truncate">
-            {talent.contact.emails[0].email}
+            {talent.contact.emails[0].value}
         </div>
     {/if}
 </div>

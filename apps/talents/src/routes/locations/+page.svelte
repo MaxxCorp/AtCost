@@ -34,15 +34,15 @@
         createSchema={createLocationSchema}
         updateRemote={updateLocation}
         updateSchema={updateLocationSchema}
-        getFormData={(loc) => loc}
-        searchPredicate={(loc, q) => {
+        getFormData={(loc: any) => loc}
+        searchPredicate={(loc: any, q: any) => {
             return (
                 loc.name.toLowerCase().includes(q.toLowerCase()) ||
                 (loc.city?.toLowerCase().includes(q.toLowerCase()) ?? false)
             );
         }}
     >
-        {#snippet renderItemLabel(loc)}
+        {#snippet renderItemLabel(loc: any)}
             <div class="flex flex-col">
                 <span class="font-medium">{loc.name}</span>
                 <span class="text-xs text-gray-500"
@@ -59,7 +59,7 @@
             onSuccess,
             onCancel,
             id,
-        })}
+        }: any)}
             <LocationForm
                 {remoteFunction}
                 validationSchema={schema}

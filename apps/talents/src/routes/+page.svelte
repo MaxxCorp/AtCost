@@ -18,6 +18,13 @@
         const user = session?.data?.user;
         if (user) {
             dashboardDataPromise = loadDashboardData();
+            
+            // Auto-redirect to talent profile if associated
+            const profile = await (getMyTalentProfile as any)();
+            if (profile?.id) {
+                const { goto } = await import("$app/navigation");
+                goto(`/talents/${profile.id}`);
+            }
         }
         return {
             user,

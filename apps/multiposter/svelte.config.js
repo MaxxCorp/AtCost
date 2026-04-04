@@ -25,9 +25,9 @@ const config = {
 		},
 		alias: {
 			"@": "./src/lib",
-			"@ac/validations": "../../packages/validations/src/index.ts",
-			"@ac/ui": "../../packages/ui/src/index.ts",
-			"@ac/db": "../../packages/db/src/index.ts"
+			"@ac/validations": "../../packages/validations/src",
+			"@ac/ui": "../../packages/ui/src",
+			"@ac/db": "../../packages/db/src"
 		}
 	},
 	compilerOptions: {

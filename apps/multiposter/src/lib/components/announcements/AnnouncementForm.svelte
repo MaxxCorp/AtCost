@@ -389,7 +389,7 @@
                     initialData={formData}
                     {onSuccess}
                     {onCancel}
-                    contactId={id}
+                    contactId={id} 
                 />
             {/snippet}
         </EntityManager>
