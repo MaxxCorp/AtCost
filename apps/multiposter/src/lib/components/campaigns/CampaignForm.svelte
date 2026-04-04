@@ -1,5 +1,5 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "$lib/paraglide/messages";
     import { goto } from "$app/navigation";
     import type { Campaign } from "../../../routes/campaigns/[id]/read.remote";
     import { deleteCampaigns } from "../../../routes/campaigns/[id]/delete.remote";

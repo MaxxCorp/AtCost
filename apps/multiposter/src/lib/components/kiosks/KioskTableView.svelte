@@ -224,9 +224,4 @@
     {/if}
 </div>
 
-<style>
-    :global(body) {
-        margin: 0;
-        background: #030712;
-    }
-</style>
+

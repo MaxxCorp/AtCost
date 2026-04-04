@@ -115,7 +115,60 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  main {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+  }
+
+  /* RichTextEditor styles */
+  .editor-container {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    min-height: 300px;
+    position: relative;
+    background: white;
+  }
+
+  .loading-state,
+  .error-state {
+    padding: 1rem;
+    color: #64748b;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #f8fafc;
+    z-index: 10;
+  }
+
+  .error-state {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+  }
+
+  .ck-editor__editable {
+    min-height: 300px;
+  }
+
+  .ck.ck-editor__main > .ck-editor__editable:not(.ck-focused) {
+    border-color: transparent;
   }
 }

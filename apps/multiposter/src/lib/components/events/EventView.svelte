@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { PublicEvent } from "../../../routes/events/list-public.remote";
+    import { m } from "$lib/paraglide/messages";
+    import { getLocale } from "$lib/paraglide/runtime";
     import {
         Calendar,
         Clock,
@@ -16,7 +18,7 @@
 
     function formatDateTime(dateStr: string | null) {
         if (!dateStr) return "";
-        return new Date(dateStr).toLocaleString("en-US", {
+        return new Date(dateStr).toLocaleString(getLocale(), {
             weekday: "long",
             year: "numeric",
             month: "long",
@@ -28,7 +30,7 @@
 
     function formatDate(dateStr: string | null) {
         if (!dateStr) return "";
-        return new Date(dateStr).toLocaleDateString("en-US", {
+        return new Date(dateStr).toLocaleDateString(getLocale(), {
             weekday: "long",
             year: "numeric",
             month: "long",
@@ -68,7 +70,7 @@
             <!-- Description -->
             <div class="prose prose-lg text-gray-600 max-w-none">
                 <div class="whitespace-pre-wrap">
-                    {@html event.description || "No description provided."}
+                    {@html event.description || m.no_description_provided()}
                 </div>
             </div>
 
@@ -81,7 +83,7 @@
                         <MapPin class="w-7 h-7 text-blue-600 mt-0.5" />
                         <div>
                             <h3 class="font-semibold text-gray-900">
-                                Location
+                                {m.location()}
                             </h3>
                             <p class="text-gray-600">{event.location}</p>
                         </div>
@@ -94,7 +96,7 @@
                     >
                         <Users class="w-6 h-6 text-blue-600 mt-1" />
                         <div>
-                            <h3 class="font-semibold text-gray-900">Contact</h3>
+                            <h3 class="font-semibold text-gray-900">{m.contact()}</h3>
                             <p class="text-gray-900 font-medium text-sm">
                                 {event.resolvedContact.name}
                             </p>
@@ -164,7 +166,7 @@
                                         class="w-24 h-24 object-contain border rounded-lg bg-white p-1"
                                     />
                                     <p class="text-xs text-gray-500 mt-1">
-                                        Scan Contact Info
+                                        {m.scan_contact_info()}
                                     </p>
                                 </div>
                             {/if}
@@ -203,7 +205,7 @@
                         {/if}
                     </div>
                     <p class="text-sm text-gray-500 font-medium">
-                        Scan for details
+                        {m.scan_for_details()}
                     </p>
                 </div>
             {/if}
@@ -217,7 +219,7 @@
                         class="font-semibold text-indigo-900 mb-4 flex items-center gap-2"
                     >
                         <Tag class="w-5 h-5 text-indigo-700" />
-                        Event Details
+                        {m.event_details()}
                     </h3>
 
                     <div class="space-y-4">
@@ -254,10 +256,10 @@
                                     <strong
                                         >{event.confirmedParticipants}</strong
                                     >
-                                    confirmed participants
+                                    {m.confirmed_participants()}
                                     {#if event.maxOccupancy}
                                         <span class="opacity-75 block text-xs"
-                                            >Capacity: {event.maxOccupancy}</span
+                                            >{m.capacity()}: {event.maxOccupancy}</span
                                         >
                                     {/if}
                                 </span>

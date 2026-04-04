@@ -12,8 +12,8 @@
 	import LayersIcon from "$lib/components/icons/layers.svelte";
 	import LogInIcon from "$lib/components/icons/log-in.svelte";
 	import UserPlusIcon from "$lib/components/icons/user-plus.svelte";
-	import * as m from "$lib/paraglide/messages.js";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
+	import * as m from "$lib/paraglide/messages";
+	import { setLocale, getLocale } from "$lib/paraglide/runtime";
 
 	let {
 		ref = $bindable(null),

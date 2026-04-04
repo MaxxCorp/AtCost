@@ -3,6 +3,7 @@
     import { Button } from "$lib/components/ui/button";
     import { RRule, Frequency } from "$lib/utils/rrule-compat";
     import { createEventDispatcher } from "svelte";
+    import * as m from "$lib/paraglide/messages";
 
     let { open = $bindable(false), value = $bindable<string | null>(null) } =
         $props();
@@ -27,49 +28,49 @@
 
     // Weekdays for checkboxes
     const weekdays = [
-        { label: "Mon", value: RRule.MO.weekday },
-        { label: "Tue", value: RRule.TU.weekday },
-        { label: "Wed", value: RRule.WE.weekday },
-        { label: "Thu", value: RRule.TH.weekday },
-        { label: "Fri", value: RRule.FR.weekday },
-        { label: "Sat", value: RRule.SA.weekday },
-        { label: "Sun", value: RRule.SU.weekday },
+        { label: m.mon_short(), value: RRule.MO.weekday },
+        { label: m.tue_short(), value: RRule.TU.weekday },
+        { label: m.wed_short(), value: RRule.WE.weekday },
+        { label: m.thu_short(), value: RRule.TH.weekday },
+        { label: m.fri_short(), value: RRule.FR.weekday },
+        { label: m.sat_short(), value: RRule.SA.weekday },
+        { label: m.sun_short(), value: RRule.SU.weekday },
     ];
 
     const positions = [
-        { label: "First", value: 1 },
-        { label: "Second", value: 2 },
-        { label: "Third", value: 3 },
-        { label: "Fourth", value: 4 },
-        { label: "Last", value: -1 },
+        { label: m.position_first(), value: 1 },
+        { label: m.position_second(), value: 2 },
+        { label: m.position_third(), value: 3 },
+        { label: m.position_fourth(), value: 4 },
+        { label: m.position_last(), value: -1 },
     ];
 
     const relativeDays = [
-        { label: "Monday", value: 0 },
-        { label: "Tuesday", value: 1 },
-        { label: "Wednesday", value: 2 },
-        { label: "Thursday", value: 3 },
-        { label: "Friday", value: 4 },
-        { label: "Saturday", value: 5 },
-        { label: "Sunday", value: 6 },
-        { label: "Day", value: 7 },
-        { label: "Weekday", value: 8 },
-        { label: "Weekend day", value: 9 },
+        { label: m.monday(), value: 0 },
+        { label: m.tuesday(), value: 1 },
+        { label: m.wednesday(), value: 2 },
+        { label: m.thursday(), value: 3 },
+        { label: m.friday(), value: 4 },
+        { label: m.saturday(), value: 5 },
+        { label: m.sunday(), value: 6 },
+        { label: m.day_relative(), value: 7 },
+        { label: m.weekday_relative(), value: 8 },
+        { label: m.weekend_day_relative(), value: 9 },
     ];
 
     const months = [
-        { label: "January", value: 1 },
-        { label: "February", value: 2 },
-        { label: "March", value: 3 },
-        { label: "April", value: 4 },
-        { label: "May", value: 5 },
-        { label: "June", value: 6 },
-        { label: "July", value: 7 },
-        { label: "August", value: 8 },
-        { label: "September", value: 9 },
-        { label: "October", value: 10 },
-        { label: "November", value: 11 },
-        { label: "December", value: 12 },
+        { label: m.january(), value: 1 },
+        { label: m.february(), value: 2 },
+        { label: m.march(), value: 3 },
+        { label: m.april(), value: 4 },
+        { label: m.may(), value: 5 },
+        { label: m.june(), value: 6 },
+        { label: m.july(), value: 7 },
+        { label: m.august(), value: 8 },
+        { label: m.september(), value: 9 },
+        { label: m.october(), value: 10 },
+        { label: m.november(), value: 11 },
+        { label: m.december(), value: 12 },
     ];
 
     // Initialize state from existing value if present
@@ -223,10 +224,10 @@
     }
 
     const frequencies = [
-        { label: "Daily", value: RRule.DAILY },
-        { label: "Weekly", value: RRule.WEEKLY },
-        { label: "Monthly", value: RRule.MONTHLY },
-        { label: "Yearly", value: RRule.YEARLY },
+        { label: m.daily(), value: RRule.DAILY },
+        { label: m.weekly(), value: RRule.WEEKLY },
+        { label: m.monthly(), value: RRule.MONTHLY },
+        { label: m.yearly(), value: RRule.YEARLY },
     ];
 
     function toggleWeekday(day: number) {
@@ -241,9 +242,9 @@
 <Dialog.Root bind:open>
     <Dialog.Content class="sm:max-w-[500px]">
         <Dialog.Header>
-            <Dialog.Title>Recurrence Settings</Dialog.Title>
+            <Dialog.Title>{m.recurrence_settings()}</Dialog.Title>
             <Dialog.Description>
-                Set the recurrence rules for this event.
+                {m.recurrence_description()}
             </Dialog.Description>
         </Dialog.Header>
         <div class="grid gap-6 py-4">
@@ -251,7 +252,7 @@
                 <label
                     for="freq"
                     class="text-right text-sm font-medium leading-none"
-                    >Repeat</label
+                    >{m.repeat()}</label
                 >
                 <div class="col-span-3">
                     <select
@@ -270,7 +271,7 @@
                 <label
                     for="interval"
                     class="text-right text-sm font-medium leading-none"
-                    >Every</label
+                    >{m.every()}</label
                 >
                 <div class="col-span-3 flex items-center gap-2">
                     <input
@@ -282,19 +283,19 @@
                     />
                     <span class="text-sm text-gray-500">
                         {freq === RRule.DAILY
-                            ? "days"
+                            ? m.days()
                             : freq === RRule.WEEKLY
-                              ? "weeks"
+                              ? m.weeks()
                               : freq === RRule.MONTHLY
-                                ? "months"
-                                : "years"}
+                                ? m.months_plural()
+                                : m.years_plural()}
                     </span>
                 </div>
             </div>
 
             {#if freq === RRule.WEEKLY}
                 <div class="grid grid-cols-4 items-start gap-4">
-                    <span class="text-right text-sm font-medium leading-none mt-2">On</span>
+                    <span class="text-right text-sm font-medium leading-none mt-2">{m.on_days()}</span>
                     <div class="col-span-3 flex flex-wrap gap-2">
                         {#each weekdays as day}
                             <button
@@ -311,11 +312,11 @@
 
             {#if freq === RRule.MONTHLY}
                 <div class="grid grid-cols-4 items-start gap-4">
-                    <span class="text-right text-sm font-medium leading-none mt-2">Mode</span>
+                    <span class="text-right text-sm font-medium leading-none mt-2">{m.mode()}</span>
                     <div class="col-span-3 space-y-4">
                         <div class="flex items-center gap-3">
                             <input type="radio" id="monthly-day" value="day" bind:group={monthlyType} class="h-4 w-4" />
-                            <label for="monthly-day" class="text-sm">Day</label>
+                            <label for="monthly-day" class="text-sm">{m.day_relative()}</label>
                             <input 
                                 type="number" 
                                 min="1" max="31" 
@@ -323,11 +324,11 @@
                                 disabled={monthlyType !== 'day'}
                                 class="h-8 w-14 rounded-md border text-sm px-2" 
                             />
-                            <span class="text-sm text-muted-foreground">of the month</span>
+                            <span class="text-sm text-muted-foreground">{m.of_the_month()}</span>
                         </div>
                         <div class="flex items-center gap-3">
                             <input type="radio" id="monthly-relative" value="relative" bind:group={monthlyType} class="h-4 w-4" />
-                            <label for="monthly-relative" class="text-sm">The</label>
+                            <label for="monthly-relative" class="text-sm">{m.the_relative()}</label>
                             <select 
                                 bind:value={bysetpos} 
                                 disabled={monthlyType !== 'relative'}
@@ -353,7 +354,7 @@
 
             {#if freq === RRule.YEARLY}
                 <div class="grid grid-cols-4 items-start gap-4">
-                    <span class="text-right text-sm font-medium leading-none mt-2">In</span>
+                    <span class="text-right text-sm font-medium leading-none mt-2">{m.in_month()}</span>
                     <div class="col-span-3 space-y-4">
                         <div class="flex items-center gap-3">
                             <select bind:value={bymonth} class="h-8 rounded-md border text-sm px-1 w-32">
@@ -364,7 +365,7 @@
                         </div>
                         <div class="flex items-center gap-3">
                             <input type="radio" id="yearly-day" value="day" bind:group={yearlyType} class="h-4 w-4" />
-                            <label for="yearly-day" class="text-sm">Day</label>
+                            <label for="yearly-day" class="text-sm">{m.day_relative()}</label>
                             <input 
                                 type="number" 
                                 min="1" max="31" 
@@ -375,7 +376,7 @@
                         </div>
                         <div class="flex items-center gap-3">
                             <input type="radio" id="yearly-relative" value="relative" bind:group={yearlyType} class="h-4 w-4" />
-                            <label for="yearly-relative" class="text-sm">The</label>
+                            <label for="yearly-relative" class="text-sm">{m.the_relative()}</label>
                             <select 
                                 bind:value={bysetpos} 
                                 disabled={yearlyType !== 'relative'}
@@ -403,7 +404,7 @@
                 <div class="grid grid-cols-4 gap-4">
                     <span
                         class="text-right mt-2 text-sm font-medium leading-none"
-                        >End</span
+                        >{m.end()}</span
                     >
                     <div class="col-span-3 space-y-3">
                         <div class="flex items-center space-x-2">
@@ -418,7 +419,7 @@
                             <label
                                 for="end-never"
                                 class="text-sm"
-                                >Never</label
+                                >{m.never()}</label
                             >
                         </div>
 
@@ -434,7 +435,7 @@
                             <label
                                 for="end-count"
                                 class="text-sm"
-                                >After</label
+                                >{m.after()}</label
                             >
                             <input
                                 type="number"
@@ -444,7 +445,7 @@
                                 class="h-8 w-16 rounded-md border bg-transparent px-3 py-1 text-sm disabled:opacity-50"
                             />
                             <span class="text-sm text-muted-foreground"
-                                >occurrences</span
+                                >{m.occurrences()}</span
                             >
                         </div>
 
@@ -460,7 +461,7 @@
                             <label
                                 for="end-until"
                                 class="text-sm"
-                                >On date</label
+                                >{m.on_date()}</label
                             >
                             <input
                                 type="date"
@@ -474,8 +475,8 @@
             </div>
         </div>
         <Dialog.Footer>
-            <Button variant="ghost" onclick={() => clear()}>Clear</Button>
-            <Button onclick={save}>Save Recurrence</Button>
+            <Button variant="ghost" onclick={() => clear()}>{m.clear_recurrence()}</Button>
+            <Button onclick={save}>{m.save_recurrence()}</Button>
         </Dialog.Footer>
     </Dialog.Content>
 </Dialog.Root>

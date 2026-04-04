@@ -7,8 +7,8 @@
 	import LogOutIcon from "$lib/components/icons/log-out.svelte";
 	import GlobeIcon from "$lib/components/icons/globe.svelte";
 	import { authClient } from "$lib/auth";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
-	import * as m from "$lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "$lib/paraglide/runtime";
+	import * as m from "$lib/paraglide/messages";
 
 	let { user }: { user: { name: string; email: string; avatar?: string } } =
 		$props();
