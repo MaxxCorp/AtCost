@@ -11,6 +11,6 @@ export const deleteLocation = command(v.array(v.string()), async (ids: string[])
     ensureAccess(user, 'locations');
 
     await db.delete(location).where(inArray(location.id, ids));
-    await listLocations().refresh();
+    listLocations().refresh();
     return { success: true };
 });

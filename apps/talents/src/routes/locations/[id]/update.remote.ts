@@ -41,8 +41,8 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
             return { success: false, error: { message: 'Location not found' } };
         }
 
-        await readLocation(data.id).refresh();
-        await listLocations().refresh();
+        readLocation(data.id).refresh();
+        listLocations().refresh();
 
         return { success: true, location: result[0] };
     } catch (err: any) {

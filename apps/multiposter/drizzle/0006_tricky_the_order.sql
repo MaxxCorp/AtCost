@@ -1,1 +1,0 @@
-ALTER TABLE "location" ADD COLUMN "is_public" boolean DEFAULT true NOT NULL;

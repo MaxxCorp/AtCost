@@ -52,6 +52,9 @@
         initialData = null,
     } = $props();
 
+    // Initialize remoteFunction if it's a definition function to ensure reactive context
+    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
+
     const type = "announcement";
 
     // svelte-ignore state_referenced_locally
@@ -98,15 +101,34 @@
     );
 
     function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
+        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
+        let current: any = (rf as any).fields;
         for (const part of parts) {
-            if (!current) return {};
+            if (current?.[part] === undefined) return def;
             current = current[part];
         }
-        return current || {};
+        return current ?? def;
     }
+
+    const formSetup = $derived((rf as any).preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
+        try {
+            await submit();
+            const result = (rf as any).result;
+            if (result?.error) {
+                toast.error(
+                    result.error.message || m.something_went_wrong(),
+                );
+                return;
+            }
+
+            toast.success(m.successfully_saved());
+            goto("/announcements");
+        } catch (error: any) {
+            toast.error(error.message || m.something_went_wrong());
+        }
+    }));
 </script>
 
 <div class="max-w-3xl mx-auto px-4 py-8">
@@ -141,28 +163,7 @@
         {/if}
     </div>
 
-    <form
-        {...remoteFunction
-            .preflight(validationSchema)
-            .enhance(async ({ submit }: any) => {
-                try {
-                    const result: any = await submit();
-                    if (result?.error) {
-                        toast.error(
-                            result.error.message || m.something_went_wrong(),
-                        );
-                        return;
-                    }
-                    toast.success(m.successfully_saved());
-                    goto("/announcements");
-                } catch (error: any) {
-                    toast.error(
-                        error?.message || m.something_went_wrong(),
-                    );
-                }
-            })}
-        class="space-y-6"
-    >
+    <form {...formSetup} class="space-y-6">
         {#if isUpdating && initialData}
             <input {...getField("id").as("hidden", initialData.id)} />
         {/if}
@@ -402,7 +403,7 @@
         <div class="flex justify-end pt-4">
             <AsyncButton
                 type="submit"
-                loading={remoteFunction.pending}
+                loading={(rf as any).pending}
                 class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
             >
                 {isUpdating ? m.save_changes() : m.create_item({ item: m.announcement() })}

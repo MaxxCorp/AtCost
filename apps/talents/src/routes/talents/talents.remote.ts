@@ -26,6 +26,7 @@ export const listTalents = query(v.void_(), async () => {
         },
         orderBy: [desc(talent.updatedAt)]
     });
+    console.info(`[listTalents] DB returned ${results.length} talents.`);
 
 
     // Resolve linked users for each talent's contact
@@ -58,8 +59,8 @@ export const listTalents = query(v.void_(), async () => {
         resumeUrl: t.resumeUrl,
         source: t.source,
         internalNotes: t.internalNotes,
-        createdAt: t.createdAt.toISOString(),
-        updatedAt: t.updatedAt.toISOString(),
+        createdAt: t.createdAt?.toISOString?.() ?? (t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt),
+        updatedAt: t.updatedAt?.toISOString?.() ?? (t.updatedAt instanceof Date ? t.updatedAt.toISOString() : t.updatedAt),
         linkedUser: userByContactId.get(t.contact.id) ?? null,
         contact: {
             id: t.contact.id,
@@ -72,8 +73,8 @@ export const listTalents = query(v.void_(), async () => {
             birthday: t.contact.birthday?.toISOString() ?? null,
             notes: t.contact.notes,
             isPublic: t.contact.isPublic,
-            createdAt: t.contact.createdAt.toISOString(),
-            updatedAt: t.contact.updatedAt.toISOString(),
+            createdAt: t.contact.createdAt?.toISOString?.() ?? (t.contact.createdAt instanceof Date ? t.contact.createdAt.toISOString() : t.contact.createdAt),
+            updatedAt: t.contact.updatedAt?.toISOString?.() ?? (t.contact.updatedAt instanceof Date ? t.contact.updatedAt.toISOString() : t.contact.updatedAt),
             emails: t.contact.emails || [],
             phones: t.contact.phones || [],
             addresses: t.contact.addresses || [],
@@ -148,8 +149,8 @@ export const readTalent = query(v.string(), async (id) => {
         resumeUrl: result.resumeUrl,
         source: result.source,
         internalNotes: result.internalNotes,
-        createdAt: result.createdAt.toISOString(),
-        updatedAt: result.updatedAt.toISOString(),
+        createdAt: result.createdAt?.toISOString?.() ?? (result.createdAt instanceof Date ? result.createdAt.toISOString() : result.createdAt),
+        updatedAt: result.updatedAt?.toISOString?.() ?? (result.updatedAt instanceof Date ? result.updatedAt.toISOString() : result.updatedAt),
         linkedUser,
         contact: {
             id: result.contact.id,
@@ -162,8 +163,8 @@ export const readTalent = query(v.string(), async (id) => {
             birthday: result.contact.birthday?.toISOString() ?? null,
             notes: result.contact.notes,
             isPublic: result.contact.isPublic,
-            createdAt: result.contact.createdAt.toISOString(),
-            updatedAt: result.contact.updatedAt.toISOString(),
+            createdAt: result.contact.createdAt?.toISOString?.() ?? (result.contact.createdAt instanceof Date ? result.contact.createdAt.toISOString() : result.contact.createdAt),
+            updatedAt: result.contact.updatedAt?.toISOString?.() ?? (result.contact.updatedAt instanceof Date ? result.contact.updatedAt.toISOString() : result.contact.updatedAt),
             emails: result.contact.emails || [],
             phones: result.contact.phones || [],
             addresses: result.contact.addresses || [],
@@ -209,7 +210,7 @@ export const createTalent = form(createTalentSchema, async (data) => {
         internalNotes: data.internalNotes,
     } as any).returning();
 
-    await listTalents().refresh();
+    listTalents().refresh();
     return { success: true, id: newTalent.id };
 });
 
@@ -229,15 +230,15 @@ export const updateTalent = form(updateTalentSchema as any, async (data: any) =>
         internalNotes: data.internalNotes,
     } as any).where(eq(talent.id, data.id)).returning();
 
-    await readTalent(data.id).refresh();
-    await listTalents().refresh();
+    readTalent(data.id).refresh();
+    listTalents().refresh();
     return { success: true, id: updatedTalent.id };
 });
 
 export const deleteTalent = form(v.string() as any, async (id: any) => {
     ensureAccess(getAuthenticatedUser(), 'talents');
     await db.delete(talent).where(eq(talent.id, id));
-    await listTalents().refresh();
+    listTalents().refresh();
     return { success: true };
 });
 
@@ -246,7 +247,7 @@ export const bulkDeleteTalents = form(v.array(v.string()) as any, async (ids: an
     for (const id of ids) {
         await db.delete(talent).where(eq(talent.id, id));
     }
-    await listTalents().refresh();
+    listTalents().refresh();
     return { success: true };
 });
 
@@ -272,8 +273,8 @@ export const addTimelineEntry = form(v.object({
         }
     } as any).returning();
 
-    await readTalent(data.talentId as string).refresh();
-    await listTalents().refresh();
+    readTalent(data.talentId as string).refresh();
+    listTalents().refresh();
 
     return { success: true, id: newEntry.id };
 });
@@ -391,8 +392,8 @@ export const upsertTalent = form(unifiedTalentSchema as any, async (data: any) =
             return { talentId, contactId };
         });
 
-        await listTalents().refresh();
-        if (talentData.id) await readTalent(talentData.id).refresh();
+        listTalents().refresh();
+        if (talentData.id) readTalent(talentData.id).refresh();
         
         return { success: true, id: result.talentId };
     } catch (err: any) {

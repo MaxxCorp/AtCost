@@ -1,6 +1,7 @@
 import { command, query } from '$app/server';
-import { db, userTalent } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { userTalent, userContact, talent } from '@ac/db';
+import { db } from '$lib/server/db';
+import { eq, and, inArray } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { talentAssociationSchema, getTalentAssociationsSchema } from '@ac/validations';
 
@@ -44,35 +45,50 @@ export const fetchEntityTalents = query(getTalentAssociationsSchema, async (data
 
     const { type, entityId } = data;
     if (type === "user") {
-        const results = await db.query.userTalent.findMany({
-            where: (table, { eq }) => eq(table.userId, entityId),
+        // 1. Get explicit associations
+        const explicitAssociations = await db.select().from(userTalent).where(eq(userTalent.userId, entityId));
+        
+        // 2. Get talents linked via user_contact (for talents "Linked" to an account)
+        const contactLinks = await db.select().from(userContact).where(eq(userContact.userId, entityId));
+        
+        const talentIds = new Set(explicitAssociations.map(a => a.talentId));
+        
+        if (contactLinks.length > 0) {
+            const linkedTalents = await db.select({ id: talent.id })
+                .from(talent)
+                .where(inArray(talent.contactId, contactLinks.map(c => c.contactId)));
+            
+            for (const t of linkedTalents) {
+                talentIds.add(t.id);
+            }
+        }
+
+        if (talentIds.size === 0) return [];
+
+        const results = await db.query.talent.findMany({
+            where: inArray(talent.id, Array.from(talentIds)),
             with: {
-                talent: {
+                contact: {
                     with: {
-                        contact: {
-                            with: {
-                                emails: true,
-                                phones: true
-                            }
-                        }
+                        emails: true,
+                        phones: true
                     }
                 }
             }
         });
         
-        return (results as any[]).map(r => {
-            const t: any = r.talent;
+        return results.map(t => {
             if (!t) return null;
             return {
                 ...(t as any),
-                createdAt: t.createdAt?.toISOString(),
-                updatedAt: t.updatedAt?.toISOString(),
-                availabilityDate: t.availabilityDate?.toISOString(),
+                createdAt: t.createdAt?.toISOString?.() ?? (t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt),
+                updatedAt: t.updatedAt?.toISOString?.() ?? (t.updatedAt instanceof Date ? t.updatedAt.toISOString() : t.updatedAt),
+                availabilityDate: t.availabilityDate?.toISOString?.() ?? (t.availabilityDate instanceof Date ? t.availabilityDate.toISOString() : t.availabilityDate),
                 contact: t.contact ? {
                     ...(t.contact as any),
-                    birthday: t.contact.birthday?.toISOString(),
-                    createdAt: t.contact.createdAt?.toISOString(),
-                    updatedAt: t.contact.updatedAt?.toISOString(),
+                    birthday: t.contact.birthday?.toISOString?.() ?? (t.contact.birthday instanceof Date ? t.contact.birthday.toISOString() : t.contact.birthday),
+                    createdAt: t.contact.createdAt?.toISOString?.() ?? (t.contact.createdAt instanceof Date ? t.contact.createdAt.toISOString() : t.contact.createdAt),
+                    updatedAt: t.contact.updatedAt?.toISOString?.() ?? (t.contact.updatedAt instanceof Date ? t.contact.updatedAt.toISOString() : t.contact.updatedAt),
                 } : null
             };
         }).filter(Boolean);

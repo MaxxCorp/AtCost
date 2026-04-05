@@ -8,8 +8,14 @@ export const contactBaseSchema = v.object({
     honorificPrefix: v.optional(v.string()),
     honorificSuffix: v.optional(v.string()),
     birthday: v.optional(v.string()),
+    gender: v.optional(v.string()),
+    company: v.optional(v.string()),
+    role: v.optional(v.string()),
+    department: v.optional(v.string()),
     notes: v.optional(v.string()),
     isPublic: v.optional(v.union([v.boolean(), v.string()])),
+    vCardPath: v.optional(v.string()),
+    qrCodePath: v.optional(v.string()),
 });
 
 export const emailSchemaPure = v.object({
@@ -30,6 +36,7 @@ export const addressSchemaPure = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),
     street: v.optional(v.string()),
     houseNumber: v.optional(v.string()),
+    addressSuffix: v.optional(v.string()),
     zip: v.optional(v.string()),
     city: v.optional(v.string()),
     state: v.optional(v.string()),

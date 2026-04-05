@@ -3,7 +3,7 @@ import { user, session, account, verification } from "./auth";
 import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, contactTag, userContact } from "./contacts";
 import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
 import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag } from "./events";
-import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance } from "./talents";
+import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent } from "./talents";
 import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
@@ -23,6 +23,7 @@ export const userRelations = relations(user, ({ many }) => ({
     timesheetAuditTrails: many(timesheetAuditTrail),
     syncConfigs: many(syncConfig),
     timeOffRequests: many(timeOffRequest),
+    userTalents: many(userTalent),
 }));
 
 export const contactRelations = relations(contact, ({ many }) => ({
@@ -125,6 +126,7 @@ export const talentRelations = relations(talent, ({ one, many }) => ({
     timesheetEntries: many(timesheetEntry),
     timeOffRequests: many(timeOffRequest),
     timeOffBalances: many(timeOffBalance),
+    userAssociations: many(userTalent),
 }));
 
 export const talentTimelineEntryRelations = relations(talentTimelineEntry, ({ one }) => ({
@@ -286,4 +288,9 @@ export const timeOffRequestRelations = relations(timeOffRequest, ({ one }) => ({
 
 export const timeOffBalanceRelations = relations(timeOffBalance, ({ one }) => ({
     talent: one(talent, { fields: [timeOffBalance.talentId], references: [talent.id] }),
+}));
+
+export const userTalentRelations = relations(userTalent, ({ one }) => ({
+    user: one(user, { fields: [userTalent.userId], references: [user.id] }),
+    talent: one(talent, { fields: [userTalent.talentId], references: [talent.id] }),
 }));

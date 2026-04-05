@@ -5,10 +5,11 @@
       title: string;
       description: string;
       actionLabel: string;
-      actionHref: string;
+      actionHref?: string;
+      onclick?: () => void;
     }
 
-    let { icon: Icon, title, description, actionLabel, actionHref }: Props = $props();
+    let { icon: Icon, title, description, actionLabel, actionHref, onclick }: Props = $props();
 // ...existing code...
 </script>
 
@@ -19,6 +20,10 @@
     {/if}
     <h2 class="text-xl font-semibold text-gray-700 mb-2">{title}</h2>
     <p class="text-gray-500 mb-4">{description}</p>
-    <a href={actionHref} class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">{actionLabel}</a>
+    {#if onclick}
+      <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700" {onclick}>{actionLabel}</button>
+    {:else}
+      <a href={actionHref} class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">{actionLabel}</a>
+    {/if}
   </div>
 </div>

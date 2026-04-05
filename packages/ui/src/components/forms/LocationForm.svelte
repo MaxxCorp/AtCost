@@ -13,7 +13,6 @@
         onSuccess = undefined,
         onCancel = undefined,
         cancelHref = "/locations",
-        // Extra slots for flexibility (e.g. EntityManager for associations)
         children,
         heroImageSlot,
         labels = {},
@@ -27,44 +26,11 @@
         cancelHref?: string;
         children?: Snippet<[]>;
         heroImageSlot?: Snippet<[]>;
-        labels?: {
-            name?: string;
-            street?: string;
-            houseNumber?: string;
-            addressSuffix?: string;
-            zip?: string;
-            city?: string;
-            state?: string;
-            country?: string;
-            roomId?: string;
-            latitude?: string;
-            longitude?: string;
-            what3words?: string;
-            inclusivitySupport?: string;
-            isPublic?: string;
-            saveChanges?: string;
-            createLocation?: string;
-            cancel?: string;
-            saving?: string;
-            creating?: string;
-            successfullySaved?: string;
-            errorSomethingWentWrong?: string;
-            enterLocationName?: string;
-            streetName?: string;
-            houseNumberPlaceholder?: string;
-            addressSuffixPlaceholder?: string;
-            zipCodePlaceholder?: string;
-            cityNamePlaceholder?: string;
-            statePlaceholder?: string;
-            countryPlaceholder?: string;
-            enterRoomId?: string;
-            latitudePlaceholder?: string;
-            longitudePlaceholder?: string;
-            what3wordsPlaceholder?: string;
-            inclusivitySupportPlaceholder?: string;
-            heroImage?: string;
-        };
+        labels?: any;
     } = $props();
+
+    // Initialize remoteFunction if it's a definition function to ensure reactive context
+    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
 
     const i18n = $derived({
         name: labels?.name ?? "Name",
@@ -105,25 +71,24 @@
     });
 
     function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
+        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
+        let current: any = (rf as any).fields;
         for (const part of parts) {
-            if (!current) return {};
+            if (current?.[part] === undefined) return def;
             current = current[part];
         }
-        return current || {};
+        return current ?? def;
     }
 </script>
 
 <form
     class="space-y-4"
-    {...remoteFunction
-        .preflight(validationSchema)
-        .enhance(async ({ submit }: any) => {
+    {...(rf as any).preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
             try {
                 await submit();
-                const result = (remoteFunction as any).result;
+                const result = (rf as any).result;
                 if (result?.error) {
                     toast.error(
                         result.error.message || i18n.errorSomethingWentWrong,
@@ -153,7 +118,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={i18n.enterLocationName}
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
             value={initialData?.name ?? ""}
         />
         {#each getField("name").issues() ?? [] as issue}
@@ -321,7 +286,7 @@
         <AsyncButton
             type="submit"
             loadingLabel={isUpdating ? i18n.saving : i18n.creating}
-            loading={remoteFunction.pending}
+            loading={(rf as any).pending}
         >
             {isUpdating ? i18n.saveChanges : i18n.createLocation}
         </AsyncButton>

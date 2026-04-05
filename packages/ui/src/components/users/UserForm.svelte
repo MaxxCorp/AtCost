@@ -1,7 +1,7 @@
 <script lang="ts">
-    import AsyncButton from "../../components/AsyncButton.svelte";
+    import AsyncButton from "../AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "../../components/button";
+    import { Button } from "../button";
     import type { Snippet } from "svelte";
 
     export type FeatureMeta = {
@@ -40,15 +40,18 @@
         extraEntities,
     }: Props = $props();
 
+    // Initialize remoteFunction if it's a definition function to ensure reactive context
+    const rf = $derived(typeof remoteFunction === "function" ? remoteFunction() : remoteFunction);
+
     function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
+        if (!rf.fields) return { as: () => ({}), issues: () => [] };
         const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
+        let current = rf.fields;
         for (const part of parts) {
-            if (!current) return {};
+            if (!current?.[part]) return { as: () => ({}), issues: () => [] };
             current = current[part];
         }
-        return current || {};
+        return current;
     }
 
     // svelte-ignore state_referenced_locally
@@ -95,12 +98,10 @@
 
 <form
     class="space-y-4"
-    {...remoteFunction
-        .preflight(validationSchema)
-        .enhance(async ({ submit }: any) => {
+    {...rf.preflight(validationSchema).enhance(async ({ submit }: any) => {
             try {
                 await submit();
-                const result = (remoteFunction as any).result;
+                const result = rf.result;
                 if (result?.error) {
                     toast.error(
                         result.error.message || m.something_went_wrong(),
@@ -142,7 +143,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             value={initialData?.name ?? ""}
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
         {#each getField("name").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -159,7 +160,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             value={initialData?.email ?? ""}
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
         {#each getField("email").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -238,7 +239,7 @@
         <AsyncButton
             type="submit"
             loadingLabel={isUpdating ? m.loading() : m.creating()}
-            loading={remoteFunction.pending}
+            loading={rf.pending}
         >
             {isUpdating ? m.save_changes() : m.create_user()}
         </AsyncButton>

@@ -1,77 +1,104 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { LoadingSection, TalentTimeline, Button } from "@ac/ui";
-    import { Calendar } from "@lucide/svelte";
+    import { LoadingSection, ErrorSection, TalentTimeline, Button } from "@ac/ui";
+    import { Calendar, ArrowLeft, ExternalLink } from "@lucide/svelte";
     import { readTalent, addTimelineEntry, listEmployees, listTalents } from "../talents.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";
 
-    const id = $derived(page.params.id as string);
-    const talentQuery = $derived(readTalent(id) as any);
-    const employeeQuery = $derived(listEmployees() as any);
-
+    const talentIdParam = $derived(page.params.id as string);
+    
+    // Remote functions return Promises, so we track it with $derived
+    const talentPromise = $derived(readTalent(talentIdParam));
+    
     $effect(() => {
-        const data = talentQuery.data;
-        if (data?.contact) {
-            breadcrumbState.set({
-                feature: "talents",
-                current: `${data.contact.displayName}`,
-            });
-        }
+        talentPromise.then(talent => {
+            if (talent?.contact) {
+                breadcrumbState.set({
+                    feature: "talents",
+                    current: `Edit: ${talent.contact.displayName}`,
+                });
+            }
+        });
     });
 
-    const initialData = $derived(talentQuery.data);
+    const employees = $derived(listEmployees() as any);
 </script>
 
-<div class="max-w-6xl mx-auto px-4 py-8">
-    {#if talentQuery.pending}
+<div class="max-w-4xl mx-auto px-4 py-8">
+    {#await talentPromise}
         <LoadingSection message="Loading talent details..." />
-    {:else if talentQuery.data}
-        <div class="mb-8 flex justify-between items-end border-b border-gray-100 pb-6">
-            <div>
-                <h1 class="text-4xl font-black text-gray-900 tracking-tight">
-                    {talentQuery.data.contact.displayName}
-                </h1>
-                <p class="text-gray-500 mt-2 font-medium">
-                    {talentQuery.data.jobTitle || "No title set"} • <span class="uppercase text-indigo-600 text-xs font-bold">{talentQuery.data.status}</span>
-                </p>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            <div class="xl:col-span-2">
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-                    <TalentForm
-                        {initialData}
-                        talentId={id}
-                        cancelHref="/talents"
-                        listContactsRemote={listTalents}
-                    />
+    {:then talent}
+        {#if talent}
+            <div class="mb-6">
+                <a
+                    href="/talents"
+                    class="flex items-center text-sm text-gray-500 hover:text-gray-900 mb-4 transition-colors"
+                >
+                    <ArrowLeft size={16} class="mr-1" />
+                    Back to Talents
+                </a>
+                <div class="flex items-center justify-between">
+                    <h1 class="text-3xl font-bold text-gray-900 tracking-tight">
+                        Edit Talent Profile
+                    </h1>
+                    <div class="flex gap-2">
+                        <a href="/talents/{talentIdParam}/view">
+                            <Button variant="outline" size="sm">
+                                <ExternalLink size={16} class="mr-2" />
+                                View Public Profile
+                            </Button>
+                        </a>
+                    </div>
                 </div>
             </div>
 
             <div class="space-y-8">
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
-                        <Calendar size={20} class="text-indigo-500" />
-                        Recruitment Timeline
-                    </h3>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+                    <TalentForm
+                        initialData={talent}
+                        talentId={talentIdParam}
+                    />
+                </div>
+
+                <div class="pt-8 border-t border-gray-100">
+                    <h2 class="text-xl font-bold text-gray-900 mb-6">
+                        Talent Timeline
+                    </h2>
                     <TalentTimeline 
-                        talentId={talentQuery.data.id}
-                        entries={talentQuery.data.timelineEntries || []}
-                        employees={employeeQuery.data || []}
+                        talentId={talentIdParam}
+                        entries={(talent.timelineEntries || []) as any}
+                        {employees}
                         onAddEntry={async (entry: any) => {
-                            await (addTimelineEntry as any)({ talentId: talentQuery.data.id, entry });
+                            await (addTimelineEntry as any).action({
+                                talentId: talentIdParam,
+                                entry
+                            });
+                            // No need for refresh logic as Svelte 5 will re-derive when needed
+                            // or the page could be refreshed.
                         }}
                     />
                 </div>
             </div>
-        </div>
-    {:else}
-        <div class="text-center py-20">
-            <h2 class="text-2xl font-bold text-gray-900">Talent not found</h2>
-            <p class="text-gray-500 mt-2">The talent profile you are looking for does not exist.</p>
-            <Button href="/talents" variant="outline" class="mt-6">Back to Talents</Button>
-        </div>
-    {/if}
+        {:else}
+            <div
+                class="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200"
+            >
+                <h2 class="text-2xl font-bold text-gray-900">
+                    Talent not found
+                </h2>
+                <p class="text-gray-500 mt-2">
+                    The talent profile you are looking for does not exist.
+                </p>
+                <a
+                    href="/talents"
+                    class="mt-6 inline-block text-indigo-600 font-semibold hover:underline"
+                >
+                    Return to Talent List
+                </a>
+            </div>
+        {/if}
+    {:catch error}
+        <ErrorSection headline="Error loading talent" message={error.message} />
+    {/await}
 </div>

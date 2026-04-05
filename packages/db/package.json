@@ -3,6 +3,12 @@
     "version": "0.0.1",
     "private": true,
     "type": "module",
+    "scripts": {
+        "db:generate": "drizzle-kit generate",
+        "db:push": "drizzle-kit push",
+        "db:pull": "drizzle-kit pull",
+        "db:check": "drizzle-kit check"
+    },
     "main": "./src/index.ts",
     "types": "./src/index.ts",
     "exports": {

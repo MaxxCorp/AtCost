@@ -77,6 +77,9 @@
         labels,
     }: Props = $props();
 
+    // Initialize remoteFunction if it's a definition function to ensure reactive context
+    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
+
     const i18n = $derived({
         saveContact: labels?.saveContact ?? "Save Contact",
         cancel: labels?.cancel ?? "Cancel",
@@ -102,9 +105,13 @@
         displayName: d(initialData.contact?.displayName, ""),
         givenName: d(initialData.contact?.givenName, ""),
         familyName: d(initialData.contact?.familyName, ""),
+        middleName: d(initialData.contact?.middleName, ""),
+        honorificPrefix: d(initialData.contact?.honorificPrefix, ""),
+        honorificSuffix: d(initialData.contact?.honorificSuffix, ""),
         company: d(initialData.contact?.company, ""),
         role: d(initialData.contact?.role, ""),
         department: d(initialData.contact?.department, ""),
+        gender: d(initialData.contact?.gender, ""),
         birthday: d(
             initialData.contact?.birthday
                 ? initialData.contact.birthday instanceof Date
@@ -154,24 +161,25 @@
     );
 
     function getField(name: string) {
-        if (!remoteFunction?.fields) return {};
+        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
-        let current: any = remoteFunction.fields;
+        let current: any = (rf as any).fields;
         for (const part of parts) {
-            if (!current?.[part]) return {};
+            if (!current?.[part]) return def;
             current = current[part];
         }
-        return current;
+        return current ?? def;
     }
 
     const prefix = $derived(contactId ? "data.contact" : "contact");
 </script>
 
 <form
-    {...remoteFunction.preflight(schema).enhance(async ({ submit }: any) => {
+    {...(rf as any).preflight(schema).enhance(async ({ submit }: { submit: any }) => {
         try {
             await submit();
-            const result = (remoteFunction as any).result;
+            const result = (rf as any).result;
             if (result?.success === false || result?.error) {
                 const msg =
                     result?.error?.message ||
@@ -234,7 +242,7 @@
         {/if}
         <AsyncButton
             type="submit"
-            loading={(remoteFunction && remoteFunction.pending) || loading}
+            loading={(rf && rf.pending) || loading}
             loadingLabel={i18n.saving}
         >
             {i18n.saveContact}

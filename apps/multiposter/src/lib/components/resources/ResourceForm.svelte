@@ -56,15 +56,19 @@
         allResources: any[];
     } = $props();
 
+    // Initialize remoteFunction if it's a definition function to ensure reactive context
+    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
+
     function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
+        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
+        let current: any = (rf as any).fields;
         for (const part of parts) {
-            if (!current) return {};
+            if (current?.[part] === undefined) return def;
             current = current[part];
         }
-        return current || {};
+        return current ?? def;
     }
 
     // Allocation calendars management
@@ -108,9 +112,9 @@
 
 <form
     class="space-y-4"
-    {...remoteFunction
+    {...(rf as any)
         .preflight(validationSchema)
-        .enhance(async ({ submit }) => {
+        .enhance(async ({ submit }: { submit: any }) => {
             try {
                 const result: any = await submit();
                 if (result?.error) {
@@ -142,7 +146,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_location_name()}
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
         {#each getField("name").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -160,7 +164,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.resource_type_placeholder()}
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
         {#each getField("type").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -178,7 +182,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_inventory_number()}
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
         {#each getField("inventoryNumber").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -456,7 +460,7 @@
         <AsyncButton
             type="submit"
             loadingLabel={isUpdating ? m.loading() : m.creating()}
-            loading={remoteFunction.pending}
+            loading={(rf as any).pending}
         >
             {isUpdating ? m.save_changes() : m.create_resource()}
         </AsyncButton>

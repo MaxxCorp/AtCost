@@ -3,7 +3,10 @@
     import { listTalents } from "../talents.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 
-    breadcrumbState.set({ feature: "talents", current: "New Talent" });
+    import { browser } from "$app/environment";
+    $effect(() => {
+        breadcrumbState.set({ feature: "talents", current: "New Talent" });
+    });
 </script>
 
 <div class="max-w-5xl mx-auto px-4 py-8">
@@ -15,9 +18,15 @@
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-10">
-        <TalentForm
-            listContactsRemote={listTalents}
-            cancelHref="/talents"
-        />
+        {#if browser}
+            <TalentForm
+                listContactsRemote={listTalents}
+                cancelHref="/talents"
+            />
+        {:else}
+            <div class="h-64 flex items-center justify-center">
+                <div class="animate-pulse text-gray-400">Preparing form...</div>
+            </div>
+        {/if}
     </div>
 </div>

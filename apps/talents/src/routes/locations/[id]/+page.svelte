@@ -9,7 +9,13 @@
 
     const id = $derived(page.params.id as string);
 
-    const locationQuery = $derived(readLocation(id) as any);
+    // Initialize query in script setup for correct reactive context
+    let locationQuery = $state(readLocation(page.params.id as string) as any);
+    
+    // Update query when ID changes
+    $effect(() => {
+        locationQuery = readLocation(id) as any;
+    });
 
     $effect(() => {
         if (locationQuery.data) {

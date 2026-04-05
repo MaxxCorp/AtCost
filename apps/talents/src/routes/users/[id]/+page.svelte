@@ -17,6 +17,7 @@
     import { createTalent, updateTalent } from "../../talents/talents.remote";
     import { createTalentSchema, updateTalentSchema } from "@ac/validations";
     import { EntityManager } from "@ac/ui";
+    import TalentForm from "$lib/components/talent/TalentForm.svelte";
 
     const userId = page.params.id || "";
 
@@ -96,16 +97,40 @@
                                     id: t.id,
                                 })}
                                 searchPredicate={(t: any, q: string) => {
+                                    const query = q.toLowerCase();
                                     const name = (
                                         t.contact?.displayName ||
                                         `${t.contact?.givenName || ""} ${t.contact?.familyName || ""}`
                                     ).toLowerCase();
-                                    return name.includes(q.toLowerCase());
+                                    const jobTitle = (t.jobTitle || "").toLowerCase();
+                                    const email = (t.contact?.emails?.[0]?.value || "").toLowerCase();
+                                    
+                                    return name.includes(query) || 
+                                           jobTitle.includes(query) || 
+                                           email.includes(query);
                                 }}
                             >
                                 {#snippet renderItemLabel(talent: any)}
-                                    {talent.contact?.displayName ||
-                                        `${talent.contact?.givenName || ""} ${talent.contact?.familyName || ""}`}
+                                    <div class="flex flex-col">
+                                        <span class="font-bold">
+                                            {talent.contact?.displayName ||
+                                                `${talent.contact?.givenName || ""} ${talent.contact?.familyName || ""}`}
+                                        </span>
+                                        {#if talent.jobTitle}
+                                            <span class="text-xs text-gray-500 font-normal">{talent.jobTitle}</span>
+                                        {/if}
+                                    </div>
+                                {/snippet}
+
+                                {#snippet renderForm({ remoteFunction, schema, initialData, onSuccess, onCancel, id })}
+                                    <TalentForm
+                                        {initialData}
+                                        talentId={id}
+                                        listContactsRemote={listTalents}
+                                        {remoteFunction}
+                                        {onSuccess}
+                                        {onCancel}
+                                    />
                                 {/snippet}
                             </EntityManager>
                         {/snippet}

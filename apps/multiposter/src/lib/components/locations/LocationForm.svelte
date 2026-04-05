@@ -26,23 +26,27 @@
         children,
     }: Props = $props();
 
+    // Initialize remoteFunction if it's a definition function to ensure reactive context
+    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
+
     // svelte-ignore state_referenced_locally
     let heroImage = $state(initialData?.heroImage ?? "");
 
     function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
+        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
+        let current: any = (rf as any).fields;
         for (const part of parts) {
-            if (!current) return {};
+            if (current?.[part] === undefined) return def;
             current = current[part];
         }
-        return current || {};
+        return current ?? def;
     }
 </script>
 
 <LocationForm
-    {remoteFunction}
+    remoteFunction={rf}
     {validationSchema}
     {isUpdating}
     {initialData}

@@ -21,10 +21,14 @@
             displayName: string;
             givenName: string;
             familyName: string;
+            middleName?: string;
+            honorificPrefix?: string;
+            honorificSuffix?: string;
             company: string;
             role: string;
             department: string;
             birthday: string;
+            gender?: string;
             notes: string;
             isPublic: boolean;
         };
@@ -40,6 +44,7 @@
         contactId?: string;
         listContactsRemote: () => Promise<any[]>;
         labels?: any;
+        getField?: (name: string) => any;
     }
 
     let {
@@ -54,14 +59,19 @@
         contactId,
         listContactsRemote,
         labels,
+        getField,
     }: Props = $props();
 
     const i18n = $derived({
         basicInformation: labels?.basicInformation ?? "Basic Information",
         displayName: labels?.displayName ?? "Display Name",
         givenName: labels?.givenName ?? "Given Name",
+        middleName: labels?.middleName ?? "Middle Name",
         familyName: labels?.familyName ?? "Family Name",
+        honorificPrefix: labels?.honorificPrefix ?? "Prefix",
+        honorificSuffix: labels?.honorificSuffix ?? "Suffix",
         birthday: labels?.birthday ?? "Birthday",
+        gender: labels?.gender ?? "Gender",
         company: labels?.company ?? "Company",
         department: labels?.department ?? "Department",
         role: labels?.role ?? "Role",
@@ -182,6 +192,7 @@
                     >{i18n.displayName} <span class="text-red-500">*</span></label
                 >
                 <input
+                    {...getField?.(`${prefix}.displayName`).as("text")}
                     name={`${prefix}.displayName`}
                     type="text"
                     bind:value={contactData.displayName}
@@ -196,9 +207,24 @@
                     >{i18n.givenName}</label
                 >
                 <input
+                    {...getField?.(`${prefix}.givenName`).as("text")}
                     name={`${prefix}.givenName`}
                     type="text"
                     bind:value={contactData.givenName}
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+            <div>
+                <label
+                    for="middleName"
+                    class="block text-sm font-medium text-gray-700"
+                    >{i18n.middleName}</label
+                >
+                <input
+                    {...getField?.(`${prefix}.middleName`).as("text")}
+                    name={`${prefix}.middleName`}
+                    type="text"
+                    bind:value={contactData.middleName}
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
             </div>
@@ -209,6 +235,7 @@
                     >{i18n.familyName}</label
                 >
                 <input
+                    {...getField?.(`${prefix}.familyName`).as("text")}
                     name={`${prefix}.familyName`}
                     type="text"
                     bind:value={contactData.familyName}
@@ -217,11 +244,62 @@
             </div>
             <div>
                 <label
+                    for="honorificPrefix"
+                    class="block text-sm font-medium text-gray-700"
+                    >{i18n.honorificPrefix}</label
+                >
+                <input
+                    {...getField?.(`${prefix}.honorificPrefix`).as("text")}
+                    name={`${prefix}.honorificPrefix`}
+                    type="text"
+                    bind:value={contactData.honorificPrefix}
+                    placeholder="e.g. Dr., Prof."
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+            <div>
+                <label
+                    for="honorificSuffix"
+                    class="block text-sm font-medium text-gray-700"
+                    >{i18n.honorificSuffix}</label
+                >
+                <input
+                    {...getField?.(`${prefix}.honorificSuffix`).as("text")}
+                    name={`${prefix}.honorificSuffix`}
+                    type="text"
+                    bind:value={contactData.honorificSuffix}
+                    placeholder="e.g. PhD, MD"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+            <div>
+                <label
+                    for="gender"
+                    class="block text-sm font-medium text-gray-700"
+                    >{i18n.gender}</label
+                >
+                <select
+                    {...getField?.(`${prefix}.gender`).as("select")}
+                    name={`${prefix}.gender`}
+                    bind:value={contactData.gender}
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="">Select...</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="non-binary">Non-binary</option>
+                    <option value="prefer-not-to-say">Prefer not to say</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div>
+                <label
                     for="birthday"
                     class="block text-sm font-medium text-gray-700"
                     >{i18n.birthday}</label
                 >
                 <input
+                    {...getField?.(`${prefix}.birthday`).as("date")}
                     name={`${prefix}.birthday`}
                     type="date"
                     bind:value={contactData.birthday}
@@ -235,6 +313,7 @@
                     >{i18n.company}</label
                 >
                 <input
+                    {...getField?.(`${prefix}.company`).as("text")}
                     name={`${prefix}.company`}
                     type="text"
                     bind:value={contactData.company}
@@ -248,6 +327,7 @@
                     >{i18n.department}</label
                 >
                 <input
+                    {...getField?.(`${prefix}.department`).as("text")}
                     name={`${prefix}.department`}
                     type="text"
                     bind:value={contactData.department}
@@ -260,6 +340,7 @@
                     class="block text-sm font-medium text-gray-700">{i18n.role}</label
                 >
                 <input
+                    {...getField?.(`${prefix}.role`).as("text")}
                     name={`${prefix}.role`}
                     type="text"
                     bind:value={contactData.role}
@@ -272,6 +353,7 @@
                 >{i18n.notes}</label
             >
             <textarea
+                {...getField?.(`${prefix}.notes`).as("textarea")}
                 name={`${prefix}.notes`}
                 bind:value={contactData.notes}
                 rows="3"
@@ -281,6 +363,7 @@
 
         <div class="flex items-center gap-2 pt-2">
             <input
+                {...getField?.(`${prefix}.isPublic`).as("checkbox")}
                 name={`${prefix}.isPublic`}
                 type="checkbox"
                 bind:checked={contactData.isPublic}

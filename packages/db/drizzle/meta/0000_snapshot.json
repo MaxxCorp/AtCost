@@ -1,6 +1,6 @@
 {
-  "id": "8f5c9291-486c-49aa-97c7-34d43436fc39",
-  "prevId": "fe7ae63e-f7be-4058-b6bd-fa8c80529f41",
+  "id": "7f15a6c9-c740-4123-ba41-4412334ce2a3",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4055,6 +4055,66 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_talent": {
+      "name": "user_talent",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "talent_id": {
+          "name": "talent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_talent_user_id_user_id_fk": {
+          "name": "user_talent_user_id_user_id_fk",
+          "tableFrom": "user_talent",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_talent_talent_id_talent_id_fk": {
+          "name": "user_talent_talent_id_talent_id_fk",
+          "tableFrom": "user_talent",
+          "tableTo": "talent",
+          "columnsFrom": [
+            "talent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_talent_user_id_talent_id_pk": {
+          "name": "user_talent_user_id_talent_id_pk",
+          "columns": [
+            "user_id",
+            "talent_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

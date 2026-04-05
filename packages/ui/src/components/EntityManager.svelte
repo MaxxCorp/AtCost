@@ -107,25 +107,31 @@
         renderItemDetail,
         participationSnippet,
         searchPredicate,
-        initialItems = [],
+        initialItems = undefined,
         emptyTitle,
         emptyDescription,
         emptyActionLabel,
     }: Props<any> = $props();
 
     const isStandalone = $derived(mode === "standalone");
+    
+    // Remote Query Initialization (Ensure reactive context)
+    const listQuery = $derived(typeof listItemsRemote === "function" ? listItemsRemote() : listItemsRemote);
+    const fetchQuery = $derived(!isStandalone && entityId && type && fetchAssociationsRemote 
+        ? fetchAssociationsRemote({ type, entityId }) 
+        : null);
 
     // svelte-ignore state_referenced_locally
-    let associatedItems = $state<any[]>(initialItems);
+    let associatedItems = $state<any[]>(initialItems ?? []);
     let allItems = $state<any[]>([]);
     let showSelector = $state(false);
     let showQuickCreate = $state(false);
-    let searchQuery = $state("");
     let loadingSearch = $state(false);
     let loadingItems = $state(false);
-    let editingItem = $state<any | null>(null);
     let linkingItemId = $state<string | null>(null);
     let deletingItemId = $state<string | null>(null);
+    let editingItem = $state<any | null>(null);
+    let searchQuery = $state("");
     let selectedIds = $state<Set<string>>(new Set());
     let bulkDeleting = $state(false);
 
@@ -142,26 +148,40 @@
             : associatedItems,
     );
 
+    let fetchingAssociations = $state(false);
+
     $effect(() => {
         // Keep associatedItems in sync with initialItems prop from parent
-        associatedItems = initialItems;
+        // ONLY if initialItems was explicitly provided and we aren't loading our own.
+        if (initialItems !== undefined && !fetchAssociationsRemote && !loadingItems) {
+            associatedItems = initialItems;
+        }
+    });
+
+    $effect(() => {
+        // Refetch associations when entityId or type changes
+        if (fetchQuery) {
+            fetchingAssociations = true;
+            fetchQuery.then((data: any) => {
+                associatedItems = data;
+                fetchingAssociations = false;
+            }).catch((err: any) => {
+                console.error("Failed to fetch associations", err);
+                fetchingAssociations = false;
+            });
+        }
     });
 
     onMount(async () => {
-        if (isStandalone) {
+        if (isStandalone && listQuery) {
             loadingItems = true;
             try {
-                associatedItems = await listItemsRemote();
+                associatedItems = await listQuery;
             } catch (e: any) {
                 console.error("Failed to load items", e);
             } finally {
                 loadingItems = false;
             }
-        } else if (entityId && fetchAssociationsRemote) {
-            associatedItems = await fetchAssociationsRemote({
-                type: type!,
-                entityId,
-            });
         }
     });
 
@@ -204,10 +224,15 @@
 
     async function toggleSelector() {
         showSelector = !showSelector;
-        if (showSelector && allItems.length === 0) {
+        if (showSelector && allItems.length === 0 && listQuery) {
             loadingSearch = true;
-            allItems = await listItemsRemote();
-            loadingSearch = false;
+            try {
+                allItems = await listQuery;
+            } catch (err: any) {
+                toast.error(`Error loading search list: ${err.message}`);
+            } finally {
+                loadingSearch = false;
+            }
         }
     }
 
@@ -389,7 +414,7 @@
                     `Get started by creating your first ${title.toLowerCase().replace(/s$/, "")}`}
                 actionLabel={emptyActionLabel ||
                     `Create ${title.replace(/s$/, "")}`}
-                actionHref="#"
+                onclick={() => (showQuickCreate = true)}
             />
         {:else if displayedItems.length === 0}
             <div class="text-center py-8 text-gray-400 text-sm">
@@ -590,7 +615,11 @@
             </div>
         {:else}
             <!-- Home Mode -->
-            {#if associatedItems.length > 0}
+            {#if fetchingAssociations}
+                <div class="text-xs text-center py-4 text-gray-400">
+                    Loading {title.toLowerCase()}...
+                </div>
+            {:else if associatedItems.length > 0}
                 <div class="space-y-1">
                     {#each associatedItems as item}
                         <div

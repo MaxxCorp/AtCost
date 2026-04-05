@@ -1,394 +1,366 @@
 <script lang="ts">
     import {
-        Plus,
-        Trash2,
-        Mail,
-        Phone,
-        MapPin,
-        Link as LinkIcon,
-        User,
-        Search,
         Briefcase,
         DollarSign,
         Calendar,
         FileText,
-        Info,
-        Settings,
+        MapPin,
     } from "@lucide/svelte";
-    import { goto } from "$app/navigation";
-    import { toast } from "svelte-sonner";
     import { onMount } from "svelte";
-    import { upsertTalent, listTalents, listSystemUsers } from "../../../routes/talents/talents.remote";
-    import { unifiedTalentSchema, createLocationSchema, updateLocationSchema } from "@ac/validations";
-    import { Button, AsyncButton, TagInput, ContactFields, EntityManager, handleDelete, LocationForm } from "@ac/ui";
+    import { toast } from "svelte-sonner";
+    import { goto } from "$app/navigation";
+    import {
+        upsertTalent,
+        listTalents,
+        listSystemUsers,
+    } from "../../../routes/talents/talents.remote";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import {
+        unifiedTalentSchema,
+        createLocationSchema,
+        updateLocationSchema,
+    } from "@ac/validations";
+    import {
+        Button,
+        AsyncButton,
+        ContactFields,
+        EntityManager,
+        LocationForm,
+        handleDelete,
+    } from "@ac/ui";
 
     interface Props {
         initialData?: any;
         talentId?: string;
+        cancelHref?: string;
         onSuccess?: (result: any) => void;
         onCancel?: () => void;
-        cancelHref?: string;
-        listContactsRemote: () => Promise<any[]>;
+        remoteFunction?: any;
+        listContactsRemote?: any;
     }
 
     let {
         initialData = {},
         talentId,
+        cancelHref = "/talents",
         onSuccess,
         onCancel,
-        cancelHref = "/talents",
-        listContactsRemote,
+        remoteFunction = upsertTalent,
+        listContactsRemote = listTalents,
     }: Props = $props();
+
+    const rf = $derived(typeof remoteFunction === "function" ? remoteFunction() : remoteFunction);
 
     const d = (val: any, def: any) =>
         val === undefined || val === null ? def : val;
 
-    // --- State for Talent (HR) Fields ---
+    let systemUsers = $state<any[]>([]);
+    let allLocations = $state<any[]>([]);
+    // svelte-ignore state_referenced_locally
+    let emails = $state(initialData.contact?.emails || [{ value: "", type: "work", primary: true }]);
+    // svelte-ignore state_referenced_locally
+    let phones = $state(initialData.contact?.phones || []);
+    // svelte-ignore state_referenced_locally
+    let relations = $state(initialData.contact?.relations || []);
+    // svelte-ignore state_referenced_locally
+    let tagsInput = $state((initialData.contact?.tags || []).join(", "));
+    // svelte-ignore state_referenced_locally
+    let locationIds = $state<string[]>((initialData.contact?.locationAssociations || []).map((la: any) => la.locationId));
+    // svelte-ignore state_referenced_locally
+    let addresses = $state(initialData.contact?.addresses || []);
+    let autoLinked = $state(false);
+    // svelte-ignore state_referenced_locally
+    let linkedUserId = $state(initialData.contact?.linkedUserId || "");
+
+    // svelte-ignore state_referenced_locally
+    let contactData = $state({
+        id: d(initialData.contactId || initialData.contact?.id, undefined),
+        displayName: d(initialData.contact?.displayName, ""),
+        givenName: d(initialData.contact?.givenName, ""),
+        middleName: d(initialData.contact?.middleName, ""),
+        familyName: d(initialData.contact?.familyName, ""),
+        honorificPrefix: d(initialData.contact?.honorificPrefix, ""),
+        honorificSuffix: d(initialData.contact?.honorificSuffix, ""),
+        company: d(initialData.contact?.company, ""),
+        role: d(initialData.contact?.role, ""),
+        department: d(initialData.contact?.department, ""),
+        gender: d(initialData.contact?.gender, ""),
+        birthday: d(initialData.contact?.birthday ? String(initialData.contact.birthday).split("T")[0] : "", ""),
+        notes: d(initialData.contact?.notes, ""),
+        isPublic: d(initialData.contact?.isPublic, false),
+    });
+
     // svelte-ignore state_referenced_locally
     let talentData = $state({
         id: talentId || d(initialData.id, undefined),
         status: d(initialData.status, "applicant"),
         jobTitle: d(initialData.jobTitle, ""),
         salaryExpectation: d(initialData.salaryExpectation, ""),
-        availabilityDate: d(
-            initialData.availabilityDate
-                ? String(initialData.availabilityDate).split("T")[0]
-                : "",
-            "",
-        ),
+        availabilityDate: d(initialData.availabilityDate ? String(initialData.availabilityDate).split("T")[0] : "", ""),
         onboardingStatus: d(initialData.onboardingStatus, ""),
         resumeUrl: d(initialData.resumeUrl, ""),
         source: d(initialData.source, ""),
         internalNotes: d(initialData.internalNotes, ""),
     });
 
-    // --- State for Contact Fields (Shared) ---
-    // svelte-ignore state_referenced_locally
-    let contactData = $state({
-        id: d(initialData.contactId || initialData.contact?.id, undefined),
-        displayName: d(initialData.contact?.displayName, ""),
-        givenName: d(initialData.contact?.givenName, ""),
-        familyName: d(initialData.contact?.familyName, ""),
-        company: d(initialData.contact?.company, ""),
-        role: d(initialData.contact?.role, ""),
-        department: d(initialData.contact?.department, ""),
-        birthday: d(
-            initialData.contact?.birthday
-                ? initialData.contact.birthday instanceof Date
-                    ? initialData.contact.birthday.toISOString().split("T")[0]
-                    : String(initialData.contact.birthday).split("T")[0]
-                : "",
-            "",
-        ),
-        notes: d(initialData.contact?.notes, ""),
-        isPublic: d(initialData.contact?.isPublic, false),
-    });
-    // svelte-ignore state_referenced_locally
-    let addresses = $state([...d(initialData.addresses || initialData.contact?.addresses, [])]);
-
-    // svelte-ignore state_referenced_locally
-    let emails = $state([...d(initialData.emails || initialData.contact?.emails, [])]);
-    // svelte-ignore state_referenced_locally
-    let phones = $state([...d(initialData.phones || initialData.contact?.phones, [])]);
-    // svelte-ignore state_referenced_locally
-    let relations = $state([...d(initialData.relations || initialData.contact?.relations, [])]);
-    // svelte-ignore state_referenced_locally
-    let tagsInput = $state(
-        (initialData.tags || initialData.contact?.tags || [])
-            .map((t: any) => t.name || t)
-            .join(", ")
-    );
-    // svelte-ignore state_referenced_locally
-    let locationIds = $state<string[]>(
-        (initialData?.locationAssociations || initialData.contact?.locationAssociations || []).map(
-            (la: any) => la.locationId || la.location?.id,
-        ),
-    );
-
-    // --- State for Linked User Association ---
-    // svelte-ignore state_referenced_locally
-    let linkedUserId = $state(initialData.linkedUser?.id || "");
-    let systemUsers = $state<any[]>([]);
-    let autoLinked = $state(false);
+    const emailsJson = $derived(JSON.stringify(emails.filter((e: any) => e.value)));
+    const phonesJson = $derived(JSON.stringify(phones.filter((p: any) => p.value)));
+    const relationsJson = $derived(JSON.stringify(relations.map((r: any) => ({ targetContactId: r.targetContactId, relationType: r.relationType }))));
+    const addressesJson = $derived(JSON.stringify(addresses.filter((a: any) => a.street || a.city)));
+    const tagsJson = $derived(JSON.stringify(tagsInput.split(",").map((t: string) => t.trim()).filter(Boolean)));
+    const locationIdsJson = $derived(JSON.stringify(locationIds));
 
     onMount(async () => {
+        if (!initialData?.id && !talentId) {
+            if (!tagsInput) tagsInput = "Applicant";
+        }
         try {
-            systemUsers = await listSystemUsers();
+            const [users, locations] = await Promise.all([
+                listSystemUsers(),
+                listLocations()
+            ]);
+            systemUsers = users;
+            allLocations = locations;
         } catch (e) {
             console.error("Failed to load system users", e);
         }
     });
 
     $effect(() => {
-        // Auto-match user by email for new talents
-        if (!initialData.id && !linkedUserId && !autoLinked && emails.length > 0 && emails[0].value && systemUsers.length > 0) {
-            const email = emails[0].value.toLowerCase();
-            const match = systemUsers.find(u => u.email?.toLowerCase() === email);
+        if (!initialData.id && !linkedUserId && !autoLinked && emails.length > 0 && emails[0]?.value && systemUsers.length > 0) {
+            const primaryEmail = emails[0].value.toLowerCase();
+            const match = systemUsers.find(u => u.email.toLowerCase() === primaryEmail);
             if (match) {
                 linkedUserId = match.id;
                 autoLinked = true;
-                toast.success(`Auto-linked user account: ${match.name}`);
+                toast.success(`Automatically linked to system user: ${match.name}`);
             }
         }
     });
 
-    const emailsJson = $derived(JSON.stringify(emails.filter((e) => e.value)));
-    const phonesJson = $derived(JSON.stringify(phones.filter((p) => p.value)));
-    const relationsJson = $derived(JSON.stringify(relations.map(r => ({ targetContactId: r.targetContactId, relationType: r.relationType }))));
-    const tagsJson = $derived(
-        JSON.stringify(
-            tagsInput
-                .split(",")
-                .map((t: string) => t.trim())
-                .filter(Boolean),
-        ),
-    );
-    const addressesJson = $derived(JSON.stringify(addresses.filter(a => a.street || a.city)));
-    const locationIdsJson = $derived(JSON.stringify(locationIds));
-
-    const remote = upsertTalent as any;
-
-    function getField(name: string) {
-        if (!remote?.fields) return {};
+    function getFieldMetadata(name: string) {
+        if (!rf?.fields) return { as: () => ({}), issues: () => [] };
         const parts = name.split(".");
-        let current: any = remote.fields;
+        let current = rf.fields;
         for (const part of parts) {
-            if (!current?.[part]) return {};
+            if (!current?.[part]) return { as: () => ({}), issues: () => [] };
             current = current[part];
         }
         return current;
     }
-    const formSetup = $derived(remote.preflight(unifiedTalentSchema).enhance(async ({ submit }: any) => {
-        try {
-            await submit();
-            const result = remote.result;
-            if (result?.success === false || result?.error) {
-                toast.error(result?.error?.message || result?.error || "Failed to save talent");
-                return;
-            }
-
-            toast.success("Talent successfully saved!");
-            if (onSuccess) onSuccess(result);
-            else goto(cancelHref);
-        } catch (error: any) {
-            toast.error(error.message || "An unexpected error occurred");
-        }
-    }));
 </script>
 
 <form
-    {...formSetup}
     class="space-y-8"
+    {...rf.preflight(unifiedTalentSchema).enhance(async ({ submit }: any) => {
+        try {
+            await submit();
+            const result = rf.result;
+            if (result?.success === false || result?.error) {
+                toast.error(result?.error?.message || result?.error || "Save Failed");
+                return;
+            }
+            toast.success(talentId ? "Talent updated!" : "Talent registered!");
+            if (onSuccess) onSuccess(result);
+            else goto(cancelHref);
+        } catch (error: any) {
+            toast.error(error.message || "Error");
+        }
+    })}
 >
-    <!-- Hidden Fields for IDs and JSON sets -->
+    <!-- RPC-based hidden inputs with {#if} guards as requested by USER -->
     {#if talentId || talentData.id}
-        <input {...getField("talent.id").as("hidden", talentId || talentData.id)} />
+        <input {...getFieldMetadata("talent.id").as("hidden", talentId || talentData.id)} />
     {/if}
     {#if contactData.id}
-        <input {...getField("contact.id").as("hidden", contactData.id)} />
+        <input {...getFieldMetadata("contact.id").as("hidden", contactData.id)} />
     {/if}
-    <input {...getField("emailsJson").as("hidden", emailsJson)} />
-    <input {...getField("phonesJson").as("hidden", phonesJson)} />
-    <input {...getField("relationsJson").as("hidden", relationsJson)} />
-    <input {...getField("tagsJson").as("hidden", tagsJson)} />
-    <input {...getField("addressesJson").as("hidden", addressesJson)} />
-    <input {...getField("locationIdsJson").as("hidden", locationIdsJson)} />
-    <input {...getField("linkedUserId").as("hidden", linkedUserId)} />
+    {#if emailsJson}
+        <input {...getFieldMetadata("emailsJson").as("hidden", emailsJson)} />
+    {/if}
+    {#if phonesJson}
+        <input {...getFieldMetadata("phonesJson").as("hidden", phonesJson)} />
+    {/if}
+    {#if relationsJson}
+        <input {...getFieldMetadata("relationsJson").as("hidden", relationsJson)} />
+    {/if}
+    {#if tagsJson}
+        <input {...getFieldMetadata("tagsJson").as("hidden", tagsJson)} />
+    {/if}
+    {#if addressesJson}
+        <input {...getFieldMetadata("addressesJson").as("hidden", addressesJson)} />
+    {/if}
+    {#if locationIdsJson}
+        <input {...getFieldMetadata("locationIdsJson").as("hidden", locationIdsJson)} />
+    {/if}
+    {#if linkedUserId}
+        <input {...getFieldMetadata("linkedUserId").as("hidden", linkedUserId)} />
+    {/if}
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- LEFT: Contact Information (Shared UI) -->
-        <div class="bg-gray-50/50 p-6 rounded-xl border border-gray-100 space-y-4">
-            <ContactFields
-                bind:contactData
-                bind:emails
-                bind:phones
-                bind:relations
-                bind:tagsInput
-                bind:locationIds
-                bind:addresses
-                prefix="contact"
-                contactId={contactData.id}
-                {listContactsRemote}
-            />
+        <!-- LEFT: Contact Information -->
+        <div class="space-y-6">
+            <div class="bg-gray-50/50 p-6 rounded-xl border border-gray-100">
+                <ContactFields
+                    bind:contactData
+                    bind:emails
+                    bind:phones
+                    bind:relations
+                    bind:tagsInput
+                    bind:locationIds
+                    bind:addresses
+                    listContactsRemote={listContactsRemote}
+                    getField={getFieldMetadata}
+                />
 
-            <!-- Locations Manager (EntityManager) -->
-            <div class="mt-8 pt-8 border-t border-gray-100">
-                <EntityManager
-                    title="Locations"
-                    icon={MapPin}
-                    type="location"
-                    entityId={contactData.id}
-                    initialItems={(initialData.contact?.locationAssociations || []).map((la: any) => la.location)}
-                    embedded={true}
-                    onchange={(ids: string[]) => (locationIds = ids)}
-                    listItemsRemote={listLocations}
-                    addAssociationRemote={async (p: any) => {
-                        const { addAssociation } = await import("../../../routes/talents/associate.remote");
-                        return await addAssociation({
-                            type: "location",
-                            entityId: p.itemId,
-                            talentId: talentData.id,
-                        });
-                    }}
-                    removeAssociationRemote={async (p: any) => {
-                        const { removeAssociation } = await import("../../../routes/talents/associate.remote");
-                        return await removeAssociation({
-                            type: "location",
-                            entityId: p.itemId,
-                            talentId: talentData.id,
-                        });
-                    }}
-                    deleteItemRemote={async (ids: any) => {
-                        return await handleDelete({
-                            ids: Array.isArray(ids) ? ids : [ids],
-                            deleteFn: deleteLocation,
-                            itemName: "location",
-                        });
-                    }}
-                    createRemote={createLocation}
-                    createSchema={createLocationSchema}
-                    updateRemote={updateLocation}
-                    updateSchema={updateLocationSchema}
-                    getFormData={(l: any) => l}
-                    searchPredicate={(l: any, q: string) => {
-                        return (
-                            l.name.toLowerCase().includes(q.toLowerCase()) ||
-                            (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false)
-                        );
-                    }}
-                >
-                    {#snippet renderItemLabel(location: any)}
-                        {location.name}
-                        {location.roomId ? `(${location.roomId})` : ""}
-                    {/snippet}
-                    {#snippet renderForm({ remoteFunction: rf, schema, id, initialData: formData, onSuccess, onCancel }: any)}
-                        <LocationForm
-                            remoteFunction={rf}
-                            validationSchema={schema}
-                            isUpdating={!!id}
-                            initialData={formData}
-                            {onSuccess}
-                            {onCancel}
-                        />
-                    {/snippet}
-                </EntityManager>
+                <div class="mt-8 pt-8 border-t border-gray-100 flex justify-between items-center">
+                    <p class="text-sm text-gray-500">Manage associated locations and branch offices.</p>
+                    <EntityManager
+                        title="Locations"
+                        icon={MapPin}
+                        initialItems={allLocations.filter(l => locationIds.includes(l.id))}
+                        listItemsRemote={listLocations}
+                        onchange={(ids: string[]) => { locationIds = ids; }}
+                        createRemote={createLocation}
+                        createSchema={createLocationSchema}
+                        updateRemote={updateLocation}
+                        updateSchema={updateLocationSchema}
+                        getFormData={(l: any) => l}
+                        deleteItemRemote={async (ids: string[]) => {
+                            return await handleDelete({
+                                ids,
+                                deleteFn: deleteLocation,
+                                itemName: "location",
+                            });
+                        }}
+                        searchPredicate={(item: any, term: string) =>
+                            item.name.toLowerCase().includes(term.toLowerCase())}
+                    >
+                        {#snippet renderItemLabel(l: any)}
+                            <span>{l.name}</span>
+                            {#if l.city}
+                                <span class="text-gray-400 text-xs ml-1">({l.city})</span>
+                            {/if}
+                        {/snippet}
+
+                        {#snippet renderForm({
+                            remoteFunction: rf,
+                            schema,
+                            initialData: formData,
+                            onSuccess: os,
+                            onCancel: oc,
+                            id: lid,
+                        }: any)}
+                            <LocationForm 
+                                remoteFunction={rf} 
+                                validationSchema={schema} 
+                                initialData={formData} 
+                                onSuccess={os} 
+                                onCancel={oc} 
+                                isUpdating={!!lid} 
+                            />
+                        {/snippet}
+                    </EntityManager>
+                </div>
             </div>
         </div>
 
-        <!-- RIGHT: HR Information -->
-        <div class="space-y-6">
-            <div class="bg-indigo-50/30 p-6 rounded-xl border border-indigo-100 space-y-4">
-                <h3 class="text-sm font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-2">
-                    <Briefcase size={16} />
-                    Talent & HR Data
+        <!-- RIGHT: Talent Details -->
+        <div class="space-y-8">
+            <div class="bg-indigo-50/50 p-6 rounded-xl border border-indigo-100 space-y-6">
+                <h3 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                    <Briefcase size={20} class="text-indigo-500" />
+                    Talent Information
                 </h3>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label for="linkedUser" class="block text-xs font-semibold text-gray-600 mb-1">System User Account (Optional)</label>
-                        <select
-                            {...getField("linkedUserId").as("select")}
-                            bind:value={linkedUserId}
-                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                        >
-                            <option value="">-- No linked account --</option>
-                            {#each systemUsers as su}
-                                <option value={su.id}>{su.name} ({su.email})</option>
-                            {/each}
-                        </select>
-                        <p class="text-[10px] text-gray-500 mt-1">Links this talent profile to a specific employee login account.</p>
-                    </div>
-
-                    <div class="col-span-2">
-                        <label for="jobTitle" class="block text-xs font-semibold text-gray-600 mb-1">Target Job Title</label>
-                        <input
-                            {...getField("talent.jobTitle").as("text")}
-                            bind:value={talentData.jobTitle}
-                            placeholder="e.g. Senior Frontend Engineer"
-                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label for="status" class="block text-xs font-semibold text-gray-600 mb-1">Pipeline Status</label>
-                        <select
-                            {...getField("talent.status").as("select")}
-                            bind:value={talentData.status}
-                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                        >
-                            <option value="applicant">Applicant</option>
-                            <option value="active">Active Talent</option>
-                            <option value="inactive">Inactive / Archived</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="salary" class="block text-xs font-semibold text-gray-600 mb-1">Salary Expectation</label>
-                        <div class="relative">
-                            <DollarSign size={14} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label for="jobTitle" class="block text-sm font-medium text-gray-700">Job Title</label>
+                        <div class="mt-1 relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Briefcase size={16} class="text-gray-400" />
+                            </div>
                             <input
-                                {...getField("talent.salaryExpectation").as("text")}
-                                bind:value={talentData.salaryExpectation}
-                                placeholder="Yearly gross"
-                                class="w-full pl-8 pr-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                {...getFieldMetadata("talent.jobTitle").as("text")}
+                                bind:value={talentData.jobTitle}
+                                placeholder="e.g. Senior Software Engineer"
+                                class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
                     </div>
+
                     <div>
-                        <label for="availability" class="block text-xs font-semibold text-gray-600 mb-1">Available From</label>
+                        <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                        <select
+                            {...getFieldMetadata("talent.status").as("select")}
+                            bind:value={talentData.status}
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="applicant">Applicant</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="salaryExpectation" class="block text-sm font-medium text-gray-700">Salary Expectation</label>
+                        <div class="mt-1 relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <DollarSign size={16} class="text-gray-400" />
+                            </div>
+                            <input
+                                {...getFieldMetadata("talent.salaryExpectation").as("text")}
+                                bind:value={talentData.salaryExpectation}
+                                placeholder="e.g. 85,000"
+                                class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="availabilityDate" class="block text-sm font-medium text-gray-700">Availability</label>
                         <input
-                            {...getField("talent.availabilityDate").as("date")}
+                            type="date"
+                            {...getFieldMetadata("talent.availabilityDate").as("date")}
                             bind:value={talentData.availabilityDate}
-                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     </div>
+
                     <div>
-                        <label for="source" class="block text-xs font-semibold text-gray-600 mb-1">Source</label>
+                        <label for="onboardingStatus" class="block text-sm font-medium text-gray-700">Onboarding</label>
                         <input
-                            {...getField("talent.source").as("text")}
-                            bind:value={talentData.source}
-                            placeholder="e.g. LinkedIn, Referral"
-                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                            {...getFieldMetadata("talent.onboardingStatus").as("text")}
+                            bind:value={talentData.onboardingStatus}
+                            placeholder="Status..."
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
-                    </div>
-                    <div class="col-span-2">
-                        <label for="resumeUrl" class="block text-xs font-semibold text-gray-600 mb-1">Resume / CV URL</label>
-                        <input
-                            {...getField("talent.resumeUrl").as("text")}
-                            bind:value={talentData.resumeUrl}
-                            placeholder="Link to file storage or cloud CV"
-                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                        />
-                    </div>
-                    <div class="col-span-2">
-                        <label for="internalNotes" class="block text-xs font-semibold text-gray-600 mb-1">Internal HR Notes</label>
-                        <textarea
-                            {...getField("talent.internalNotes").as("textarea")}
-                            bind:value={talentData.internalNotes}
-                            rows="4"
-                            placeholder="Private notes for recruitment team..."
-                            class="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm resize-none"
-                        ></textarea>
                     </div>
                 </div>
+            </div>
+
+            <div class="bg-gray-50/50 p-6 rounded-xl border border-gray-100 space-y-4">
+                <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <FileText size={20} class="text-gray-500" />
+                    Internal Notes
+                </h3>
+                <textarea
+                    {...getFieldMetadata("talent.internalNotes").as("textarea")}
+                    bind:value={talentData.internalNotes}
+                    rows="4"
+                    placeholder="Private notes for recruitment team..."
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                ></textarea>
             </div>
         </div>
     </div>
 
-    <div class="flex justify-end gap-3 pt-6 border-t border-gray-100">
-        {#if onCancel}
-            <Button variant="secondary" type="button" onclick={onCancel}>Cancel</Button>
-        {:else}
-            <Button href={cancelHref} variant="secondary" type="button">Cancel</Button>
-        {/if}
-        <AsyncButton
-            type="submit"
-            loading={remote.pending}
-            class="bg-indigo-600 hover:bg-indigo-700 text-white"
-        >
-            {talentId || talentData.id ? "Save Changes" : "Create Talent"}
-        </AsyncButton>
+    <div class="flex justify-end gap-4 p-6 bg-gray-50 rounded-2xl border border-gray-100">
+        <Button variant="outline" onclick={() => (onCancel ? onCancel() : goto(cancelHref))}>Cancel</Button>
+        <AsyncButton type="submit" loading={rf.pending}>Register Talent</AsyncButton>
     </div>
 </form>

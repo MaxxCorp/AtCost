@@ -1,1 +1,0 @@
-ALTER TABLE "kiosk" ADD COLUMN "ui_mode" text DEFAULT 'carousel' NOT NULL;
