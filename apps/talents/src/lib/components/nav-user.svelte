@@ -5,6 +5,9 @@
 	import { useSidebar } from "@ac/ui/components/sidebar";
 	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
 	import LogOutIcon from "@lucide/svelte/icons/log-out";
+import UserIcon from "@lucide/svelte/icons/user";
+import ClockIcon from "@lucide/svelte/icons/clock";
+
 
 	import { authClient } from "$lib/auth";
 
@@ -35,7 +38,7 @@
 	<Sidebar.MenuItem>
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
+				{#snippet child({ props }: { props: any })}
 					<Sidebar.MenuButton
 						{...props}
 						size="lg"
@@ -79,6 +82,21 @@
 						</div>
 					</div>
 				</DropdownMenu.Label>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Group>
+					<DropdownMenu.Item>
+						<a href="/my-profile" class="flex items-center gap-2 w-full h-full">
+							<UserIcon class="size-4" />
+							My Profile
+						</a>
+					</DropdownMenu.Item>
+					<DropdownMenu.Item>
+						<a href="/my-timesheet" class="flex items-center gap-2 w-full h-full">
+							<ClockIcon class="size-4" />
+							My Timesheets
+						</a>
+					</DropdownMenu.Item>
+				</DropdownMenu.Group>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
 					<DropdownMenu.Item onclick={handleSignOut}>

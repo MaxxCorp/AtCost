@@ -27,7 +27,7 @@
         onchange?: (ids: string[]) => void;
 
         // Data fetchers
-        listItemsRemote: () => Promise<T[]>;
+        listItemsRemote: () => Promise<T[] | { data: T[] }>;
         fetchAssociationsRemote?: (params: {
             type: string;
             entityId: string;
@@ -81,6 +81,24 @@
         emptyTitle?: string;
         emptyDescription?: string;
         emptyActionLabel?: string;
+
+        // Localization props
+        loadingLabel?: string;
+        noItemsLabel?: string;
+        noItemsFoundLabel?: string;
+        searchPlaceholder?: string;
+        linkItemLabel?: string;
+        associatedItemLabel?: string;
+        quickCreateLabel?: string;
+        closeSearchLabel?: string;
+        editLabel?: string;
+        deleteLabel?: string;
+        unlinkLabel?: string;
+        deleteForeverLabel?: string;
+        bulkDeleteLabel?: string;
+        selectAllLabel?: string;
+        deselectAllLabel?: string;
+        confirmUnlinkLabel?: string;
     }
 
     let {
@@ -111,6 +129,24 @@
         emptyTitle,
         emptyDescription,
         emptyActionLabel,
+
+        // Localization defaults
+        loadingLabel = `Loading ${title.toLowerCase()}...`,
+        noItemsLabel = `No ${title.toLowerCase()} associated yet.`,
+        noItemsFoundLabel = `No ${title.toLowerCase()} found.`,
+        searchPlaceholder = `Search ${title.toLowerCase()}...`,
+        linkItemLabel = `Link ${title}`,
+        associatedItemLabel = `Associated ${title}`,
+        quickCreateLabel = "Quick Create",
+        closeSearchLabel = "Close Search",
+        editLabel = "Edit",
+        deleteLabel = "Delete",
+        unlinkLabel = "Unlink",
+        deleteForeverLabel = `Delete ${title.toLowerCase()} forever`,
+        bulkDeleteLabel = "Delete Selected",
+        selectAllLabel = "Select All",
+        deselectAllLabel = "Deselect All",
+        confirmUnlinkLabel = "Remove link",
     }: Props<any> = $props();
 
     const isStandalone = $derived(mode === "standalone");
@@ -176,7 +212,8 @@
         if (isStandalone && listQuery) {
             loadingItems = true;
             try {
-                associatedItems = await listQuery;
+                const res = await listQuery;
+                associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
             } catch (e: any) {
                 console.error("Failed to load items", e);
             } finally {
@@ -227,9 +264,10 @@
         if (showSelector && allItems.length === 0 && listQuery) {
             loadingSearch = true;
             try {
-                allItems = await listQuery;
+                const res = await listQuery;
+                allItems = Array.isArray(res) ? res : (res?.data ?? []);
             } catch (err: any) {
-                toast.error(`Error loading search list: ${err.message}`);
+                toast.error(`${noItemsFoundLabel}: ${err.message}`);
             } finally {
                 loadingSearch = false;
             }
@@ -273,7 +311,8 @@
         showQuickCreate = false;
 
         if (result?.id) {
-            const items = await listItemsRemote();
+            const res: any = await listItemsRemote();
+            const items = Array.isArray(res) ? res : (res?.data ?? []);
 
             if (isStandalone) {
                 // Standalone: just refresh the full list
@@ -304,7 +343,8 @@
 
         if (!targetId) return;
 
-        const items = await listItemsRemote();
+        const res: any = await listItemsRemote();
+        const items = Array.isArray(res) ? res : (res?.data ?? []);
         const updatedItem = items.find((i: any) => i.id === targetId);
 
         if (updatedItem) {
@@ -360,17 +400,17 @@
                             : selectAll}
                     >
                         {selectedIds.size === displayedItems.length
-                            ? "Deselect All"
-                            : "Select All"}
+                            ? deselectAllLabel
+                            : selectAllLabel}
                     </Button>
                     <AsyncButton
                         onclick={bulkDelete}
                         variant="destructive"
                         class="px-4 py-2"
                         loading={bulkDeleting}
-                        loadingLabel="Deleting..."
+                        loadingLabel={loadingLabel}
                     >
-                        Delete Selected ({selectedIds.size})
+                        {bulkDeleteLabel} ({selectedIds.size})
                     </AsyncButton>
                 {/if}
                 {#if createRemote && renderForm}
@@ -381,7 +421,7 @@
                         onclick={() => (showQuickCreate = true)}
                     >
                         <Plus size={16} class="mr-1" />
-                        New {title.replace(/s$/, "")}
+                        {quickCreateLabel}
                     </Button>
                 {/if}
             </div>
@@ -395,7 +435,7 @@
             />
             <input
                 type="text"
-                placeholder={`Search ${title.toLowerCase()}...`}
+                placeholder={searchPlaceholder}
                 bind:value={searchQuery}
                 class="pl-9 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -404,7 +444,7 @@
         <!-- Items list -->
         {#if loadingItems}
             <div class="text-center py-12 text-gray-400">
-                Loading {title.toLowerCase()}...
+                {loadingLabel}
             </div>
         {:else if associatedItems.length === 0}
             <EmptyState
@@ -418,7 +458,7 @@
             />
         {:else if displayedItems.length === 0}
             <div class="text-center py-8 text-gray-400 text-sm">
-                No {title.toLowerCase()} match your search.
+                {noItemsFoundLabel}
             </div>
         {:else}
             <div class="grid gap-3">
@@ -448,7 +488,7 @@
                             {/if}
                         </div>
                         <div
-                            class="flex items-center gap-1 shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                            class="flex items-center gap-1 shrink-0"
                         >
                             {#if updateRemote && renderForm && getFormData}
                                 <button
@@ -458,7 +498,7 @@
                                         editingItem = item;
                                         showQuickCreate = false;
                                     }}
-                                    title="Edit"
+                                    title={editLabel}
                                 >
                                     <Pencil size={16} />
                                 </button>
@@ -472,7 +512,7 @@
                                     loading={deletingItemId === item.id}
                                     loadingLabel=""
                                     onclick={() => deleteItem(item)}
-                                    title="Delete"
+                                    title={deleteLabel}
                                 >
                                     <Trash2 size={16} />
                                 </AsyncButton>
@@ -495,7 +535,7 @@
                 class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2"
             >
                 <Icon size={16} />
-                {showSelector ? `Link ${title}` : `Associated ${title}`}
+                {showSelector ? linkItemLabel : associatedItemLabel}
             </h3>
             <div class="flex gap-2 flex-wrap">
                 <Button
@@ -507,12 +547,12 @@
                 >
                     {#if showSelector}
                         <X size={16} />
-                        <span class="hidden sm:inline">Close Search</span>
-                        <span class="sm:hidden">Close</span>
+                        <span class="hidden sm:inline">{closeSearchLabel}</span>
+                        <span class="sm:hidden">{editLabel}</span>
                     {:else}
                         <Link size={16} />
-                        <span class="hidden sm:inline">Link {title}</span>
-                        <span class="sm:hidden">Link</span>
+                        <span class="hidden sm:inline">{linkItemLabel}</span>
+                        <span class="sm:hidden">{unlinkLabel}</span>
                     {/if}
                 </Button>
                 {#if renderForm}
@@ -524,8 +564,8 @@
                         class="flex items-center gap-1"
                     >
                         <Plus size={16} />
-                        <span class="hidden sm:inline">Quick Create</span>
-                        <span class="sm:hidden">Create</span>
+                        <span class="hidden sm:inline">{quickCreateLabel}</span>
+                        <span class="sm:hidden">{quickCreateLabel}</span>
                     </Button>
                 {/if}
             </div>
@@ -541,7 +581,7 @@
                     />
                     <input
                         type="text"
-                        placeholder={`Search ${title.toLowerCase()}...`}
+                        placeholder={searchPlaceholder}
                         bind:value={searchQuery}
                         class="pl-9 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -550,11 +590,11 @@
                 <div class="max-h-64 overflow-y-auto space-y-1">
                     {#if loadingSearch}
                         <div class="text-xs text-center py-4 text-gray-400">
-                            Loading {title.toLowerCase()}...
+                            {loadingLabel}
                         </div>
                     {:else if filteredItems.length === 0}
                         <div class="text-xs text-center py-4 text-gray-400">
-                            No {title.toLowerCase()} found.
+                            {noItemsFoundLabel}
                         </div>
                     {:else}
                         {#each filteredItems as item}
@@ -581,11 +621,11 @@
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        class="h-8 px-2 text-gray-400 hover:text-blue-500 opacity-0 group-hover/item:opacity-100"
+                                        class="h-8 px-2 text-gray-400 hover:text-blue-500"
                                         loading={linkingItemId === item.id}
                                         loadingLabel=""
                                         onclick={() => toggleAssociation(item)}
-                                        title={isAssociated ? "Unlink" : "Link"}
+                                        title={isAssociated ? unlinkLabel : linkItemLabel}
                                     >
                                         {#if isAssociated}
                                             <Unlink size={14} />
@@ -598,11 +638,11 @@
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            class="h-8 px-2 text-gray-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100"
+                                            class="h-8 px-2 text-gray-400 hover:text-red-500"
                                             loading={deletingItemId === item.id}
                                             loadingLabel=""
                                             onclick={() => deleteItem(item)}
-                                            title={`Delete ${title.toLowerCase()} forever`}
+                                            title={deleteForeverLabel}
                                         >
                                             <Trash2 size={14} />
                                         </AsyncButton>
@@ -617,7 +657,7 @@
             <!-- Home Mode -->
             {#if fetchingAssociations}
                 <div class="text-xs text-center py-4 text-gray-400">
-                    Loading {title.toLowerCase()}...
+                    {loadingLabel}
                 </div>
             {:else if associatedItems.length > 0}
                 <div class="space-y-1">
@@ -639,13 +679,13 @@
                                 {#if updateRemote && renderForm && getFormData}
                                     <button
                                         type="button"
-                                        class="h-8 px-2 text-gray-400 hover:text-blue-500 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                                        class="h-8 px-2 text-gray-400 hover:text-blue-500 transition-colors"
                                         onclick={() => {
                                             editingItem = item;
                                             showQuickCreate = false;
                                             showSelector = false;
                                         }}
-                                        title="Edit in place"
+                                        title={editLabel}
                                     >
                                         <Pencil size={14} />
                                     </button>
@@ -654,11 +694,11 @@
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    class="h-8 px-2 text-gray-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100"
+                                    class="h-8 px-2 text-gray-400 hover:text-red-500"
                                     loading={linkingItemId === item.id}
                                     loadingLabel=""
                                     onclick={() => toggleAssociation(item)}
-                                    title="Remove link"
+                                    title={confirmUnlinkLabel}
                                 >
                                     <Unlink size={14} />
                                 </AsyncButton>
@@ -667,11 +707,11 @@
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        class="h-8 px-2 text-gray-400 hover:text-red-500 opacity-0 group-hover/item:opacity-100"
+                                        class="h-8 px-2 text-gray-400 hover:text-red-500"
                                         loading={deletingItemId === item.id}
                                         loadingLabel=""
                                         onclick={() => deleteItem(item)}
-                                        title={`Delete ${title.toLowerCase()} forever`}
+                                        title={deleteForeverLabel}
                                     >
                                         <Trash2 size={14} />
                                     </AsyncButton>
@@ -682,7 +722,7 @@
                 </div>
             {:else}
                 <p class="text-sm text-gray-500 italic">
-                    No {title.toLowerCase()} associated yet.
+                    {noItemsLabel}
                 </p>
             {/if}
         {/if}
@@ -703,9 +743,7 @@
         <Dialog.Content class="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
             <Dialog.Header class="mb-4">
                 <Dialog.Title class="text-xl font-bold">
-                    {editingItem
-                        ? `Edit ${title.replace(/s$/, "")}`
-                        : `New ${title.replace(/s$/, "")}`}
+                    {editingItem ? editLabel : quickCreateLabel}
                 </Dialog.Title>
             </Dialog.Header>
 

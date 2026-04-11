@@ -15,10 +15,28 @@ export const clockOutSchema = v.object({
     longitude: v.optional(v.number()),
 });
 
+export const manageShiftSchema = v.variant('action', [
+    v.object({
+        action: v.literal('in'),
+        ...clockInSchema.entries,
+    }),
+    v.object({
+        action: v.literal('out'),
+        ...clockOutSchema.entries,
+    }),
+]);
+
 export const timesheetApprovalSchema = v.object({
     entryId: v.string(),
     comment: v.optional(v.string()),
 });
+
+export const manageTimesheetsSchema = v.variant('action', [
+    v.object({ action: v.literal('clock_in'), ...clockInSchema.entries }),
+    v.object({ action: v.literal('clock_out'), ...clockOutSchema.entries }),
+    v.object({ action: v.literal('approve'), ...timesheetApprovalSchema.entries }),
+    v.object({ action: v.literal('reject'), entryId: v.string(), comment: v.string() }),
+]);
 
 export const timesheetManualUpdateSchema = v.object({
     entryId: v.string(),

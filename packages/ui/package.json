@@ -36,7 +36,7 @@
         }
     },
     "peerDependencies": {
-        "svelte": "^5.0.0"
+        "svelte": "^5.55.1"
     },
     "dependencies": {
         "@lucide/svelte": "^0.575.0",
@@ -48,7 +48,7 @@
         "tailwind-variants": "^3.2.2"
     },
     "devDependencies": {
-        "svelte": "^5.53.2",
+        "svelte": "^5.55.1",
         "typescript": "~5.7.3"
     }
 }

@@ -10,6 +10,7 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
     const results = await listQuery({
         table: contact,
         featureName: 'contacts',
+        accessLevel: 'use',
         transform: (row) => ({
             ...row,
             createdAt: row.createdAt.toISOString(),

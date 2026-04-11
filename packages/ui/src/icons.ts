@@ -53,4 +53,12 @@ export const ICONS = {
         path: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
         strokeWidth: 2
     } satisfies IconDef,
+    user: {
+        path: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+        strokeWidth: 2
+    } satisfies IconDef,
+    plane: {
+        path: 'M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3.5c-.5-.5-2.5 0-4 1.5L13.5 8.5L5.3 6.7c-.5-.1-1.1.1-1.4.5s-.3 1.1-.1 1.6l4 5.5l-3.5 3.5l-2.1-.7c-.4-.1-.8 0-1.1.2s-.5.6-.5 1c0 .1 0 .1 0 .2l.4 1.9l.4.4l1.9.4c.1 0 .1 0 .2 0c.4 0 .8-.2 1-.5s.3-.7.2-1.1l-.7-2.1l3.5-3.5l5.5 4c.5.2 1.2.1 1.6-.1s.6-.9.5-1.4z',
+        strokeWidth: 2
+    } satisfies IconDef,
 } as const;

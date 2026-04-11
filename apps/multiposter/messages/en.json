@@ -454,6 +454,8 @@
 	"tags_placeholder": "e.g. Customer, Lead, Priority",
 	"contact_search_placeholder": "Search for a contact to link...",
 	"no_items_found": "No {item} found.",
+	"confirm_unlink_label": "Unlink this {item}?",
+	"no_items_associated_label": "No {item} associated yet.",
 	"recurrence_settings": "Recurrence Settings",
 	"recurrence_description": "Set the recurrence rules for this event.",
 	"every": "Every",

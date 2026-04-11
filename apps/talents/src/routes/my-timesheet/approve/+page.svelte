@@ -1,9 +1,8 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { listPendingApprovals, approveEntry, rejectEntry } from '../timesheets.remote';
+    import { listPendingApprovals, manageTimesheets } from '../timesheets.remote';
     import { breadcrumbState } from '$lib/stores/breadcrumb.svelte';
-    import LoadingSection from '@ac/ui/components/LoadingSection.svelte';
-    import AsyncButton from '@ac/ui/components/AsyncButton.svelte';
+    import { LoadingSection, AsyncButton } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { format, differenceInMinutes, parseISO } from 'date-fns';
 
@@ -11,14 +10,14 @@
     let loading = $state(true);
 
     onMount(async () => {
-        breadcrumbState.set({ feature: 'timesheets', segments: [{ label: 'Time Tracking', href: '/timesheets' }], current: 'Approve Entries' });
+        breadcrumbState.set({ feature: 'timesheets', segments: [{ label: 'Time Tracking', href: '/my-timesheet' }], current: 'Approve Entries' });
         pendingEntries = await (listPendingApprovals as any)();
         loading = false;
     });
 
-    async function handleApprove(entryId: string) {
+    async function handleApprove(entryId: string, talentId: string) {
         try {
-            await (approveEntry as any)({ entryId });
+            await (manageTimesheets as any).action({ action: 'approve', entryId, talentId });
             pendingEntries = await (listPendingApprovals as any)();
             toast.success('Entry approved');
         } catch (e: any) {
@@ -26,11 +25,11 @@
         }
     }
 
-    async function handleReject(entryId: string) {
+    async function handleReject(entryId: string, talentId: string) {
         const comment = prompt('Reason for rejection:');
         if (comment === null) return;
         try {
-            await (rejectEntry as any)({ entryId, comment });
+            await (manageTimesheets as any).action({ action: 'reject', entryId, talentId, comment });
             pendingEntries = await (listPendingApprovals as any)();
             toast.success('Entry rejected');
         } catch (e: any) {
@@ -118,13 +117,13 @@
                             <td class="px-6 py-4 text-right">
                                 <div class="flex justify-end gap-2">
                                     <AsyncButton 
-                                        onclick={() => handleReject(entry.id)}
+                                        onclick={() => handleReject(entry.id, entry.talentId)}
                                         class="px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-rose-100"
                                     >
                                         Reject
                                     </AsyncButton>
                                     <AsyncButton 
-                                        onclick={() => handleApprove(entry.id)}
+                                        onclick={() => handleApprove(entry.id, entry.talentId)}
                                         class="px-3 py-1.5 text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-colors shadow-sm"
                                     >
                                         Approve

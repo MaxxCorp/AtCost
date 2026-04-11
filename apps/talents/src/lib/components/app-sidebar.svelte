@@ -11,6 +11,8 @@
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import LogInIcon from "@lucide/svelte/icons/log-in";
 	import UserPlusIcon from "@lucide/svelte/icons/user-plus";
+	import UserIcon from "@lucide/svelte/icons/user";
+	import ShieldIcon from "@lucide/svelte/icons/shield";
 
 	let {
 		ref = $bindable(null),
@@ -26,23 +28,45 @@
 		if (session?.data?.user) {
 			user = session.data.user;
 
-			const platformFeatures = getVisibleFeatures(user, hasAccess).map(
-				(f) => ({
+			const platformFeatures = getVisibleFeatures(user, hasAccess);
+
+			const selfService = platformFeatures
+				.filter((f) => f.category === "self-service")
+				.map((f) => ({
 					title: f.title,
 					url: f.href,
 					iconPath: ICONS[f.icon].path,
-				}),
-			);
+				}));
 
-			navMain = [
-				{
-					title: "Features",
+			const management = platformFeatures
+				.filter((f) => f.category === "management")
+				.map((f) => ({
+					title: f.title,
+					url: f.href,
+					iconPath: ICONS[f.icon].path,
+				}));
+
+			navMain = [];
+
+			if (selfService.length > 0) {
+				navMain.push({
+					title: "My Employment",
 					url: "#",
-					icon: LayersIcon,
+					icon: UserIcon,
 					isActive: true,
-					items: platformFeatures,
-				},
-			];
+					items: selfService,
+				});
+			}
+
+			if (management.length > 0) {
+				navMain.push({
+					title: "Administration",
+					url: "#",
+					icon: ShieldIcon,
+					isActive: management.length > 0 && selfService.length === 0,
+					items: management,
+				});
+			}
 		}
 	});
 </script>
@@ -55,7 +79,7 @@
 					size="lg"
 					class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
 				>
-					{#snippet child({ props })}
+					{#snippet child({ props }: { props: any })}
 						<a href="/" {...props}>
 							<div
 								class="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 text-white shrink-0"
@@ -94,7 +118,7 @@
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton tooltipContent="Log In">
-						{#snippet child({ props })}
+						{#snippet child({ props }: { props: any })}
 							<a href="/login" {...props}>
 								<LogInIcon />
 								<span>Log In</span>
@@ -104,7 +128,7 @@
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton tooltipContent="Sign Up">
-						{#snippet child({ props })}
+						{#snippet child({ props }: { props: any })}
 							<a href="/signup" {...props}>
 								<UserPlusIcon />
 								<span>Sign Up</span>

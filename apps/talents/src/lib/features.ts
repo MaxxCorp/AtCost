@@ -14,9 +14,55 @@ export interface FeatureMeta {
     borderClass: string;
     buttonClass: string;
     order: number;
+    category: 'management' | 'self-service';
 }
 
 export const FEATURES: readonly FeatureMeta[] = [
+    {
+        key: 'my-profile',
+        title: 'My Profile',
+        description: 'View and manage your personal talent profile and contact details.',
+        href: '/my-profile',
+        buttonText: 'View Profile',
+        claim: 'my-profile',
+        icon: 'user',
+        gradientFrom: 'from-blue-50',
+        gradientTo: 'to-indigo-50',
+        borderClass: 'border-blue-100',
+        buttonClass: 'bg-blue-600 hover:bg-blue-700',
+        order: 1,
+        category: 'self-service'
+    },
+    {
+        key: 'timesheets',
+        title: 'Time Tracking',
+        description: 'Track your work hours, record shifts and view history.',
+        href: '/my-timesheet',
+        buttonText: 'Track Time',
+        claim: 'timesheets',
+        icon: 'clock',
+        gradientFrom: 'from-emerald-50',
+        gradientTo: 'to-teal-50',
+        borderClass: 'border-emerald-100',
+        buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+        order: 2,
+        category: 'self-service'
+    },
+    {
+        key: 'time-off',
+        title: 'Time Off',
+        description: 'Request time off and manage your leave balances.',
+        href: '/time-off',
+        buttonText: 'Request Leave',
+        claim: 'time-off',
+        icon: 'plane',
+        gradientFrom: 'from-amber-50',
+        gradientTo: 'to-orange-50',
+        borderClass: 'border-amber-100',
+        buttonClass: 'bg-amber-600 hover:bg-amber-700',
+        order: 3,
+        category: 'self-service'
+    },
     {
         key: 'talents',
         title: 'Talents',
@@ -29,7 +75,8 @@ export const FEATURES: readonly FeatureMeta[] = [
         gradientTo: 'to-blue-50',
         borderClass: 'border-indigo-100',
         buttonClass: 'bg-indigo-600 hover:bg-indigo-700',
-        order: 1
+        order: 10,
+        category: 'management'
     },
     {
         key: 'locations',
@@ -43,7 +90,8 @@ export const FEATURES: readonly FeatureMeta[] = [
         gradientTo: 'to-amber-50',
         borderClass: 'border-orange-100',
         buttonClass: 'bg-orange-600 hover:bg-orange-700',
-        order: 2
+        order: 11,
+        category: 'management'
     },
     {
         key: 'users',
@@ -57,22 +105,9 @@ export const FEATURES: readonly FeatureMeta[] = [
         gradientTo: 'to-red-50',
         borderClass: 'border-rose-100',
         buttonClass: 'bg-rose-600 hover:bg-rose-700',
-        order: 3
-    },
-    {
-        key: 'timesheets',
-        title: 'Time Tracking',
-        description: 'Track work hours, manage shift plans, and approve time sheets.',
-        href: '/timesheets',
-        buttonText: 'Manage Time',
-        claim: 'timesheets',
-        icon: 'clock',
-        gradientFrom: 'from-emerald-50',
-        gradientTo: 'to-teal-50',
-        borderClass: 'border-emerald-100',
-        buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
-        order: 4
-    },
+        order: 12,
+        category: 'management'
+    }
 ] as const;
 
 export function getVisibleFeatures(user: any, hasAccessFn: (u: any, f: TalentFeature) => boolean): FeatureMeta[] {

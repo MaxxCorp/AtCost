@@ -454,6 +454,8 @@
 	"tags_placeholder": "z. B. Kunde, Lead, Priorität",
 	"contact_search_placeholder": "Suchen Sie einen Kontakt zum Verknüpfen...",
 	"no_items_found": "{item} nicht gefunden",
+	"confirm_unlink_label": "Verknüpfung mit {item} aufheben?",
+	"no_items_associated_label": "Noch keine {item} verknüpft.",
 	"recurrence_settings": "Wiederholungseinstellungen",
 	"recurrence_description": "Legen Sie die Wiederholungsregeln für dieses Ereignis fest.",
 	"every": "Alle",

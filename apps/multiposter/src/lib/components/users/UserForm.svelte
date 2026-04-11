@@ -7,7 +7,7 @@
     import { FEATURES } from "$lib/features";
     import type { updateUser } from "../../../routes/users/[id]/update.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import EntityManager from "$lib/components/ui/EntityManager.svelte";
+    import { EntityManager } from "@ac/ui";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import type { Contact } from "$lib/validations/contacts";
     import {
@@ -217,9 +217,9 @@
                 addAssociation({ ...p, contactId: p.itemId } as any)}
             removeAssociationRemote={async (p: any) =>
                 removeAssociation({ ...p, contactId: p.itemId } as any)}
-            deleteItemRemote={async (id: string) => {
+            deleteItemRemote={async (ids: string[]) => {
                 return await handleDelete({
-                    ids: [id],
+                    ids,
                     deleteFn: deleteExistingContact,
                     itemName: m.feature_contacts_title(),
                 });
@@ -243,6 +243,22 @@
                 ).toLowerCase();
                 return name.includes(q.toLowerCase());
             }}
+            loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
+            noItemsLabel={m.no_items_associated_label({ item: m.feature_contacts_title() })}
+            noItemsFoundLabel={m.no_items_found({ item: m.feature_contacts_title() })}
+            searchPlaceholder={m.search_placeholder({ item: m.feature_contacts_title() })}
+            linkItemLabel={m.link_item_label({ item: m.feature_contacts_title() })}
+            associatedItemLabel={m.associated_item_label({ item: m.feature_contacts_title() })}
+            quickCreateLabel={m.quick_create()}
+            closeSearchLabel={m.close_search()}
+            editLabel={m.edit()}
+            deleteLabel={m.delete()}
+            unlinkLabel={m.unlink()}
+            deleteForeverLabel={m.delete_forever({ item: m.contact() })}
+            bulkDeleteLabel={m.delete_selected({ count: 0 })}
+            selectAllLabel={m.select_all()}
+            deselectAllLabel={m.deselect_all()}
+            confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
         >
             {#snippet renderItemLabel(contact)}
                 {contact.displayName ||

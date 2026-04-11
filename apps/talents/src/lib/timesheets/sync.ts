@@ -1,5 +1,5 @@
 import { getUnsyncedEntries, markAsSynced } from './offline';
-import { clockIn, clockOut } from '../../routes/timesheets/timesheets.remote';
+import { manageTimesheets } from '../../routes/my-timesheet/timesheets.remote';
 
 export async function syncOfflineEntries() {
     const entries = await getUnsyncedEntries();
@@ -9,7 +9,8 @@ export async function syncOfflineEntries() {
                 // Was a full entry, but maybe it was a clock-out of an existing entry?
                 // For simplicity, we assume we sync start/stop actions sequentially.
             } else {
-                await (clockIn as any)({
+                await (manageTimesheets as any).action({
+                    action: 'clock_in',
                     talentId: entry.talentId,
                     type: entry.type,
                     locationId: entry.locationId,

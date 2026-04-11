@@ -4,7 +4,7 @@ import { user } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { listUsers } from '../list.remote';
 import { readUser } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess, parseRoles } from '$lib/server/authorization';
 import { updateUserSchema } from '$lib/validations/users';
 import { error } from '@sveltejs/kit';
 
@@ -18,7 +18,7 @@ export const updateUser = form(updateUserSchema, async (data) => {
         console.log('User authenticated:', currentUser.id);
 
         // Strict access control: only admin or self can update
-        const roles = currentUser.roles as string[] || [];
+        const roles = parseRoles(currentUser);
         if (!roles.includes('admin') && currentUser.id !== data.id) {
             error(403, 'You do not have permission to update this user');
         }

@@ -12,6 +12,8 @@
         User,
         ArrowLeft,
         Edit,
+        Clock,
+        Plane,
     } from "@lucide/svelte";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 
@@ -99,6 +101,25 @@
                 <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-10">
                     <!-- Main Info -->
                     <div class="md:col-span-2 space-y-8">
+                        <!-- Employment Quick Access -->
+                        <section class="bg-indigo-50/50 rounded-xl p-4 border border-indigo-100">
+                            <h2 class="text-xs font-bold text-indigo-900 uppercase tracking-wider mb-3">Employment</h2>
+                            <div class="flex flex-wrap gap-3">
+                                <a href="/my-timesheet" class="flex-1 min-w-[140px]">
+                                    <Button variant="outline" class="w-full justify-start bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700">
+                                        <Clock size={16} class="mr-2" />
+                                        Time Tracking
+                                    </Button>
+                                </a>
+                                <a href="/time-off" class="flex-1 min-w-[140px]">
+                                    <Button variant="outline" class="w-full justify-start bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700">
+                                        <Plane size={16} class="mr-2" />
+                                        Time Off
+                                    </Button>
+                                </a>
+                            </div>
+                        </section>
+
                         <!-- Contact Methods -->
                         <section>
                             <h2

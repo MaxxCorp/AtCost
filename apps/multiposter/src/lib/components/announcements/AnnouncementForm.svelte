@@ -10,7 +10,7 @@
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
-    import EntityManager from "$lib/components/ui/EntityManager.svelte";
+    import { EntityManager } from "@ac/ui";
     import TagInput from "$lib/components/ui/TagInput.svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
     import type { Location } from "../../../routes/locations/list.remote";
@@ -21,10 +21,10 @@
         updateLocationSchema,
     } from "$lib/validations/locations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
-    import { 
-        fetchEntityLocations, 
-        addLocationAssociation, 
-        removeLocationAssociation 
+    import {
+        fetchEntityLocations,
+        addLocationAssociation,
+        removeLocationAssociation,
     } from "../../../routes/locations/associate.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import type { Contact } from "$lib/validations/contacts";
@@ -53,7 +53,11 @@
     } = $props();
 
     // Initialize remoteFunction if it's a definition function to ensure reactive context
-    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
+    const rf = $derived(
+        typeof remoteFunction === "function"
+            ? (remoteFunction as any)()
+            : remoteFunction,
+    );
 
     const type = "announcement";
 
@@ -101,7 +105,11 @@
     );
 
     function getField(name: string) {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        const def = {
+            as: () => ({}),
+            issues: () => [],
+            value: () => undefined,
+        };
         if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
         let current: any = (rf as any).fields;
@@ -112,25 +120,30 @@
         return current ?? def;
     }
 
-    const formSetup = $derived((rf as any).preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
-        try {
-            await submit();
-            const result = (rf as any).result;
-            if (result?.error) {
-                toast.error(
-                    result.error.message || m.something_went_wrong(),
-                );
-                return;
-            }
+    const formSetup = $derived(
+        (rf as any)
+            .preflight(validationSchema)
+            .enhance(async ({ submit }: { submit: any }) => {
+                try {
+                    await submit();
+                    const result = (rf as any).result;
+                    if (result?.error) {
+                        toast.error(
+                            result.error.message || m.something_went_wrong(),
+                        );
+                        return;
+                    }
 
-            toast.success(m.successfully_saved());
-            goto("/announcements");
-        } catch (error: any) {
-            toast.error(error.message || m.something_went_wrong());
-        }
-    }));
+                    toast.success(m.successfully_saved());
+                    goto("/announcements");
+                } catch (error: any) {
+                    toast.error(error.message || m.something_went_wrong());
+                }
+            }),
+    );
 </script>
 
+-.
 <div class="max-w-3xl mx-auto px-4 py-8">
     <Breadcrumb
         feature="announcements"
@@ -227,8 +240,8 @@
             </div>
 
             <div>
-                <TagInput 
-                    bind:value={tagsString} 
+                <TagInput
+                    bind:value={tagsString}
                     label={m.tags()}
                     placeholder={m.tags_comma_separated()}
                 />
@@ -244,7 +257,8 @@
                         initialItems={locations.filter((l: any) =>
                             selectedLocationIds.includes(l.id),
                         )}
-                        onchange={(ids: string[]) => (selectedLocationIds = ids)}
+                        onchange={(ids: string[]) =>
+                            (selectedLocationIds = ids)}
                         embedded={true}
                         listItemsRemote={listLocations as any}
                         fetchAssociationsRemote={fetchEntityLocations as any}
@@ -252,17 +266,17 @@
                             addLocationAssociation({
                                 ...p,
                                 locationId: p.itemId,
-                              // @ts-ignore
+                                // @ts-ignore
                             } as any)}
                         removeAssociationRemote={async (p: any) =>
                             removeLocationAssociation({
                                 ...p,
                                 locationId: p.itemId,
-                              // @ts-ignore
+                                // @ts-ignore
                             } as any)}
-                        deleteItemRemote={async (id: string) => {
+                        deleteItemRemote={async (ids: string[]) => {
                             return await handleDelete({
-                                ids: [id],
+                                ids,
                                 deleteFn: deleteLocation,
                                 itemName: m.location().toLowerCase(),
                             });
@@ -274,13 +288,45 @@
                         getFormData={(l: Location) => l}
                         searchPredicate={(l: Location, q: string) => {
                             return (
-                                l.name.toLowerCase().includes(q.toLowerCase()) ||
+                                l.name
+                                    .toLowerCase()
+                                    .includes(q.toLowerCase()) ||
                                 (l.roomId
                                     ?.toLowerCase()
                                     .includes(q.toLowerCase()) ??
                                     false)
                             );
                         }}
+                        loadingLabel={m.loading_item({ item: m.locations() })}
+                        noItemsLabel={m.no_items_associated_label({
+                            item: m.locations(),
+                        })}
+                        noItemsFoundLabel={m.no_items_found({
+                            item: m.locations(),
+                        })}
+                        searchPlaceholder={m.search_placeholder({
+                            item: m.locations(),
+                        })}
+                        linkItemLabel={m.link_item_label({
+                            item: m.locations(),
+                        })}
+                        associatedItemLabel={m.associated_item_label({
+                            item: m.locations(),
+                        })}
+                        quickCreateLabel={m.quick_create()}
+                        closeSearchLabel={m.close_search()}
+                        editLabel={m.edit()}
+                        deleteLabel={m.delete()}
+                        unlinkLabel={m.unlink()}
+                        deleteForeverLabel={m.delete_forever({
+                            item: m.location(),
+                        })}
+                        bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                        selectAllLabel={m.select_all()}
+                        deselectAllLabel={m.deselect_all()}
+                        confirmUnlinkLabel={m.confirm_unlink_label({
+                            item: m.location(),
+                        })}
                     >
                         {#snippet renderItemLabel(location)}
                             {location.name}
@@ -345,9 +391,9 @@
                 addAssociation({ ...p, contactId: p.itemId } as any)}
             removeAssociationRemote={async (p: any) =>
                 removeAssociation({ ...p, contactId: p.itemId } as any)}
-            deleteItemRemote={async (id: string) => {
+            deleteItemRemote={async (ids: string[]) => {
                 return await handleDelete({
-                    ids: [id],
+                    ids,
                     deleteFn: deleteExistingContact,
                     itemName: m.contact().toLowerCase(),
                 });
@@ -355,7 +401,7 @@
             createRemote={createNewContact}
             createSchema={createContactSchema}
             updateRemote={updateExistingContact}
-            updateSchema={updateExistingContact}
+            updateSchema={updateContactSchema}
             getFormData={(c: Contact) => ({
                 contact: c,
                 emails: c.emails,
@@ -371,6 +417,24 @@
                 ).toLowerCase();
                 return name.includes(q.toLowerCase());
             }}
+            loadingLabel={m.loading_item({ item: m.contacts() })}
+            noItemsLabel={m.no_items_associated_label({ item: m.contacts() })}
+            noItemsFoundLabel={m.no_items_found({ item: m.contacts() })}
+            searchPlaceholder={m.search_placeholder({ item: m.contacts() })}
+            linkItemLabel={m.link_item_label({ item: m.contacts() })}
+            associatedItemLabel={m.associated_item_label({
+                item: m.contacts(),
+            })}
+            quickCreateLabel={m.quick_create()}
+            closeSearchLabel={m.close_search()}
+            editLabel={m.edit()}
+            deleteLabel={m.delete()}
+            unlinkLabel={m.unlink()}
+            deleteForeverLabel={m.delete_forever({ item: m.contact() })}
+            bulkDeleteLabel={m.delete_selected({ count: 0 })}
+            selectAllLabel={m.select_all()}
+            deselectAllLabel={m.deselect_all()}
+            confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
         >
             {#snippet renderItemLabel(contact)}
                 {contact.displayName ||
@@ -390,14 +454,14 @@
                     initialData={formData}
                     {onSuccess}
                     {onCancel}
-                    contactId={id} 
+                    contactId={id}
                 />
             {/snippet}
         </EntityManager>
 
-        <SyncCheckboxBlock 
+        <SyncCheckboxBlock
             syncFieldConfig={getField("syncIds")}
-            initialSelectedIds={initialData?.syncIds || []} 
+            initialSelectedIds={initialData?.syncIds || []}
         />
 
         <div class="flex justify-end pt-4">
@@ -406,7 +470,9 @@
                 loading={(rf as any).pending}
                 class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
             >
-                {isUpdating ? m.save_changes() : m.create_item({ item: m.announcement() })}
+                {isUpdating
+                    ? m.save_changes()
+                    : m.create_item({ item: m.announcement() })}
             </AsyncButton>
             <Button
                 variant="secondary"

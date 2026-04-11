@@ -1,7 +1,7 @@
 import { query, form } from '$app/server';
 import { db } from '$lib/server/db';
 import { talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
 import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema } from '@ac/validations';
 import { eq, desc, inArray } from 'drizzle-orm';
 import * as v from 'valibot';
@@ -101,8 +101,7 @@ export const listTalents = query(v.void_(), async () => {
     }));
 });
 
-export const readTalent = query(v.string(), async (id) => {
-    ensureAccess(getAuthenticatedUser(), 'talents');
+const readTalentCore = async (id: string) => {
     const result = await db.query.talent.findFirst({
         where: eq(talent.id, id),
         with: {
@@ -125,15 +124,29 @@ export const readTalent = query(v.string(), async (id) => {
     if (!result) return null;
 
     // Resolve linked user
+    let linkedUser: { id: string; name: string; email: string } | null = null;
+    
+    // Check userContact (implicit)
     const uc = await db.select({ userId: userContact.userId })
         .from(userContact)
         .where(eq(userContact.contactId, result.contact.id))
         .limit(1);
-    let linkedUser: { id: string; name: string; email: string } | null = null;
-    if (uc[0]) {
+    
+    let userId = uc[0]?.userId;
+    
+    // Check userTalent (explicit) if no contact link found
+    if (!userId) {
+        const ut = await db.select({ userId: userTalent.userId })
+            .from(userTalent)
+            .where(eq(userTalent.talentId, result.id))
+            .limit(1);
+        userId = ut[0]?.userId;
+    }
+
+    if (userId) {
         const [u] = await db.select({ id: user.id, name: user.name, email: user.email })
             .from(user)
-            .where(eq(user.id, uc[0].userId))
+            .where(eq(user.id, userId))
             .limit(1);
         if (u) linkedUser = u;
     }
@@ -192,7 +205,13 @@ export const readTalent = query(v.string(), async (id) => {
             data: te.data,
         })),
     };
+};
+
+export const readTalent = query(v.string(), async (id) => {
+    ensureAccess(getAuthenticatedUser(), 'talents');
+    return await readTalentCore(id);
 });
+
 
 export const createTalent = form(createTalentSchema, async (data) => {
     const authUser = getAuthenticatedUser();
@@ -403,25 +422,35 @@ export const upsertTalent = form(unifiedTalentSchema as any, async (data: any) =
 });
 
 export const getMyTalentProfile = query(v.void_(), async () => {
-    const authUser = getAuthenticatedUser();
-    if (!authUser) return null;
-
-    // Step 1: Get talent association for user directly via userTalent
-    const ut = await db.select().from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
-    
-    // Fallback: If not explicitly associated, check if linked via contact
-    if (!ut[0]) {
-        const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
-        if (uc[0]) {
-            const t = await db.query.talent.findFirst({
-                where: eq(talent.contactId, uc[0].contactId),
-            });
-            if (t) return await readTalent(t.id);
-        }
+    const authUser = getOptionalUser();
+    if (!authUser) {
+        console.warn('[getMyTalentProfile] No authenticated user found.');
         return null;
     }
 
-    return await readTalent(ut[0].talentId);
+    // Step 1: Explicit association via userTalent
+    const ut = await db.select().from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
+    if (ut[0]) {
+        const profile = await readTalentCore(ut[0].talentId);
+        if (profile) return profile;
+    }
+
+    // Step 2: Implicit association via contact email
+    const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
+    if (uc[0]) {
+        console.info(`[getMyTalentProfile] Trying implicit link via contact: ${uc[0].contactId}`);
+        const t = await db.query.talent.findFirst({
+            where: eq(talent.contactId, uc[0].contactId),
+        });
+        if (t) {
+            console.info(`[getMyTalentProfile] Found implicit userContact link to talent: ${t.id}`);
+            const profile = await readTalentCore(t.id);
+            if (profile) return profile;
+        }
+    }
+
+    console.warn(`[getMyTalentProfile] No talent association found for user: ${authUser.id}`);
+    return null;
 });
 
 export const listEmployees = query(v.void_(), async () => {

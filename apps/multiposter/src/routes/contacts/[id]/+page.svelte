@@ -12,7 +12,7 @@
     import { goto } from "$app/navigation";
 
     import { updateContactSchema } from "$lib/validations/contacts";
-    import EntityManager from "$lib/components/ui/EntityManager.svelte";
+    import { EntityManager } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
     import { listLocations } from "../../locations/list.remote";
     import { createLocation } from "../../locations/new/create.remote";
@@ -163,6 +163,22 @@
                                                 false)
                                         );
                                     }}
+                                    loadingLabel={m.loading_item({ item: m.feature_locations_title() })}
+                                    noItemsLabel={m.no_items_associated_label({ item: m.feature_locations_title() })}
+                                    noItemsFoundLabel={m.no_items_found({ item: m.feature_locations_title() })}
+                                    searchPlaceholder={m.search_placeholder({ item: m.feature_locations_title() })}
+                                    linkItemLabel={m.link_item_label({ item: m.feature_locations_title() })}
+                                    associatedItemLabel={m.associated_item_label({ item: m.feature_locations_title() })}
+                                    quickCreateLabel={m.quick_create()}
+                                    closeSearchLabel={m.close_search()}
+                                    editLabel={m.edit()}
+                                    deleteLabel={m.delete()}
+                                    unlinkLabel={m.unlink()}
+                                    deleteForeverLabel={m.delete_forever({ item: m.location() })}
+                                    bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                                    selectAllLabel={m.select_all()}
+                                    deselectAllLabel={m.deselect_all()}
+                                    confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
                                 >
                                     {#snippet renderItemLabel(location)}
                                         {location.name}

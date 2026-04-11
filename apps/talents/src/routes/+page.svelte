@@ -4,7 +4,7 @@
     import { hasAccess, parseRoles, parseClaims } from "$lib/authorization";
     import { getVisibleFeatures } from "$lib/features";
     import { getMyTalentProfile } from "./talents/talents.remote";
-    import { getMyStatus } from "./timesheets/timesheets.remote";
+    import { getMyStatus } from "./my-timesheet/timesheets.remote";
     import { getMyTimeOffBalances, getMyTimeOffRequests } from "./time-off/time-off.remote";
     import DashboardTalentCard from "$lib/components/dashboard/DashboardTalentCard.svelte";
     import DashboardTimeTrackingCard from "$lib/components/dashboard/DashboardTimeTrackingCard.svelte";
@@ -18,13 +18,6 @@
         const user = session?.data?.user;
         if (user) {
             dashboardDataPromise = loadDashboardData();
-            
-            // Auto-redirect to talent profile if associated
-            const profile = await (getMyTalentProfile as any)();
-            if (profile?.id) {
-                const { goto } = await import("$app/navigation");
-                goto(`/talents/${profile.id}`);
-            }
         }
         return {
             user,
@@ -34,13 +27,13 @@
     }
 
     async function loadDashboardData() {
-        const profile = await (getMyTalentProfile as any)();
+        const profile = await getMyTalentProfile().run();
         if (!profile) return null;
 
         const [status, balances, requests] = await Promise.all([
-            (getMyStatus as any)(profile.id),
-            (getMyTimeOffBalances as any)(profile.id),
-            (getMyTimeOffRequests as any)(profile.id)
+            getMyStatus(profile.id).run(),
+            getMyTimeOffBalances(profile.id).run(),
+            getMyTimeOffRequests(profile.id).run()
         ]);
 
         return { profile, status, balances, requests };
