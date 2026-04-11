@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { kiosk, kioskLocation, location } from '@ac/db';
+import { kiosk, kioskLocation, location, contactEmail, contactPhone } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
@@ -47,8 +47,8 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
                 with: {
                     contact: {
                         with: {
-                            emails: { limit: 1 },
-                            phones: { limit: 1 },
+                            emails: { where: eq(contactEmail.type, 'work'), limit: 1 },
+                            phones: { where: eq(contactPhone.type, 'work'), limit: 1 },
                             tags: {
                                 with: {
                                     tag: true
@@ -83,7 +83,7 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
                     name: contactDetails.displayName || `${contactDetails.givenName || ''} ${contactDetails.familyName || ''}`.trim(),
                     email: contactDetails.emails[0]?.value,
                     phone: contactDetails.phones[0]?.value,
-                    qrCodePath: contactDetails.qrCodePath,
+                    qrCodePath: contactDetails.qrCodePath ? (contactDetails.qrCodePath.includes('_public') ? contactDetails.qrCodePath : contactDetails.qrCodePath.replace('/qr.png', '/qr_public.png')) : undefined,
                 } : null
             };
         }),

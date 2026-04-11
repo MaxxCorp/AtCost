@@ -5,6 +5,7 @@ import type {
     ProviderType,
     SyncDirection
 } from '../types';
+import { parsePricing } from '../utils/pricing';
 import { resolveContactForEventId } from '$lib/server/contact-resolution';
 import { env } from '$env/dynamic/private';
 import { htmlToPlainText } from '../utils/html';
@@ -757,22 +758,8 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
      */
     private isEventFree(event: ExternalEvent): boolean {
         const price = event.ticketPrice ?? event.metadata?.ticketPrice;
-        if (!price) return true;
-
-        const priceStr = String(price).trim().toLowerCase();
-        if (!priceStr) return true;
-
-        // Check for free-indicating keywords
-        if (priceStr === 'gratis' || priceStr === 'free' || priceStr === 'frei' || priceStr === 'kostenlos') {
-            return true;
-        }
-
-        // Check if it contains "gratis" anywhere
-        if (priceStr.includes('gratis')) return true;
-
-        const parsed = parseFloat(priceStr);
-        if (isNaN(parsed)) return true; // Non-numeric → free
-        return parsed === 0;            // Zero → free
+        const { isFree } = parsePricing(price);
+        return isFree;
     }
 
     /**

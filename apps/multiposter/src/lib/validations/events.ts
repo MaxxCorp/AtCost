@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import * as m from '$lib/paraglide/messages';
 
 const recurrenceSchema = v.union([v.array(v.string()), v.string()]);
 const attendeesSchema = v.array(v.object({
@@ -50,7 +51,7 @@ export const eventBaseSchema = v.object({
 	resourceIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	contactIds: v.optional(v.string()),
 	categoryBerlinDotDe: v.optional(v.string()),
-	ticketPrice: v.optional(v.string()),
+	ticketPrice: v.pipe(v.string(), v.minLength(1, m.ticket_price_required?.() ?? 'Ticket price is required')),
 	tags: v.optional(v.string()),
 	syncIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	status: v.optional(v.string()),

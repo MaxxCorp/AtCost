@@ -742,16 +742,25 @@
                         for="ticketPrice"
                         class="block text-sm font-medium text-gray-700 mb-1"
                     >
-                        {m.ticket_price()}
+                        {m.ticket_price()} <span class="text-red-500">*</span>
                     </label>
                     <input
                         {...getField("ticketPrice").as("text")}
+                        required
                         value={getField("ticketPrice").value() ??
                             initialData?.ticketPrice ??
                             ""}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(getField(
+                            'ticketPrice',
+                        ).issues()?.length ?? 0) > 0
+                            ? 'border-red-500'
+                            : 'border-gray-300'}"
                         placeholder={m.ticket_price_placeholder()}
+                        onblur={() => remoteFunction.validate()}
                     />
+                    {#each getField("ticketPrice").issues() ?? [] as issue}
+                        <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    {/each}
                 </div>
             </div>
 
@@ -853,7 +862,7 @@
                             remoteFunction: rf,
                             schema,
                             id,
-                            initialData: formData,
+                            initialData: formData = null,
                             onSuccess,
                             onCancel,
                         })}
@@ -1255,7 +1264,7 @@
             {#snippet renderForm({
                 remoteFunction: rf,
                 schema,
-                initialData: formData,
+                initialData: formData = {},
                 onSuccess,
                 onCancel,
                 id,
@@ -1276,7 +1285,7 @@
                                 type="location"
                                 entityId={id}
                                 initialItems={(
-                                    formData.locationAssociations || []
+                                    formData?.locationAssociations || []
                                 ).map((la: any) => la.location)}
                                 embedded={true}
                                 onchange={onLocationsChange}
@@ -1345,7 +1354,7 @@
                                     remoteFunction: rf,
                                     schema,
                                     id,
-                                    initialData: formData,
+                                    initialData: formData = null,
                                     onSuccess,
                                     onCancel,
                                 }: any)}

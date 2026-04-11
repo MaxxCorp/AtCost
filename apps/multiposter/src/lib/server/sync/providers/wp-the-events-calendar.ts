@@ -10,6 +10,7 @@ import { db } from '../../db';
 import { syncMapping } from '../../db/schema';
 import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
+import { parsePricing } from '../utils/pricing';
 
 /**
  * WordPress The Events Calendar sync provider implementation
@@ -873,7 +874,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 		// Map Cost/Price
 		if (event.ticketPrice) {
-			wpEvent.cost = event.ticketPrice;
+			const { priceValue } = parsePricing(event.ticketPrice);
+			wpEvent.cost = priceValue;
 		}
 
 		return wpEvent;

@@ -521,5 +521,6 @@
 	"confirmed_participants": "bestätigte Teilnehmer",
 	"capacity": "Kapazität",
 	"mode": "Modus",
-	"end": "Ende"
+	"end": "Ende",
+	"ticket_price_required": "Ticketpreis ist erforderlich"
 }

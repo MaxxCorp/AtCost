@@ -548,11 +548,11 @@
                     {#if showSelector}
                         <X size={16} />
                         <span class="hidden sm:inline">{closeSearchLabel}</span>
-                        <span class="sm:hidden">{editLabel}</span>
+                        <span class="sm:hidden">{closeSearchLabel}</span>
                     {:else}
                         <Link size={16} />
                         <span class="hidden sm:inline">{linkItemLabel}</span>
-                        <span class="sm:hidden">{unlinkLabel}</span>
+                        <span class="sm:hidden">{linkItemLabel}</span>
                     {/if}
                 </Button>
                 {#if renderForm}
@@ -740,14 +740,16 @@
             }
         }}
     >
-        <Dialog.Content class="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
-            <Dialog.Header class="mb-4">
+        <Dialog.Content
+            style="max-height: 85vh; max-width: 672px; display: flex; flex-direction: column; overflow: hidden;"
+        >
+            <Dialog.Header class="mb-4" style="flex-shrink: 0;">
                 <Dialog.Title class="text-xl font-bold">
                     {editingItem ? editLabel : quickCreateLabel}
                 </Dialog.Title>
             </Dialog.Header>
 
-            <div class="mt-2">
+            <div style="overflow-y: auto; flex: 1; min-height: 0;">
                 {#if editingItem && getFormData}
                     {@render renderForm({
                         remoteFunction: updateRemote,

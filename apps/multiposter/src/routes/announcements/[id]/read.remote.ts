@@ -1,37 +1,36 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact, campaign } from '@ac/db';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact, campaign, location } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Announcement } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getOptionalUser, hasAccess, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
-
-import { getRequestEvent } from '$app/server';
 
 /**
  * Query: Read an announcement by ID
+ * 
+ * Access rules:
+ * - If announcement is public: anyone can view (but only public-safe fields)
+ * - If announcement is private: only authenticated users with 'announcements' access can view
  */
 export const readAnnouncement = query(v.string(), async (announcementId: string): Promise<Announcement | null> => {
-    const event = getRequestEvent();
-    const user = event.locals.user;
-
-
     const [result] = await db
         .select()
         .from(announcement)
-        .where(and(
-            eq(announcement.id, announcementId),
-        ));
+        .where(eq(announcement.id, announcementId));
 
     if (!result) return null;
+
+    // Check access based on public flag
+    const user = getOptionalUser();
+    const isAuthorized = user && hasAccess(user, 'announcements');
 
     if (!result.isPublic) {
         if (!user) throw new Error('Unauthorized');
         ensureAccess(user, 'announcements');
     }
 
-    // Fetch related tags and contacts
-    // Fetch related tags and contacts
+    // Fetch related tags
     const tags = await db
         .select({ id: announcementTag.tagId, name: tag.name })
         .from(announcementTag)
@@ -43,8 +42,8 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         .from(announcementContact)
         .where(eq(announcementContact.announcementId, announcementId));
 
-    // Fetch related locations
-    const locations = await db
+    // Fetch related locations (with full details for filtering)
+    const locationAssocs = await db
         .select({ id: announcementLocation.locationId })
         .from(announcementLocation)
         .where(eq(announcementLocation.announcementId, announcementId));
@@ -52,11 +51,33 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     // Resolve primary contact details
     let resolvedContact = null;
 
-    // Helper to fetch full contact info
-    const fetchContactInfo = async (contactId: string) => {
+    // Helper to fetch contact info (public-safe or full)
+    const fetchContactInfo = async (contactId: string, publicOnly: boolean) => {
         const [c] = await db.select().from(contact).where(eq(contact.id, contactId));
         if (!c) return null;
 
+        if (publicOnly) {
+            // For public access: only work emails/phones, no QR code
+            const [email] = await db
+                .select({ value: contactEmail.value })
+                .from(contactEmail)
+                .where(and(eq(contactEmail.contactId, contactId), eq(contactEmail.type, 'work')))
+                .limit(1);
+
+            const [phone] = await db
+                .select({ value: contactPhone.value })
+                .from(contactPhone)
+                .where(and(eq(contactPhone.contactId, contactId), eq(contactPhone.type, 'work')))
+                .limit(1);
+
+            return {
+                name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
+                email: email?.value || '',
+                phone: phone?.value || '',
+            };
+        }
+
+        // For authenticated access: primary contact info
         const [email] = await db
             .select({ value: contactEmail.value })
             .from(contactEmail)
@@ -105,8 +126,8 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     }
 
     // 2. If no Announcement Employee Contact, check Location Employee Contacts
-    if (!chosenContactId && locations.length > 0) {
-        const locIds = locations.map(l => l.id);
+    if (!chosenContactId && locationAssocs.length > 0) {
+        const locIds = locationAssocs.map(l => l.id);
         const locationContacts = await db
             .select({
                 contactId: locationContact.contactId,
@@ -130,9 +151,57 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     }
 
     if (chosenContactId) {
-        resolvedContact = await fetchContactInfo(chosenContactId);
+        resolvedContact = await fetchContactInfo(chosenContactId, !isAuthorized);
     }
 
+    // --- PUBLIC VIEW: Return filtered, safe data only ---
+    if (!isAuthorized) {
+        // Fetch public locations for display
+        let publicLocations: any[] = [];
+        if (locationAssocs.length > 0) {
+            const locIds = locationAssocs.map(l => l.id);
+            publicLocations = await db
+                .select({
+                    id: location.id,
+                    name: location.name,
+                    street: location.street,
+                    houseNumber: location.houseNumber,
+                    zip: location.zip,
+                    city: location.city,
+                    country: location.country,
+                    isPublic: location.isPublic,
+                })
+                .from(location)
+                .where(and(inArray(location.id, locIds), eq(location.isPublic, true)));
+        }
+
+        return {
+            id: result.id,
+            title: result.title,
+            content: result.content,
+            isPublic: result.isPublic,
+            createdAt: result.createdAt.toISOString(),
+            updatedAt: result.updatedAt.toISOString(),
+            tagNames: tags.map(t => t.name).filter(n => n !== null) as string[],
+            locations: publicLocations.map(l => ({
+                id: l.id,
+                name: l.name,
+                street: l.street,
+                houseNumber: l.houseNumber,
+                zip: l.zip,
+                city: l.city,
+                country: l.country,
+                isPublic: l.isPublic,
+            })),
+            resolvedContact,
+            // Explicitly exclude internal data
+            contactIds: [],
+            locationIds: [],
+            syncIds: [],
+        } as unknown as Announcement;
+    }
+
+    // --- AUTHENTICATED VIEW: Return full data ---
     // Fetch Campaign
     let syncIds: string[] = [];
     if (result.campaignId) {
@@ -152,7 +221,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         tagIds: tags.map(t => t.id),
         tagNames: tags.map(t => t.name).filter(n => n !== null) as string[],
         contactIds: contacts.map(c => c.id),
-        locationIds: locations.map(l => l.id),
+        locationIds: locationAssocs.map(l => l.id),
         syncIds,
         resolvedContact,
     } as Announcement;

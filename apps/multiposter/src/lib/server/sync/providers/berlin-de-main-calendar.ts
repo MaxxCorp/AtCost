@@ -9,6 +9,7 @@ import { db } from '$lib/server/db';
 import { user, eventResource } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { resolveEventContact } from '$lib/server/contact-resolution';
+import { parsePricing } from '../utils/pricing';
 import { env } from '$env/dynamic/private';
 import { htmlToPlainText } from '../utils/html';
 
@@ -188,8 +189,10 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 		}
 
 		// Ticket price
-		if (event.metadata?.ticketPrice) {
-			formData[this.fieldMappings.eintrittspreis] = event.metadata.ticketPrice;
+		const price = event.ticketPrice ?? event.metadata?.ticketPrice;
+		if (price) {
+			const { priceValue } = parsePricing(price);
+			formData[this.fieldMappings.eintrittspreis] = priceValue;
 		}
 
 		// Contact info resolution using shared algorithm

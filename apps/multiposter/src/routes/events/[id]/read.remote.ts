@@ -11,11 +11,10 @@ import * as v from 'valibot';
  * Query: Read an event by ID
  * 
  * Access rules:
- * - If event is public: anyone can view
+ * - If event is public: anyone can view (but only public-safe fields)
  * - If event is private: only authenticated users with 'events' access can view
  */
 export const readEvent = query(v.string(), async (eventId: string): Promise<Event | null> => {
-	console.log(`[readEvent] Fetching event ${eventId}`);
 	// First, fetch the event to check if it's public
 	const [result] = await db
 		.select()
@@ -23,10 +22,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		.where(eq(event.id, eventId));
 
 	if (!result) {
-		console.log(`[readEvent] Event ${eventId} not found`);
 		return null;
 	}
-	console.log(`[readEvent] Found event: ${result.summary}`);
 
 	// Check access based on public flag
 	const user = getOptionalUser();
@@ -35,16 +32,13 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	if (!result.isPublic) {
 		// Private event: require authentication and authorization
 		if (!user) {
-			console.log(`[readEvent] Forbidden: No user`);
 			error(403, 'Authentication required to view this event');
 		}
 		if (!isAuthorized) {
-			console.log(`[readEvent] Forbidden: Not authorized`);
 			error(403, 'You do not have permission to view this event');
 		}
 	}
 
-	console.log(`[readEvent] Fetching resources, contacts, locations...`);
 	// Fetch related resources and contacts
 	const resources = await db
 		.select({ id: eventResource.resourceId })
@@ -79,15 +73,36 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		.innerJoin(location, eq(eventLocation.locationId, location.id))
 		.where(eq(eventLocation.eventId, eventId));
 
-	console.log(`[readEvent] Resolving contact info...`);
 	// Resolve primary contact details
 	let resolvedContact = null;
 
-	// Helper to fetch full contact info
-	const fetchContactInfo = async (contactId: string) => {
+	// Helper to fetch full contact info (for public view: work info only)
+	const fetchContactInfo = async (contactId: string, publicOnly: boolean) => {
 		const [c] = await db.select().from(contact).where(eq(contact.id, contactId));
 		if (!c) return null;
 
+		if (publicOnly) {
+			// For public access: only return work emails/phones
+			const [email] = await db
+				.select({ value: contactEmail.value })
+				.from(contactEmail)
+				.where(and(eq(contactEmail.contactId, contactId), eq(contactEmail.type, 'work')))
+				.limit(1);
+
+			const [phone] = await db
+				.select({ value: contactPhone.value })
+				.from(contactPhone)
+				.where(and(eq(contactPhone.contactId, contactId), eq(contactPhone.type, 'work')))
+				.limit(1);
+
+			return {
+				name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
+				email: email?.value || '',
+				phone: phone?.value || '',
+			};
+		}
+
+		// For authenticated access: primary contact info
 		const [email] = await db
 			.select({ value: contactEmail.value })
 			.from(contactEmail)
@@ -163,10 +178,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	}
 
 	if (chosenContactId) {
-		resolvedContact = await fetchContactInfo(chosenContactId);
+		resolvedContact = await fetchContactInfo(chosenContactId, !isAuthorized);
 	}
 
-	console.log(`[readEvent] Fetching tags and campaign...`);
 	// Fetch tags
 	const tags = await db
 		.select({ name: tag.name })
@@ -174,6 +188,46 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		.innerJoin(tag, eq(eventTag.tagId, tag.id))
 		.where(eq(eventTag.eventId, eventId));
 
+	// --- PUBLIC VIEW: Return filtered, safe data only ---
+	if (!isAuthorized) {
+		// Only return public-safe fields for unauthenticated/unauthorized users
+		return {
+			id: result.id,
+			summary: result.summary,
+			description: result.description,
+			status: result.status,
+			startDateTime: result.startDateTime?.toISOString() ?? null,
+			endDateTime: result.endDateTime?.toISOString() ?? null,
+			isAllDay: result.isAllDay,
+			isPublic: result.isPublic,
+			location: result.location,
+			heroImage: result.heroImage,
+			ticketPrice: result.ticketPrice,
+			categoryBerlinDotDe: result.categoryBerlinDotDe,
+			createdAt: result.createdAt.toISOString(),
+			updatedAt: result.updatedAt.toISOString(),
+			// Only public locations
+			locationIds: locations.filter((l: any) => l.isPublic).map((l: any) => l.id),
+			locations: locations.filter((l: any) => l.isPublic).map((l: any) => ({
+				id: l.id,
+				name: l.name,
+				street: l.street,
+				houseNumber: l.houseNumber,
+				zip: l.zip,
+				city: l.city,
+				country: l.country,
+				isPublic: l.isPublic,
+			})),
+			tags: tags.map((t: any) => t.name),
+			resolvedContact,
+			// Explicitly exclude internal data
+			resourceIds: [],
+			contactIds: [],
+			syncIds: [],
+		} as unknown as Event;
+	}
+
+	// --- AUTHENTICATED VIEW: Return full data ---
 	// Fetch Campaign
 	let syncIds: string[] = [];
 	if (result.campaignId) {
@@ -186,7 +240,6 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		}
 	}
 
-	console.log(`[readEvent] Constructing final object...`);
 	const finalResult = {
 		...result,
 		createdAt: result.createdAt.toISOString(),
@@ -205,6 +258,5 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		syncIds,
 		resolvedContact,
 	} as Event;
-	console.log(`[readEvent] Done.`);
 	return finalResult;
 });
