@@ -28,6 +28,7 @@
     "not_found_message": "The {item} you are looking for does not exist.",
     "delete_confirm": "Delete this {item}?",
     "successfully_saved": "Successfully Saved!",
+    "please_fix_validation": "Please fix the validation errors in the form.",
     "something_went_wrong": "Oh no! Something went wrong",
     "retry": "Retry",
     "summary": "Summary",

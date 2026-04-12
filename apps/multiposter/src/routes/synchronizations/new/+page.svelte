@@ -173,6 +173,8 @@
 
 
 
+	import * as m from "$lib/paraglide/messages";
+
 	function getField(name: string): any {
 		if (!(create as any).fields) return {};
 		const parts = name.split(".");
@@ -183,6 +185,15 @@
 		}
 		return current || {};
 	}
+
+	let prevIssuesLength = $state(0);
+	$effect(() => {
+		const issues = (create as any).allIssues?.() ?? [];
+		if (issues.length > 0 && prevIssuesLength === 0) {
+			toast.error(m.please_fix_validation());
+		}
+		prevIssuesLength = issues.length;
+	});
 </script>
 
 <svelte:head>

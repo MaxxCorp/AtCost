@@ -6,8 +6,11 @@ import { timeOffRequestSchema } from '@ac/validations';
 import { eq, and, desc } from 'drizzle-orm';
 import * as v from 'valibot';
 
-export const getMyTimeOffBalances = query(v.string(), async (talentId) => {
-    ensureAccess(getAuthenticatedUser(), 'timesheets');
+/**
+ * CORE LOGIC - EXPOSED FOR SERVER LOAD
+ */
+
+async function getMyTimeOffBalancesCore(talentId: string) {
     const currentYear = new Date().getFullYear();
     return await db.query.timeOffBalance.findMany({
         where: and(
@@ -15,15 +18,28 @@ export const getMyTimeOffBalances = query(v.string(), async (talentId) => {
             eq(timeOffBalance.year, currentYear)
         )
     });
-});
+}
 
-export const getMyTimeOffRequests = query(v.string(), async (talentId) => {
-    ensureAccess(getAuthenticatedUser(), 'timesheets');
+async function getMyTimeOffRequestsCore(talentId: string) {
     return await db.query.timeOffRequest.findMany({
         where: eq(timeOffRequest.talentId, talentId),
         orderBy: [desc(timeOffRequest.startDate)],
         limit: 5
     });
+}
+
+/**
+ * REMOTE FUNCTIONS
+ */
+
+export const getMyTimeOffBalances = query(v.string(), async (talentId) => {
+    ensureAccess(getAuthenticatedUser(), 'timesheets');
+    return await getMyTimeOffBalancesCore(talentId);
+});
+
+export const getMyTimeOffRequests = query(v.string(), async (talentId) => {
+    ensureAccess(getAuthenticatedUser(), 'timesheets');
+    return await getMyTimeOffRequestsCore(talentId);
 });
 
 export const requestTimeOff = form(timeOffRequestSchema, async (data) => {

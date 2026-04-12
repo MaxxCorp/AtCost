@@ -11,14 +11,14 @@
 
     onMount(async () => {
         breadcrumbState.set({ feature: 'timesheets', segments: [{ label: 'Time Tracking', href: '/my-timesheet' }], current: 'Approve Entries' });
-        pendingEntries = await (listPendingApprovals as any)();
+        pendingEntries = await listPendingApprovals();
         loading = false;
     });
 
     async function handleApprove(entryId: string, talentId: string) {
         try {
             await (manageTimesheets as any).action({ action: 'approve', entryId, talentId });
-            pendingEntries = await (listPendingApprovals as any)();
+            pendingEntries = await listPendingApprovals();
             toast.success('Entry approved');
         } catch (e: any) {
             toast.error(e.message || 'Failed to approve');
@@ -30,7 +30,7 @@
         if (comment === null) return;
         try {
             await (manageTimesheets as any).action({ action: 'reject', entryId, talentId, comment });
-            pendingEntries = await (listPendingApprovals as any)();
+            pendingEntries = await listPendingApprovals();
             toast.success('Entry rejected');
         } catch (e: any) {
             toast.error(e.message || 'Failed to reject');

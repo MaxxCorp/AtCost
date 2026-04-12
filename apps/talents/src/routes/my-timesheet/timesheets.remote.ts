@@ -100,40 +100,44 @@ export const listPendingApprovals = query(v.void_(), async () => {
 });
 
 export const manageTimesheets = form(manageTimesheetsSchema, async (data) => {
-    const authUser = getAuthenticatedUser();
-    const myTalentId = await getMyTalentIdCore();
-    
-    // Authorization check
-    if ('talentId' in data && data.talentId !== myTalentId) {
-        ensureAccess(authUser, 'timesheets');
-    } else if (!('talentId' in data)) {
-        // Actions without talentId (approve/reject) require 'timesheets' claim
-        ensureAccess(authUser, 'timesheets');
-    }
+    try {
+        const authUser = getAuthenticatedUser();
+        const myTalentId = await getMyTalentIdCore();
+        
+        // Authorization check
+        if ('talentId' in data && data.talentId !== myTalentId) {
+            ensureAccess(authUser, 'timesheets');
+        } else if (!('talentId' in data)) {
+            // Actions without talentId (approve/reject) require 'timesheets' claim
+            ensureAccess(authUser, 'timesheets');
+        }
 
-    let entry;
-    switch (data.action) {
-        case 'clock_in':
-            entry = await service.clockIn(data);
-            break;
-        case 'clock_out':
-            entry = await service.clockOut(data.entryId, data.talentId, { latitude: data.latitude, longitude: data.longitude });
-            break;
-        case 'approve':
-            await db.update(timesheetEntry).set({ status: 'approved' }).where(eq(timesheetEntry.id, data.entryId));
-            break;
-        case 'reject':
-            await db.update(timesheetEntry).set({ status: 'rejected' }).where(eq(timesheetEntry.id, data.entryId));
-            break;
-    }
+        let entry;
+        switch (data.action) {
+            case 'clock_in':
+                entry = await service.clockIn(data, authUser.id);
+                break;
+            case 'clock_out':
+                entry = await service.clockOut(data.entryId, authUser.id, { latitude: data.latitude, longitude: data.longitude });
+                break;
+            case 'approve':
+                entry = await service.approveEntry(data.entryId, authUser.id, (data as any).comment);
+                break;
+            case 'reject':
+                entry = await service.rejectEntry(data.entryId, authUser.id, (data as any).comment);
+                break;
+        }
 
-    if ('talentId' in data) {
-        getMyStatus(data.talentId).refresh();
+        // Sanitize entry to plain JSON object to avoid serialization issues with Dates/complex objects
+        const sanitizedEntry = entry ? JSON.parse(JSON.stringify(entry)) : null;
+
+        return { success: true, entry: sanitizedEntry };
+    } catch (e: any) {
+        console.error('[manageTimesheets] Error:', e);
+        return { 
+            success: false, 
+            error: { message: e.message || 'Action failed at source' },
+            message: e.message || 'Action failed at source' 
+        };
     }
-    
-    if (data.action === 'approve' || data.action === 'reject') {
-        listPendingApprovals().refresh();
-    }
-    
-    return { success: true, entry };
 });

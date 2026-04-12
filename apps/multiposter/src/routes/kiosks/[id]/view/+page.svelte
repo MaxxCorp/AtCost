@@ -14,9 +14,7 @@
     import { invalidate, invalidateAll } from "$app/navigation";
 
     import { page } from "$app/state";
-    import { getKioskForDisplay } from "../read.remote";
-    import { listKioskEvents } from "../../../events/list-public.remote";
-    import { listKioskAnnouncements } from "../../../announcements/list.remote";
+    import { readKioskView } from "./read.remote";
 
     let kioskId = $derived(page.params.id);
     let kiosk = $state<any>(null);
@@ -79,31 +77,14 @@
         resetLoop();
     }
 
-    function getItemDate(item: PublicEvent | Announcement) {
-        return ("startDateTime" in item ? item.startDateTime : item.updatedAt) || new Date().toISOString();
-    }
-
     async function fetchData() {
         if (!kioskId) return;
         try {
-            const [kioskData, eventsData, announcementsData] =
-                await Promise.all([
-                    getKioskForDisplay(kioskId),
-                    listKioskEvents(kioskId),
-                    listKioskAnnouncements(),
-                ]);
+            const data = await readKioskView(kioskId);
+            if (!data) return;
 
-            if (kioskData) {
-                kiosk = kioskData;
-            }
-
-            const freshItems = [...eventsData, ...announcementsData].sort(
-                (a, b) => {
-                    const dateA = new Date(getItemDate(a));
-                    const dateB = new Date(getItemDate(b));
-                    return dateA.getTime() - dateB.getTime();
-                },
-            );
+            kiosk = data.kiosk;
+            const freshItems = data.items;
 
             // Online success: enrich with QR codes for caching and update cache
             const enrichedItems = await Promise.all(
@@ -147,7 +128,7 @@
             // Also cache kiosk details
             localStorage.setItem(
                 `kiosk_details_${kioskId}`,
-                JSON.stringify(kioskData),
+                JSON.stringify(kiosk),
             );
 
             isOffline = false;

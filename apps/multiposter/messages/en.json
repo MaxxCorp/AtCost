@@ -157,6 +157,7 @@
 	"location": "Location",
 	"locations_label": "Locations",
 	"tags": "Tags",
+	"please_fix_validation": "Please fix the validation errors in the form.",
 	"start_date": "Start Date",
 	"end_date": "End Date",
 	"start_time": "Start Time",

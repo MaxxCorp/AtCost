@@ -1,30 +1,30 @@
+import { query } from '$app/server';
 import { listKioskEvents } from '../../../events/list-public.remote';
 import { listKioskAnnouncements } from '../../../announcements/list.remote';
 import { db } from '$lib/server/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq } from 'drizzle-orm';
-import { error } from '@sveltejs/kit';
+import * as v from 'valibot';
 
-export const load = async ({ params, depends }) => {
-    depends('app:events');
+export const readKioskView = query(v.string(), async (kioskId) => {
     const kioskData = await db.query.kiosk.findFirst({
-        where: eq(kiosk.id, params.id),
+        where: eq(kiosk.id, kioskId),
     });
 
-    if (!kioskData) throw error(404, 'Kiosk not found');
+    if (!kioskData) return null;
 
     const locations = await db
         .select({ name: location.name })
         .from(kioskLocation)
         .innerJoin(location, eq(kioskLocation.locationId, location.id))
-        .where(eq(kioskLocation.kioskId, params.id));
+        .where(eq(kioskLocation.kioskId, kioskId));
 
     const kioskWithLocations = {
         ...kioskData,
         locations: locations.map(l => l.name)
     };
 
-    const events = await listKioskEvents(params.id);
+    const events = await listKioskEvents(kioskId);
     const announcements = await listKioskAnnouncements();
 
     const items = [...events, ...announcements].sort((a, b) => {
@@ -35,4 +35,4 @@ export const load = async ({ params, depends }) => {
         kiosk: kioskWithLocations,
         items
     };
-};
+});

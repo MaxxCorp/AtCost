@@ -141,6 +141,8 @@
         }
     });
 
+    import * as m from "$lib/paraglide/messages";
+
     function getFieldMetadata(name: string) {
         if (!rf?.fields) return { as: () => ({}), issues: () => [] };
         const parts = name.split(".");
@@ -151,6 +153,15 @@
         }
         return current;
     }
+
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (rf as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
 </script>
 
 <form

@@ -197,8 +197,11 @@
                     type="text"
                     bind:value={contactData.displayName}
                     required
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(getField?.(`${prefix}.displayName`).issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each getField?.(`${prefix}.displayName`).issues() ?? [] as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label

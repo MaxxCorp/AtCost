@@ -155,6 +155,15 @@
         return current || {};
     }
 
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (remoteFunction as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
+
     // State derived from initialData
     // svelte-ignore state_referenced_locally
     let isAllDay = $state(initialData?.isAllDay ?? false);
@@ -836,22 +845,38 @@
                                     false)
                             );
                         }}
-                        loadingLabel={m.loading_item({ item: m.feature_locations_title() })}
-                        noItemsLabel={m.no_items_associated_label({ item: m.feature_locations_title() })}
-                        noItemsFoundLabel={m.no_items_found({ item: m.feature_locations_title() })}
-                        searchPlaceholder={m.search_placeholder({ item: m.feature_locations_title() })}
-                        linkItemLabel={m.link_item_label({ item: m.feature_locations_title() })}
-                        associatedItemLabel={m.associated_item_label({ item: m.feature_locations_title() })}
+                        loadingLabel={m.loading_item({
+                            item: m.feature_locations_title(),
+                        })}
+                        noItemsLabel={m.no_items_associated_label({
+                            item: m.feature_locations_title(),
+                        })}
+                        noItemsFoundLabel={m.no_items_found({
+                            item: m.feature_locations_title(),
+                        })}
+                        searchPlaceholder={m.search_placeholder({
+                            item: m.feature_locations_title(),
+                        })}
+                        linkItemLabel={m.link_item_label({
+                            item: m.feature_locations_title(),
+                        })}
+                        associatedItemLabel={m.associated_item_label({
+                            item: m.feature_locations_title(),
+                        })}
                         quickCreateLabel={m.quick_create()}
                         closeSearchLabel={m.close_search()}
                         editLabel={m.edit()}
                         deleteLabel={m.delete()}
                         unlinkLabel={m.unlink()}
-                        deleteForeverLabel={m.delete_forever({ item: m.location() })}
+                        deleteForeverLabel={m.delete_forever({
+                            item: m.location(),
+                        })}
                         bulkDeleteLabel={m.delete_selected({ count: 0 })}
                         selectAllLabel={m.select_all()}
                         deselectAllLabel={m.deselect_all()}
-                        confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
+                        confirmUnlinkLabel={m.confirm_unlink_label({
+                            item: m.location(),
+                        })}
                     >
                         {#snippet renderItemLabel(location)}
                             {location.name}
@@ -1212,11 +1237,21 @@
                 return name.includes(q.toLowerCase());
             }}
             loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
-            noItemsLabel={m.no_items_associated_label({ item: m.feature_contacts_title() })}
-            noItemsFoundLabel={m.no_items_found({ item: m.feature_contacts_title() })}
-            searchPlaceholder={m.search_placeholder({ item: m.feature_contacts_title() })}
-            linkItemLabel={m.link_item_label({ item: m.feature_contacts_title() })}
-            associatedItemLabel={m.associated_item_label({ item: m.feature_contacts_title() })}
+            noItemsLabel={m.no_items_associated_label({
+                item: m.feature_contacts_title(),
+            })}
+            noItemsFoundLabel={m.no_items_found({
+                item: m.feature_contacts_title(),
+            })}
+            searchPlaceholder={m.search_placeholder({
+                item: m.feature_contacts_title(),
+            })}
+            linkItemLabel={m.link_item_label({
+                item: m.feature_contacts_title(),
+            })}
+            associatedItemLabel={m.associated_item_label({
+                item: m.feature_contacts_title(),
+            })}
             quickCreateLabel={m.quick_create()}
             closeSearchLabel={m.close_search()}
             editLabel={m.edit()}
@@ -1327,22 +1362,40 @@
                                             false)
                                     );
                                 }}
-                                loadingLabel={m.loading_item({ item: m.feature_locations_title() })}
-                                noItemsLabel={m.no_items_associated_label({ item: m.feature_locations_title() })}
-                                noItemsFoundLabel={m.no_items_found({ item: m.feature_locations_title() })}
-                                searchPlaceholder={m.search_placeholder({ item: m.feature_locations_title() })}
-                                linkItemLabel={m.link_item_label({ item: m.feature_locations_title() })}
-                                associatedItemLabel={m.associated_item_label({ item: m.feature_locations_title() })}
+                                loadingLabel={m.loading_item({
+                                    item: m.feature_locations_title(),
+                                })}
+                                noItemsLabel={m.no_items_associated_label({
+                                    item: m.feature_locations_title(),
+                                })}
+                                noItemsFoundLabel={m.no_items_found({
+                                    item: m.feature_locations_title(),
+                                })}
+                                searchPlaceholder={m.search_placeholder({
+                                    item: m.feature_locations_title(),
+                                })}
+                                linkItemLabel={m.link_item_label({
+                                    item: m.feature_locations_title(),
+                                })}
+                                associatedItemLabel={m.associated_item_label({
+                                    item: m.feature_locations_title(),
+                                })}
                                 quickCreateLabel={m.quick_create()}
                                 closeSearchLabel={m.close_search()}
                                 editLabel={m.edit()}
                                 deleteLabel={m.delete()}
                                 unlinkLabel={m.unlink()}
-                                deleteForeverLabel={m.delete_forever({ item: m.location() })}
-                                bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                                deleteForeverLabel={m.delete_forever({
+                                    item: m.location(),
+                                })}
+                                bulkDeleteLabel={m.delete_selected({
+                                    count: 0,
+                                })}
                                 selectAllLabel={m.select_all()}
                                 deselectAllLabel={m.deselect_all()}
-                                confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
+                                confirmUnlinkLabel={m.confirm_unlink_label({
+                                    item: m.location(),
+                                })}
                             >
                                 {#snippet renderItemLabel(location)}
                                     {location.name}

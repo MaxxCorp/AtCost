@@ -68,6 +68,16 @@
         what3wordsPlaceholder: labels?.what3wordsPlaceholder ?? "e.g. filled.count.soap",
         inclusivitySupportPlaceholder: labels?.inclusivitySupportPlaceholder ?? "Accessibility and inclusivity information",
         heroImage: labels?.heroImage ?? "Hero Image",
+        pleaseFixValidation: labels?.pleaseFixValidation ?? "Please fix the validation errors in the form.",
+    });
+
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (rf as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(i18n.pleaseFixValidation);
+        }
+        prevIssuesLength = issues.length;
     });
 
     function getField(name: string) {

@@ -48,6 +48,15 @@
         return current || {};
     }
 
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (remoteFunction as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
+
     // svelte-ignore state_referenced_locally
     const initialRoles =
         initialData?.roles && Array.isArray(initialData.roles)

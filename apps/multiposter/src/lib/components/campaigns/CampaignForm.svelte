@@ -28,6 +28,15 @@
         if (!(remoteFunction as any).fields) return {};
         return (remoteFunction as any).fields[name] || {};
     }
+
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (remoteFunction as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
 </script>
 
 <div class="max-w-2xl mx-auto text-left">

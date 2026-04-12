@@ -1,8 +1,8 @@
 import { getRequestEvent } from '$app/server';
 import type { UserWithRolesAndClaims } from '../auth.d';
-import { hasAccess as sharedHasAccess } from '../authorization';
+import { hasAccess as sharedHasAccess, parseRoles, parseClaims } from '../authorization';
 
-export * from '../authorization';
+export { parseRoles, parseClaims };
 
 export function getAuthenticatedUser(): UserWithRolesAndClaims {
     const event = getRequestEvent();

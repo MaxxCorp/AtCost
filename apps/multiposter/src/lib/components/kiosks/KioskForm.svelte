@@ -93,6 +93,15 @@
         }
         return current || {};
     }
+
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (remoteFunction as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
  
     function formatForInput(date: Date) {
         const year = date.getFullYear();

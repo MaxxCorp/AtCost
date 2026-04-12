@@ -1,12 +1,16 @@
 <script lang="ts">
     import { manageTimesheets } from '../../../routes/my-timesheet/timesheets.remote';
+    import { manageTimesheetsSchema } from '@ac/validations';
     import { AsyncButton } from '@ac/ui';
     import { format } from 'date-fns';
     import { toast } from 'svelte-sonner';
     import { browser } from "$app/environment";
+    import * as m from "$lib/paraglide/messages";
 
     /**
-     * DASHBOARD COMPONENT - NATIVE RPC PATTERN (Prop-driven)
+     * DASHBOARD COMPONENT - Dedicated Handle Pattern
+     * Uses a specific handle (manageTimesheetsDashboard) to avoid collisions
+     * with other timesheet forms on the same page.
      */
 
     let { status, talentId, onRefresh } = $props<{ 
@@ -15,12 +19,21 @@
         onRefresh: () => void 
     }>();
 
-    // Reactive Form Proxy for timesheet actions (initialized only in browser)
-    const rf = $derived(browser ? (manageTimesheets as any)() : null);
+    // Reactive Form Proxy (initialized only in browser)
+    const rf = $derived(browser ? manageTimesheets : null);
 
     // Local form state
     let formAction = $state<'clock_in' | 'clock_out'>('clock_in');
     let formEntryId = $state('');
+
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (rf as any)?.allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
 
     function getFieldMetadata(name: string) {
         const def = { as: () => ({}), issues: () => [], value: () => undefined };
@@ -77,10 +90,9 @@
                     {#if rf}
                         <form
                             class="pt-2"
-                            {...rf.enhance(async ({ submit }: any) => {
+                            {...(rf as any).preflight(manageTimesheetsSchema).enhance(async ({ submit }: { submit: any }) => {
                                 try {
-                                    await submit();
-                                    const result = rf.result;
+                                    const result: any = await submit();
                                     if (result?.success) {
                                         toast.success(formAction === 'clock_in' ? 'Clocked In!' : 'Clocked Out!');
                                         onRefresh();

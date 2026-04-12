@@ -59,6 +59,7 @@
             reportsTo?: string;
             cooperatesWith?: string;
             managerOf?: string;
+            pleaseFixValidation?: string;
         };
     }
 
@@ -87,6 +88,16 @@
         errorSomethingWentWrong:
             labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong",
         successfullySaved: labels?.successfullySaved ?? "Successfully Saved!",
+        pleaseFixValidation: labels?.pleaseFixValidation ?? "Please fix the validation errors in the form.",
+    });
+
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (rf as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(i18n.pleaseFixValidation);
+        }
+        prevIssuesLength = issues.length;
     });
 
     const d = (val: any, def: any) =>
@@ -220,6 +231,7 @@
         {contactId}
         {listContactsRemote}
         {labels}
+        {getField}
     />
 
     {#if children}

@@ -47,6 +47,15 @@
 		return getOperations(configId);
 	});
 
+	let prevIssuesLength = $state(0);
+	$effect(() => {
+		const issues = (update as any).allIssues?.() ?? [];
+		if (issues.length > 0 && prevIssuesLength === 0) {
+			toast.error(m.please_fix_validation());
+		}
+		prevIssuesLength = issues.length;
+	});
+
 	async function triggerSync() {
 		try {
 			isSyncing = true;

@@ -141,6 +141,15 @@
                 }
             }),
     );
+
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (rf as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
 </script>
 
 -.
