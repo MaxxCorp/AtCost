@@ -10,3 +10,16 @@
   - **Client-Side Validation**: Reuse the remote validation schemas for `preflight()`. This prevents network requests when the form is locally invalid.
   - **Per-Field Feedback**: ALWAYS display field-specific validation errors using `{#each rf.fields.fieldName.issues() as issue}<p>{issue.message}</p>{/each}`.
   - **Validation Toast**: Add an `$effect` to trigger a global `toast.error(m.please_fix_validation())` when validation issues are detected. Use a transition check (e.g., tracking `prevIssuesLength`) to avoid spamming toasts on every keystroke.
+
+## Svelte 5 Rune Best Practices ($effect)
+
+- **Avoid State Synchronization**: DO NOT use `$effect` to synchronize props to local `$state`. 
+  - If you need to reset a component when a prop changes, use the `{#key prop}` block in the parent template.
+  - If the value is a transformation of a prop, use `$derived` or `$derived.by`.
+- **Prefer Event Handlers**: Use event handlers (`oninput`, `onclick`, `onchange`) for side-effects triggered by user interactions instead of watching state via `$effect`.
+- **Escape Hatch Only**: Consider `$effect` as an escape hatch for:
+  - Third-party library integrations (e.g., charts, maps, toast notifications).
+  - Direct DOM manipulation.
+  - Analytics and logging.
+- **Async Data**: For asynchronous data loading in the script, prefer handling promises via `{#await}` in the template or using `$derived` if the result needs to be reactive.
+

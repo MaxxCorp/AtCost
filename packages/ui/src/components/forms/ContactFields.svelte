@@ -45,6 +45,7 @@
         listContactsRemote: () => Promise<any[]>;
         labels?: any;
         getField?: (name: string) => any;
+        onEmailChange?: () => void;
     }
 
     let {
@@ -60,6 +61,7 @@
         listContactsRemote,
         labels,
         getField,
+        onEmailChange,
     }: Props = $props();
 
     const i18n = $derived({
@@ -141,9 +143,11 @@
 
     function addEmail() {
         emails = [...emails, { value: "", type: "work", primary: false }];
+        onEmailChange?.();
     }
     function removeEmail(index: number) {
         emails = emails.filter((_, i) => i !== index);
+        onEmailChange?.();
     }
 
     function addPhone() {
@@ -492,6 +496,7 @@
                         type="email"
                         placeholder={i18n.emailPlaceholder}
                         bind:value={email.value}
+                        oninput={() => onEmailChange?.()}
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                 </div>

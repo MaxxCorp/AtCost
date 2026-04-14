@@ -18,6 +18,7 @@
     import type { Location } from "../../../routes/locations/list.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
+    import { onMount, type Snippet } from "svelte";
     import { EntityManager } from "@ac/ui";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import type { Contact } from "$lib/validations/contacts";
@@ -216,15 +217,21 @@
     let locationsPromise = listLocations();
     let resourcesPromise = listResourcesWithHierarchy();
 
-    $effect(() => {
-        resourcesPromise.then((res) => {
-            resources = res as any;
-            resourcesLoaded = true;
-        });
-        locationsPromise.then((res) => {
-            locations = res as any;
-            locationsLoaded = true;
-        });
+    onMount(async () => {
+        const [resResources, resLocations] = await Promise.all([resourcesPromise, locationsPromise]);
+        resources = resResources as any;
+        resourcesLoaded = true;
+        locations = resLocations as any;
+        locationsLoaded = true;
+
+        // Fallback logic for legacy single-string location finding
+        if ((!initialData?.locationIds || initialData.locationIds.length === 0) && initialData?.location) {
+            const id = await findInitialLocationId();
+            if (id) {
+                selectedLocationIds = [id];
+                useFreeTextLocation = false;
+            }
+        }
     });
     // svelte-ignore state_referenced_locally
     let selectedResourceIds = $state<string[]>(initialData?.resourceIds || []);
@@ -293,22 +300,9 @@
         return match ? match.id : "";
     }
 
+    // Selected locations state - initialized from props
     // svelte-ignore state_referenced_locally
     let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
-    $effect(() => {
-        if (initialData?.locationIds && initialData.locationIds.length > 0) {
-            selectedLocationIds = initialData.locationIds;
-            useFreeTextLocation = false;
-        } else if (initialData?.location) {
-            // Fallback logic for legacy single-string location finding if needed
-            findInitialLocationId().then((id) => {
-                if (id) {
-                    selectedLocationIds = [id];
-                    useFreeTextLocation = false;
-                }
-            });
-        }
-    });
 
     const BERLIN_DE_CATEGORIES = [
         "Ausstellungen",

@@ -18,7 +18,7 @@
 		"typescript": "~6.0.2"
 	},
 	"overrides": {
-		"typescript": "~5.7.3",
+		"typescript": "~6.0.2",
 		"vite": "^8.0.0",
 		"svelte": "^5.55.1",
 		"drizzle-orm": "0.45.2",

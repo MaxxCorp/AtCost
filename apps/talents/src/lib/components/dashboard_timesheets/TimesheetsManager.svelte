@@ -24,15 +24,8 @@
     const fields = rf.fields as any;
 
     // UI State for form submission
-    // UI State for form submission
-    let formAction = $state<'clock_in' | 'clock_out'>('clock_in');
-    let formEntryId = $state('');
-
-    // Sync form state when status changes from server
-    $effect(() => {
-        formAction = status?.activeEntry ? 'clock_out' : 'clock_in';
-        formEntryId = status?.activeEntry?.id || '';
-    });
+    let formAction = $state<'clock_in' | 'clock_out'>(status?.activeEntry ? 'clock_out' : 'clock_in');
+    let formEntryId = $state(status?.activeEntry?.id || '');
 
     let prevIssuesLength = $state(0);
     $effect(() => {
