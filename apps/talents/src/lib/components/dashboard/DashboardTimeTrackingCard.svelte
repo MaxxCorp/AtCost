@@ -104,10 +104,18 @@
                                 }
                             })}
                         >
-                            <input {...getFieldMetadata('action').as('hidden', formAction)} />
-                            <input {...getFieldMetadata('talentId').as('hidden', talentId)} />
-                            <input {...getFieldMetadata('entryId').as('hidden', formEntryId)} />
-                            <input {...getFieldMetadata('type').as('hidden', 'manual')} />
+                            {#if formAction}
+                                <input {...getFieldMetadata('action').as('hidden', formAction)} />
+                            {/if}
+                            {#if talentId}
+                                <input {...getFieldMetadata('talentId').as('hidden', talentId)} />
+                            {/if}
+                            {#if formEntryId}
+                                <input {...getFieldMetadata('entryId').as('hidden', formEntryId)} />
+                            {/if}
+                            {#if true}
+                                <input {...getFieldMetadata('type').as('hidden', 'manual')} />
+                            {/if}
 
                             {#if !isActive}
                                 <AsyncButton 

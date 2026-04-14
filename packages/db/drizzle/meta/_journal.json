@@ -8,6 +8,13 @@
       "when": 1775404836473,
       "tag": "0000_init_unified_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776020271620,
+      "tag": "0001_brave_starbolt",
+      "breakpoints": true
     }
   ]
 }

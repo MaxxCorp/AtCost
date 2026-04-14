@@ -47,6 +47,20 @@ export const shiftPlan = pgTable("shift_plan", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
+export const shiftPlanTemplate = pgTable("shift_plan_template", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    locationId: uuid("location_id").references(() => location.id, { onDelete: "set null" }),
+    schedule: jsonb("schedule"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+
+export const shiftPlanTemplateTalent = pgTable("shift_plan_template_talent", {
+    templateId: uuid("template_id").notNull().references(() => shiftPlanTemplate.id, { onDelete: "cascade" }),
+    talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.templateId, table.talentId] })]);
+
 export const timesheetEntry = pgTable("timesheet_entry", {
     id: uuid("id").primaryKey().defaultRandom(),
     talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
@@ -121,3 +135,7 @@ export type TimeOffBalance = typeof timeOffBalance.$inferSelect;
 export type NewTimeOffBalance = typeof timeOffBalance.$inferInsert;
 export type UserTalent = typeof userTalent.$inferSelect;
 export type NewUserTalent = typeof userTalent.$inferInsert;
+export type ShiftPlanTemplate = typeof shiftPlanTemplate.$inferSelect;
+export type NewShiftPlanTemplate = typeof shiftPlanTemplate.$inferInsert;
+export type ShiftPlanTemplateTalent = typeof shiftPlanTemplateTalent.$inferSelect;
+export type NewShiftPlanTemplateTalent = typeof shiftPlanTemplateTalent.$inferInsert;

@@ -94,6 +94,21 @@ export const FEATURES: readonly FeatureMeta[] = [
         category: 'management'
     },
     {
+        key: 'shiftplans',
+        title: 'Shiftplans',
+        description: 'Manage recurring shiftplan templates and daily assignments.',
+        href: '/shiftplans',
+        buttonText: 'Manage Shiftplans',
+        claim: 'shiftplans',
+        icon: 'calendar',
+        gradientFrom: 'from-purple-50',
+        gradientTo: 'to-fuchsia-50',
+        borderClass: 'border-purple-100',
+        buttonClass: 'bg-purple-600 hover:bg-purple-700',
+        order: 12,
+        category: 'management'
+    },
+    {
         key: 'users',
         title: 'Users',
         description: 'Manage system users, roles, and access permissions.',
@@ -105,7 +120,7 @@ export const FEATURES: readonly FeatureMeta[] = [
         gradientTo: 'to-red-50',
         borderClass: 'border-rose-100',
         buttonClass: 'bg-rose-600 hover:bg-rose-700',
-        order: 12,
+        order: 13,
         category: 'management'
     }
 ] as const;

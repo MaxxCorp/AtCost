@@ -12,6 +12,7 @@ export { ICONS, type IconDef } from "./icons.js";
 export { default as EntityManager } from './components/EntityManager.svelte';
 export { default as ContactManager } from './components/ContactManager.svelte';
 export { default as AsyncButton } from './components/AsyncButton.svelte';
+export { default as BulkActionToolbar } from './components/BulkActionToolbar.svelte';
 export { default as LoadingSection } from './components/LoadingSection.svelte';
 export { default as DashboardCard } from './components/DashboardCard.svelte';
 export { default as ErrorSection } from './components/ErrorSection.svelte';

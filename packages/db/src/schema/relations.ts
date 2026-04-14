@@ -3,7 +3,7 @@ import { user, session, account, verification } from "./auth";
 import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, contactTag, userContact } from "./contacts";
 import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
 import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag } from "./events";
-import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent } from "./talents";
+import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent } from "./talents";
 import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
@@ -127,6 +127,7 @@ export const talentRelations = relations(talent, ({ one, many }) => ({
     timeOffRequests: many(timeOffRequest),
     timeOffBalances: many(timeOffBalance),
     userAssociations: many(userTalent),
+    shiftPlanTemplates: many(shiftPlanTemplateTalent),
 }));
 
 export const talentTimelineEntryRelations = relations(talentTimelineEntry, ({ one }) => ({
@@ -137,6 +138,16 @@ export const shiftPlanRelations = relations(shiftPlan, ({ one, many }) => ({
     talent: one(talent, { fields: [shiftPlan.talentId], references: [talent.id] }),
     location: one(location, { fields: [shiftPlan.locationId], references: [location.id] }),
     timesheetEntries: many(timesheetEntry),
+}));
+
+export const shiftPlanTemplateRelations = relations(shiftPlanTemplate, ({ one, many }) => ({
+    location: one(location, { fields: [shiftPlanTemplate.locationId], references: [location.id] }),
+    talents: many(shiftPlanTemplateTalent),
+}));
+
+export const shiftPlanTemplateTalentRelations = relations(shiftPlanTemplateTalent, ({ one }) => ({
+    template: one(shiftPlanTemplate, { fields: [shiftPlanTemplateTalent.templateId], references: [shiftPlanTemplate.id] }),
+    talent: one(talent, { fields: [shiftPlanTemplateTalent.talentId], references: [talent.id] }),
 }));
 
 export const timesheetEntryRelations = relations(timesheetEntry, ({ one, many }) => ({
