@@ -18,7 +18,9 @@
             {#await getMyStatus(profile.id)}
                 <LoadingSection message="Synchronizing status..." />
             {:then status}
-                <TimesheetsManager {profile} {status} />
+                {#key status}
+                    <TimesheetsManager {profile} {status} />
+                {/key}
             {:catch error}
                 <ErrorSection headline="Synchronization Diverged" message={error.message} />
             {/await}

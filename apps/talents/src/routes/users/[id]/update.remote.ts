@@ -19,16 +19,22 @@ export const updateUser = form(updateUserSchema, async (data) => {
 
         // Strict access control: only admin or self can update
         const roles = parseRoles(currentUser);
-        if (!roles.includes('admin') && currentUser.id !== data.id) {
+        const isAdmin = roles.includes('admin');
+        if (!isAdmin && currentUser.id !== data.id) {
             error(403, 'You do not have permission to update this user');
         }
 
         const updateData: any = {
             name: data.name,
             email: data.email,
-            roles: data.roles as any,
             claims: data.claims as any,
         };
+
+        // Only admins can update roles.
+        // If the user is an admin, we treat missing roles as an empty array (clearing roles).
+        if (isAdmin) {
+            updateData.roles = data.roles ?? [];
+        }
 
         console.log('Update payload:', updateData);
 

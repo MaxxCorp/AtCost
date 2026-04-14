@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { untrack } from "svelte";
     import { goto } from "$app/navigation";
+
     import { toast } from "svelte-sonner";
     import { type Snippet } from "svelte";
 
@@ -188,9 +190,11 @@
 
 <form
     {...(rf as any).preflight(schema).enhance(async ({ submit }: { submit: any }) => {
+        const handle = rf;
         try {
             await submit();
-            const result = (rf as any).result;
+            const result = untrack(() => (handle as any).result);
+
             if (result?.success === false || result?.error) {
                 const msg =
                     result?.error?.message ||

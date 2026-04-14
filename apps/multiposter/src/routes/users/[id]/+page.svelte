@@ -7,7 +7,6 @@
     import { deleteUser } from "./delete.remote";
     import { updateUserSchema } from "$lib/validations/users";
 
-
     import { UserForm, EntityManager, ErrorSection, LoadingSection, AsyncButton, handleDelete } from "@ac/ui";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import { FEATURES } from "$lib/features";
@@ -20,15 +19,11 @@
     import { deleteExistingContact } from "../../contacts/[id]/delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { User as UserIcon } from "@lucide/svelte";
-
-    import { listTalents } from "../../talents/talents.remote";
-    import * as talentAssociate from "../../talents/associate.remote";
-    import { createTalentSchema, updateTalentSchema } from "@ac/validations";
-    import { createTalent, updateTalent } from "../../talents/talents.remote";
-
+    import { parseRoles } from "$lib/authorization";
     import { browser } from "$app/environment";
+    import { authClient } from "$lib/auth";
 
-    const userId = page.params.id || "";
+    const userId = $derived(page.params.id || "");
 
     const appConfigList = [
         {
@@ -37,55 +32,61 @@
             features: FEATURES as any[]
         }
     ];
+
+    let dataPromise = $derived(Promise.all([readUser(userId), authClient.getSession()]));
 </script>
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
-        {#if browser}
-            {#await readUser(userId)}
-                <LoadingSection message={m.loading_user()} />
-            {:then user}
-            {#if user}
-                <Breadcrumb feature="users" current={user.name} />
-                <div class="bg-white shadow rounded-lg p-6 space-y-4">
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <h1 class="text-3xl font-bold mb-2">
-                                {user.name}
-                            </h1>
-                            <p class="text-gray-500">{user.email}</p>
+        {#key userId}
+            {#if browser}
+                {#await dataPromise}
+                    <LoadingSection message={m.loading_user()} />
+                {:then [user, session]}
+                {#if user}
+                    <Breadcrumb feature="users" current={user.name} />
+                    <div class="bg-white shadow rounded-lg p-6 space-y-4">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h1 class="text-3xl font-bold mb-2">
+                                    {user.name}
+                                </h1>
+                                <p class="text-gray-500">{user.email}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <AsyncButton
+                                    type="button"
+                                    loadingLabel={m.deleting()}
+                                    loading={deleteUser.pending}
+                                    variant="destructive"
+                                    onclick={async () => {
+                                        const confirmed = await handleDelete({
+                                            ids: [user.id],
+                                            deleteFn: async (ids: string[]) => deleteUser(ids),
+                                            itemName: m.users(),
+                                        });
+                                        if (confirmed) {
+                                            goto("/users");
+                                        }
+                                    }}
+                                >
+                                    {m.delete()}
+                                </AsyncButton>
+                            </div>
                         </div>
-                        <div class="flex gap-2">
-                            <AsyncButton
-                                type="button"
-                                loadingLabel={m.deleting()}
-                                loading={deleteUser.pending}
-                                variant="destructive"
-                                onclick={async () => {
-                                    await handleDelete({
-                                        ids: [user.id],
-                                        deleteFn: async (ids: string[]) => deleteUser(ids),
-                                        itemName: m.users(),
-                                    });
-                                    goto("/users");
-                                }}
-                            >
-                                {m.delete()}
-                            </AsyncButton>
-                        </div>
-                    </div>
 
-                    <h2 class="text-xl font-semibold mb-4">{m.edit_user()}</h2>
-                    <UserForm
-                        remoteFunction={updateUser}
-                        validationSchema={updateUserSchema}
-                        isUpdating={true}
-                        initialData={user}
-                        {m}
-                        {appConfigList}
-                        onSuccess={() => goto("/users")}
-                        onCancel={() => goto("/users")}
-                    >
+                        <h2 class="text-xl font-semibold mb-4">{m.edit_user()}</h2>
+                        <UserForm
+                            remoteFunction={updateUser}
+                            validationSchema={updateUserSchema}
+                            isUpdating={true}
+                            initialData={user}
+                            {m}
+                            {appConfigList}
+                            canEditRoles={session?.data?.user ? parseRoles(session.data.user).includes("admin") : false}
+                            onSuccess={() => goto("/users")}
+                            onCancel={() => goto("/users")}
+                        >
                         {#snippet extraEntities(data: any)}
                             <EntityManager
                                 title={m.feature_contacts_title()}
@@ -150,8 +151,8 @@
                                         remoteFunction={props.remoteFunction}
                                         schema={props.schema}
                                         initialData={props.initialData}
-                                        onSuccess={props.onSuccess as any}
-                                        onCancel={props.onCancel as any}
+                                        onSuccess={props.onSuccess}
+                                        onCancel={props.onCancel}
                                         contactId={props.id}
                                     />
                                 {/snippet}
@@ -167,18 +168,19 @@
                     button={m.back_to_users()}
                 />
             {/if}
-        {:catch error}
-            <ErrorSection
-                headline="Error"
-                message={error instanceof Error
-                    ? error.message
-                    : m.failed_to_load_user()}
-                href="/users"
-                button={m.back_to_users()}
-            />
-        {/await}
-        {:else}
-            <LoadingSection message={m.loading_user()} />
-        {/if}
+            {:catch error}
+                <ErrorSection
+                    headline="Error"
+                    message={error instanceof Error
+                        ? error.message
+                        : m.failed_to_load_user()}
+                    href="/users"
+                    button={m.back_to_users()}
+                />
+            {/await}
+            {:else}
+                <LoadingSection message={m.loading_user()} />
+            {/if}
+        {/key}
     </div>
 </div>

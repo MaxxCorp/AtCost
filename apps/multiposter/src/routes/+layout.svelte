@@ -10,7 +10,7 @@
 	import { browser } from "$app/environment";
 	import { kioskState } from "$lib/stores/kiosk.svelte";
 	import { slide } from "svelte/transition";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 	import { FEATURES } from "$lib/features";
 	import * as m from "$lib/paraglide/messages.js";
@@ -36,10 +36,10 @@
 	});
 
 	let isAuthPage = $derived(
-		$page.url.pathname === "/login" || $page.url.pathname === "/signup",
+		page.url.pathname === "/login" || page.url.pathname === "/signup",
 	);
 	let isKioskPage = $derived(
-		$page.url.pathname.startsWith("/kiosks/") || kioskState.isKiosk,
+		page.url.pathname.startsWith("/kiosks/") || kioskState.isKiosk,
 	);
 
 	const featureMeta = $derived.by(() =>
@@ -63,7 +63,9 @@
 
 {#if isAuthPage}
 	<main class="min-h-screen bg-background">
-		{@render children()}
+		{#key page.url.pathname}
+			{@render children()}
+		{/key}
 	</main>
 {:else if isKioskPage}
 	{#if !kioskState.isKiosk || kioskState.isHeaderVisible}
@@ -73,7 +75,9 @@
 	{/if}
 	<main class="min-h-screen bg-gray-50">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-			{@render children()}
+			{#key page.url.pathname}
+				{@render children()}
+			{/key}
 		</div>
 	</main>
 {:else}
@@ -124,7 +128,9 @@
 			</header>
 			<div class="flex flex-1 flex-col gap-4 p-4 md:p-8 bg-gray-50">
 				<div class="mx-auto w-full max-w-7xl">
-					{@render children()}
+					{#key page.url.pathname}
+						{@render children()}
+					{/key}
 				</div>
 			</div>
 		</Sidebar.Inset>

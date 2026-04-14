@@ -1,7 +1,12 @@
+---
+trigger: always_on
+---
+
 # AI Agent Instructions: SvelteKit Architecture
 
 - **SvelteKit Remote Functions Exclusivity**: ALL SvelteKit applications in this repository MUST exclusively use SvelteKit Remote Functions (`$app/server` exports `query` and `form`) and their native form binding syntax as described in https://svelte.dev/docs/kit/remote-functions.
-- **No Legacy Patterns**: Legacy `+page.server.ts` `load` functions and `actions` are superseded and should NOT be used.
+- **No Legacy Patterns**: SvelteKit `load` functions and `actions` (in `+*.server.ts` or `+*.ts`) are strictly PROHIBITED. All data fetching must occur via Remote Functions (`query`/`form`) or established client-side state providers.
+  - **Note**: Static configuration exports (e.g., `export const ssr = false;`) are permitted in `+layout.ts` or `+page.ts` if required for project-level settings.
 - **No REST Endpoints for Data Fetching**: Standard API routes (`+server.ts` GET/POST/etc.) are superseded for internal data fetching/mutation and should NOT be used unless explicitly interacting with a non-SvelteKit external client.
 - **Strict Fields API**: When submitting remote forms, ALWAYS use the official field API syntax: `{...formHandle.fields.fieldName.as('type', value)}`.
   - DO NOT manually create HTML `<input type="hidden">` tags for form submissions.
@@ -10,6 +15,17 @@
   - **Client-Side Validation**: Reuse the remote validation schemas for `preflight()`. This prevents network requests when the form is locally invalid.
   - **Per-Field Feedback**: ALWAYS display field-specific validation errors using `{#each rf.fields.fieldName.issues() as issue}<p>{issue.message}</p>{/each}`.
   - **Validation Toast**: Add an `$effect` to trigger a global `toast.error(m.please_fix_validation())` when validation issues are detected. Use a transition check (e.g., tracking `prevIssuesLength`) to avoid spamming toasts on every keystroke.
+
+## Svelte 5 State and Navigation Standards
+
+- **State over Stores**: ALWAYS use `import { page } from '$app/state'` for accessing URL parameters, route data, and page state. Legacy stores from `$app/stores` (e.g., `page`, `navigating`) are strictly PROHIBITED for new or refactored code.
+- **Router-Native Navigation**: Internal application navigation MUST exclusively use `import { goto } from '$app/navigation'`. 
+  - DO NOT use `window.location.assign` or `window.location.href` for internal routing.
+  - Hard reloads should be avoided unless explicitly required for external transitions or catastrophic state resets.
+- **Declarative Reactivity & Component Resets**: 
+  - Use `$derived` for mirroring props or global state. 
+  - Use `{#key page.url.pathname}` in `+layout.svelte` around `{@render children()}` to force-reset entire page trees on navigation if state feels "stuck" or components fail to swap.
+  - Use `{#key identifier}` in components to force identity-based refreshes instead of relying on manual state synchronization.
 
 ## Svelte 5 Rune Best Practices ($effect)
 

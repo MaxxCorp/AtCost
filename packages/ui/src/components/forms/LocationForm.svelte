@@ -4,6 +4,7 @@
     import { Button } from "../button";
     import { goto } from "$app/navigation";
     import type { Snippet } from "svelte";
+    import { untrack } from "svelte";
 
     let {
         remoteFunction,
@@ -96,15 +97,17 @@
 <form
     class="space-y-4"
     {...(rf as any).preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
+            const handle = rf;
             try {
                 await submit();
-                const result = (rf as any).result;
-                if (result?.error) {
+                const result = untrack(() => (handle as any).result);
+                if (untrack(() => (handle as any).error)) {
                     toast.error(
-                        result.error.message || i18n.errorSomethingWentWrong,
+                        untrack(() => (handle as any).error.message) || i18n.errorSomethingWentWrong,
                     );
                     return;
                 }
+
                 toast.success(i18n.successfullySaved);
                 if (onSuccess) onSuccess(result);
                 else await goto(cancelHref);

@@ -24,7 +24,9 @@
     const fields = rf.fields as any;
 
     // UI State for form submission
+    // svelte-ignore state_referenced_locally
     let formAction = $state<'clock_in' | 'clock_out'>(status?.activeEntry ? 'clock_out' : 'clock_in');
+    // svelte-ignore state_referenced_locally
     let formEntryId = $state(status?.activeEntry?.id || '');
 
     let prevIssuesLength = $state(0);
