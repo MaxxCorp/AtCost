@@ -210,6 +210,32 @@
                 </div>
             {/if}
 
+            <!-- Contact QR Code Card -->
+            {#if event.resolvedContact?.qrCodeDataUrl || event.resolvedContact?.qrCodePath}
+                <div
+                    class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col items-center text-center"
+                >
+                    <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                        {#if event.resolvedContact.qrCodeDataUrl}
+                            <img
+                                src={event.resolvedContact.qrCodeDataUrl}
+                                alt="Contact QR"
+                                class="w-32 h-32 object-contain"
+                            />
+                        {:else if event.resolvedContact.qrCodePath}
+                            <img
+                                src={event.resolvedContact.qrCodePath}
+                                alt="Contact QR"
+                                class="w-32 h-32 object-contain"
+                            />
+                        {/if}
+                    </div>
+                    <p class="text-sm text-gray-500 font-medium">
+                        {m.scan_contact_info()}
+                    </p>
+                </div>
+            {/if}
+
             <!-- Event Details Sidebar -->
             {#if event.ticketPrice || event.categoryBerlinDotDe || (event.confirmedParticipants !== undefined && event.confirmedParticipants > 0) || (event.inclusivityInformation && event.inclusivityInformation.length > 0)}
                 <div

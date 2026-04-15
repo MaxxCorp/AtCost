@@ -1,6 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { readEvent } from "../read.remote";
+    import { authClient } from "$lib/auth";
     import { deleteSeries } from "../delete-series.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
@@ -31,10 +32,10 @@
     const eventId = page.params.id || "";
     let dataPromise = $state(readEvent(eventId));
 
-    // Check if the user is authorized to edit
+    const session = authClient.useSession();
     // Check if the user is authorized to edit
     function checkCanEdit(event: any) {
-        const user = page.data.user as any;
+        const user = $session.data?.user;
         // Allow any authenticated user to edit
         return !!user;
     }

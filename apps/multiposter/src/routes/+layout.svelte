@@ -20,17 +20,15 @@
 
 	onMount(() => {
 		if (browser) {
-			console.log("[Language Debug] onMount started");
-			console.log("[Language Debug] navigator.language:", navigator.language);
-			console.log("[Language Debug] current getLocale():", getLocale());
-
 			// Service worker cleanup
 			if ("serviceWorker" in navigator) {
-				navigator.serviceWorker.getRegistrations().then((registrations) => {
-					for (const registration of registrations) {
-						registration.unregister();
-					}
-				});
+				navigator.serviceWorker
+					.getRegistrations()
+					.then((registrations) => {
+						for (const registration of registrations) {
+							registration.unregister();
+						}
+					});
 			}
 		}
 	});
@@ -138,5 +136,3 @@
 {/if}
 
 <Toaster richColors position="top-right" />
-
-

@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
+    import { authClient } from "$lib/auth";
     import { goto } from "$app/navigation";
     import { readAnnouncement } from "../read.remote";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
@@ -10,13 +11,14 @@
     import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
     import { onMount } from "svelte";
 
-    let id = $derived($page.params.id);
+    let id = $derived(page.params.id);
     let dataPromise = $derived(
         id ? readAnnouncement(id) : Promise.reject("No ID"),
     );
 
+    const session = authClient.useSession();
     function checkCanEdit(announcement: any) {
-        const user = $page.data.user as any;
+        const user = $session.data?.user;
         // Allow any authenticated user to edit
         return !!user;
     }

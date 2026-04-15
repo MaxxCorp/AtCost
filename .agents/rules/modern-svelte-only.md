@@ -38,4 +38,3 @@ trigger: always_on
   - Direct DOM manipulation.
   - Analytics and logging.
 - **Async Data**: For asynchronous data loading in the script, prefer handling promises via `{#await}` in the template or using `$derived` if the result needs to be reactive.
-

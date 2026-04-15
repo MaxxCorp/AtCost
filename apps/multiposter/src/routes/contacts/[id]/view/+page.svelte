@@ -1,6 +1,7 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
     import { page } from "$app/state";
+    import { authClient } from "$lib/auth";
     import { readContact } from "../read.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
@@ -18,16 +19,18 @@
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
     import { onMount } from "svelte";
+    import { parseRoles } from "$lib/authorization";
 
     const contactId = page.params.id || "";
     let itemsPromise = $state(readContact(contactId));
 
+    const session = authClient.useSession();
     // Check if the user is authorized to edit
     function checkCanEdit(contact: any) {
-        const user = page.data.user as any;
+        const user = $session.data?.user;
         return (
             !!user &&
-            (user.id === contact.userId || (user.roles || []).includes("admin"))
+            (user.id === contact.userId || parseRoles(user as any).includes("admin"))
         );
     }
 
