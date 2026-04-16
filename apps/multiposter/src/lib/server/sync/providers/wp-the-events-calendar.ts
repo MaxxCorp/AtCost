@@ -143,7 +143,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			await this.delay(300);
 
 			// Ensure venues exist
 			const venueIds: number[] = [];
@@ -152,7 +151,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
 				if (vId) venueIds.push(vId);
-				await this.delay(200);
 			}
 
 			if (venueIds.length > 0) {
@@ -161,7 +159,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				wpEventData.venue = venueIds.length === 1 ? venueIds[0] : venueIds;
 			}
 
-			await this.delay(300);
 
 			// Ensure organizer exists if provided
 			if (event.organizer) {
@@ -170,7 +167,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					// API expects array of IDs
 					wpEventData.organizer = organizerId;
 				}
-				await this.delay(300);
 			}
 
 			// Ensure tags
@@ -179,12 +175,10 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				for (const tag of event.tags) {
 					const tagId = await this.ensureTag(tag);
 					if (tagId) tagIds.push(tagId);
-					await this.delay(200);
 				}
 				if (tagIds.length > 0) {
 					wpEventData.tags = tagIds;
 				}
-				await this.delay(300);
 			}
 
 			// Ensure image
@@ -198,7 +192,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				} else {
 					console.warn(`[WP-Sync] Failed to ensure image`);
 				}
-				await this.delay(300);
 			}
 
 			console.log(`[WP-Sync] Posting event to WordPress:`, JSON.stringify(wpEventData, null, 2));
@@ -220,8 +213,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			}
 
 			const createdEvent = await response.json();
-
-			await this.delay(300);
 
 			// Post-link media if we have it
 			if (mediaData && createdEvent.id) {
@@ -262,7 +253,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
 				if (vId) venueIds.push(vId);
-				await this.delay(200);
 			}
 
 			if (venueIds.length > 0) {
@@ -270,7 +260,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				wpEventData.venue = venueIds.length === 1 ? venueIds[0] : venueIds;
 			}
 
-			await this.delay(300);
 
 			// Ensure organizer exists if provided
 			if (event.organizer) {
@@ -279,7 +268,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					// API expects array of IDs
 					wpEventData.organizer = [organizerId];
 				}
-				await this.delay(300);
 			}
 
 			// Ensure tags
@@ -288,12 +276,10 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				for (const tag of event.tags) {
 					const tagId = await this.ensureTag(tag);
 					if (tagId) tagIds.push(tagId);
-					await this.delay(200);
 				}
 				if (tagIds.length > 0) {
 					wpEventData.tags = tagIds;
 				}
-				await this.delay(300);
 			}
 
 			// Ensure image
@@ -303,7 +289,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				if (mediaData) {
 					wpEventData.image = mediaData.url;
 				}
-				await this.delay(300);
 			}
 
 			console.log(`[WP-Sync] Updating event ${externalId} in WordPress:`, JSON.stringify(wpEventData, null, 2));
@@ -323,8 +308,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			}
 
 			const updatedEvent = await response.json();
-
-			await this.delay(300);
 
 			// Post-link media if we have it
 			if (mediaData) {
@@ -874,10 +857,20 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			}
 		}
 
-		// Handle categories/tags if present in metadata
-		if (event.metadata?.categories) {
-			wpEvent.categories = event.metadata.categories;
-		}
+		// Hardcoded category mapping rule based on location
+		const CAT_STZ = 109;
+		const CAT_DEFAULT = 110;
+		const stzLocations = [
+			'STZ Biesdorf - Gelbe Villa',
+			'STZ Biesdorf - Historischer Pferdestall',
+			'Schloss Biesdorf'
+		];
+
+		const venues =
+			event.venues && event.venues.length > 0 ? event.venues : event.venue ? [event.venue] : [];
+		const isStzEvent = venues.some((v) => stzLocations.includes(v.name));
+
+		wpEvent.categories = isStzEvent ? [CAT_STZ] : [CAT_DEFAULT];
 
 		// Handle custom fields if present in metadata
 		if (event.metadata?.customFields) {
@@ -921,7 +914,5 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		return url.toString();
 	}
 
-	private async delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms));
-	}
 }
+
