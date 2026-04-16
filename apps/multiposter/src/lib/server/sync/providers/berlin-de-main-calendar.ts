@@ -191,8 +191,8 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 		// Ticket price
 		const price = event.ticketPrice ?? event.metadata?.ticketPrice;
 		if (price) {
-			const { priceValue } = parsePricing(price);
-			formData[this.fieldMappings.eintrittspreis] = priceValue;
+			const { isFree, priceValue } = parsePricing(price);
+			formData[this.fieldMappings.eintrittspreis] = isFree ? 'Gratis' : priceValue;
 		}
 
 		// Contact info resolution using shared algorithm
@@ -216,5 +216,9 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 		}
 
 		return formData;
+	}
+
+	private async delay(ms: number): Promise<void> {
+		return new Promise(resolve => setTimeout(resolve, ms));
 	}
 }

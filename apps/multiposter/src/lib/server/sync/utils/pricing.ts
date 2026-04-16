@@ -14,7 +14,7 @@ export interface PricingInfo {
  * 
  * Rules:
  * - Non-numeric strings (e.g., "free", "gratis", "frei") -> Is Free, Value "0"
- * - Numeric string "0" -> NOT Free (interpreted as a "fee offering" per requirements), Value "0"
+ * - Numeric string "0" -> Is Free, Value "0"
  * - Numeric string > 0 -> NOT Free, Value as provided
  * - Empty/null/undefined -> Is Free, Value "0"
  * 
@@ -44,10 +44,9 @@ export function parsePricing(ticketPrice: string | null | undefined): PricingInf
 		return { isFree: true, priceValue: '0' };
 	}
 
-	// A parsed value of 0 is explicitly a "fee offering" according to requirements.
-	// This means it's NOT free (isFree: false) but the value synced should still be "0".
+	// A parsed value of 0 is treated as free.
 	if (parsed === 0) {
-		return { isFree: false, priceValue: '0' };
+		return { isFree: true, priceValue: '0' };
 	}
 
 	// Any other number is a fee offering
