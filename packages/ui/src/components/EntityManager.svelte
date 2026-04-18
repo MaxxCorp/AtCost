@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends { id: string }">
-    import { onMount, type Component, type Snippet } from "svelte";
+    import { onMount, untrack, type Component, type Snippet } from "svelte";
     import {
         Search,
         Plus,
@@ -209,10 +209,11 @@
     });
 
     onMount(async () => {
-        if (isStandalone && listQuery) {
+        const query = listQuery;
+        if (isStandalone && query) {
             loadingItems = true;
             try {
-                const res = await listQuery;
+                const res = await query;
                 associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
             } catch (e: any) {
                 console.error("Failed to load items", e);
@@ -261,10 +262,11 @@
 
     async function toggleSelector() {
         showSelector = !showSelector;
-        if (showSelector && allItems.length === 0 && listQuery) {
+        const query = listQuery;
+        if (showSelector && allItems.length === 0 && query) {
             loadingSearch = true;
             try {
-                const res = await listQuery;
+                const res = await query;
                 allItems = Array.isArray(res) ? res : (res?.data ?? []);
             } catch (err: any) {
                 toast.error(`${noItemsFoundLabel}: ${err.message}`);
@@ -311,7 +313,8 @@
         showQuickCreate = false;
 
         if (result?.id) {
-            const res: any = await listItemsRemote();
+            const query = listQuery;
+            const res: any = query ? await query : await listItemsRemote();
             const items = Array.isArray(res) ? res : (res?.data ?? []);
 
             if (isStandalone) {
@@ -343,7 +346,8 @@
 
         if (!targetId) return;
 
-        const res: any = await listItemsRemote();
+        const query = listQuery;
+        const res: any = query ? await query : await listItemsRemote();
         const items = Array.isArray(res) ? res : (res?.data ?? []);
         const updatedItem = items.find((i: any) => i.id === targetId);
 

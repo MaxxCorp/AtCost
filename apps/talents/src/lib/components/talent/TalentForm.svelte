@@ -57,54 +57,69 @@
     const d = (val: any, def: any) =>
         val === undefined || val === null ? def : val;
 
+    // Initialize state from initialData directly
     let systemUsers = $state<any[]>([]);
     let allLocations = $state<any[]>([]);
+    
+    // Helper to get nested initial data
+    const getInitial = (path: string, defaultValue: any) => {
+        const parts = path.split('.');
+        let current = initialData;
+        for (const part of parts) {
+            if (current === undefined || current === null) return defaultValue;
+            current = current[part];
+        }
+        return current === undefined || current === null ? defaultValue : current;
+    };
+
     // svelte-ignore state_referenced_locally
-    let emails = $state(initialData.contact?.emails || [{ value: "", type: "work", primary: true }]);
+    let emails = $state<any[]>(getInitial('contact.emails', [{ value: "", type: "work", primary: true }]));
     // svelte-ignore state_referenced_locally
-    let phones = $state(initialData.contact?.phones || []);
+    let phones = $state<any[]>(getInitial('contact.phones', []));
     // svelte-ignore state_referenced_locally
-    let relations = $state(initialData.contact?.relations || []);
+    let relations = $state<any[]>(getInitial('contact.relations', []));
     // svelte-ignore state_referenced_locally
-    let tagsInput = $state((initialData.contact?.tags || []).join(", "));
+    let tagsInput = $state((getInitial('contact.tags', []) as string[]).join(", "));
     // svelte-ignore state_referenced_locally
-    let locationIds = $state<string[]>((initialData.contact?.locationAssociations || []).map((la: any) => la.locationId));
+    let locationIds = $state<string[]>((getInitial('contact.locationAssociations', []) as any[]).map((la: any) => la.locationId));
     // svelte-ignore state_referenced_locally
-    let addresses = $state(initialData.contact?.addresses || []);
+    let addresses = $state<any[]>(getInitial('contact.addresses', []));
     let autoLinked = $state(false);
     // svelte-ignore state_referenced_locally
-    let linkedUserId = $state(initialData.contact?.linkedUserId || "");
+    let linkedUserId = $state(getInitial('contact.linkedUserId', ""));
 
     // svelte-ignore state_referenced_locally
     let contactData = $state({
-        id: d(initialData.contactId || initialData.contact?.id, undefined),
-        displayName: d(initialData.contact?.displayName, ""),
-        givenName: d(initialData.contact?.givenName, ""),
-        middleName: d(initialData.contact?.middleName, ""),
-        familyName: d(initialData.contact?.familyName, ""),
-        honorificPrefix: d(initialData.contact?.honorificPrefix, ""),
-        honorificSuffix: d(initialData.contact?.honorificSuffix, ""),
-        company: d(initialData.contact?.company, ""),
-        role: d(initialData.contact?.role, ""),
-        department: d(initialData.contact?.department, ""),
-        gender: d(initialData.contact?.gender, ""),
-        birthday: d(initialData.contact?.birthday ? String(initialData.contact.birthday).split("T")[0] : "", ""),
-        notes: d(initialData.contact?.notes, ""),
-        isPublic: d(initialData.contact?.isPublic, false),
+        id: d(initialData?.contactId || initialData?.contact?.id, undefined),
+        displayName: d(initialData?.contact?.displayName, ""),
+        givenName: d(initialData?.contact?.givenName, ""),
+        middleName: d(initialData?.contact?.middleName, ""),
+        familyName: d(initialData?.contact?.familyName, ""),
+        honorificPrefix: d(initialData?.contact?.honorificPrefix, ""),
+        honorificSuffix: d(initialData?.contact?.honorificSuffix, ""),
+        company: d(initialData?.contact?.company, ""),
+        role: d(initialData?.contact?.role, ""),
+        department: d(initialData?.contact?.department, ""),
+        gender: d(initialData?.contact?.gender, ""),
+        birthday: d(initialData?.contact?.birthday ? String(initialData.contact.birthday).split("T")[0] : "", ""),
+        notes: d(initialData?.contact?.notes, ""),
+        isPublic: d(initialData?.contact?.isPublic, false),
     });
 
     // svelte-ignore state_referenced_locally
     let talentData = $state({
-        id: talentId || d(initialData.id, undefined),
-        status: d(initialData.status, "applicant"),
-        jobTitle: d(initialData.jobTitle, ""),
-        salaryExpectation: d(initialData.salaryExpectation, ""),
-        availabilityDate: d(initialData.availabilityDate ? String(initialData.availabilityDate).split("T")[0] : "", ""),
-        onboardingStatus: d(initialData.onboardingStatus, ""),
-        resumeUrl: d(initialData.resumeUrl, ""),
-        source: d(initialData.source, ""),
-        internalNotes: d(initialData.internalNotes, ""),
+        id: talentId || d(initialData?.id, undefined),
+        status: d(initialData?.status, "applicant"),
+        jobTitle: d(initialData?.jobTitle, ""),
+        salaryExpectation: d(initialData?.salaryExpectation, ""),
+        availabilityDate: d(initialData?.availabilityDate ? String(initialData.availabilityDate).split("T")[0] : "", ""),
+        onboardingStatus: d(initialData?.onboardingStatus, ""),
+        resumeUrl: d(initialData?.resumeUrl, ""),
+        source: d(initialData?.source, ""),
+        internalNotes: d(initialData?.internalNotes, ""),
     });
+
+
 
     const emailsJson = $derived(JSON.stringify(emails.filter((e: any) => e.value)));
     const phonesJson = $derived(JSON.stringify(phones.filter((p: any) => p.value)));
@@ -129,17 +144,17 @@
         }
     });
 
-    $effect(() => {
-        if (!initialData.id && !linkedUserId && !autoLinked && emails.length > 0 && emails[0]?.value && systemUsers.length > 0) {
+    function tryAutoLink() {
+        if (!talentData.id && !linkedUserId && !autoLinked && emails.length > 0 && emails[0]?.value && systemUsers.length > 0) {
             const primaryEmail = emails[0].value.toLowerCase();
-            const match = systemUsers.find(u => u.email.toLowerCase() === primaryEmail);
+            const match = systemUsers.find((u: any) => u.email.toLowerCase() === primaryEmail);
             if (match) {
                 linkedUserId = match.id;
                 autoLinked = true;
                 toast.success(`Automatically linked to system user: ${match.name}`);
             }
         }
-    });
+    }
 
     import * as m from "$lib/paraglide/messages";
 
@@ -155,6 +170,12 @@
     }
 
     let prevIssuesLength = $state(0);
+    function handleStatusChange(newStatus: string) {
+        if (newStatus === "hired" && talentData.id) {
+            toast.success("Talent marked as hired! Starting onboarding...");
+            talentData.onboardingStatus = "not_started";
+        }
+    }
     $effect(() => {
         const issues = (rf as any).allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
@@ -225,6 +246,7 @@
                     bind:addresses
                     listContactsRemote={listContactsRemote}
                     getField={getFieldMetadata}
+                    onEmailChange={tryAutoLink}
                 />
 
                 <div class="mt-8 pt-8 border-t border-gray-100 flex justify-between items-center">
@@ -308,7 +330,8 @@
                         <select
                             {...getFieldMetadata("talent.status").as("select")}
                             bind:value={talentData.status}
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            onchange={(e) => handleStatusChange(e.currentTarget.value)}
+                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="applicant">Applicant</option>
                             <option value="active">Active</option>

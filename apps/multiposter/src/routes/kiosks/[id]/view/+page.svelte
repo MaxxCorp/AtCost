@@ -112,6 +112,37 @@
                             );
                         }
                     }
+
+                    // Enrich contact QR code if it exists
+                    if (
+                        "resolvedContact" in item &&
+                        item.resolvedContact?.qrCodePath
+                    ) {
+                        try {
+                            const res = await fetch(
+                                item.resolvedContact.qrCodePath,
+                            );
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                const contactQrData = await new Promise<string>(
+                                    (resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () =>
+                                            resolve(reader.result as string);
+                                        reader.readAsDataURL(blob);
+                                    },
+                                );
+                                item.resolvedContact.qrCodeDataUrl =
+                                    contactQrData;
+                            }
+                        } catch (e) {
+                            console.error(
+                                "Failed to cache contact QR code for event",
+                                item.id,
+                                e,
+                            );
+                        }
+                    }
                     return { ...item, qrCodeDataUrl: qrData };
                 }),
             );

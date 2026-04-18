@@ -6,24 +6,30 @@
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
 	import * as m from "$lib/paraglide/messages";
 
-	// Use a promise to handle session loading asynchronously
-	let sessionPromise = $state(loadSession());
-
-	async function loadSession() {
-		const session = await authClient.getSession();
-		const user = session?.data?.user;
-		return {
-			user,
-			userRoles: user ? parseRoles(user) : [],
-			userClaims: user ? parseClaims(user) : null,
-		};
-	}
+	const session = authClient.useSession();
+	const user = $derived($session.data?.user);
+	const userRoles = $derived(user ? parseRoles(user) : []);
+	const userClaims = $derived(user ? parseClaims(user) : null);
 </script>
 
 <div class="space-y-8">
-	{#await sessionPromise}
+	{#if $session.isPending}
 		<LoadingSection message={m.loading_dashboard()} />
-	{:then { user, userRoles, userClaims }}
+	{:else if $session.error}
+		<div
+			class="bg-white rounded-lg shadow-sm border border-red-200 p-12 text-center"
+		>
+			<p class="text-red-600 mb-3">
+				{$session.error?.message || m.something_went_wrong()}
+			</p>
+			<button
+				onclick={() => $session.refetch()}
+				class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+			>
+				{m.retry()}
+			</button>
+		</div>
+	{:else}
 		{#if user}
 			<div
 				class="bg-white rounded-lg shadow-sm border border-gray-200 p-8"
@@ -90,21 +96,7 @@
 				</p>
 			</div>
 		{/if}
-	{:catch error}
-		<div
-			class="bg-white rounded-lg shadow-sm border border-red-200 p-12 text-center"
-		>
-			<p class="text-red-600 mb-3">
-				{error?.message || m.loading_dashboard()}
-			</p>
-			<button
-				onclick={() => (sessionPromise = loadSession())}
-				class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-			>
-				{m.retry()}
-			</button>
-		</div>
-	{/await}
+	{/if}
 </div>
 
 

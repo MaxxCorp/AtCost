@@ -93,18 +93,26 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         // Step 1: Login and get session
         await this.ensureLoggedIn();
 
-        // Step 2: Create a new event → parse editid from success banner
+        // Step 2: Create a new event
         const editId = await this.createEvent();
 
-        // Step 3: Fill out each page in sequence
+        // Step 3: Fill out each page in sequence with short delays to avoid server race conditions
         await this.submitStatus(editId, event);
+        await this.delay(500);
         await this.submitText(editId, event);
+        await this.delay(500);
         await this.submitDetailsDistrict(editId);
+        await this.delay(500);
         await this.submitDetailsCategories(editId, event);
+        await this.delay(500);
         await this.submitDetailsOrganizer(editId, event);
+        await this.delay(500);
         await this.submitDetailsVenue(editId, event);
+        await this.delay(500);
         await this.submitDate(editId, event);
+        await this.delay(500);
         await this.submitWeb(editId, event);
+        await this.delay(500);
         await this.submitImage(editId, event);
 
         return {
@@ -123,13 +131,21 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
 
         // Re-submit all tabs with the existing editId
         await this.submitStatus(editId, event);
+        await this.delay(500);
         await this.submitText(editId, event);
+        await this.delay(500);
         await this.submitDetailsDistrict(editId);
+        await this.delay(500);
         await this.submitDetailsCategories(editId, event);
+        await this.delay(500);
         await this.submitDetailsOrganizer(editId, event);
+        await this.delay(500);
         await this.submitDetailsVenue(editId, event);
+        await this.delay(500);
         await this.submitDate(editId, event);
+        await this.delay(500);
         await this.submitWeb(editId, event);
+        await this.delay(500);
         await this.submitImage(editId, event);
 
         return { etag: new Date().toISOString() };
@@ -475,9 +491,9 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const orgName = env.ORG_NAME;
         if (!orgName) return;
 
-        // Step 0: Reset organizer to start clean
         const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstalter=0`;
         await this.authedFetch(resetUrl);
+        await this.delay(300);
 
         // Resolve the contact for this event
         const contact = await resolveContactForEventId(event.metadata?.eventId, true);
@@ -492,6 +508,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             search_name: searchString,
             subaction: 'veranstalter'
         });
+        await this.delay(300);
 
         const searchHtml = await searchResponse.text();
 
@@ -518,9 +535,9 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             return;
         }
 
-        // Step 4: Select the organizer
         const selectUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstalter=${selectedId}`;
         await this.authedFetch(selectUrl);
+        await this.delay(300);
 
         // Step 5+6: Fill contact fields and save
         const data: Record<string, string> = {};
@@ -552,9 +569,9 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const orgName = env.ORG_NAME;
         if (!orgName) return;
 
-        // Step 0: Reset venue to start clean
         const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstaltungsort=0`;
         await this.authedFetch(resetUrl);
+        await this.delay(300);
 
         // Resolve the venue/location for this event
         const venue = event.venue;
@@ -569,6 +586,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             search_name: searchString,
             subaction: 'veranstaltungsort'
         });
+        await this.delay(300);
 
         const searchHtml = await searchResponse.text();
 
@@ -595,9 +613,9 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             return;
         }
 
-        // Step 4: Select the venue
         const selectUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstaltungsort=${selectedId}`;
         await this.authedFetch(selectUrl);
+        await this.delay(300);
 
         // Step 5+6: Fill phone and save
         const data: Record<string, string> = {};
@@ -751,6 +769,10 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     // ----------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------
+
+    private async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
     /**
      * Determines if the event is free.

@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { untrack } from "svelte";
     import { Briefcase, DollarSign, Calendar, FileText, User } from "@lucide/svelte";
+
     import { toast } from "svelte-sonner";
     import AsyncButton from "../../components/AsyncButton.svelte";
     import Button from "../../components/button/button.svelte";
@@ -65,13 +67,15 @@
 <form
     class="space-y-6"
     {...(rf as any).preflight(schema).enhance(async ({ submit }: { submit: any }) => {
+        const handle = rf;
         try {
             await submit();
-            const result = (rf as any).result;
+            const result = untrack(() => (handle as any).result);
             if (result?.success === false || result?.error) {
                 toast.error(result?.error?.message || result?.error || "Failed to save talent");
                 return;
             }
+
 
             toast.success("Talent successfully saved!");
             onSuccess(result);

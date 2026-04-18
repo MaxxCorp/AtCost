@@ -6,7 +6,7 @@
 	import * as Breadcrumb from "@ac/ui/components/breadcrumb";
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
-	import { page } from "$app/stores";
+	import { page } from "$app/state";
 	import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 	import { FEATURES } from "$lib/features";
 
@@ -23,7 +23,7 @@
 	});
 
 	let isAuthPage = $derived(
-		$page.url.pathname === "/login" || $page.url.pathname === "/signup",
+		page.url.pathname === "/login" || page.url.pathname === "/signup",
 	);
 
 	const featureMeta = $derived.by(() =>
@@ -46,7 +46,9 @@
 
 {#if isAuthPage}
 	<main class="min-h-screen bg-background">
-		{@render children()}
+		{#key page.url.pathname}
+			{@render children()}
+		{/key}
 	</main>
 {:else}
 	<Sidebar.Provider>
@@ -96,7 +98,9 @@
 			</header>
 			<div class="flex flex-1 flex-col gap-4 p-4 md:p-8 bg-gray-50">
 				<div class="mx-auto w-full max-w-7xl">
-					{@render children()}
+					{#key page.url.pathname}
+						{@render children()}
+					{/key}
 				</div>
 			</div>
 		</Sidebar.Inset>

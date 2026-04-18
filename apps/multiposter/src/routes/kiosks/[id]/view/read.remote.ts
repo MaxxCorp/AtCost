@@ -14,14 +14,22 @@ export const readKioskView = query(v.string(), async (kioskId) => {
     if (!kioskData) return null;
 
     const locations = await db
-        .select({ name: location.name })
+        .select({
+            id: location.id,
+            name: location.name,
+            street: location.street,
+            houseNumber: location.houseNumber,
+            zip: location.zip,
+            city: location.city,
+            country: location.country
+        })
         .from(kioskLocation)
         .innerJoin(location, eq(kioskLocation.locationId, location.id))
         .where(eq(kioskLocation.kioskId, kioskId));
 
     const kioskWithLocations = {
         ...kioskData,
-        locations: locations.map(l => l.name)
+        locations: locations
     };
 
     const events = await listKioskEvents(kioskId);

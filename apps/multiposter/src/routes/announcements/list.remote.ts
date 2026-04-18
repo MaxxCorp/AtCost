@@ -31,6 +31,7 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
         email: string;
         phone: string;
         qrCodeDataUrl?: string;
+        qrCodePath?: string;
     } | null;
 };
 

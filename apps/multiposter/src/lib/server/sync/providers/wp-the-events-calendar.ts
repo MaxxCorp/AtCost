@@ -143,6 +143,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
+
 			// Ensure venues exist
 			const venueIds: number[] = [];
 			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
@@ -157,6 +158,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				// (Most TEC setups only support one unless Pro is installed)
 				wpEventData.venue = venueIds.length === 1 ? venueIds[0] : venueIds;
 			}
+
 
 			// Ensure organizer exists if provided
 			if (event.organizer) {
@@ -257,6 +259,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				// Compatibility: Use single ID if only one venue, array if multiple
 				wpEventData.venue = venueIds.length === 1 ? venueIds[0] : venueIds;
 			}
+
 
 			// Ensure organizer exists if provided
 			if (event.organizer) {
@@ -854,10 +857,20 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			}
 		}
 
-		// Handle categories/tags if present in metadata
-		if (event.metadata?.categories) {
-			wpEvent.categories = event.metadata.categories;
-		}
+		// Hardcoded category mapping rule based on location
+		const CAT_STZ = 109;
+		const CAT_DEFAULT = 110;
+		const stzLocations = [
+			'STZ Biesdorf - Gelbe Villa',
+			'STZ Biesdorf - Historischer Pferdestall',
+			'Schloss Biesdorf'
+		];
+
+		const venues =
+			event.venues && event.venues.length > 0 ? event.venues : event.venue ? [event.venue] : [];
+		const isStzEvent = venues.some((v) => stzLocations.includes(v.name));
+
+		wpEvent.categories = isStzEvent ? [CAT_STZ] : [CAT_DEFAULT];
 
 		// Handle custom fields if present in metadata
 		if (event.metadata?.customFields) {
@@ -900,4 +913,6 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 		return url.toString();
 	}
+
 }
+

@@ -21,6 +21,7 @@ export type PublicEvent = Omit<Event, 'resolvedContact'> & {
             country: string | null;
         } | null;
         qrCodeDataUrl?: string;
+        qrCodePath?: string;
     } | null;
     ticketPrice?: string | null;
     categoryBerlinDotDe?: string | null;
@@ -364,7 +365,8 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
                     city: primaryAddress.city,
                     country: primaryAddress.country
                 } : null,
-                qrCodeDataUrl: publicQrCodePath
+                qrCodeDataUrl: publicQrCodePath,
+                qrCodePath: publicQrCodePath
             };
         }
 
