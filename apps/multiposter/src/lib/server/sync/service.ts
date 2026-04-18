@@ -854,8 +854,11 @@ export class SyncService {
 		const summary = internal.summary || internal.title || '';
 		const descriptionRaw = internal.description || internal.content || '';
 
-		// Fetch recurrence from series table if seriesId is present
+		// NOTE: Recurrence rules are intentionally NOT synced to external providers
+		// because the system expands recurrence locally and syncs individual 
+		// instances as standalone events. Syncing the rule would create duplicate series.
 		let recurrenceRules: string[] | undefined = undefined;
+		/*
 		if (internal.seriesId) {
 			const [series] = await db
 				.select()
@@ -869,6 +872,7 @@ export class SyncService {
 		if (!recurrenceRules && internal.recurrence) {
 			recurrenceRules = internal.recurrence as string[];
 		}
+		*/
 
 
 		// Fetch associated contacts

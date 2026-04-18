@@ -323,10 +323,21 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 		console.log('Event updated successfully, refreshing list...');
 
 		if (updatedEvent) {
-			await publishEventChange('update', [updatedEvent.id]);
-			// Trigger background sync to external providers
-			await syncService.triggerPushSync(user.id, updatedEvent.id, 'event');
+			let allAffectedIds = [updatedEvent.id];
+			if (data.recurrence !== undefined && updatedEvent.seriesId) {
+				const instances = await db.query.event.findMany({
+					where: (e, { eq, and, ne }) => and(
+						eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),
+						ne(e.id, data.id)
+					),
+					columns: { id: true }
+				});
+				allAffectedIds = [updatedEvent.id, ...instances.map(i => i.id)];
+			}
 
+			await publishEventChange('update', allAffectedIds);
+			// Trigger background sync to external providers for all affected instances
+			await syncService.syncItems(user.id, allAffectedIds, 'event');
 		}
 
 		await listEvents().refresh();

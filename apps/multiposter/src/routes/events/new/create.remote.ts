@@ -231,6 +231,7 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 		} catch (e) { /* ignore */ }
 
 		// Handle Instances
+		const allEventIds = [newEvent.id];
 		if (recurrenceRule) {
 			try {
 				const { expandRecurrence } = await import('$lib/server/events/recurrence');
@@ -273,6 +274,8 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 					// Link associations for instance
 					await linkAssociations(instanceId);
 
+					allEventIds.push(instanceId);
+
 					// Generate assets for instance
 					await generateEventAssets(instanceId, origin);
 				}
@@ -292,10 +295,9 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 		console.log('Event created successfully, refreshing list...');
 
 		if (newEvent) {
-			await publishEventChange('create', [newEvent.id]);
-			// Trigger background sync to external providers
-			await syncService.triggerPushSync(user.id, newEvent.id, 'event');
-
+			await publishEventChange('create', allEventIds);
+			// Trigger background sync to external providers for all created instances
+			await syncService.syncItems(user.id, allEventIds, 'event');
 		}
 
 		await listEvents().refresh();

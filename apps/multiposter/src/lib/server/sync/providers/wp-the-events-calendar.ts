@@ -147,7 +147,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// Ensure venues exist
 			const venueIds: number[] = [];
 			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
-			
+
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
 				if (vId) venueIds.push(vId);
@@ -249,7 +249,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// Ensure venues exist
 			const venueIds: number[] = [];
 			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
-			
+
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
 				if (vId) venueIds.push(vId);
@@ -841,7 +841,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		// Always explicitly include the mapped timezone so WP Events Calendar evaluates the time string properly
 		wpEvent.timezone = resolvedTz;
 
-		// Handle recurrence if present
+		/* // Handle recurrence if present
 		if (event.recurrence && event.recurrence.length > 0) {
 			const rrule = event.recurrence[0];
 			if (rrule.includes('FREQ=WEEKLY')) {
@@ -855,7 +855,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					end_type: 'never',
 				};
 			}
-		}
+		} */
 
 		// Hardcoded category mapping rule based on location
 		const CAT_STZ = 109;
@@ -900,7 +900,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	 */
 	private getApiUrl(path: string, params?: URLSearchParams): string {
 		const cleanPath = path.startsWith('/') ? path : `/${path}`;
-		
+
 		// We use the rest_route format as it is universally supported regardless of permalink settings.
 		const url = new URL(this.baseUrl);
 		url.searchParams.set('rest_route', cleanPath);
