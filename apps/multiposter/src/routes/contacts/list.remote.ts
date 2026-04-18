@@ -1,69 +1,46 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
 import { contact } from '@ac/db';
-import { listQuery } from '$lib/server/db/query-helpers';
+import type { Contact as DbContact } from '@ac/db';
+import { db } from '$lib/server/db';
+import { desc } from 'drizzle-orm';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
-import { contactSchema, type Contact } from '$lib/validations/contacts';
+/**
+ * Contact interface matching the database schema, with dates serialized to strings and relations
+ */
+export type Contact = Omit<DbContact, 'createdAt' | 'updatedAt' | 'birthday'> & {
+	createdAt: string;
+	updatedAt: string;
+	birthday: string | null;
+	emails?: { value: string; type: string | null }[];
+	phones?: { value: string; type: string | null }[];
+	addresses?: { street: string | null; houseNumber: string | null; zip: string | null; city: string | null }[];
+};
 
-export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
-    const results = await listQuery({
-        table: contact,
-        featureName: 'contacts',
-        accessLevel: 'use',
-        transform: (row) => ({
-            ...row,
-            createdAt: row.createdAt.toISOString(),
-            updatedAt: row.updatedAt.toISOString(),
-            birthday: row.birthday ? row.birthday.toISOString() : null,
-        }),
-    });
+/**
+ * Query: List all contacts
+ */
+export const listContacts = query(v.undefined_(), async (): Promise<Contact[]> => {
+	const user = getAuthenticatedUser();
+	ensureAccess(user, 'contacts');
 
-    const contactsWithRelations = await Promise.all(results.map(async (c) => {
-        const contactData = await db.query.contact.findFirst({
-            where: (table, { eq }) => eq(table.id, c.id),
-            with: {
-                emails: true,
-                phones: true,
-                addresses: true,
-                relations: {
-                    with: {
-                        targetContact: true
-                    }
-                },
-                tags: {
-                    with: {
-                        tag: true
-                    }
-                },
-                locationAssociations: {
-                    with: {
-                        location: true
-                    }
-                }
-            }
-        });
+	const results = await db.query.contact.findMany({
+		orderBy: [desc(contact.createdAt)],
+		with: {
+			emails: true,
+			phones: true,
+			addresses: true,
+		}
+	});
 
-        if (!contactData) return c;
-
-        return {
-            ...c,
-            emails: contactData.emails,
-            phones: contactData.phones,
-            addresses: contactData.addresses,
-            relations: (contactData.relations || []).map(r => ({
-                id: r.id,
-                targetContactId: r.targetContactId,
-                relationType: r.relationType,
-                targetContact: r.targetContact
-            })),
-            tags: (contactData.tags || []).map(t => ({
-                id: t.tag.id,
-                name: t.tag.name
-            })),
-            locationAssociations: contactData.locationAssociations || [],
-        };
-    }));
-
-    return contactsWithRelations as Contact[];
+	return results.map((row) => ({
+		...row,
+		createdAt: row.createdAt.toISOString(),
+		updatedAt: row.updatedAt.toISOString(),
+		birthday: row.birthday ? row.birthday.toISOString() : null,
+		emails: row.emails || [],
+		phones: row.phones || [],
+		addresses: row.addresses || [],
+	}));
 });

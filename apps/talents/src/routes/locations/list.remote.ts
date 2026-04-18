@@ -1,17 +1,26 @@
-import { type InferSelectModel } from 'drizzle-orm';
+import * as v from 'valibot';
+import { type InferSelectModel, db, desc } from '$lib/server/db';
 import { query } from '$app/server';
 import { location } from '@ac/db';
-import { listQuery } from '$lib/server/db/query-helpers';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
-export type Location = InferSelectModel<typeof location>;
+export type Location = Omit<InferSelectModel<typeof location>, 'createdAt' | 'updatedAt'> & {
+    createdAt: string;
+    updatedAt: string;
+};
 
-export const listLocations = query(async (): Promise<Location[]> => {
-    const results = await listQuery({
-        table: location,
-        featureName: 'locations',
-        transform: (row) => ({
-            ...row,
-        }),
-    });
-    return results;
+export const listLocations = query(v.undefined_(), async (): Promise<Location[]> => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'locations');
+
+    const rawResults = await db
+        .select()
+        .from(location)
+        .orderBy(desc(location.createdAt));
+
+    return rawResults.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+    }));
 });

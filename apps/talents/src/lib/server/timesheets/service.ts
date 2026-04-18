@@ -1,6 +1,4 @@
-import { db } from "../db";
-import { timesheetEntry, timesheetAuditTrail, shiftPlan, talent, userTalent, userContact } from "../db/schema";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { db, timesheetEntry, timesheetAuditTrail, shiftPlan, talent, userTalent, userContact, task, getSuperior, eq, and, isNull, desc } from "@ac/db";
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from "$lib/server/authorization";
 
 export interface ClockInData {
@@ -9,6 +7,7 @@ export interface ClockInData {
     type: "qr" | "gps" | "manual";
     latitude?: number;
     longitude?: number;
+    startTime?: Date;
 }
 
 export async function clockIn(data: ClockInData, userId: string) {
@@ -16,8 +15,8 @@ export async function clockIn(data: ClockInData, userId: string) {
         // Check if user is already clocked in
         const activeEntry = await tx.query.timesheetEntry.findFirst({
             where: and(
-                eq(timesheetEntry.talentId, data.talentId),
-                isNull(timesheetEntry.endTime)
+                eq(timesheetEntry.talentId as any, data.talentId),
+                isNull(timesheetEntry.endTime as any)
             ),
         });
 
@@ -25,12 +24,12 @@ export async function clockIn(data: ClockInData, userId: string) {
             throw new Error("User is already clocked in");
         }
 
+        const startTime = data.startTime || new Date();
+
         // Optional: Find matching shift plan
-        const now = new Date();
         const activeShift = await tx.query.shiftPlan.findFirst({
             where: and(
-                eq(shiftPlan.talentId, data.talentId),
-                // Roughly matching today
+                eq(shiftPlan.talentId as any, data.talentId),
             ),
             orderBy: desc(shiftPlan.startTime)
         });
@@ -41,10 +40,10 @@ export async function clockIn(data: ClockInData, userId: string) {
             type: data.type,
             latitude: data.latitude,
             longitude: data.longitude,
-            startTime: now,
+            startTime: startTime,
             shiftPlanId: activeShift?.id,
             status: "pending",
-        } as any).returning();
+        }).returning();
 
         await logAuditTrail(tx, {
             timesheetEntryId: newEntry.id,
@@ -57,24 +56,26 @@ export async function clockIn(data: ClockInData, userId: string) {
     });
 }
 
-export async function clockOut(entryId: string, userId: string, geo?: { latitude?: number, longitude?: number }) {
+export async function clockOut(entryId: string, userId: string, geo?: { latitude?: number, longitude?: number, endTime?: Date }) {
     return await db.transaction(async (tx) => {
         const entry = await tx.query.timesheetEntry.findFirst({
-            where: eq(timesheetEntry.id, entryId),
+            where: eq(timesheetEntry.id as any, entryId),
         });
 
         if (!entry || entry.endTime) {
             throw new Error("Invalid entry or already clocked out");
         }
 
+        const endTime = geo?.endTime || new Date();
+
         const [updatedEntry] = await tx.update(timesheetEntry)
             .set({
-                endTime: new Date(),
+                endTime: endTime,
                 latitude: geo?.latitude || entry.latitude,
                 longitude: geo?.longitude || entry.longitude,
                 updatedAt: new Date(),
             })
-            .where(eq(timesheetEntry.id, entryId))
+            .where(eq(timesheetEntry.id as any, entryId))
             .returning();
 
         await logAuditTrail(tx, {
@@ -85,6 +86,9 @@ export async function clockOut(entryId: string, userId: string, geo?: { latitude
             newData: updatedEntry,
         });
 
+        // Trigger task creation for approval
+        await ensureApprovalTask(tx, updatedEntry.id, updatedEntry.talentId);
+
         return updatedEntry;
     });
 }
@@ -92,7 +96,7 @@ export async function clockOut(entryId: string, userId: string, geo?: { latitude
 export async function approveEntry(entryId: string, managerId: string, comment?: string) {
     return await db.transaction(async (tx) => {
         const entry = await tx.query.timesheetEntry.findFirst({
-            where: eq(timesheetEntry.id, entryId),
+            where: eq(timesheetEntry.id as any, entryId),
         });
 
         if (!entry) throw new Error("Entry not found");
@@ -104,7 +108,7 @@ export async function approveEntry(entryId: string, managerId: string, comment?:
                 managerComment: comment,
                 updatedAt: new Date(),
             })
-            .where(eq(timesheetEntry.id, entryId))
+            .where(eq(timesheetEntry.id as any, entryId))
             .returning();
 
         await logAuditTrail(tx, {
@@ -115,6 +119,14 @@ export async function approveEntry(entryId: string, managerId: string, comment?:
             newData: updatedEntry,
         });
 
+        // Complete the task
+        await tx.update(task)
+            .set({ status: "completed" })
+            .where(and(
+                eq(task.type as any, "timesheet_approval"),
+                eq(task.data as any, { timesheetEntryId: entryId } as any)
+            ));
+
         return updatedEntry;
     });
 }
@@ -122,7 +134,7 @@ export async function approveEntry(entryId: string, managerId: string, comment?:
 export async function rejectEntry(entryId: string, managerId: string, comment?: string) {
     return await db.transaction(async (tx) => {
         const entry = await tx.query.timesheetEntry.findFirst({
-            where: eq(timesheetEntry.id, entryId),
+            where: eq(timesheetEntry.id as any, entryId),
         });
 
         if (!entry) throw new Error("Entry not found");
@@ -134,7 +146,7 @@ export async function rejectEntry(entryId: string, managerId: string, comment?: 
                 managerComment: comment,
                 updatedAt: new Date(),
             })
-            .where(eq(timesheetEntry.id, entryId))
+            .where(eq(timesheetEntry.id as any, entryId))
             .returning();
 
         await logAuditTrail(tx, {
@@ -145,6 +157,24 @@ export async function rejectEntry(entryId: string, managerId: string, comment?: 
             newData: updatedEntry,
         });
 
+        // Complete the approval task
+        await tx.update(task)
+            .set({ status: "completed" })
+            .where(and(
+                eq(task.type as any, "timesheet_approval"),
+                eq(task.data as any, { timesheetEntryId: entryId } as any)
+            ));
+
+        // Create a correction task for the talent
+        await tx.insert(task).values({
+            type: "correction",
+            status: "pending",
+            assigneeId: entry.talentId,
+            title: "Timesheet Correction Required",
+            description: `Your timesheet entry for ${entry.startTime.toLocaleDateString()} was rejected. Reason: ${comment || "No reason provided."}`,
+            data: { timesheetEntryId: entryId },
+        } as any);
+
         return updatedEntry;
     });
 }
@@ -152,7 +182,7 @@ export async function rejectEntry(entryId: string, managerId: string, comment?: 
 export async function updateEntryManual(entryId: string, managerId: string, data: Partial<typeof timesheetEntry.$inferInsert>) {
     return await db.transaction(async (tx) => {
         const entry = await tx.query.timesheetEntry.findFirst({
-            where: eq(timesheetEntry.id, entryId),
+            where: eq(timesheetEntry.id as any, entryId),
         });
 
         if (!entry) throw new Error("Entry not found");
@@ -163,7 +193,7 @@ export async function updateEntryManual(entryId: string, managerId: string, data
                 managerId, // Mark that it was edited by a manager
                 updatedAt: new Date(),
             })
-            .where(eq(timesheetEntry.id, entryId))
+            .where(eq(timesheetEntry.id as any, entryId))
             .returning();
 
         await logAuditTrail(tx, {
@@ -187,17 +217,17 @@ export async function getMyTalentIdCore() {
 
     try {
         // Step 1: Check direct talent association
-        const ut = await db.select({ id: userTalent.talentId }).from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
+        const ut = await db.select({ id: userTalent.talentId }).from(userTalent).where(eq(userTalent.userId as any, authUser.id)).limit(1);
         if (ut[0]) {
             return ut[0].id;
         }
 
         // Step 2: Get contact ID for user as fallback
-        const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
+        const uc = await db.select().from(userContact).where(eq(userContact.userId as any, authUser.id)).limit(1);
         if (!uc[0]) return null;
 
         // Step 3: Get talent for that contact
-        const t = await db.select({ id: talent.id }).from(talent).where(eq(talent.contactId, uc[0].contactId)).limit(1);
+        const t = await db.select({ id: talent.id }).from(talent).where(eq(talent.contactId as any, uc[0].contactId)).limit(1);
         return t[0]?.id || null;
     } catch (e: any) {
         console.error('getMyTalentIdCore failed:', e);
@@ -218,17 +248,17 @@ export async function getMyStatus(talentId: string) {
         .where(and(
             eq(timesheetEntry.talentId, talentId),
             isNull(timesheetEntry.endTime)
-        ))
+        ) as any)
         .limit(1);
 
     const recentEntries = await db.select().from(timesheetEntry)
-        .where(eq(timesheetEntry.talentId, talentId))
-        .orderBy(desc(timesheetEntry.startTime))
+        .where(eq(timesheetEntry.talentId, talentId) as any)
+        .orderBy(desc(timesheetEntry.startTime) as any)
         .limit(10);
 
     const shiftPlans = await db.select().from(shiftPlan)
-        .where(eq(shiftPlan.talentId, talentId))
-        .orderBy(desc(shiftPlan.startTime))
+        .where(eq(shiftPlan.talentId, talentId) as any)
+        .orderBy(desc(shiftPlan.startTime) as any)
         .limit(5);
 
     return {
@@ -253,4 +283,41 @@ async function logAuditTrail(tx: any, data: {
         newData: data.newData,
         timestamp: new Date(),
     } as any);
+}
+
+async function ensureApprovalTask(tx: any, entryId: string, talentId: string) {
+    // 1. Find the manager
+    const manager = await getSuperior(talentId);
+    
+    // If no manager, the top-level superior approves their own time (or no task created if they are the one approving)
+    // The requirement says "top level superiors approve their own times".
+    // So we assign the task to themselves if no manager is found.
+    const assigneeId = manager?.id || talentId;
+
+    // 2. Check for existing pending approval task for this entry
+    const existingTask = await tx.query.task.findFirst({
+        where: and(
+            eq(task.type, "timesheet_approval"),
+            eq(task.status, "pending"),
+            eq(task.data, { timesheetEntryId: entryId } as any)
+        ) as any
+    });
+
+    if (existingTask) {
+        // Update updated_at to bring it to top
+        await tx.update(task)
+            .set({ updatedAt: new Date() })
+            .where(eq(task.id, existingTask.id) as any);
+    } else {
+        // Create new task
+        await tx.insert(task).values({
+            type: "timesheet_approval",
+            status: "pending",
+            assigneeId: assigneeId,
+            creatorId: talentId,
+            title: "Timesheet Approval Requested",
+            description: `A new timesheet entry requires your review.`,
+            data: { timesheetEntryId: entryId },
+        } as any);
+    }
 }

@@ -4,7 +4,7 @@ trigger: always_on
 
 # AI Agent Instructions: SvelteKit Architecture
 
-- **SvelteKit Remote Functions Exclusivity**: ALL SvelteKit applications in this repository MUST exclusively use SvelteKit Remote Functions (`$app/server` exports `query` and `form`) and their native form binding syntax as described in https://svelte.dev/docs/kit/remote-functions.
+- **SvelteKit Remote Functions Exclusivity**: ALL SvelteKit applications in this repository MUST exclusively use SvelteKit Remote Functions (`$app/server` exports `query`, `form`, `command` and `prerender`) and their native form binding syntax as described in https://svelte.dev/docs/kit/remote-functions. Do NOT try any other ways to do remote functions either.
 - **No Legacy Patterns**: SvelteKit `load` functions and `actions` (in `+*.server.ts` or `+*.ts`) are strictly PROHIBITED. All data fetching must occur via Remote Functions (`query`/`form`) or established client-side state providers.
   - **Note**: Static configuration exports (e.g., `export const ssr = false;`) are permitted in `+layout.ts` or `+page.ts` if required for project-level settings.
 - **No REST Endpoints for Data Fetching**: Standard API routes (`+server.ts` GET/POST/etc.) are superseded for internal data fetching/mutation and should NOT be used unless explicitly interacting with a non-SvelteKit external client.
@@ -15,6 +15,10 @@ trigger: always_on
   - **Client-Side Validation**: Reuse the remote validation schemas for `preflight()`. This prevents network requests when the form is locally invalid.
   - **Per-Field Feedback**: ALWAYS display field-specific validation errors using `{#each rf.fields.fieldName.issues() as issue}<p>{issue.message}</p>{/each}`.
   - **Validation Toast**: Add an `$effect` to trigger a global `toast.error(m.please_fix_validation())` when validation issues are detected. Use a transition check (e.g., tracking `prevIssuesLength`) to avoid spamming toasts on every keystroke.
+- **Server-Side Data Synchronization**: In `create`, `update`, or `delete` Remote Functions, you MUST use `.refresh()` or `.set()` on related Remote Functions to keep client-side data in sync.
+  - This is a server-side instruction for "single-flight mutations" where the server tells the client which queries to invalidate or update in the same response.
+  - DO NOT call other remote functions directly; only use the specialized mutation instructions (`.refresh()`, `.set()`).
+  - Example: `await listEvents.refresh();` or `await readEvent.set(updatedEvent);`.
 
 ## Svelte 5 State and Navigation Standards
 
@@ -27,7 +31,7 @@ trigger: always_on
   - Use `{#key page.url.pathname}` in `+layout.svelte` around `{@render children()}` to force-reset entire page trees on navigation if state feels "stuck" or components fail to swap.
   - Use `{#key identifier}` in components to force identity-based refreshes instead of relying on manual state synchronization.
 
-## Svelte 5 Rune Best Practices ($effect)
+## Svelte 5 Rune Best Practices
 
 - **Avoid State Synchronization**: DO NOT use `$effect` to synchronize props to local `$state`. 
   - If you need to reset a component when a prop changes, use the `{#key prop}` block in the parent template.

@@ -13,13 +13,10 @@
         Archive
     } from "@lucide/svelte";
     import { listTalents, deleteTalent, bulkDeleteTalents } from "./talents.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
-    import { LoadingSection, AsyncButton } from "@ac/ui";
     import { toast } from "svelte-sonner";
+    import { LoadingSection, ErrorSection, Button, AsyncButton } from "@ac/ui";
 
-    breadcrumbState.set({ feature: "talents" });
-
-    let talentsPromise = $state(listTalents());
+    const listRf = listTalents();
     let searchQuery = $state("");
     let selectedIds = $state<string[]>([]);
 
@@ -52,9 +49,12 @@
     async function handleDelete(id: string) {
         if (!confirm("Are you sure you want to delete this talent?")) return;
         try {
-            await (deleteTalent as any)(id);
-            toast.success("Talent deleted");
-            talentsPromise = listTalents();
+            const result = await deleteTalent(id);
+            if (result.success) {
+                listRf.refresh();
+            } else {
+                toast.error("Deletion failed");
+            }
         } catch (e: any) {
             toast.error(e.message || "Failed to delete");
         }
@@ -63,10 +63,13 @@
     async function handleBulkDelete() {
         if (!confirm(`Are you sure you want to delete ${selectedIds.length} talents?`)) return;
         try {
-            await (bulkDeleteTalents as any)(selectedIds);
-            selectedIds = [];
-            toast.success("Talents deleted");
-            talentsPromise = listTalents();
+            const result = await bulkDeleteTalents(selectedIds);
+            if (result.success) {
+                selectedIds = [];
+                listRf.refresh();
+            } else {
+                toast.error("Bulk deletion failed");
+            }
         } catch (e: any) {
             toast.error(e.message || "Bulk delete failed");
         }
@@ -101,7 +104,7 @@
         </div>
     </div>
 
-    {#await talentsPromise}
+    {#await listRf}
         <LoadingSection />
     {:then talents}
         {@const filteredTalents = getFilteredTalents(talents)}

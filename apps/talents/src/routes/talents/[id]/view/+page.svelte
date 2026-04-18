@@ -1,6 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { readTalent } from "../../talents.remote";
+import TaskList from "$lib/components/tasks/TaskList.svelte";
 
     import { LoadingSection, ErrorSection, Button } from "@ac/ui";
     import {
@@ -18,18 +19,15 @@
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 
     const id = $derived(page.params.id as string);
-
-    const talentPromise = $derived(readTalent(id));
+    const talentRf = $derived(readTalent(id));
 
     $effect(() => {
-        talentPromise.then(talent => {
-            if (talent?.contact) {
-                breadcrumbState.set({
-                    feature: "talents",
-                    current: `View: ${talent.contact.displayName}`,
-                });
-            }
-        });
+        if (talentRf.current?.contact) {
+            breadcrumbState.set({
+                feature: "talents",
+                current: `View: ${talentRf.current.contact.displayName}`,
+            });
+        }
     });
 </script>
 
@@ -48,7 +46,7 @@
         </a>
     </div>
 
-    {#await talentPromise}
+    {#await talentRf}
         <LoadingSection message="Loading talent details..." />
     {:then talent}
         {#if talent && talent.contact}
@@ -118,6 +116,12 @@
                                     </Button>
                                 </a>
                             </div>
+                        </section>
+
+                        <!-- Operational Objectives Section -->
+                        <section class="space-y-4">
+                            <h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 outline-none">Operational Objectives</h2>
+                            <TaskList />
                         </section>
 
                         <!-- Contact Methods -->

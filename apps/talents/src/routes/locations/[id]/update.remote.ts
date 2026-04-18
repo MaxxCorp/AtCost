@@ -1,13 +1,11 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
-import { location } from '@ac/db';
-import { eq } from 'drizzle-orm';
+import { db, location, eq } from '$lib/server/db';
 import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateLocationSchema } from '@ac/validations/locations';
 
-export const updateLocation = form(updateLocationSchema, async (data) => {
+export const updateLocation = form(updateLocationSchema, async (data): Promise<{ success: boolean; location?: any; error?: { message: string } }> => {
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'locations');
@@ -34,7 +32,7 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
 
         const result = await db.update(location)
             .set(updateData)
-            .where(eq(location.id, data.id))
+            .where(eq(location.id, data.id) as any)
             .returning();
 
         if (result.length === 0) {

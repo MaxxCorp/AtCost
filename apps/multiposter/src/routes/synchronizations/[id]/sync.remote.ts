@@ -16,7 +16,6 @@ export const sync = command(v.string(), async (configId: string) => {
 		console.error(`[SyncCommand] Failed to synchronize ${configId}:`, error);
 	});
 
-	// Refresh the view query
 	await viewSyncConfig(configId).refresh();
 
 	return { success: true };

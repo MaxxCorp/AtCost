@@ -1,25 +1,40 @@
 import * as v from 'valibot';
+import { type InferSelectModel, db, desc } from '$lib/server/db';
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
 import { contact } from '@ac/db';
-import { listQuery } from '$lib/server/db/query-helpers';
-import { contactSchema, type Contact } from '@ac/validations/contacts';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
-export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
-    const results = await listQuery({
-        table: contact,
-        featureName: 'contacts',
-        transform: (row) => ({
-            ...row,
-            createdAt: row.createdAt.toISOString(),
-            updatedAt: row.updatedAt.toISOString(),
-            birthday: row.birthday ? row.birthday.toISOString() : null,
-        }),
-    });
+export type Contact = Omit<InferSelectModel<typeof contact>, 'createdAt' | 'updatedAt' | 'birthday'> & {
+    createdAt: string;
+    updatedAt: string;
+    birthday: string | null;
+    emails?: any[];
+    phones?: any[];
+    addresses?: any[];
+    locationAssociations?: any[];
+    relations?: any[];
+    tags?: any[];
+};
+
+export const listContacts = query(v.undefined_(), async (): Promise<Contact[]> => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'contacts');
+
+    const rawResults = await db
+        .select()
+        .from(contact)
+        .orderBy(desc(contact.createdAt));
+
+    const results = rawResults.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+        birthday: row.birthday ? row.birthday.toISOString() : null,
+    }));
 
     const contactsWithRelations = await Promise.all(results.map(async (c) => {
         const contactData = await db.query.contact.findFirst({
-            where: (table, { eq }) => eq(table.id, c.id),
+            where: (table: any, { eq }: any) => eq(table.id, c.id) as any,
             with: {
                 emails: true,
                 phones: true,
@@ -35,7 +50,6 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
                     }
                 },
                 tags: {
-
                     with: {
                         tag: true
                     }
@@ -43,7 +57,7 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
             }
         });
 
-        if (!contactData) return c;
+        if (!contactData) return c as Contact;
 
         return {
             ...c,
@@ -61,10 +75,8 @@ export const listContacts = query(v.void_(), async (): Promise<Contact[]> => {
                 id: t.tag.id,
                 name: t.tag.name
             })),
-        };
+        } as Contact;
     }));
 
-    console.log('[SERVER list.remote.ts] Returning contacts:', JSON.stringify(contactsWithRelations.map(c => ({ id: c.id, name: c.displayName, locations: c.locationAssociations })), null, 2));
-
-    return contactsWithRelations as Contact[];
+    return contactsWithRelations;
 });

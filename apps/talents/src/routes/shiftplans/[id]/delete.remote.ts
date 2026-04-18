@@ -1,8 +1,6 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db, shiftPlanTemplate, inArray } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { shiftPlanTemplate } from '@ac/db/schema';
-import { inArray } from 'drizzle-orm';
 import * as v from 'valibot';
 
 export const deleteShiftplans = query(v.array(v.string()), async (ids) => {

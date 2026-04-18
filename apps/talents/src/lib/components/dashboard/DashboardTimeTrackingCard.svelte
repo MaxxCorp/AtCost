@@ -26,20 +26,29 @@
     let formAction = $state<'clock_in' | 'clock_out'>('clock_in');
     let formEntryId = $state('');
 
+    function getNowLocal() {
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().slice(0, 16);
+    }
+
+    let startTimeOverride = $state(getNowLocal());
+    let endTimeOverride = $state(getNowLocal());
+
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = (rf as any)?.allIssues?.() ?? [];
+        const issues = (rf as any)?.allIssues ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(m.please_fix_validation());
         }
         prevIssuesLength = issues.length;
     });
 
-    function getFieldMetadata(name: string) {
+    function getFieldMetadata(name: string): any {
         const def = { as: () => ({}), issues: () => [], value: () => undefined };
         if (!rf?.fields) return def;
         const parts = name.split(".");
-        let current: any = rf.fields;
+        let current: any = (rf as any).fields; 
         for (const part of parts) {
             if (!current?.[part]) return def;
             current = current[part];
@@ -104,17 +113,36 @@
                                 }
                             })}
                         >
-                            {#if formAction}
+                            {#if formAction === 'clock_in'}
                                 <input {...getFieldMetadata('action').as('hidden', formAction)} />
-                            {/if}
-                            {#if talentId}
                                 <input {...getFieldMetadata('talentId').as('hidden', talentId)} />
-                            {/if}
-                            {#if formEntryId}
-                                <input {...getFieldMetadata('entryId').as('hidden', formEntryId)} />
-                            {/if}
-                            {#if true}
                                 <input {...getFieldMetadata('type').as('hidden', 'manual')} />
+                                <input {...(getFieldMetadata('startTime') as any).as('hidden', startTimeOverride)} />
+                                
+                                <div class="mb-4">
+                                    <label for="start-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">Start Override</label>
+                                    <input 
+                                        id="start-override"
+                                        type="datetime-local" 
+                                        bind:value={startTimeOverride}
+                                        class="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    />
+                                </div>
+                            {:else if formAction === 'clock_out'}
+                                <input {...getFieldMetadata('action').as('hidden', formAction)} />
+                                <input {...getFieldMetadata('talentId').as('hidden', talentId)} />
+                                <input {...getFieldMetadata('entryId').as('hidden', formEntryId)} />
+                                <input {...(getFieldMetadata('endTime') as any).as('hidden', endTimeOverride)} />
+
+                                <div class="mb-4">
+                                    <label for="end-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">End Override</label>
+                                    <input 
+                                        id="end-override"
+                                        type="datetime-local" 
+                                        bind:value={endTimeOverride}
+                                        class="w-full bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-2 focus:ring-rose-500 outline-none"
+                                    />
+                                </div>
                             {/if}
 
                             {#if !isActive}

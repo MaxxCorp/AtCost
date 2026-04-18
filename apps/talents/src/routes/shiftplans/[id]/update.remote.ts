@@ -1,20 +1,19 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db, shiftPlanTemplate } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { shiftPlanTemplate } from '@ac/db/schema';
 import { updateShiftplanSchema } from '@ac/validations';
-import { eq } from 'drizzle-orm';
+import { eq } from '$lib/server/db';
 
-export const updateShiftplan = form(updateShiftplanSchema, async (data) => {
+export const updateShiftplan = form(updateShiftplanSchema, async (data): Promise<{ success: boolean; error?: { message: string } }> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     
     let parsedSchedule = null;
     if (data.schedule) {
         try {
-            parsedSchedule = JSON.parse(data.schedule);
+            parsedSchedule = typeof data.schedule === 'string' ? JSON.parse(data.schedule) : data.schedule;
         } catch (e) {
-            return { error: { message: "Invalid schedule format" } };
+            return { success: false, error: { message: "Invalid schedule format" } };
         }
     }
     

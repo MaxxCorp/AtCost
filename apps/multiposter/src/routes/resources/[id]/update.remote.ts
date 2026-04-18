@@ -20,8 +20,8 @@ export const updateResource = form(updateResourceSchema, async (data) => {
         ensureAccess(user, 'resources');
         console.log('User ID:', user.id);
 
-        const maxOccupancy = (data.maxOccupancy !== undefined && data.maxOccupancy !== null && data.maxOccupancy !== '') 
-            ? Number(data.maxOccupancy) 
+        const maxOccupancy = (data.maxOccupancy !== undefined && data.maxOccupancy !== null && data.maxOccupancy !== '')
+            ? Number(data.maxOccupancy)
             : null;
 
         // Manual parsing for fields simplified in schema
@@ -113,7 +113,7 @@ export const updateResource = form(updateResourceSchema, async (data) => {
         console.log('Update success');
 
         console.log('Refreshing queries...');
-        await readResource(data.id).refresh();
+        await readResource(data.id).set(updated);
         await listResources().refresh();
         await listResourcesWithHierarchy().refresh();
 

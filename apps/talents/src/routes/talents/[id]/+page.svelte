@@ -2,7 +2,11 @@
     import { page } from "$app/state";
     import { LoadingSection, ErrorSection, TalentTimeline, Button } from "@ac/ui";
     import { Calendar, ArrowLeft, ExternalLink } from "@lucide/svelte";
-    import { readTalent, addTimelineEntry, listEmployees, listTalents } from "../talents.remote";
+    import { 
+        readTalent, 
+        invokeAddTimelineEntry, 
+        listEmployees 
+    } from '../talents.remote';
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";
 
@@ -70,7 +74,7 @@
                         entries={(talent.timelineEntries || []) as any}
                         {employees}
                         onAddEntry={async (entry: any) => {
-                            await (addTimelineEntry as any).action({
+                            await invokeAddTimelineEntry({
                                 talentId: talentIdParam,
                                 entry
                             });

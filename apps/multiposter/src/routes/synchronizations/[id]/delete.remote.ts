@@ -76,7 +76,7 @@ export const removeBulk = command(v.array(v.string()), async (ids: string[]) => 
 		.delete(syncConfig)
 		.where(inArray(syncConfig.id, ids));
 
-	await listSynchronizations().refresh();
+	// await listSynchronizations().refresh();
 
 	return { success: true };
 });

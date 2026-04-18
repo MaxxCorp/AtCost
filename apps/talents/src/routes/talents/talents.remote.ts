@@ -1,12 +1,12 @@
-import { query, form } from '$app/server';
-import { db } from '$lib/server/db';
-import { talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent } from '@ac/db';
+import { query, form, command } from '$app/server';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
 import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema } from '@ac/validations';
-import { eq, desc, inArray } from 'drizzle-orm';
+// Unifying Drizzle operators via $lib/server/db
 import * as v from 'valibot';
+import { readTalentCore, type TalentProfile } from '$lib/server/talents/service';
 
-export const listTalents = query(v.void_(), async () => {
+export const listTalents = query(v.undefined_(), async (): Promise<any[]> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
     const results = await db.query.talent.findMany({
         with: {
@@ -26,8 +26,6 @@ export const listTalents = query(v.void_(), async () => {
         },
         orderBy: [desc(talent.updatedAt)]
     });
-    console.info(`[listTalents] DB returned ${results.length} talents.`);
-
 
     // Resolve linked users for each talent's contact
     const contactIds = results.filter(t => t.contact != null).map(t => t.contact.id);
@@ -101,119 +99,12 @@ export const listTalents = query(v.void_(), async () => {
     }));
 });
 
-const readTalentCore = async (id: string) => {
-    const result = await db.query.talent.findFirst({
-        where: eq(talent.id, id),
-        with: {
-            contact: {
-                with: {
-                    emails: true,
-                    phones: true,
-                    addresses: true,
-                    locationAssociations: { with: { location: true } },
-                    tags: { with: { tag: true } },
-                    relations: { with: { targetContact: true } }
-                }
-            },
-            timelineEntries: {
-                orderBy: [desc(talentTimelineEntry.timestamp)]
-            }
-        }
-    });
-
-    if (!result) return null;
-
-    // Resolve linked user
-    let linkedUser: { id: string; name: string; email: string } | null = null;
-    
-    // Check userContact (implicit)
-    const uc = await db.select({ userId: userContact.userId })
-        .from(userContact)
-        .where(eq(userContact.contactId, result.contact.id))
-        .limit(1);
-    
-    let userId = uc[0]?.userId;
-    
-    // Check userTalent (explicit) if no contact link found
-    if (!userId) {
-        const ut = await db.select({ userId: userTalent.userId })
-            .from(userTalent)
-            .where(eq(userTalent.talentId, result.id))
-            .limit(1);
-        userId = ut[0]?.userId;
-    }
-
-    if (userId) {
-        const [u] = await db.select({ id: user.id, name: user.name, email: user.email })
-            .from(user)
-            .where(eq(user.id, userId))
-            .limit(1);
-        if (u) linkedUser = u;
-    }
-
-    return {
-        id: result.id,
-        contactId: result.contactId,
-        status: result.status,
-        jobTitle: result.jobTitle,
-        salaryExpectation: result.salaryExpectation,
-        availabilityDate: result.availabilityDate?.toISOString() ?? null,
-        onboardingStatus: result.onboardingStatus,
-        resumeUrl: result.resumeUrl,
-        source: result.source,
-        internalNotes: result.internalNotes,
-        createdAt: result.createdAt?.toISOString?.() ?? (result.createdAt instanceof Date ? result.createdAt.toISOString() : result.createdAt),
-        updatedAt: result.updatedAt?.toISOString?.() ?? (result.updatedAt instanceof Date ? result.updatedAt.toISOString() : result.updatedAt),
-        linkedUser,
-        contact: {
-            id: result.contact.id,
-            displayName: result.contact.displayName,
-            givenName: result.contact.givenName,
-            familyName: result.contact.familyName,
-            company: result.contact.company,
-            role: result.contact.role,
-            department: result.contact.department,
-            birthday: result.contact.birthday?.toISOString() ?? null,
-            notes: result.contact.notes,
-            isPublic: result.contact.isPublic,
-            createdAt: result.contact.createdAt?.toISOString?.() ?? (result.contact.createdAt instanceof Date ? result.contact.createdAt.toISOString() : result.contact.createdAt),
-            updatedAt: result.contact.updatedAt?.toISOString?.() ?? (result.contact.updatedAt instanceof Date ? result.contact.updatedAt.toISOString() : result.contact.updatedAt),
-            emails: result.contact.emails || [],
-            phones: result.contact.phones || [],
-            addresses: result.contact.addresses || [],
-            locationAssociations: result.contact.locationAssociations || [],
-            relations: (result.contact.relations || []).map((r: any) => ({
-                id: r.id,
-                targetContactId: r.targetContactId,
-                relationType: r.relationType,
-                targetContact: r.targetContact ? {
-                    id: r.targetContact.id,
-                    displayName: r.targetContact.displayName,
-                    givenName: r.targetContact.givenName,
-                    familyName: r.targetContact.familyName,
-                } : null,
-            })),
-            tags: (result.contact.tags || []).map((ct: any) => ct.tag?.name).filter(Boolean)
-        },
-        timelineEntries: (result.timelineEntries || []).map((te: any) => ({
-            id: te.id,
-            type: te.type,
-            title: te.title,
-            description: te.description,
-            date: te.date?.toISOString?.() ?? te.date,
-            timestamp: te.timestamp?.toISOString?.() ?? te.timestamp,
-            data: te.data,
-        })),
-    };
-};
-
-export const readTalent = query(v.string(), async (id) => {
+export const readTalent = query(v.string(), async (id): Promise<TalentProfile | null> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
     return await readTalentCore(id);
 });
 
-
-export const createTalent = form(createTalentSchema, async (data) => {
+export const createTalent = form(createTalentSchema, async (data): Promise<{ success: boolean; id: string }> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
@@ -227,13 +118,12 @@ export const createTalent = form(createTalentSchema, async (data) => {
         resumeUrl: data.resumeUrl,
         source: data.source,
         internalNotes: data.internalNotes,
-    } as any).returning();
+    }).returning();
 
-    listTalents().refresh();
     return { success: true, id: newTalent.id };
 });
 
-export const updateTalent = form(updateTalentSchema as any, async (data: any) => {
+export const updateTalent = form(updateTalentSchema, async (data): Promise<{ success: boolean; id: string }> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
@@ -247,41 +137,39 @@ export const updateTalent = form(updateTalentSchema as any, async (data: any) =>
         resumeUrl: data.resumeUrl,
         source: data.source,
         internalNotes: data.internalNotes,
-    } as any).where(eq(talent.id, data.id)).returning();
+    }).where(eq(talent.id, data.id)).returning();
 
-    readTalent(data.id).refresh();
-    listTalents().refresh();
     return { success: true, id: updatedTalent.id };
 });
 
-export const deleteTalent = form(v.string() as any, async (id: any) => {
+export const deleteTalent = command(v.string(), async (id): Promise<{ success: boolean }> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
     await db.delete(talent).where(eq(talent.id, id));
-    listTalents().refresh();
     return { success: true };
 });
 
-export const bulkDeleteTalents = form(v.array(v.string()) as any, async (ids: any) => {
+export const bulkDeleteTalents = command(v.array(v.string()), async (ids): Promise<{ success: boolean }> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
     for (const id of ids) {
         await db.delete(talent).where(eq(talent.id, id));
     }
-    listTalents().refresh();
     return { success: true };
 });
 
-export const addTimelineEntry = form(v.object({
-    talentId: v.string(),
-    entry: talentTimelineEntrySchema
-}), async (data: any) => {
+const addTimelineEntryHandler = async (data: {
+    talentId: string,
+    entry: v.InferInput<typeof talentTimelineEntrySchema>
+}): Promise<{ success: boolean; id: string }> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
-    const entry = data.entry as v.InferOutput<typeof talentTimelineEntrySchema>;
+    const entry = data.entry;
 
     const [newEntry] = await db.insert(talentTimelineEntry).values({
-        talentId: data.talentId as string,
+        talentId: data.talentId,
         type: entry.type as "Interview" | "Hiring" | "Evaluation" | "Termination",
+        title: entry.type,
+        date: new Date(entry.date),
         description: entry.description,
         addedByUserId: authUser.id,
         timestamp: new Date(entry.date),
@@ -290,15 +178,23 @@ export const addTimelineEntry = form(v.object({
             comment: entry.comment,
             nextStep: entry.nextStep
         }
-    } as any).returning();
-
-    readTalent(data.talentId as string).refresh();
-    listTalents().refresh();
+    }).returning();
 
     return { success: true, id: newEntry.id };
-});
+};
 
-export const upsertTalent = form(unifiedTalentSchema as any, async (data: any) => {
+export const addTimelineEntry = form(v.object({
+    talentId: v.string(),
+    entry: talentTimelineEntrySchema
+}), addTimelineEntryHandler);
+
+export const invokeAddTimelineEntry = command(v.object({
+    talentId: v.string(),
+    entry: talentTimelineEntrySchema
+}), addTimelineEntryHandler);
+
+
+export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ success: boolean; id?: string; error?: string }> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
@@ -411,9 +307,6 @@ export const upsertTalent = form(unifiedTalentSchema as any, async (data: any) =
             return { talentId, contactId };
         });
 
-        listTalents().refresh();
-        if (talentData.id) readTalent(talentData.id).refresh();
-        
         return { success: true, id: result.talentId };
     } catch (err: any) {
         console.error('upsertTalent ERROR:', err);
@@ -421,7 +314,7 @@ export const upsertTalent = form(unifiedTalentSchema as any, async (data: any) =
     }
 });
 
-export const getMyTalentProfile = query(v.void_(), async () => {
+export const getMyTalentProfile = query(v.undefined_(), async (): Promise<TalentProfile | null> => {
     const authUser = getOptionalUser();
     if (!authUser) {
         console.warn('[getMyTalentProfile] No authenticated user found.');
@@ -438,24 +331,20 @@ export const getMyTalentProfile = query(v.void_(), async () => {
     // Step 2: Implicit association via contact email
     const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
     if (uc[0]) {
-        console.info(`[getMyTalentProfile] Trying implicit link via contact: ${uc[0].contactId}`);
         const t = await db.query.talent.findFirst({
             where: eq(talent.contactId, uc[0].contactId),
         });
         if (t) {
-            console.info(`[getMyTalentProfile] Found implicit userContact link to talent: ${t.id}`);
             const profile = await readTalentCore(t.id);
             if (profile) return profile;
         }
     }
 
-    console.warn(`[getMyTalentProfile] No talent association found for user: ${authUser.id}`);
     return null;
 });
 
-export const listEmployees = query(v.void_(), async () => {
+export const listEmployees = query(v.undefined_(), async (): Promise<any[]> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
-    // Filter contacts by tag "Employee"
     const results = await db.query.contact.findMany({
         with: {
             tags: {
@@ -470,12 +359,11 @@ export const listEmployees = query(v.void_(), async () => {
     }));
 });
 
-export const listSystemUsers = query(v.void_(), async () => {
+export const listSystemUsers = query(v.undefined_(), async (): Promise<any[]> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
-    const results = await db.select({
+    return await db.select({
         id: user.id,
         name: user.name,
         email: user.email,
-    }).from(user).orderBy(user.name);
-    return results;
+    }).from(user).orderBy(desc(user.createdAt));
 });

@@ -177,7 +177,7 @@
         }
     }
     $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
+        const issues = (rf as any)?.allIssues ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(m.please_fix_validation());
         }
@@ -277,6 +277,9 @@
                             {#if l.city}
                                 <span class="text-gray-400 text-xs ml-1">({l.city})</span>
                             {/if}
+                            {#each getFieldMetadata("name").issues as issue}
+                                <p class="mt-1 text-xs text-red-500">{issue.message}</p>
+                            {/each}
                         {/snippet}
 
                         {#snippet renderForm({

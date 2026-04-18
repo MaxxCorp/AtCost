@@ -1,8 +1,7 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db, shiftPlanTemplateTalent, talent, contact, contactEmail } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { shiftPlanTemplateTalent, talent, contact, contactEmail, timeOffRequest } from '@ac/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '$lib/server/db';
 import * as v from 'valibot';
 
 const entityArgs = v.object({ 
@@ -16,7 +15,7 @@ const associationArgs = v.object({
     itemId: v.string()
 });
 
-export const fetchEntityTalents = query(entityArgs, async ({ entityId }) => {
+export const fetchEntityTalents = query(entityArgs, async ({ entityId }): Promise<any[]> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     
@@ -28,13 +27,13 @@ export const fetchEntityTalents = query(entityArgs, async ({ entityId }) => {
             email: contactEmail.value,
         })
         .from(shiftPlanTemplateTalent)
-        .innerJoin(talent, eq(shiftPlanTemplateTalent.talentId, talent.id))
-        .innerJoin(contact, eq(talent.contactId, contact.id))
+        .innerJoin(talent, eq(shiftPlanTemplateTalent.talentId, talent.id) as any)
+        .innerJoin(contact, eq(talent.contactId, contact.id) as any)
         .leftJoin(contactEmail, and(
             eq(contact.id, contactEmail.contactId),
             eq(contactEmail.primary, true)
-        ))
-        .where(eq(shiftPlanTemplateTalent.templateId, entityId));
+        ) as any)
+        .where(eq(shiftPlanTemplateTalent.templateId, entityId) as any);
         
     return results.map(r => ({ 
         ...r, 
@@ -43,18 +42,18 @@ export const fetchEntityTalents = query(entityArgs, async ({ entityId }) => {
     }));
 });
 
-export const addAssociation = query(associationArgs, async ({ entityId, itemId }) => {
+export const addAssociation = query(associationArgs, async ({ entityId, itemId }): Promise<{ success: boolean }> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     
     await db.insert(shiftPlanTemplateTalent).values({
         templateId: entityId,
         talentId: itemId,
-    }).onConflictDoNothing();
+    } as any).onConflictDoNothing();
     return { success: true };
 });
 
-export const removeAssociation = query(associationArgs, async ({ entityId, itemId }) => {
+export const removeAssociation = query(associationArgs, async ({ entityId, itemId }): Promise<{ success: boolean }> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     
@@ -62,12 +61,12 @@ export const removeAssociation = query(associationArgs, async ({ entityId, itemI
         and(
             eq(shiftPlanTemplateTalent.templateId, entityId),
             eq(shiftPlanTemplateTalent.talentId, itemId)
-        )
+        ) as any
     );
     return { success: true };
 });
 
-export const fetchTalentTimeOff = query(v.array(v.string()), async (talentIds) => {
+export const fetchTalentTimeOff = query(v.array(v.string()), async (talentIds): Promise<any[]> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     
@@ -75,12 +74,10 @@ export const fetchTalentTimeOff = query(v.array(v.string()), async (talentIds) =
     
     const now = new Date();
     
-    const results = await db.query.timeOffRequest.findMany({
-        where: (tor, { inArray, and, gt }) => and(
+    return await db.query.timeOffRequest.findMany({
+        where: (tor: any, { inArray, and, gt }: any) => and(
             inArray(tor.talentId, talentIds),
             gt(tor.endDate, now)
-        )
-    });
-    
-    return results;
+        ) as any
+    }) as any[];
 });

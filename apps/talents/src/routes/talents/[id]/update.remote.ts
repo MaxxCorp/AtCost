@@ -1,13 +1,12 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
-import { contact, contactEmail, contactPhone, contactTag, locationContact, contactRelation, tag } from '@ac/db';
+import { db, contact, contactEmail, contactPhone, contactTag, locationContact, contactRelation, tag, eq, inArray } from '$lib/server/db';
 import { listContacts } from '../list.remote';
 import { readContact } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateContactSchema } from '@ac/validations/contacts';
-import { eq, inArray } from 'drizzle-orm';
+// Unified Drizzle operators
 
-export const updateExistingContact = form(updateContactSchema, async (data) => {
+export const updateExistingContact = form(updateContactSchema, async (data: any) => {
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'contacts');

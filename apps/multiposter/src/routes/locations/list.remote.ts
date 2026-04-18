@@ -1,22 +1,34 @@
 import * as v from 'valibot';
-import { type InferSelectModel } from 'drizzle-orm';
 import { query } from '$app/server';
 import { location } from '@ac/db';
-import { listQuery } from '$lib/server/db/query-helpers';
-
-export type Location = InferSelectModel<typeof location>;
+import type { Location as DbLocation } from '@ac/db';
+import { db } from '$lib/server/db';
+import { desc } from 'drizzle-orm';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 /**
- * Query: List all locations (requires authentication + 'locations' access)
+ * Location interface matching the database schema, with dates serialized to strings
  */
-export const listLocations = query(v.void_(), async (): Promise<Location[]> => {
-    const results = await listQuery({
-        table: location,
-        featureName: 'locations',
-        accessLevel: 'use',
-        transform: (row) => ({
-            ...row,
-        }),
-    });
-    return results;
+export type Location = Omit<DbLocation, 'createdAt' | 'updatedAt'> & {
+	createdAt: string;
+	updatedAt: string;
+};
+
+/**
+ * Query: List all locations
+ */
+export const listLocations = query(v.undefined_(), async (): Promise<Location[]> => {
+	const user = getAuthenticatedUser();
+	ensureAccess(user, 'locations');
+
+	const rawResults = await db
+		.select()
+		.from(location)
+		.orderBy(desc(location.createdAt));
+
+	return rawResults.map((row) => ({
+		...row,
+		createdAt: row.createdAt.toISOString(),
+		updatedAt: row.updatedAt.toISOString(),
+	}));
 });

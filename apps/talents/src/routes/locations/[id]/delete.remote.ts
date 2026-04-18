@@ -1,7 +1,5 @@
 import { command } from '$app/server';
-import { db } from '$lib/server/db';
-import { location } from '@ac/db';
-import { inArray } from 'drizzle-orm';
+import { db, location, inArray } from '$lib/server/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';

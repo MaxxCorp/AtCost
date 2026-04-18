@@ -1,5 +1,5 @@
 import { getUnsyncedEntries, markAsSynced } from './offline';
-import { manageTimesheets } from '../../routes/my-timesheet/timesheets.remote';
+import { invokeManageTimesheets } from '../../routes/my-timesheet/timesheets.remote';
 
 export async function syncOfflineEntries() {
     const entries = await getUnsyncedEntries();
@@ -9,15 +9,16 @@ export async function syncOfflineEntries() {
                 // Was a full entry, but maybe it was a clock-out of an existing entry?
                 // For simplicity, we assume we sync start/stop actions sequentially.
             } else {
-                await (manageTimesheets as any).action({
-                    action: 'clock_in',
-                    talentId: entry.talentId,
-                    type: entry.type,
-                    locationId: entry.locationId,
-                    latitude: entry.latitude,
-                    longitude: entry.longitude
-                });
+            await invokeManageTimesheets({
+                action: 'clock_in',
+                talentId: entry.talentId,
+                type: entry.type,
+                locationId: entry.locationId,
+                latitude: entry.latitude,
+                longitude: entry.longitude
+            });
             }
+
             if (entry.id) await markAsSynced(entry.id);
         } catch (e) {
             console.error('Failed to sync entry', entry, e);

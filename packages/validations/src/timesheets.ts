@@ -6,6 +6,7 @@ export const clockInSchema = v.object({
     type: v.union([v.literal('qr'), v.literal('gps'), v.literal('manual')]),
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
+    startTime: v.optional(v.string()), // ISO string
 });
 
 export const clockOutSchema = v.object({
@@ -13,6 +14,7 @@ export const clockOutSchema = v.object({
     talentId: v.string(),
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
+    endTime: v.optional(v.string()), // ISO string
 });
 
 export const manageShiftSchema = v.variant('action', [

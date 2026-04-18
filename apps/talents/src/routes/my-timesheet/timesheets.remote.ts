@@ -1,65 +1,23 @@
-import { query, form } from '$app/server';
-import { db } from '$lib/server/db';
-import { timesheetEntry, timesheetAuditTrail, shiftPlan, talent, contact, userContact, userTalent, location } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
+import { query, form, command } from '$app/server';
+import { db, timesheetEntry, shiftPlan, eq, and, isNull, desc } from '$lib/server/db';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as service from '$lib/server/timesheets/service';
-import { clockInSchema, clockOutSchema, timesheetApprovalSchema, timesheetManualUpdateSchema, shiftPlanSchema, manageTimesheetsSchema } from '@ac/validations';
-import { eq, and, isNull, desc, gte, lte } from 'drizzle-orm';
+import { manageTimesheetsSchema } from '@ac/validations';
 import * as v from 'valibot';
 
-async function getMyTalentIdCore() {
-    const authUser = getOptionalUser();
-    if (!authUser) {
-        console.warn('[getMyTalentIdCore] No authenticated user found.');
-        return null;
-    }
-
-    console.info(`[getMyTalentIdCore] Looking up talent ID for user: ${authUser.id}`);
-
-    try {
-        // Step 1: Check direct talent association
-        const ut = await db.select({ id: userTalent.talentId }).from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
-        if (ut[0]) {
-            console.info(`[getMyTalentIdCore] Found explicit userTalent link: ${ut[0].id}`);
-            return ut[0].id;
-        }
-
-        // Step 2: Get contact ID for user as fallback
-        const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
-        if (!uc[0]) {
-            console.warn(`[getMyTalentIdCore] No userTalent or userContact found for user: ${authUser.id}`);
-            return null;
-        }
-
-        // Step 3: Get talent for that contact
-        const t = await db.select({ id: talent.id }).from(talent).where(eq(talent.contactId, uc[0].contactId)).limit(1);
-        const resultId = t[0]?.id || null;
-        if (resultId) {
-            console.info(`[getMyTalentIdCore] Found implicit talent link via contact: ${resultId}`);
-        } else {
-            console.warn(`[getMyTalentIdCore] Found userContact but no talent record exists for contactId: ${uc[0].contactId}`);
-        }
-        return resultId;
-    } catch (e: any) {
-        console.error('getMyTalentIdCore failed:', e);
-        return null;
-    }
-}
-
-export const getMyTalentId = query(v.void_(), async () => {
-    return await getMyTalentIdCore();
+export const getMyTalentId = query(v.undefined_(), async (): Promise<string | null> => {
+    return await service.getMyTalentIdCore();
 });
 
-export const getMyStatus = query(v.string(), async (talentId) => {
+export const getMyStatus = query(v.string(), async (talentId): Promise<{ activeEntry: any; recentEntries: any[]; shiftPlans: any[] }> => {
     const authUser = getAuthenticatedUser();
     
     // Allow if user has 'timesheets' claim OR if they are requesting their own talent ID
-    const myTalentId = await getMyTalentIdCore();
+    const myTalentId = await service.getMyTalentIdCore();
     if (talentId !== myTalentId) {
         ensureAccess(authUser, 'timesheets');
     }
     
-    // Using select instead of query helper to rule out proxy issues
     const activeEntry = await db.select().from(timesheetEntry)
         .where(and(
             eq(timesheetEntry.talentId, talentId),
@@ -84,7 +42,7 @@ export const getMyStatus = query(v.string(), async (talentId) => {
     };
 });
 
-export const listPendingApprovals = query(v.void_(), async () => {
+export const listPendingApprovals = query(v.undefined_(), async (): Promise<any[]> => {
     ensureAccess(getAuthenticatedUser(), 'timesheets');
     return await db.query.timesheetEntry.findMany({
         where: eq(timesheetEntry.status, 'pending'),
@@ -96,13 +54,13 @@ export const listPendingApprovals = query(v.void_(), async () => {
             }
         },
         orderBy: [desc(timesheetEntry.startTime)]
-    });
+    }) as any[];
 });
 
-export const manageTimesheets = form(manageTimesheetsSchema, async (data) => {
+const manageTimesheetsHandler = async (data: v.InferInput<typeof manageTimesheetsSchema>): Promise<{ success: boolean; entry?: any; error?: { message: string }; message?: string }> => {
     try {
         const authUser = getAuthenticatedUser();
-        const myTalentId = await getMyTalentIdCore();
+        const myTalentId = await service.getMyTalentIdCore();
         
         // Authorization check
         if ('talentId' in data && data.talentId !== myTalentId) {
@@ -115,10 +73,17 @@ export const manageTimesheets = form(manageTimesheetsSchema, async (data) => {
         let entry;
         switch (data.action) {
             case 'clock_in':
-                entry = await service.clockIn(data, authUser.id);
+                entry = await service.clockIn({
+                    ...data,
+                    startTime: data.startTime ? new Date(data.startTime) : undefined
+                }, authUser.id);
                 break;
             case 'clock_out':
-                entry = await service.clockOut(data.entryId, authUser.id, { latitude: data.latitude, longitude: data.longitude });
+                entry = await service.clockOut(data.entryId, authUser.id, { 
+                    latitude: data.latitude, 
+                    longitude: data.longitude,
+                    endTime: data.endTime ? new Date(data.endTime) : undefined
+                });
                 break;
             case 'approve':
                 entry = await service.approveEntry(data.entryId, authUser.id, (data as any).comment);
@@ -128,9 +93,7 @@ export const manageTimesheets = form(manageTimesheetsSchema, async (data) => {
                 break;
         }
 
-        // Sanitize entry to plain JSON object to avoid serialization issues with Dates/complex objects
         const sanitizedEntry = entry ? JSON.parse(JSON.stringify(entry)) : null;
-
         return { success: true, entry: sanitizedEntry };
     } catch (e: any) {
         console.error('[manageTimesheets] Error:', e);
@@ -140,4 +103,8 @@ export const manageTimesheets = form(manageTimesheetsSchema, async (data) => {
             message: e.message || 'Action failed at source' 
         };
     }
-});
+};
+
+export const manageTimesheets = form(manageTimesheetsSchema, manageTimesheetsHandler);
+export const invokeManageTimesheets = command(manageTimesheetsSchema, manageTimesheetsHandler);
+

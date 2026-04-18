@@ -28,9 +28,9 @@
         initialData = null,
     } = $props();
 
-    // Workaround for svelte-check warning about initial state from props
-    const initialSchedule = initialData?.schedule;
-    const initialLocationId = initialData?.locationId;
+    // Derived prop shortcuts
+    const initialSchedule = $derived(initialData?.schedule);
+    const initialLocationId = $derived(initialData?.locationId);
 
     // Schedule state: default 5 workday, 7am-7pm
     const defaultSchedule = [
@@ -43,8 +43,10 @@
         { day: "Sunday", isActive: false, start: "07:00", end: "19:00" },
     ];
 
-    let schedule = $state(initialSchedule || [...defaultSchedule]);
-    let selectedLocationId = $state(initialLocationId || "");
+    // svelte-ignore state_referenced_locally
+    let schedule = $state(initialData?.schedule || [...defaultSchedule]);
+    // svelte-ignore state_referenced_locally
+    let selectedLocationId = $state(initialData?.locationId || "");
     let selectedLocationName = $state("");
 
     // EntityManager for Location (Single Selection Pattern)
@@ -53,12 +55,12 @@
     onMount(async () => {
         if (selectedLocationId) {
             const locs = await listLocations();
-            const loc = locs.find((l) => l.id === selectedLocationId);
+            const loc = locs.find((l: any) => l.id === selectedLocationId);
             if (loc) selectedLocationName = loc.name;
         }
     });
 
-    const getField = (name: string) => remoteFunction.fields[name];
+    const getField = (name: string) => (remoteFunction as any).fields[name];
 
     const scheduleJson = $derived(JSON.stringify(schedule));
 
@@ -132,7 +134,7 @@
                         placeholder="e.g. Standard Weekday Rota"
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all outline-none"
                     />
-                    {#each getField("name").issues() as issue}
+                    {#each getField("name").issues as issue}
                         <p class="mt-1 text-xs text-red-500">{issue.message}</p>
                     {/each}
                 </div>
@@ -244,10 +246,10 @@
                     mode="embedded"
                     type="shiftplan"
                     entityId={initialData.id}
-                    listItemsRemote={listTalents}
-                    fetchAssociationsRemote={fetchEntityTalents}
-                    addAssociationRemote={addAssociation}
-                    removeAssociationRemote={removeAssociation}
+                    listItemsRemote={() => listTalents()}
+                    fetchAssociationsRemote={(params: any) => fetchEntityTalents(params)}
+                    addAssociationRemote={(params: any) => addAssociation(params)}
+                    removeAssociationRemote={(params: any) => removeAssociation(params)}
                     searchPredicate={(t: any, q: string) => {
                         const searchStr =
                             `${t.contact?.displayName || ""} ${t.jobTitle || ""}`.toLowerCase();

@@ -21,7 +21,7 @@
 
     // Dedicated action handle
     const rf = manageTimesheets;
-    const fields = rf.fields as any;
+    const fields = rf.fields;
 
     // UI State for form submission
     // svelte-ignore state_referenced_locally
@@ -29,9 +29,18 @@
     // svelte-ignore state_referenced_locally
     let formEntryId = $state(status?.activeEntry?.id || '');
 
+    function getNowLocal() {
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().slice(0, 16);
+    }
+
+    let startTimeOverride = $state(getNowLocal());
+    let endTimeOverride = $state(getNowLocal());
+
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
+        const issues = (rf as any).allIssues ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(m.please_fix_validation());
         }
@@ -41,6 +50,17 @@
     async function handleRefresh() {
         // Re-run the server-side load function
         await invalidateAll();
+    }
+    function getFieldMetadata(name: string): any {
+        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        if (!rf?.fields) return def;
+        const parts = name.split(".");
+        let current: any = (rf as any).fields; 
+        for (const part of parts) {
+            if (!current?.[part]) return def;
+            current = current[part];
+        }
+        return current ?? def;
     }
 </script>
 
@@ -104,37 +124,68 @@
                                     })}
                                 >
                                     <!-- Proper SvelteKit Remote Form Hidden Inputs -->
-                                    <input {...fields.action.as('hidden', formAction)} />
+                                    <input {...getFieldMetadata('action').as('hidden' as any, formAction)} />
                                     {#if profile?.id}
-                                        <input {...fields.talentId.as('hidden', profile.id)} />
+                                        <input {...getFieldMetadata('talentId').as('hidden' as any, profile.id)} />
                                     {/if}
                                     {#if formAction === 'clock_out' && formEntryId}
-                                        <input {...fields.entryId.as('hidden', formEntryId)} />
+                                        <input {...getFieldMetadata('entryId').as('hidden' as any, formEntryId)} />
                                     {/if}
                                     
                                     {#if formAction === 'clock_in'}
-                                        <input {...fields.type.as('hidden', 'manual')} />
+                                        <input {...getFieldMetadata('type').as('hidden' as any, 'manual')} />
+                                        <input {...getFieldMetadata('startTime').as('hidden' as any, startTimeOverride)} />
+                                    {:else}
+                                        <input {...getFieldMetadata('endTime').as('hidden' as any, endTimeOverride)} />
                                     {/if}
 
-                                    {#if !isActive}
-                                        <AsyncButton 
-                                            type="submit"
-                                            onclick={() => { formAction = 'clock_in'; formEntryId = ''; }}
-                                            loading={rf.pending}
-                                            class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-16 rounded-3xl text-lg font-black shadow-2xl shadow-emerald-100 active:scale-95 transition-all uppercase tracking-widest"
-                                        >
-                                            Initiate
-                                        </AsyncButton>
-                                    {:else}
-                                        <AsyncButton 
-                                            type="submit"
-                                            onclick={() => { formAction = 'clock_out'; formEntryId = status.activeEntry.id; }}
-                                            loading={rf.pending}
-                                            class="flex-1 bg-rose-600 hover:bg-rose-700 text-white h-16 rounded-3xl text-lg font-black shadow-2xl shadow-rose-100 active:scale-95 transition-all uppercase tracking-widest"
-                                        >
-                                            Terminate
-                                        </AsyncButton>
-                                    {/if}
+                                    <div class="flex flex-col gap-6 w-full">
+                                        <div class="space-y-3">
+                                            {#if !isActive}
+                                                <div class="animate-in fade-in slide-in-from-top-2 duration-500">
+                                                    <label for="startTime" class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1 mb-1 block">Start Time Record</label>
+                                                    <input 
+                                                        id="startTime"
+                                                        type="datetime-local" 
+                                                        bind:value={startTimeOverride}
+                                                        class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm hover:border-gray-200"
+                                                    />
+                                                </div>
+                                            {:else}
+                                                <div class="animate-in fade-in slide-in-from-top-2 duration-500">
+                                                    <label for="endTime" class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1 mb-1 block">End Time Record</label>
+                                                    <input 
+                                                        id="endTime"
+                                                        type="datetime-local" 
+                                                        bind:value={endTimeOverride}
+                                                        class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-sm hover:border-gray-200"
+                                                    />
+                                                </div>
+                                            {/if}
+                                        </div>
+
+                                        <div class="flex gap-4">
+                                            {#if !isActive}
+                                                <AsyncButton 
+                                                    type="submit"
+                                                    onclick={() => { formAction = 'clock_in'; formEntryId = ''; }}
+                                                    loading={rf.pending}
+                                                    class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-20 rounded-[2rem] text-xl font-black shadow-2xl shadow-emerald-200 active:scale-95 transition-all uppercase tracking-widest border-b-4 border-emerald-800"
+                                                >
+                                                    Initiate
+                                                </AsyncButton>
+                                            {:else}
+                                                <AsyncButton 
+                                                    type="submit"
+                                                    onclick={() => { formAction = 'clock_out'; formEntryId = status.activeEntry.id; }}
+                                                    loading={rf.pending}
+                                                    class="flex-1 bg-rose-600 hover:bg-rose-700 text-white h-20 rounded-[2rem] text-xl font-black shadow-2xl shadow-rose-200 active:scale-95 transition-all uppercase tracking-widest border-b-4 border-rose-800"
+                                                >
+                                                    Terminate
+                                                </AsyncButton>
+                                            {/if}
+                                        </div>
+                                    </div>
                                 </form>
                         </div>
                     </div>

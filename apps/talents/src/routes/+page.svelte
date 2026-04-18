@@ -5,6 +5,7 @@
     import DashboardTalentCard from "$lib/components/dashboard/DashboardTalentCard.svelte";
     import DashboardTimeTrackingCard from "$lib/components/dashboard/DashboardTimeTrackingCard.svelte";
     import DashboardTimeOffCard from "$lib/components/dashboard/DashboardTimeOffCard.svelte";
+import DashboardTaskCard from "$lib/components/dashboard/DashboardTaskCard.svelte";
     import { authClient } from "$lib/auth";
     
     import { getMyTalentProfile } from "./talents/talents.remote";
@@ -47,11 +48,12 @@
                         <LoadingSection message="Synchronizing profile configuration..." />
                     {:then profile}
                         {#if profile}
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
                                 <DashboardTalentCard talent={profile} />
+                                <DashboardTaskCard />
                                 
                                 {#await Promise.all([getMyStatus(profile.id), getMyTimeOffBalances(profile.id), getMyTimeOffRequests(profile.id)])}
-                                    <div class="col-span-2 flex items-center justify-center p-12 bg-gray-50/50 rounded-[2.5rem] border border-gray-100">
+                                    <div class="lg:col-span-2 flex items-center justify-center p-12 bg-gray-50/50 rounded-[2.5rem] border border-gray-100">
                                         <LoadingSection message="Loading operational statistics..." />
                                     </div>
                                 {:then [status, balances, requests]}
@@ -67,7 +69,7 @@
                                         onRefresh={refreshDashboard}
                                     />
                                 {:catch error}
-                                    <div class="col-span-2">
+                                    <div class="lg:col-span-2">
                                         <ErrorSection headline="Modules Sync Failure" message={error.message} />
                                     </div>
                                 {/await}

@@ -3,7 +3,7 @@ import { user, session, account, verification } from "./auth";
 import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, contactTag, userContact } from "./contacts";
 import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
 import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag } from "./events";
-import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent } from "./talents";
+import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
 import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
@@ -128,6 +128,13 @@ export const talentRelations = relations(talent, ({ one, many }) => ({
     timeOffBalances: many(timeOffBalance),
     userAssociations: many(userTalent),
     shiftPlanTemplates: many(shiftPlanTemplateTalent),
+    tasks: many(task, { relationName: 'assignee' }),
+    createdTasks: many(task, { relationName: 'creator' }),
+}));
+
+export const taskRelations = relations(task, ({ one }) => ({
+    assignee: one(talent, { fields: [task.assigneeId], references: [talent.id], relationName: 'assignee' }),
+    creator: one(talent, { fields: [task.creatorId], references: [talent.id], relationName: 'creator' }),
 }));
 
 export const talentTimelineEntryRelations = relations(talentTimelineEntry, ({ one }) => ({

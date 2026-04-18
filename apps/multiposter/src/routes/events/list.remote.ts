@@ -1,11 +1,10 @@
+import * as v from 'valibot';
 import { query } from '$app/server';
-import { event } from '@ac/db';
-import { listQuery } from '$lib/server/db/query-helpers';
-
-/**
- * Event interface matching the database schema
- */
+import { event, eventTag, tag, campaign } from '@ac/db';
 import type { Event as DbEvent } from '@ac/db';
+import { db } from '$lib/server/db';
+import { eq, desc, inArray } from 'drizzle-orm';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 /**
  * Event interface matching the database schema, with dates serialized to strings
@@ -45,25 +44,22 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 /**
  * List all events for the authenticated user
  */
-import { inArray, eq } from 'drizzle-orm';
-import { eventTag, tag, campaign } from '@ac/db';
-import { db } from '$lib/server/db';
+export const listEvents = query(v.undefined_(), async (): Promise<Event[]> => {
+	const user = getAuthenticatedUser();
+	ensureAccess(user, 'events');
 
-/**
- * List all events for the authenticated user
- */
-export const listEvents = query(async (): Promise<Event[]> => {
-	const results = await listQuery({
-		table: event,
-		featureName: 'events',
-		transform: (row) => ({
-			...row,
-			createdAt: row.createdAt.toISOString(),
-			updatedAt: row.updatedAt.toISOString(),
-			startDateTime: row.startDateTime?.toISOString() ?? null,
-			endDateTime: row.endDateTime?.toISOString() ?? null,
-		}),
-	});
+	const rawResults = await db
+		.select()
+		.from(event)
+		.orderBy(desc(event.createdAt));
+
+	const results = rawResults.map((row) => ({
+		...row,
+		createdAt: row.createdAt.toISOString(),
+		updatedAt: row.updatedAt.toISOString(),
+		startDateTime: row.startDateTime?.toISOString() ?? null,
+		endDateTime: row.endDateTime?.toISOString() ?? null,
+	}));
 
 	if (results.length === 0) {
 		return [];

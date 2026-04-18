@@ -1,7 +1,5 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
-import { location } from '@ac/db';
-import { eq } from 'drizzle-orm';
+import { db, location, eq } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 

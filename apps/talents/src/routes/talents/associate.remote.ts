@@ -1,11 +1,9 @@
 import { command, query } from '$app/server';
-import { userTalent, userContact, talent } from '@ac/db';
-import { db } from '$lib/server/db';
-import { eq, and, inArray } from 'drizzle-orm';
+import { db, userTalent, userContact, talent, eq, and, inArray } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { talentAssociationSchema, getTalentAssociationsSchema } from '@ac/validations';
 
-export const addAssociation = command(talentAssociationSchema, async (data) => {
+export const addAssociation = command(talentAssociationSchema, async (data): Promise<{ success: boolean }> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
@@ -14,14 +12,13 @@ export const addAssociation = command(talentAssociationSchema, async (data) => {
         await db.insert(userTalent).values({
             userId: entityId,
             talentId: talentId
-        }).onConflictDoNothing();
+        } as any).onConflictDoNothing();
     }
     
-    await fetchEntityTalents({ type, entityId }).refresh();
     return { success: true };
 });
 
-export const removeAssociation = command(talentAssociationSchema, async (data) => {
+export const removeAssociation = command(talentAssociationSchema, async (data): Promise<{ success: boolean }> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
@@ -35,11 +32,10 @@ export const removeAssociation = command(talentAssociationSchema, async (data) =
         );
     }
     
-    await fetchEntityTalents({ type, entityId }).refresh();
     return { success: true };
 });
 
-export const fetchEntityTalents = query(getTalentAssociationsSchema, async (data) => {
+export const fetchEntityTalents = query(getTalentAssociationsSchema, async (data): Promise<any[]> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
@@ -80,12 +76,12 @@ export const fetchEntityTalents = query(getTalentAssociationsSchema, async (data
         return results.map(t => {
             if (!t) return null;
             return {
-                ...(t as any),
+                ...t,
                 createdAt: t.createdAt?.toISOString?.() ?? (t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt),
                 updatedAt: t.updatedAt?.toISOString?.() ?? (t.updatedAt instanceof Date ? t.updatedAt.toISOString() : t.updatedAt),
                 availabilityDate: t.availabilityDate?.toISOString?.() ?? (t.availabilityDate instanceof Date ? t.availabilityDate.toISOString() : t.availabilityDate),
                 contact: t.contact ? {
-                    ...(t.contact as any),
+                    ...t.contact,
                     birthday: t.contact.birthday?.toISOString?.() ?? (t.contact.birthday instanceof Date ? t.contact.birthday.toISOString() : t.contact.birthday),
                     createdAt: t.contact.createdAt?.toISOString?.() ?? (t.contact.createdAt instanceof Date ? t.contact.createdAt.toISOString() : t.contact.createdAt),
                     updatedAt: t.contact.updatedAt?.toISOString?.() ?? (t.contact.updatedAt instanceof Date ? t.contact.updatedAt.toISOString() : t.contact.updatedAt),

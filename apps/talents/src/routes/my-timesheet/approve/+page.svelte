@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { listPendingApprovals, manageTimesheets } from '../timesheets.remote';
+    import { listPendingApprovals, invokeManageTimesheets } from '../timesheets.remote';
     import { breadcrumbState } from '$lib/stores/breadcrumb.svelte';
     import { LoadingSection, AsyncButton } from '@ac/ui';
     import { toast } from 'svelte-sonner';
@@ -17,11 +17,11 @@
 
     async function handleApprove(entryId: string, talentId: string) {
         try {
-            await (manageTimesheets as any).action({ action: 'approve', entryId, talentId });
+            await invokeManageTimesheets({ action: 'approve', entryId });
             pendingEntries = await listPendingApprovals();
-            toast.success('Entry approved');
+            toast.success('Approved');
         } catch (e: any) {
-            toast.error(e.message || 'Failed to approve');
+            toast.error('Failed to approve');
         }
     }
 
@@ -29,13 +29,14 @@
         const comment = prompt('Reason for rejection:');
         if (comment === null) return;
         try {
-            await (manageTimesheets as any).action({ action: 'reject', entryId, talentId, comment });
+            await invokeManageTimesheets({ action: 'reject', entryId, comment });
             pendingEntries = await listPendingApprovals();
-            toast.success('Entry rejected');
+            toast.success('Rejected');
         } catch (e: any) {
-            toast.error(e.message || 'Failed to reject');
+            toast.error('Failed to reject');
         }
     }
+
 
     function calculateDiff(entry: any) {
         if (!entry.shiftPlan || !entry.endTime) return null;

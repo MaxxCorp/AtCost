@@ -1,9 +1,7 @@
 import { query, form } from '$app/server';
-import { db } from '$lib/server/db';
-import { timeOffRequest, timeOffBalance, talent } from '@ac/db';
+import { db, timeOffRequest, timeOffBalance, talent, eq, and, desc } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { timeOffRequestSchema } from '@ac/validations';
-import { eq, and, desc } from 'drizzle-orm';
 import * as v from 'valibot';
 
 /**
@@ -16,14 +14,14 @@ async function getMyTimeOffBalancesCore(talentId: string) {
         where: and(
             eq(timeOffBalance.talentId, talentId),
             eq(timeOffBalance.year, currentYear)
-        )
+        ) as any
     });
 }
 
 async function getMyTimeOffRequestsCore(talentId: string) {
     return await db.query.timeOffRequest.findMany({
-        where: eq(timeOffRequest.talentId, talentId),
-        orderBy: [desc(timeOffRequest.startDate)],
+        where: eq(timeOffRequest.talentId, talentId) as any,
+        orderBy: [desc(timeOffRequest.startDate) as any],
         limit: 5
     });
 }
@@ -63,13 +61,13 @@ export const requestTimeOff = form(timeOffRequestSchema, async (data) => {
         where: and(
             eq(timeOffBalance.talentId, data.talentId),
             eq(timeOffBalance.year, currentYear)
-        )
+        ) as any
     });
 
     if (balance) {
         await db.update(timeOffBalance).set({
             pendingDays: (balance.pendingDays || 0) + days
-        }).where(eq(timeOffBalance.id, balance.id));
+        }).where(eq(timeOffBalance.id, balance.id) as any);
     } else {
         await db.insert(timeOffBalance).values({
             talentId: data.talentId,

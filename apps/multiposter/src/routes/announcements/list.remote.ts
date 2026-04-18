@@ -1,8 +1,9 @@
+import * as v from 'valibot';
 import { query } from '$app/server';
 import { announcement, campaign } from '@ac/db';
 import { db } from '$lib/server/db';
 import { eq, desc, inArray } from 'drizzle-orm';
-import { listQuery } from '$lib/server/db/query-helpers';
+import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { Announcement as DbAnnouncement } from '@ac/db';
 
 /**
@@ -38,16 +39,20 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
 /**
  * List all announcements for the authenticated user
  */
-export const listAnnouncements = query(async (): Promise<Announcement[]> => {
-    const results = await listQuery({
-        table: announcement,
-        featureName: 'announcements', // This should match ensureAccess permission
-        transform: (row) => ({
-            ...row,
-            createdAt: row.createdAt.toISOString(),
-            updatedAt: row.updatedAt.toISOString(),
-        }),
-    });
+export const listAnnouncements = query(v.undefined_(), async (): Promise<Announcement[]> => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'announcements');
+
+    const rawResults = await db
+        .select()
+        .from(announcement)
+        .orderBy(desc(announcement.createdAt));
+
+    const results = rawResults.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+    }));
     // Fetch campaigns for all announcements
     const campaignIds = results.map((a) => a.campaignId).filter(Boolean) as string[];
     const campaignsMap = new Map<string, string[]>();
@@ -70,7 +75,7 @@ export const listAnnouncements = query(async (): Promise<Announcement[]> => {
 /**
  * List all public announcements for Kiosk display
  */
-export const listKioskAnnouncements = query(async (): Promise<Announcement[]> => {
+export const listKioskAnnouncements = query(v.undefined_(), async (): Promise<Announcement[]> => {
     const results = await db.query.announcement.findMany({
         where: eq(announcement.isPublic, true),
         orderBy: [desc(announcement.updatedAt)],
