@@ -233,7 +233,8 @@
 				(config.name || '').toLowerCase().includes(q.toLowerCase()) || 
 				config.providerType.toLowerCase().includes(q.toLowerCase())
 			}
-
+			createHref="/synchronizations/new"
+			createLabel={m.create_item({ item: "Synchronization" })}
 		>
 			{#snippet renderListItem(config: Synchronization, { isSelected, toggleSelection, deleteItem })}
 				{@const Icon = getProviderIcon(config.providerType)}

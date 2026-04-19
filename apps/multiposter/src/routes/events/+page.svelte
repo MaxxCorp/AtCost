@@ -121,6 +121,8 @@
 				loadingLabel={m.loading_item({ item: m.feature_events_title() })}
 				noItemsFoundLabel={m.no_items_found({ item: m.feature_events_title() })}
 				searchPredicate={(e: Event, q: string) => e.summary.toLowerCase().includes(q.toLowerCase())}
+				createHref="/events/new"
+				createLabel={m.create_item({ item: "Event" })}
 				filterAssociations={eventAssociations}
 			>
 				{#snippet renderListItem(event: Event, { isSelected, toggleSelection, deleteItem })}

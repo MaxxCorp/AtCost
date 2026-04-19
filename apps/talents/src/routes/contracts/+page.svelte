@@ -10,21 +10,14 @@
 </script>
 
 <div class="space-y-6">
-    <div class="flex items-center justify-between mb-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Contracts</h1>
-            <p class="text-sm text-gray-500 mt-1">
-                Manage talent employment contracts and framework associations.
-            </p>
-        </div>
-    </div>
-
     <EntityManager
         title="Contracts"
         icon={FileText}
         mode="standalone"
         listItemsRemote={listContracts}
         deleteItemRemote={deleteContract}
+        createHref="/contracts/new"
+        createLabel="Create Contract"
         createRemote={createContract}
         createSchema={contractSchema}
         updateRemote={updateContract}

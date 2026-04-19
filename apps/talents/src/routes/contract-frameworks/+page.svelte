@@ -10,21 +10,14 @@
 </script>
 
 <div class="space-y-6">
-    <div class="flex items-center justify-between mb-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Contract Frameworks</h1>
-            <p class="text-sm text-gray-500 mt-1">
-                Manage base union contracts and governing frameworks (e.g., German Law, AWO Berlin).
-            </p>
-        </div>
-    </div>
-
     <EntityManager
         title="Contract Frameworks"
         icon={FileSignature}
         mode="standalone"
         listItemsRemote={listContractFrameworks}
         deleteItemRemote={deleteContractFramework}
+        createHref="/contract-frameworks/new"
+        createLabel="Create Framework"
         createRemote={createContractFramework}
         createSchema={contractFrameworkSchema}
         updateRemote={updateContractFramework}

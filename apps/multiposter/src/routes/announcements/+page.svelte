@@ -32,6 +32,8 @@
                 loadingLabel={m.loading_item({ item: m.announcements() })}
                 noItemsFoundLabel={m.no_items({ items: m.announcements() })}
                 searchPredicate={(a: Announcement, q: string) => a.title.toLowerCase().includes(q.toLowerCase())}
+                createHref="/announcements/new"
+                createLabel={m.create_item({ item: m.announcement() })}
             >
                 {#snippet renderListItem(announcement: Announcement, { isSelected, toggleSelection, deleteItem })}
                     <div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">

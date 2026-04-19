@@ -22,6 +22,8 @@
                 icon={Megaphone} 
                 mode="standalone"
                 listItemsRemote={listCampaigns}
+                createHref="/campaigns/new"
+                createLabel={m.create_item({ item: "Campaign" })}
                 deleteItemRemote={async (ids: string[]) => {
                     return await handleDelete({
                         ids,

@@ -94,7 +94,7 @@
                     <EntityManager
                         title="Contracts"
                         icon={FileText}
-                        mode="standalone"
+                        mode="embedded"
                         listItemsRemote={listTalentContracts}
                         deleteItemRemote={deleteContract}
                         createRemote={createContract}

@@ -38,15 +38,6 @@
                 Strategic recruitment pipeline and professional network
             </p>
         </div>
-        <div class="flex gap-3">
-            <Button 
-                href="/talents/new" 
-                class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md font-bold text-sm"
-            >
-                <UserPlusIcon size={18} />
-                Register New Talent
-            </Button>
-        </div>
     </div>
 
     <!-- Stats Summary -->
@@ -79,6 +70,8 @@
                 const res = await bulkDeleteTalents(ids);
                 return res.success;
             }}
+            createHref="/talents/new"
+            createLabel="Create Talent"
             loadingLabel="Loading talents..."
             noItemsFoundLabel="No talents discovered in your network yet."
             searchPredicate={(t: Talent, q: string) => 

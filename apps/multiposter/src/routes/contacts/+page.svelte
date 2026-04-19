@@ -23,6 +23,8 @@
                 icon={User} 
                 mode="standalone"
                 listItemsRemote={listContacts as any}
+                createHref="/contacts/new"
+                createLabel={m.create_item({ item: m.contact() })}
                 deleteItemRemote={async (ids: string[]) => {
                     return await handleDelete({
                         ids,

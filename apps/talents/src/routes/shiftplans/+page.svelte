@@ -12,20 +12,17 @@
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-5xl mx-auto space-y-6">
-        <div>
-            <h1 class="text-3xl font-bold tracking-tight text-gray-900">Shiftplan Templates</h1>
-            <p class="text-gray-500 mt-1">Manage recurring schedules and staff assignments across locations.</p>
-        </div>
-
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
             <EntityManager
                 title="Shiftplans"
-                icon={Calendar}
-                mode="standalone"
-                listItemsRemote={listShiftplans as any}
-                deleteItemRemote={deleteShiftplans}
-                loadingLabel="Synchronizing templates..."
-                noItemsFoundLabel="No templates found."
+        icon={Calendar}
+        mode="standalone"
+        createHref="/shiftplans/new"
+        createLabel="Create Shift Plan"
+        listItemsRemote={listShiftplans as any}
+        deleteItemRemote={deleteShiftplans}
+        loadingLabel="Synchronizing templates..."
+        noItemsFoundLabel="No templates found."
                 searchPredicate={(plan: Shiftplan, q: string) => 
                     plan.name.toLowerCase().includes(q.toLowerCase()) ||
                     (plan.locationName?.toLowerCase().includes(q.toLowerCase()) ?? false)

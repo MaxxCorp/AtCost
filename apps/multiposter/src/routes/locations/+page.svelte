@@ -45,6 +45,8 @@
 				})}
 				searchPredicate={(l: Location, q: string) =>
 					l.name.toLowerCase().includes(q.toLowerCase())}
+				createHref="/locations/new"
+				createLabel={m.create_item({ item: m.location() })}
 				createRemote={createLocation}
 				createSchema={createLocationSchema}
 				updateRemote={updateLocation}

@@ -32,6 +32,8 @@
                 loadingLabel={m.loading_kiosks()}
                 noItemsFoundLabel={m.no_kiosks()}
                 searchPredicate={(k: Kiosk, q: string) => k.name.toLowerCase().includes(q.toLowerCase())}
+                createHref="/kiosks/new"
+                createLabel={m.create_item({ item: "Kiosk" })}
             >
                 {#snippet renderListItem(kiosk: Kiosk, { isSelected, toggleSelection, deleteItem })}
                     <div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">

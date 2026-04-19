@@ -93,6 +93,7 @@
                                 <EntityManager
                                     title={m.contacts()}
                                     icon={User}
+                                    mode="embedded"
                                     type="location"
                                     entityId={location.id}
                                     listItemsRemote={listContacts as any as (params: any) => Promise<{ data: Contact[], total: number }>}
@@ -184,7 +185,7 @@
                                                             (la: any) =>
                                                                 la.location,
                                                         )}
-                                                        embedded={true}
+                                                        mode="embedded"
                                                         onchange={onLocationsChange}
                                                         listItemsRemote={listLocations as any as (params: any) => Promise<any[]>}
                                                         addAssociationRemote={async (

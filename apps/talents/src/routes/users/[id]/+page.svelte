@@ -88,6 +88,7 @@
                                     <EntityManager
                                         title="Associated Talents"
                                         icon={UserIcon}
+                                        mode="embedded"
                                         type="user"
                                         entityId={data.id}
                                         listItemsRemote={listTalents as any}

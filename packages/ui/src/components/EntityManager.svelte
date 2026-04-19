@@ -113,7 +113,11 @@
         searchPlaceholder?: string;
         linkItemLabel?: string;
         associatedItemLabel?: string;
+        createLabel?: string;
         quickCreateLabel?: string;
+        createHref?: string;
+        showCreateButton?: boolean;
+        showQuickCreateButton?: boolean;
         closeSearchLabel?: string;
         editLabel?: string;
         deleteLabel?: string;
@@ -166,7 +170,11 @@
         searchPlaceholder = `Search ${title.toLowerCase()}...`,
         linkItemLabel = `Link ${title}`,
         associatedItemLabel = `Associated ${title}`,
+        createLabel = `Create ${title}`,
         quickCreateLabel = "Quick Create",
+        createHref,
+        showCreateButton = true,
+        showQuickCreateButton = true,
         closeSearchLabel = "Close Search",
         editLabel = "Edit",
         deleteLabel = "Delete",
@@ -529,16 +537,28 @@
                         {bulkDeleteLabel} ({selectedIds.size})
                     </AsyncButton>
                 {/if}
-                {#if createRemote && renderForm}
-                    <Button
-                        type="button"
-                        variant="default"
-                        size="default"
-                        onclick={() => (showQuickCreate = true)}
-                    >
-                        <Plus size={16} class="mr-1" />
-                        {quickCreateLabel}
-                    </Button>
+
+                {#if isStandalone}
+                    {#if createHref && showCreateButton}
+                        <Button
+                            href={createHref}
+                            variant="default"
+                            size="default"
+                        >
+                            <Plus size={16} class="mr-1" />
+                            {createLabel}
+                        </Button>
+                    {:else if createRemote && renderForm && showQuickCreateButton}
+                        <Button
+                            type="button"
+                            variant="default"
+                            size="default"
+                            onclick={() => (showQuickCreate = true)}
+                        >
+                            <Plus size={16} class="mr-1" />
+                            {quickCreateLabel}
+                        </Button>
+                    {/if}
                 {/if}
             </div>
         </div>
@@ -632,17 +652,19 @@
             {/if}
         </div>
 
-        {#if !singleSelect || associatedItems.length === 0}
+        {#if !isStandalone && (linkItemLabel || (createRemote && createSchema))}
             <div class="flex items-center gap-2 mb-4 bg-white/50 p-2 rounded-lg border border-dashed border-gray-200">
-                <Button 
-                    variant="outline" 
-                    size="sm"
-                    onclick={() => (showSelector = true)}
-                    disabled={loadingItems}
-                >
-                    <Link class="mr-2 h-4 w-4" />
-                    {linkItemLabel}
-                </Button>
+                {#if linkItemLabel}
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onclick={() => (showSelector = true)}
+                        disabled={loadingItems}
+                    >
+                        <Link class="mr-2 h-4 w-4" />
+                        {linkItemLabel}
+                    </Button>
+                {/if}
                 {#if createRemote && createSchema}
                     <Button 
                         variant="secondary" 
