@@ -9,7 +9,7 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 /**
  * Location interface matching the database schema, with dates serialized to strings
  */
-import { PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
+import { LocationPaginationSchema as PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
 
 
 /**
@@ -19,15 +19,26 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'locations');
 
-	const { page = 1, limit = 50, search = '' } = input || {};
+	const { page = 1, limit = 50, search = '', city } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: location.id }).from(location).$dynamic();
 	
 	const conditions = [];
 	if (search) {
-		const { ilike } = await import('drizzle-orm');
-		conditions.push(ilike(location.name, `%${search}%`));
+		const { ilike, or } = await import('drizzle-orm');
+		conditions.push(or(
+			ilike(location.name, `%${search}%`),
+			ilike(location.city, `%${search}%`)
+		));
+	}
+
+	if (city) {
+		const { inArray } = await import('drizzle-orm');
+		const cities = Array.isArray(city) ? city : [city];
+		if (cities.length > 0) {
+			conditions.push(inArray(location.city, cities as any));
+		}
 	}
 
 	if (conditions.length > 0) {

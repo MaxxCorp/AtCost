@@ -34,6 +34,19 @@
                 (loc.city?.toLowerCase().includes(q.toLowerCase()) ?? false)
             );
         }}
+        filters={[
+            {
+                id: "city",
+                label: "City",
+                type: "select",
+                optionsRemote: async () => {
+                    const res = await listLocations({ limit: 1000 });
+                    const items = Array.isArray(res) ? res : res.data;
+                    const cities = [...new Set(items.map((i: any) => i.city).filter(Boolean))];
+                    return cities.map(city => ({ value: city, label: city }));
+                }
+            }
+        ]}
     >
         {#snippet renderItemLabel(loc: any)}
             <div class="flex flex-col">

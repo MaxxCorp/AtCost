@@ -4,14 +4,14 @@ import { query } from '$app/server';
 import { location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
-import { PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
+import { LocationPaginationSchema as PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
 
 
 export const listLocations = query(PaginationSchema, async (input): Promise<PaginatedResult<Location>> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'locations');
 
-    const { page = 1, limit = 50, search = '' } = input || {};
+    const { page = 1, limit = 50, search = '', city } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select().from(location).$dynamic();
@@ -23,6 +23,14 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
             ilike(location.city, `%${search}%`),
             ilike(location.street, `%${search}%`)
         ));
+    }
+
+    if (city) {
+        const { inArray } = await import('drizzle-orm');
+        const cities = Array.isArray(city) ? city : [city];
+        if (cities.length > 0) {
+            conditions.push(inArray(location.city, cities as any));
+        }
     }
 
     if (conditions.length > 0) {

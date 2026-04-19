@@ -1,6 +1,7 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
     import { listAnnouncements } from "./list.remote";
+    import { listLocations } from "../locations/list.remote";
     import { deleteAnnouncements } from "./[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import Button from "$lib/components/ui/button/button.svelte";
@@ -22,6 +23,14 @@
                 icon={Megaphone}
                 mode="standalone"
                 listItemsRemote={listAnnouncements as any}
+                filterAssociations={[
+                    {
+                        id: "locationId",
+                        label: m.locations(),
+                        listRemote: listLocations as any,
+                        getOptionLabel: (l: any) => l.name,
+                    },
+                ]}
                 deleteItemRemote={async (ids: string[]) => {
                     return await handleDelete({
                         ids,

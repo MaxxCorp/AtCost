@@ -12,6 +12,15 @@ export const updateShiftplanSchema = v.object({
     locationId: v.optional(v.string()),
     schedule: v.optional(v.string()),
 });
+import { FilterableIdSchema } from './pagination.js';
+
+export const ShiftplanPaginationSchema = v.optional(v.object({
+    page: v.optional(v.number(), 1),
+    limit: v.optional(v.number(), 50),
+    search: v.optional(v.string()),
+    locationId: FilterableIdSchema,
+}), {});
+
 export interface ShiftplanOverview {
     id: string;
     name: string;

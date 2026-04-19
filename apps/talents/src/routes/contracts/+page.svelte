@@ -3,6 +3,8 @@
     import EntityManager from "@ac/ui/components/EntityManager.svelte";
     import ContractForm from "./ContractForm.svelte";
     import { listContracts, createContract, updateContract, deleteContract } from "./contracts.remote";
+    import { listTalents } from "../talents/talents.remote";
+    import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import { contractSchema } from "@ac/validations/contracts";
 
@@ -14,7 +16,21 @@
         title="Contracts"
         icon={FileText}
         mode="standalone"
-        listItemsRemote={listContracts}
+        listItemsRemote={listContracts as any}
+        filterAssociations={[
+            {
+                id: "talentId",
+                label: "Talent",
+                listRemote: listTalents as any,
+                getOptionLabel: (t: any) => t.contact?.displayName,
+            },
+            {
+                id: "frameworkId",
+                label: "Framework",
+                listRemote: listContractFrameworks as any,
+                getOptionLabel: (f: any) => f.name,
+            }
+        ]}
         deleteItemRemote={deleteContract}
         createHref="/contracts/new"
         createLabel="Create Contract"

@@ -37,6 +37,19 @@
                     user.name.toLowerCase().includes(q.toLowerCase()) ||
                     user.email.toLowerCase().includes(q.toLowerCase())
                 }
+                filters={[
+                    {
+                        id: "role",
+                        label: m.roles(),
+                        type: "select",
+                        options: [
+                            { value: "admin", label: "Admin" },
+                            { value: "manager", label: "Manager" },
+                            { value: "user", label: "User" },
+                        ],
+                        optionsRemote: async () => [], // Dummy since we have hardcoded options
+                    }
+                ]}
             >
                 {#snippet renderListItem(user: User, { isSelected, toggleSelection, deleteItem })}
                     <div class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-300">

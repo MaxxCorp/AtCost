@@ -109,3 +109,20 @@ export const getTalentAssociationsSchema = v.object({
     type: v.picklist(['user', 'event', 'location', 'resource', 'announcement']),
     entityId: v.string(),
 });
+import { FilterableIdSchema } from './pagination.js';
+
+export const talentPaginationSchema = v.optional(v.object({
+	page: v.optional(v.number(), 1),
+	limit: v.optional(v.number(), 50),
+	search: v.optional(v.string()),
+	tagId: FilterableIdSchema,
+	locationId: FilterableIdSchema,
+	status: FilterableIdSchema,
+}), {});
+
+export const timeOffPaginationSchema = v.optional(v.object({
+	page: v.optional(v.number(), 1),
+	limit: v.optional(v.number(), 50),
+	search: v.optional(v.string()),
+	talentId: FilterableIdSchema,
+}), {});

@@ -31,16 +31,18 @@ async function getMyTimeOffRequestsCore(talentId: string) {
  * REMOTE FUNCTIONS
  */
 
-import { TimeOffPaginationSchema } from '@ac/validations';
+import { timeOffPaginationSchema as PaginationSchema } from '@ac/validations';
 
 
-export const listTimeOffRequests = query(TimeOffPaginationSchema, async (input): Promise<PaginatedResult<any>> => {
+export const listTimeOffRequests = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
 
     const user = getAuthenticatedUser();
     ensureAccess(user, 'timesheets');
 
     const { page = 1, limit = 50, search = '', talentId } = input || {};
     const offset = (page - 1) * limit;
+    
+    const { contact } = await import('@ac/db');
 
     let baseQuery = db.select({
         id: timeOffRequest.id,
@@ -49,27 +51,35 @@ export const listTimeOffRequests = query(TimeOffPaginationSchema, async (input):
         startDate: timeOffRequest.startDate,
         endDate: timeOffRequest.endDate,
         reason: timeOffRequest.reason,
-        talentName: talent.status, // Using status as a proxy for name if not joined properly, but let's join contact
+        talentId: timeOffRequest.talentId,
+        talentName: contact.displayName,
     }).from(timeOffRequest)
     .leftJoin(talent, eq(timeOffRequest.talentId, talent.id) as any)
+    .leftJoin(contact, eq(talent.contactId, contact.id) as any)
     .$dynamic();
     
     const conditions = [];
     if (talentId) {
-        conditions.push(eq(timeOffRequest.talentId, talentId));
+        const { inArray } = await import('drizzle-orm');
+        const ids = Array.isArray(talentId) ? talentId : [talentId];
+        conditions.push(inArray(timeOffRequest.talentId, ids));
     }
     
     if (search) {
+        const { or, ilike } = await import('drizzle-orm');
         conditions.push(or(
-            ilike(timeOffRequest.reason, `%${search}%`),
-            ilike(timeOffRequest.type, `%${search}%`)
+            ilike(timeOffRequest.reason as any, `%${search}%`),
+            ilike(timeOffRequest.type as any, `%${search}%`),
+            ilike(contact.displayName, `%${search}%`)
         ));
     }
 
     if (conditions.length > 0) {
+        const { and } = await import('drizzle-orm');
         baseQuery = baseQuery.where(and(...conditions as any)) as any;
     }
 
+    const { sql, desc } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 

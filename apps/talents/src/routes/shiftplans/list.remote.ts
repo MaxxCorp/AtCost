@@ -4,33 +4,41 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { ShiftPlanTemplate } from '@ac/db';
 import * as v from 'valibot';
 
-import { PaginationSchema, type ShiftplanOverview, type PaginatedResult } from '@ac/validations';
+import { ShiftplanPaginationSchema as PaginationSchema, type ShiftplanOverview, type PaginatedResult } from '@ac/validations';
 
 
 export const listShiftplans = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
 
-    const { page = 1, limit = 50, search = '' } = input || {};
-    const offset = (page - 1) * limit;
+        const { page = 1, limit = 50, search = '', locationId } = input || {};
+        const offset = (page - 1) * limit;
 
-    let baseQuery = db.select({
-        id: shiftPlanTemplate.id,
-        name: shiftPlanTemplate.name,
-        schedule: shiftPlanTemplate.schedule,
-        createdAt: shiftPlanTemplate.createdAt,
-        locationName: location.name,
-    }).from(shiftPlanTemplate)
-    .leftJoin(location, eq(shiftPlanTemplate.locationId, location.id) as any)
-    .$dynamic();
-    
-    const conditions: any[] = [];
-    if (search) {
-        conditions.push(or(
-            ilike(shiftPlanTemplate.name, `%${search}%`),
-            ilike(location.name, `%${search}%`)
-        ));
-    }
+        let baseQuery = db.select({
+            id: shiftPlanTemplate.id,
+            name: shiftPlanTemplate.name,
+            schedule: shiftPlanTemplate.schedule,
+            createdAt: shiftPlanTemplate.createdAt,
+            locationName: location.name,
+        }).from(shiftPlanTemplate)
+        .leftJoin(location, eq(shiftPlanTemplate.locationId, location.id) as any)
+        .$dynamic();
+        
+        const conditions: any[] = [];
+        if (search) {
+            conditions.push(or(
+                ilike(shiftPlanTemplate.name, `%${search}%`),
+                ilike(location.name, `%${search}%`)
+            ));
+        }
+
+        if (locationId) {
+            const { inArray } = await import('drizzle-orm');
+            const ids = Array.isArray(locationId) ? locationId : [locationId];
+            if (ids.length > 0) {
+                conditions.push(inArray(shiftPlanTemplate.locationId, ids as any));
+            }
+        }
 
     if (conditions.length > 0) {
         baseQuery = baseQuery.where(and(...conditions as any)) as any;

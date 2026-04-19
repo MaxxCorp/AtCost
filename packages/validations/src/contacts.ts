@@ -140,3 +140,12 @@ export const getAssociationsSchema = v.object({
     type: v.picklist(['event', 'user', 'location', 'resource', 'announcement']),
     entityId: v.string(),
 });
+import { FilterableIdSchema } from './pagination.js';
+
+export const contactPaginationSchema = v.optional(v.object({
+	page: v.optional(v.number(), 1),
+	limit: v.optional(v.number(), 50),
+	search: v.optional(v.string()),
+	locationId: FilterableIdSchema,
+	tagId: FilterableIdSchema,
+}), {});

@@ -10,29 +10,50 @@ export const listContracts = query(contractPaginationSchema, async (input) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'contracts');
 
-    const { page = 1, limit = 50, search = '', talentId } = input || {};
+    const { page = 1, limit = 50, search = '', talentId, frameworkId } = input || {};
     const offset = (page - 1) * limit;
 
-    let baseQuery = db.select().from(contract).$dynamic();
+    let baseQuery = db.select({ id: contract.id }).from(contract).$dynamic();
     
+    const conditions = [];
     if (talentId) {
-        baseQuery = baseQuery.where(eq(contract.talentId, talentId)) as any;
+        const ids = Array.isArray(talentId) ? talentId : [talentId];
+        conditions.push(inArray(contract.talentId, ids));
     }
     
-    // Example: allow searching by entgeltgruppe or wageType
-    if (search) {
-        baseQuery = baseQuery.where(
-            or(ilike(contract.entgeltgruppe, `%${search}%`), ilike(contract.wageType, `%${search}%`))
-        ) as any;
+    if (frameworkId) {
+        const ids = Array.isArray(frameworkId) ? frameworkId : [frameworkId];
+        baseQuery = baseQuery.innerJoin(contractFrameworkContract, eq(contractFrameworkContract.contractId, contract.id)) as any;
+        conditions.push(inArray(contractFrameworkContract.frameworkId, ids));
     }
 
+    if (search) {
+        conditions.push(or(ilike(contract.entgeltgruppe, `%${search}%`), ilike(contract.wageType, `%${search}%`)));
+    }
+
+    if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+    }
+
+    // Deduplicate
+    baseQuery = baseQuery.groupBy(contract.id) as any;
+
+    const { sql } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
-    const rawResults = await baseQuery
+    if (total === 0) return { data: [], total: 0 };
+
+    const rawIds = await baseQuery
         .orderBy(desc(contract.createdAt))
         .limit(limit)
         .offset(offset);
+    
+    const ids = rawIds.map(r => r.id);
+
+    const rawResults = await db.select().from(contract)
+        .where(inArray(contract.id, ids))
+        .orderBy(desc(contract.createdAt));
 
     const data = rawResults.map((row) => ({
         ...row,

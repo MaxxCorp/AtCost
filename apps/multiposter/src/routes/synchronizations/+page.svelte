@@ -235,6 +235,22 @@
 			}
 			createHref="/synchronizations/new"
 			createLabel={m.create_item({ item: "Synchronization" })}
+			filters={[
+				{
+					id: "providerType",
+					label: m.type_label(),
+					type: "select",
+					options: [
+						{ value: "google-calendar", label: "Google Calendar" },
+						{ value: "microsoft-calendar", label: "Microsoft Calendar" },
+						{ value: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
+						{ value: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
+						{ value: "wp-the-events-calendar", label: "WP The Events Calendar" },
+						{ value: "email", label: "E-Mail (Brevo)" },
+					],
+					optionsRemote: async () => [], // Dummy since we have hardcoded options
+				}
+			]}
 		>
 			{#snippet renderListItem(config: Synchronization, { isSelected, toggleSelection, deleteItem })}
 				{@const Icon = getProviderIcon(config.providerType)}

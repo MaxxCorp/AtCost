@@ -1,19 +1,27 @@
 import { query, form, command } from '$app/server';
 import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, ilike, or, and, sql } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
-import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema, PaginationSchema, type PaginatedResult, createContactSchema } from '@ac/validations';
+import { 
+    createTalentSchema, 
+    updateTalentSchema, 
+    talentTimelineEntrySchema, 
+    unifiedTalentSchema, 
+    talentPaginationSchema as PaginationSchema,
+    PaginationBaseSchema,
+    type PaginatedResult, 
+    createContactSchema 
+} from '@ac/validations';
 import * as v from 'valibot';
 import { readTalentCore, type TalentProfile } from '$lib/server/talents/service';
-
 
 export const listTalents = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
-    const { page = 1, limit = 50, search = '' } = input || {};
+    const { page = 1, limit = 50, search = '', tagId, locationId, status } = input || {};
     const offset = (page - 1) * limit;
 
-    let baseQuery = db.select().from(talent).$dynamic();
+    let baseQuery = db.select({ id: talent.id }).from(talent);
     
     const conditions: any[] = [];
     if (search) {
@@ -22,12 +30,42 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
             ilike(talent.status, `%${search}%`)
         ));
     }
+
+    if (status) {
+        const ids = Array.isArray(status) ? status : [status];
+        conditions.push(inArray(talent.status, ids as any));
+    }
+
+    if (tagId || locationId) {
+        baseQuery = baseQuery.innerJoin(contact, eq(contact.id, talent.contactId)) as any;
+    }
+
+    if (tagId) {
+        const { contactTag } = await import('@ac/db');
+        const ids = Array.isArray(tagId) ? tagId : [tagId];
+        baseQuery = baseQuery.innerJoin(contactTag, eq(contactTag.contactId, talent.contactId)) as any;
+        conditions.push(inArray(contactTag.tagId, ids));
+    }
+
+    if (locationId) {
+        const { locationContact } = await import('@ac/db');
+        const ids = Array.isArray(locationId) ? locationId : [locationId];
+        baseQuery = baseQuery.innerJoin(locationContact, eq(locationContact.contactId, talent.contactId)) as any;
+        conditions.push(inArray(locationContact.locationId, ids));
+    }
+
     if (conditions.length > 0) {
         baseQuery = baseQuery.where(and(...conditions as any)) as any;
     }
 
+    // Deduplicate in case of multiple join matches
+    baseQuery = baseQuery.groupBy(talent.id) as any;
+
+    const { sql } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
+
+    if (total === 0) return { data: [], total: 0 };
 
     const talentsWithId = await baseQuery
         .orderBy(desc(talent.updatedAt))
@@ -35,10 +73,6 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
         .offset(offset);
         
     const ids = talentsWithId.map(t => t.id);
-
-    if (ids.length === 0) {
-        return { data: [], total };
-    }
 
     const rawTalents = await db.query.talent.findMany({
         where: inArray(talent.id, ids),
@@ -56,11 +90,11 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
                 orderBy: [desc(talentTimelineEntry.timestamp)],
                 limit: 3
             }
-        },
-        orderBy: [desc(talent.updatedAt)],
+        }
     });
 
-    const results = rawTalents;
+    // Ensure we maintain the sorting order from the ID query
+    const results = ids.map(id => rawTalents.find(rt => rt.id === id)!).filter(Boolean);
 
     // Resolve linked users for each talent's contact
     const contactIds = results.filter(t => t.contact != null).map(t => t.contact.id);
@@ -553,5 +587,18 @@ export const createContact = form(createContactSchema, async (data): Promise<any
         console.error('createContact ERROR:', err);
         return { success: false, error: err.message || 'Contact creation failed' };
     }
+});
+
+export const listTags = query(PaginationSchema, async (input) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'talents');
+    
+    const { tag } = await import('@ac/db');
+    const results = await db.select({
+        id: tag.id,
+        name: tag.name
+    }).from(tag);
+    
+    return { data: results, total: results.length };
 });
 

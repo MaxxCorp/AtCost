@@ -4,7 +4,7 @@ import { getOptionalUser, parseRoles } from '$lib/server/authorization';
 import { desc, type InferSelectModel, sql, and, or, ilike } from '$lib/server/db';
 import * as v from 'valibot';
 
-import { PaginationSchema, type User, type PaginatedResult } from '@ac/validations';
+import { UserPaginationSchema as PaginationSchema, type User, type PaginatedResult } from '@ac/validations';
 
 
 export const listUsers = query(PaginationSchema, async (input): Promise<PaginatedResult<User>> => {
@@ -17,7 +17,7 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
             throw new Error('Forbidden: Admin access only');
         }
 
-        const { page = 1, limit = 50, search = '' } = input || {};
+        const { page = 1, limit = 50, search = '', role } = input || {};
         const offset = (page - 1) * limit;
 
         let baseQuery = db.select().from(user).$dynamic();
@@ -28,6 +28,14 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
                 ilike(user.name, `%${search}%`),
                 ilike(user.email, `%${search}%`)
             ));
+        }
+
+        if (role) {
+            const roles = Array.isArray(role) ? role : [role];
+            if (roles.length > 0) {
+                // For JSONB roles, we check if any of the provided roles are in the array
+                conditions.push(sql`${user.roles} ?| ${roles}`);
+            }
         }
 
         if (conditions.length > 0) {

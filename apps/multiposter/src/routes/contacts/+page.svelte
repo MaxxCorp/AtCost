@@ -1,6 +1,8 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
     import { listContacts } from "./list.remote";
+    import { listLocations } from "../locations/list.remote";
+    import { listTags } from "../tags/list.remote";
     import { deleteExistingContact } from "./[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import Button from "$lib/components/ui/button/button.svelte";
@@ -23,6 +25,20 @@
                 icon={User} 
                 mode="standalone"
                 listItemsRemote={listContacts as any}
+                filterAssociations={[
+                    {
+                        id: "locationId",
+                        label: m.locations(),
+                        listRemote: listLocations as any,
+                        getOptionLabel: (l: any) => l.name,
+                    },
+                    {
+                        id: "tagId",
+                        label: m.tags(),
+                        listRemote: listTags as any,
+                        getOptionLabel: (t: any) => t.name,
+                    },
+                ]}
                 createHref="/contacts/new"
                 createLabel={m.create_item({ item: m.contact() })}
                 deleteItemRemote={async (ids: string[]) => {

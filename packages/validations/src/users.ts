@@ -21,5 +21,9 @@ export type User = Omit<DbUser, 'createdAt' | 'updatedAt'> & {
     updatedAt: string;
 };
 
-
-
+export const UserPaginationSchema = v.optional(v.object({
+    page: v.optional(v.number(), 1),
+    limit: v.optional(v.number(), 50),
+    search: v.optional(v.string()),
+    role: v.optional(v.union([v.string(), v.array(v.string())])),
+}), {});

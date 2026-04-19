@@ -3,6 +3,7 @@
     import { deleteShiftplans } from "./[id]/delete.remote";
     import { EntityManager, Button, AsyncButton } from "@ac/ui";
     import { Calendar, MapPin, Pencil, Trash2, ChevronRight } from "@lucide/svelte";
+    import { listLocations } from "../locations/list.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 
     breadcrumbState.set({ feature: "shiftplans" });
@@ -20,6 +21,14 @@
         createHref="/shiftplans/new"
         createLabel="Create Shift Plan"
         listItemsRemote={listShiftplans as any}
+        filterAssociations={[
+            {
+                id: "locationId",
+                label: "Location",
+                listRemote: listLocations as any,
+                getOptionLabel: (l: any) => l.name,
+            },
+        ]}
         deleteItemRemote={deleteShiftplans}
         loadingLabel="Synchronizing templates..."
         noItemsFoundLabel="No templates found."

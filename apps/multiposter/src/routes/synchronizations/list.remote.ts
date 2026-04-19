@@ -3,22 +3,22 @@ import { query } from '$app/server';
 import { syncConfig } from '@ac/db';
 import type { SyncConfig as DbSyncConfig } from '@ac/db';
 import { db } from '$lib/server/db';
-import { desc } from 'drizzle-orm';
+import { desc, and, or, ilike, sql, inArray } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 
 
-import { PaginationSchema, type Synchronization, type PaginatedResult } from '@ac/validations';
+import { synchronizationPaginationSchema as PaginationSchema, type Synchronization, type PaginatedResult } from '@ac/validations';
 
 
 /**
  * Query: List all synchronizations
  */
-export const list = query(PaginationSchema, async (input): Promise<PaginatedResult<Synchronization>> => {
+export const list = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<Synchronization>> => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'synchronizations');
 
-	const { page = 1, limit = 50, search = '' } = input || {};
+	const { page = 1, limit = 50, search = '', providerType } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select().from(syncConfig).$dynamic();
@@ -29,16 +29,18 @@ export const list = query(PaginationSchema, async (input): Promise<PaginatedResu
 		conditions.push(or(
 			ilike(syncConfig.name, `%${search}%`),
 			ilike(syncConfig.providerType, `%${search}%`)
-
 		));
 	}
 
+	if (providerType) {
+		const ids = Array.isArray(providerType) ? providerType : [providerType];
+		conditions.push(inArray(syncConfig.providerType, ids));
+	}
+
 	if (conditions.length > 0) {
-		const { and } = await import('drizzle-orm');
 		baseQuery = baseQuery.where(and(...conditions as any)) as any;
 	}
 
-	const { sql } = await import('drizzle-orm');
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
 	const total = Number(countResult[0]?.count || 0);
 
@@ -56,7 +58,7 @@ export const list = query(PaginationSchema, async (input): Promise<PaginatedResu
         settings: row.settings ?? undefined,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
-	})) as any as Synchronization[];
+	})) as any as Synchronization[]; // Using Synchronization[] which now has string dates
 
 
 	return { data, total };

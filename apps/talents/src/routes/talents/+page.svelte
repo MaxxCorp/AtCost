@@ -12,7 +12,8 @@
         Clock,
         Archive
     } from "@lucide/svelte";
-    import { listTalents, deleteTalent, bulkDeleteTalents } from "./talents.remote";
+    import { listTalents, deleteTalent, bulkDeleteTalents, listTags } from "./talents.remote";
+    import { listLocations } from "../locations/list.remote";
     import { toast } from "svelte-sonner";
     import { Button, AsyncButton, EntityManager } from "@ac/ui";
 
@@ -62,6 +63,33 @@
             icon={User}
             mode="standalone"
             listItemsRemote={listTalents as any}
+            filterAssociations={[
+                {
+                    id: "locationId",
+                    label: "Locations",
+                    listRemote: listLocations as any,
+                    getOptionLabel: (l: any) => l.name,
+                },
+                {
+                    id: "tagId",
+                    label: "Tags",
+                    listRemote: listTags as any,
+                    getOptionLabel: (t: any) => t.name,
+                },
+            ]}
+            filters={[
+                {
+                    id: "status",
+                    label: "Status",
+                    type: "select",
+                    options: [
+                        { value: "active", label: "Active" },
+                        { value: "applicant", label: "Applicant" },
+                        { value: "inactive", label: "Inactive" },
+                    ],
+                    optionsRemote: async () => [],
+                }
+            ]}
             deleteItemRemote={async (ids: string[]) => {
                 if (ids.length === 1) {
                     const res = await deleteTalent(ids[0]);

@@ -1,93 +1,94 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { contact } from '@ac/db';
+import { contact, locationContact, contactTag, tag } from '@ac/db';
 import type { Contact as DbContact } from '@ac/db';
 import { db } from '$lib/server/db';
-import { desc } from 'drizzle-orm';
+import { desc, eq, inArray, and, or, ilike, sql } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-
-/**
- * Contact interface matching the database schema, with dates serialized to strings and relations
- */
-import { PaginationSchema, type Contact, type PaginatedResult } from '@ac/validations';
-
-
+import { contactPaginationSchema as PaginationSchema, type Contact, type PaginatedResult } from '@ac/validations';
 
 /**
  * Query: List all contacts
  */
-export const listContacts = query(PaginationSchema, async (input): Promise<PaginatedResult<Contact>> => {
+export const listContacts = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<Contact>> => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'contacts');
 
-	const { page = 1, limit = 50, search = '' } = input || {};
+	const { page = 1, limit = 50, search = '', locationId, tagId } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: contact.id }).from(contact).$dynamic();
 	
 	const conditions = [];
 	if (search) {
-		const { ilike, or } = await import('drizzle-orm');
 		conditions.push(or(
+			ilike(contact.displayName, `%${search}%`),
 			ilike(contact.givenName, `%${search}%`),
-			ilike(contact.familyName, `%${search}%`),
-			ilike(contact.displayName, `%${search}%`)
+			ilike(contact.familyName, `%${search}%`)
 		));
 	}
 
+	if (locationId) {
+		const ids = Array.isArray(locationId) ? locationId : [locationId];
+		baseQuery = baseQuery.leftJoin(locationContact, eq(contact.id, locationContact.contactId)) as any;
+		conditions.push(inArray(locationContact.locationId, ids));
+	}
+
+	if (tagId) {
+		const ids = Array.isArray(tagId) ? tagId : [tagId];
+		baseQuery = baseQuery.leftJoin(contactTag, eq(contact.id, contactTag.contactId)) as any;
+		conditions.push(inArray(contactTag.tagId, ids));
+	}
+
 	if (conditions.length > 0) {
-		const { and } = await import('drizzle-orm');
 		baseQuery = baseQuery.where(and(...conditions as any)) as any;
 	}
 
-	const { sql, inArray } = await import('drizzle-orm');
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
 	const total = Number(countResult[0]?.count || 0);
 
-	if (total === 0) {
-		return { data: [], total: 0 };
-	}
+	const paginatedIdsResult = await baseQuery
+		.orderBy(desc(contact.createdAt))
+		.limit(limit)
+		.offset(offset);
+        
+	const ids = paginatedIdsResult.map(r => r.id);
 
-	const paginatedIdsQuery = baseQuery.orderBy(desc(contact.createdAt)).limit(limit).offset(offset);
-	const paginatedIds = (await paginatedIdsQuery).map((r) => r.id);
-
-	if (paginatedIds.length === 0) {
+	if (ids.length === 0) {
 		return { data: [], total };
 	}
 
-	const results = await db.query.contact.findMany({
-		where: inArray(contact.id, paginatedIds),
-		orderBy: [desc(contact.createdAt)],
-		with: {
-			emails: true,
-			phones: true,
-			addresses: true,
-		}
-	});
+	const rawResults = await db
+		.select()
+		.from(contact)
+		.where(inArray(contact.id, ids))
+		.orderBy(desc(contact.createdAt));
 
-	const data = results.map((row) => ({
+	const data = rawResults.map((row) => ({
 		...row,
-        displayName: row.displayName || "",
+        displayName: row.displayName || '',
         givenName: row.givenName ?? undefined,
         familyName: row.familyName ?? undefined,
+        middleName: row.middleName ?? undefined,
         honorificPrefix: row.honorificPrefix ?? undefined,
         honorificSuffix: row.honorificSuffix ?? undefined,
+        birthday: row.birthday?.toISOString() ?? undefined,
         gender: row.gender ?? undefined,
         company: row.company ?? undefined,
-        role: row.role ?? undefined,
         department: row.department ?? undefined,
-        notes: row.notes ?? undefined,
+        role: row.role ?? undefined,
         vCardPath: row.vCardPath ?? undefined,
         qrCodePath: row.qrCodePath ?? undefined,
+        notes: row.notes ?? undefined,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
-		birthday: row.birthday ? row.birthday.toISOString() : undefined,
-		emails: row.emails || [],
-		phones: row.phones || [],
-		addresses: row.addresses || [],
-	})) as Contact[];
-
-
+		emails: [],
+		phones: [],
+		addresses: [],
+		locationAssociations: [],
+		relations: [],
+		tags: [],
+	}));
 
 	return { data, total };
 });

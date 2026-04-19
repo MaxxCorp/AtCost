@@ -1,11 +1,14 @@
 import * as v from "valibot";
 
+import { FilterableIdSchema } from './pagination.js';
+
 export const contractPaginationSchema = v.optional(v.object({
     page: v.optional(v.number(), 1),
     limit: v.optional(v.number(), 50),
     search: v.optional(v.string(), ''),
-    talentId: v.optional(v.string())
-}));
+    talentId: FilterableIdSchema,
+    frameworkId: FilterableIdSchema,
+}), {});
 
 export const contractFrameworkSchema = v.object({
     id: v.optional(v.string()),

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { listTimeOffRequests, requestTimeOff } from "./time-off.remote";
+    import { listTalents } from "../talents/talents.remote";
     import { EntityManager, Button, AsyncButton } from "@ac/ui";
     import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus } from "@lucide/svelte";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
@@ -43,6 +44,14 @@
                 icon={Plane}
                 mode="standalone"
                 listItemsRemote={listTimeOffRequests as any}
+                filterAssociations={[
+                    {
+                        id: "talentId",
+                        label: "Talent",
+                        listRemote: listTalents as any,
+                        getOptionLabel: (t: any) => t.contact?.displayName,
+                    },
+                ]}
                 loadingLabel="Checking balances..."
                 noItemsFoundLabel="No leave requests found."
                 searchPredicate={(req: TimeOffRequest, q: string) => 

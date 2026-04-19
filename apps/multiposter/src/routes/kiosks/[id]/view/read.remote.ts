@@ -32,10 +32,10 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         locations: locations
     };
 
-    const events = await listKioskEvents(kioskId);
-    const announcements = await listKioskAnnouncements();
+    const eventsResult = await listKioskEvents(kioskId);
+    const announcementsResult = await listKioskAnnouncements();
 
-    const items = [...events, ...announcements].sort((a, b) => {
+    const items = [...eventsResult, ...announcementsResult.data].sort((a, b) => {
         return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
     });
 

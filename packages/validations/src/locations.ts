@@ -30,3 +30,10 @@ export const updateLocationSchema = v.intersect([
     locationBaseSchema,
     v.object({ id: v.pipe(v.string(), v.uuid()) })
 ]);
+
+export const LocationPaginationSchema = v.optional(v.object({
+    page: v.optional(v.number(), 1),
+    limit: v.optional(v.number(), 50),
+    search: v.optional(v.string()),
+    city: v.optional(v.union([v.string(), v.array(v.string())])),
+}), {});

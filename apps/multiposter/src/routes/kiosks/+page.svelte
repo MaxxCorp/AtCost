@@ -1,5 +1,6 @@
 <script lang="ts">
     import { listKiosks } from "./list.remote";
+    import { listLocations } from "../locations/list.remote";
     import * as m from "$lib/paraglide/messages";
     import { deleteKiosk } from "./[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
@@ -22,6 +23,14 @@
                 icon={Monitor}
                 mode="standalone"
                 listItemsRemote={listKiosks as any}
+                filterAssociations={[
+                    {
+                        id: "locationId",
+                        label: m.locations(),
+                        listRemote: listLocations as any,
+                        getOptionLabel: (l: any) => l.name,
+                    },
+                ]}
                 deleteItemRemote={async (ids: string[]) => {
                     return await handleDelete({
                         ids,
