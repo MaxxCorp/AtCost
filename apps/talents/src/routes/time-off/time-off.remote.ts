@@ -1,7 +1,8 @@
 import { query, form } from '$app/server';
-import { db, timeOffRequest, timeOffBalance, talent, eq, and, desc } from '$lib/server/db';
+import { db, timeOffRequest, timeOffBalance, talent, eq, and, desc, or, ilike, sql } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { timeOffRequestSchema } from '@ac/validations';
+import { timeOffRequestSchema, type PaginatedResult } from '@ac/validations';
+
 import * as v from 'valibot';
 
 /**
@@ -30,14 +31,64 @@ async function getMyTimeOffRequestsCore(talentId: string) {
  * REMOTE FUNCTIONS
  */
 
-export const getMyTimeOffBalances = query(v.string(), async (talentId) => {
-    ensureAccess(getAuthenticatedUser(), 'timesheets');
-    return await getMyTimeOffBalancesCore(talentId);
+import { TimeOffPaginationSchema } from '@ac/validations';
+
+
+export const listTimeOffRequests = query(TimeOffPaginationSchema, async (input): Promise<PaginatedResult<any>> => {
+
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'timesheets');
+
+    const { page = 1, limit = 50, search = '', talentId } = input || {};
+    const offset = (page - 1) * limit;
+
+    let baseQuery = db.select({
+        id: timeOffRequest.id,
+        type: timeOffRequest.type,
+        status: timeOffRequest.status,
+        startDate: timeOffRequest.startDate,
+        endDate: timeOffRequest.endDate,
+        reason: timeOffRequest.reason,
+        talentName: talent.status, // Using status as a proxy for name if not joined properly, but let's join contact
+    }).from(timeOffRequest)
+    .leftJoin(talent, eq(timeOffRequest.talentId, talent.id) as any)
+    .$dynamic();
+    
+    const conditions = [];
+    if (talentId) {
+        conditions.push(eq(timeOffRequest.talentId, talentId));
+    }
+    
+    if (search) {
+        conditions.push(or(
+            ilike(timeOffRequest.reason, `%${search}%`),
+            ilike(timeOffRequest.type, `%${search}%`)
+        ));
+    }
+
+    if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+    }
+
+    const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+    const total = Number(countResult[0]?.count || 0);
+
+    const data = await baseQuery
+        .orderBy(desc(timeOffRequest.startDate) as any)
+        .limit(limit)
+        .offset(offset);
+
+    return { data, total };
 });
 
 export const getMyTimeOffRequests = query(v.string(), async (talentId) => {
     ensureAccess(getAuthenticatedUser(), 'timesheets');
     return await getMyTimeOffRequestsCore(talentId);
+});
+
+export const getMyTimeOffBalances = query(v.string(), async (talentId) => {
+    ensureAccess(getAuthenticatedUser(), 'timesheets');
+    return await getMyTimeOffBalancesCore(talentId);
 });
 
 export const requestTimeOff = form(timeOffRequestSchema, async (data) => {

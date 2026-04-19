@@ -19,7 +19,7 @@
         {#await itemsPromise}
             <LoadingSection message={m.loading_users()} />
         {:then items}
-            <UserList {items} onRefresh={refresh} deleteUserFn={async (id) => await deleteUser(id)} {m} />
+            <UserList items={items.data || []} onRefresh={refresh} deleteUserFn={async (id) => await deleteUser(id)} {m} />
         {:catch error}
             <ErrorSection
                 headline={m.failed_to_load_users()}

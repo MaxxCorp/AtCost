@@ -60,11 +60,16 @@ const tagSchemaPure = v.object({
 export const contactSchema = v.intersect([
     contactBaseSchema,
     v.object({
-        id: v.optional(v.pipe(v.string(), v.uuid())),
+        id: v.pipe(v.string(), v.uuid()),
+        createdAt: v.optional(v.string()), // Serialized from ISO string
+        updatedAt: v.optional(v.string()),
         emails: v.optional(v.array(emailSchemaPure)),
         phones: v.optional(v.array(phoneSchemaPure)),
         addresses: v.optional(v.array(addressSchemaPure)),
-        locationAssociations: v.optional(v.array(v.object({ location: v.any() }))),
+        locationAssociations: v.optional(v.array(v.object({ 
+            location: v.any(),
+            locationId: v.optional(v.string())
+        }))),
         relations: v.optional(v.array(contactRelationSchemaPure)),
         tags: v.optional(v.array(tagSchemaPure)),
         participationStatus: v.optional(v.string()),
@@ -72,6 +77,7 @@ export const contactSchema = v.intersect([
 ]);
 
 export type Contact = v.InferOutput<typeof contactSchema>;
+
 
 export const createContactSchema = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),

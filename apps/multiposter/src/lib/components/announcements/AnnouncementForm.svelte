@@ -13,7 +13,8 @@
     import { EntityManager } from "@ac/ui";
     import TagInput from "$lib/components/ui/TagInput.svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
-    import type { Location } from "../../../routes/locations/list.remote";
+    import { type Location } from "@ac/validations";
+
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import {
@@ -27,7 +28,8 @@
         removeLocationAssociation,
     } from "../../../routes/locations/associate.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import type { Contact } from "$lib/validations/contacts";
+    import { type Contact } from "@ac/validations";
+
     import {
         addAssociation,
         removeAssociation,
@@ -88,7 +90,7 @@
 
     onMount(async () => {
         try {
-            locations = await listLocations();
+            locations = (await listLocations()).data;
         } catch (e) {
             console.error("Failed to load locations", e);
         }

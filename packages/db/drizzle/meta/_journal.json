@@ -15,6 +15,13 @@
       "when": 1776020271620,
       "tag": "0001_brave_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776558139353,
+      "tag": "0002_outstanding_mole_man",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,8 @@
 <script lang="ts">
-    import type { PublicEvent } from "../../../routes/events/list-public.remote";
-    import type { Announcement } from "../../../routes/announcements/list.remote";
+    import { type PublicEvent } from "@ac/validations";
+
+    import { type Announcement } from "@ac/validations";
+
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
 

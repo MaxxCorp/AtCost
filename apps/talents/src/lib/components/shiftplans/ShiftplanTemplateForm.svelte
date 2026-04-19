@@ -54,7 +54,7 @@
 
     onMount(async () => {
         if (selectedLocationId) {
-            const locs = await listLocations();
+            const { data: locs } = await listLocations({});
             const loc = locs.find((l: any) => l.id === selectedLocationId);
             if (loc) selectedLocationName = loc.name;
         }
@@ -322,12 +322,12 @@
             </div>
 
             <div class="flex-1 overflow-y-auto p-4 space-y-2">
-                {#await listLocations()}
+                {#await listLocations({})}
                     <div class="py-10 text-center text-gray-400">
                         Loading locations...
                     </div>
-                {:then locations}
-                    {#each locations as loc}
+                {:then result}
+                    {#each result.data as loc}
                         <button
                             type="button"
                             onclick={() => handleLocationSelect(loc)}

@@ -12,3 +12,10 @@ export const updateShiftplanSchema = v.object({
     locationId: v.optional(v.string()),
     schedule: v.optional(v.string()),
 });
+export interface ShiftplanOverview {
+    id: string;
+    name: string;
+    schedule: any;
+    createdAt: string;
+    locationName: string | null;
+}

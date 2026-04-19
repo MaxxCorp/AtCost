@@ -1,7 +1,8 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
     import { Calendar, MapPin } from "@lucide/svelte";
-    import type { Announcement } from "../../../routes/announcements/list.remote";
+    import { type Announcement } from "@ac/validations";
+
 
     let { announcement } = $props<{ announcement: any }>();
 </script>

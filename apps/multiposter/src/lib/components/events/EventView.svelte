@@ -1,5 +1,6 @@
 <script lang="ts">
-    import type { PublicEvent } from "../../../routes/events/list-public.remote";
+    import { type PublicEvent } from "@ac/validations";
+
     import { m } from "$lib/paraglide/messages";
     import { getLocale } from "$lib/paraglide/runtime";
     import {

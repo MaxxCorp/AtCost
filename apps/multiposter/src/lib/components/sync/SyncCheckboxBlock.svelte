@@ -38,12 +38,12 @@
 
     {#await configsPromise}
         <p class="text-sm text-gray-500">Loading synchronizations...</p>
-    {:then configs}
-        {#if configs.length === 0}
+    {:then result}
+        {#if !result.data || result.data.length === 0}
             <p class="text-sm text-gray-500 italic">No synchronizations configured.</p>
         {:else}
             <div class="space-y-2 border rounded-md p-4 bg-gray-50 max-h-64 overflow-y-auto">
-                {#each configs as config}
+                {#each result.data as config}
                     {#if config.enabled}
                         <label class="flex items-center gap-3 py-2 px-2 hover:bg-white border border-transparent hover:border-gray-200 rounded transition-colors cursor-pointer">
                             <input 
@@ -53,7 +53,7 @@
                                 onchange={() => toggleConfig(config.id)}
                             />
                             <div class="flex flex-col">
-                                <span class="text-sm font-medium text-gray-900 capitalize">{config.providerType.replace(/-/g, ' ')}</span>
+                                <span class="text-sm font-medium text-gray-900 capitalize">{config.providerType?.replace(/-/g, ' ') ?? 'Unknown'}</span>
                                 <span class="text-xs text-gray-500 font-mono">{config.providerId}</span>
                             </div>
                         </label>
@@ -62,6 +62,7 @@
             </div>
         {/if}
     {/await}
+
     
     <input {...syncFieldConfig.as("hidden", hiddenValue)} />
 </div>

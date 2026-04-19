@@ -135,7 +135,8 @@
 
     onMount(async () => {
         try {
-            allContacts = await listContactsRemote();
+            const res: any = await listContactsRemote();
+            allContacts = res?.data ?? res ?? [];
         } catch (e) {
             console.error("Failed to load contacts for relations", e);
         }

@@ -1,14 +1,47 @@
 import { query, form, command } from '$app/server';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray } from '$lib/server/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, ilike, or, and, sql } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
-import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema } from '@ac/validations';
-// Unifying Drizzle operators via $lib/server/db
+import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema, PaginationSchema, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 import { readTalentCore, type TalentProfile } from '$lib/server/talents/service';
 
-export const listTalents = query(v.undefined_(), async (): Promise<any[]> => {
-    ensureAccess(getAuthenticatedUser(), 'talents');
-    const results = await db.query.talent.findMany({
+
+export const listTalents = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
+    const authUser = getAuthenticatedUser();
+    ensureAccess(authUser, 'talents');
+
+    const { page = 1, limit = 50, search = '' } = input || {};
+    const offset = (page - 1) * limit;
+
+    let baseQuery = db.select().from(talent).$dynamic();
+    
+    const conditions: any[] = [];
+    if (search) {
+        conditions.push(or(
+            ilike(talent.jobTitle, `%${search}%`),
+            ilike(talent.status, `%${search}%`)
+        ));
+    }
+    if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+    }
+
+    const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+    const total = Number(countResult[0]?.count || 0);
+
+    const talentsWithId = await baseQuery
+        .orderBy(desc(talent.updatedAt))
+        .limit(limit)
+        .offset(offset);
+        
+    const ids = talentsWithId.map(t => t.id);
+
+    if (ids.length === 0) {
+        return { data: [], total };
+    }
+
+    const rawTalents = await db.query.talent.findMany({
+        where: inArray(talent.id, ids),
         with: {
             contact: {
                 with: {
@@ -24,8 +57,10 @@ export const listTalents = query(v.undefined_(), async (): Promise<any[]> => {
                 limit: 3
             }
         },
-        orderBy: [desc(talent.updatedAt)]
+        orderBy: [desc(talent.updatedAt)],
     });
+
+    const results = rawTalents;
 
     // Resolve linked users for each talent's contact
     const contactIds = results.filter(t => t.contact != null).map(t => t.contact.id);
@@ -46,7 +81,7 @@ export const listTalents = query(v.undefined_(), async (): Promise<any[]> => {
         if (u) userByContactId.set(ul.contactId, u);
     }
 
-    return results.filter(t => t.contact != null).map(t => ({
+    const data = results.filter(t => t.contact != null).map(t => ({
         id: t.id,
         contactId: t.contactId,
         status: t.status,
@@ -97,6 +132,8 @@ export const listTalents = query(v.undefined_(), async (): Promise<any[]> => {
             data: te.data,
         })),
     }));
+
+    return { data, total };
 });
 
 export const readTalent = query(v.string(), async (id): Promise<TalentProfile | null> => {

@@ -23,8 +23,8 @@
                 <ResourceForm
                     remoteFunction={createResource}
                     validationSchema={createResourceSchema}
-                    {locations}
-                    {allResources}
+                    locations={locations.data}
+                    allResources={allResources.data}
                 />
             {/await}
         </div>

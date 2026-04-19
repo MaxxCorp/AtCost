@@ -113,7 +113,6 @@ export const deleteSeries = command(
 
             console.log(`Deleted ${legacyIds.length} events via legacy recurringEventId`);
         }
-
         // Publish deletion events
         if (deletedEventIds.length > 0) {
             await publishEventChange('delete', deletedEventIds);

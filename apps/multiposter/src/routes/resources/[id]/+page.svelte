@@ -34,8 +34,9 @@
                         validationSchema={updateResourceSchema}
                         isUpdating={true}
                         initialData={resource}
-                        {locations}
-                        {allResources}
+                        locations={locations.data}
+                        allResources={allResources.data}
+
                     />
                 </div>
             </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
-    import type { Location } from "../../../routes/locations/list.remote";
+    import { type Location } from "@ac/validations";
+
 
     let {
         selectedIds = $bindable([]),

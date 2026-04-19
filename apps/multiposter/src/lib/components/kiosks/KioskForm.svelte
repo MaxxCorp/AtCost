@@ -1,6 +1,7 @@
 <script lang="ts">
     import { listLocations } from "../../../routes/locations/list.remote";
-    import type { Location } from "../../../routes/locations/list.remote";
+    import { type Location } from "@ac/validations";
+
     import * as m from "$lib/paraglide/messages";
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
@@ -74,7 +75,7 @@
  
     onMount(async () => {
         try {
-            locations = await listLocations();
+            locations = (await listLocations()).data;
             loaded = true;
         } catch (e) {
             console.error("Failed to load locations", e);

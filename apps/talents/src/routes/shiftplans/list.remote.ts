@@ -1,32 +1,54 @@
 import { query } from '$app/server';
-import { db, shiftPlanTemplate, location, eq, desc } from '$lib/server/db';
+import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { ShiftPlanTemplate } from '@ac/db';
 import * as v from 'valibot';
 
-export interface ShiftplanOverview {
-    id: string;
-    name: string;
-    schedule: any;
-    createdAt: Date;
-    locationName: string | null;
-}
+import { PaginationSchema, type ShiftplanOverview, type PaginatedResult } from '@ac/validations';
 
-export const listShiftplans = query(v.undefined_(), async (): Promise<any[]> => {
+
+export const listShiftplans = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
+
+    const { page = 1, limit = 50, search = '' } = input || {};
+    const offset = (page - 1) * limit;
+
+    let baseQuery = db.select({
+        id: shiftPlanTemplate.id,
+        name: shiftPlanTemplate.name,
+        schedule: shiftPlanTemplate.schedule,
+        createdAt: shiftPlanTemplate.createdAt,
+        locationName: location.name,
+    }).from(shiftPlanTemplate)
+    .leftJoin(location, eq(shiftPlanTemplate.locationId, location.id) as any)
+    .$dynamic();
     
-    return await db
-        .select({
-            id: shiftPlanTemplate.id,
-            name: shiftPlanTemplate.name,
-            schedule: shiftPlanTemplate.schedule,
-            createdAt: shiftPlanTemplate.createdAt,
-            locationName: location.name,
-        })
-        .from(shiftPlanTemplate)
-        .leftJoin(location, eq(shiftPlanTemplate.locationId, location.id) as any)
-        .orderBy(desc(shiftPlanTemplate.createdAt) as any);
+    const conditions: any[] = [];
+    if (search) {
+        conditions.push(or(
+            ilike(shiftPlanTemplate.name, `%${search}%`),
+            ilike(location.name, `%${search}%`)
+        ));
+    }
+
+    if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+    }
+
+    const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+    const total = Number(countResult[0]?.count || 0);
+
+    const data = (await baseQuery
+        .orderBy(desc(shiftPlanTemplate.createdAt) as any)
+        .limit(limit)
+        .offset(offset)).map(row => ({
+            ...row,
+            createdAt: row.createdAt.toISOString()
+        }));
+
+    return { data, total };
+
 });
 
 export const getShiftplan = query(v.string(), async (id): Promise<ShiftPlanTemplate | null> => {

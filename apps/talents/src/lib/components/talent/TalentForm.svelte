@@ -133,14 +133,14 @@
             if (!tagsInput) tagsInput = "Applicant";
         }
         try {
-            const [users, locations] = await Promise.all([
-                listSystemUsers(),
-                listLocations()
+            const [usersResult, locationsResult] = await Promise.all([
+                listSystemUsers(), // Internal query still returns array? Let's check.
+                listLocations({})
             ]);
-            systemUsers = users;
-            allLocations = locations;
+            systemUsers = Array.isArray(usersResult) ? usersResult : (usersResult as any).data;
+            allLocations = locationsResult.data;
         } catch (e) {
-            console.error("Failed to load system users", e);
+            console.error("Failed to load system users or locations", e);
         }
     });
 

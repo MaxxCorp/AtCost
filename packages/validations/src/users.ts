@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import { type User as DbUser } from '@ac/db';
 
 export const userBaseSchema = v.object({
     id: v.pipe(v.string()),
@@ -14,3 +15,11 @@ export const updateUserSchema = v.intersect([
 ]);
 
 export const deleteUserSchema = v.array(v.string());
+
+export type User = Omit<DbUser, 'createdAt' | 'updatedAt'> & {
+    createdAt: string;
+    updatedAt: string;
+};
+
+
+

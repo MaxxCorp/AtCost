@@ -2,7 +2,8 @@ import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { event, eventResource, eventContact, contact, contactEmail, contactPhone, eventLocation, contactTag, tag, locationContact, eventTag, campaign, location } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
-import type { Event } from '../list.remote';
+import { type Event } from '@ac/validations';
+
 import { getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';

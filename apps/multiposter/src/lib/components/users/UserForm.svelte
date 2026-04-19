@@ -9,7 +9,8 @@
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { EntityManager } from "@ac/ui";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import type { Contact } from "$lib/validations/contacts";
+    import { type Contact } from "@ac/validations";
+
     import {
         addAssociation,
         removeAssociation,

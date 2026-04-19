@@ -10,7 +10,8 @@
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { EntityManager } from "@ac/ui";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import type { Contact } from "$lib/validations/contacts";
+    import { type Contact } from "@ac/validations";
+
     import {
         addAssociation,
         removeAssociation,
@@ -27,6 +28,8 @@
     import { User, MapPin, Box } from "@lucide/svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
+    import { type Location } from "@ac/validations";
+
     import {
         addLocationAssociation,
         removeLocationAssociation,

@@ -2,7 +2,8 @@ import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact, campaign, location } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
-import type { Announcement } from '../list.remote';
+import { type Announcement } from '@ac/validations';
+
 import { getOptionalUser, hasAccess, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 

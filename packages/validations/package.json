@@ -26,8 +26,10 @@
         }
     },
     "dependencies": {
+        "@ac/db": "workspace:*",
         "valibot": "^1.2.0"
     },
+
     "devDependencies": {
         "typescript": "^5.7.3"
     }

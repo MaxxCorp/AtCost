@@ -1,9 +1,10 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import * as m from "$lib/paraglide/messages";
-    import type { Event } from "../../../routes/events/list.remote";
+    import { type Event } from "@ac/validations";
     import { deleteEvents as deleteEventAction } from "../../../routes/events/[id]/delete.remote";
     import { deleteSeries as deleteSeriesAction } from "../../../routes/events/[id]/delete-series.remote";
+
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
@@ -15,13 +16,15 @@
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import { listLocations } from "../../../routes/locations/list.remote";
-    import type { Location } from "../../../routes/locations/list.remote";
+    import { type Location } from "@ac/validations";
+
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
     import { onMount, type Snippet } from "svelte";
     import { EntityManager } from "@ac/ui";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import type { Contact } from "$lib/validations/contacts";
+    import { type Contact } from "@ac/validations";
+
     import {
         addAssociation,
         removeAssociation,
@@ -219,9 +222,9 @@
 
     onMount(async () => {
         const [resResources, resLocations] = await Promise.all([resourcesPromise, locationsPromise]);
-        resources = resResources as any;
+        resources = (resResources as any).data ?? resResources;
         resourcesLoaded = true;
-        locations = resLocations as any;
+        locations = (resLocations as any).data ?? resLocations;
         locationsLoaded = true;
 
         // Fallback logic for legacy single-string location finding
@@ -290,7 +293,7 @@
     async function findInitialLocationId() {
         if (!initialData?.location) return "";
         const allLocs = await locationsPromise;
-        const match = allLocs.find((l: Location) => {
+        const match = allLocs.data.find((l: Location) => {
             const parts = [l.name];
             if (l.roomId) parts.push(l.roomId);
             // Simple check for start of string or full match
@@ -399,7 +402,7 @@
     async function onLocationSelect(id: string) {
         selectedLocationIds = [id];
         const allLocs = await locationsPromise;
-        const l = allLocs.find((x: Location) => x.id === id);
+        const l = allLocs.data.find((x: Location) => x.id === id);
         if (l) {
             const parts = [l.name];
             if (l.roomId) parts.push(l.roomId);

@@ -2,6 +2,8 @@
     import * as m from "$lib/paraglide/messages";
     import SharedContactForm from "@ac/ui/components/forms/ContactForm.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
+    import { type Location, type Contact } from "@ac/validations";
+
     import type { Snippet } from "svelte";
 
     interface Props {
@@ -39,7 +41,7 @@
     {contactId}
     {loading}
     {children}
-    listContactsRemote={listContacts}
+    listContactsRemote={listContacts as any}
     labels={{
         basicInformation: m.basic_information(),
         displayName: m.display_name(),

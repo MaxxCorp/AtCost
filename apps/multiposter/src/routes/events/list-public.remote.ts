@@ -3,46 +3,8 @@ import { db } from '$lib/server/db';
 import { eq, and, or, gte, lte, desc, isNull, inArray, ilike } from 'drizzle-orm';
 import { event, eventContact, contact, contactEmail, contactPhone, contactAddress, eventResource, resource, location, kiosk, kioskLocation, eventLocation, contactTag, tag, locationContact, eventTag } from '@ac/db';
 import * as v from 'valibot';
-import type { Event } from './list.remote';
+import { type Event, type PublicEvent, type PaginatedResult } from '@ac/validations';
 
-export type PublicEvent = Omit<Event, 'resolvedContact'> & {
-    resolvedContact: {
-        name: string;
-        company?: string | null;
-        role?: string | null;
-        department?: string | null;
-        emails: { value: string; type: string | null; primary: boolean }[];
-        phones: { value: string; type: string | null; primary: boolean }[];
-        address: {
-            street: string | null;
-            houseNumber: string | null;
-            zip: string | null;
-            city: string | null;
-            country: string | null;
-        } | null;
-        qrCodeDataUrl?: string;
-        qrCodePath?: string;
-    } | null;
-    ticketPrice?: string | null;
-    categoryBerlinDotDe?: string | null;
-    qrCodeDataUrl?: string;
-    confirmedParticipants?: number;
-    maxOccupancy?: number | null;
-    inclusivityInformation?: string[];
-    roomTitle?: string | null;
-    tags?: string[];
-    locationIds?: string[];
-    locations?: {
-        id: string;
-        name: string;
-        street: string | null;
-        houseNumber: string | null;
-        zip: string | null;
-        city: string | null;
-        country: string | null;
-        isPublic: boolean;
-    }[];
-};
 
 export const listPublicEvents = query(async (): Promise<PublicEvent[]> => {
     const now = new Date();

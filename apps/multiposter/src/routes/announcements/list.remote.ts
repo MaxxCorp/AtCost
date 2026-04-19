@@ -9,50 +9,51 @@ import type { Announcement as DbAnnouncement } from '@ac/db';
 /**
  * Announcement interface matching the database schema, with dates serialized to strings
  */
-export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
-    createdAt: string;
-    updatedAt: string;
-    tagIds?: string[];
-    tagNames?: string[];
-    syncIds?: string[];
-    contactIds?: string[];
-    locationIds?: string[];
-    locations?: {
-        id: string;
-        name: string;
-        street: string | null;
-        houseNumber: string | null;
-        zip: string | null;
-        city: string | null;
-        country: string | null;
-        isPublic: boolean;
-    }[];
-    resolvedContact?: {
-        name: string;
-        email: string;
-        phone: string;
-        qrCodeDataUrl?: string;
-        qrCodePath?: string;
-    } | null;
-};
+import { PaginationSchema, type Announcement, type PaginatedResult } from '@ac/validations';
+
+
 
 /**
  * List all announcements for the authenticated user
  */
-export const listAnnouncements = query(v.undefined_(), async (): Promise<Announcement[]> => {
+export const listAnnouncements = query(PaginationSchema, async (input): Promise<PaginatedResult<Announcement>> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'announcements');
 
-    const rawResults = await db
-        .select()
-        .from(announcement)
-        .orderBy(desc(announcement.createdAt));
+    const { page = 1, limit = 50, search = '' } = input || {};
+    const offset = (page - 1) * limit;
+
+    let baseQuery = db.select().from(announcement).$dynamic();
+    
+    const conditions = [];
+    if (search) {
+        const { ilike, or } = await import('drizzle-orm');
+        conditions.push(or(
+            ilike(announcement.title, `%${search}%`),
+            ilike(announcement.content as any, `%${search}%`)
+        ));
+    }
+
+    if (conditions.length > 0) {
+        const { and } = await import('drizzle-orm');
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+    }
+
+    const { sql } = await import('drizzle-orm');
+    const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+    const total = Number(countResult[0]?.count || 0);
+
+    const rawResults = await baseQuery
+        .orderBy(desc(announcement.createdAt))
+        .limit(limit)
+        .offset(offset);
 
     const results = rawResults.map((row) => ({
         ...row,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
     }));
+
     // Fetch campaigns for all announcements
     const campaignIds = results.map((a) => a.campaignId).filter(Boolean) as string[];
     const campaignsMap = new Map<string, string[]>();
@@ -66,10 +67,12 @@ export const listAnnouncements = query(v.undefined_(), async (): Promise<Announc
         }
     }
 
-    return results.map((announcement) => ({
+    const data = results.map((announcement) => ({
         ...announcement,
         syncIds: announcement.campaignId ? campaignsMap.get(announcement.campaignId) || [] : [],
     }));
+
+    return { data, total };
 });
 
 /**

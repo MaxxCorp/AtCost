@@ -5,7 +5,8 @@
     import { readUser } from "./read.remote";
     import { updateUser } from "./update.remote";
     import { deleteUser } from "./delete.remote";
-    import { updateUserSchema } from "$lib/validations/users";
+    import { updateUserSchema } from "@ac/validations";
+
     import { ErrorSection, LoadingSection, AsyncButton, UserForm, handleDelete } from "@ac/ui";
     import { User as UserIcon } from "@lucide/svelte";
     import { parseRoles } from "$lib/authorization";

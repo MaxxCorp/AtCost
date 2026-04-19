@@ -1,29 +1,38 @@
-import * as v from 'valibot';
-import { type InferSelectModel, db, desc } from '$lib/server/db';
 import { query } from '$app/server';
-import { contact } from '@ac/db';
+import { db, desc, and, or, ilike, sql, contact } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { PaginationSchema, type Contact, type PaginatedResult } from '@ac/validations';
+import * as v from 'valibot';
 
-export type Contact = Omit<InferSelectModel<typeof contact>, 'createdAt' | 'updatedAt' | 'birthday'> & {
-    createdAt: string;
-    updatedAt: string;
-    birthday: string | null;
-    emails?: any[];
-    phones?: any[];
-    addresses?: any[];
-    locationAssociations?: any[];
-    relations?: any[];
-    tags?: any[];
-};
 
-export const listContacts = query(v.undefined_(), async (): Promise<Contact[]> => {
+
+export const listContacts = query(PaginationSchema, async (input): Promise<PaginatedResult<Contact>> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'contacts');
 
-    const rawResults = await db
-        .select()
-        .from(contact)
-        .orderBy(desc(contact.createdAt));
+    const { page = 1, limit = 50, search = '' } = input || {};
+    const offset = (page - 1) * limit;
+
+    let baseQuery = db.select().from(contact).$dynamic();
+    
+    const conditions: any[] = [];
+    if (search) {
+        conditions.push(or(
+            ilike(contact.givenName, `%${search}%`),
+            ilike(contact.familyName, `%${search}%`)
+        ));
+    }
+    if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+    }
+
+    const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+    const total = Number(countResult[0]?.count || 0);
+
+    const rawResults = await baseQuery
+        .orderBy(desc(contact.createdAt))
+        .limit(limit)
+        .offset(offset);
 
     const results = rawResults.map((row) => ({
         ...row,
@@ -78,5 +87,5 @@ export const listContacts = query(v.undefined_(), async (): Promise<Contact[]> =
         } as Contact;
     }));
 
-    return contactsWithRelations;
+    return { data: contactsWithRelations, total };
 });

@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import type { Location as DbLocation } from '@ac/db';
 
 export const locationBaseSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
@@ -15,6 +16,14 @@ export const locationBaseSchema = v.object({
     what3words: v.optional(v.string()),
     inclusivitySupport: v.optional(v.string()),
 });
+
+/**
+ * Location interface matching the database schema, with dates serialized to strings
+ */
+export type Location = Omit<DbLocation, 'createdAt' | 'updatedAt'> & {
+	createdAt: string;
+	updatedAt: string;
+};
 
 export const createLocationSchema = locationBaseSchema;
 export const updateLocationSchema = v.intersect([

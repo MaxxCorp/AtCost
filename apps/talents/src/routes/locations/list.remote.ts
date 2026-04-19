@@ -1,26 +1,47 @@
 import * as v from 'valibot';
-import { type InferSelectModel, db, desc } from '$lib/server/db';
+import { type InferSelectModel, db, desc, and, or, ilike, sql } from '$lib/server/db';
 import { query } from '$app/server';
 import { location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
-export type Location = Omit<InferSelectModel<typeof location>, 'createdAt' | 'updatedAt'> & {
-    createdAt: string;
-    updatedAt: string;
-};
+import { PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
 
-export const listLocations = query(v.undefined_(), async (): Promise<Location[]> => {
+
+export const listLocations = query(PaginationSchema, async (input): Promise<PaginatedResult<Location>> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'locations');
 
-    const rawResults = await db
-        .select()
-        .from(location)
-        .orderBy(desc(location.createdAt));
+    const { page = 1, limit = 50, search = '' } = input || {};
+    const offset = (page - 1) * limit;
 
-    return rawResults.map((row) => ({
+    let baseQuery = db.select().from(location).$dynamic();
+    
+    const conditions: any[] = [];
+    if (search) {
+        conditions.push(or(
+            ilike(location.name, `%${search}%`),
+            ilike(location.city, `%${search}%`),
+            ilike(location.street, `%${search}%`)
+        ));
+    }
+
+    if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+    }
+
+    const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+    const total = Number(countResult[0]?.count || 0);
+
+    const rawResults = await baseQuery
+        .orderBy(desc(location.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+    const data = rawResults.map((row) => ({
         ...row,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
     }));
+
+    return { data, total };
 });

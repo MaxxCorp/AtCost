@@ -6,8 +6,8 @@
     import EventView from "$lib/components/events/EventView.svelte";
     import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
     import KioskTableView from "$lib/components/kiosks/KioskTableView.svelte";
-    import type { PublicEvent } from "../../../events/list-public.remote";
-    import type { Announcement } from "../../../announcements/list.remote";
+    import { type PublicEvent, type Announcement } from "@ac/validations";
+
     import { browser } from "$app/environment";
     // import * as Ably from "ably";
     import { toast } from "svelte-sonner";

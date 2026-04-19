@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { listEvents } from "./list.remote";
+	import { listLocations } from "../locations/list.remote";
+	import { listTags } from "../tags/list.remote";
+	import { listContacts } from "../contacts/list.remote";
 	import * as m from "$lib/paraglide/messages.js";
-	import type { Event } from "./list.remote";
+	import type { Event } from "@ac/validations";
 	import { deleteEvents } from "./delete.remote";
 	import { deleteSeries } from "./[id]/delete-series.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-	import BulkActionToolbar from "$lib/components/ui/BulkActionToolbar.svelte";
 	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-	import EmptyState from "$lib/components/ui/EmptyState.svelte";
+	import { EntityManager } from "@ac/ui";
 	import {
 		Calendar,
 		MapPin,
@@ -27,60 +27,13 @@
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
 	import { goto } from "$app/navigation";
-	// import * as Ably from "ably"; // Removing static import
 	import { toast } from "svelte-sonner";
 
-	const query = listEvents();
-	let selectedIds = $state<Set<string>>(new Set());
-
-	let realtime: any; // Declare realtime at a higher scope
-
-	onMount(() => {
-		if (browser) {
-			// @ts-ignore
-			import("ably")
-				.then((AblyModule) => {
-					const Ably = AblyModule.default;
-					realtime = new Ably.Realtime({ authUrl: "/api/ably/auth" });
-					const eventsChannel =
-						realtime.channels.get("event-changes");
-					eventsChannel.subscribe("change", (message: any) => {
-						console.log("Event update received:", message.data);
-						query.refresh();
-						toast.info(m.events_updated(), {
-							description: m.refreshing_list(),
-						});
-					});
-				})
-				.catch((e) => {
-					console.error("Failed to connect to Ably:", e);
-				});
-
-			return () => {
-				if (realtime) {
-					realtime.close();
-				}
-			};
-		}
-	});
-
-	function isSelected(id: string) {
-		return selectedIds.has(id);
-	}
-	function toggleSelection(id: string) {
-		if (selectedIds.has(id)) {
-			selectedIds.delete(id);
-		} else {
-			selectedIds.add(id);
-		}
-		selectedIds = new Set(selectedIds);
-	}
-	function selectAll(items: Event[]) {
-		selectedIds = new Set(items.map((item) => item.id));
-	}
-	function deselectAll() {
-		selectedIds = new Set();
-	}
+	// We still initialize the Ably listener. As listEvents is passed to EntityManager, it handles its own QueryHandle.
+	// We'll manage the refresh indirectly or manually. Since EntityManager now calls listEvents({page, limit}) reactively,
+	// if we just reassigned a "version" variable we could force a refresh. But Ably is tricky.
+	
+	let ablyConnected = $state(false);
 
 	function formatEventTime(event: Event): string {
 		if (event.isAllDay && event.startDateTime) {
@@ -127,288 +80,200 @@
 		);
 	}
 
+	const eventAssociations = [
+		{
+			id: "locationId",
+			label: m.location(),
+			listRemote: listLocations,
+			getOptionLabel: (l: any) => l.name
+		},
+		{
+			id: "tagId",
+			label: m.tags(),
+			listRemote: listTags,
+			getOptionLabel: (t: any) => t.name
+		},
+		{
+			id: "contactId",
+			label: m.feature_contacts_title(),
+			listRemote: listContacts,
+			getOptionLabel: (c: any) => c.displayName || `${c.givenName || ""} ${c.familyName || ""}`
+		}
+	];
 </script>
 
 <div class="container mx-auto px-4 py-8">
 	<div class="max-w-4xl mx-auto">
 		<Breadcrumb feature="events" />
 		<div class="bg-white shadow rounded-lg p-6">
-			<div
-				class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4"
+			<EntityManager 
+				title={m.feature_events_title()} 
+				icon={Calendar} 
+				mode="standalone"
+				listItemsRemote={listEvents as any}
+				deleteItemRemote={async (ids: string[]) => {
+					return await handleDelete({
+						ids,
+						deleteFn: deleteEvents,
+						itemName: m.event_label().toLowerCase(),
+					});
+				}}
+				loadingLabel={m.loading_item({ item: m.feature_events_title() })}
+				noItemsFoundLabel={m.no_items_found({ item: m.feature_events_title() })}
+				searchPredicate={(e: Event, q: string) => e.summary.toLowerCase().includes(q.toLowerCase())}
+				filterAssociations={eventAssociations}
 			>
-				<h1 class="text-3xl font-bold flex-shrink-0">{m.feature_events_title()}</h1>
-				<div class="flex-1 flex justify-end w-full md:w-auto">
-					<BulkActionToolbar
-						selectedCount={selectedIds.size}
-						totalCount={query.current?.length ?? 0}
-						onSelectAll={() => selectAll(query.current ?? [])}
-						onDeselectAll={deselectAll}
-						onDelete={async () => {
-							await handleDelete({
-								ids: [...selectedIds],
-								deleteFn: deleteEvents,
-								itemName: m.event_label(),
-							});
-							deselectAll();
-						}}
-						newItemHref="/events/new"
-						newItemLabel={m.create_new({ item: m.feature_events_title() })}
-					/>
-				</div>
-			</div>
-
-			{#if query.loading}
-				<LoadingSection message={m.loading_item({ item: m.feature_events_title().toLowerCase() })} />
-			{:else if query.error}
-				<ErrorSection
-					headline={m.failed_to_load({ item: m.feature_events_title().toLowerCase() })}
-					message={query.error?.message || m.something_went_wrong()}
-					href="/events"
-					button={m.retry()}
-				/>
-			{:else if query.current}
-				<div class="grid gap-4">
-					{#if query.current.length === 0}
-						<EmptyState
-							icon={Calendar}
-							title={m.no_items({ items: m.feature_events_title() })}
-							description={m.get_started_creating({ item: m.feature_events_title().toLowerCase() })}
-							actionLabel={m.create_first({ item: m.feature_events_title().toLowerCase() })}
-							actionHref="/events/new"
+				{#snippet renderListItem(event: Event, { isSelected, toggleSelection, deleteItem })}
+					<div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
+						<input
+							type="checkbox"
+							checked={isSelected}
+							onchange={() => toggleSelection(event.id)}
+							class="mt-1 w-4 h-4 text-blue-600 rounded shrink-0"
 						/>
-					{:else}
-						{#each query.current as event (event.id)}
-							<div class="mb-6 last:mb-0">
-								<div
-									class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow"
-								>
-									<input
-										type="checkbox"
-										checked={isSelected(event.id)}
-										onchange={() =>
-											toggleSelection(event.id)}
-										class="mt-1 w-4 h-4 text-blue-600"
-									/>
-									<div class="flex-1 w-full min-w-0">
-										<div
-											class="flex items-start gap-3 mb-2"
+						<div class="flex-1 w-full min-w-0">
+							<div class="flex items-start gap-3 mb-2">
+								<div class="flex-1 min-w-0">
+									<h2 class="text-xl font-semibold break-all text-pretty">
+										<a
+											href={`/events/${event.id}/view`}
+											class="hover:underline text-blue-600"
 										>
-											<div class="flex-1 min-w-0">
-												<h2
-													class="text-xl font-semibold break-all text-pretty"
-												>
-												<a
-													href={`/events/${event.id}/view`}
-													class="hover:underline text-blue-600"
-												>
-													{event.summary}
-												</a>
-												</h2>
-											</div>
-										</div>
-										<div class="flex flex-col gap-1 mt-1">
-											<div
-												class="flex items-center gap-2"
-											>
-												<Calendar
-													size={14}
-													class="text-blue-500"
-												/>
-												<span
-													class="text-xs text-gray-500 break-all text-pretty"
-													>{formatEventTime(
-														event,
-													)}</span
-												>
-											</div>
-											{#if event.location}
-												<div
-													class="flex items-center gap-2 min-w-0"
-												>
-													<MapPin
-														size={14}
-														class="text-red-500 shrink-0"
-													/>
-													<span
-														class="text-xs text-gray-400 break-all text-pretty"
-														>{event.location}</span
-													>
-												</div>
-											{/if}
-											<div
-												class="flex flex-wrap items-center gap-2 mt-1"
-											>
-												{#if event.isPublic}
-													<div
-														class="flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full border border-green-100"
-													>
-														<Earth
-															size={12}
-															class="text-green-600"
-														/>
-														<span
-															class="text-[10px] text-green-700 font-medium"
-															>{m.public()}</span
-														>
-													</div>
-												{/if}
-												{#if event.tags && event.tags.length > 0}
-													{#each event.tags as tag}
-														<span
-															class="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-medium rounded-full border border-indigo-100 flex items-center gap-1"
-														>
-															<TagIcon
-																size={12}
-															/>
-															{tag}
-														</span>
-													{/each}
-												{/if}
-											</div>
-										</div>
-									</div>
-									<div
-										class="flex flex-col gap-2 shrink-0 items-end"
-									>
-										{#if isSeriesEvent(event)}
-											<DropdownMenu.Root>
-												<DropdownMenu.Trigger>
-													<Button
-														variant="default"
-														size="default"
-														class="flex items-center gap-2 w-[120px] justify-start"
-														><Pencil size={16} />
-														<span class="ml-auto"
-															>{m.edit()}</span
-														>
-														<ChevronDown
-															size={14}
-															class="ml-auto"
-														/></Button
-													>
-												</DropdownMenu.Trigger>
-												<DropdownMenu.Content
-													align="end"
-												>
-													<DropdownMenu.Item
-														onclick={() =>
-															goto(
-																`/events/${event.id}`,
-															)}
-														><Pencil
-															size={14}
-															class="mr-2"
-														/> {m.edit_item({ item: m.instance() })}</DropdownMenu.Item
-													>
-													<DropdownMenu.Item
-														onclick={() =>
-															goto(
-																`/events/${event.recurringEventId || event.id}?editSeries=true`,
-															)}
-														><RefreshCw
-															size={14}
-															class="mr-2"
-														/> {m.edit_item({ item: m.series() })}</DropdownMenu.Item
-													>
-												</DropdownMenu.Content>
-											</DropdownMenu.Root>
-											<DropdownMenu.Root>
-												<DropdownMenu.Trigger>
-													<Button
-														variant="destructive"
-														size="default"
-														class="flex items-center gap-2 w-[120px] justify-start"
-														><Trash2 size={16} />
-														<span class="ml-auto"
-															>{m.delete()}</span
-														>
-														<ChevronDown
-															size={14}
-															class="ml-auto"
-														/></Button
-													>
-												</DropdownMenu.Trigger>
-												<DropdownMenu.Content
-													align="end"
-												>
-													<DropdownMenu.Item
-														onclick={async () => {
-															await handleDelete({
-																ids: [event.id],
-																deleteFn:
-																	deleteEvents,
-																itemName:
-																	m.instance().toLowerCase(),
-															});
-															deselectAll();
-														}}
-														><Trash2
-															size={14}
-															class="mr-2"
-														/> {m.delete()} {m.instance()}</DropdownMenu.Item
-													>
-													<DropdownMenu.Item
-														onclick={async () => {
-															if (
-																!confirm(
-																	m.delete_series_confirm(),
-																)
-															)
-																return;
-															await deleteSeries(
-																event.id,
-															);
-															toast.success(
-																m.series_deleted(),
-															);
-															query.refresh();
-															deselectAll();
-														}}
-														><RefreshCw
-															size={14}
-															class="mr-2"
-														/> {m.delete()} {m.series()}</DropdownMenu.Item
-													>
-												</DropdownMenu.Content>
-											</DropdownMenu.Root>
-										{:else}
-											<Button
-												href={`/events/${event.id}`}
-												variant="default"
-												size="default"
-												class="flex items-center gap-2 w-[120px] justify-center"
-											>
-												<Pencil size={16} /> {m.edit()}
-											</Button>
-											<AsyncButton
-												variant="destructive"
-												size="default"
-												loading={false}
-												loadingLabel={m.deleting()}
-												class="flex items-center gap-2 w-[120px] justify-center"
-												onclick={async () => {
-													const success =
-														await handleDelete({
-															ids: [event.id],
-															deleteFn:
-																deleteEvents,
-															itemName: m.event_label(),
-														});
-													if (success) {
-														deselectAll();
-													}
-												}}
-											>
-												<Trash2 size={16} /> {m.delete()}
-											</AsyncButton>
-										{/if}
-									</div>
+											{event.summary}
+										</a>
+									</h2>
 								</div>
 							</div>
-						{/each}
-					{/if}
-				</div>
-			{/if}
+							<div class="flex flex-col gap-1 mt-1">
+								<div class="flex items-center gap-2">
+									<Calendar size={14} class="text-blue-500" />
+									<span class="text-xs text-gray-500 break-all text-pretty">
+										{formatEventTime(event)}
+									</span>
+								</div>
+								{#if event.location}
+									<div class="flex items-center gap-2 min-w-0">
+										<MapPin size={14} class="text-red-500 shrink-0" />
+										<span class="text-xs text-gray-400 break-all text-pretty">
+											{event.location}
+										</span>
+									</div>
+								{/if}
+								<div class="flex flex-wrap items-center gap-2 mt-1">
+									{#if event.isPublic}
+										<div class="flex items-center gap-1 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+											<Earth size={12} class="text-green-600" />
+											<span class="text-[10px] text-green-700 font-medium">
+												{m.public()}
+											</span>
+										</div>
+									{/if}
+									{#if event.tags && event.tags.length > 0}
+										{#each event.tags as tag}
+											<span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-medium rounded-full border border-indigo-100 flex items-center gap-1">
+												<TagIcon size={12} />
+												{tag}
+											</span>
+										{/each}
+									{/if}
+								</div>
+							</div>
+						</div>
+						
+						<div class="flex flex-col gap-2 shrink-0 items-end">
+							{#if isSeriesEvent(event)}
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger>
+										<Button
+											variant="default"
+											size="default"
+											class="flex items-center gap-2 w-[120px] justify-start"
+										>
+											<Pencil size={16} />
+											<span class="ml-auto">{m.edit()}</span>
+											<ChevronDown size={14} class="ml-auto" />
+										</Button>
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content align="end">
+										<DropdownMenu.Item
+											onclick={() => goto(`/events/${event.id}`)}
+										>
+											<Pencil size={14} class="mr-2" /> 
+											{m.edit_item({ item: m.instance() })}
+										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											onclick={() => goto(`/events/${(event as any).recurringEventId || event.id}?editSeries=true`)}
+										>
+											<RefreshCw size={14} class="mr-2" /> 
+											{m.edit_item({ item: m.series() })}
+										</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger>
+										<Button
+											variant="destructive"
+											size="default"
+											class="flex items-center gap-2 w-[120px] justify-start"
+										>
+											<Trash2 size={16} />
+											<span class="ml-auto">{m.delete()}</span>
+											<ChevronDown size={14} class="ml-auto" />
+										</Button>
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content align="end">
+										<DropdownMenu.Item
+											onclick={async () => {
+												await handleDelete({
+													ids: [event.id],
+													deleteFn: deleteEvents,
+													itemName: m.instance().toLowerCase(),
+												});
+												// Note: Deselect All is handled by EntityManager if items are deleted via default actions, 
+												// but here we manually call delete backend. We could trigger deleteItem(event) instead if it's supported!
+											}}
+										>
+											<Trash2 size={14} class="mr-2" /> 
+											{m.delete()} {m.instance()}
+										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											onclick={async () => {
+												if (!confirm(m.delete_series_confirm())) return;
+												await deleteSeries(event.id);
+												toast.success(m.series_deleted());
+												// Note: Requires a hard page reload or EntityManager query reset in the future
+												location.reload(); 
+											}}
+										>
+											<RefreshCw size={14} class="mr-2" /> 
+											{m.delete()} {m.series()}
+										</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
+							{:else}
+								<Button
+									href={`/events/${event.id}`}
+									variant="default"
+									size="default"
+									class="flex items-center gap-2 w-[120px] justify-center"
+								>
+									<Pencil size={16} /> {m.edit()}
+								</Button>
+								<AsyncButton
+									variant="destructive"
+									size="default"
+									loading={false}
+									loadingLabel={m.deleting()}
+									class="flex items-center gap-2 w-[120px] justify-center"
+									onclick={() => deleteItem(event)}
+								>
+									<Trash2 size={16} /> {m.delete()}
+								</AsyncButton>
+							{/if}
+						</div>
+					</div>
+				{/snippet}
+			</EntityManager>
 		</div>
 	</div>
 </div>
