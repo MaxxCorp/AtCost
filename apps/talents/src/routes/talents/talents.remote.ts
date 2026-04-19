@@ -333,21 +333,25 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             }
 
             // 4. Link User Account (userContact)
-            await tx.delete(userContact).where(eq(userContact.contactId, contactId));
-            if (linkedUserId) {
-                await tx.insert(userContact).values({
-                    userId: linkedUserId,
-                    contactId,
-                }).onConflictDoNothing();
+            if (linkedUserId !== undefined) {
+                await tx.delete(userContact).where(eq(userContact.contactId, contactId));
+                if (linkedUserId) {
+                    await tx.insert(userContact).values({
+                        userId: linkedUserId,
+                        contactId,
+                    }).onConflictDoNothing();
+                }
             }
 
             // 5. Link User Account (userTalent)
-            await tx.delete(userTalent).where(eq(userTalent.talentId, talentId));
-            if (linkedUserId) {
-                await tx.insert(userTalent).values({
-                    userId: linkedUserId,
-                    talentId,
-                }).onConflictDoNothing();
+            if (linkedUserId !== undefined) {
+                await tx.delete(userTalent).where(eq(userTalent.talentId, talentId));
+                if (linkedUserId) {
+                    await tx.insert(userTalent).values({
+                        userId: linkedUserId,
+                        talentId,
+                    }).onConflictDoNothing();
+                }
             }
 
             return { talentId, contactId };
@@ -363,44 +367,75 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
 export const getMyTalentProfile = query(v.undefined_(), async (): Promise<TalentProfile | null> => {
     const authUser = getOptionalUser();
     if (!authUser) {
-        console.warn('[getMyTalentProfile] No authenticated user found.');
+        console.warn('[getMyTalentProfile] No authenticated user found in locals.');
         return null;
     }
 
     // Step 1: Explicit association via userTalent
-    const ut = await db.select().from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
-    if (ut[0]) {
-        const profile = await readTalentCore(ut[0].talentId);
-        if (profile) return profile;
+    try {
+        const ut = await db.select().from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
+        if (ut[0]) {
+            const profile = await readTalentCore(ut[0].talentId);
+            if (profile) return profile;
+        }
+    } catch (e) {
+        console.error('[getMyTalentProfile] Error in Step 1 (userTalent):', e);
     }
 
     // Step 2: Implicit association via userContact joined with talent
-    const talentLink = await db.select({ talentId: talent.id })
-        .from(userContact)
-        .innerJoin(talent, eq(talent.contactId, userContact.contactId))
-        .where(eq(userContact.userId, authUser.id))
-        .limit(1);
-    
-    if (talentLink[0]) {
-        const profile = await readTalentCore(talentLink[0].talentId);
-        if (profile) return profile;
+    try {
+        const talentLink = await db.select({ talentId: talent.id })
+            .from(userContact)
+            .innerJoin(talent, eq(talent.contactId, userContact.contactId))
+            .where(eq(userContact.userId, authUser.id))
+            .limit(1);
+        
+        if (talentLink[0]) {
+            console.log('[getMyTalentProfile] Step 2 match found:', talentLink[0].talentId);
+            const profile = await readTalentCore(talentLink[0].talentId);
+            if (profile) return profile;
+        }
+    } catch (e) {
+        console.error('[getMyTalentProfile] Error in Step 2 (userContact):', e);
+    }
+
+    // Step 2.5: Direct association via contact.userId ownership
+    try {
+        const directContactLink = await db.select({ talentId: talent.id })
+            .from(talent)
+            .innerJoin(contact, eq(contact.id, talent.contactId))
+            .where(eq(contact.userId, authUser.id))
+            .limit(1);
+        
+        if (directContactLink[0]) {
+            console.log('[getMyTalentProfile] Step 2.5 (ownership) match found:', directContactLink[0].talentId);
+            const profile = await readTalentCore(directContactLink[0].talentId);
+            if (profile) return profile;
+        }
+    } catch (e) {
+        console.error('[getMyTalentProfile] Error in Step 2.5 (contact ownership):', e);
     }
 
     // Step 3: Fallback association via email match
     if (authUser.email) {
-        const emailMatch = await db.select({ talentId: talent.id })
-            .from(talent)
-            .innerJoin(contact, eq(talent.contactId, contact.id))
-            .innerJoin(contactEmail, eq(contact.id, contactEmail.contactId))
-            .where(eq(sql`LOWER(${contactEmail.value})`, authUser.email.toLowerCase()))
-            .limit(1);
-            
-        if (emailMatch[0]) {
-            const profile = await readTalentCore(emailMatch[0].talentId);
-            if (profile) return profile;
+        try {
+            const emailMatch = await db.select({ talentId: talent.id })
+                .from(talent)
+                .innerJoin(contact, eq(talent.contactId, contact.id))
+                .innerJoin(contactEmail, eq(contact.id, contactEmail.contactId))
+                .where(eq(sql`LOWER(${contactEmail.value})`, authUser.email.toLowerCase()))
+                .limit(1);
+                
+            if (emailMatch[0]) {
+                const profile = await readTalentCore(emailMatch[0].talentId);
+                if (profile) return profile;
+            }
+        } catch (e) {
+            console.error('[getMyTalentProfile] Error in Step 3 (email):', e);
         }
     }
 
+    console.warn(`[getMyTalentProfile] No talent profile found for user ${authUser.id} (${authUser.email})`);
     return null;
 });
 

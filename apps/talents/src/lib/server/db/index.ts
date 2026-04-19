@@ -3,19 +3,33 @@ import postgres from 'postgres';
 import * as schema from '@ac/db/schema';
 import { env } from '$env/dynamic/private';
 
-// Connection string handling
-let connectionString = env.DATABASE_URL || process.env.DATABASE_URL || 'postgres://postgres:Soulhunter1!@localhost:5432/AtCost';
+// Lazy initialization - only create connection when db is actually accessed
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-// Clean up surrounding quotes from .env if they exist
-connectionString = connectionString.replace(/^"|"$/g, '');
-
-const client = postgres(connectionString);
+function getDb() {
+    if (!_db) {
+        let connectionString = env.DATABASE_URL || process.env.DATABASE_URL || 'postgres://postgres:Soulhunter1!@localhost:5432/AtCost';
+        
+        // Clean up surrounding quotes from .env if they exist
+        connectionString = connectionString.replace(/^"|"$/g, '');
+        
+        const client = postgres(connectionString);
+        _db = drizzle(client, { schema });
+    }
+    return _db;
+}
 
 /**
  * The standard type-safe Drizzle instance for the talents application.
  * Using this locally ensures we pick up app-specific environment variables correctly.
+ * Initialized lazily via Proxy to avoid issues during build or early module load.
  */
-export const db = drizzle(client, { schema });
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+    get(target, prop) {
+        const database = getDb();
+        return database[prop as keyof typeof database];
+    }
+});
 
 // Re-export all schema objects directly from the schema entry point
 export * from '@ac/db/schema';

@@ -4,7 +4,7 @@ import { env } from '$env/dynamic/private';
 
 // Ensure legacy dependencies see the database URL
 if (env.DATABASE_URL) {
-    process.env.DATABASE_URL = env.DATABASE_URL;
+    process.env.DATABASE_URL = env.DATABASE_URL.replace(/^"|"$/g, '');
 }
 
 import { auth } from "$lib/server/auth";

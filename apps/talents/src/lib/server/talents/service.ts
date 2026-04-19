@@ -39,7 +39,12 @@ export async function readTalentCore(id: string): Promise<TalentProfile | null> 
         }
     });
 
-    if (!result) return null;
+    if (!result) {
+        console.warn(`[readTalentCore] No talent found with ID: ${id}`);
+        return null;
+    }
+
+    try {
 
     // Resolve linked user
     let linkedUser: { id: string; name: string; email: string } | null = null;
@@ -135,4 +140,8 @@ export async function readTalentCore(id: string): Promise<TalentProfile | null> 
             data: te.data,
         })),
     } as TalentProfile;
+    } catch (err) {
+        console.error(`[readTalentCore] Error processing talent ${id}:`, err);
+        return null;
+    }
 }

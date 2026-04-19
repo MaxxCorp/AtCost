@@ -642,11 +642,9 @@
             )}
         />
     {/if}
-    {#if linkedUserId !== null}
-        <input
-            {...getFieldMetadata("linkedUserId").as("hidden", linkedUserId)}
-        />
-    {/if}
+    <input
+        {...getFieldMetadata("linkedUserId").as("hidden", linkedUserId || "")}
+    />
 
     <div class="grid grid-cols-1 gap-6">
         <!-- Contact Information -->
