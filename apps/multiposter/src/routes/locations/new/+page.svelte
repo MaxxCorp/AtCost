@@ -49,8 +49,8 @@
                             icon={User}
                             type="location"
                             entityId={""}
-                            listItemsRemote={listContacts as any}
-                            fetchAssociationsRemote={fetchEntityContacts as any}
+                            listItemsRemote={listContacts as any as (params: any) => Promise<{ data: Contact[], total: number }>}
+                            fetchAssociationsRemote={fetchEntityContacts as any as (params: any) => Promise<Contact[]>}
                             addAssociationRemote={async (p: any) =>
                                 addAssociation({
                                     ...p,
@@ -74,27 +74,25 @@
                             createSchema={createContactSchema}
                             updateRemote={updateExistingContact}
                             updateSchema={updateContactSchema}
-                            getFormData={(c: Contact) => ({
-                                contact: c,
-                                emails: c.emails,
-                                phones: c.phones,
-                                addresses: c.addresses,
-                                relations: c.relations,
-                                tags: c.tags,
-                                locationAssociations: c.locationAssociations,
-                            })}
-                            searchPredicate={(
-                                c: Contact,
-                                q: string,
-                            ) => {
+                            getFormData={((c: any) => ({
+                                contact: c as Contact,
+                                emails: (c as Contact).emails,
+                                phones: (c as Contact).phones,
+                                addresses: (c as Contact).addresses,
+                                relations: (c as Contact).relations,
+                                tags: (c as Contact).tags,
+                                locationAssociations: (c as Contact).locationAssociations,
+                            })) as any}
+                            searchPredicate={((c: any, q: string) => {
+                                const contact = c as Contact;
                                 const name = (
-                                    c.displayName ||
-                                    `${c.givenName || ""} ${c.familyName || ""}`
+                                    contact.displayName ||
+                                    `${contact.givenName || ""} ${contact.familyName || ""}`
                                 ).toLowerCase();
                                 return name.includes(
                                     q.toLowerCase(),
                                 );
-                            }}
+                            }) as any}
                                     loadingLabel={m.loading_item({ item: m.contacts() })}
                                     noItemsLabel={m.no_items_associated_label({ item: m.contacts() })}
                                     noItemsFoundLabel={m.no_items_found({ item: m.contacts() })}
