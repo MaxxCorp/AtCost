@@ -20,7 +20,6 @@
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-10">
         {#if browser}
             <TalentForm
-                listContactsRemote={listTalents}
                 cancelHref="/talents"
             />
         {:else}

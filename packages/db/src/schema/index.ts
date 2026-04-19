@@ -9,3 +9,4 @@ export * from "./sync";
 export * from "./talents";
 export * from "./cms";
 export * from "./relations";
+export * from "./contracts";

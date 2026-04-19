@@ -134,7 +134,7 @@
                         placeholder="e.g. Standard Weekday Rota"
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all outline-none"
                     />
-                    {#each getField("name").issues as issue}
+                    {#each getField("name").issues() ?? [] as issue}
                         <p class="mt-1 text-xs text-red-500">{issue.message}</p>
                     {/each}
                 </div>

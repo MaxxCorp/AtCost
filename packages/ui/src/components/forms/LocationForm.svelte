@@ -72,17 +72,17 @@
         pleaseFixValidation: labels?.pleaseFixValidation ?? "Please fix the validation errors in the form.",
     });
 
-    let prevIssuesLength = $state(0);
+    let submissionTriggered = $state(false);
     $effect(() => {
         const issues = (rf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
+        if (submissionTriggered && issues.length > 0) {
             toast.error(i18n.pleaseFixValidation);
+            submissionTriggered = false;
         }
-        prevIssuesLength = issues.length;
     });
 
     function getField(name: string) {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        const def = { as: (type: string, value?: any) => ({ name, type, value }), issues: () => [], value: () => undefined };
         if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
         let current: any = (rf as any).fields;
@@ -98,12 +98,14 @@
     class="space-y-4"
     {...(rf as any).preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
             const handle = rf;
+            submissionTriggered = false;
             try {
                 await submit();
                 const result = untrack(() => (handle as any).result);
-                if (untrack(() => (handle as any).error)) {
+                if (untrack(() => (handle as any).error) || (result && result.success === false)) {
+                    submissionTriggered = true;
                     toast.error(
-                        untrack(() => (handle as any).error.message) || i18n.errorSomethingWentWrong,
+                        untrack(() => (handle as any).error?.message) || result?.error?.message || result?.error || i18n.errorSomethingWentWrong,
                     );
                     return;
                 }
@@ -112,6 +114,7 @@
                 if (onSuccess) onSuccess(result);
                 else await goto(cancelHref);
             } catch (error: unknown) {
+                submissionTriggered = true;
                 const err = error as { message?: string };
                 toast.error(err?.message || i18n.errorSomethingWentWrong);
             }
@@ -124,7 +127,7 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{i18n.name}</span>
         <input
-            {...getField("name").as("text")}
+            {...getField("name").as("text", initialData?.name ?? "")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
                 'name',
             ).issues()?.length ?? 0) > 0
@@ -132,7 +135,6 @@
                 : 'border-gray-300'}"
             placeholder={i18n.enterLocationName}
             onblur={() => rf.validate()}
-            value={initialData?.name ?? ""}
         />
         {#each getField("name").issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
@@ -146,10 +148,9 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{i18n.street}</span>
         <input
-            {...getField("street").as("text")}
+            {...getField("street").as("text", initialData?.street ?? "")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.streetName}
-            value={initialData?.street ?? ""}
         />
     </label>
 
@@ -159,10 +160,9 @@
                 >{i18n.houseNumber}</span
             >
             <input
-                {...getField("houseNumber").as("text")}
+                {...getField("houseNumber").as("text", initialData?.houseNumber ?? "")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.houseNumberPlaceholder}
-                value={initialData?.houseNumber ?? ""}
             />
         </label>
         <label class="block">
@@ -170,10 +170,9 @@
                 >{i18n.addressSuffix}</span
             >
             <input
-                {...getField("addressSuffix").as("text")}
+                {...getField("addressSuffix").as("text", initialData?.addressSuffix ?? "")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.addressSuffixPlaceholder}
-                value={initialData?.addressSuffix ?? ""}
             />
         </label>
     </div>
@@ -182,19 +181,17 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">{i18n.zip}</span>
             <input
-                {...getField("zip").as("text")}
+                {...getField("zip").as("text", initialData?.zip ?? "")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.zipCodePlaceholder}
-                value={initialData?.zip ?? ""}
             />
         </label>
         <label class="block col-span-2">
             <span class="text-sm font-medium text-gray-700 mb-2">{i18n.city}</span>
             <input
-                {...getField("city").as("text")}
+                {...getField("city").as("text", initialData?.city ?? "")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.cityNamePlaceholder}
-                value={initialData?.city ?? ""}
             />
         </label>
     </div>
@@ -205,19 +202,17 @@
                 >{i18n.state}</span
             >
             <input
-                {...getField("state").as("text")}
+                {...getField("state").as("text", initialData?.state ?? "")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.statePlaceholder}
-                value={initialData?.state ?? ""}
             />
         </label>
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">{i18n.country}</span>
             <input
-                {...getField("country").as("text")}
+                {...getField("country").as("text", initialData?.country ?? "")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.countryPlaceholder}
-                value={initialData?.country ?? ""}
             />
         </label>
     </div>
@@ -225,10 +220,9 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{i18n.roomId}</span>
         <input
-            {...getField("roomId").as("text")}
+            {...getField("roomId").as("text", initialData?.roomId ?? "")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.enterRoomId}
-            value={initialData?.roomId ?? ""}
         />
     </label>
 
@@ -236,24 +230,22 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">{i18n.latitude}</span>
             <input
-                {...getField("latitude").as("text")}
+                {...getField("latitude").as("text", initialData?.latitude ?? "")}
                 type="number"
                 step="any"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.latitudePlaceholder}
-                value={initialData?.latitude ?? ""}
             />
         </label>
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">{i18n.longitude}</span
             >
             <input
-                {...getField("longitude").as("text")}
+                {...getField("longitude").as("text", initialData?.longitude ?? "")}
                 type="number"
                 step="any"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.longitudePlaceholder}
-                value={initialData?.longitude ?? ""}
             />
         </label>
     </div>
@@ -261,10 +253,9 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{i18n.what3words}</span>
         <input
-            {...getField("what3words").as("text")}
+            {...getField("what3words").as("text", initialData?.what3words ?? "")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.what3wordsPlaceholder}
-            value={initialData?.what3words ?? ""}
         />
     </label>
 
@@ -273,20 +264,18 @@
             >{i18n.inclusivitySupport}</span
         >
         <textarea
-            {...getField("inclusivitySupport").as("text")}
+            {...getField("inclusivitySupport").as("text", initialData?.inclusivitySupport ?? "")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.inclusivitySupportPlaceholder}
             rows="3"
-            value={initialData?.inclusivitySupport ?? ""}
         ></textarea>
     </label>
 
     <label class="flex items-center gap-2 cursor-pointer py-2">
         <input
-            {...getField("isPublic").as("checkbox")}
+            {...getField("isPublic").as("checkbox", initialData?.isPublic ?? true)}
             type="checkbox"
             class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            checked={initialData?.isPublic ?? true}
         />
         <span class="text-sm font-medium text-gray-700">{i18n.isPublic}</span>
     </label>

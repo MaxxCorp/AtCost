@@ -1,4 +1,4 @@
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, and } from '$lib/server/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, and, sql } from '$lib/server/db';
 // Unifying Drizzle operators via $lib/server/db
 
 export interface TalentProfile {
@@ -67,6 +67,18 @@ export async function readTalentCore(id: string): Promise<TalentProfile | null> 
             .where(eq(user.id, userId))
             .limit(1);
         if (u) linkedUser = u;
+    }
+
+    // NEW: Step 3: Global email fallback if no link found yet
+    if (!linkedUser) {
+        const emails = result.contact.emails.map(e => e.value.toLowerCase());
+        if (emails.length > 0) {
+            const [u] = await db.select({ id: user.id, name: user.name, email: user.email })
+                .from(user)
+                .where(inArray(sql`LOWER(${user.email})`, emails))
+                .limit(1);
+            if (u) linkedUser = u;
+        }
     }
 
     return {

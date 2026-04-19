@@ -10,6 +10,7 @@ trigger: always_on
 - **No REST Endpoints for Data Fetching**: Standard API routes (`+server.ts` GET/POST/etc.) are superseded for internal data fetching/mutation and should NOT be used unless explicitly interacting with a non-SvelteKit external client.
 - **Strict Fields API**: When submitting remote forms, ALWAYS use the official field API syntax: `{...formHandle.fields.fieldName.as('type', value)}`.
   - DO NOT manually create HTML `<input type="hidden">` tags for form submissions.
+  - DO wrap hidden fields that have a chance to empty in {#if ...} blocks to prevent the svelte static analyzer to throw an error
   - DO NOT use proxy helper functions (like a custom `getField` utility) to work around `fields` typings. Fix the underlying typing issues.
 - **Enhance & Preflight Pattern**: Always use `{...remoteForm.preflight(schema).enhance(async ({ submit }) => { ... })}` to bind forms and enable client-side validation.
   - **Client-Side Validation**: Reuse the remote validation schemas for `preflight()`. This prevents network requests when the form is locally invalid.

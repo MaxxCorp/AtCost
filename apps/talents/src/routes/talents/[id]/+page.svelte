@@ -1,12 +1,16 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { LoadingSection, ErrorSection, TalentTimeline, Button } from "@ac/ui";
-    import { Calendar, ArrowLeft, ExternalLink } from "@lucide/svelte";
+    import { Calendar, ArrowLeft, ExternalLink, FileText } from "@lucide/svelte";
     import { 
         readTalent, 
         invokeAddTimelineEntry, 
         listEmployees 
     } from '../talents.remote';
+    import { listContracts, deleteContract, createContract, updateContract } from '../../contracts/contracts.remote';
+    import ContractForm from '../../contracts/ContractForm.svelte';
+    import EntityManager from "@ac/ui/components/EntityManager.svelte";
+    import { contractSchema } from "@ac/validations/contracts";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";
 
@@ -27,6 +31,8 @@
     });
 
     const employees = $derived(listEmployees() as any);
+
+    const listTalentContracts = (params: any) => listContracts({ ...params, talentId: talentIdParam });
 </script>
 
 <div class="max-w-4xl mx-auto px-4 py-8">
@@ -82,6 +88,44 @@
                             // or the page could be refreshed.
                         }}
                     />
+                </div>
+
+                <div class="pt-8 border-t border-gray-100">
+                    <EntityManager
+                        title="Contracts"
+                        icon={FileText}
+                        mode="standalone"
+                        listItemsRemote={listTalentContracts}
+                        deleteItemRemote={deleteContract}
+                        createRemote={createContract}
+                        createSchema={contractSchema}
+                        updateRemote={updateContract}
+                        updateSchema={contractSchema}
+                        getFormData={(c: any) => c}
+                        searchPredicate={(c: any, q: any) => {
+                            return (c.entgeltgruppe?.toLowerCase() || '').includes(q.toLowerCase());
+                        }}
+                    >
+                        {#snippet renderItemLabel(c: any)}
+                            <div class="flex flex-col">
+                                <span class="font-medium">Contract ({c.wageType})</span>
+                                <span class="text-xs text-gray-500 truncate">
+                                    {c.entgeltgruppe ? `Group: ${c.entgeltgruppe}` : 'No group'} · {c.erfahrungsstufe ? `Level: ${c.erfahrungsstufe}` : ''}
+                                </span>
+                            </div>
+                        {/snippet}
+
+                        {#snippet renderForm({ remoteFunction, schema, initialData, onSuccess, onCancel, id }: any)}
+                            <ContractForm
+                                {remoteFunction}
+                                validationSchema={schema}
+                                isUpdating={!!id}
+                                initialData={{ ...initialData, talentId: talentIdParam }}
+                                {onSuccess}
+                                {onCancel}
+                            />
+                        {/snippet}
+                    </EntityManager>
                 </div>
             </div>
         {:else}

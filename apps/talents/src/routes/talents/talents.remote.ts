@@ -1,7 +1,7 @@
 import { query, form, command } from '$app/server';
 import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, ilike, or, and, sql } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
-import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema, PaginationSchema, type PaginatedResult } from '@ac/validations';
+import { createTalentSchema, updateTalentSchema, talentTimelineEntrySchema, unifiedTalentSchema, PaginationSchema, type PaginatedResult, createContactSchema } from '@ac/validations';
 import * as v from 'valibot';
 import { readTalentCore, type TalentProfile } from '$lib/server/talents/service';
 
@@ -341,6 +341,15 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
                 }).onConflictDoNothing();
             }
 
+            // 5. Link User Account (userTalent)
+            await tx.delete(userTalent).where(eq(userTalent.talentId, talentId));
+            if (linkedUserId) {
+                await tx.insert(userTalent).values({
+                    userId: linkedUserId,
+                    talentId,
+                }).onConflictDoNothing();
+            }
+
             return { talentId, contactId };
         });
 
@@ -365,14 +374,29 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
         if (profile) return profile;
     }
 
-    // Step 2: Implicit association via contact email
-    const uc = await db.select().from(userContact).where(eq(userContact.userId, authUser.id)).limit(1);
-    if (uc[0]) {
-        const t = await db.query.talent.findFirst({
-            where: eq(talent.contactId, uc[0].contactId),
-        });
-        if (t) {
-            const profile = await readTalentCore(t.id);
+    // Step 2: Implicit association via userContact joined with talent
+    const talentLink = await db.select({ talentId: talent.id })
+        .from(userContact)
+        .innerJoin(talent, eq(talent.contactId, userContact.contactId))
+        .where(eq(userContact.userId, authUser.id))
+        .limit(1);
+    
+    if (talentLink[0]) {
+        const profile = await readTalentCore(talentLink[0].talentId);
+        if (profile) return profile;
+    }
+
+    // Step 3: Fallback association via email match
+    if (authUser.email) {
+        const emailMatch = await db.select({ talentId: talent.id })
+            .from(talent)
+            .innerJoin(contact, eq(talent.contactId, contact.id))
+            .innerJoin(contactEmail, eq(contact.id, contactEmail.contactId))
+            .where(eq(sql`LOWER(${contactEmail.value})`, authUser.email.toLowerCase()))
+            .limit(1);
+            
+        if (emailMatch[0]) {
+            const profile = await readTalentCore(emailMatch[0].talentId);
             if (profile) return profile;
         }
     }
@@ -404,3 +428,95 @@ export const listSystemUsers = query(v.undefined_(), async (): Promise<any[]> =>
         email: user.email,
     }).from(user).orderBy(desc(user.createdAt));
 });
+
+export const createContact = form(createContactSchema, async (data): Promise<any> => {
+    const authUser = getAuthenticatedUser();
+    ensureAccess(authUser, 'contacts');
+
+    const { contact: contactData, emailsJson, phonesJson, relationsJson, tagsJson, addressesJson, locationIdsJson } = data;
+    const emails = emailsJson ? JSON.parse(emailsJson) : [];
+    const phones = phonesJson ? JSON.parse(phonesJson) : [];
+    const relations = relationsJson ? JSON.parse(relationsJson) : [];
+    const tags = tagsJson ? JSON.parse(tagsJson) : [];
+    const addresses = addressesJson ? JSON.parse(addressesJson) : [];
+    const locationIds = locationIdsJson ? JSON.parse(locationIdsJson) : [];
+
+    try {
+        const result = await db.transaction(async (tx) => {
+            // 1. Insert Contact
+            const contactValues = {
+                userId: authUser.id,
+                displayName: contactData.displayName,
+                givenName: contactData.givenName,
+                familyName: contactData.familyName,
+                birthday: contactData.birthday ? new Date(contactData.birthday) : null,
+                role: contactData.role,
+                department: contactData.department,
+                notes: contactData.notes,
+                updatedAt: new Date(),
+            };
+
+            const [newContact] = await tx.insert(contact).values(contactValues).returning();
+            const contactId = newContact.id;
+
+            // 2. Insert Sub-entities
+            if (emails.length > 0) {
+                await tx.insert(contactEmail).values(emails.map((e: any) => ({ ...e, contactId })));
+            }
+            if (phones.length > 0) {
+                await tx.insert(contactPhone).values(phones.map((p: any) => ({ ...p, contactId })));
+            }
+            if (relations.length > 0) {
+                await tx.insert(contactRelation).values(relations.map((r: any) => ({
+                    contactId,
+                    targetContactId: r.targetContactId,
+                    relationType: r.relationType
+                })));
+            }
+            if (tags.length > 0) {
+                for (const tagName of tags) {
+                    let [existingTag] = await tx.select().from(tag).where(eq(tag.name, tagName)).limit(1);
+                    if (!existingTag) {
+                        [existingTag] = await tx.insert(tag).values({ name: tagName, userId: authUser.id }).returning();
+                    }
+                    await tx.insert(contactTag).values({ contactId, tagId: existingTag.id });
+                }
+            }
+            if (addresses.length > 0) {
+                await tx.insert(contactAddress).values(addresses.map((a: any) => ({ ...a, contactId })));
+            }
+            if (locationIds.length > 0) {
+                await tx.insert(locationContact).values(locationIds.map((lid: string) => ({ 
+                    locationId: lid,
+                    contactId
+                })));
+            }
+
+            // Fetch the full contact with relations to return it
+            const fullContact = await tx.query.contact.findFirst({
+                where: eq(contact.id, contactId),
+                with: {
+                    emails: true,
+                    phones: true,
+                    addresses: true,
+                    locationAssociations: { with: { location: true } },
+                    tags: { with: { tag: true } }
+                }
+            });
+
+            return {
+                ...fullContact,
+                createdAt: fullContact?.createdAt.toISOString(),
+                updatedAt: fullContact?.updatedAt.toISOString(),
+                birthday: fullContact?.birthday?.toISOString() ?? null,
+                tags: (fullContact?.tags || []).map((ct: any) => ct.tag.name)
+            };
+        });
+
+        return { success: true, data: result };
+    } catch (err: any) {
+        console.error('createContact ERROR:', err);
+        return { success: false, error: err.message || 'Contact creation failed' };
+    }
+});
+

@@ -16,8 +16,8 @@
 
     import { listTalents } from "../../talents/talents.remote";
     import { fetchEntityTalents, addAssociation, removeAssociation } from "../../talents/associate.remote";
-    import { createTalent, updateTalent } from "../../talents/talents.remote";
-    import { createTalentSchema, updateTalentSchema } from "@ac/validations";
+    import { upsertTalent } from "../../talents/talents.remote";
+    import { unifiedTalentSchema } from "@ac/validations";
     import { EntityManager } from "@ac/ui";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";
 
@@ -96,13 +96,14 @@
                                             addAssociation({ ...p, talentId: p.itemId } as any)}
                                         removeAssociationRemote={async (p: any) =>
                                             removeAssociation({ ...p, talentId: p.itemId } as any)}
-                                        createRemote={createTalent}
-                                        createSchema={createTalentSchema}
-                                        updateRemote={updateTalent}
-                                        updateSchema={updateTalentSchema}
+                                        createRemote={upsertTalent}
+                                        createSchema={unifiedTalentSchema}
+                                        updateRemote={upsertTalent}
+                                        updateSchema={unifiedTalentSchema}
                                         getFormData={(t: any) => ({
-                                            ...t,
-                                            id: t.id,
+                                            talent: { ...t },
+                                            contact: { ...t.contact },
+                                            linkedUserId: userId
                                         })}
                                         searchPredicate={(t: any, q: string) => {
                                             const query = q.toLowerCase();
@@ -132,9 +133,14 @@
 
                                         {#snippet renderForm({ remoteFunction, schema, initialData, onSuccess, onCancel, id })}
                                             <TalentForm
-                                                {initialData}
+                                                initialData={{
+                                                    ...(initialData || {}),
+                                                    contact: {
+                                                        ...(initialData?.contact || {}),
+                                                        linkedUserId: userId
+                                                    }
+                                                }}
                                                 talentId={id}
-                                                listContactsRemote={listTalents}
                                                 {remoteFunction}
                                                 {onSuccess}
                                                 {onCancel}

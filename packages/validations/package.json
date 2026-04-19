@@ -23,6 +23,14 @@
         "./talents": {
             "types": "./src/talents.ts",
             "default": "./src/talents.ts"
+        },
+        "./contracts": {
+            "types": "./src/contracts.ts",
+            "default": "./src/contracts.ts"
+        },
+        "./pagination": {
+            "types": "./src/pagination.ts",
+            "default": "./src/pagination.ts"
         }
     },
     "dependencies": {

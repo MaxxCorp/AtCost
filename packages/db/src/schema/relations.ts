@@ -9,6 +9,7 @@ import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
 import { syncConfig, syncOperation, syncMapping, webhookSubscription } from "./sync";
 import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion, cmsMedia } from "./cms";
+import { contract, contractFramework, contractFrameworkContract } from "./contracts";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -130,6 +131,7 @@ export const talentRelations = relations(talent, ({ one, many }) => ({
     shiftPlanTemplates: many(shiftPlanTemplateTalent),
     tasks: many(task, { relationName: 'assignee' }),
     createdTasks: many(task, { relationName: 'creator' }),
+    contracts: many(contract),
 }));
 
 export const taskRelations = relations(task, ({ one }) => ({
@@ -312,3 +314,18 @@ export const userTalentRelations = relations(userTalent, ({ one }) => ({
     user: one(user, { fields: [userTalent.userId], references: [user.id] }),
     talent: one(talent, { fields: [userTalent.talentId], references: [talent.id] }),
 }));
+
+export const contractRelations = relations(contract, ({ one, many }) => ({
+    talent: one(talent, { fields: [contract.talentId], references: [talent.id] }),
+    frameworks: many(contractFrameworkContract),
+}));
+
+export const contractFrameworkRelations = relations(contractFramework, ({ many }) => ({
+    contracts: many(contractFrameworkContract),
+}));
+
+export const contractFrameworkContractRelations = relations(contractFrameworkContract, ({ one }) => ({
+    contract: one(contract, { fields: [contractFrameworkContract.contractId], references: [contract.id] }),
+    framework: one(contractFramework, { fields: [contractFrameworkContract.frameworkId], references: [contractFramework.id] }),
+}));
+

@@ -1,5 +1,12 @@
 import { sequence } from '@sveltejs/kit/hooks';
 import { type Handle } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
+
+// Ensure legacy dependencies see the database URL
+if (env.DATABASE_URL) {
+    process.env.DATABASE_URL = env.DATABASE_URL;
+}
+
 import { auth } from "$lib/server/auth";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building, dev } from '$app/environment';

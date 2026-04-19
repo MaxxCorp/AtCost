@@ -43,7 +43,8 @@
         type?: string;
         entityId?: string | null;
         embedded?: boolean;
-        onchange?: (ids: string[]) => void;
+        singleSelect?: boolean;
+        onchange?: (ids: string[], items: T[]) => void;
 
         // Data fetchers
         listItemsRemote: (params?: any) => Promise<T[] | { data: T[], total?: number }>;
@@ -85,7 +86,7 @@
         >;
 
         // Rendering snippets
-        renderListItem?: Snippet<[T, { isSelected: boolean, toggleSelection: (id: string) => void, deleteItem: (item: T) => void, isAssociated: boolean, toggleAssociation: (item: T) => void }]>;
+        renderListItem?: Snippet<[T, { isSelected: boolean, toggleSelection: (id: string) => void, deleteItem: (item: T) => void, isAssociated: boolean, toggleAssociation: (item: T) => void, singleSelect: boolean }]>;
         renderItemLabel?: Snippet<[T]>;
         renderItemBadge?: Snippet<[T]>;
         renderItemDetail?: Snippet<[T]>;
@@ -131,6 +132,7 @@
         type,
         entityId = null,
         embedded = false,
+        singleSelect = false,
         onchange = undefined,
         listItemsRemote,
         fetchAssociationsRemote,
@@ -280,11 +282,9 @@
     let fetchingAssociations = $state(false);
 
     $effect(() => {
-        untrack(() => {
-            if (initialItems !== undefined && !fetchAssociationsRemote && !loadingItems) {
-                associatedItems = initialItems;
-            }
-        });
+        if (!isStandalone && initialItems !== undefined && !fetchAssociationsRemote && !loadingItems) {
+            associatedItems = initialItems;
+        }
     });
 
     $effect(() => {
@@ -344,7 +344,7 @@
                 (i) => !selectedIds.has(i.id),
             );
             allItems = allItems.filter((i) => !selectedIds.has(i.id));
-            if (onchange) onchange(associatedItems.map((i) => i.id));
+            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
             deselectAll();
             toast.success(`Deleted successfully`);
         } catch (e: any) {
@@ -386,16 +386,38 @@
                     (ai) => ai.id !== item.id,
                 );
             } else {
-                if (entityId && addAssociationRemote) {
-                    await addAssociationRemote({
-                        type: type!,
-                        entityId,
-                        itemId: item.id,
-                    });
+                if (singleSelect) {
+                    // In single-select mode, replace instead of append
+                    if (entityId && removeAssociationRemote) {
+                        for (const existing of associatedItems) {
+                            await removeAssociationRemote({
+                                type: type!,
+                                entityId,
+                                itemId: existing.id,
+                            });
+                        }
+                    }
+                    if (entityId && addAssociationRemote) {
+                        await addAssociationRemote({
+                            type: type!,
+                            entityId,
+                            itemId: item.id,
+                        });
+                    }
+                    associatedItems = [item];
+                    showSelector = false;
+                } else {
+                    if (entityId && addAssociationRemote) {
+                        await addAssociationRemote({
+                            type: type!,
+                            entityId,
+                            itemId: item.id,
+                        });
+                    }
+                    associatedItems = [...associatedItems, item];
                 }
-                associatedItems = [...associatedItems, item];
             }
-            if (onchange) onchange(associatedItems.map((i) => i.id));
+            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
         } catch (error: any) {
             toast.error(error.message || "Failed to update association");
         } finally {
@@ -427,7 +449,7 @@
                     }
                     allItems = [newItem, ...allItems];
                     associatedItems = [newItem, ...associatedItems];
-                    if (onchange) onchange(associatedItems.map((i) => i.id));
+                    if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
                     toast.success(`${title} created and associated`);
                 }
             }
@@ -452,7 +474,7 @@
             allItems = allItems.map((i) =>
                 i.id === targetId ? updatedItem : i,
             );
-            if (onchange) onchange(associatedItems.map((i) => i.id));
+            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
             toast.success(`${title} updated`);
         }
     }
@@ -464,7 +486,7 @@
             await deleteItemRemote([item.id]);
             allItems = allItems.filter((i) => i.id !== item.id);
             associatedItems = associatedItems.filter((i) => i.id !== item.id);
-            if (onchange) onchange(associatedItems.map((i) => i.id));
+            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
             toast.success("Deleted successfully");
         } catch (e: any) {
             toast.error(e.message || "Failed to delete item");
@@ -610,6 +632,31 @@
             {/if}
         </div>
 
+        {#if !singleSelect || associatedItems.length === 0}
+            <div class="flex items-center gap-2 mb-4 bg-white/50 p-2 rounded-lg border border-dashed border-gray-200">
+                <Button 
+                    variant="outline" 
+                    size="sm"
+                    onclick={() => (showSelector = true)}
+                    disabled={loadingItems}
+                >
+                    <Link class="mr-2 h-4 w-4" />
+                    {linkItemLabel}
+                </Button>
+                {#if createRemote && createSchema}
+                    <Button 
+                        variant="secondary" 
+                        size="sm"
+                        onclick={() => (showQuickCreate = true)}
+                        disabled={loadingItems}
+                    >
+                        <Plus class="mr-2 h-4 w-4" />
+                        {quickCreateLabel}
+                    </Button>
+                {/if}
+            </div>
+        {/if}
+
         {#if loadingItems}
             <div class="text-center py-12 text-gray-400">
                 {loadingLabel}
@@ -637,18 +684,22 @@
                             toggleSelection,
                             deleteItem,
                             isAssociated: associatedItems.some((ai) => ai.id === item.id),
-                            toggleAssociation
+                            toggleAssociation,
+                            singleSelect
                         })}
                     {:else}
                         <div
                             class="bg-white shadow-sm rounded-lg p-4 flex items-center gap-4 border border-gray-100 hover:shadow-md transition-shadow group/item"
                         >
+                            {#if !singleSelect}
                             <input
                                 type="checkbox"
                                 checked={selectedIds.has(item.id)}
                                 onchange={() => toggleSelection(item.id)}
                                 class="w-4 h-4 text-blue-600 shrink-0"
                             />
+                            {/if}
+
                             <div class="flex-1 min-w-0">
                                 <div class="font-medium text-gray-900">
                                     {#if renderItemLabel}
@@ -741,6 +792,7 @@
                 {showSelector ? linkItemLabel : associatedItemLabel}
             </h3>
             <div class="flex gap-2 flex-wrap">
+                {#if !singleSelect || associatedItems.length === 0}
                 <Button
                     type="button"
                     variant="outline"
@@ -758,6 +810,7 @@
                         <span class="sm:hidden">{linkItemLabel}</span>
                     {/if}
                 </Button>
+                {/if}
                 {#if renderForm}
                     <Button
                         type="button"
@@ -947,7 +1000,7 @@
         }}
     >
         <Dialog.Content
-            style="max-height: 85vh; max-width: 672px; display: flex; flex-direction: column; overflow: hidden;"
+            style="max-height: 85vh; max-width: 900px; width: calc(100vw - 2rem); display: flex; flex-direction: column; overflow: hidden;"
         >
             <Dialog.Header class="mb-4" style="flex-shrink: 0;">
                 <Dialog.Title class="text-xl font-bold">

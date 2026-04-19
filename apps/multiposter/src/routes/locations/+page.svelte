@@ -2,10 +2,14 @@
 	import * as m from "$lib/paraglide/messages";
 	import { listLocations } from "./list.remote";
 	import { deleteLocation } from "./[id]/delete.remote";
+	import { createLocation } from "./new/create.remote";
+	import { updateLocation } from "./[id]/update.remote";
+	import { createLocationSchema, updateLocationSchema } from "$lib/validations/locations";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import { MapPin, Pencil, Trash2, Home, Hash } from "@lucide/svelte";
+	import LocationForm from "$lib/components/locations/LocationForm.svelte";
 
 	import { EntityManager } from "@ac/ui";
 	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
@@ -33,7 +37,24 @@
 				loadingLabel={m.loading_item({ item: m.feature_locations_title() })}
 				noItemsFoundLabel={m.no_items({ items: m.feature_locations_title() })}
 				searchPredicate={(l: Location, q: string) => l.name.toLowerCase().includes(q.toLowerCase())}
+				createRemote={createLocation}
+				createSchema={createLocationSchema}
+				updateRemote={updateLocation}
+				updateSchema={updateLocationSchema}
+				getFormData={(l: Location) => l}
+				onchange={() => listLocations().refresh()}
 			>
+				{#snippet renderForm({ remoteFunction, schema, initialData, onSuccess, onCancel, id }: any)}
+					<LocationForm
+						{remoteFunction}
+						validationSchema={schema}
+						isUpdating={!!id}
+						{initialData}
+						{onSuccess}
+						{onCancel}
+					/>
+				{/snippet}
+
 				{#snippet renderListItem(location: Location, { isSelected, toggleSelection, deleteItem })}
 					<div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
 						<input

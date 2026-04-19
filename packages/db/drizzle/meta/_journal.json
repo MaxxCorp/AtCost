@@ -22,6 +22,13 @@
       "when": 1776558139353,
       "tag": "0002_outstanding_mole_man",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776586179509,
+      "tag": "0003_useful_harrier",
+      "breakpoints": true
     }
   ]
 }

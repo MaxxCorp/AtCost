@@ -33,7 +33,7 @@
     let heroImage = $state(initialData?.heroImage ?? "");
 
     function getField(name: string) {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
+        const def = { as: (type: string, value?: any) => ({ name, type, value }), issues: () => [], value: () => undefined };
         if (!(rf as any)?.fields) return def;
         const parts = name.split(".");
         let current: any = (rf as any).fields;

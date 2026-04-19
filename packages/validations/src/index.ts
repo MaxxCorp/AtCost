@@ -12,3 +12,4 @@ export * from './resources.js';
 export * from './kiosks.js';
 export * from './synchronizations.js';
 export * from './time-off.js';
+export * from './contracts.js';
