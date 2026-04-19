@@ -130,7 +130,7 @@
                                             </div>
                                         {/snippet}
 
-                                        {#snippet renderForm({ remoteFunction, schema, initialData, onSuccess, onCancel, id })}
+                                        {#snippet renderForm({ remoteFunction, schema, initialData, onSuccess, onCancel, id }: { remoteFunction: any, schema: any, initialData?: any, onSuccess: (result: any) => void, onCancel: () => void, id?: string })}
                                             <TalentForm
                                                 {initialData}
                                                 talentId={id}

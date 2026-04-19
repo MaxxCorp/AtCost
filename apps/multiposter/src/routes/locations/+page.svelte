@@ -22,7 +22,7 @@
 				title={m.feature_locations_title()} 
 				icon={MapPin} 
 				mode="standalone"
-				listItemsRemote={listLocations as any}
+				listItemsRemote={listLocations}
 				deleteItemRemote={async (ids: string[]) => {
 					return await handleDelete({
 						ids,
@@ -34,7 +34,7 @@
 				noItemsFoundLabel={m.no_items({ items: m.feature_locations_title() })}
 				searchPredicate={(l: Location, q: string) => l.name.toLowerCase().includes(q.toLowerCase())}
 			>
-				{#snippet renderListItem(location: Location, { isSelected, toggleSelection, deleteItem })}
+				{#snippet renderListItem(location: Location, { isSelected, toggleSelection, deleteItem }: { isSelected: boolean, toggleSelection: (id: string) => void, deleteItem: (item: Location) => void })}
 					<div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
 						<input
 							type="checkbox"

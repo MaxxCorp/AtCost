@@ -1,4 +1,4 @@
-<script lang="ts" generics="T extends { id: string }">
+<script lang="ts" generics="T extends { id?: string | null }">
     import { onMount, untrack, type Component, type Snippet } from "svelte";
     import {
         Search,
@@ -36,7 +36,7 @@
         getOptionLabel: (item: any) => string;
     }
 
-    interface Props<T extends { id: string }> {
+    interface Props<T extends { id?: string | null }> {
         title: string;
         icon: Component<any>;
         mode?: "embedded" | "standalone";
@@ -48,16 +48,16 @@
         // Data fetchers
         listItemsRemote: (params?: any) => Promise<T[] | { data: T[], total?: number }>;
         fetchAssociationsRemote?: (params: {
-            type: string;
+            type: any;
             entityId: string;
         }) => Promise<T[]>;
         addAssociationRemote?: (params: {
-            type: string;
+            type: any;
             entityId: string;
             itemId: string;
         }) => Promise<any>;
         removeAssociationRemote?: (params: {
-            type: string;
+            type: any;
             entityId: string;
             itemId: string;
         }) => Promise<any>;
@@ -174,7 +174,7 @@
         selectAllLabel = "Select All",
         deselectAllLabel = "Deselect All",
         confirmUnlinkLabel = "Remove link",
-    }: Props<any> = $props();
+    }: Props<T> = $props();
 
     const effectiveFilters = $derived([
         ...filters,
