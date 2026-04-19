@@ -65,6 +65,7 @@
 	"error_loading_imprint": "Error loading Imprint",
 	"language": "Language",
 	"retry": "Retry",
+	"refresh": "Refresh",
 	"back_to_list": "Back to List",
 	"failed_to_load": "Failed to load {item}",
 	"not_found": "{item} Not Found",

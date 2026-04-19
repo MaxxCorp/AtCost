@@ -7,6 +7,8 @@ export type Kiosk = Omit<DbKiosk, 'createdAt' | 'updatedAt' | 'startDate' | 'end
     updatedAt: string;
     startDate: string | null;
     endDate: string | null;
+    publicContactQrCodePath?: string | null;
+    locations?: { id: string, name: string, publicContactQrCodePath: string | null }[];
 };
 
 export const kioskPaginationSchema = v.optional(v.object({
@@ -14,4 +16,5 @@ export const kioskPaginationSchema = v.optional(v.object({
 	limit: v.optional(v.number(), 50),
 	search: v.optional(v.string()),
 	locationId: FilterableIdSchema,
+    _t: v.optional(v.number()),
 }), {});

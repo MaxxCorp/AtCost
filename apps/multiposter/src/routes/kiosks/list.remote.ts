@@ -50,19 +50,69 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
         return { data: [], total };
     }
 
-    const rawResults = await db
-        .select()
-        .from(kiosk)
-        .where(inArray(kiosk.id, ids))
-        .orderBy(desc(kiosk.createdAt));
+    const rawResults = await db.query.kiosk.findMany({
+        where: inArray(kiosk.id, ids),
+        orderBy: desc(kiosk.createdAt),
+        with: {
+            locations: {
+                with: {
+                    location: {
+                        with: {
+                            locationContacts: {
+                                with: {
+                                    contact: {
+                                        with: {
+                                            tags: {
+                                                with: {
+                                                    tag: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
 
-    const data = rawResults.map((row) => ({
-        ...row,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-        startDate: row.startDate?.toISOString() || null,
-        endDate: row.endDate?.toISOString() || null,
-    }));
+    const data = rawResults.map((row) => {
+        // Selection logic for the public contact QR codes per location
+        const locations = (row.locations || []).map((kl) => {
+            const loc = kl.location;
+            if (!loc) return null;
 
-    return { data, total };
+            const employeeLocContact = loc.locationContacts.find((lc: any) => 
+                lc.contact.tags?.some((t: any) => t.tag.name === 'Employee')
+            ) || loc.locationContacts[0];
+
+            let publicContactQrCodePath: string | null = null;
+            if (employeeLocContact?.contact?.qrCodePath) {
+                const path = employeeLocContact.contact.qrCodePath;
+                publicContactQrCodePath = path.includes('_public') ? path : path.replace('/qr.png', '/qr_public.png');
+            }
+
+            return {
+                id: loc.id,
+                name: loc.name,
+                publicContactQrCodePath
+            };
+        }).filter(l => l !== null) as any[];
+
+        const primaryQrCode = locations.find(l => l.publicContactQrCodePath)?.publicContactQrCodePath || null;
+
+        return {
+            ...row,
+            createdAt: row.createdAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
+            startDate: row.startDate?.toISOString() || null,
+            endDate: row.endDate?.toISOString() || null,
+            publicContactQrCodePath: primaryQrCode,
+            locations
+        };
+    });
+
+    return { data: data as any, total };
 });

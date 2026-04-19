@@ -30,6 +30,7 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
             longitude: data.longitude ? parseFloat(data.longitude) : null,
             what3words: data.what3words || null,
             inclusivitySupport: data.inclusivitySupport || null,
+            isPublic: data.isPublic ?? false,
             heroImage: data.heroImage || null,
             updatedAt: new Date(),
         };

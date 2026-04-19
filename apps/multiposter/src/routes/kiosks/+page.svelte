@@ -6,7 +6,7 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import { Monitor, Trash2, Pencil } from "@lucide/svelte";
+    import { Monitor, Trash2, Pencil, MapPin } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
 
@@ -54,7 +54,7 @@
                         />
 
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-start gap-3 mb-2">
+                            <div class="flex items-start gap-4 mb-2">
                                 <div class="flex-1 min-w-0">
                                     <h2 class="text-xl font-semibold break-all text-pretty">
                                         <a href={`/kiosks/${kiosk.id}/view`} target="_blank" class="hover:underline text-blue-600">
@@ -70,7 +70,25 @@
                                 </div>
                             {/if}
 
-                            <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-600">
+                            {#if kiosk.locations && kiosk.locations.length > 0}
+                                <div class="mt-4 flex flex-wrap gap-3">
+                                    {#each kiosk.locations as loc}
+                                        <div class="flex items-center gap-4 bg-gray-50 pl-3 pr-2 py-2 rounded-xl border border-gray-100 transition-colors hover:bg-gray-100 shadow-sm">
+                                            <div class="flex items-center gap-2 min-w-0">
+                                                <MapPin size={16} class="text-red-500 shrink-0" />
+                                                <span class="text-xs font-bold text-gray-700 truncate">{loc.name}</span>
+                                            </div>
+                                            {#if loc.publicContactQrCodePath}
+                                                <div class="bg-white p-1 border rounded-lg shadow-inner shrink-0 flex items-center justify-center">
+                                                    <img src={loc.publicContactQrCodePath} alt="Contact QR" class="w-14 h-14 object-contain" />
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
+
+                            <div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-600">
                                 <div>
                                     <span class="text-gray-500 mr-1">{m.loop_label()}</span>
                                     <span class="font-medium">{kiosk.loopDuration}s</span>
