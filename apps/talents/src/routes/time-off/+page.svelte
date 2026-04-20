@@ -1,6 +1,6 @@
 <script lang="ts">
     import { listTimeOffRequests, requestTimeOff } from "./time-off.remote";
-    import { listTalents } from "../talents/talents.remote";
+    import { listTalents } from "../talents/list.remote";
     import { EntityManager, Button, AsyncButton } from "@ac/ui";
     import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus } from "@lucide/svelte";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
@@ -39,6 +39,7 @@
         </div>
 
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">Time Off Requests</h1>
             <EntityManager
                 title="Time Off"
                 icon={Plane}

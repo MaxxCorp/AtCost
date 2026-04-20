@@ -1,6 +1,6 @@
 <script lang="ts">
     import AnnouncementForm from "$lib/components/announcements/AnnouncementForm.svelte";
-    import { updateExistingAnnouncement } from "./update.remote";
+    import { updateAnnouncement } from "./update.remote";
     import { updateAnnouncementSchema } from "$lib/validations/announcements";
     import { readAnnouncement } from "./read.remote";
     import { page } from "$app/stores";
@@ -19,7 +19,7 @@
 
 {#if announcement}
     <AnnouncementForm
-        remoteFunction={updateExistingAnnouncement}
+        remoteFunction={updateAnnouncement}
         validationSchema={updateAnnouncementSchema}
         isUpdating={true}
         initialData={announcement}

@@ -18,6 +18,7 @@
         <Breadcrumb feature="announcements" />
         
         <div class="bg-white shadow rounded-lg p-6">
+            <h1 class="text-2xl font-black mb-6 text-gray-900">{m.announcements()}</h1>
             <EntityManager
                 title={m.announcements()}
                 icon={Megaphone}

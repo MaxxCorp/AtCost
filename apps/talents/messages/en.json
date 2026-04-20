@@ -41,6 +41,11 @@
     "save_changes": "Save Changes",
     "create_user": "Create User",
     "cancel": "Cancel",
-    "loading": "Loading...",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "contacts": "Contacts",
+    "locations": "Locations",
+    "shiftplans": "Shiftplans",
+    "time_off": "Time Off",
+    "contract_frameworks": "Contract Frameworks",
+    "contracts": "Contracts"
 }

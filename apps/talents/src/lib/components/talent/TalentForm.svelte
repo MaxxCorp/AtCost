@@ -14,9 +14,9 @@
     import {
         upsertTalent,
         listSystemUsers,
-        createContact,
     } from "../../../routes/talents/talents.remote";
-    import { listContacts } from "../../../routes/talents/list.remote";
+    import { createTalent } from "../../../routes/talents/new/create.remote";
+    import { listTalents as listContacts } from "../../../routes/talents/list.remote";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
@@ -25,7 +25,7 @@
         unifiedTalentSchema,
         createLocationSchema,
         updateLocationSchema,
-        createContactSchema,
+        createTalentSchema,
     } from "@ac/validations";
     import {
         Button,
@@ -652,6 +652,12 @@
             <div
                 class="bg-gray-50/50 p-4 sm:p-6 rounded-xl border border-gray-100 space-y-4"
             >
+                <h3
+                    class="text-lg font-bold text-gray-900 flex items-center gap-2"
+                >
+                    <User size={20} class="text-indigo-500" />
+                    {m.contacts()}
+                </h3>
                 <EntityManager
                     title="Contact"
                     icon={User}
@@ -666,8 +672,8 @@
                             clearContactSelection();
                         }
                     }}
-                    createRemote={createContact}
-                    createSchema={createContactSchema}
+                    createRemote={createTalent}
+                    createSchema={createTalentSchema}
                     linkItemLabel="Search Existing"
                     associatedItemLabel="Selected Contact"
                     searchPlaceholder="Search contacts by name..."
@@ -760,13 +766,20 @@
                     {/snippet}
                 </EntityManager>
 
-                <div class="mt-6 pt-6 border-t border-gray-100 space-y-2">
+                <div class="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                    <h3
+                        class="text-lg font-bold text-gray-900 flex items-center gap-2"
+                    >
+                        <MapPin size={20} class="text-indigo-500" />
+                        {m.locations()}
+                    </h3>
                     <p class="text-sm text-gray-500">
                         Manage associated locations and branch offices.
                     </p>
                     <EntityManager
                         title="Locations"
                         icon={MapPin}
+                        mode="embedded"
                         initialItems={allLocations.filter((l) =>
                             locationIds.includes(l.id),
                         )}

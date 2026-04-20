@@ -16,9 +16,9 @@
         removeAssociation,
         fetchEntityContacts,
     } from "../../contacts/associate.remote";
-    import { createNewContact } from "../../contacts/new/create.remote";
-    import { updateExistingContact } from "../../contacts/[id]/update.remote";
-    import { deleteExistingContact } from "../../contacts/[id]/delete.remote";
+    import { createContact } from "../../contacts/new/create.remote";
+    import { updateContact } from "../../contacts/[id]/update.remote";
+    import { deleteContact } from "../../contacts/[id]/delete.remote";
     import { updateLocation } from "../[id]/update.remote";
     import { deleteLocation } from "../[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
@@ -44,9 +44,14 @@
             >
                 {#snippet children()}
                     <div class="mt-8 border-t pt-8">
+                        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                            <User size={18} class="text-blue-600" />
+                            {m.contacts()}
+                        </h3>
                         <EntityManager
                             title={m.contacts()}
                             icon={User}
+                            mode="embedded"
                             type="location"
                             entityId={""}
                             listItemsRemote={listContacts as any as (params: any) => Promise<{ data: Contact[], total: number }>}
@@ -64,15 +69,15 @@
                             deleteItemRemote={async (ids: string[]) => {
                                 return await handleDelete({
                                     ids,
-                                    deleteFn: deleteExistingContact,
+                                    deleteFn: deleteContact,
                                     itemName: m
                                         .contacts()
                                         .toLowerCase(),
                                 });
                             }}
-                            createRemote={createNewContact}
+                            createRemote={createContact}
                             createSchema={createContactSchema}
-                            updateRemote={updateExistingContact}
+                            updateRemote={updateContact}
                             updateSchema={updateContactSchema}
                             getFormData={((c: any) => ({
                                 contact: c as Contact,
@@ -125,20 +130,24 @@
                                     contactId={id}
                                 >
                                     {#snippet children({ onLocationsChange }: any)}
-                                        <div class="mt-8 border-t pt-8">
-                                            <EntityManager
-                                                title={m.feature_locations_title()}
-                                                icon={MapPin}
-                                                type="location"
-                                                entityId={id}
-                                                initialItems={(
-                                                    formData.locationAssociations ||
-                                                    []
-                                                ).map(
-                                                    (la: any) => la.location,
-                                                )}
-                                                embedded={true}
-                                                onchange={onLocationsChange}
+                                            <div class="mt-8 border-t pt-8">
+                                                <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                                                    <MapPin size={18} class="text-blue-600" />
+                                                    {m.feature_locations_title()}
+                                                </h3>
+                                                <EntityManager
+                                                    title={m.feature_locations_title()}
+                                                    icon={MapPin}
+                                                    type="location"
+                                                    entityId={id}
+                                                    initialItems={(
+                                                        formData.locationAssociations ||
+                                                        []
+                                                    ).map(
+                                                        (la: any) => la.location,
+                                                    )}
+                                                    mode="embedded"
+                                                    onchange={onLocationsChange}
                                                 listItemsRemote={listLocations as any}
                                                 addAssociationRemote={async (
                                                     p: any,

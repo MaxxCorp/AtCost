@@ -15,7 +15,7 @@ const associationArgs = v.object({
     itemId: v.string()
 });
 
-export const fetchEntityTalents = query(entityArgs, async ({ entityId }): Promise<any[]> => {
+export const getEntityTalents = query(entityArgs, async ({ entityId }): Promise<any[]> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     
@@ -42,7 +42,7 @@ export const fetchEntityTalents = query(entityArgs, async ({ entityId }): Promis
     }));
 });
 
-export const addAssociation = query(associationArgs, async ({ entityId, itemId }): Promise<{ success: boolean }> => {
+export const associateTalent = query(associationArgs, async ({ entityId, itemId }): Promise<{ success: boolean }> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     
@@ -53,7 +53,7 @@ export const addAssociation = query(associationArgs, async ({ entityId, itemId }
     return { success: true };
 });
 
-export const removeAssociation = query(associationArgs, async ({ entityId, itemId }): Promise<{ success: boolean }> => {
+export const dissociateTalent = query(associationArgs, async ({ entityId, itemId }): Promise<{ success: boolean }> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
     

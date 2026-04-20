@@ -11,7 +11,7 @@ import { syncService } from '$lib/server/sync/service';
 /**
  * Command: Create a new announcement
  */
-export const createNewAnnouncement = form(createAnnouncementSchema, async (input) => {
+export const createAnnouncement = form(createAnnouncementSchema, async (input) => {
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'announcements');

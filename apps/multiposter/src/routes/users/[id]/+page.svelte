@@ -13,10 +13,10 @@
 
     import { listContacts } from "../../contacts/list.remote";
     import { addAssociation, removeAssociation, fetchEntityContacts } from "../../contacts/associate.remote";
-    import { createNewContact } from "../../contacts/new/create.remote";
-    import { updateExistingContact } from "../../contacts/[id]/update.remote";
+    import { createContact } from "../../contacts/new/create.remote";
+    import { updateContact } from "../../contacts/[id]/update.remote";
     import { createContactSchema, updateContactSchema } from "$lib/validations/contacts";
-    import { deleteExistingContact } from "../../contacts/[id]/delete.remote";
+    import { deleteContact } from "../../contacts/[id]/delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { User as UserIcon } from "@lucide/svelte";
     import { parseRoles } from "$lib/authorization";
@@ -102,13 +102,13 @@
                                 deleteItemRemote={async (ids: string[]) => {
                                     return await handleDelete({
                                         ids: ids,
-                                        deleteFn: async (ids: string[]) => deleteExistingContact(ids),
+                                        deleteFn: async (ids: string[]) => deleteContact(ids),
                                         itemName: m.feature_contacts_title(),
                                     });
                                 }}
-                                createRemote={createNewContact}
+                                createRemote={createContact}
                                 createSchema={createContactSchema}
-                                updateRemote={updateExistingContact}
+                                updateRemote={updateContact}
                                 updateSchema={updateContactSchema}
                                 getFormData={(c: any) => ({
                                     contact: c,

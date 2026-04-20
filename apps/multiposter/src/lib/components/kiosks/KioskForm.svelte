@@ -220,16 +220,20 @@
             {#if !loaded}
                 <div class="animate-pulse h-10 bg-gray-100 rounded"></div>
             {:else}
+                <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                    <MapPin size={18} class="text-blue-600" />
+                    {m.feature_locations_title()}
+                </h3>
                 <EntityManager
                     title={m.feature_locations_title()}
                     icon={MapPin}
+                    mode="embedded"
                     {type}
                     entityId={initialData?.id}
                     initialItems={locations.filter((l: any) =>
                         selectedLocationIds.includes(l.id),
                     )}
                     onchange={(ids: string[]) => (selectedLocationIds = ids)}
-                    embedded={true}
                     listItemsRemote={listLocations as any}
                     deleteItemRemote={async (ids: string[]) => {
                         return await handleDelete({

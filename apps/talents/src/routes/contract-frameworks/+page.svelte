@@ -10,6 +10,7 @@
 </script>
 
 <div class="space-y-6">
+    <h1 class="text-2xl font-black text-gray-900 px-1">Contract Frameworks</h1>
     <EntityManager
         title="Contract Frameworks"
         icon={FileSignature}

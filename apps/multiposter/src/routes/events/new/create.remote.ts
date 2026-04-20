@@ -11,8 +11,8 @@ import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
 
-export const createNewEvent = form(createEventSchema, async (data) => {
-	console.log('--- createNewEvent START ---');
+export const createEvent = form(createEventSchema, async (data) => {
+	console.log('--- createEvent START ---');
 	console.log('Raw Data:', JSON.stringify(data, null, 2));
 	try {
 		console.log('Authenticating user...');
@@ -301,10 +301,10 @@ export const createNewEvent = form(createEventSchema, async (data) => {
 		}
 
 		await listEvents().refresh();
-		console.log('--- createNewEvent DONE ---');
+		console.log('--- createEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {
-		console.error('--- createNewEvent ERROR ---', err);
+		console.error('--- createEvent ERROR ---', err);
 		if (err?.status && err?.location) {
 			error(500, err.message);
 		}

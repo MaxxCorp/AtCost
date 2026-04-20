@@ -3,7 +3,7 @@
     import EntityManager from "@ac/ui/components/EntityManager.svelte";
     import ContractForm from "./ContractForm.svelte";
     import { listContracts, createContract, updateContract, deleteContract } from "./contracts.remote";
-    import { listTalents } from "../talents/talents.remote";
+    import { listTalents } from "../talents/list.remote";
     import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import { contractSchema } from "@ac/validations/contracts";
@@ -12,6 +12,7 @@
 </script>
 
 <div class="space-y-6">
+    <h1 class="text-2xl font-black text-gray-900 px-1">Contracts</h1>
     <EntityManager
         title="Contracts"
         icon={FileText}

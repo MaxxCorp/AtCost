@@ -1,20 +1,24 @@
-import { form } from '$app/server';
-import { createContact, getContact } from '$lib/server/contacts';
-import { listContacts } from '../list.remote';
+import { form, getRequestEvent } from '$app/server';
+import { db } from '$lib/server/db';
+import {
+    contact, contactEmail, contactPhone, contactAddress,
+    contactRelation, tag, contactTag, locationContact
+} from '$lib/server/db/schema';
 import { createContactSchema, type Contact } from '$lib/validations/contacts';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { generateContactAssets } from '$lib/server/contacts';
+import { listContacts } from '../list.remote';
 
-export const createNewContact = form(createContactSchema, async (input) => {
-    console.log('--- createNewContact START ---');
+export const createContact = form(createContactSchema, async (input) => {
+    console.log('--- createContact START ---');
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'contacts');
         console.log('User authenticated:', user.id);
 
         const data = input as any;
-        console.log('Raw input data:', JSON.stringify(data, null, 2));
 
-        // Parse JSON fields commonly used to bypass FormData nesting issues
+        // Parse JSON fields
         let emails = data.emails;
         let phones = data.phones;
         let addresses = data.addresses;
@@ -31,38 +35,144 @@ export const createNewContact = form(createContactSchema, async (input) => {
             if (data.locationIdsJson) locationIds = JSON.parse(data.locationIdsJson);
         } catch (e) {
             console.error('JSON parsing error:', e);
-            // Continue with potentially unparsed or default values, or throw?
-            // Usually unparsed strings won't match schema for arrays, so it might fail later.
         }
 
-        console.log('Parsed complex fields:', { emails, phones, addresses, relationIds, tagNames });
-
         // Sanitize contact data
-        const {
-            birthday,
-            ...rest
-        } = data.contact;
-
+        const { birthday, ...rest } = data.contact;
         const parsedBirthday = (birthday && !isNaN(new Date(birthday).getTime())) ? new Date(birthday) : null;
-        console.log('Parsed birthday:', parsedBirthday);
 
-        const contactId = await createContact({
-            contact: {
-                ...rest,
-                birthday: parsedBirthday,
-            } as any,
+        const createData = {
+            contact: { ...rest, birthday: parsedBirthday },
             emails,
             phones,
             addresses,
             relationIds,
             tagNames,
             locationIds,
+        };
+
+        // --- Logic from createContact helper ---
+        const contactId = await db.transaction(async (tx) => {
+            // Insert main contact
+            const [newContact] = await tx.insert(contact).values({
+                userId: user.id,
+                displayName: createData.contact.displayName,
+                givenName: createData.contact.givenName || null,
+                familyName: createData.contact.familyName || null,
+                middleName: createData.contact.middleName || null,
+                honorificPrefix: createData.contact.honorificPrefix || null,
+                honorificSuffix: createData.contact.honorificSuffix || null,
+                company: createData.contact.company || null,
+                role: createData.contact.role || null,
+                department: createData.contact.department || null,
+                birthday: createData.contact.birthday || null,
+                gender: createData.contact.gender || null,
+                notes: createData.contact.notes || null,
+                isPublic: !!createData.contact.isPublic
+            }).returning({ id: contact.id });
+
+            const id = newContact.id;
+
+            // Insert emails
+            if (createData.emails && createData.emails.length > 0) {
+                await tx.insert(contactEmail).values(createData.emails.map((e: any) => ({
+                    contactId: id,
+                    value: e.value,
+                    type: e.type || 'other',
+                    primary: !!e.primary
+                })));
+            }
+
+            // Insert phones
+            if (createData.phones && createData.phones.length > 0) {
+                await tx.insert(contactPhone).values(createData.phones.map((p: any) => ({
+                    contactId: id,
+                    value: p.value,
+                    type: p.type || 'other',
+                    primary: !!p.primary
+                })));
+            }
+
+            // Insert addresses
+            if (createData.addresses && createData.addresses.length > 0) {
+                await tx.insert(contactAddress).values(createData.addresses.map((a: any) => ({
+                    contactId: id,
+                    street: a.street || null,
+                    houseNumber: a.houseNumber || null,
+                    addressSuffix: a.addressSuffix || null,
+                    zip: a.zip || null,
+                    city: a.city || null,
+                    state: a.state || null,
+                    country: a.country || null,
+                    type: a.type || 'other',
+                    primary: !!a.primary
+                })));
+            }
+
+            // Insert relations
+            if (createData.relationIds && createData.relationIds.length > 0) {
+                await tx.insert(contactRelation).values(createData.relationIds.map((r: any) => ({
+                    contactId: id,
+                    targetContactId: r.targetContactId,
+                    relationType: r.relationType
+                })));
+            }
+
+            // Insert tags
+            if (createData.tagNames && createData.tagNames.length > 0) {
+                for (const tagName of createData.tagNames) {
+                    let tagId: string;
+                    const existingTag = await tx.query.tag.findFirst({ where: (t, { eq }) => eq(t.name, tagName) });
+                    if (existingTag) {
+                        tagId = existingTag.id;
+                    } else {
+                        const [newTag] = await tx.insert(tag).values({ name: tagName, userId: user.id }).returning({ id: tag.id });
+                        tagId = newTag.id;
+                    }
+                    await tx.insert(contactTag).values({ contactId: id, tagId });
+                }
+            }
+
+            // Insert location associations
+            if (createData.locationIds && createData.locationIds.length > 0) {
+                await tx.insert(locationContact).values(createData.locationIds.map(locationId => ({ locationId, contactId: id })));
+            }
+
+            return id;
         });
 
-        const newContact = await getContact(contactId);
+        // Generate assets after transaction
+        let origin: string | undefined;
+        try {
+            origin = getRequestEvent()?.url.origin;
+        } catch (e) { /* ignore */ }
+        await generateContactAssets(contactId, origin);
+
+        const newContact = await db.query.contact.findFirst({
+            where: (table, { eq }) => eq(table.id, contactId),
+            with: {
+                emails: true,
+                phones: true,
+                addresses: true,
+                locationAssociations: {
+                    with: {
+                        location: true
+                    }
+                },
+                relations: {
+                    with: {
+                        targetContact: true
+                    }
+                },
+                tags: {
+                    with: {
+                        tag: true
+                    }
+                }
+            }
+        });
         if (!newContact) throw new Error("Created contact not found");
 
-        // Transform the same way as listContacts
         const transformed: Contact = {
             ...newContact,
             createdAt: newContact.createdAt.toISOString(),
@@ -83,11 +193,13 @@ export const createNewContact = form(createContactSchema, async (input) => {
             }))
         } as Contact;
 
-        console.log('--- createNewContact SUCCESS --- returning contact:', transformed.id);
+        console.log('--- createContact SUCCESS --- returning contact:', transformed.id);
+        await listContacts().refresh();
         return { success: true, id: contactId, contact: transformed };
 
     } catch (err: any) {
-        console.error('--- createNewContact ERROR ---', err);
+        console.error('--- createContact ERROR ---', err);
         return { success: false, error: { message: err.message || 'Failed to create contact' } };
     }
 });
+

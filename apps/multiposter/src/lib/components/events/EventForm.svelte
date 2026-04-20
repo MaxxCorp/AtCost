@@ -11,8 +11,8 @@
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-    import type { updateExistingEvent } from "../../../routes/events/[id]/update.remote";
-    import type { createNewEvent } from "../../../routes/events/new/create.remote";
+    import type { updateEvent } from "../../../routes/events/[id]/update.remote";
+    import type { createEvent } from "../../../routes/events/new/create.remote";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import { listLocations } from "../../../routes/locations/list.remote";
@@ -31,13 +31,13 @@
         fetchEntityContacts,
         updateAssociationStatus as updateAssociationStatusRemote,
     } from "../../../routes/contacts/associate.remote";
-    import { createNewContact } from "../../../routes/contacts/new/create.remote";
-    import { updateExistingContact } from "../../../routes/contacts/[id]/update.remote";
+    import { createContact } from "../../../routes/contacts/new/create.remote";
+    import { updateContact } from "../../../routes/contacts/[id]/update.remote";
     import {
         createContactSchema,
         updateContactSchema,
     } from "$lib/validations/contacts";
-    import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import {
@@ -67,7 +67,7 @@
         isUpdating = false,
         initialData = null,
     }: {
-        remoteFunction: typeof updateExistingEvent | typeof createNewEvent;
+        remoteFunction: typeof updateEvent | typeof createEvent;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: Event | null;
@@ -807,9 +807,14 @@
                     </p>
                 {:else}
                     <!-- Using Multi-Location Selector -->
+                    <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                        <MapPin size={18} class="text-blue-600" />
+                        {m.feature_locations_title()}
+                    </h3>
                     <EntityManager
                         title={m.feature_locations_title()}
                         icon={MapPin}
+                        mode="embedded"
                         {type}
                         entityId={initialData?.id}
                         initialItems={locations.filter((l: any) =>
@@ -817,7 +822,6 @@
                         )}
                         onchange={(ids: string[]) =>
                             (selectedLocationIds = ids)}
-                        embedded={true}
                         listItemsRemote={listLocations as any}
                         deleteItemRemote={async (ids: string[]) => {
                             return await handleDelete({
@@ -1192,14 +1196,17 @@
                 {/if}
             </div>
         </div>
-
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <User size={18} class="text-blue-600" />
+            {m.feature_contacts_title()}
+        </h3>
         <EntityManager
             title={m.feature_contacts_title()}
             icon={User}
+            mode="embedded"
             type="event"
             entityId={initialData?.id}
             onchange={(ids: string[]) => (selectedContactIds = ids)}
-            embedded={true}
             listItemsRemote={listContacts as any}
             fetchAssociationsRemote={fetchEntityContacts as any}
             addAssociationRemote={async (p: any) =>
@@ -1209,13 +1216,13 @@
             deleteItemRemote={async (ids: string[]) => {
                 return await handleDelete({
                     ids,
-                    deleteFn: deleteExistingContact,
+                    deleteFn: deleteContact,
                     itemName: m.contact_label().toLowerCase(),
                 });
             }}
-            createRemote={createNewContact}
+            createRemote={createContact}
             createSchema={createContactSchema}
-            updateRemote={updateExistingContact}
+            updateRemote={updateContact}
             updateSchema={updateContactSchema}
             getFormData={(c: Contact) => ({
                 contact: c,
@@ -1311,15 +1318,21 @@
                 >
                     {#snippet children({ onLocationsChange })}
                         <div class="mt-8 border-t pt-8">
+                            <h3
+                                class="text-lg font-semibold mb-2 flex items-center gap-2"
+                            >
+                                <MapPin size={18} class="text-blue-600" />
+                                {m.feature_locations_title()}
+                            </h3>
                             <EntityManager
                                 title={m.feature_locations_title()}
                                 icon={MapPin}
+                                mode="embedded"
                                 type="location"
                                 entityId={id}
                                 initialItems={(
                                     formData?.locationAssociations || []
                                 ).map((la: any) => la.location)}
-                                embedded={true}
                                 onchange={onLocationsChange}
                                 listItemsRemote={listLocations as any}
                                 addAssociationRemote={async (p: any) => {

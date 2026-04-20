@@ -3,7 +3,7 @@
 	import { page } from "$app/state";
 	import { browser } from "$app/environment";
 	import { readEvent } from "./read.remote";
-	import { updateExistingEvent } from "./update.remote";
+	import { updateEvent } from "./update.remote";
 	import { updateEventSchema } from "$lib/validations/events";
 	import EventForm from "$lib/components/events/EventForm.svelte";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
@@ -17,7 +17,7 @@
 	{:then event}
 	{#if event}
 		<EventForm
-			remoteFunction={updateExistingEvent}
+			remoteFunction={updateEvent}
 			validationSchema={updateEventSchema}
 			isUpdating={true}
 			initialData={event}

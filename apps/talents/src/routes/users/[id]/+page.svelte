@@ -14,9 +14,12 @@
     import { browser } from "$app/environment";
     import { authClient } from "$lib/auth";
 
-    import { listTalents } from "../../talents/talents.remote";
-    import { fetchEntityTalents, addAssociation, removeAssociation } from "../../talents/associate.remote";
-    import { upsertTalent } from "../../talents/talents.remote";
+    import { listTalents } from "../../talents/list.remote";
+    import { getEntityTalents, associateTalent, dissociateTalent } from "../../talents/associate.remote";
+    import { upsertTalent, listTags } from "../../talents/talents.remote";
+    import { listLocations } from "../../locations/list.remote";
+    import { createTalent } from "../../talents/new/create.remote";
+    import { updateTalent } from "../../talents/[id]/update.remote";
     import { unifiedTalentSchema } from "@ac/validations";
     import { EntityManager } from "@ac/ui";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";
@@ -85,6 +88,10 @@
                                 onCancel={() => goto("/users")}
                             >
                                 {#snippet extraEntities(data: any)}
+                                    <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4 mt-8 pt-8 border-t">
+                                        <UserIcon size={20} class="text-indigo-500" />
+                                        {m.talents()}
+                                    </h3>
                                     <EntityManager
                                         title="Associated Talents"
                                         icon={UserIcon}
@@ -92,14 +99,41 @@
                                         type="user"
                                         entityId={data.id}
                                         listItemsRemote={listTalents as any}
-                                        fetchAssociationsRemote={fetchEntityTalents as any}
+                                        fetchAssociationsRemote={getEntityTalents as any}
                                         addAssociationRemote={async (p: any) =>
-                                            addAssociation({ ...p, talentId: p.itemId } as any)}
+                                            associateTalent({ ...p, talentId: p.itemId } as any)}
                                         removeAssociationRemote={async (p: any) =>
-                                            removeAssociation({ ...p, talentId: p.itemId } as any)}
-                                        createRemote={upsertTalent}
+                                            dissociateTalent({ ...p, talentId: p.itemId } as any)}
+                                        filterAssociations={[
+                                            {
+                                                id: "locationId",
+                                                label: "Locations",
+                                                listRemote: listLocations as any,
+                                                getOptionLabel: (l: any) => l.name,
+                                            },
+                                            {
+                                                id: "tagId",
+                                                label: "Tags",
+                                                listRemote: listTags as any,
+                                                getOptionLabel: (t: any) => t.name,
+                                            },
+                                        ]}
+                                        filters={[
+                                            {
+                                                id: "status",
+                                                label: "Status",
+                                                type: "select",
+                                                options: [
+                                                    { value: "active", label: "Active" },
+                                                    { value: "applicant", label: "Applicant" },
+                                                    { value: "inactive", label: "Inactive" },
+                                                ],
+                                                optionsRemote: async () => [],
+                                            }
+                                        ]}
+                                        createRemote={createTalent}
                                         createSchema={unifiedTalentSchema}
-                                        updateRemote={upsertTalent}
+                                        updateRemote={updateTalent}
                                         updateSchema={unifiedTalentSchema}
                                         getFormData={(t: any) => ({
                                             talent: { ...t },
@@ -132,7 +166,7 @@
                                             </div>
                                         {/snippet}
 
-                                        {#snippet renderForm({ remoteFunction, schema, initialData, onSuccess, onCancel, id }: { remoteFunction: any, schema: any, initialData?: any, onSuccess: (result: any) => void, onCancel: () => void, id?: string })}
+                                        {#snippet renderForm({ remoteFunction, initialData, onSuccess, onCancel, id }: { remoteFunction: any, initialData?: any, onSuccess: (result: any) => void, onCancel: () => void, id?: string })}
                                             <TalentForm
                                                 initialData={{
                                                     ...(initialData || {}),

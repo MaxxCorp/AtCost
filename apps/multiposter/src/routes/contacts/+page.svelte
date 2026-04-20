@@ -3,7 +3,7 @@
     import { listContacts } from "./list.remote";
     import { listLocations } from "../locations/list.remote";
     import { listTags } from "../tags/list.remote";
-    import { deleteExistingContact } from "./[id]/delete.remote";
+    import { deleteContact } from "./[id]/delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
@@ -20,6 +20,7 @@
     <div class="max-w-4xl mx-auto">
         <Breadcrumb feature="contacts" />
         <div class="bg-white shadow rounded-lg p-6">
+            <h1 class="text-2xl font-black mb-6 text-gray-900">{m.feature_contacts_title()}</h1>
             <EntityManager 
                 title={m.feature_contacts_title()} 
                 icon={User} 
@@ -44,7 +45,7 @@
                 deleteItemRemote={async (ids: string[]) => {
                     return await handleDelete({
                         ids,
-                        deleteFn: deleteExistingContact,
+                        deleteFn: deleteContact,
                         itemName: m.feature_contacts_title().toLowerCase(),
                     });
                 }}

@@ -2,8 +2,8 @@
     import { page } from "$app/state";
     import * as m from "$lib/paraglide/messages";
     import { readContact } from "./read.remote";
-    import { updateExistingContact } from "./update.remote";
-    import { deleteExistingContact } from "./delete.remote";
+    import { updateContact } from "./update.remote";
+    import { deleteContact } from "./delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
@@ -70,12 +70,12 @@
                         <AsyncButton
                             type="button"
                             loadingLabel={m.deleting()}
-                            loading={deleteExistingContact.pending}
+                            loading={deleteContact.pending}
                             variant="destructive"
                             onclick={async () => {
                                 await handleDelete({
                                     ids: [contact.id],
-                                    deleteFn: deleteExistingContact,
+                                    deleteFn: deleteContact,
                                     itemName: m.contacts().toLowerCase(),
                                 });
                                 goto("/contacts");
@@ -85,7 +85,7 @@
                         </AsyncButton>
                     </div>
                     <ContactForm
-                        remoteFunction={updateExistingContact}
+                        remoteFunction={updateContact}
                         schema={updateContactSchema}
                         onSuccess={handleSuccess}
                         contactId={contact.id}
@@ -103,15 +103,19 @@
                     >
                         {#snippet children({ onLocationsChange })}
                             <div class="mt-8 border-t pt-8">
+                                <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                                    <MapPin size={18} class="text-blue-600" />
+                                    {m.feature_locations_title()}
+                                </h3>
                                 <EntityManager
                                     title={m.feature_locations_title()}
                                     icon={MapPin}
+                                    mode="embedded"
                                     type="location"
                                     entityId={contactId}
                                     initialItems={(
                                         contact.locationAssociations || []
                                     ).map((la: any) => la.location)}
-                                    embedded={true}
                                     onchange={onLocationsChange}
                                     listItemsRemote={listLocations}
                                     addAssociationRemote={async (p: any) => {

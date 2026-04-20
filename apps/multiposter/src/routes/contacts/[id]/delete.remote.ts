@@ -9,7 +9,7 @@ import { getStorageProvider } from '$lib/server/blob-storage';
 
 const deleteContactsSchema = v.array(v.string());
 
-export const deleteExistingContact = command(deleteContactsSchema, async (ids) => {
+export const deleteContact = command(deleteContactsSchema, async (ids) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'contacts');
 

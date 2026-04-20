@@ -24,9 +24,9 @@
         removeAssociation,
         fetchEntityContacts,
     } from "../../contacts/associate.remote";
-    import { createNewContact } from "../../contacts/new/create.remote";
-    import { updateExistingContact } from "../../contacts/[id]/update.remote";
-    import { deleteExistingContact } from "../../contacts/[id]/delete.remote";
+    import { createContact } from "../../contacts/new/create.remote";
+    import { updateContact } from "../../contacts/[id]/update.remote";
+    import { deleteContact } from "../../contacts/[id]/delete.remote";
     import { listContacts } from "../../contacts/list.remote";
     import {
         createLocationSchema,
@@ -34,6 +34,7 @@
     } from "$lib/validations/locations";
     import { listLocations } from "../list.remote";
     import { createLocation } from "../new/create.remote";
+    import { listTags } from "../../tags/list.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
 	const locationPromise = $state(readLocation(page.params.id || ""));
 </script>
@@ -90,6 +91,10 @@
                     >
                         {#snippet children()}
                             <div class="mt-8 border-t pt-8">
+                                <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                                    <User size={18} class="text-blue-600" />
+                                    {m.contacts()}
+                                </h3>
                                 <EntityManager
                                     title={m.contacts()}
                                     icon={User}
@@ -108,10 +113,24 @@
                                             ...p,
                                             contactId: p.itemId,
                                         } as any)}
+                                    filterAssociations={[
+                                        {
+                                            id: "locationId",
+                                            label: m.locations(),
+                                            listRemote: listLocations as any,
+                                            getOptionLabel: (l: any) => l.name,
+                                        },
+                                        {
+                                            id: "tagId",
+                                            label: m.tags(),
+                                            listRemote: listTags as any,
+                                            getOptionLabel: (t: any) => t.name,
+                                        },
+                                    ]}
                                     deleteItemRemote={async (ids: string[]) => {
                                         return await handleDelete({
                                             ids,
-                                            deleteFn: deleteExistingContact,
+                                            deleteFn: deleteContact,
                                             itemName: m
                                                 .contacts()
                                                 .toLowerCase(),
@@ -125,9 +144,9 @@
                                         ).toLowerCase();
                                         return name.includes(q.toLowerCase());
                                     }) as any}
-                                    createRemote={createNewContact}
+                                    createRemote={createContact}
                                     createSchema={createContactSchema}
-                                    updateRemote={updateExistingContact}
+                                    updateRemote={updateContact}
                                     updateSchema={updateContactSchema}
                                     getFormData={((c: any) => ({
                                         contact: c as Contact,
@@ -173,6 +192,10 @@
                                                 <div
                                                     class="mt-8 border-t pt-8"
                                                 >
+                                                    <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                                                        <MapPin size={18} class="text-blue-600" />
+                                                        {m.feature_locations_title()}
+                                                    </h3>
                                                     <EntityManager
                                                         title={m.feature_locations_title()}
                                                         icon={MapPin}

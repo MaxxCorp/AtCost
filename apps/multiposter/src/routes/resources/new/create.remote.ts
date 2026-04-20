@@ -5,7 +5,7 @@ import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createResourceSchema } from '$lib/validations/resources';
-import { associateContact } from '$lib/server/contacts';
+
 
 export const createResource = form(createResourceSchema, async (data) => {
     console.log('--- createResource START ---');
@@ -93,9 +93,13 @@ export const createResource = form(createResourceSchema, async (data) => {
 
         if (contactIds.length > 0) {
             console.log('Associating contacts:', contactIds);
-            for (const contactId of contactIds) {
-                await associateContact('resource', newResource.id, contactId);
-            }
+            const { resourceContact: resourceContactTable } = await import('@ac/db');
+            await db.insert(resourceContactTable).values(
+                contactIds.map((cId: string) => ({
+                    resourceId: newResource.id,
+                    contactId: cId,
+                }))
+            ).onConflictDoNothing();
             console.log('Contacts associated successfully');
         }
 

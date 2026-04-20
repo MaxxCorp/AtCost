@@ -17,13 +17,13 @@
         removeAssociation,
         fetchEntityContacts,
     } from "../../../routes/contacts/associate.remote";
-    import { createNewContact } from "../../../routes/contacts/new/create.remote";
-    import { updateExistingContact } from "../../../routes/contacts/[id]/update.remote";
+    import { createContact } from "../../../routes/contacts/new/create.remote";
+    import { updateContact } from "../../../routes/contacts/[id]/update.remote";
     import {
         createContactSchema,
         updateContactSchema,
     } from "$lib/validations/contacts";
-    import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import { User, MapPin, Box } from "@lucide/svelte";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
@@ -224,10 +224,14 @@
     </label>
 
     <div class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{m.feature_locations_title()}</span>
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <MapPin size={18} class="text-blue-600" />
+            {m.feature_locations_title()}
+        </h3>
         <EntityManager
             title={m.feature_locations_title()}
             icon={MapPin}
+            mode="embedded"
             type="resource"
             entityId={isUpdating ? initialData?.id : null}
             initialItems={initialData?.locationIds ? locations.filter(l => initialData.locationIds.includes(l.id)) : []}
@@ -270,7 +274,6 @@
             selectAllLabel={m.select_all()}
             deselectAllLabel={m.deselect_all()}
             confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
-            embedded={true}
         >
             {#snippet renderItemLabel(location)}
                 {location.name} {location.roomId ? `(${location.roomId})` : ""}
@@ -415,11 +418,17 @@
             )}
         />
     </div>
+    <div class="block">
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <User size={18} class="text-blue-600" />
+            {m.feature_contacts_title()}
+        </h3>
 
         <EntityManager
             title={m.feature_contacts_title()}
             icon={User}
             type="resource"
+            mode="embedded"
             entityId={isUpdating ? initialData?.id : null}
             onchange={(ids) => (selectedContactIds = ids)}
             listItemsRemote={listContacts as any}
@@ -431,13 +440,13 @@
             deleteItemRemote={async (ids: string[]) => {
                 return await handleDelete({
                     ids,
-                    deleteFn: deleteExistingContact,
+                    deleteFn: deleteContact,
                     itemName: m.feature_contacts_title(),
                 });
             }}
-            createRemote={createNewContact}
+            createRemote={createContact}
             createSchema={createContactSchema}
-            updateRemote={updateExistingContact}
+            updateRemote={updateContact}
             updateSchema={updateContactSchema}
             getFormData={(c: Contact) => ({
                 contact: c,
@@ -493,6 +502,7 @@
                 />
             {/snippet}
         </EntityManager>
+    </div>
 
     <input
         type="hidden"

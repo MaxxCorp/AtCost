@@ -1,10 +1,10 @@
 <script lang="ts">
     import AnnouncementForm from "$lib/components/announcements/AnnouncementForm.svelte";
-    import { createNewAnnouncement } from "./create.remote";
+    import { createAnnouncement } from "./create.remote";
     import { createAnnouncementSchema } from "$lib/validations/announcements";
 </script>
 
 <AnnouncementForm
-    remoteFunction={createNewAnnouncement}
+    remoteFunction={createAnnouncement}
     validationSchema={createAnnouncementSchema}
 />

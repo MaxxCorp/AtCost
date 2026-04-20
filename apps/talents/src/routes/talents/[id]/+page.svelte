@@ -1,9 +1,12 @@
 <script lang="ts">
     import { page } from "$app/state";
+    import * as m from "$lib/paraglide/messages";
     import { LoadingSection, ErrorSection, TalentTimeline, Button } from "@ac/ui";
     import { Calendar, ArrowLeft, ExternalLink, FileText } from "@lucide/svelte";
     import { 
         readTalent, 
+    } from './read.remote';
+    import {
         invokeAddTimelineEntry, 
         listEmployees 
     } from '../talents.remote';
@@ -91,6 +94,10 @@
                 </div>
 
                 <div class="pt-8 border-t border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <FileText size={20} class="text-indigo-500" />
+                        {m.contracts()}
+                    </h3>
                     <EntityManager
                         title="Contracts"
                         icon={FileText}

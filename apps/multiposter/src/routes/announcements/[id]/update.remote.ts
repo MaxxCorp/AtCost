@@ -13,7 +13,7 @@ import { syncService } from '$lib/server/sync/service';
 /**
  * Command: Update an existing announcement
  */
-export const updateExistingAnnouncement = form(updateAnnouncementSchema, async (input) => {
+export const updateAnnouncement = form(updateAnnouncementSchema, async (input) => {
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'announcements');

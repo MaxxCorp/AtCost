@@ -1,14 +1,12 @@
 import { command } from '$app/server';
-import { db, contact } from '$lib/server/db';
-import { inArray } from '$lib/server/db';
-import { listContacts } from '../list.remote';
+import { db, talent, eq } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 
-export const deleteExistingContact = command(v.array(v.string()), async (ids): Promise<{ success: boolean }> => {
+export const deleteTalent = command(v.string(), async (id): Promise<{ success: boolean }> => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'contacts');
+    ensureAccess(user, 'talents');
 
-    await db.delete(contact).where(inArray(contact.id, ids));
+    await db.delete(talent).where(eq(talent.id, id));
     return { success: true };
 });

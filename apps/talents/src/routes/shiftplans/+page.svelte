@@ -14,6 +14,7 @@
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-5xl mx-auto space-y-6">
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <h1 class="text-2xl font-black text-gray-900 mb-6 flex-shrink-0">Shiftplans</h1>
             <EntityManager
                 title="Shiftplans"
         icon={Calendar}

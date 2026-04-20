@@ -16,13 +16,13 @@
         removeAssociation,
         fetchEntityContacts,
     } from "../../../routes/contacts/associate.remote";
-    import { createNewContact } from "../../../routes/contacts/new/create.remote";
-    import { updateExistingContact } from "../../../routes/contacts/[id]/update.remote";
+    import { createContact } from "../../../routes/contacts/new/create.remote";
+    import { updateContact } from "../../../routes/contacts/[id]/update.remote";
     import {
         createContactSchema,
         updateContactSchema,
     } from "$lib/validations/contacts";
-    import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import { User } from "@lucide/svelte";
 
@@ -216,9 +216,14 @@
     </div>
 
     {#if isUpdating && initialData?.id}
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <User size={18} class="text-blue-600" />
+            {m.feature_contacts_title()}
+        </h3>
         <EntityManager
             title={m.feature_contacts_title()}
             icon={User}
+            mode="embedded"
             type="user"
             entityId={initialData.id}
             listItemsRemote={listContacts as any}
@@ -230,13 +235,13 @@
             deleteItemRemote={async (ids: string[]) => {
                 return await handleDelete({
                     ids,
-                    deleteFn: deleteExistingContact,
+                    deleteFn: deleteContact,
                     itemName: m.feature_contacts_title(),
                 });
             }}
-            createRemote={createNewContact}
+            createRemote={createContact}
             createSchema={createContactSchema}
-            updateRemote={updateExistingContact}
+            updateRemote={updateContact}
             updateSchema={updateContactSchema}
             getFormData={(c: Contact) => ({
                 contact: c,

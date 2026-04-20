@@ -12,7 +12,9 @@
         Clock,
         Archive
     } from "@lucide/svelte";
-    import { listTalents, deleteTalent, bulkDeleteTalents, listTags } from "./talents.remote";
+    import { listTalents } from "./list.remote";
+    import { deleteTalent } from "./[id]/delete.remote";
+    import { bulkDeleteTalents, listTags } from "./talents.remote";
     import { listLocations } from "../locations/list.remote";
     import { toast } from "svelte-sonner";
     import { Button, AsyncButton, EntityManager } from "@ac/ui";
@@ -58,6 +60,7 @@
     </div>
 
     <div class="bg-white shadow-xl rounded-2xl p-6 border border-gray-100">
+        <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">Talents</h1>
         <EntityManager
             title="Talent Management"
             icon={User}

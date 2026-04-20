@@ -25,14 +25,18 @@
         id: string;
         label: string;
         type: "select";
-        optionsRemote: (params?: any) => Promise<any[] | { data: any[]; total: number }>;
-        options?: { value: string, label: string }[];
+        optionsRemote: (
+            params?: any,
+        ) => Promise<any[] | { data: any[]; total: number }>;
+        options?: { value: string; label: string }[];
     }
 
     export interface FilterAssociation {
         id: string;
         label: string;
-        listRemote: (params?: any) => Promise<any[] | { data: any[]; total: number }>;
+        listRemote: (
+            params?: any,
+        ) => Promise<any[] | { data: any[]; total: number }>;
         getOptionLabel: (item: any) => string;
     }
 
@@ -42,12 +46,13 @@
         mode?: "embedded" | "standalone";
         type?: string;
         entityId?: string | null;
-        embedded?: boolean;
         singleSelect?: boolean;
         onchange?: (ids: string[], items: T[]) => void;
 
         // Data fetchers
-        listItemsRemote: (params?: any) => Promise<T[] | { data: T[], total?: number }>;
+        listItemsRemote: (
+            params?: any,
+        ) => Promise<T[] | { data: T[]; total?: number }>;
         fetchAssociationsRemote?: (params: {
             type: any;
             entityId: string;
@@ -86,7 +91,19 @@
         >;
 
         // Rendering snippets
-        renderListItem?: Snippet<[T, { isSelected: boolean, toggleSelection: (id: string) => void, deleteItem: (item: T) => void, isAssociated: boolean, toggleAssociation: (item: T) => void, singleSelect: boolean }]>;
+        renderListItem?: Snippet<
+            [
+                T,
+                {
+                    isSelected: boolean;
+                    toggleSelection: (id: string) => void;
+                    deleteItem: (item: T) => void;
+                    isAssociated: boolean;
+                    toggleAssociation: (item: T) => void;
+                    singleSelect: boolean;
+                },
+            ]
+        >;
         renderItemLabel?: Snippet<[T]>;
         renderItemBadge?: Snippet<[T]>;
         renderItemDetail?: Snippet<[T]>;
@@ -135,7 +152,6 @@
         mode = "standalone",
         type,
         entityId = null,
-        embedded = false,
         singleSelect = false,
         onchange = undefined,
         listItemsRemote,
@@ -188,36 +204,40 @@
 
     const effectiveFilters = $derived([
         ...filters,
-        ...filterAssociations.map(assoc => ({
+        ...filterAssociations.map((assoc) => ({
             id: assoc.id,
             label: assoc.label,
             type: "select" as const,
             optionsRemote: async (params: any) => {
                 const result = await assoc.listRemote(params);
                 const items = Array.isArray(result) ? result : result.data;
-                return items.map(item => ({
+                return items.map((item) => ({
                     label: assoc.getOptionLabel(item),
-                    value: item.id
+                    value: item.id,
                 }));
-            }
-        }))
+            },
+        })),
     ]);
 
     const isStandalone = $derived(mode === "standalone");
-    
+
     let page = $state(1);
     let limit = $state(50);
     let totalItems = $state(0);
 
     let searchQuery = $state("");
-    
+
     // Filter persistence
-    const storageKey = $derived(`em-filters-${title.toLowerCase().replace(/\s+/g, '-')}`);
+    const storageKey = $derived(
+        `em-filters-${title.toLowerCase().replace(/\s+/g, "-")}`,
+    );
     let selectedFilters = $state<Record<string, string[]>>({});
-    const activeFiltersCount = $derived(Object.values(selectedFilters).filter(v => v.length > 0).length);
+    const activeFiltersCount = $derived(
+        Object.values(selectedFilters).filter((v) => v.length > 0).length,
+    );
 
     onMount(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
             const saved = localStorage.getItem(storageKey);
             if (saved) {
                 try {
@@ -230,18 +250,20 @@
     });
 
     $effect(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
             localStorage.setItem(storageKey, JSON.stringify(selectedFilters));
         }
     });
 
-    let filterOptions = $state<Record<string, { value: string, label: string }[]>>({});
+    let filterOptions = $state<
+        Record<string, { value: string; label: string }[]>
+    >({});
 
     $effect(() => {
         if (filters && filters.length > 0) {
             for (const filter of filters) {
                 if (filter.optionsRemote) {
-                    filter.optionsRemote().then(opts => {
+                    filter.optionsRemote().then((opts) => {
                         const items = Array.isArray(opts) ? opts : opts.data;
                         filterOptions[filter.id] = items;
                     });
@@ -251,16 +273,23 @@
             }
         }
     });
-    
+
     // Remote Query Initialization
     const listQuery = $derived.by(() => {
-        const params: any = { page, limit, search: searchQuery, ...selectedFilters };
+        const params: any = {
+            page,
+            limit,
+            search: searchQuery,
+            ...selectedFilters,
+        };
         return listItemsRemote(params);
     });
 
-    const fetchQuery = $derived(!isStandalone && entityId && type && fetchAssociationsRemote 
-        ? fetchAssociationsRemote({ type, entityId }) 
-        : null);
+    const fetchQuery = $derived(
+        !isStandalone && entityId && type && fetchAssociationsRemote
+            ? fetchAssociationsRemote({ type, entityId })
+            : null,
+    );
 
     // svelte-ignore state_referenced_locally
     let associatedItems = $state<any[]>(initialItems ?? []);
@@ -284,13 +313,54 @@
             ? searchQuery
                 ? associatedItems.filter((i) => searchPredicate(i, searchQuery))
                 : associatedItems
-            : associatedItems,
+            : associatedItems.filter((item) => {
+                  // Search
+                  if (
+                      searchQuery &&
+                      searchPredicate &&
+                      !searchPredicate(item, searchQuery)
+                  ) {
+                      return false;
+                  }
+
+                  // Filters
+                  for (const [key, values] of Object.entries(selectedFilters)) {
+                      if (!values || values.length === 0) continue;
+
+                      // Check if the item has the property directly
+                      if (
+                          item[key] !== undefined &&
+                          !values.includes(item[key])
+                      ) {
+                          return false;
+                      }
+
+                      // Fallback for nested objects if key might be an ID but item has object
+                      // (e.g. key is 'locationId' and item has 'location: { id: ... }')
+                      if (key.endsWith("Id")) {
+                          const objKey = key.slice(0, -2);
+                          if (
+                              item[objKey]?.id !== undefined &&
+                              !values.includes(item[objKey].id)
+                          ) {
+                              return false;
+                          }
+                      }
+                  }
+
+                  return true;
+              }),
     );
 
     let fetchingAssociations = $state(false);
 
     $effect(() => {
-        if (!isStandalone && initialItems !== undefined && !fetchAssociationsRemote && !loadingItems) {
+        if (
+            !isStandalone &&
+            initialItems !== undefined &&
+            !fetchAssociationsRemote &&
+            !loadingItems
+        ) {
             associatedItems = initialItems;
         }
     });
@@ -298,31 +368,43 @@
     $effect(() => {
         if (fetchQuery) {
             fetchingAssociations = true;
-            fetchQuery.then((data: any) => {
-                associatedItems = data;
-                fetchingAssociations = false;
-            }).catch((err: any) => {
-                console.error("Failed to fetch associations", err);
-                fetchingAssociations = false;
-            });
+            fetchQuery
+                .then((data: any) => {
+                    associatedItems = data;
+                    fetchingAssociations = false;
+                })
+                .catch((err: any) => {
+                    console.error("Failed to fetch associations", err);
+                    fetchingAssociations = false;
+                });
         }
     });
 
-    $effect(() => {
-        if (isStandalone && listQuery) {
-            loadingItems = true;
-            Promise.resolve(listQuery).then((res: any) => {
-                untrack(() => {
-                    associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
-                    totalItems = Array.isArray(res) ? res.length : (res?.total ?? associatedItems.length);
-                    loadingItems = false;
-                });
-            }).catch(e => {
-                console.error("Failed to load items", e);
-                untrack(() => {
-                    loadingItems = false;
-                });
+    const refresh = async () => {
+        loadingItems = true;
+        try {
+            const res = await listQuery;
+            untrack(() => {
+                associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
+                totalItems = Array.isArray(res)
+                    ? res.length
+                    : (res?.total ?? associatedItems.length);
             });
+        } catch (e) {
+            console.error("Failed to load items", e);
+        } finally {
+            loadingItems = false;
+        }
+    };
+
+    $effect(() => {
+        if (isStandalone) {
+            // Access listQuery to register as dependency
+            listQuery;
+            refresh();
+        } else if (showSelector) {
+            // In embedded mode, if selector is open, refresh allItems when filters or search change
+            refreshAllItems();
         }
     });
 
@@ -352,7 +434,11 @@
                 (i) => !selectedIds.has(i.id),
             );
             allItems = allItems.filter((i) => !selectedIds.has(i.id));
-            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
+            if (onchange)
+                onchange(
+                    associatedItems.map((i) => i.id),
+                    associatedItems,
+                );
             deselectAll();
             toast.success(`Deleted successfully`);
         } catch (e: any) {
@@ -362,19 +448,24 @@
         }
     }
 
+    async function refreshAllItems() {
+        const query = listQuery;
+        if (!query) return;
+        loadingSearch = true;
+        try {
+            const res = await query;
+            allItems = Array.isArray(res) ? res : (res?.data ?? []);
+        } catch (err: any) {
+            toast.error(`${noItemsFoundLabel}: ${err.message}`);
+        } finally {
+            loadingSearch = false;
+        }
+    }
+
     async function toggleSelector() {
         showSelector = !showSelector;
-        const query = listQuery;
-        if (showSelector && allItems.length === 0 && query) {
-            loadingSearch = true;
-            try {
-                const res = await query;
-                allItems = Array.isArray(res) ? res : (res?.data ?? []);
-            } catch (err: any) {
-                toast.error(`${noItemsFoundLabel}: ${err.message}`);
-            } finally {
-                loadingSearch = false;
-            }
+        if (showSelector && allItems.length === 0) {
+            await refreshAllItems();
         }
     }
 
@@ -425,7 +516,11 @@
                     associatedItems = [...associatedItems, item];
                 }
             }
-            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
+            if (onchange)
+                onchange(
+                    associatedItems.map((i) => i.id),
+                    associatedItems,
+                );
         } catch (error: any) {
             toast.error(error.message || "Failed to update association");
         } finally {
@@ -438,12 +533,16 @@
 
         if (result?.id) {
             const query = listQuery;
-            const res: any = query ? await query : await listItemsRemote({ page, limit, search: searchQuery });
+            const res: any = query
+                ? await query
+                : await listItemsRemote({ page, limit, search: searchQuery });
             const items = Array.isArray(res) ? res : (res?.data ?? []);
 
             if (isStandalone) {
                 associatedItems = items;
-                totalItems = Array.isArray(res) ? res.length : (res?.total ?? items.length);
+                totalItems = Array.isArray(res)
+                    ? res.length
+                    : (res?.total ?? items.length);
                 toast.success(`${title} created`);
             } else {
                 const newItem = items.find((i: any) => i.id === result.id);
@@ -457,7 +556,11 @@
                     }
                     allItems = [newItem, ...allItems];
                     associatedItems = [newItem, ...associatedItems];
-                    if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
+                    if (onchange)
+                        onchange(
+                            associatedItems.map((i) => i.id),
+                            associatedItems,
+                        );
                     toast.success(`${title} created and associated`);
                 }
             }
@@ -471,7 +574,9 @@
         if (!targetId) return;
 
         const query = listQuery;
-        const res: any = query ? await query : await listItemsRemote({ page, limit, search: searchQuery });
+        const res: any = query
+            ? await query
+            : await listItemsRemote({ page, limit, search: searchQuery });
         const items = Array.isArray(res) ? res : (res?.data ?? []);
         const updatedItem = items.find((i: any) => i.id === targetId);
 
@@ -482,7 +587,11 @@
             allItems = allItems.map((i) =>
                 i.id === targetId ? updatedItem : i,
             );
-            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
+            if (onchange)
+                onchange(
+                    associatedItems.map((i) => i.id),
+                    associatedItems,
+                );
             toast.success(`${title} updated`);
         }
     }
@@ -494,7 +603,11 @@
             await deleteItemRemote([item.id]);
             allItems = allItems.filter((i) => i.id !== item.id);
             associatedItems = associatedItems.filter((i) => i.id !== item.id);
-            if (onchange) onchange(associatedItems.map((i) => i.id), associatedItems);
+            if (onchange)
+                onchange(
+                    associatedItems.map((i) => i.id),
+                    associatedItems,
+                );
             toast.success("Deleted successfully");
         } catch (e: any) {
             toast.error(e.message || "Failed to delete item");
@@ -504,508 +617,574 @@
     }
 </script>
 
-{#if isStandalone}
-    <div class="space-y-4">
-        <div
-            class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-        >
-            <h1 class="text-3xl font-bold flex items-center gap-3">
-                <Icon size={28} />
-                {title}
-            </h1>
-            <div class="flex flex-wrap gap-2">
-                {#if selectedIds.size > 0}
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="default"
-                        onclick={selectedIds.size === displayedItems.length
-                            ? deselectAll
-                            : selectAll}
-                    >
-                        {selectedIds.size === displayedItems.length
-                            ? deselectAllLabel
-                            : selectAllLabel}
-                    </Button>
-                    <AsyncButton
-                        onclick={bulkDelete}
-                        variant="destructive"
-                        class="px-4 py-2"
-                        loading={bulkDeleting}
-                        loadingLabel={loadingLabel}
-                    >
-                        {bulkDeleteLabel} ({selectedIds.size})
-                    </AsyncButton>
-                {/if}
-
-                {#if isStandalone}
-                    {#if createHref && showCreateButton}
-                        <Button
-                            href={createHref}
-                            variant="default"
-                            size="default"
-                        >
-                            <Plus size={16} class="mr-1" />
-                            {createLabel}
-                        </Button>
-                    {:else if createRemote && renderForm && showQuickCreateButton}
-                        <Button
-                            type="button"
-                            variant="default"
-                            size="default"
-                            onclick={() => (showQuickCreate = true)}
-                        >
-                            <Plus size={16} class="mr-1" />
-                            {quickCreateLabel}
-                        </Button>
-                    {/if}
-                {/if}
-            </div>
+<!-- Action Bar (Search, Filter, Actions) -->
+<div class="flex flex-col gap-3 {isStandalone ? 'mb-4' : 'mb-3'}">
+    <div class="flex flex-col md:flex-row gap-3">
+        <div class="relative flex-1">
+            <Search
+                size={isStandalone ? 16 : 14}
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+                type="text"
+                placeholder={searchPlaceholder}
+                bind:value={searchQuery}
+                class="pl-9 w-full {isStandalone
+                    ? 'px-3 py-2'
+                    : 'px-2 py-1.5'} border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all bg-gray-50/50"
+            />
         </div>
 
-        <div class="flex flex-col md:flex-row gap-3">
-            <div class="relative flex-1">
-                <Search
-                    size={16}
-                    class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                />
-                <input
-                    type="text"
-                    placeholder={searchPlaceholder}
-                    bind:value={searchQuery}
-                    class="pl-9 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-            </div>
+        <div class="flex items-center gap-2">
             {#if effectiveFilters.length > 0}
                 <DropdownMenu.Root>
                     <DropdownMenu.Trigger>
-                        <Button variant="outline" size="icon" class="relative">
-                            <FilterIcon size={18} />
+                        <Button
+                            variant="outline"
+                            size={isStandalone ? "icon" : "sm"}
+                            class="relative border-gray-200 rounded-xl hover:bg-gray-50"
+                        >
+                            <FilterIcon size={isStandalone ? 18 : 16} />
+                            {#if !isStandalone}
+                                <span class="ml-2 text-xs font-medium"
+                                    >Filter</span
+                                >
+                            {/if}
                             {#if activeFiltersCount > 0}
-                                <span class="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center">
+                                <span
+                                    class="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white"
+                                >
                                     {activeFiltersCount}
                                 </span>
                             {/if}
                         </Button>
                     </DropdownMenu.Trigger>
-                    <DropdownMenu.Content align="end" class="min-w-[200px]">
-                        <DropdownMenu.Label>Filters</DropdownMenu.Label>
-                        <DropdownMenu.Separator />
+                    <DropdownMenu.Content
+                        align="end"
+                        class="min-w-[200px] rounded-2xl shadow-xl border-gray-100 p-1"
+                    >
+                        <DropdownMenu.Label
+                            class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2"
+                            >System Filters</DropdownMenu.Label
+                        >
+                        <DropdownMenu.Separator class="bg-gray-50" />
                         {#each effectiveFilters as filter}
                             <DropdownMenu.Sub>
-                                <DropdownMenu.SubTrigger class="flex items-center gap-2">
+                                <DropdownMenu.SubTrigger
+                                    class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
+                                >
                                     <span>{filter.label}</span>
                                     {#if selectedFilters[filter.id]?.length > 0}
-                                        <span class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-gray-100 text-gray-900 rounded-full flex items-center justify-center font-medium">
+                                        <span
+                                            class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-blue-50 text-blue-700 rounded-full flex items-center justify-center font-bold"
+                                        >
                                             {selectedFilters[filter.id].length}
                                         </span>
                                     {/if}
                                 </DropdownMenu.SubTrigger>
-                                <DropdownMenu.SubContent class="w-56 p-0 max-h-[300px] overflow-y-auto">
-                                    {#await filter.optionsRemote({ limit: 100 })}
-                                        <div class="p-2 text-xs text-muted-foreground animate-pulse">Loading...</div>
+                                <DropdownMenu.SubContent
+                                    class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
+                                >
+                                    {#await filter.optionsRemote( { limit: 100 }, )}
+                                        <div
+                                            class="p-3 text-xs text-muted-foreground animate-pulse text-center"
+                                        >
+                                            Loading options...
+                                        </div>
                                     {:then options}
-                                        {#each Array.isArray(options) ? options : [] as option}
+                                        {@const items = Array.isArray(options)
+                                            ? options
+                                            : options?.data || []}
+                                        {#each items as option}
                                             <DropdownMenu.CheckboxItem
-                                                checked={selectedFilters[filter.id]?.includes(option.value)}
+                                                class="rounded-lg"
+                                                checked={selectedFilters[
+                                                    filter.id
+                                                ]?.includes(option.value)}
                                                 onCheckedChange={(checked) => {
-                                                    const current = selectedFilters[filter.id] || [];
+                                                    const current =
+                                                        selectedFilters[
+                                                            filter.id
+                                                        ] || [];
                                                     if (checked) {
-                                                        selectedFilters[filter.id] = [...current, option.value];
+                                                        selectedFilters[
+                                                            filter.id
+                                                        ] = [
+                                                            ...current,
+                                                            option.value,
+                                                        ];
                                                     } else {
-                                                        selectedFilters[filter.id] = current.filter(v => v !== option.value);
-                                                        if (selectedFilters[filter.id].length === 0) {
-                                                            delete selectedFilters[filter.id];
+                                                        selectedFilters[
+                                                            filter.id
+                                                        ] = current.filter(
+                                                            (v) =>
+                                                                v !==
+                                                                option.value,
+                                                        );
+                                                        if (
+                                                            selectedFilters[
+                                                                filter.id
+                                                            ].length === 0
+                                                        ) {
+                                                            delete selectedFilters[
+                                                                filter.id
+                                                            ];
                                                         }
                                                     }
-                                                    selectedFilters = { ...selectedFilters };
+                                                    selectedFilters = {
+                                                        ...selectedFilters,
+                                                    };
                                                     page = 1;
                                                 }}
                                             >
                                                 {option.label}
                                             </DropdownMenu.CheckboxItem>
                                         {/each}
-                                        {#if (Array.isArray(options) ? options : []).length === 0}
-                                            <div class="p-2 text-xs text-muted-foreground">No items found</div>
+                                        {#if (Array.isArray(options) ? options : (options?.data ?? [])).length === 0}
+                                            <div
+                                                class="p-3 text-xs text-muted-foreground text-center italic"
+                                            >
+                                                No options found
+                                            </div>
                                         {/if}
                                     {/await}
                                 </DropdownMenu.SubContent>
                             </DropdownMenu.Sub>
                         {/each}
                         {#if activeFiltersCount > 0}
-                            <DropdownMenu.Separator />
-                            <DropdownMenu.Item 
+                            <DropdownMenu.Separator class="bg-gray-50" />
+                            <DropdownMenu.Item
                                 onclick={() => {
                                     selectedFilters = {};
                                     page = 1;
                                 }}
-                                class="text-red-600 justify-center font-medium"
+                                class="text-red-600 justify-center font-bold text-xs py-2 hover:bg-red-50 rounded-lg"
                             >
-                                Clear All
+                                Clear All Filters
                             </DropdownMenu.Item>
                         {/if}
                     </DropdownMenu.Content>
                 </DropdownMenu.Root>
             {/if}
+
             {#if filtersSnippet}
                 {@render filtersSnippet()}
             {/if}
-        </div>
 
-        {#if !isStandalone && (linkItemLabel || (createRemote && createSchema))}
-            <div class="flex items-center gap-2 mb-4 bg-white/50 p-2 rounded-lg border border-dashed border-gray-200">
-                {#if linkItemLabel}
-                    <Button 
-                        variant="outline" 
-                        size="sm"
-                        onclick={() => (showSelector = true)}
-                        disabled={loadingItems}
-                    >
-                        <Link class="mr-2 h-4 w-4" />
-                        {linkItemLabel}
-                    </Button>
-                {/if}
-                {#if createRemote && createSchema}
-                    <Button 
-                        variant="secondary" 
-                        size="sm"
-                        onclick={() => (showQuickCreate = true)}
-                        disabled={loadingItems}
-                    >
-                        <Plus class="mr-2 h-4 w-4" />
-                        {quickCreateLabel}
-                    </Button>
-                {/if}
-            </div>
-        {/if}
-
-        {#if loadingItems}
-            <div class="text-center py-12 text-gray-400">
-                {loadingLabel}
-            </div>
-        {:else if associatedItems.length === 0}
-            <EmptyState
-                icon={Icon}
-                title={emptyTitle || `No ${title}`}
-                description={emptyDescription ||
-                    `Get started by creating your first ${title.toLowerCase().replace(/s$/, "")}`}
-                actionLabel={emptyActionLabel ||
-                    `Create ${title.replace(/s$/, "")}`}
-                onclick={() => (showQuickCreate = true)}
-            />
-        {:else if displayedItems.length === 0}
-            <div class="text-center py-8 text-gray-400 text-sm">
-                {noItemsFoundLabel}
-            </div>
-        {:else}
-            <div class="grid gap-3">
-                {#each displayedItems as item (item.id)}
-                    {#if renderListItem}
-                        {@render renderListItem(item, {
-                            isSelected: selectedIds.has(item.id),
-                            toggleSelection,
-                            deleteItem,
-                            isAssociated: associatedItems.some((ai) => ai.id === item.id),
-                            toggleAssociation,
-                            singleSelect
-                        })}
-                    {:else}
-                        <div
-                            class="bg-white shadow-sm rounded-lg p-4 flex items-center gap-4 border border-gray-100 hover:shadow-md transition-shadow group/item"
+            {#if isStandalone && showCreateButton && (renderForm || createHref)}
+                <div class="flex items-center gap-1.5 ml-auto">
+                    {#if renderForm}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onclick={() => (showQuickCreate = !showQuickCreate)}
+                            class="h-9 px-3 text-gray-500 hover:bg-gray-100 rounded-xl"
                         >
-                            {#if !singleSelect}
-                            <input
-                                type="checkbox"
-                                checked={selectedIds.has(item.id)}
-                                onchange={() => toggleSelection(item.id)}
-                                class="w-4 h-4 text-blue-600 shrink-0"
-                            />
-                            {/if}
-
-                            <div class="flex-1 min-w-0">
-                                <div class="font-medium text-gray-900">
-                                    {#if renderItemLabel}
-                                        {@render renderItemLabel(item)}
-                                    {/if}
-                                </div>
-                                {#if renderItemBadge}
-                                    <div class="mt-1">
-                                        {@render renderItemBadge(item)}
-                                    </div>
-                                {/if}
-                                {#if renderItemDetail}
-                                    <div class="mt-1 text-sm text-gray-500">
-                                        {@render renderItemDetail(item)}
-                                    </div>
-                                {/if}
-                            </div>
-                            <div
-                                class="flex items-center gap-1 shrink-0"
+                            <Plus size={16} class="mr-1.5" />
+                            <span class="text-sm font-semibold"
+                                >{createLabel}</span
                             >
-                                {#if updateRemote && renderForm && getFormData}
-                                    <button
-                                        type="button"
-                                        class="h-8 px-2 text-gray-400 hover:text-blue-500 transition-colors"
-                                        onclick={() => {
-                                            editingItem = item;
-                                            showQuickCreate = false;
-                                        }}
-                                        title={editLabel}
-                                    >
-                                        <Pencil size={16} />
-                                    </button>
-                                {/if}
-                                {#if deleteItemRemote}
-                                    <AsyncButton
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        class="h-8 px-2 text-gray-400 hover:text-red-500"
-                                        loading={deletingItemId === item.id}
-                                        loadingLabel=""
-                                        onclick={() => deleteItem(item)}
-                                        title={deleteLabel}
-                                    >
-                                        <Trash2 size={16} />
-                                    </AsyncButton>
-                                {/if}
-                            </div>
-                        </div>
+                        </Button>
+                    {:else if createHref}
+                        <Button
+                            href={createHref}
+                            variant="ghost"
+                            size="sm"
+                            class="h-9 px-3 text-gray-500 hover:bg-gray-100 rounded-xl"
+                        >
+                            <Plus size={16} class="mr-1.5" />
+                            <span class="text-sm font-semibold"
+                                >{createLabel}</span
+                            >
+                        </Button>
                     {/if}
-                {/each}
-            </div>
-            
-            {#if totalItems > limit}
-                <div class="flex justify-between items-center py-4 border-t mt-4 text-sm text-gray-600">
-                    <div>
-                        Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems}
-                    </div>
-                    <div class="flex gap-2">
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            disabled={page === 1}
-                            onclick={() => page--}
+                </div>
+            {:else if !isStandalone}
+                <div class="flex items-center gap-1.5 ml-auto">
+                    {#if !singleSelect || associatedItems.length === 0}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onclick={toggleSelector}
+                            class="h-9 px-3 rounded-xl {showSelector
+                                ? 'bg-blue-50 text-blue-600'
+                                : 'text-gray-500 hover:bg-gray-100'}"
                         >
-                            Previous
+                            {#if showSelector}
+                                <X size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{closeSearchLabel}</span
+                                >
+                            {:else}
+                                <Link size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{linkItemLabel}</span
+                                >
+                            {/if}
                         </Button>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            disabled={page * limit >= totalItems}
-                            onclick={() => page++}
+                    {/if}
+                    {#if renderForm && showQuickCreateButton}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onclick={() => (showQuickCreate = !showQuickCreate)}
+                            class="h-9 px-3 text-gray-500 hover:bg-gray-100 rounded-xl"
                         >
-                            Next
+                            <Plus size={16} class="mr-1.5" />
+                            <span class="text-sm font-semibold"
+                                >{quickCreateLabel}</span
+                            >
                         </Button>
-                    </div>
+                    {/if}
                 </div>
             {/if}
-        {/if}
-    </div>
-{:else}
-    <div class="space-y-4 border rounded-lg p-4 bg-gray-50">
-        <div
-            class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2"
-        >
-            <h3
-                class="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2"
-            >
-                <Icon size={16} />
-                {showSelector ? linkItemLabel : associatedItemLabel}
-            </h3>
-            <div class="flex gap-2 flex-wrap">
-                {#if !singleSelect || associatedItems.length === 0}
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onclick={toggleSelector}
-                    class="flex items-center gap-1"
-                >
-                    {#if showSelector}
-                        <X size={16} />
-                        <span class="hidden sm:inline">{closeSearchLabel}</span>
-                        <span class="sm:hidden">{closeSearchLabel}</span>
-                    {:else}
-                        <Link size={16} />
-                        <span class="hidden sm:inline">{linkItemLabel}</span>
-                        <span class="sm:hidden">{linkItemLabel}</span>
-                    {/if}
-                </Button>
-                {/if}
-                {#if renderForm}
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onclick={() => (showQuickCreate = !showQuickCreate)}
-                        class="flex items-center gap-1"
-                    >
-                        <Plus size={16} />
-                        <span class="hidden sm:inline">{quickCreateLabel}</span>
-                        <span class="sm:hidden">{quickCreateLabel}</span>
-                    </Button>
-                {/if}
-            </div>
         </div>
+    </div>
+</div>
 
-        {#if showSelector}
-            <div class="bg-white border rounded-lg p-3 shadow-inner space-y-3">
-                <div class="relative">
-                    <Search
-                        size={16}
-                        class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    />
-                    <input
-                        type="text"
-                        placeholder={searchPlaceholder}
-                        bind:value={searchQuery}
-                        class="pl-9 w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-
-                <div class="max-h-64 overflow-y-auto space-y-1">
-                    {#if loadingSearch}
-                        <div class="text-xs text-center py-4 text-gray-400">
-                            {loadingLabel}
-                        </div>
-                    {:else if filteredItems.length === 0}
-                        <div class="text-xs text-center py-4 text-gray-400">
-                            {noItemsFoundLabel}
-                        </div>
-                    {:else}
-                        {#each filteredItems as item}
-                            {@const isAssociated = associatedItems.some(
-                                (ai) => ai.id === item.id,
-                            )}
-                            <div
-                                class="flex items-center gap-2 group/item transition-colors rounded-md p-1 {isAssociated
-                                    ? 'bg-blue-50'
-                                    : 'hover:bg-gray-100'}"
-                            >
-                                <div class="flex-1 px-2 py-1">
-                                    <span
-                                        class="text-sm font-medium {isAssociated
-                                            ? 'text-blue-700'
-                                            : 'text-gray-700'}"
-                                    >
-                                        {#if renderItemLabel}
-                                            {@render renderItemLabel(item)}
-                                        {/if}
-                                    </span>
-                                </div>
-
-                                <div class="flex items-center gap-1">
-                                    <AsyncButton
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        class="h-8 px-2 text-gray-400 hover:text-blue-500"
-                                        loading={linkingItemId === item.id}
-                                        loadingLabel=""
-                                        onclick={() => toggleAssociation(item)}
-                                        title={isAssociated ? unlinkLabel : linkItemLabel}
-                                    >
-                                        {#if isAssociated}
-                                            <Unlink size={14} />
-                                        {:else}
-                                            <Link size={14} />
-                                        {/if}
-                                    </AsyncButton>
-                                    {#if deleteItemRemote}
-                                        <AsyncButton
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            class="h-8 px-2 text-gray-400 hover:text-red-500"
-                                            loading={deletingItemId === item.id}
-                                            loadingLabel=""
-                                            onclick={() => deleteItem(item)}
-                                            title={deleteForeverLabel}
-                                        >
-                                            <Trash2 size={14} />
-                                        </AsyncButton>
-                                    {/if}
-                                </div>
-                            </div>
-                        {/each}
-                    {/if}
-                </div>
-            </div>
-        {:else}
-            <!-- Home Mode -->
-            {#if fetchingAssociations}
-                <div class="text-xs text-center py-4 text-gray-400">
+{#if showSelector && !isStandalone}
+    <div
+        class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
+    >
+        <div class="max-h-64 overflow-y-auto space-y-1 p-1">
+            {#if loadingSearch}
+                <div class="text-xs text-center py-8 text-gray-400 font-medium">
+                    <div
+                        class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"
+                    ></div>
                     {loadingLabel}
                 </div>
-            {:else if associatedItems.length > 0}
-                <div class="space-y-1">
-                    {#each associatedItems as item}
-                        <div
-                            class="flex items-center gap-2 group/item transition-colors rounded-md p-1 hover:bg-gray-100"
-                        >
-                            <div class="flex-1 px-2 py-1">
-                                <span class="text-sm font-medium text-gray-700">
-                                    {#if renderItemLabel}
-                                        {@render renderItemLabel(item)}
-                                    {/if}
-                                </span>
-                            </div>
-
-                            {#if participationSnippet}
-                                {@render participationSnippet(item)}
-                            {/if}
-
-                            <div class="flex items-center gap-1">
-                                {#if updateRemote && renderForm && getFormData}
-                                    <button
-                                        type="button"
-                                        class="h-8 px-2 text-gray-400 hover:text-blue-500 transition-colors"
-                                        onclick={() => {
-                                            editingItem = item;
-                                            showQuickCreate = false;
-                                            showSelector = false;
-                                        }}
-                                        title={editLabel}
-                                    >
-                                        <Pencil size={14} />
-                                    </button>
+            {:else if filteredItems.length === 0}
+                <div
+                    class="text-xs text-center py-8 text-gray-400 font-medium italic"
+                >
+                    {noItemsFoundLabel}
+                </div>
+            {:else}
+                {#each filteredItems as item}
+                    {@const isAssociated = associatedItems.some(
+                        (ai) => ai.id === item.id,
+                    )}
+                    <div
+                        class="flex items-center gap-3 transition-all rounded-xl p-2 {isAssociated
+                            ? 'bg-blue-50/50'
+                            : 'hover:bg-gray-50'}"
+                    >
+                        <div class="flex-1 min-w-0">
+                            <div
+                                class="text-sm font-bold {isAssociated
+                                    ? 'text-blue-700'
+                                    : 'text-gray-900'} truncate"
+                            >
+                                {#if renderItemLabel}
+                                    {@render renderItemLabel(item)}
+                                {:else}
+                                    {item.id || "Unnamed Item"}
                                 {/if}
+                            </div>
+                            {#if renderItemBadge}
+                                <div class="mt-0.5">
+                                    {@render renderItemBadge(item)}
+                                </div>
+                            {/if}
+                        </div>
+
+                        <div class="flex items-center gap-1">
+                            <AsyncButton
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                class="h-8 w-8 p-0 rounded-lg {isAssociated
+                                    ? 'text-blue-600 bg-blue-100/50'
+                                    : 'text-gray-400 hover:text-blue-500'}"
+                                loading={linkingItemId === item.id}
+                                loadingLabel=""
+                                onclick={() => toggleAssociation(item)}
+                                title={isAssociated
+                                    ? unlinkLabel
+                                    : linkItemLabel}
+                            >
+                                {#if isAssociated}
+                                    <Unlink size={16} />
+                                {:else}
+                                    <Link size={16} />
+                                {/if}
+                            </AsyncButton>
+                            {#if deleteItemRemote}
                                 <AsyncButton
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    class="h-8 px-2 text-gray-400 hover:text-red-500"
-                                    loading={linkingItemId === item.id}
+                                    class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-500"
+                                    loading={deletingItemId === item.id}
                                     loadingLabel=""
-                                    onclick={() => toggleAssociation(item)}
-                                    title={confirmUnlinkLabel}
+                                    onclick={() => deleteItem(item)}
+                                    title={deleteForeverLabel}
                                 >
-                                    <Unlink size={14} />
+                                    <Trash2 size={16} />
                                 </AsyncButton>
-                                {#if deleteItemRemote}
-                                    <AsyncButton
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        class="h-8 px-2 text-gray-400 hover:text-red-500"
-                                        loading={deletingItemId === item.id}
-                                        loadingLabel=""
-                                        onclick={() => deleteItem(item)}
-                                        title={deleteForeverLabel}
+                            {/if}
+                        </div>
+                    </div>
+                {/each}
+            {/if}
+        </div>
+    </div>
+{/if}
+
+{#if isStandalone}
+    {#if loadingItems}
+        <div class="text-center py-20 text-gray-400 font-medium animate-pulse">
+            {loadingLabel}
+        </div>
+    {:else if associatedItems.length === 0 && !searchQuery && activeFiltersCount === 0}
+        <div class="py-10">
+            <EmptyState
+                icon={Icon}
+                title={emptyTitle || `No ${title}`}
+                description={emptyDescription ||
+                    `No ${title.toLowerCase()} were found in this selection.`}
+                actionLabel={emptyActionLabel ||
+                    `Create First ${title.replace(/s$/, "")}`}
+                onclick={renderForm
+                    ? () => (showQuickCreate = true)
+                    : undefined}
+                actionHref={!renderForm ? createHref : undefined}
+            />
+        </div>
+    {:else if displayedItems.length === 0}
+        <div
+            class="text-center py-20 text-gray-400 font-medium italic bg-gray-50/50 rounded-2xl border border-dashed border-gray-200"
+        >
+            {noItemsFoundLabel}
+        </div>
+    {:else}
+        <div class="grid gap-4">
+            {#each displayedItems as item (item.id)}
+                {#if renderListItem}
+                    {@render renderListItem(item, {
+                        isSelected: selectedIds.has(item.id),
+                        toggleSelection,
+                        deleteItem,
+                        isAssociated: true,
+                        toggleAssociation,
+                        singleSelect,
+                    })}
+                {:else}
+                    <div
+                        class="bg-white rounded-2xl p-5 flex items-center gap-6 border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all group/item"
+                    >
+                        {#if !singleSelect}
+                            <input
+                                type="checkbox"
+                                checked={selectedIds.has(item.id)}
+                                onchange={() => toggleSelection(item.id)}
+                                class="w-5 h-5 text-blue-600 rounded-lg border-gray-200 focus:ring-blue-500 transition-all cursor-pointer"
+                            />
+                        {/if}
+
+                        <div class="flex-1 min-w-0">
+                            <div
+                                class="text-lg font-black text-gray-900 group-hover/item:text-blue-600 transition-colors"
+                            >
+                                {#if renderItemLabel}
+                                    {@render renderItemLabel(item)}
+                                {:else}
+                                    {item.id}
+                                {/if}
+                            </div>
+                            <div
+                                class="flex flex-wrap items-center gap-3 mt-1.5"
+                            >
+                                {#if renderItemBadge}
+                                    {@render renderItemBadge(item)}
+                                {/if}
+                                {#if renderItemDetail}
+                                    <div
+                                        class="text-xs font-bold text-gray-400 uppercase tracking-widest"
                                     >
-                                        <Trash2 size={14} />
-                                    </AsyncButton>
+                                        {@render renderItemDetail(item)}
+                                    </div>
                                 {/if}
                             </div>
                         </div>
-                    {/each}
+                        <div class="flex items-center gap-2">
+                            {#if updateRemote && renderForm && getFormData}
+                                <button
+                                    type="button"
+                                    class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                    onclick={() => {
+                                        editingItem = item;
+                                    }}
+                                    title={editLabel}
+                                >
+                                    <Pencil size={20} />
+                                </button>
+                            {/if}
+                            {#if deleteItemRemote}
+                                <AsyncButton
+                                    type="button"
+                                    variant="ghost"
+                                    class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                    loading={deletingItemId === item.id}
+                                    loadingLabel=""
+                                    onclick={() => deleteItem(item)}
+                                    title={deleteLabel}
+                                >
+                                    <Trash2 size={20} />
+                                </AsyncButton>
+                            {/if}
+                        </div>
+                    </div>
+                {/if}
+            {/each}
+        </div>
+
+        {#if totalItems > limit}
+            <div
+                class="flex flex-col sm:flex-row justify-between items-center py-6 gap-4 border-t border-gray-50 mt-6"
+            >
+                <div
+                    class="text-xs font-bold text-gray-400 uppercase tracking-widest"
+                >
+                    Showing <span class="text-gray-900"
+                        >{(page - 1) * limit + 1}</span
+                    >
+                    to
+                    <span class="text-gray-900"
+                        >{Math.min(page * limit, totalItems)}</span
+                    >
+                    of <span class="text-gray-900">{totalItems}</span>
                 </div>
-            {:else}
-                <p class="text-sm text-gray-500 italic">
+                <div class="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="rounded-xl font-bold px-4 hover:bg-gray-50"
+                        disabled={page === 1}
+                        onclick={() => {
+                            page--;
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                    >
+                        Previous
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="rounded-xl font-bold px-4 hover:bg-gray-50"
+                        disabled={page * limit >= totalItems}
+                        onclick={() => {
+                            page++;
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                    >
+                        Next
+                    </Button>
+                </div>
+            </div>
+        {/if}
+    {/if}
+{:else}
+    <!-- Embedded Content -->
+    <div class="space-y-2">
+        {#if fetchingAssociations}
+            <div
+                class="text-center py-10 animate-pulse text-gray-400 font-medium"
+            >
+                <div
+                    class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"
+                ></div>
+                {loadingLabel}
+            </div>
+        {:else if associatedItems.length > 0}
+            <div class="grid gap-2">
+                {#each associatedItems as item}
+                    <div
+                        class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
+                    >
+                        <div class="flex-1 min-w-0">
+                            <div
+                                class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
+                            >
+                                {#if renderItemLabel}
+                                    {@render renderItemLabel(item)}
+                                {:else}
+                                    {item.id}
+                                {/if}
+                            </div>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                {#if renderItemBadge}
+                                    {@render renderItemBadge(item)}
+                                {/if}
+                                {#if renderItemDetail}
+                                    <div
+                                        class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
+                                    >
+                                        {@render renderItemDetail(item)}
+                                    </div>
+                                {/if}
+                            </div>
+                        </div>
+
+                        {#if participationSnippet}
+                            {@render participationSnippet(item)}
+                        {/if}
+
+                        <div class="flex items-center gap-1">
+                            {#if updateRemote && renderForm && getFormData}
+                                <button
+                                    type="button"
+                                    class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                    onclick={() => {
+                                        editingItem = item;
+                                    }}
+                                    title={editLabel}
+                                >
+                                    <Pencil size={15} />
+                                </button>
+                            {/if}
+                            <AsyncButton
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                loading={linkingItemId === item.id}
+                                loadingLabel=""
+                                onclick={() => toggleAssociation(item)}
+                                title={confirmUnlinkLabel}
+                            >
+                                <Unlink size={15} />
+                            </AsyncButton>
+                            {#if deleteItemRemote}
+                                <AsyncButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                    loading={deletingItemId === item.id}
+                                    loadingLabel=""
+                                    onclick={() => deleteItem(item)}
+                                    title={deleteForeverLabel}
+                                >
+                                    <Trash2 size={15} />
+                                </AsyncButton>
+                            {/if}
+                        </div>
+                    </div>
+                {/each}
+            </div>
+        {:else}
+            <div
+                class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
+            >
+                <p class="text-sm font-medium text-gray-400 italic">
                     {noItemsLabel}
                 </p>
-            {/if}
+            </div>
         {/if}
     </div>
 {/if}

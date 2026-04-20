@@ -35,13 +35,13 @@
         removeAssociation,
         fetchEntityContacts,
     } from "../../../routes/contacts/associate.remote";
-    import { createNewContact } from "../../../routes/contacts/new/create.remote";
-    import { updateExistingContact } from "../../../routes/contacts/[id]/update.remote";
+    import { createContact } from "../../../routes/contacts/new/create.remote";
+    import { updateContact } from "../../../routes/contacts/[id]/update.remote";
     import {
         createContactSchema,
         updateContactSchema,
     } from "$lib/validations/contacts";
-    import { deleteExistingContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { onMount } from "svelte";
     import { MapPin, User } from "@lucide/svelte";
 
@@ -260,9 +260,14 @@
 
             <div>
                 {#if locations.length > 0}
+                    <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                        <MapPin size={18} class="text-blue-600" />
+                        {m.locations()}
+                    </h3>
                     <EntityManager
                         title={m.locations()}
                         icon={MapPin}
+                        mode="embedded"
                         {type}
                         entityId={initialData?.id}
                         initialItems={locations.filter((l: any) =>
@@ -270,7 +275,6 @@
                         )}
                         onchange={(ids: string[]) =>
                             (selectedLocationIds = ids)}
-                        embedded={true}
                         listItemsRemote={listLocations as any}
                         fetchAssociationsRemote={fetchEntityLocations as any}
                         addAssociationRemote={async (p: any) =>
@@ -389,13 +393,18 @@
             </div>
         </div>
 
-        <EntityManager
+        <div class="bg-white shadow rounded-lg p-6 space-y-4">
+            <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                <User size={18} class="text-blue-600" />
+                {m.contacts()}
+            </h3>
+            <EntityManager
             title={m.contacts()}
             icon={User}
+            mode="embedded"
             {type}
             entityId={initialData?.id}
             onchange={(ids: string[]) => (selectedContactIds = ids)}
-            embedded={true}
             listItemsRemote={listContacts as any}
             fetchAssociationsRemote={fetchEntityContacts as any}
             addAssociationRemote={async (p: any) =>
@@ -405,13 +414,13 @@
             deleteItemRemote={async (ids: string[]) => {
                 return await handleDelete({
                     ids,
-                    deleteFn: deleteExistingContact,
+                    deleteFn: deleteContact,
                     itemName: m.contact().toLowerCase(),
                 });
             }}
-            createRemote={createNewContact}
+            createRemote={createContact}
             createSchema={createContactSchema}
-            updateRemote={updateExistingContact}
+            updateRemote={updateContact}
             updateSchema={updateContactSchema}
             getFormData={(c: Contact) => ({
                 contact: c,
@@ -469,6 +478,7 @@
                 />
             {/snippet}
         </EntityManager>
+    </div>
 
         <SyncCheckboxBlock
             syncFieldConfig={getField("syncIds")}

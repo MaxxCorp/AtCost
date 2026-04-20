@@ -13,8 +13,8 @@ import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
 
 // Complete rewrite to support recurrence and use helper
-export const updateExistingEvent = form(updateEventSchema, async (data) => {
-	console.log('--- updateExistingEvent START ---');
+export const updateEvent = form(updateEventSchema, async (data) => {
+	console.log('--- updateEvent START ---');
 	console.log('Raw Data:', JSON.stringify(data, null, 2));
 	try {
 		console.log('Authenticating user...');
@@ -167,18 +167,58 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 				}
 			}
 
-			const { updateEventAssociations } = await import('$lib/server/events/associations');
+			// Internal helper to update associations
+			const linkAssociations = async (targetEventId: string, client: any) => {
+				// Locations
+				if (locationIds !== undefined) {
+					await client.delete(eventLocation).where(eq(eventLocation.eventId, targetEventId));
+					if (locationIds.length > 0) {
+						await client.insert(eventLocation).values(
+							locationIds.map((id: string) => ({ eventId: targetEventId, locationId: id }))
+						);
+					}
+				}
+
+				// Resources
+				if (resourceIds !== undefined) {
+					await client.delete(eventResource).where(eq(eventResource.eventId, targetEventId));
+					if (resourceIds.length > 0) {
+						await client.insert(eventResource).values(
+							resourceIds.map((id: string) => ({ eventId: targetEventId, resourceId: id }))
+						);
+					}
+				}
+
+				// Contacts
+				if (contactIds !== undefined) {
+					await client.delete(eventContact).where(eq(eventContact.eventId, targetEventId));
+					if (contactIds.length > 0) {
+						await client.insert(eventContact).values(
+							contactIds.map((id: string) => ({ eventId: targetEventId, contactId: id }))
+						);
+					}
+				}
+
+				// Tags
+				if (tagNames !== undefined) {
+					const uniqueTags = [...new Set(tagNames)];
+					await client.delete(eventTag).where(eq(eventTag.eventId, targetEventId));
+					if (uniqueTags.length > 0) {
+						for (const name of uniqueTags) {
+							let [existingTag] = await client.select().from(tag).where(eq(tag.name, name));
+							if (!existingTag) {
+								[existingTag] = await client.insert(tag).values({ name, userId: user.id }).returning();
+							}
+							if (existingTag) {
+								await client.insert(eventTag).values({ eventId: targetEventId, tagId: existingTag.id }).onConflictDoNothing();
+							}
+						}
+					}
+				}
+			};
 
 			// Update Associations for Master Event
-			await updateEventAssociations({
-				eventId: data.id,
-				userId: user.id,
-				locationIds,
-				resourceIds,
-				contactIds,
-				tags: tagNames,
-				tx
-			});
+			await linkAssociations(data.id, tx);
 
 			// Handle Recurrence Expansion/Update
 			if (data.recurrence !== undefined) {
@@ -270,15 +310,7 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 							guestsCanSeeOtherGuests: updatedEvent.guestsCanSeeOtherGuests,
 						});
 
-						await updateEventAssociations({
-							eventId: instanceId,
-							userId: user.id,
-							locationIds,
-							resourceIds,
-							contactIds,
-							tags: tagNames,
-							tx
-						});
+						await linkAssociations(instanceId, tx);
 					}
 				} else {
 					if (seriesId) {
@@ -341,10 +373,10 @@ export const updateExistingEvent = form(updateEventSchema, async (data) => {
 		}
 
 		await listEvents().refresh();
-		console.log('--- updateExistingEvent DONE ---');
+		console.log('--- updateEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {
-		console.error('--- updateExistingEvent ERROR ---', err);
+		console.error('--- updateEvent ERROR ---', err);
 		if (err?.status && err?.location) {
 			error(500, err.message);
 		}

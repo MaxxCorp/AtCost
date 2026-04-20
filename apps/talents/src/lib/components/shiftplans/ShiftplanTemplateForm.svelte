@@ -11,11 +11,11 @@
         Check,
     } from "@lucide/svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
-    import { listTalents } from "../../../routes/talents/talents.remote";
+    import { listTalents } from "../../../routes/talents/list.remote";
     import {
-        fetchEntityTalents,
-        addAssociation,
-        removeAssociation,
+        getEntityTalents,
+        associateTalent,
+        dissociateTalent,
     } from "../../../routes/shiftplans/associate.remote";
     import ShiftplanTalentParticipation from "./ShiftplanTalentParticipation.svelte";
     import { toast } from "svelte-sonner";
@@ -237,7 +237,7 @@
                     <div class="p-2 bg-emerald-50 rounded-lg text-emerald-600">
                         <Users size={20} />
                     </div>
-                    <h2 class="text-xl font-semibold">Assigned Talents</h2>
+                    <h2 class="text-xl font-semibold">{m.talents()}</h2>
                 </div>
 
                 <EntityManager
@@ -247,9 +247,9 @@
                     type="shiftplan"
                     entityId={initialData.id}
                     listItemsRemote={() => listTalents()}
-                    fetchAssociationsRemote={(params: any) => fetchEntityTalents(params)}
-                    addAssociationRemote={(params: any) => addAssociation(params)}
-                    removeAssociationRemote={(params: any) => removeAssociation(params)}
+                    fetchAssociationsRemote={(params: any) => getEntityTalents(params)}
+                    addAssociationRemote={(params: any) => associateTalent(params)}
+                    removeAssociationRemote={(params: any) => dissociateTalent(params)}
                     searchPredicate={(t: any, q: string) => {
                         const searchStr =
                             `${t.contact?.displayName || ""} ${t.jobTitle || ""}`.toLowerCase();

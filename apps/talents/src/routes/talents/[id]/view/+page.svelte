@@ -1,6 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { readTalent } from "../../talents.remote";
+    import { readTalent } from "../read.remote";
 import TaskList from "$lib/components/tasks/TaskList.svelte";
 
     import { LoadingSection, ErrorSection, Button } from "@ac/ui";

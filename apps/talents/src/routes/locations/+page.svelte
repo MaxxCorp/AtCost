@@ -15,6 +15,7 @@
 </script>
 
 <div class="space-y-6">
+    <h1 class="text-2xl font-black text-gray-900 px-1">Locations</h1>
     <EntityManager
         title="Locations"
         icon={MapPin}

@@ -17,6 +17,7 @@
 	<div class="max-w-4xl mx-auto">
 		<Breadcrumb feature="campaigns" />
 		<div class="bg-white shadow rounded-lg p-6">
+            <h1 class="text-2xl font-black mb-6 text-gray-900">{m.feature_campaigns_title()}</h1>
             <EntityManager 
                 title={m.feature_campaigns_title()} 
                 icon={Megaphone} 

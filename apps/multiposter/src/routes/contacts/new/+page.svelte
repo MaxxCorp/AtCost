@@ -1,6 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import { createNewContact } from "./create.remote";
+    import { createContact } from "./create.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 
@@ -35,19 +35,23 @@
         <div class="bg-white shadow rounded-lg p-6">
             <h1 class="text-2xl font-bold mb-6">Create New Contact</h1>
             <ContactForm
-                remoteFunction={createNewContact}
+                remoteFunction={createContact}
                 schema={createContactSchema}
                 onSuccess={handleSuccess}
             >
-                {#snippet children({ onLocationsChange })}
-                    <div class="mt-8 border-t pt-8">
-                        <EntityManager
-                            title={m.feature_locations_title()}
-                            icon={MapPin}
-                            type="location"
-                            entityId={""}
-                            initialItems={[]}
-                            embedded={true}
+                        {#snippet children({ onLocationsChange })}
+                            <div class="mt-8 border-t pt-8">
+                                <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                                    <MapPin size={18} class="text-blue-600" />
+                                    {m.feature_locations_title()}
+                                </h3>
+                                <EntityManager
+                                    title={m.feature_locations_title()}
+                                    icon={MapPin}
+                                    type="location"
+                                    entityId={""}
+                                    initialItems={[]}
+                                    mode="embedded"
                             onchange={onLocationsChange}
                             listItemsRemote={listLocations}
                             addAssociationRemote={async (p: any) => {

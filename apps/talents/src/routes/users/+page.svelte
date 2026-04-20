@@ -26,6 +26,7 @@
         </div>
 
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+            <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">{m.users()}</h1>
             <EntityManager
                 title={m.users()}
                 icon={UserIcon}
