@@ -8,13 +8,16 @@ import {
     type PaginatedResult 
 } from '@ac/validations';
 import * as v from 'valibot';
-import { readTalentCore, type TalentProfile } from '$lib/server/talents/service';
+import { readTalent as readTalentService, type TalentProfile } from '$lib/server/talents/service';
+import { listTalents } from './list.remote';
+import { readTalent } from './[id]/read.remote';
 
 export const bulkDeleteTalents = command(v.array(v.string()), async (ids): Promise<{ success: boolean }> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
     for (const id of ids) {
         await db.delete(talent).where(eq(talent.id, id));
     }
+    await (listTalents as any).refresh();
     return { success: true };
 });
 
@@ -42,6 +45,7 @@ const addTimelineEntryHandler = async (data: {
         }
     }).returning();
 
+    await (readTalent(data.talentId) as any).refresh();
     return { success: true, id: newEntry.id };
 };
 
@@ -182,6 +186,45 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             return { talentId, contactId };
         });
 
+        // Construct local object to avoid re-fetching relations we already have
+        if (result.talentId) {
+            const transformed = {
+                id: result.talentId,
+                contactId: result.contactId,
+                status: talentData.status,
+                jobTitle: talentData.jobTitle,
+                salaryExpectation: talentData.salaryExpectation,
+                availabilityDate: talentData.availabilityDate || null,
+                onboardingStatus: talentData.onboardingStatus,
+                resumeUrl: talentData.resumeUrl,
+                source: talentData.source,
+                internalNotes: talentData.internalNotes,
+                updatedAt: new Date().toISOString(),
+                contact: {
+                    id: result.contactId,
+                    displayName: contactData.displayName,
+                    givenName: contactData.givenName,
+                    familyName: contactData.familyName,
+                    birthday: contactData.birthday || null,
+                    role: contactData.role,
+                    department: contactData.department,
+                    notes: contactData.notes,
+                    emails: emails,
+                    phones: phones,
+                    addresses: addresses,
+                    tags: tags,
+                    locationIds: locationIds,
+                    // Minimal hydrated structure to prevent crashes
+                    locationAssociations: locationIds.map((lid: string) => ({ locationId: lid, location: { id: lid } })),
+                },
+                timelineEntries: [], // Will refresh on next read
+            };
+            await (readTalent(result.talentId) as any).set(transformed);
+        } else {
+            await (readTalent(result.talentId) as any).refresh();
+        }
+        await (listTalents as any).refresh();
+
         return { success: true, id: result.talentId };
     } catch (err: any) {
         console.error('upsertTalent ERROR:', err);
@@ -200,7 +243,7 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
     try {
         const ut = await db.select().from(userTalent).where(eq(userTalent.userId, authUser.id)).limit(1);
         if (ut[0]) {
-            const profile = await readTalentCore(ut[0].talentId);
+            const profile = await readTalentService(ut[0].talentId);
             if (profile) return profile;
         }
     } catch (e) {
@@ -217,7 +260,7 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
         
         if (talentLink[0]) {
             console.log('[getMyTalentProfile] Step 2 match found:', talentLink[0].talentId);
-            const profile = await readTalentCore(talentLink[0].talentId);
+            const profile = await readTalentService(talentLink[0].talentId);
             if (profile) return profile;
         }
     } catch (e) {
@@ -234,7 +277,7 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
         
         if (directContactLink[0]) {
             console.log('[getMyTalentProfile] Step 2.5 (ownership) match found:', directContactLink[0].talentId);
-            const profile = await readTalentCore(directContactLink[0].talentId);
+            const profile = await readTalentService(directContactLink[0].talentId);
             if (profile) return profile;
         }
     } catch (e) {
@@ -252,7 +295,7 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
                 .limit(1);
                 
             if (emailMatch[0]) {
-                const profile = await readTalentCore(emailMatch[0].talentId);
+                const profile = await readTalentService(emailMatch[0].talentId);
                 if (profile) return profile;
             }
         } catch (e) {

@@ -19,6 +19,7 @@
     } from "$lib/validations/locations";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
 
+
     function handleSuccess(result: any) {
         const finalId = result?.id || result?.contact?.id;
         if (finalId) {

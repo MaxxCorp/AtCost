@@ -12,6 +12,7 @@
         updateLocationSchema,
     } from "@ac/validations/locations";
     breadcrumbState.set({ feature: "locations" });
+
 </script>
 
 <div class="space-y-6">

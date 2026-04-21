@@ -9,7 +9,7 @@ import { view as viewSyncConfig } from './view.remote';
  */
 export const checkStatus = query(v.string(), async (configId: string) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'synchronizations');
+    ensureAccess(user, 'synchronizations', 'use');
 
     return await syncService.checkWebhookStatus(configId);
 });

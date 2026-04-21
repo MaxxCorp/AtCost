@@ -48,7 +48,6 @@
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
     import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
-    import TagInput from "$lib/components/ui/TagInput.svelte";
     import { RRule } from "$lib/utils/rrule-compat";
     import {
         CalendarClock,
@@ -58,8 +57,15 @@
         Trash2,
         ChevronDown,
         RefreshCw,
+        Tag as TagIcon
     } from "@lucide/svelte";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+    import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
+    import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
+    import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
+    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
+    import * as v from "valibot";
+
 
     let {
         remoteFunction,
@@ -660,11 +666,84 @@
             </div>
 
             <div>
-                <TagInput
-                    bind:value={tagsString}
-                    label={m.tags()}
-                    placeholder={m.tags_placeholder_events()}
-                />
+                <h3 class="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+                    <TagIcon size={16} class="text-indigo-500" />
+                    {m.tags()}
+                </h3>
+                <EntityManager
+                    title={m.tags()}
+                    icon={TagIcon}
+                    mode="embedded"
+                    initialItems={initialData?.tags?.map((t: string) => ({ name: t })) || []}
+                    listItemsRemote={listTagsRemote}
+                    onchange={(ids, items) => {
+                        tagsString = items.map(i => i.name).join(", ");
+                    }}
+                    createRemote={createTagRemote}
+                    createSchema={v.object({
+                        name: v.pipe(v.string(), v.minLength(1)),
+                    })}
+                    updateRemote={updateTagRemote}
+                    updateSchema={v.object({
+                        name: v.pipe(v.string(), v.minLength(1)),
+                    })}
+                    deleteItemRemote={async (ids: string[]) => {
+                        return await handleDelete({
+                            ids,
+                            deleteFn: deleteTagRemote,
+                            itemName: m.tags(),
+                        });
+                    }}
+                    getFormData={(t: any) => t}
+                    searchPredicate={(t: any, q: string) => t.name.toLowerCase().includes(q.toLowerCase())}
+                    loadingLabel={m.loading_item({ item: m.tags() })}
+                    noItemsLabel={m.no_items_associated_label({ item: m.tags() })}
+                    noItemsFoundLabel={m.no_items_found({ item: m.tags() })}
+                    searchPlaceholder={m.search_placeholder({ item: m.tags() })}
+                    linkItemLabel={m.link_item_label({ item: m.tags() })}
+                    associatedItemLabel={m.associated_item_label({ item: m.tags() })}
+                    quickCreateLabel={m.quick_create()}
+                    closeSearchLabel={m.close_search()}
+                    editLabel={m.edit()}
+                    deleteLabel={m.delete()}
+                    unlinkLabel={m.unlink()}
+                    selectAllLabel={m.select_all()}
+                    deselectAllLabel={m.deselect_all()}
+                >
+                    {#snippet renderItemLabel(tag)}
+                        {tag.name}
+                    {/snippet}
+                    {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id })}
+                        <div class="space-y-4 p-4">
+                            <div>
+                                <label for="tag-name" class="block text-sm font-medium text-gray-700">{m.summary()}</label>
+                                <input 
+                                    {...rf.fields.name.as("text")}
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    value={formData?.name ?? ""}
+                                />
+                                {#each rf.fields.name.issues() as issue}
+                                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                                {/each}
+                            </div>
+                            <div class="flex justify-end gap-2 pt-4 border-t">
+                                <Button variant="outline" onclick={onCancel}>{m.cancel()}</Button>
+                                <AsyncButton 
+                                    type="button" 
+                                    loading={rf.pending}
+                                    onclick={async () => {
+                                        const res = await rf.submit();
+                                        if (res?.success !== false) {
+                                            onSuccess(res);
+                                        }
+                                    }}
+                                >
+                                    {id ? m.save_changes() : m.create_item({ item: "Tag" })}
+                                </AsyncButton>
+                            </div>
+                        </div>
+                    {/snippet}
+                </EntityManager>
             </div>
 
             <div>

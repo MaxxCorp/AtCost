@@ -13,7 +13,9 @@
 
     import Button from "../button/button.svelte";
     import AsyncButton from "../AsyncButton.svelte";
-    import TagInput from "../TagInput.svelte";
+    import EntityManager from "../EntityManager.svelte";
+    import { Tag as TagIcon } from "@lucide/svelte";
+    import { handleDelete } from "../../hooks/handleDelete.svelte";
 
     interface Props {
         // Bindable state
@@ -43,6 +45,16 @@
         prefix?: string;
         contactId?: string;
         listContactsRemote: () => Promise<any[]>;
+        
+        // Tags Configuration
+        listTagsRemote?: any;
+        createTagRemote?: any;
+        deleteTagRemote?: any;
+        updateTagRemote?: any;
+        createTagSchema?: any;
+        updateTagSchema?: any;
+        initialTags?: any[];
+
         labels?: any;
         getField?: (name: string) => any;
         onEmailChange?: () => void;
@@ -59,12 +71,29 @@
         prefix = "contact",
         contactId,
         listContactsRemote,
+
+        listTagsRemote,
+        createTagRemote,
+        deleteTagRemote,
+        updateTagRemote,
+        createTagSchema,
+        updateTagSchema,
+        initialTags = [],
+
         labels,
         getField,
         onEmailChange,
     }: Props = $props();
 
     const i18n = $derived({
+        summary: labels?.summary ?? "Name",
+        tags: labels?.tags ?? "Tags",
+        linkTag: labels?.linkTag ?? "Link Tag",
+        associatedTags: labels?.associatedTags ?? "Associated Tags",
+        searchTags: labels?.searchTags ?? "Search tags...",
+        noTags: labels?.noTags ?? "No tags linked yet.",
+        quickCreateTag: labels?.quickCreateTag ?? "Quick Create Tag",
+        tag: labels?.tag ?? "Tag",
         basicInformation: labels?.basicInformation ?? "Basic Information",
         displayName: labels?.displayName ?? "Display Name",
         givenName: labels?.givenName ?? "Given Name",
@@ -78,14 +107,17 @@
         department: labels?.department ?? "Department",
         role: labels?.role ?? "Role",
         notes: labels?.notes ?? "Notes",
-        isPublicLabel: labels?.isPublicLabel ?? "Public Profile",
-        isPublicDescription: labels?.isPublicDescription ?? "Allow unauthenticated viewing",
-        tagsPlaceholder: labels?.tagsPlaceholder ?? "e.g. Customer, Lead, Priority",
+        isPublicLabel: labels?.isPublicLabel ?? "Make this contact public",
+        isPublicDescription:
+            labels?.isPublicDescription ??
+            "Public contacts are visible to all users.",
+        tagsPlaceholder: labels?.tagsPlaceholder ?? "Add tags...",
         relations: labels?.relations ?? "Relations",
-        contactSearchPlaceholder: labels?.contactSearchPlaceholder ?? "Search for a contact to link...",
+        contactSearchPlaceholder:
+            labels?.contactSearchPlaceholder ?? "Search for a contact...",
         emailAddresses: labels?.emailAddresses ?? "Email Addresses",
         addEmail: labels?.addEmail ?? "Add Email",
-        emailPlaceholder: labels?.emailPlaceholder ?? "Email Address",
+        emailPlaceholder: labels?.emailPlaceholder ?? "email@example.com",
         home: labels?.home ?? "Home",
         work: labels?.work ?? "Work",
         mobile: labels?.mobile ?? "Mobile",
@@ -93,10 +125,10 @@
         primary: labels?.primary ?? "Primary",
         phoneNumbers: labels?.phoneNumbers ?? "Phone Numbers",
         addPhone: labels?.addPhone ?? "Add Phone",
-        phonePlaceholder: labels?.phonePlaceholder ?? "Phone Number",
-        reportsTo: labels?.reportsTo ?? "reports to",
-        cooperatesWith: labels?.cooperatesWith ?? "cooperates with",
-        managerOf: labels?.managerOf ?? "manager of",
+        phonePlaceholder: labels?.phonePlaceholder ?? "+1 (555) 000-0000",
+        reportsTo: labels?.reportsTo ?? "Reports To",
+        cooperatesWith: labels?.cooperatesWith ?? "Cooperates With",
+        managerOf: labels?.managerOf ?? "Manager Of",
         addresses: labels?.addresses ?? "Addresses",
         addAddress: labels?.addAddress ?? "Add Address",
         street: labels?.street ?? "Street",
@@ -382,12 +414,93 @@
             </label>
         </div>
 
-        <div>
-            <TagInput
-                bind:value={tagsInput}
-                placeholder={i18n.tagsPlaceholder}
-            />
-        </div>
+        {#if listTagsRemote}
+            <div>
+                <h3 class="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+                    <TagIcon size={16} class="text-indigo-500" />
+                    {labels?.tags ?? "Tags"}
+                </h3>
+                <EntityManager
+                    title={labels?.tags ?? "Tag"}
+                    icon={TagIcon}
+                    mode="embedded"
+                    initialItems={initialTags}
+                    listItemsRemote={listTagsRemote}
+                    onchange={(ids, items) => {
+                        tagsInput = items.map(i => i.name).join(", ");
+                    }}
+                    createRemote={createTagRemote}
+                    createSchema={createTagSchema}
+                    updateRemote={updateTagRemote}
+                    updateSchema={updateTagSchema}
+                    deleteItemRemote={deleteTagRemote ? async (ids: string[]) => {
+                        return await handleDelete({
+                            ids,
+                            deleteFn: deleteTagRemote,
+                            itemName: labels?.tag ?? "tag",
+                        });
+                    } : undefined}
+                    getFormData={(t: any) => t}
+                    searchPredicate={(t: any, q: string) => t.name.toLowerCase().includes(q.toLowerCase())}
+                    linkItemLabel={labels?.linkTag ?? "Link Tag"}
+                    associatedItemLabel={labels?.associatedTags ?? "Associated Tags"}
+                    searchPlaceholder={labels?.searchTags ?? "Search tags..."}
+                    noItemsLabel={labels?.noTags ?? "No tags associated."}
+                    quickCreateLabel={labels?.quickCreateTag ?? "Quick Create Tag"}
+                >
+                    {#snippet renderItemLabel(tag)}
+                        {tag.name}
+                    {/snippet}
+                    {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id })}
+                        <div class="space-y-4 p-4">
+                            <div>
+                                <label for="tag-name" class="block text-sm font-medium text-gray-700">{i18n.summary}</label>
+                                <input 
+                                    {...rf.fields.name.as("text")}
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    value={formData?.name ?? ""}
+                                />
+                                {#each rf.fields.name.issues() as issue}
+                                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                                {/each}
+                            </div>
+                            <div class="flex justify-end gap-2 pt-4 border-t">
+                                <Button variant="outline" onclick={onCancel}>Cancel</Button>
+                                <AsyncButton 
+                                    type="button" 
+                                    loading={rf.pending}
+                                    onclick={async () => {
+                                        const res = await rf.submit();
+                                        if (res?.success !== false) {
+                                            onSuccess(res);
+                                        }
+                                    }}
+                                >
+                                    {id ? "Update" : "Create"}
+                                </AsyncButton>
+                            </div>
+                        </div>
+                    {/snippet}
+                </EntityManager>
+            </div>
+        {:else}
+            <div>
+                <label
+                    for="tags-input"
+                    class="block text-sm font-medium text-gray-700 flex items-center gap-2 mb-1"
+                >
+                    <TagIcon size={16} class="text-indigo-500" />
+                    {labels?.tags ?? "Tags"}
+                </label>
+                <input
+                    type="text"
+                    id="tags-input"
+                    bind:value={tagsInput}
+                    placeholder={i18n.tagsPlaceholder}
+                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+        {/if}
     </div>
 
     <div class="space-y-4">

@@ -258,7 +258,8 @@ export const updateContact = form(updateContactSchema, async (input) => {
         } as Contact;
 
         console.log('--- updateContact SUCCESS ---');
-        await listContacts().refresh();
+        readContact(id).set(transformed);
+        void listContacts().refresh();
         return { success: true, contact: transformed };
 
     } catch (err: any) {

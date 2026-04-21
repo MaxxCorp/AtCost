@@ -10,7 +10,7 @@ import { eq, and, desc } from 'drizzle-orm';
  */
 export const view = query(v.string(), async (id: string) => {
 	const user = getAuthenticatedUser();
-	ensureAccess(user, 'synchronizations');
+	ensureAccess(user, 'synchronizations', 'use');
 
 	const [config] = await db
 		.select()
@@ -29,7 +29,7 @@ export const view = query(v.string(), async (id: string) => {
  */
 export const getOperations = query(v.string(), async (configId: string) => {
 	const user = getAuthenticatedUser();
-	ensureAccess(user, 'synchronizations');
+	ensureAccess(user, 'synchronizations', 'use');
 
 	return await db
 		.select()

@@ -274,15 +274,11 @@
         }
     });
 
-    // Remote Query Initialization
-    const listQuery = $derived.by(() => {
-        const params: any = {
-            page,
-            limit,
-            search: searchQuery,
-            ...selectedFilters,
-        };
-        return listItemsRemote(params);
+    const currentParams = $derived({
+        page,
+        limit,
+        search: searchQuery,
+        ...selectedFilters,
     });
 
     const fetchQuery = $derived(
@@ -383,7 +379,7 @@
     const refresh = async () => {
         loadingItems = true;
         try {
-            const res = await listQuery;
+            const res = await listItemsRemote(currentParams);
             untrack(() => {
                 associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
                 totalItems = Array.isArray(res)
@@ -399,8 +395,8 @@
 
     $effect(() => {
         if (isStandalone) {
-            // Access listQuery to register as dependency
-            listQuery;
+            // Trigger refresh on params change
+            currentParams;
             refresh();
         } else if (showSelector) {
             // In embedded mode, if selector is open, refresh allItems when filters or search change
@@ -429,7 +425,10 @@
         if (!deleteItemRemote || selectedIds.size === 0) return;
         bulkDeleting = true;
         try {
-            await deleteItemRemote(Array.from(selectedIds));
+            const result = await deleteItemRemote(Array.from(selectedIds));
+            const success = result === true || (result && result.success !== false);
+            if (!success) return;
+
             associatedItems = associatedItems.filter(
                 (i) => !selectedIds.has(i.id),
             );
@@ -440,7 +439,11 @@
                     associatedItems,
                 );
             deselectAll();
-            toast.success(`Deleted successfully`);
+            // Success toast is usually handled by deleteItemRemote (e.g. handleDelete)
+            // but if not, we can show one. However, avoid doubling up.
+            if (result !== true) {
+                toast.success(`Deleted successfully`);
+            }
         } catch (e: any) {
             toast.error(e.message || "Failed to delete some items");
         } finally {
@@ -449,13 +452,15 @@
     }
 
     async function refreshAllItems() {
-        const query = listQuery;
-        if (!query) return;
         loadingSearch = true;
         try {
-            const res = await query;
+            const res = await listItemsRemote(currentParams);
             allItems = Array.isArray(res) ? res : (res?.data ?? []);
         } catch (err: any) {
+            // Ignore abort errors common in reactive systems
+            if (err.name === "AbortError" || err.message?.includes("aborted")) {
+                return;
+            }
             toast.error(`${noItemsFoundLabel}: ${err.message}`);
         } finally {
             loadingSearch = false;
@@ -464,14 +469,16 @@
 
     async function toggleSelector() {
         showSelector = !showSelector;
-        if (showSelector && allItems.length === 0) {
-            await refreshAllItems();
-        }
+        // Effect at line 396 automatically handles the first-time/reactive refresh
     }
 
     async function toggleAssociation(item: any) {
         linkingItemId = item.id;
-        const isAssociated = associatedItems.some((ai) => ai.id === item.id);
+        const isAssociated = associatedItems.some((ai) => {
+            if (item.id && ai.id) return item.id === ai.id;
+            // Fallback for ID-less items (like tags initialized by name)
+            return item.name === ai.name;
+        });
         try {
             if (isAssociated) {
                 if (entityId && removeAssociationRemote) {
@@ -481,9 +488,10 @@
                         itemId: item.id,
                     });
                 }
-                associatedItems = associatedItems.filter(
-                    (ai) => ai.id !== item.id,
-                );
+                associatedItems = associatedItems.filter((ai) => {
+                    if (item.id && ai.id) return ai.id !== item.id;
+                    return ai.name !== item.name;
+                });
             } else {
                 if (singleSelect) {
                     // In single-select mode, replace instead of append
@@ -532,10 +540,7 @@
         showQuickCreate = false;
 
         if (result?.id) {
-            const query = listQuery;
-            const res: any = query
-                ? await query
-                : await listItemsRemote({ page, limit, search: searchQuery });
+            const res: any = await listItemsRemote(currentParams);
             const items = Array.isArray(res) ? res : (res?.data ?? []);
 
             if (isStandalone) {
@@ -573,20 +578,19 @@
 
         if (!targetId) return;
 
-        const query = listQuery;
-        const res: any = query
-            ? await query
-            : await listItemsRemote({ page, limit, search: searchQuery });
+        const res: any = await listItemsRemote(currentParams);
         const items = Array.isArray(res) ? res : (res?.data ?? []);
         const updatedItem = items.find((i: any) => i.id === targetId);
 
         if (updatedItem) {
-            associatedItems = associatedItems.map((i) =>
-                i.id === targetId ? updatedItem : i,
-            );
-            allItems = allItems.map((i) =>
-                i.id === targetId ? updatedItem : i,
-            );
+            associatedItems = associatedItems.map((i) => {
+                const isMatch = targetId && i.id ? i.id === targetId : i.name === updatedItem.name;
+                return isMatch ? updatedItem : i;
+            });
+            allItems = allItems.map((i) => {
+                const isMatch = targetId && i.id ? i.id === targetId : i.name === updatedItem.name;
+                return isMatch ? updatedItem : i;
+            });
             if (onchange)
                 onchange(
                     associatedItems.map((i) => i.id),
@@ -600,7 +604,22 @@
         if (!item.id || !deleteItemRemote) return;
         deletingItemId = item.id;
         try {
-            await deleteItemRemote([item.id]);
+            console.log(`[EntityManager] Deleting item:`, item.id);
+            const result = await deleteItemRemote([item.id]);
+            console.log(`[EntityManager] Deletion result:`, result);
+            
+            // If result is false, it means handleDelete showed its own error or user cancelled
+            if (result === false) {
+                console.log(`[EntityManager] Deletion was cancelled or failed in the wrapper`);
+                return;
+            }
+
+            const success = result === true || (result && result.success !== false);
+            if (!success) {
+                console.log(`[EntityManager] Deletion reported failure:`, result);
+                return;
+            }
+
             allItems = allItems.filter((i) => i.id !== item.id);
             associatedItems = associatedItems.filter((i) => i.id !== item.id);
             if (onchange)
@@ -608,8 +627,13 @@
                     associatedItems.map((i) => i.id),
                     associatedItems,
                 );
-            toast.success("Deleted successfully");
+            
+            // Avoid redundant toast if handleDelete already showed one (result would be true)
+            if (result !== true) {
+                toast.success("Deleted successfully");
+            }
         } catch (e: any) {
+            console.error(`[EntityManager] Exception during deleteItem:`, e);
             toast.error(e.message || "Failed to delete item");
         } finally {
             deletingItemId = null;
@@ -645,11 +669,7 @@
                             class="relative border-gray-200 rounded-xl hover:bg-gray-50"
                         >
                             <FilterIcon size={isStandalone ? 18 : 16} />
-                            {#if !isStandalone}
-                                <span class="ml-2 text-xs font-medium"
-                                    >Filter</span
-                                >
-                            {/if}
+
                             {#if activeFiltersCount > 0}
                                 <span
                                     class="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white"
@@ -865,9 +885,10 @@
                 </div>
             {:else}
                 {#each filteredItems as item}
-                    {@const isAssociated = associatedItems.some(
-                        (ai) => ai.id === item.id,
-                    )}
+                    {@const isAssociated = associatedItems.some((ai) => {
+                        if (item.id && ai.id) return ai.id === item.id;
+                        return ai.name === item.name;
+                    })}
                     <div
                         class="flex items-center gap-3 transition-all rounded-xl p-2 {isAssociated
                             ? 'bg-blue-50/50'

@@ -3,6 +3,10 @@
     import SharedContactForm from "@ac/ui/components/forms/ContactForm.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Location, type Contact } from "@ac/validations";
+    import { listTags as listTagsRoute } from "../../../routes/tags/list.remote";
+    import { createTag as createTagRoute } from "../../../routes/tags/new/create.remote";
+    import { updateTag as updateTagRoute } from "../../../routes/tags/[id]/update.remote";
+    import { deleteTag as deleteTagRoute } from "../../../routes/tags/[id]/delete.remote";
 
     import type { Snippet } from "svelte";
 
@@ -15,8 +19,17 @@
         cancelHref?: string;
         contactId?: string;
         loading?: boolean;
+        listTagsRemote?: any;
+        createTagRemote?: any;
+        updateTagRemote?: any;
+        deleteTagRemote?: any;
         children?: Snippet<[{ onLocationsChange: (ids: string[]) => void }]>;
     }
+
+    const listTagsHandle = listTagsRoute;
+    const createTagHandle = createTagRoute;
+    const updateTagHandle = updateTagRoute;
+    const deleteTagHandle = deleteTagRoute;
 
     let {
         initialData = {},
@@ -27,6 +40,10 @@
         cancelHref = "/contacts",
         contactId,
         loading = false,
+        listTagsRemote = listTagsHandle,
+        createTagRemote = createTagHandle,
+        updateTagRemote = updateTagHandle,
+        deleteTagRemote = deleteTagHandle,
         children,
     }: Props = $props();
 </script>
@@ -76,5 +93,16 @@
         reportsTo: m.reports_to(),
         cooperatesWith: m.cooperates_with(),
         managerOf: m.manager_of(),
+        tags: m.tags(),
+        linkTag: m.link_item_label({ item: m.tags() }),
+        associatedTags: m.associated_item_label({ item: m.tags() }),
+        searchTags: m.search_placeholder({ item: m.tags() }),
+        noTags: m.no_items_associated_label({ item: m.tags() }),
+        quickCreateTag: m.quick_create(),
+        tag: "tag",
     }}
+    {listTagsRemote}
+    {createTagRemote}
+    {updateTagRemote}
+    {deleteTagRemote}
 />

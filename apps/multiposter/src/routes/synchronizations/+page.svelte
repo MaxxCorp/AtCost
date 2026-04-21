@@ -25,6 +25,12 @@
 	import { EntityManager } from "@ac/ui";
 	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
 	import WebhookToggleButton from "$lib/components/synchronizations/WebhookToggleButton.svelte";
+	import { authClient } from "$lib/auth";
+	import { hasAccess } from "$lib/authorization";
+
+	const session = authClient.useSession();
+	const user = $derived($session.data?.user);
+	const isAdmin = $derived(hasAccess(user, 'synchronizations', 'admin'));
 
 	// Type definition for the list items
 	type Synchronization = Awaited<ReturnType<typeof list>>["data"][number];
@@ -234,7 +240,8 @@
 				(config.name || '').toLowerCase().includes(q.toLowerCase()) || 
 				config.providerType.toLowerCase().includes(q.toLowerCase())
 			}
-			createHref="/synchronizations/new"
+			createHref={isAdmin ? "/synchronizations/new" : undefined}
+			showCreateButton={isAdmin}
 			createLabel={m.create_item({ item: "Synchronization" })}
 			filters={[
 				{
@@ -385,25 +392,37 @@
 							configId={config.id}
 							providerType={config.providerType}
 							direction={config.direction}
+							disabled={!isAdmin}
 						/>
-						<Button
-							href={`/synchronizations/${config.id}`}
-							variant="default"
-							size="default"
-							class="flex items-center gap-2 w-[120px] justify-center"
-						>
-							<Pencil size={16} /> {m.edit()}
-						</Button>
-						<AsyncButton
-							variant="destructive"
-							size="default"
-							loading={false}
-							loadingLabel={m.deleting()}
-							class="flex items-center gap-2 w-[120px] justify-center"
-							onclick={() => deleteItem(config)}
-						>
-							<Trash2 size={16} /> {m.delete()}
-						</AsyncButton>
+						{#if isAdmin}
+							<Button
+								href={`/synchronizations/${config.id}`}
+								variant="default"
+								size="default"
+								class="flex items-center gap-2 w-[120px] justify-center"
+							>
+								<Pencil size={16} /> {m.edit()}
+							</Button>
+							<AsyncButton
+								variant="destructive"
+								size="default"
+								loading={false}
+								loadingLabel={m.deleting()}
+								class="flex items-center gap-2 w-[120px] justify-center"
+								onclick={() => deleteItem(config)}
+							>
+								<Trash2 size={16} /> {m.delete()}
+							</AsyncButton>
+						{:else}
+							<Button
+								href={`/synchronizations/${config.id}`}
+								variant="outline"
+								size="default"
+								class="flex items-center gap-2 w-[120px] justify-center"
+							>
+								<Eye size={16} /> {m.view()}
+							</Button>
+						{/if}
 					</div>
 				</div>
 			{/snippet}

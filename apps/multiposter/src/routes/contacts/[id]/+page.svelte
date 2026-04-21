@@ -25,6 +25,7 @@
     } from "$lib/validations/locations";
     import LocationForm from "$lib/components/locations/LocationForm.svelte";
 
+
     const contactId = page.params.id || "";
     let itemsPromise = $state(readContact(contactId));
 

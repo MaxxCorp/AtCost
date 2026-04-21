@@ -1,11 +1,10 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, contact, contactEmail, contactPhone, contactTag, locationContact, campaign, location } from '@ac/db';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, location, contact, contactEmail, contactPhone, contactTag, locationContact, campaign } from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
-import { type Announcement } from '@ac/validations';
-
 import { getOptionalUser, hasAccess, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
+import { type Announcement } from '@ac/validations';
 
 /**
  * Query: Read an announcement by ID
@@ -15,167 +14,64 @@ import * as v from 'valibot';
  * - If announcement is private: only authenticated users with 'announcements' access can view
  */
 export const readAnnouncement = query(v.string(), async (announcementId: string): Promise<Announcement | null> => {
-    const [result] = await db
-        .select()
-        .from(announcement)
-        .where(eq(announcement.id, announcementId));
+	// 1. Fetch using Relational Queries for "easier reasoning"
+	const result = await db.query.announcement.findFirst({
+		where: eq(announcement.id, announcementId),
+		with: {
+			locations: { with: { location: true } },
+			contacts: { with: { contact: { with: {
+				emails: true,
+				phones: true,
+				tags: { with: { tag: true } }
+			} } } },
+			tags: { with: { tag: true } },
+			campaign: true,
+		}
+	});
 
     if (!result) return null;
 
-    // Check access based on public flag
+    // 2. Check access
     const user = getOptionalUser();
     const isAuthorized = user && hasAccess(user, 'announcements');
 
     if (!result.isPublic) {
-        if (!user) throw new Error('Unauthorized');
-        ensureAccess(user, 'announcements');
+        if (!user || !isAuthorized) throw new Error('Unauthorized');
     }
 
-    // Fetch related tags
-    const tags = await db
-        .select({ id: announcementTag.tagId, name: tag.name })
-        .from(announcementTag)
-        .leftJoin(tag, eq(announcementTag.tagId, tag.id))
-        .where(eq(announcementTag.announcementId, announcementId));
+    // 3. Resolve Primary Contact
+	let resolvedContact = null;
+    const findEmployee = (contacts: any[]) => {
+		return contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'));
+	};
 
-    const contacts = await db
-        .select({ id: announcementContact.contactId })
-        .from(announcementContact)
-        .where(eq(announcementContact.announcementId, announcementId));
+	let chosenContact = findEmployee(result.contacts);
+	if (!chosenContact && result.contacts.length > 0) {
+		chosenContact = result.contacts[0];
+	}
 
-    // Fetch related locations (with full details for filtering)
-    const locationAssocs = await db
-        .select({ id: announcementLocation.locationId })
-        .from(announcementLocation)
-        .where(eq(announcementLocation.announcementId, announcementId));
+    if (chosenContact) {
+		const c = chosenContact.contact;
+		const name = c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim();
+		
+		if (!isAuthorized) {
+			const workEmail = c.emails.find((e: any) => e.type === 'work')?.value || '';
+			const workPhone = c.phones.find((p: any) => p.type === 'work')?.value || '';
+			resolvedContact = { name, email: workEmail, phone: workPhone };
+		} else {
+			const primaryEmail = c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '';
+			const primaryPhone = c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '';
+			resolvedContact = { 
+				name, 
+				email: primaryEmail, 
+				phone: primaryPhone,
+				qrCodeDataUrl: c.qrCodePath || undefined
+			};
+		}
+	}
 
-    // Resolve primary contact details
-    let resolvedContact = null;
-
-    // Helper to fetch contact info (public-safe or full)
-    const fetchContactInfo = async (contactId: string, publicOnly: boolean) => {
-        const [c] = await db.select().from(contact).where(eq(contact.id, contactId));
-        if (!c) return null;
-
-        if (publicOnly) {
-            // For public access: only work emails/phones, no QR code
-            const [email] = await db
-                .select({ value: contactEmail.value })
-                .from(contactEmail)
-                .where(and(eq(contactEmail.contactId, contactId), eq(contactEmail.type, 'work')))
-                .limit(1);
-
-            const [phone] = await db
-                .select({ value: contactPhone.value })
-                .from(contactPhone)
-                .where(and(eq(contactPhone.contactId, contactId), eq(contactPhone.type, 'work')))
-                .limit(1);
-
-            return {
-                name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
-                email: email?.value || '',
-                phone: phone?.value || '',
-            };
-        }
-
-        // For authenticated access: primary contact info
-        const [email] = await db
-            .select({ value: contactEmail.value })
-            .from(contactEmail)
-            .where(and(eq(contactEmail.contactId, contactId), eq(contactEmail.primary, true)))
-            .limit(1);
-
-        const [phone] = await db
-            .select({ value: contactPhone.value })
-            .from(contactPhone)
-            .where(and(eq(contactPhone.contactId, contactId), eq(contactPhone.primary, true)))
-            .limit(1);
-
-        return {
-            name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
-            email: email?.value || '',
-            phone: phone?.value || '',
-            qrCodeDataUrl: c.qrCodePath || undefined
-        };
-    };
-
-    // 1. Check for Announcement Contact with 'Employee' tag
-    let chosenContactId: string | null = null;
-
-    // Fetch contacts with their tags
-    const contactsWithTags = await db
-        .select({
-            contactId: announcementContact.contactId,
-            tagName: tag.name
-        })
-        .from(announcementContact)
-        .leftJoin(contactTag, eq(announcementContact.contactId, contactTag.contactId))
-        .leftJoin(tag, eq(contactTag.tagId, tag.id))
-        .where(eq(announcementContact.announcementId, announcementId));
-
-    // Group tags by contact
-    const contactTagsMap = new Map<string, string[]>();
-    for (const row of contactsWithTags) {
-        if (!contactTagsMap.has(row.contactId)) contactTagsMap.set(row.contactId, []);
-        if (row.tagName) contactTagsMap.get(row.contactId)?.push(row.tagName);
-    }
-
-    // Find first contact with 'Employee' tag
-    const employeeContact = Array.from(contactTagsMap.entries()).find(([_, tags]) => tags.includes('Employee'));
-    if (employeeContact) {
-        chosenContactId = employeeContact[0];
-    }
-
-    // 2. If no Announcement Employee Contact, check Location Employee Contacts
-    if (!chosenContactId && locationAssocs.length > 0) {
-        const locIds = locationAssocs.map(l => l.id);
-        const locationContacts = await db
-            .select({
-                contactId: locationContact.contactId,
-                tagName: tag.name
-            })
-            .from(locationContact)
-            .leftJoin(contactTag, eq(locationContact.contactId, contactTag.contactId))
-            .leftJoin(tag, eq(contactTag.tagId, tag.id))
-            .where(inArray(locationContact.locationId, locIds));
-
-        // Find first location contact with 'Employee' tag
-        const locContact = locationContacts.find(row => row.tagName === 'Employee');
-        if (locContact) {
-            chosenContactId = locContact.contactId;
-        }
-    }
-
-    // 3. Fallback: First announcement contact (if any)
-    if (!chosenContactId && contacts.length > 0) {
-        chosenContactId = contacts[0].id;
-    }
-
-    if (chosenContactId) {
-        resolvedContact = await fetchContactInfo(chosenContactId, !isAuthorized);
-    }
-
-    // --- PUBLIC VIEW: Return filtered, safe data only ---
+    // 4. Return Data
     if (!isAuthorized) {
-        // Fetch public locations for display
-        let publicLocations: any[] = [];
-        if (locationAssocs.length > 0) {
-            const locIds = locationAssocs.map(l => l.id);
-            publicLocations = await db
-                .select({
-                    id: location.id,
-                    name: location.name,
-                    street: location.street,
-                    houseNumber: location.houseNumber,
-                    zip: location.zip,
-                    city: location.city,
-                    country: location.country,
-                    isPublic: location.isPublic,
-                })
-                .from(location)
-                .where(and(inArray(location.id, locIds), eq(location.isPublic, true)));
-        }
-
         return {
             id: result.id,
             title: result.title,
@@ -183,47 +79,25 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
             isPublic: result.isPublic,
             createdAt: result.createdAt.toISOString(),
             updatedAt: result.updatedAt.toISOString(),
-            tagNames: tags.map(t => t.name).filter(n => n !== null) as string[],
-            locations: publicLocations.map(l => ({
-                id: l.id,
-                name: l.name,
-                street: l.street,
-                houseNumber: l.houseNumber,
-                zip: l.zip,
-                city: l.city,
-                country: l.country,
-                isPublic: l.isPublic,
-            })),
+            tagNames: result.tags.map(t => t.tag.name).filter(n => n !== null) as string[],
+            locations: result.locations.filter(l => l.location.isPublic).map(l => l.location),
             resolvedContact,
-            // Explicitly exclude internal data
             contactIds: [],
             locationIds: [],
             syncIds: [],
-        } as unknown as Announcement;
-    }
-
-    // --- AUTHENTICATED VIEW: Return full data ---
-    // Fetch Campaign
-    let syncIds: string[] = [];
-    if (result.campaignId) {
-        const [c] = await db
-            .select({ content: campaign.content })
-            .from(campaign)
-            .where(eq(campaign.id, result.campaignId));
-        if (c && c.content) {
-            syncIds = (c.content as any).syncIds || [];
-        }
+        } as any;
     }
 
     return {
         ...result,
         createdAt: result.createdAt.toISOString(),
         updatedAt: result.updatedAt.toISOString(),
-        tagIds: tags.map(t => t.id),
-        tagNames: tags.map(t => t.name).filter(n => n !== null) as string[],
-        contactIds: contacts.map(c => c.id),
-        locationIds: locationAssocs.map(l => l.id),
-        syncIds,
+        tagIds: result.tags.map(t => t.tagId),
+        tagNames: result.tags.map(t => t.tag.name).filter(n => n !== null) as string[],
+        contactIds: result.contacts.map(c => c.contactId),
+        locationIds: result.locations.map(l => l.locationId),
+        locations: result.locations.map(l => l.location),
+        syncIds: (result.campaign?.content as any)?.syncIds || [],
         resolvedContact,
-    } as Announcement;
+    } as any;
 });

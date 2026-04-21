@@ -45,13 +45,20 @@
     }: Props = $props();
 
     // Initialize remoteFunction if it's a definition function to ensure reactive context
-    const rf = $derived(typeof remoteFunction === "function" ? remoteFunction() : remoteFunction);
+    const rf = $derived(
+        typeof remoteFunction === "function"
+            ? remoteFunction()
+            : remoteFunction,
+    );
 
     let prevIssuesLength = $state(0);
     $effect(() => {
         const issues = (rf as any).allIssues?.() ?? [];
         const currentIssuesLength = issues.length;
-        if (currentIssuesLength > 0 && currentIssuesLength !== prevIssuesLength) {
+        if (
+            currentIssuesLength > 0 &&
+            currentIssuesLength !== prevIssuesLength
+        ) {
             toast.error(m.please_fix_validation());
         }
         prevIssuesLength = currentIssuesLength;
@@ -81,7 +88,10 @@
             const claimKey = `${app.namespace}.${f.key}`;
             if (initialClaims[claimKey] !== undefined) {
                 initialClaimsMap[claimKey] = initialClaims[claimKey];
-            } else if (initialClaims[f.key] !== undefined && app.namespace === "multiposter") {
+            } else if (
+                initialClaims[f.key] !== undefined &&
+                app.namespace === "multiposter"
+            ) {
                 initialClaimsMap[claimKey] = initialClaims[f.key];
             }
         });
@@ -102,28 +112,27 @@
 <form
     class="space-y-4"
     {...rf.preflight(validationSchema).enhance(async ({ submit }: any) => {
-            const handle = rf;
-            try {
-                await submit();
-                
-                // Native Svelte 5 / Remote Function semantics: 
-                // We check the handle's error state and result state directly.
-                // Use untrack to prevent 'derived_inert' if rf was re-derived during await.
-                const result = untrack(() => handle.result);
-                const error = untrack(() => handle.error);
+        const handle = rf;
+        try {
+            await submit();
 
+            // Native Svelte 5 / Remote Function semantics:
+            // We check the handle's error state and result state directly.
+            // Use untrack to prevent 'derived_inert' if rf was re-derived during await.
+            const result = untrack(() => handle.result);
+            const error = untrack(() => handle.error);
 
-                if (!error && result) {
-                    toast.success(m.successfully_saved());
-                    onSuccess();
-                } else if (error) {
-                    toast.error(error.message || m.something_went_wrong());
-                }
-            } catch (error: unknown) {
-                const err = error as { message?: string };
-                toast.error(err?.message || m.something_went_wrong());
+            if (!error && result) {
+                toast.success(m.successfully_saved());
+                onSuccess();
+            } else if (error) {
+                toast.error(error.message || m.something_went_wrong());
             }
-        })}
+        } catch (error: unknown) {
+            const err = error as { message?: string };
+            toast.error(err?.message || m.something_went_wrong());
+        }
+    })}
 >
     {#if isUpdating && initialData}
         <input {...rf.fields.id.as("hidden", initialData.id)} />
@@ -132,10 +141,12 @@
     <input {...rf.fields.claims.as("hidden", claimsJson)} />
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span
+        >
         <input
             {...rf.fields.name.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.name.issues()?.length ?? 0) > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.name.issues()
+                ?.length ?? 0) > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             value={initialData?.name ?? ""}
@@ -147,10 +158,13 @@
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{m.email_address()}</span>
+        <span class="text-sm font-medium text-gray-700 mb-2"
+            >{m.email_address()}</span
+        >
         <input
             {...rf.fields.email.as("email")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.email.issues()?.length ?? 0) > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.email.issues()
+                ?.length ?? 0) > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             value={initialData?.email ?? ""}
@@ -187,14 +201,18 @@
                         {@const claimKey = `${app.namespace}.${feature.key}`}
                         <div class="space-y-2">
                             <span class="text-sm font-medium text-gray-900">
-                                {typeof feature.title === 'function' ? feature.title() : feature.title}
+                                {typeof feature.title === "function"
+                                    ? feature.title()
+                                    : feature.title}
                             </span>
-                            {#if feature.key === 'synchronizations'}
+                            {#if feature.key === "synchronizations"}
                                 <select
-                                    value={claimsMap[claimKey] === true ? 'admin' : (claimsMap[claimKey] || 'none')}
+                                    value={claimsMap[claimKey] === true
+                                        ? "admin"
+                                        : claimsMap[claimKey] || "none"}
                                     onchange={(e) => {
                                         const val = e.currentTarget.value;
-                                        if (val === 'none') {
+                                        if (val === "none") {
                                             const next = { ...claimsMap };
                                             delete next[claimKey];
                                             claimsMap = next;
@@ -204,21 +222,32 @@
                                     }}
                                     class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 >
-                                    <option value="none">{m.none_access()}</option>
-                                    <option value="use">{m.use_only_access()}</option>
-                                    <option value="admin">{m.administrator_access()}</option>
+                                    <option value="none"
+                                        >{m.none_access()}</option
+                                    >
+                                    <option value="use"
+                                        >{m.use_only_access()}</option
+                                    >
+                                    <option value="admin"
+                                        >{m.administrator_access()}</option
+                                    >
                                 </select>
                             {:else}
-                                <label class="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 border border-transparent cursor-pointer">
+                                <label
+                                    class="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 border border-transparent cursor-pointer"
+                                >
                                     <input
                                         type="checkbox"
                                         checked={!!claimsMap[claimKey]}
                                         onchange={(e) => {
-                                            claimsMap[claimKey] = e.currentTarget.checked;
+                                            claimsMap[claimKey] =
+                                                e.currentTarget.checked;
                                         }}
                                         class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                                     />
-                                    <span class="text-sm text-gray-700">{m.enabled()}</span>
+                                    <span class="text-sm text-gray-700"
+                                        >{m.enabled()}</span
+                                    >
                                 </label>
                             {/if}
                         </div>
@@ -240,6 +269,8 @@
         >
             {isUpdating ? m.save_changes() : m.create_user()}
         </AsyncButton>
-        <Button variant="secondary" onclick={onCancel} size="default">{m.cancel()}</Button>
+        <Button variant="secondary" onclick={onCancel} size="default"
+            >{m.cancel()}</Button
+        >
     </div>
 </form>

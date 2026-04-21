@@ -91,6 +91,7 @@
                             <EntityManager
                                 title={m.feature_contacts_title()}
                                 icon={UserIcon}
+                                mode="embedded"
                                 type="user"
                                 entityId={data.id}
                                 listItemsRemote={listContacts as any}

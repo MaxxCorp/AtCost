@@ -58,8 +58,16 @@ export const updateResource = form(updateResourceSchema, async (data) => {
             await tx.delete(resourceRelation)
                 .where(eq(resourceRelation.childResourceId, data.id));
 
-            const parentResourceIds = data.parentResourceIds as any;
-            if (parentResourceIds && Array.isArray(parentResourceIds) && parentResourceIds.length > 0) {
+            let parentResourceIds = [];
+            if (typeof data.parentResourceIds === 'string') {
+                try { parentResourceIds = JSON.parse(data.parentResourceIds); } catch { parentResourceIds = []; }
+            } else if (Array.isArray(data.parentResourceIds)) {
+                parentResourceIds = data.parentResourceIds;
+            } else if (data.parentResourceIds) {
+                parentResourceIds = [data.parentResourceIds as string];
+            }
+
+            if (parentResourceIds.length > 0) {
                 const relationData = parentResourceIds.map((parentId: string) => ({
                     parentResourceId: parentId,
                     childResourceId: data.id,
@@ -107,18 +115,27 @@ export const updateResource = form(updateResourceSchema, async (data) => {
                 await tx.insert(resourceContactTable).values(contactData);
             }
 
-            return result[0];
+            return { updated: result[0], locationIds, contactIds, parentResourceIds };
         });
 
         console.log('Update success');
 
         console.log('Refreshing queries...');
-        await readResource(data.id).set(updated);
-        await listResources().refresh();
-        await listResourcesWithHierarchy().refresh();
+        const updatedResource = {
+            ...updated.updated,
+            // Since we know the IDs from above, we can populate them without re-fetching
+            parentResourceIds: updated.parentResourceIds || [],
+            locationIds: updated.locationIds || [],
+            contactIds: updated.contactIds || []
+        };
+        
+        await (readResource(data.id) as any).set(updatedResource);
+        await (listResources as any).refresh();
+        await (listResourcesWithHierarchy as any).refresh();
 
         console.log('--- updateResource SUCCESS ---');
         return { success: true, resource: updated };
+
     } catch (err: any) {
         console.error('--- updateResource ERROR ---');
         console.error(err);

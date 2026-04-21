@@ -62,7 +62,22 @@
             cooperatesWith?: string;
             managerOf?: string;
             pleaseFixValidation?: string;
+            tags?: string;
+            linkTag?: string;
+            associatedTags?: string;
+            searchTags?: string;
+            noTags?: string;
+            quickCreateTag?: string;
+            tag?: string;
         };
+
+        // Tags Configuration
+        listTagsRemote?: any;
+        createTagRemote?: any;
+        deleteTagRemote?: any;
+        updateTagRemote?: any;
+        createTagSchema?: any;
+        updateTagSchema?: any;
     }
 
     let {
@@ -78,10 +93,17 @@
         children,
         tags = $bindable(),
         labels,
+
+        listTagsRemote,
+        createTagRemote,
+        deleteTagRemote,
+        updateTagRemote,
+        createTagSchema,
+        updateTagSchema,
     }: Props = $props();
 
     // Initialize remoteFunction if it's a definition function to ensure reactive context
-    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
+    const rf = $derived(remoteFunction);
 
     const i18n = $derived({
         saveContact: labels?.saveContact ?? "Save Contact",
@@ -236,6 +258,13 @@
         {listContactsRemote}
         {labels}
         {getField}
+        {listTagsRemote}
+        {createTagRemote}
+        {deleteTagRemote}
+        {updateTagRemote}
+        {createTagSchema}
+        {updateTagSchema}
+        initialTags={initialData.tags || []}
     />
 
     {#if children}

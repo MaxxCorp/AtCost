@@ -25,7 +25,9 @@
 	<div class="max-w-4xl mx-auto">
 		<Breadcrumb feature="locations" />
 		<div class="bg-white shadow rounded-lg p-6">
-			<h1 class="text-2xl font-black mb-6 text-gray-900">{m.feature_locations_title()}</h1>
+			<h1 class="text-2xl font-black mb-6 text-gray-900">
+				{m.feature_locations_title()}
+			</h1>
 			<EntityManager
 				title={m.feature_locations_title()}
 				icon={MapPin}
@@ -55,11 +57,20 @@
 						optionsRemote: async () => {
 							const res = await listLocations({ limit: 1000 });
 							const items = Array.isArray(res) ? res : res.data;
-							const cities = [...new Set(items.map((i: any) => i.city).filter(Boolean))];
-							return cities.map(city => ({ value: city, label: city }));
+							const cities = [
+								...new Set(
+									items
+										.map((i: any) => i.city)
+										.filter(Boolean),
+								),
+							];
+							return cities.map((city) => ({
+								value: city,
+								label: city,
+							}));
 						},
 						options: [],
-					}
+					},
 				]}
 				createHref="/locations/new"
 				createLabel={m.create_item({ item: m.location() })}
@@ -68,7 +79,7 @@
 				updateRemote={updateLocation}
 				updateSchema={updateLocationSchema}
 				getFormData={(l: Location) => l}
-				onchange={() => listLocations().refresh()}
+				onchange={() => (listLocations as any).refresh()}
 			>
 				{#snippet renderForm({
 					remoteFunction,

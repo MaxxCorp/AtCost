@@ -23,6 +23,10 @@
         updateContactSchema,
     } from "$lib/validations/contacts";
     import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
+    import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
+    import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
+    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import { User } from "@lucide/svelte";
 
@@ -294,6 +298,10 @@
                     {onSuccess}
                     {onCancel}
                     contactId={id}
+                    {listTagsRemote}
+                    {createTagRemote}
+                    {updateTagRemote}
+                    {deleteTagRemote}
                 />
             {/snippet}
         </EntityManager>

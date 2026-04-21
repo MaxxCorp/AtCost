@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
-import { resource, location, resourceRelation, resourceLocation } from '@ac/db';
+import { resource, location, resourceRelation, resourceLocation, resourceContact } from '@ac/db';
 import { eq, and, getTableColumns } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
@@ -33,9 +33,17 @@ export const readResource = query(v.string(), async (id: string) => {
 		.from(resourceLocation)
 		.where(eq(resourceLocation.resourceId, id));
 
+	// Fetch contact associations
+	const contacts = await db
+		.select({ contactId: resourceContact.contactId })
+		.from(resourceContact)
+		.where(eq(resourceContact.resourceId, id));
+
 	return {
 		...result,
 		parentResourceIds: relations.map((r: any) => r.parentId),
-		locationIds: locations.map((l: any) => l.locationId)
+		locationIds: locations.map((l: any) => l.locationId),
+		contactIds: contacts.map((c: any) => c.contactId)
 	};
 });
+

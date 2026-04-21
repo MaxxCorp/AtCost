@@ -23,13 +23,16 @@ export async function handleDelete({
     try {
         const result = await deleteFn(ids);
         // Commands return a result object. If it has success: false, it failed.
-        if (result && result.success === false) {
+        if (result && (result.success === false || result.error)) {
+            console.error(`[handleDelete] Deletion failed for ${itemName}:`, result.error || result);
             toast.error(result.error || `Failed to delete ${itemName}${plural}`);
             return false;
         }
+
         toast.success(`${ids.length} ${itemName}${plural} deleted successfully!`);
         return true;
-    } catch (e) {
+    } catch (e: any) {
+        console.error(`[handleDelete] Exception during deletion of ${itemName}:`, e);
         toast.error(`Error deleting ${itemName}${plural}`);
         return false;
     }

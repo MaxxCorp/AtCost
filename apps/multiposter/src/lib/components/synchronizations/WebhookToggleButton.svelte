@@ -11,10 +11,11 @@
     import BellOff from "$lib/components/icons/bell-off.svelte";
     import { invalidateAll } from "$app/navigation";
 
-    let { configId, providerType, direction } = $props<{
+    let { configId, providerType, direction, disabled = false } = $props<{
         configId: string;
         providerType: string;
         direction: string;
+        disabled?: boolean;
     }>();
 
     let status = $state<{ active: boolean; expiresAt?: Date } | null>(null);
@@ -95,10 +96,13 @@
             loading={actionLoading}
             loadingLabel={m.updating()}
             onclick={toggleWebhook}
+            disabled={disabled}
             class="w-full flex items-center justify-center gap-2"
-            title={status?.active
-                ? m.webhook_active_click_to_unregister()
-                : m.webhook_inactive_click_to_register()}
+            title={disabled 
+                ? m.none_access() 
+                : (status?.active
+                    ? m.webhook_active_click_to_unregister()
+                    : m.webhook_inactive_click_to_register())}
         >
             {#if status?.active}
                 <Bell class="h-4 w-4 text-green-600" />

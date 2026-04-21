@@ -33,7 +33,13 @@
         });
     });
 
-    const employees = $derived(listEmployees() as any);
+    let employees = $state<any[]>([]);
+
+    $effect(() => {
+        listEmployees().then(res => {
+            employees = Array.isArray(res) ? res : [];
+        });
+    });
 
     const listTalentContracts = (params: any) => listContracts({ ...params, talentId: talentIdParam });
 </script>

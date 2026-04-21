@@ -21,6 +21,10 @@
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
+    import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
+    import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
+    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import {
         unifiedTalentSchema,
         createLocationSchema,
@@ -54,11 +58,12 @@
         remoteFunction = upsertTalent,
     }: Props = $props();
 
-    const rf = $derived(
-        typeof remoteFunction === "function"
-            ? remoteFunction()
-            : remoteFunction,
-    );
+    const rf = $derived(remoteFunction);
+
+    const listTagsHandle = listTagsRemote;
+    const createTagHandle = createTagRemote;
+    const updateTagHandle = updateTagRemote;
+    const deleteTagHandle = deleteTagRemote;
 
     const d = (val: any, def: any) =>
         val === undefined || val === null ? def : val;
@@ -724,6 +729,11 @@
                                 }}
                                 getField={getFieldMetadata}
                                 onEmailChange={tryAutoLink}
+                                listTagsRemote={listTagsHandle}
+                                createTagRemote={createTagHandle}
+                                deleteTagRemote={deleteTagHandle}
+                                updateTagRemote={updateTagHandle}
+                                initialTags={getInitial("contact.tags", [])}
                             />
                             <div class="flex justify-end gap-2 pt-4 border-t">
                                 <Button variant="outline" onclick={oc}

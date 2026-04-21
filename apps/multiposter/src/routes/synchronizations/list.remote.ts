@@ -16,7 +16,7 @@ import { synchronizationPaginationSchema as PaginationSchema, type Synchronizati
  */
 export const list = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<Synchronization>> => {
 	const user = getAuthenticatedUser();
-	ensureAccess(user, 'synchronizations');
+	ensureAccess(user, 'synchronizations', 'use');
 
 	const { page = 1, limit = 50, search = '', providerType } = input || {};
 	const offset = (page - 1) * limit;

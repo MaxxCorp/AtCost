@@ -24,7 +24,6 @@ export { default as TimelineEntryDialog } from './components/talents/TimelineEnt
 export { default as TalentForm } from './components/talents/TalentForm.svelte';
 export { default as TalentsManager } from './components/talents/TalentsManager.svelte';
 export { default as UserForm } from './components/users/UserForm.svelte';
-export { default as UserList } from './components/users/UserList.svelte';
 export { default as ContactFields } from './components/forms/ContactFields.svelte';
 export { default as LocationForm } from './components/forms/LocationForm.svelte';
 export { IsMobile } from "./hooks/is-mobile.svelte.ts";

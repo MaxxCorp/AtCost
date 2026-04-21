@@ -129,7 +129,7 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
         await publishAnnouncementChange('create', [announcementId]);
 
         // Refresh list cache if applicable
-        await (listAnnouncements() as any).refresh();
+        void listAnnouncements().refresh();
 
         // Trigger background sync to external providers
         await syncService.triggerPushSync(user.id, announcementId, 'announcement');

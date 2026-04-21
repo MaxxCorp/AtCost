@@ -73,7 +73,7 @@ export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             }
             await tx.delete(locationContact).where(eq(locationContact.contactId, contactId));
             if (locationIds.length > 0) {
-                await tx.insert(locationContact).values(locationIds.map((lid: string) => ({ 
+                await tx.insert(locationContact).values(locationIds.map((lid: string) => ({
                     locationId: lid,
                     contactId
                 })));
@@ -117,11 +117,50 @@ export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ su
                 }
             }
 
-            return { talentId };
+            return { talentId, contactId };
         });
 
-        await readTalent(result.talentId).refresh();
-        await listTalents().refresh();
+        // Construct local object to avoid re-fetching relations we already have
+        // (Note: timelineEntries and linkedUser logic remains slightly complex, 
+        // but for the immediate update result, we can build a consistent state)
+        if (result.talentId) {
+            const { talentId, contactId } = result as any;
+            const transformed = {
+                id: talentId,
+                contactId: contactId,
+                status: talentData.status,
+                jobTitle: talentData.jobTitle,
+                salaryExpectation: talentData.salaryExpectation,
+                availabilityDate: talentData.availabilityDate || null,
+                onboardingStatus: talentData.onboardingStatus,
+                resumeUrl: talentData.resumeUrl,
+                source: talentData.source,
+                internalNotes: talentData.internalNotes,
+                updatedAt: new Date().toISOString(),
+                contact: {
+                    id: contactId,
+                    displayName: contactData.displayName,
+                    givenName: contactData.givenName,
+                    familyName: contactData.familyName,
+                    birthday: contactData.birthday || null,
+                    role: contactData.role,
+                    department: contactData.department,
+                    notes: contactData.notes,
+                    emails: emails,
+                    phones: phones,
+                    addresses: addresses,
+                    tags: tags,
+                    locationIds: locationIds,
+                    // Minimal hydrated structure to prevent crashes
+                    locationAssociations: locationIds.map((lid: string) => ({ locationId: lid, location: { id: lid } })),
+                },
+                timelineEntries: [], // Will refresh on next read
+            };
+            await (readTalent(result.talentId) as any).set(transformed);
+        } else {
+            await (readTalent(result.talentId) as any).refresh();
+        }
+        void listTalents().refresh();
 
         return { success: true, id: result.talentId };
     } catch (err: any) {

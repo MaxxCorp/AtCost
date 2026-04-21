@@ -8,6 +8,7 @@ import { listAnnouncements } from '../list.remote';
 import { readAnnouncement } from './read.remote';
 import { eq } from 'drizzle-orm';
 import { syncService } from '$lib/server/sync/service';
+import { type Announcement } from '@ac/validations';
 
 
 /**
@@ -45,7 +46,7 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
             ? undefined
             : (input.isPublic === true || input.isPublic === 'true');
 
-        await db.transaction(async (tx) => {
+        const transactionResult = await db.transaction(async (tx) => {
             // Update Announcement
             const [updatedAnnouncement] = await tx.update(announcement)
                 .set({
@@ -78,11 +79,12 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
             }
 
             // Update Tags if provided (either via IDs or Names)
+            const finalTags: { id: string, name: string }[] = [];
             if (tagIds !== undefined || tagNames !== undefined) {
                 // Delete existing
                 await tx.delete(announcementTag).where(eq(announcementTag.announcementId, announcementId));
 
-                const finalTagIds = new Set<string>(tagIds || []);
+                const finalTagIdSet = new Set<string>(tagIds || []);
 
                 // Process tag names (find or create)
                 if (tagNames && tagNames.length > 0) {
@@ -92,21 +94,25 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
                         });
 
                         if (existingTag) {
-                            finalTagIds.add(existingTag.id);
+                            finalTagIdSet.add(existingTag.id);
+                            finalTags.push({ id: existingTag.id, name: tagName });
                         } else {
                             const [newTag] = await tx.insert(tag).values({
                                 name: tagName,
                                 userId: user.id
                             }).returning({ id: tag.id });
-                            finalTagIds.add(newTag.id);
+                            finalTagIdSet.add(newTag.id);
+                            finalTags.push({ id: newTag.id, name: tagName });
                         }
                     }
                 }
 
+                // If tagIds were provided directly, we might need their names for hydration
+
                 // Insert new
-                if (finalTagIds.size > 0) {
+                if (finalTagIdSet.size > 0) {
                     await tx.insert(announcementTag).values(
-                        [...finalTagIds].map(tagId => ({
+                        [...finalTagIdSet].map(tagId => ({
                             announcementId: announcementId,
                             tagId: tagId
                         }))
@@ -148,20 +154,70 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
                     );
                 }
             }
+
+            return { updatedAnnouncement, finalTags };
         });
+
+        const { updatedAnnouncement, finalTags } = transactionResult as any;
 
         // Notify listeners
         await publishAnnouncementChange('update', [announcementId]);
 
-        // Refresh caches
-        await (listAnnouncements() as any).refresh();
-        await (readAnnouncement as any).refresh(announcementId);
+        // Refresh caches - Fetch the full state inlined for "easier reasoning"
+        const fullAnnouncementData = await db.query.announcement.findFirst({
+            where: eq(announcement.id, announcementId),
+            with: {
+                locations: { with: { location: true } },
+                contacts: {
+                    with: {
+                        contact: {
+                            with: {
+                                emails: true,
+                                phones: true,
+                                tags: { with: { tag: true } }
+                            }
+                        }
+                    }
+                },
+                tags: { with: { tag: true } },
+                campaign: true,
+            }
+        });
+
+        if (fullAnnouncementData) {
+            // Compute resolved contact (duplicated for self-containment)
+            const c = fullAnnouncementData.contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'))?.contact || fullAnnouncementData.contacts[0]?.contact;
+            let resolvedContact = null;
+            if (c) {
+                resolvedContact = {
+                    name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
+                    email: c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '',
+                    phone: c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '',
+                    qrCodeDataUrl: c.qrCodePath || undefined
+                };
+            }
+
+            const transformed = {
+                ...fullAnnouncementData,
+                createdAt: fullAnnouncementData.createdAt.toISOString(),
+                updatedAt: fullAnnouncementData.updatedAt.toISOString(),
+                tagIds: fullAnnouncementData.tags.map(t => t.tagId),
+                tagNames: fullAnnouncementData.tags.map(t => t.tag.name).filter(n => n !== null) as string[],
+                contactIds: fullAnnouncementData.contacts.map(c => c.contactId),
+                locationIds: fullAnnouncementData.locations.map(l => l.locationId),
+                locations: fullAnnouncementData.locations.map(l => l.location),
+                syncIds: (fullAnnouncementData.campaign?.content as any)?.syncIds || [],
+                resolvedContact,
+            } as Announcement;
+            readAnnouncement(announcementId).set(transformed);
+        }
+
+        void listAnnouncements().refresh();
 
         // Trigger background sync to external providers
         await syncService.triggerPushSync(user.id, announcementId, 'announcement');
 
         return {
-
             success: true,
             id: announcementId
         };

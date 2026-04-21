@@ -5,6 +5,7 @@
     import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { deleteLocation } from "./delete.remote";
+    import { createLocation } from "../new/create.remote";
     import { toast } from "svelte-sonner";
     import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
@@ -33,9 +34,9 @@
         updateLocationSchema,
     } from "$lib/validations/locations";
     import { listLocations } from "../list.remote";
-    import { createLocation } from "../new/create.remote";
     import { listTags } from "../../tags/list.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+
 	const locationPromise = $state(readLocation(page.params.id || ""));
 </script>
 

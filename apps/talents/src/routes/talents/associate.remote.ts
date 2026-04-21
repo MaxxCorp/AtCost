@@ -23,6 +23,7 @@ export const associateTalent = command(talentAssociationSchema, async (data): Pr
         }
     }
     
+    await (getEntityTalents({ type, entityId }) as any).refresh();
     return { success: true };
 });
 
@@ -50,6 +51,7 @@ export const dissociateTalent = command(talentAssociationSchema, async (data): P
         }
     }
     
+    await (getEntityTalents({ type: data.type, entityId: data.entityId }) as any).refresh();
     return { success: true };
 });
 

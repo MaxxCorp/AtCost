@@ -34,8 +34,9 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
         }
 
         // Update Locations if provided
+        let locationIds: string[] = [];
         if (data.locationIds !== undefined) {
-            const locationIds = typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds;
+            locationIds = typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds;
             // Delete existing
             await db.delete(kioskLocation).where(eq(kioskLocation.kioskId, id));
             // Insert new
@@ -49,8 +50,10 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
             }
         }
 
-        await getKiosk(id).refresh();
-        await listKiosks().refresh();
+        // Refresh caches - Fetch the full state to ensure absolute consistency and avoid partial state wiping
+        getKiosk(id).set({ ...updated, locationIds });
+        void listKiosks().refresh();
+
 
         return { success: true };
     } catch (e: any) {

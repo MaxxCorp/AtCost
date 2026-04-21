@@ -16,7 +16,8 @@
 
     import { listTalents } from "../../talents/list.remote";
     import { getEntityTalents, associateTalent, dissociateTalent } from "../../talents/associate.remote";
-    import { upsertTalent, listTags } from "../../talents/talents.remote";
+    import { upsertTalent } from "../../talents/talents.remote";
+    import { listTags } from "../../tags/list.remote";
     import { listLocations } from "../../locations/list.remote";
     import { createTalent } from "../../talents/new/create.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";

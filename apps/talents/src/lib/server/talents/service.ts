@@ -19,7 +19,7 @@ export interface TalentProfile {
     timelineEntries: any[];
 }
 
-export async function readTalentCore(id: string): Promise<TalentProfile | null> {
+export async function readTalent(id: string): Promise<TalentProfile | null> {
     const result = await db.query.talent.findFirst({
         where: eq(talent.id, id),
         with: {

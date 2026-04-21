@@ -117,6 +117,16 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
+		// Prepare data for association updates
+		const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
+		const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
+		const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
+
+		let tagNames: string[] | undefined = undefined;
+		if (data.tags !== undefined) {
+			tagNames = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0) : [];
+		}
+
 		const updatedEvent = await db.transaction(async (tx) => {
 			const [updatedEvent] = await tx
 				.update(event)
@@ -151,15 +161,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				}
 			}
 
-			// Prepare data for association updates
-			const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
-			const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
-			const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
-
-			let tagNames: string[] | undefined = undefined;
-			if (data.tags !== undefined) {
-				tagNames = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0) : [];
-				// Add Series tag if recurring
+			// Add Series tag if recurring
+			if (tagNames !== undefined) {
 				if (updatedEvent.seriesId || (updatedEvent.recurrence && (updatedEvent.recurrence as string[]).length > 0) || updatedEvent.recurringEventId) {
 					if (!tagNames.includes('Series')) {
 						tagNames.push('Series');
@@ -372,7 +375,60 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			await syncService.syncItems(user.id, allAffectedIds, 'event');
 		}
 
-		await listEvents().refresh();
+		// Refresh caches - Fetch the full state inlined for "easier reasoning" and avoiding partial state wiping
+		const fullEventData = await db.query.event.findFirst({
+			where: eq(event.id, data.id),
+			with: {
+				locations: { with: { location: true } },
+				contacts: {
+					with: {
+						contact: {
+							with: {
+								emails: true,
+								phones: true,
+								tags: { with: { tag: true } }
+							}
+						}
+					}
+				},
+				resources: { with: { resource: true } },
+				tags: { with: { tag: true } },
+				campaign: true,
+			},
+		});
+
+		if (fullEventData) {
+			// Compute resolved contact (duplicated from read.remote for self-containment)
+			const c = fullEventData.contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'))?.contact || fullEventData.contacts[0]?.contact;
+			let resolvedContact = null;
+			if (c) {
+				resolvedContact = {
+					name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
+					email: c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '',
+					phone: c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '',
+					qrCodeDataUrl: c.qrCodePath || undefined
+				};
+			}
+
+			const transformed = {
+				...fullEventData,
+				createdAt: fullEventData.createdAt.toISOString(),
+				updatedAt: fullEventData.updatedAt.toISOString(),
+				startDateTime: fullEventData.startDateTime?.toISOString() ?? null,
+				endDateTime: fullEventData.endDateTime?.toISOString() ?? null,
+				resourceIds: fullEventData.resources.map(r => r.resourceId),
+				contactIds: fullEventData.contacts.map(c => c.contactId),
+				locationIds: fullEventData.locations.map(l => l.locationId),
+				tags: fullEventData.tags.map(t => t.tag.name),
+				syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
+				resolvedContact,
+			};
+			await (readEvent(data.id) as any).set(transformed);
+		} else {
+			await (readEvent(data.id) as any).refresh();
+		}
+
+		void listEvents().refresh();
 		console.log('--- updateEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {

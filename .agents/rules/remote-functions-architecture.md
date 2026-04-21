@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # SvelteKit Remote Function Architecture Rules
 
 ## 1. Remote Function Exclusivity in `.remote.ts`
@@ -16,4 +20,4 @@
 
 ## 4. Interaction Patterns
 - Use `remoteFunction.preflight(schema).enhance(...)` to bind forms.
-- Use the official field API: `{...rf.fields.fieldName.as('type', value)}`.
+- Use the official field API: `{...remoteFunction.fields.fieldName.as('type', value)}`.

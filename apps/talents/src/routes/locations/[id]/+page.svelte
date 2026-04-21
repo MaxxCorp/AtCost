@@ -20,6 +20,7 @@
     import { createTalentSchema, updateTalentSchema } from "@ac/validations/talents";
     import { handleDelete } from "@ac/ui";
 
+
     const id = $derived(page.params.id as string);
 
     // Initialize query in script setup for correct reactive context
