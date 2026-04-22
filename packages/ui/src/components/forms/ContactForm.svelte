@@ -176,7 +176,7 @@
 
     $effect(() => {
         if (initialData.tags) {
-            tagsInput = initialData.tags.map((t: any) => t.name).join(", ");
+            tagsInput = initialData.tags.map((t: any) => t.name || t).join(", ");
         }
     });
 

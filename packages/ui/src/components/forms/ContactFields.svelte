@@ -427,7 +427,7 @@
                     initialItems={initialTags}
                     listItemsRemote={listTagsRemote}
                     onchange={(ids, items) => {
-                        tagsInput = items.map(i => i.name).join(", ");
+                        tagsInput = items.map(i => i.name || i).join(", ");
                     }}
                     createRemote={createTagRemote}
                     createSchema={createTagSchema}

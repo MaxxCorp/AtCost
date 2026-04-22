@@ -30,14 +30,11 @@ export async function resolveContactForEventId(eventId: string | undefined, filt
 
 	// Find contacts with "Employee" tag
 	for (const contact of eventContacts) {
-		const contactTags = await db.query.contactTag.findMany({
-			where: (ct, { eq }) => eq(ct.contactId, contact.id),
-			with: {
-				tag: true
-			}
+		const contactTags = contact.tags || [];
+		const hasEmployeeTag = contactTags.some((ct: any) => {
+			const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
+			return tagName === 'employee';
 		});
-
-		const hasEmployeeTag = contactTags.some(ct => ct.tag.name.toLowerCase() === 'employee');
 		if (hasEmployeeTag) {
 			return {
 				name: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),

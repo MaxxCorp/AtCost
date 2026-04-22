@@ -118,7 +118,10 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
             birthday: t.contact.birthday?.toISOString() ?? null,
             createdAt: t.contact.createdAt?.toISOString() ?? t.contact.createdAt,
             updatedAt: t.contact.updatedAt?.toISOString() ?? t.contact.updatedAt,
-            tags: (t.contact.tags || []).map((ct: any) => ct.tag?.name).filter(Boolean)
+            tags: (t.contact.tags || []).map((ct: any) => ({
+                id: ct.tag?.id,
+                name: ct.tag?.name
+            })).filter((tag: any) => tag.name)
         }
     }));
 

@@ -128,7 +128,10 @@ export async function readTalent(id: string): Promise<TalentProfile | null> {
                     familyName: r.targetContact.familyName,
                 } : null,
             })),
-            tags: (result.contact.tags || []).map((ct: any) => ct.tag?.name).filter(Boolean)
+            tags: (result.contact.tags || []).map((ct: any) => ({
+                id: ct.tag?.id,
+                name: ct.tag?.name
+            })).filter((t: any) => t.name)
         },
         timelineEntries: (result.timelineEntries || []).map((te: any) => ({
             id: te.id,

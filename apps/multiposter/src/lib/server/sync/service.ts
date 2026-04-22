@@ -882,7 +882,10 @@ export class SyncService {
 		const attendees = [];
 		for (const contact of associatedContacts) {
 			const contactTags = (contact as any).tags || [];
-			const isEmployee = contactTags.some((ct: any) => ct.tag.name.toLowerCase() === 'employee' || ct.tag.name.toLowerCase() === 'employees');
+			const isEmployee = contactTags.some((ct: any) => {
+				const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
+				return tagName === 'employee' || tagName === 'employees';
+			});
 
 			if (!isEmployee) {
 				// Get primary email
@@ -968,7 +971,10 @@ export class SyncService {
 		// Find associated contacts who are employees
 		for (const contact of associatedContacts) {
 			const contactTags = (contact as any).tags || [];
-			const isEmployee = contactTags.some((ct: any) => ct.tag.name.toLowerCase() === 'employee' || ct.tag.name.toLowerCase() === 'employees');
+			const isEmployee = contactTags.some((ct: any) => {
+				const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
+				return tagName === 'employee' || tagName === 'employees';
+			});
 
 			if (isEmployee) {
 				// Use the first employee found as organizer
