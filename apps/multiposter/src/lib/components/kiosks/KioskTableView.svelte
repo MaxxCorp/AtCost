@@ -188,7 +188,7 @@
                                     <div class="flex flex-wrap gap-1.5 max-h-[8vh] overflow-hidden">
                                         {#each (item.tags || []).slice(0, 3) as tag}
                                             <span class="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-xs font-bold uppercase tracking-wider">
-                                                {tag}
+                                                {tag.name || tag}
                                             </span>
                                         {/each}
                                     </div>

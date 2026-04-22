@@ -177,7 +177,7 @@
                                             class="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100 flex items-center gap-1"
                                         >
                                             <TagIcon size={12} />
-                                            {tag}
+                                            {tag.name}
                                         </span>
                                     {/each}
                                 {/if}

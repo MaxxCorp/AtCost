@@ -88,7 +88,7 @@ import TaskList from "$lib/components/tasks/TaskList.svelte";
                                     <span
                                         class="px-2.5 py-0.5 bg-white/20 rounded-full text-xs font-medium backdrop-blur-sm"
                                     >
-                                        {t}
+                                        {t.name || t}
                                     </span>
                                 {/each}
                             </div>
