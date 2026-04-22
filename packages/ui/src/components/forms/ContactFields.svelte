@@ -452,7 +452,22 @@
                         {tag.name}
                     {/snippet}
                     {#snippet renderForm({ remoteFunction: state, schema, initialData: formData, onSuccess, onCancel, id })}
-                        <div class="space-y-4 p-4">
+                        <form
+                            {...state.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
+                                try {
+                                    const res = await submit();
+                                    if (res && res.success !== false) {
+                                        onSuccess(res);
+                                    }
+                                } catch (err) {
+                                    console.error("[ContactFields] Tag Quick Create Error:", err);
+                                }
+                            })}
+                            class="space-y-4 p-4"
+                        >
+                            {#if id && state.fields?.id}
+                                <input {...state.fields.id.as("hidden", id)} />
+                            {/if}
                             <div>
                                 <label for="tag-name" class="block text-sm font-medium text-gray-700">{i18n.summary}</label>
                                 <input 
@@ -465,25 +480,15 @@
                                 {/each}
                             </div>
                             <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" onclick={onCancel}>Cancel</Button>
+                                <Button variant="outline" type="button" onclick={onCancel}>Cancel</Button>
                                 <AsyncButton 
-                                    type="button" 
+                                    type="submit" 
                                     loading={state.pending}
-                                    onclick={async () => {
-                                        try {
-                                            const res = await state.submit();
-                                            if (res && res.success !== false) {
-                                                onSuccess(res);
-                                            }
-                                        } catch (err) {
-                                            console.error("[ContactFields] Quick Create Error:", err);
-                                        }
-                                    }}
                                 >
                                     {id ? "Update" : "Create"}
                                 </AsyncButton>
                             </div>
-                        </div>
+                        </form>
                     {/snippet}
                 </EntityManager>
             </div>

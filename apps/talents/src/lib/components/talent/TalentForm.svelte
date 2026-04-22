@@ -714,7 +714,24 @@
                         onSuccess: os,
                         onCancel: oc,
                     }: any)}
-                        <div class="p-4 space-y-4">
+                        <form
+                            {...crf.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
+                                try {
+                                    const result = await submit();
+                                    if (result && result.success !== false) {
+                                        os(result.data);
+                                    } else {
+                                        toast.error(
+                                            result?.error || "Failed to create contact"
+                                        );
+                                    }
+                                } catch (err) {
+                                    console.error("[TalentForm] Contact Quick Create Error:", err);
+                                    toast.error("An unexpected error occurred");
+                                }
+                            })}
+                            class="p-4 space-y-4"
+                        >
                             <ContactFields
                                 bind:contactData
                                 bind:emails
@@ -727,7 +744,7 @@
                                     const res = await listContacts();
                                     return res.data;
                                 }}
-                                getField={getFieldMetadata}
+                                getField={(name) => crf.fields?.[name] ?? { as: () => ({}), issues: () => [] }}
                                 onEmailChange={tryAutoLink}
                                 listTagsRemote={listTagsHandle}
                                 createTagRemote={createTagHandle}
@@ -735,44 +752,40 @@
                                 updateTagRemote={updateTagHandle}
                                 initialTags={getInitial("contact.tags", [])}
                             />
+
+                            <!-- Hidden fields for the remote function payload -->
+                            {#if crf.fields?.contact}
+                                <input {...crf.fields.contact.as("hidden", contactData)} />
+                            {/if}
+                            {#if crf.fields?.emailsJson}
+                                <input {...crf.fields.emailsJson.as("hidden", JSON.stringify(emails))} />
+                            {/if}
+                            {#if crf.fields?.phonesJson}
+                                <input {...crf.fields.phonesJson.as("hidden", JSON.stringify(phones))} />
+                            {/if}
+                            {#if crf.fields?.relationsJson}
+                                <input {...crf.fields.relationsJson.as("hidden", JSON.stringify(relations))} />
+                            {/if}
+                            {#if crf.fields?.tagsJson}
+                                <input {...crf.fields.tagsJson.as("hidden", JSON.stringify(tagsInput.split(",").map(t => t.trim()).filter(Boolean)))} />
+                            {/if}
+                            {#if crf.fields?.addressesJson}
+                                <input {...crf.fields.addressesJson.as("hidden", JSON.stringify(addresses))} />
+                            {/if}
+                            {#if crf.fields?.locationIdsJson}
+                                <input {...crf.fields.locationIdsJson.as("hidden", JSON.stringify(locationIds))} />
+                            {/if}
+
                             <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" onclick={oc}
-                                    >Cancel</Button
-                                >
+                                <Button variant="outline" type="button" onclick={oc}>Cancel</Button>
                                 <AsyncButton
-                                    type="button"
-                                    onclick={async () => {
-                                        const result = await crf({
-                                            contact: contactData,
-                                            emailsJson: JSON.stringify(emails),
-                                            phonesJson: JSON.stringify(phones),
-                                            relationsJson:
-                                                JSON.stringify(relations),
-                                            tagsJson: JSON.stringify(
-                                                tagsInput
-                                                    .split(",")
-                                                    .map((t) => t.trim())
-                                                    .filter(Boolean),
-                                            ),
-                                            addressesJson:
-                                                JSON.stringify(addresses),
-                                            locationIdsJson:
-                                                JSON.stringify(locationIds),
-                                        });
-                                        if (result.success) {
-                                            os(result.data);
-                                        } else {
-                                            toast.error(
-                                                result.error ||
-                                                    "Failed to create contact",
-                                            );
-                                        }
-                                    }}
+                                    type="submit"
+                                    loading={crf.pending}
                                 >
                                     Create Contact
                                 </AsyncButton>
                             </div>
-                        </div>
+                        </form>
                     {/snippet}
                 </EntityManager>
 
