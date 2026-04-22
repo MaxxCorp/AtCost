@@ -61,10 +61,33 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
         .where(inArray(announcement.id, ids))
         .orderBy(desc(announcement.createdAt));
 
+    // Fetch tags for these announcements
+    const { announcementTag, tag } = await import('@ac/db');
+    const tagsForAnnouncements = await db
+        .select({
+            announcementId: announcementTag.announcementId,
+            tagId: tag.id,
+            tagName: tag.name,
+        })
+        .from(announcementTag)
+        .innerJoin(tag, eq(announcementTag.tagId, tag.id))
+        .where(inArray(announcementTag.announcementId, ids));
+
+    const tagsMap = new Map<string, { id: string, name: string }[]>();
+    for (const { announcementId: aid, tagId, tagName } of tagsForAnnouncements) {
+        if (!tagsMap.has(aid)) {
+            tagsMap.set(aid, []);
+        }
+        if (tagName) {
+            tagsMap.get(aid)?.push({ id: tagId, name: tagName });
+        }
+    }
+
     const data = finalResults.map((row) => ({
         ...row,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
+        tags: tagsMap.get(row.id) || [],
     }));
 
     return { data, total };

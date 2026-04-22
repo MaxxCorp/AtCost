@@ -419,7 +419,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				resourceIds: fullEventData.resources.map(r => r.resourceId),
 				contactIds: fullEventData.contacts.map(c => c.contactId),
 				locationIds: fullEventData.locations.map(l => l.locationId),
-				tags: fullEventData.tags.map(t => t.tag.name),
+				tags: fullEventData.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 				syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
 				resolvedContact,
 			};

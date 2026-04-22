@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import type { Announcement as DbAnnouncement } from '@ac/db';
+import type { Tag } from './tags.js';
 
 /**
  * Announcement interface matching the database schema, with dates serialized to strings
@@ -7,8 +8,7 @@ import type { Announcement as DbAnnouncement } from '@ac/db';
 export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
     createdAt: string;
     updatedAt: string;
-    tagIds?: string[];
-    tagNames?: string[];
+    tags?: Tag[];
     syncIds?: string[];
     contactIds?: string[];
     locationIds?: string[];

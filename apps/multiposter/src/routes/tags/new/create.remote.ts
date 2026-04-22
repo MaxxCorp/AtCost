@@ -1,8 +1,9 @@
 import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { tag } from '@ac/db';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { ensureAccess, getAuthenticatedUser } from '$lib/server/authorization';
 import * as v from 'valibot';
+import { listTags } from "../list.remote.js"
 
 const createTagSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
@@ -10,10 +11,11 @@ const createTagSchema = v.object({
 
 export const createTag = form(createTagSchema, async (input) => {
     const user = getAuthenticatedUser();
-    
+    ensureAccess(user, "admin");
+
     // Check if tag already exists for this user
     const existing = await db.query.tag.findFirst({
-        where: (tags, { and, eq }) => and(eq(tags.userId, user.id), eq(tags.name, input.name))
+        where: (tags, { eq }) => eq(tags.name, input.name)
     });
 
     if (existing) {
@@ -25,5 +27,6 @@ export const createTag = form(createTagSchema, async (input) => {
         userId: user.id
     }).returning();
 
-    return { success: true, ...newTag };
+    void listTags().refresh();
+    return { success: true, tag: newTag };
 });

@@ -2,7 +2,7 @@ import { form } from '$app/server';
 import { db } from '$lib/server/db';
 import { tag } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { ensureAccess, getAuthenticatedUser } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { listTags } from '../list.remote';
 
@@ -13,12 +13,13 @@ const updateTagSchema = v.object({
 
 export const updateTag = form(updateTagSchema, async (input) => {
     const user = getAuthenticatedUser();
-    
+    ensureAccess(user, "admin");
+
     const [updatedTag] = await db.update(tag)
         .set({ name: input.name })
-        .where(and(eq(tag.id, input.id), eq(tag.userId, user.id)))
+        .where(eq(tag.id, input.id))
         .returning();
 
-    await (listTags as any).refresh();
+    void listTags().refresh();
     return { success: true, ...updatedTag };
 });

@@ -93,6 +93,7 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 	const tagsForEvents = await db
 		.select({
 			eventId: eventTag.eventId,
+			tagId: tag.id,
 			tagName: tag.name,
 		})
 		.from(eventTag)
@@ -100,13 +101,13 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 		.where(inArray(eventTag.eventId, eventIds));
 
 	// Map tags to events
-	const tagsMap = new Map<string, string[]>();
-	for (const { eventId, tagName } of tagsForEvents) {
+	const tagsMap = new Map<string, { id: string, name: string }[]>();
+	for (const { eventId, tagId, tagName } of tagsForEvents) {
 		if (!tagsMap.has(eventId)) {
 			tagsMap.set(eventId, []);
 		}
 		if (tagName) {
-			tagsMap.get(eventId)?.push(tagName);
+			tagsMap.get(eventId)?.push({ id: tagId, name: tagName });
 		}
 	}
 

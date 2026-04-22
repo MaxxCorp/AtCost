@@ -1,12 +1,11 @@
 import { query } from '$app/server';
 import { db } from '$lib/server/db';
 import { tag } from '@ac/db';
-import { eq, desc } from 'drizzle-orm';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { desc } from 'drizzle-orm';
 import { PaginationSchema } from '@ac/validations';
 
 export const listTags = query(PaginationSchema, async (input) => {
-    const user = getAuthenticatedUser();
+
     const { page = 1, limit = 100 } = input || {};
     const offset = (page - 1) * limit;
 

@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import type { Event as DbEvent } from '@ac/db';
+import type { Tag } from './tags.js';
 
 /**
  * Event interface matching the database schema, with dates serialized to strings
@@ -22,7 +23,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 		country: string | null;
 		isPublic: boolean;
 	}[];
-	tags?: string[];
+	tags?: Tag[];
 	syncIds?: string[];
 	participationStatuses?: Record<string, string>;
 	maxOccupancy?: number | null;
@@ -61,7 +62,7 @@ export type PublicEvent = Omit<Event, 'resolvedContact'> & {
     maxOccupancy?: number | null;
     inclusivityInformation?: string[];
     roomTitle?: string | null;
-    tags?: string[];
+    tags?: Tag[];
     locationIds?: string[];
     locations?: {
         id: string;

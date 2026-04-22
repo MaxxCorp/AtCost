@@ -105,7 +105,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			updatedAt: result.updatedAt.toISOString(),
 			locations: result.locations.filter(l => l.location.isPublic).map(l => l.location),
 			locationIds: result.locations.filter(l => l.location.isPublic).map(l => l.location.id),
-			tags: result.tags.map(t => t.tag.name),
+			tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 			resolvedContact,
 			resourceIds: [],
 			contactIds: [],
@@ -123,7 +123,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		resourceIds: result.resources.map(r => r.resourceId),
 		contactIds: result.contacts.map(c => c.contactId),
 		locationIds: result.locations.map(l => l.locationId),
-		tags: result.tags.map(t => t.tag.name),
+		tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 		syncIds: (result.campaign?.content as any)?.syncIds || [],
 		resolvedContact,
 	} as any;

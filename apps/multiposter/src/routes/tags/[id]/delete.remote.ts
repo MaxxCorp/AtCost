@@ -9,11 +9,10 @@ import { listTags } from '../list.remote';
 const deleteTagSchema = v.array(v.pipe(v.string(), v.uuid()));
 
 export const deleteTag = command(deleteTagSchema, async (ids) => {
-    const user = getAuthenticatedUser();
-    
-    await db.delete(tag)
-        .where(and(inArray(tag.id, ids), eq(tag.userId, user.id)));
 
-    await (listTags as any).refresh();
+    await db.delete(tag)
+        .where(inArray(tag.id, ids));
+
+    void listTags().refresh();
     return { success: true };
 });

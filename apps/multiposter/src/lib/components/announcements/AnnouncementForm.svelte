@@ -72,8 +72,8 @@
     );
     // svelte-ignore state_referenced_locally
     let tagsString = $state(
-        isUpdating && initialData?.tagNames
-            ? initialData.tagNames.join(", ")
+        isUpdating && initialData?.tags
+            ? initialData.tags.map((t: any) => t.name).join(", ")
             : "News",
     );
     // svelte-ignore state_referenced_locally
@@ -261,7 +261,7 @@
                     title={m.tags()}
                     icon={TagIcon}
                     mode="embedded"
-                    initialItems={initialData?.tagNames?.map((t: string) => ({ name: t })) || []}
+                    initialItems={initialData?.tags || []}
                     listItemsRemote={listTagsRemote}
                     onchange={(ids, items) => {
                         tagsString = items.map(i => i.name).join(", ");
@@ -294,7 +294,8 @@
                     {#snippet renderItemLabel(tag)}
                         {tag.name}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id })}
+                    {#snippet renderForm({ remoteFunction, schema, initialData: formData, onSuccess, onCancel, id })}
+                        {@const rf = typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction}
                         <div class="space-y-4 p-4">
                             <div>
                                 <label for="tag-name" class="block text-sm font-medium text-gray-700">{m.summary()}</label>
@@ -313,7 +314,7 @@
                                     type="button" 
                                     loading={rf.pending}
                                     onclick={async () => {
-                                        const res = await rf.submit();
+                                        const res = await (rf as any).submit();
                                         if (res?.success !== false) {
                                             onSuccess(res);
                                         }

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import * as m from "$lib/paraglide/messages";
-    import { type Event } from "@ac/validations";
+    import { type Event, type Tag } from "@ac/validations";
     import { deleteEvents as deleteEventAction } from "../../../routes/events/[id]/delete.remote";
     import { deleteSeries as deleteSeriesAction } from "../../../routes/events/[id]/delete-series.remote";
 
@@ -211,9 +211,9 @@
     let showRecurrenceDialog = $state(false);
 
     // svelte-ignore state_referenced_locally
-    let tags = $state<string[]>(initialData?.tags || []);
+    let tags = $state<Tag[]>(initialData?.tags || []);
     // svelte-ignore state_referenced_locally
-    let tagsString = $state(tags.join(", "));
+    let tagsString = $state(tags.map(t => t.name).join(", "));
     // svelte-ignore state_referenced_locally
     let heroImage = $state(initialData?.heroImage ?? "");
 
@@ -674,7 +674,7 @@
                     title={m.tags()}
                     icon={TagIcon}
                     mode="embedded"
-                    initialItems={initialData?.tags?.map((t: string) => ({ name: t })) || []}
+                    initialItems={initialData?.tags || []}
                     listItemsRemote={listTagsRemote}
                     onchange={(ids, items) => {
                         tagsString = items.map(i => i.name).join(", ");
@@ -713,7 +713,8 @@
                     {#snippet renderItemLabel(tag)}
                         {tag.name}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id })}
+                    {#snippet renderForm({ remoteFunction, schema, initialData: formData, onSuccess, onCancel, id })}
+                        {@const rf = typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction}
                         <div class="space-y-4 p-4">
                             <div>
                                 <label for="tag-name" class="block text-sm font-medium text-gray-700">{m.summary()}</label>
@@ -732,7 +733,7 @@
                                     type="button" 
                                     loading={rf.pending}
                                     onclick={async () => {
-                                        const res = await rf.submit();
+                                        const res = await (rf as any).submit();
                                         if (res?.success !== false) {
                                             onSuccess(res);
                                         }
