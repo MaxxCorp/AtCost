@@ -165,7 +165,7 @@ export async function generateContactAssets(contactId: string, origin?: string) 
     
     let vCardUrl = oldVCardPath;
     if (vCardFingerprint !== fingerprints.vcard || !oldVCardPath || !oldVCardPath.includes(fullNameSlug)) {
-        vCardUrl = await storage.put(vCardFileName, vCardContent, 'text/vcard');
+        vCardUrl = (await storage.put(vCardFileName, vCardContent, 'text/vcard')) ?? null;
         newFingerprints.vcard = vCardFingerprint;
     }
 
@@ -194,7 +194,7 @@ export async function generateContactAssets(contactId: string, origin?: string) 
         });
 
         const qrCodeFileName = `contacts/${contactId}/qr.png`;
-        qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
+        qrCodeUrl = (await storage.put(qrCodeFileName, qrBuffer, 'image/png')) ?? null;
 
         const publicQrCodeFileName = `contacts/${contactId}/qr_public.png`;
         await storage.put(publicQrCodeFileName, qrBuffer, 'image/png');

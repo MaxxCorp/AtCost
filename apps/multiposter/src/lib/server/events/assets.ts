@@ -120,7 +120,7 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     let iCalUrl = oldICalPath;
     // Only upload if content changed OR filename (path) changed
     if (iCalFingerprint !== fingerprints.ical || !oldICalPath || !oldICalPath.includes(summarySlug)) {
-        iCalUrl = await storage.put(iCalFileName, iCalContent, 'text/calendar');
+        iCalUrl = (await storage.put(iCalFileName, iCalContent, 'text/calendar')) ?? null;
         newFingerprints.ical = iCalFingerprint;
     }
 
@@ -143,7 +143,7 @@ export async function generateEventAssets(eventId: string, origin?: string) {
         });
 
         const qrCodeFileName = `events/${eventId}/qr.png`;
-        qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
+        qrCodeUrl = (await storage.put(qrCodeFileName, qrBuffer, 'image/png')) ?? null;
         newFingerprints.qrcode = eventUrlFingerprint;
     }
 
