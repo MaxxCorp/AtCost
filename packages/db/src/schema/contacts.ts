@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, uuid, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, index, primaryKey, jsonb } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 // --- CONTACT TABLES ---
@@ -23,6 +23,7 @@ export const contact = pgTable("contact", {
     isPublic: boolean("is_public").default(false).notNull(),
     vCardPath: text("vcard_path"),
     qrCodePath: text("qrcode_path"),
+    fingerprints: jsonb("fingerprints").$type<Record<string, string>>().default({}).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (table) => [

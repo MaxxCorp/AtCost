@@ -5,6 +5,11 @@ import QRCode from 'qrcode';
 import ICAL from 'ical.js';
 import { getStorageProvider } from '../blob-storage';
 import { env } from '$env/dynamic/private';
+import { createHash } from 'crypto';
+
+function getFingerprint(content: string | Buffer): string {
+    return createHash('sha256').update(content).digest('hex');
+}
 
 /**
  * Generate iCal and QR Code for an event
@@ -94,7 +99,8 @@ export async function generateEventAssets(eventId: string, origin?: string) {
         vevent.addPropertyWithValue('dtend', ICAL.Time.fromJSDate(data.endDateTime, true));
     }
 
-    vevent.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(new Date(), true));
+    // Use updatedAt for DTSTAMP to ensure stable fingerprints when data doesn't change
+    vevent.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(data.updatedAt, true));
 
     vcalendar.addSubcomponent(vevent);
 
@@ -103,32 +109,51 @@ export async function generateEventAssets(eventId: string, origin?: string) {
 
     const oldICalPath = data.iCalPath;
     const oldQRCodePath = data.qrCodePath;
+    const fingerprints = (data.fingerprints as Record<string, string>) || {};
+    const newFingerprints = { ...fingerprints };
 
-    // iCal Upload
+    // iCal Generation & Upload
+    const iCalContent = vcalendar.toString();
+    const iCalFingerprint = getFingerprint(iCalContent);
     const iCalFileName = `events/${eventId}/${summarySlug}.ics`;
-    const iCalUrl = await storage.put(iCalFileName, vcalendar.toString(), 'text/calendar');
+    
+    let iCalUrl = oldICalPath;
+    // Only upload if content changed OR filename (path) changed
+    if (iCalFingerprint !== fingerprints.ical || !oldICalPath || !oldICalPath.includes(summarySlug)) {
+        iCalUrl = await storage.put(iCalFileName, iCalContent, 'text/calendar');
+        newFingerprints.ical = iCalFingerprint;
+    }
 
     // QR Code generation — resolve base URL with multiple fallbacks
     const baseUrl = env.PUBLIC_BASE_URL || origin || env.BETTER_AUTH_URL || "";
     const eventUrl = `${baseUrl}/events/${eventId}/view`;
+    const eventUrlFingerprint = getFingerprint(eventUrl);
 
-    // Generate QR as Buffer
-    const qrBuffer = await QRCode.toBuffer(eventUrl, {
-        width: 300,
-        margin: 2,
-        color: {
-            dark: '#1e40af', // blue-800
-            light: '#ffffff'
-        }
-    });
+    let qrCodeUrl = oldQRCodePath;
+    // Only generate and upload QR if URL changed (or path missing)
+    if (eventUrlFingerprint !== fingerprints.qrcode || !oldQRCodePath) {
+        // Generate QR as Buffer
+        const qrBuffer = await QRCode.toBuffer(eventUrl, {
+            width: 300,
+            margin: 2,
+            color: {
+                dark: '#1e40af', // blue-800
+                light: '#ffffff'
+            }
+        });
 
-    const qrCodeFileName = `events/${eventId}/qr.png`;
-    const qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
+        const qrCodeFileName = `events/${eventId}/qr.png`;
+        qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
+        newFingerprints.qrcode = eventUrlFingerprint;
+    }
 
-    // Update paths in DB
+    // Update paths and fingerprints in DB
     const updateData: any = {};
-    if (iCalUrl) updateData.iCalPath = iCalUrl;
-    if (qrCodeUrl) updateData.qrCodePath = qrCodeUrl;
+    if (iCalUrl && iCalUrl !== oldICalPath) updateData.iCalPath = iCalUrl;
+    if (qrCodeUrl && qrCodeUrl !== oldQRCodePath) updateData.qrCodePath = qrCodeUrl;
+    if (JSON.stringify(newFingerprints) !== JSON.stringify(fingerprints)) {
+        updateData.fingerprints = newFingerprints;
+    }
 
     if (Object.keys(updateData).length > 0) {
         await db.update(eventTable)
@@ -137,10 +162,10 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     }
 
     // Clean up old assets if paths changed
-    if (oldICalPath && oldICalPath !== iCalUrl) {
+    if (oldICalPath && iCalUrl && oldICalPath !== iCalUrl) {
         await storage.delete(oldICalPath);
     }
-    if (oldQRCodePath && oldQRCodePath !== qrCodeUrl) {
+    if (oldQRCodePath && qrCodeUrl && oldQRCodePath !== qrCodeUrl) {
         await storage.delete(oldQRCodePath);
     }
 }

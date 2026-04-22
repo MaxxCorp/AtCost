@@ -8,6 +8,11 @@ import QRCode from 'qrcode';
 import ICAL from 'ical.js';
 import { getStorageProvider } from './blob-storage';
 import { env } from '$env/dynamic/private';
+import { createHash } from 'crypto';
+
+function getFingerprint(content: string | Buffer): string {
+    return createHash('sha256').update(content).digest('hex');
+}
 
 /**
  * Backend logic for managing contacts and their associations.
@@ -150,35 +155,60 @@ export async function generateContactAssets(contactId: string, origin?: string) 
 
     const oldVCardPath = data.vCardPath;
     const oldQrCodePath = data.qrCodePath;
+    const fingerprints = (data.fingerprints as Record<string, string>) || {};
+    const newFingerprints = { ...fingerprints };
 
-    // Upload vCards
+    // Full vCard Upload
+    const vCardContent = card.toString();
+    const vCardFingerprint = getFingerprint(vCardContent);
     const vCardFileName = `contacts/${contactId}/${fullNameSlug}.vcf`;
-    const vCardUrl = await storage.put(vCardFileName, card.toString(), 'text/vcard');
+    
+    let vCardUrl = oldVCardPath;
+    if (vCardFingerprint !== fingerprints.vcard || !oldVCardPath || !oldVCardPath.includes(fullNameSlug)) {
+        vCardUrl = await storage.put(vCardFileName, vCardContent, 'text/vcard');
+        newFingerprints.vcard = vCardFingerprint;
+    }
 
+    // Public vCard Upload
+    const publicVCardContent = publicCard.toString();
+    const publicVCardFingerprint = getFingerprint(publicVCardContent);
     const publicVCardFileName = `contacts/${contactId}/${fullNameSlug}_public.vcf`;
-    await storage.put(publicVCardFileName, publicCard.toString(), 'text/vcard');
+    
+    if (publicVCardFingerprint !== fingerprints.vcard_public) {
+        await storage.put(publicVCardFileName, publicVCardContent, 'text/vcard');
+        newFingerprints.vcard_public = publicVCardFingerprint;
+    }
 
     // QR Code generation — resolve base URL with multiple fallbacks
     const baseUrl = env.PUBLIC_BASE_URL || origin || env.BETTER_AUTH_URL || "";
     const contactUrl = `${baseUrl}/contacts/${contactId}/view`;
+    const contactUrlFingerprint = getFingerprint(contactUrl);
 
-    // Generate QR as Buffer
-    const qrBuffer = await QRCode.toBuffer(contactUrl, {
-        width: 300,
-        margin: 2,
-        color: { dark: '#1e40af', light: '#ffffff' }
-    });
+    let qrCodeUrl = oldQrCodePath;
+    if (contactUrlFingerprint !== fingerprints.qrcode || !oldQrCodePath) {
+        // Generate QR as Buffer
+        const qrBuffer = await QRCode.toBuffer(contactUrl, {
+            width: 300,
+            margin: 2,
+            color: { dark: '#1e40af', light: '#ffffff' }
+        });
 
-    const qrCodeFileName = `contacts/${contactId}/qr.png`;
-    const qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
+        const qrCodeFileName = `contacts/${contactId}/qr.png`;
+        qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
 
-    const publicQrCodeFileName = `contacts/${contactId}/qr_public.png`;
-    await storage.put(publicQrCodeFileName, qrBuffer, 'image/png');
+        const publicQrCodeFileName = `contacts/${contactId}/qr_public.png`;
+        await storage.put(publicQrCodeFileName, qrBuffer, 'image/png');
+        
+        newFingerprints.qrcode = contactUrlFingerprint;
+    }
 
-    // Update paths in DB
+    // Update paths and fingerprints in DB
     const updateData: any = {};
-    if (vCardUrl) updateData.vCardPath = vCardUrl;
-    if (qrCodeUrl) updateData.qrCodePath = qrCodeUrl;
+    if (vCardUrl && vCardUrl !== oldVCardPath) updateData.vCardPath = vCardUrl;
+    if (qrCodeUrl && qrCodeUrl !== oldQrCodePath) updateData.qrCodePath = qrCodeUrl;
+    if (JSON.stringify(newFingerprints) !== JSON.stringify(fingerprints)) {
+        updateData.fingerprints = newFingerprints;
+    }
 
     if (Object.keys(updateData).length > 0) {
         await db.update(contact)
@@ -187,8 +217,8 @@ export async function generateContactAssets(contactId: string, origin?: string) 
     }
 
     // Clean up old assets if paths changed
-    if (oldVCardPath && oldVCardPath !== vCardUrl) await storage.delete(oldVCardPath);
-    if (oldQrCodePath && oldQrCodePath !== qrCodeUrl) await storage.delete(oldQrCodePath);
+    if (oldVCardPath && vCardUrl && oldVCardPath !== vCardUrl) await storage.delete(oldVCardPath);
+    if (oldQrCodePath && qrCodeUrl && oldQrCodePath !== qrCodeUrl) await storage.delete(oldQrCodePath);
 }
 
 

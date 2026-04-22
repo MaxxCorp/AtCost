@@ -47,6 +47,7 @@ export const event = pgTable("event", {
     heroImage: text("hero_image"),
     attendees: jsonb("attendees"),
     reminders: jsonb("reminders").$type<{ useDefault?: boolean; overrides?: any[] }>(),
+    fingerprints: jsonb("fingerprints").$type<Record<string, string>>().default({}).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 }, (table) => [

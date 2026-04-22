@@ -29,6 +29,13 @@
       "when": 1776586179509,
       "tag": "0003_useful_harrier",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776877025868,
+      "tag": "0004_known_glorian",
+      "breakpoints": true
     }
   ]
 }

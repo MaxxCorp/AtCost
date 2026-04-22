@@ -351,10 +351,6 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			}
 		}
 
-
-		console.log('Regenerating assets for master event via update.remote...');
-		await generateEventAssets(data.id, origin);
-
 		console.log('Event updated successfully, refreshing list...');
 
 		if (updatedEvent) {
