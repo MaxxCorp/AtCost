@@ -126,12 +126,15 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     const qrCodeUrl = await storage.put(qrCodeFileName, qrBuffer, 'image/png');
 
     // Update paths in DB
-    await db.update(eventTable)
-        .set({
-            iCalPath: iCalUrl,
-            qrCodePath: qrCodeUrl
-        })
-        .where(eq(eventTable.id, eventId));
+    const updateData: any = {};
+    if (iCalUrl) updateData.iCalPath = iCalUrl;
+    if (qrCodeUrl) updateData.qrCodePath = qrCodeUrl;
+
+    if (Object.keys(updateData).length > 0) {
+        await db.update(eventTable)
+            .set(updateData)
+            .where(eq(eventTable.id, eventId));
+    }
 
     // Clean up old assets if paths changed
     if (oldICalPath && oldICalPath !== iCalUrl) {

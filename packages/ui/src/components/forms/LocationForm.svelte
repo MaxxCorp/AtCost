@@ -96,7 +96,7 @@
 
 <form
     class="space-y-4"
-    {...(rf as any).preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
+    {...remoteFunction.preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
             const handle = rf;
             submissionTriggered = false;
             try {

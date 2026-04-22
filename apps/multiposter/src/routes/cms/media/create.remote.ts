@@ -32,6 +32,13 @@ export const uploadMedia = command(uploadImageSchema, async (data) => {
         const provider = getStorageProvider();
         const url = await provider.put(path, buffer, contentType);
 
+        if (!url) {
+            return {
+                success: false,
+                error: 'Storage operation failed or limit reached. Please try again later.'
+            };
+        }
+
         // Save to database
         const [record] = await db.insert(cmsMedia).values({
             url,

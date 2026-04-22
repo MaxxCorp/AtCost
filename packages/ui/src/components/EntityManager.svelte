@@ -539,7 +539,9 @@
     async function handleQuickCreateSuccess(result: any) {
         showQuickCreate = false;
 
-        if (result?.id) {
+        const newId = result?.id || result?.tag?.id || result?.data?.id;
+
+        if (newId) {
             const res: any = await listItemsRemote(currentParams);
             const items = Array.isArray(res) ? res : (res?.data ?? []);
 
@@ -550,7 +552,7 @@
                     : (res?.total ?? items.length);
                 toast.success(`${title} created`);
             } else {
-                const newItem = items.find((i: any) => i.id === result.id);
+                const newItem = items.find((i: any) => i.id === newId);
                 if (newItem) {
                     if (entityId && addAssociationRemote) {
                         await addAssociationRemote({

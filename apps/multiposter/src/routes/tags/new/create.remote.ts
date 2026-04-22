@@ -11,7 +11,7 @@ const createTagSchema = v.object({
 
 export const createTag = form(createTagSchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, "admin");
+    ensureAccess(user, "events");
 
     // Check if tag already exists for this user
     const existing = await db.query.tag.findFirst({

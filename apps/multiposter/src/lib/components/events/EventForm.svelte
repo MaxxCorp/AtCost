@@ -713,36 +713,44 @@
                     {#snippet renderItemLabel(tag)}
                         {tag.name}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction, schema, initialData: formData, onSuccess, onCancel, id })}
-                        {@const rf = typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction}
-                        <div class="space-y-4 p-4">
+                    {#snippet renderForm({ remoteFunction: rfState, schema, initialData: formData, onSuccess, onCancel, id })}
+                        <form
+                            {...rfState.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
+                                try {
+                                    const res = await submit();
+                                    if (res && res.success !== false) {
+                                        onSuccess(res);
+                                    }
+                                } catch (err) {
+                                    console.error("[EventForm] Quick Create Error:", err);
+                                }
+                            })}
+                            class="space-y-4 p-4"
+                        >
+                            {#if id && rfState.fields?.id}
+                                <input {...rfState.fields.id.as("hidden", id)} />
+                            {/if}
                             <div>
                                 <label for="tag-name" class="block text-sm font-medium text-gray-700">{m.summary()}</label>
                                 <input 
-                                    {...rf.fields.name.as("text")}
+                                    {...rfState.fields.name.as("text")}
                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                     value={formData?.name ?? ""}
                                 />
-                                {#each rf.fields.name.issues() as issue}
+                                {#each rfState.fields.name.issues() as issue}
                                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                                 {/each}
                             </div>
                             <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" onclick={onCancel}>{m.cancel()}</Button>
+                                <Button variant="outline" type="button" onclick={onCancel}>{m.cancel()}</Button>
                                 <AsyncButton 
-                                    type="button" 
-                                    loading={rf.pending}
-                                    onclick={async () => {
-                                        const res = await (rf as any).submit();
-                                        if (res?.success !== false) {
-                                            onSuccess(res);
-                                        }
-                                    }}
+                                    type="submit" 
+                                    loading={rfState.pending}
                                 >
                                     {id ? m.save_changes() : m.create_item({ item: "Tag" })}
                                 </AsyncButton>
                             </div>
-                        </div>
+                        </form>
                     {/snippet}
                 </EntityManager>
             </div>

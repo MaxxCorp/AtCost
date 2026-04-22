@@ -6,7 +6,7 @@ export interface BlobStorageProvider {
      * @param contentType MIME type of the content
      * @returns The public URL of the uploaded asset
      */
-    put(path: string, content: Buffer | string, contentType: string): Promise<string>;
+    put(path: string, content: Buffer | string, contentType: string): Promise<string | undefined>;
 
     /**
      * Delete an asset from the storage provider

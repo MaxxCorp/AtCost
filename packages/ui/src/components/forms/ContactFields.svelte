@@ -451,16 +451,16 @@
                     {#snippet renderItemLabel(tag)}
                         {tag.name}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction: rf, schema, initialData: formData, onSuccess, onCancel, id })}
+                    {#snippet renderForm({ remoteFunction: state, schema, initialData: formData, onSuccess, onCancel, id })}
                         <div class="space-y-4 p-4">
                             <div>
                                 <label for="tag-name" class="block text-sm font-medium text-gray-700">{i18n.summary}</label>
                                 <input 
-                                    {...rf.fields.name.as("text")}
+                                    {...state.fields.name.as("text")}
                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                     value={formData?.name ?? ""}
                                 />
-                                {#each rf.fields.name.issues() as issue}
+                                {#each state.fields.name.issues() as issue}
                                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                                 {/each}
                             </div>
@@ -468,11 +468,15 @@
                                 <Button variant="outline" onclick={onCancel}>Cancel</Button>
                                 <AsyncButton 
                                     type="button" 
-                                    loading={rf.pending}
+                                    loading={state.pending}
                                     onclick={async () => {
-                                        const res = await rf.submit();
-                                        if (res?.success !== false) {
-                                            onSuccess(res);
+                                        try {
+                                            const res = await state.submit();
+                                            if (res && res.success !== false) {
+                                                onSuccess(res);
+                                            }
+                                        } catch (err) {
+                                            console.error("[ContactFields] Quick Create Error:", err);
                                         }
                                     }}
                                 >

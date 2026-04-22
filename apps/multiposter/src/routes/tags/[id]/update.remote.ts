@@ -13,7 +13,7 @@ const updateTagSchema = v.object({
 
 export const updateTag = form(updateTagSchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, "admin");
+    ensureAccess(user, "events");
 
     const [updatedTag] = await db.update(tag)
         .set({ name: input.name })

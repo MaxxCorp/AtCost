@@ -176,12 +176,15 @@ export async function generateContactAssets(contactId: string, origin?: string) 
     await storage.put(publicQrCodeFileName, qrBuffer, 'image/png');
 
     // Update paths in DB
-    await db.update(contact)
-        .set({
-            vCardPath: vCardUrl,
-            qrCodePath: qrCodeUrl
-        })
-        .where(eq(contact.id, contactId));
+    const updateData: any = {};
+    if (vCardUrl) updateData.vCardPath = vCardUrl;
+    if (qrCodeUrl) updateData.qrCodePath = qrCodeUrl;
+
+    if (Object.keys(updateData).length > 0) {
+        await db.update(contact)
+            .set(updateData)
+            .where(eq(contact.id, contactId));
+    }
 
     // Clean up old assets if paths changed
     if (oldVCardPath && oldVCardPath !== vCardUrl) await storage.delete(oldVCardPath);

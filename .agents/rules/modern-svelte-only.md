@@ -43,3 +43,4 @@ trigger: always_on
   - Direct DOM manipulation.
   - Analytics and logging.
 - **Async Data**: For asynchronous data loading in the script, prefer handling promises via `{#await}` in the template or using `$derived` if the result needs to be reactive.
+- **Simplicity and Svelte idiomatics**: If you are building massive abstractions or conversions, you are likely to do something wrong, as Svelte + Sveltekit are designed to offer solutions that require little code in most cases. go to svelte.dev documentation or consult the svelte MCP, when in doubt to see, whether there is a simpler way.
