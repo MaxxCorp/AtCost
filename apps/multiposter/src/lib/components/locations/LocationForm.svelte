@@ -1,8 +1,27 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
-    import { LocationForm } from "@ac/ui";
+    import { LocationForm, EntityManager } from "@ac/ui";
     import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
-    import type { Snippet } from "svelte";
+    import { onMount, type Snippet } from "svelte";
+    import { User, MapPin } from "@lucide/svelte";
+    import { listContacts } from "../../../routes/contacts/list.remote";
+    import {
+        addAssociation,
+        removeAssociation,
+        fetchEntityContacts,
+    } from "../../../routes/contacts/associate.remote";
+    import { createContact } from "../../../routes/contacts/new/create.remote";
+    import { updateContact } from "../../../routes/contacts/[id]/update.remote";
+    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
+    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import {
+        createContactSchema,
+        updateContactSchema,
+        type Contact,
+    } from "$lib/validations/contacts";
+    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import { toast } from "svelte-sonner";
+    import * as v from "valibot";
 
     interface Props {
         remoteFunction: any;
@@ -43,6 +62,8 @@
         }
         return current ?? def;
     }
+
+    let selectedContactIds = $state<string[]>([]);
 </script>
 
 <LocationForm
@@ -53,7 +74,6 @@
     {onSuccess}
     {onCancel}
     {cancelHref}
-    {children}
     labels={{
         name: m.location_name(),
         street: m.street(),
@@ -99,5 +119,113 @@
                 <input {...getField("heroImage").as("hidden", heroImage)} />
             {/if}
         </div>
+    {/snippet}
+
+    {#snippet children()}
+        <div class="mt-8 border-t pt-8">
+            <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                <User size={18} class="text-blue-600" />
+                {m.contacts()}
+            </h3>
+            <EntityManager
+                title={m.contacts()}
+                icon={User}
+                mode="embedded"
+                type="location"
+                entityId={initialData?.id || ""}
+                listItemsRemote={listContacts as any}
+                fetchAssociationsRemote={fetchEntityContacts as any}
+                addAssociationRemote={async (p: any) =>
+                    addAssociation({
+                        ...p,
+                        contactId: p.itemId,
+                    } as any)}
+                removeAssociationRemote={async (p: any) =>
+                    removeAssociation({
+                        ...p,
+                        contactId: p.itemId,
+                    } as any)}
+                deleteItemRemote={async (ids: string[]) => {
+                    return await handleDelete({
+                        ids,
+                        deleteFn: deleteContact,
+                        itemName: m.contacts().toLowerCase(),
+                    });
+                }}
+                createRemote={createContact}
+                createSchema={createContactSchema}
+                updateRemote={updateContact}
+                updateSchema={updateContactSchema}
+                getFormData={((c: any) => ({
+                    contact: c as Contact,
+                    emails: (c as Contact).emails,
+                    phones: (c as Contact).phones,
+                    addresses: (c as Contact).addresses,
+                    relations: (c as Contact).relations,
+                    tags: (c as Contact).tags,
+                    locationAssociations: (c as Contact).locationAssociations,
+                })) as any}
+                searchPredicate={((c: any, q: string) => {
+                    const contact = c as Contact;
+                    const name = (
+                        contact.displayName ||
+                        `${contact.givenName || ""} ${contact.familyName || ""}`
+                    ).toLowerCase();
+                    return name.includes(q.toLowerCase());
+                }) as any}
+                loadingLabel={m.loading_item({ item: m.contacts() })}
+                noItemsLabel={m.no_items_associated_label({
+                    item: m.contacts(),
+                })}
+                noItemsFoundLabel={m.no_items_found({
+                    item: m.contacts(),
+                })}
+                searchPlaceholder={m.search_placeholder({
+                    item: m.contacts(),
+                })}
+                linkItemLabel={m.link_item_label({ item: m.contacts() })}
+                associatedItemLabel={m.associated_item_label({
+                    item: m.contacts(),
+                })}
+                quickCreateLabel={m.quick_create()}
+                closeSearchLabel={m.close_search()}
+                editLabel={m.edit()}
+                deleteLabel={m.delete()}
+                unlinkLabel={m.unlink()}
+                deleteForeverLabel={m.delete_forever({
+                    item: m.contact(),
+                })}
+                bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                selectAllLabel={m.select_all()}
+                deselectAllLabel={m.deselect_all()}
+                confirmUnlinkLabel={m.confirm_unlink_label({
+                    item: m.contact(),
+                })}
+            >
+                {#snippet renderItemLabel(contact: any)}
+                    {contact.displayName ||
+                        `${contact.givenName || ""} ${contact.familyName || ""}` ||
+                        m.unnamed_contact()}
+                {/snippet}
+                {#snippet renderForm({
+                    remoteFunction: rf,
+                    schema,
+                    initialData: formData,
+                    onSuccess,
+                    onCancel,
+                    id,
+                }: any)}
+                    <ContactForm
+                        remoteFunction={rf}
+                        {schema}
+                        initialData={formData}
+                        {onSuccess}
+                        {onCancel}
+                        contactId={id}
+                    />
+                {/snippet}
+            </EntityManager>
+        </div>
+        {@render children?.()}
     {/snippet}
 </LocationForm>
