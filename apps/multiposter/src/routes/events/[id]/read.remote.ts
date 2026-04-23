@@ -113,9 +113,10 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		} as any;
 	}
 
+	const { locations: _l, contacts: _c, resources: _r, tags: _t, campaign: _camp, ...eventWithoutRelations } = result;
 	// Full object
 	return {
-		...result,
+		...eventWithoutRelations,
 		createdAt: result.createdAt.toISOString(),
 		updatedAt: result.updatedAt.toISOString(),
 		startDateTime: result.startDateTime?.toISOString() ?? null,
@@ -123,6 +124,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		resourceIds: result.resources.map(r => r.resourceId),
 		contactIds: result.contacts.map(c => c.contactId),
 		locationIds: result.locations.map(l => l.locationId),
+		locations: result.locations.map(l => l.location),
 		tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 		syncIds: (result.campaign?.content as any)?.syncIds || [],
 		resolvedContact,

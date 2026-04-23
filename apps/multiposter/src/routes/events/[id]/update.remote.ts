@@ -406,8 +406,9 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				};
 			}
 
+			const { locations: _l, contacts: _c, resources: _r, tags: _t, campaign: _camp, ...eventWithoutRelations } = fullEventData;
 			const transformed = {
-				...fullEventData,
+				...eventWithoutRelations,
 				createdAt: fullEventData.createdAt.toISOString(),
 				updatedAt: fullEventData.updatedAt.toISOString(),
 				startDateTime: fullEventData.startDateTime?.toISOString() ?? null,
@@ -415,6 +416,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				resourceIds: fullEventData.resources.map(r => r.resourceId),
 				contactIds: fullEventData.contacts.map(c => c.contactId),
 				locationIds: fullEventData.locations.map(l => l.locationId),
+				locations: fullEventData.locations.map(l => l.location),
 				tags: fullEventData.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 				syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
 				resolvedContact,
