@@ -53,8 +53,8 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
         }
 
         const updated = result[0];
-        await (readLocation(data.id) as any).set(updated);
-        await (listLocations as any).refresh();
+        readLocation(data.id).set(updated);
+        void listLocations.refresh();
 
         console.log('--- updateLocation SUCCESS ---');
         return { success: true, location: updated };

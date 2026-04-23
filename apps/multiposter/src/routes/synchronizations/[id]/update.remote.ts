@@ -50,8 +50,8 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 			throw new Error('Update failed');
 		}
 
-		await (viewSynchronization(id) as any).set(updated);
-		await (listSynchronizations as any).refresh();
+		viewSynchronization(id).set(updated);
+		void listSynchronizations().refresh();
 
 		console.log('--- updateSynchronization SUCCESS ---');
 		return { success: true, synchronization: updated };

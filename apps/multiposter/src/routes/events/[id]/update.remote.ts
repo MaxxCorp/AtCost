@@ -419,9 +419,9 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
 				resolvedContact,
 			};
-			await (readEvent(data.id) as any).set(transformed);
+			readEvent(data.id).set(transformed);
 		} else {
-			await (readEvent(data.id) as any).refresh();
+			void readEvent(data.id).refresh();
 		}
 
 		void listEvents().refresh();

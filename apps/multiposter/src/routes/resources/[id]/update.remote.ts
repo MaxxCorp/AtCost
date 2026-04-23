@@ -128,10 +128,10 @@ export const updateResource = form(updateResourceSchema, async (data) => {
             locationIds: updated.locationIds || [],
             contactIds: updated.contactIds || []
         };
-        
-        await (readResource(data.id) as any).set(updatedResource);
-        await (listResources as any).refresh();
-        await (listResourcesWithHierarchy as any).refresh();
+
+        readResource(data.id).set(updatedResource);
+        void listResources().refresh();
+        void listResourcesWithHierarchy().refresh();
 
         console.log('--- updateResource SUCCESS ---');
         return { success: true, resource: updated };

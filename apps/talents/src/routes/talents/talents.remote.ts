@@ -1,11 +1,11 @@
 import { query, form, command } from '$app/server';
 import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql } from '$lib/server/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
-import { 
-    talentTimelineEntrySchema, 
-    unifiedTalentSchema, 
+import {
+    talentTimelineEntrySchema,
+    unifiedTalentSchema,
     talentPaginationSchema as PaginationSchema,
-    type PaginatedResult 
+    type PaginatedResult
 } from '@ac/validations';
 import * as v from 'valibot';
 import { readTalent as readTalentService, type TalentProfile } from '$lib/server/talents/service';
@@ -133,7 +133,7 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
 
             await tx.delete(locationContact).where(eq(locationContact.contactId, contactId));
             if (locationIds.length > 0) {
-                await tx.insert(locationContact).values(locationIds.map((lid: string) => ({ 
+                await tx.insert(locationContact).values(locationIds.map((lid: string) => ({
                     locationId: lid,
                     contactId
                 })));
@@ -186,44 +186,11 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             return { talentId, contactId };
         });
 
-        // Construct local object to avoid re-fetching relations we already have
+        // Refresh the detail view and list to ensure client-side data is in sync
         if (result.talentId) {
-            const transformed = {
-                id: result.talentId,
-                contactId: result.contactId,
-                status: talentData.status,
-                jobTitle: talentData.jobTitle,
-                salaryExpectation: talentData.salaryExpectation,
-                availabilityDate: talentData.availabilityDate || null,
-                onboardingStatus: talentData.onboardingStatus,
-                resumeUrl: talentData.resumeUrl,
-                source: talentData.source,
-                internalNotes: talentData.internalNotes,
-                updatedAt: new Date().toISOString(),
-                contact: {
-                    id: result.contactId,
-                    displayName: contactData.displayName,
-                    givenName: contactData.givenName,
-                    familyName: contactData.familyName,
-                    birthday: contactData.birthday || null,
-                    role: contactData.role,
-                    department: contactData.department,
-                    notes: contactData.notes,
-                    emails: emails,
-                    phones: phones,
-                    addresses: addresses,
-                    tags: tags,
-                    locationIds: locationIds,
-                    // Minimal hydrated structure to prevent crashes
-                    locationAssociations: locationIds.map((lid: string) => ({ locationId: lid, location: { id: lid } })),
-                },
-                timelineEntries: [], // Will refresh on next read
-            };
-            await (readTalent(result.talentId) as any).set(transformed);
-        } else {
-            await (readTalent(result.talentId) as any).refresh();
+            void readTalent(result.talentId).refresh();
         }
-        await (listTalents as any).refresh();
+        void listTalents().refresh();
 
         return { success: true, id: result.talentId };
     } catch (err: any) {
@@ -257,7 +224,7 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
             .innerJoin(talent, eq(talent.contactId, userContact.contactId))
             .where(eq(userContact.userId, authUser.id))
             .limit(1);
-        
+
         if (talentLink[0]) {
             console.log('[getMyTalentProfile] Step 2 match found:', talentLink[0].talentId);
             const profile = await readTalentService(talentLink[0].talentId);
@@ -274,7 +241,7 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
             .innerJoin(contact, eq(contact.id, talent.contactId))
             .where(eq(contact.userId, authUser.id))
             .limit(1);
-        
+
         if (directContactLink[0]) {
             console.log('[getMyTalentProfile] Step 2.5 (ownership) match found:', directContactLink[0].talentId);
             const profile = await readTalentService(directContactLink[0].talentId);
@@ -293,7 +260,7 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
                 .innerJoin(contactEmail, eq(contact.id, contactEmail.contactId))
                 .where(eq(sql`LOWER(${contactEmail.value})`, authUser.email.toLowerCase()))
                 .limit(1);
-                
+
             if (emailMatch[0]) {
                 const profile = await readTalentService(emailMatch[0].talentId);
                 if (profile) return profile;
@@ -335,12 +302,12 @@ export const listSystemUsers = query(v.undefined_(), async (): Promise<any[]> =>
 export const listTags = query(PaginationSchema, async (input) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'talents');
-    
+
     // Using a more robust way to get tag for tags search
     const results = await db.select({
         id: tag.id,
         name: tag.name
     }).from(tag);
-    
+
     return { data: results, total: results.length };
 });
