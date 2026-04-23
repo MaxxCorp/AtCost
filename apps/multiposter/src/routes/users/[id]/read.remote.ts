@@ -11,7 +11,9 @@ import * as v from 'valibot';
  */
 export const readUser = query(v.string(), async (userId: string): Promise<User | null> => {
     const currentUser = getAuthenticatedUser();
-    ensureAccess(currentUser, 'users');
+    if (currentUser.id !== userId) {
+        ensureAccess(currentUser, 'users');
+    }
 
     const [result] = await db.select().from(user).where(eq(user.id, userId));
     return result || null;

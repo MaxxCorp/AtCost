@@ -14,14 +14,16 @@ export const updateUser = form(updateUserSchema, async (data) => {
 
     try {
         const currentUser = getAuthenticatedUser();
-        ensureAccess(currentUser, 'users');
         console.log('User authenticated:', currentUser.id);
 
-        // Strict access control: only admin or self can update
         const roles = parseRoles(currentUser);
         const isAdmin = roles.includes('admin');
-        if (!isAdmin && currentUser.id !== data.id) {
-            error(403, 'You do not have permission to update this user');
+        const isSelf = currentUser.id === data.id;
+
+        // Strict access control: only admin or self can update.
+        // If not self and not admin, must have 'users' management access.
+        if (!isSelf && !isAdmin) {
+            ensureAccess(currentUser, 'users');
         }
 
         const updateData: any = {
@@ -51,8 +53,8 @@ export const updateUser = form(updateUserSchema, async (data) => {
         const updated = result[0];
 
         // Refresh lists/reads
-        await (readUser(data.id) as any).set(updated);
-        await (listUsers as any).refresh();
+        readUser(data.id).set(updated);
+        void listUsers().refresh();
 
         console.log('--- updateUser SUCCESS ---');
         return { success: true, user: updated };

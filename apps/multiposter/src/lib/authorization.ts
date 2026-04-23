@@ -44,23 +44,23 @@ export function hasAccess(user: UserWithRolesAndClaims | null | undefined, featu
 	const claims = parseClaims<Record<string, any>>(user);
 	if (!claims) return false;
 
-	const claimValue = claims[feature];
+	const claimValue = claims[feature] ?? claims[`multiposter.${feature}`];
 
 	// If the claim is explicitly true, the user has full (admin) access
 	if (claimValue === true) return true;
 
 	// Handle feature-specific granular levels
 	if (feature === 'synchronizations') {
+		const syncClaim = claimValue ?? claims['calendarSyncs'] ?? claims['multiposter.calendarSyncs'];
 		if (level === 'use') {
 			// 'admin' level also implies 'use' level
-			return claimValue === 'use' || claimValue === 'admin' || claims['calendarSyncs'] === true;
+			return syncClaim === 'use' || syncClaim === 'admin' || syncClaim === true;
 		}
 		if (level === 'admin') {
-			return claimValue === 'admin' || claims['calendarSyncs'] === true;
+			return syncClaim === 'admin' || syncClaim === true;
 		}
 	}
 
 	// Default: check for the feature key (boolean or truthy)
 	return !!claimValue;
 }
-
