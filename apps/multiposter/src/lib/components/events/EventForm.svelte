@@ -10,7 +10,7 @@
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete, EntityManager, LocationForm } from "@ac/ui";
     import type { updateEvent } from "../../../routes/events/[id]/update.remote";
     import type { createEvent } from "../../../routes/events/new/create.remote";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
@@ -19,9 +19,7 @@
     import { type Location } from "@ac/validations";
 
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import LocationForm from "$lib/components/locations/LocationForm.svelte";
     import { onMount, type Snippet } from "svelte";
-    import { EntityManager } from "@ac/ui";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
 
@@ -36,14 +34,14 @@
     import {
         createContactSchema,
         updateContactSchema,
-    } from "$lib/validations/contacts";
+    } from "@ac/validations";
     import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
-    } from "$lib/validations/locations";
+    } from "@ac/validations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
     import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
@@ -73,7 +71,7 @@
         isUpdating = false,
         initialData = null,
     }: {
-        remoteFunction: typeof updateEvent | typeof createEvent;
+        remoteFunction: any;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: Event | null;
@@ -143,27 +141,7 @@
     // svelte-ignore state_referenced_locally
     const initialEnd = getInitialEndDateTime(startParsed, endParsed, localNow);
 
-    function getField(name: string) {
-        if (!(remoteFunction as any).fields) {
-            console.warn(`[EventForm] remoteFunction.fields is missing!`);
-            return {};
-        }
-        const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
-        for (const part of parts) {
-            if (!current) {
-                console.warn(
-                    `[EventForm] field ${name} part ${part} is missing!`,
-                );
-                return {};
-            }
-            current = current[part];
-        }
-        if (!current) {
-            console.warn(`[EventForm] field ${name} is missing!`);
-        }
-        return current || {};
-    }
+
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -260,7 +238,7 @@
     );
     // svelte-ignore state_referenced_locally
     let descriptionValue = $state(
-        getField("description").value() ?? initialData?.description ?? "",
+        initialData?.description ?? "",
     );
     // svelte-ignore state_referenced_locally
     let startDateInput = $state(startParsed.date || localNow.date);
@@ -554,43 +532,43 @@
         </datalist>
 
         {#if isUpdating && initialData}
-            <input {...getField("id").as("hidden", initialData.id)} />
+            <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
         {/if}
-        <input {...getField("remindersJson").as("hidden", remindersJson)} />
-        <input {...getField("isAllDay").as("hidden", isAllDay.toString())} />
-        <input {...getField("isPublic").as("hidden", isPublic.toString())} />
+        <input {...remoteFunction.fields.remindersJson.as("hidden", remindersJson)} />
+        <input {...remoteFunction.fields.isAllDay.as("hidden", isAllDay.toString())} />
+        <input {...remoteFunction.fields.isPublic.as("hidden", isPublic.toString())} />
         <input
-            {...getField("guestsCanInviteOthers").as(
+            {...remoteFunction.fields.guestsCanInviteOthers.as(
                 "hidden",
                 guestsCanInviteOthers.toString(),
             )}
         />
         <input
-            {...getField("guestsCanModify").as(
+            {...remoteFunction.fields.guestsCanModify.as(
                 "hidden",
                 guestsCanModify.toString(),
             )}
         />
         <input
-            {...getField("guestsCanSeeOtherGuests").as(
+            {...remoteFunction.fields.guestsCanSeeOtherGuests.as(
                 "hidden",
                 guestsCanSeeOtherGuests.toString(),
             )}
         />
         {#if heroImage}
-            <input {...getField("heroImage").as("hidden", heroImage)} />
+            <input {...remoteFunction.fields.heroImage.as("hidden", heroImage)} />
         {/if}
 
         <!-- Recurrence Hidden Input -->
         {#if recurrenceRule}
             <input
-                {...getField("recurrence").as("hidden", hiddenRecurrenceRule)}
+                {...remoteFunction.fields.recurrence.as("hidden", hiddenRecurrenceRule)}
             />
         {/if}
 
         <!-- Tags Hidden Input -->
         {#if hiddenTagsString}
-            <input {...getField("tags").as("hidden", hiddenTagsString)} />
+            <input {...remoteFunction.fields.tags.as("hidden", hiddenTagsString)} />
         {/if}
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
@@ -606,20 +584,15 @@
                     {m.title()} <span class="text-red-500">*</span>
                 </label>
                 <input
-                    {...getField("summary").as("text")}
+                    {...remoteFunction.fields.summary.as("text", initialData?.summary ?? "")}
                     required
-                    value={getField("summary").value() ??
-                        initialData?.summary ??
-                        ""}
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(getField(
-                        'summary',
-                    ).issues()?.length ?? 0) > 0
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {remoteFunction.fields.summary.issues().length > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
                     placeholder={m.title()}
                     onblur={() => remoteFunction.validate()}
                 />
-                {#each getField("summary").issues() ?? [] as issue}
+                {#each remoteFunction.fields.summary.issues() as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -632,11 +605,8 @@
                     {m.status()}
                 </label>
                 <select
-                    {...getField("status").as("text")}
+                    {...remoteFunction.fields.status.as("text", initialData?.status ?? "confirmed")}
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    value={getField("status").value() ??
-                        initialData?.status ??
-                        "confirmed"}
                 >
                     <option value="confirmed">{m.confirmed()}</option>
                     <option value="tentative">{m.tentative()}</option>
@@ -656,7 +626,7 @@
                     <RichTextEditor bind:value={descriptionValue} />
                     {#if hiddenDescription}
                         <input
-                            {...getField("description").as(
+                            {...remoteFunction.fields.description.as(
                                 "hidden",
                                 hiddenDescription,
                             )}
@@ -776,11 +746,10 @@
                                     8}px"
                             >
                                 <input
-                                    {...getField("resourceIds").as(
+                                    {...remoteFunction.fields.resourceIds.as(
                                         "checkbox",
                                         resource.id,
                                     )}
-                                    name={undefined}
                                     class="w-4 h-4 text-blue-600 flex-shrink-0"
                                     checked={selectedResourceIds.includes(
                                         resource.id,
@@ -803,7 +772,7 @@
                     </div>
                 {/if}
                 <input
-                    {...getField("resourceIds").as(
+                    {...remoteFunction.fields.resourceIds.as(
                         "hidden",
                         JSON.stringify(selectedResourceIds),
                     )}
@@ -819,10 +788,7 @@
                         {m.berlin_de_category()}
                     </label>
                     <select
-                        {...getField("categoryBerlinDotDe").as("text")}
-                        value={getField("categoryBerlinDotDe").value() ??
-                            initialData?.categoryBerlinDotDe ??
-                            ""}
+                        {...remoteFunction.fields.categoryBerlinDotDe.as("text", initialData?.categoryBerlinDotDe ?? "")}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     >
                         <option value="">{m.select_category()}</option>
@@ -839,20 +805,15 @@
                         {m.ticket_price()} <span class="text-red-500">*</span>
                     </label>
                     <input
-                        {...getField("ticketPrice").as("text")}
+                        {...remoteFunction.fields.ticketPrice.as("text", initialData?.ticketPrice ?? "")}
                         required
-                        value={getField("ticketPrice").value() ??
-                            initialData?.ticketPrice ??
-                            ""}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(getField(
-                            'ticketPrice',
-                        ).issues()?.length ?? 0) > 0
+                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {remoteFunction.fields.ticketPrice.issues().length > 0
                             ? 'border-red-500'
                             : 'border-gray-300'}"
                         placeholder={m.ticket_price_placeholder()}
                         onblur={() => remoteFunction.validate()}
                     />
-                    {#each getField("ticketPrice").issues() ?? [] as issue}
+                    {#each remoteFunction.fields.ticketPrice.issues() as issue}
                         <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                     {/each}
                 </div>
@@ -879,7 +840,7 @@
                 </div>
                 {#if useFreeTextLocation}
                     <input
-                        {...getField("location").as("text")}
+                        {...remoteFunction.fields.location.as("text")}
                         value={freeTextLocation}
                         oninput={(e) =>
                             (freeTextLocation = e.currentTarget.value)}
@@ -987,13 +948,50 @@
                                 initialData={formData}
                                 {onSuccess}
                                 {onCancel}
+                                labels={{
+                                    name: m.location_name(),
+                                    street: m.street(),
+                                    houseNumber: m.house_number(),
+                                    addressSuffix: m.address_suffix(),
+                                    zip: m.zip_code(),
+                                    city: m.city(),
+                                    state: m.state_region(),
+                                    country: m.country(),
+                                    roomId: m.room_id(),
+                                    latitude: m.latitude(),
+                                    longitude: m.longitude(),
+                                    what3words: m.what3words(),
+                                    inclusivitySupport: m.inclusivity_support(),
+                                    isPublic: m.public(),
+                                    heroImage: m.hero_image(),
+                                    saveChanges: m.save_changes(),
+                                    createLocation: m.create_location(),
+                                    cancel: m.cancel(),
+                                    saving: m.loading(),
+                                    creating: m.creating(),
+                                    successfullySaved: m.successfully_saved(),
+                                    errorSomethingWentWrong: m.something_went_wrong(),
+                                    enterLocationName: m.enter_location_name(),
+                                    streetName: m.street_placeholder(),
+                                    houseNumberPlaceholder: m.house_number_placeholder(),
+                                    addressSuffixPlaceholder: m.address_suffix_placeholder(),
+                                    zipCodePlaceholder: m.zip_code_placeholder(),
+                                    cityNamePlaceholder: m.city_placeholder(),
+                                    statePlaceholder: m.state_placeholder(),
+                                    countryPlaceholder: m.country_placeholder(),
+                                    enterRoomId: m.room_id_placeholder(),
+                                    latitudePlaceholder: m.latitude_placeholder(),
+                                    longitudePlaceholder: m.longitude_placeholder(),
+                                    what3wordsPlaceholder: m.what3words_placeholder(),
+                                    inclusivitySupportPlaceholder: m.accessibility_info(),
+                                }}
                             />
                         {/snippet}
                     </EntityManager>
                     <!-- Populate freeTextLocation based on selection if needed, or leave independent -->
                 {/if}
                 <input
-                    {...getField("locationIds").as(
+                    {...remoteFunction.fields.locationIds.as(
                         "hidden",
                         JSON.stringify(
                             useFreeTextLocation
@@ -1224,7 +1222,7 @@
                 </label>
 
                 <input
-                    {...getField("reminders.useDefault").as(
+                    {...remoteFunction.fields.reminders.fields.useDefault.as(
                         "hidden",
                         useDefaultReminders?.toString() ?? "true",
                     )}
@@ -1516,6 +1514,43 @@
                                         initialData={formData}
                                         {onSuccess}
                                         {onCancel}
+                                        labels={{
+                                            name: m.location_name(),
+                                            street: m.street(),
+                                            houseNumber: m.house_number(),
+                                            addressSuffix: m.address_suffix(),
+                                            zip: m.zip_code(),
+                                            city: m.city(),
+                                            state: m.state_region(),
+                                            country: m.country(),
+                                            roomId: m.room_id(),
+                                            latitude: m.latitude(),
+                                            longitude: m.longitude(),
+                                            what3words: m.what3words(),
+                                            inclusivitySupport: m.inclusivity_support(),
+                                            isPublic: m.public(),
+                                            heroImage: m.hero_image(),
+                                            saveChanges: m.save_changes(),
+                                            createLocation: m.create_location(),
+                                            cancel: m.cancel(),
+                                            saving: m.loading(),
+                                            creating: m.creating(),
+                                            successfullySaved: m.successfully_saved(),
+                                            errorSomethingWentWrong: m.something_went_wrong(),
+                                            enterLocationName: m.enter_location_name(),
+                                            streetName: m.street_placeholder(),
+                                            houseNumberPlaceholder: m.house_number_placeholder(),
+                                            addressSuffixPlaceholder: m.address_suffix_placeholder(),
+                                            zipCodePlaceholder: m.zip_code_placeholder(),
+                                            cityNamePlaceholder: m.city_placeholder(),
+                                            statePlaceholder: m.state_placeholder(),
+                                            countryPlaceholder: m.country_placeholder(),
+                                            enterRoomId: m.room_id_placeholder(),
+                                            latitudePlaceholder: m.latitude_placeholder(),
+                                            longitudePlaceholder: m.longitude_placeholder(),
+                                            what3wordsPlaceholder: m.what3words_placeholder(),
+                                            inclusivitySupportPlaceholder: m.accessibility_info(),
+                                        }}
                                     />
                                 {/snippet}
                             </EntityManager>
@@ -1525,14 +1560,14 @@
             {/snippet}
         </EntityManager>
         <input
-            {...getField("contactIds").as(
+            {...remoteFunction.fields.contactIds.as(
                 "hidden",
                 JSON.stringify(selectedContactIds ?? []),
             )}
         />
 
         <SyncCheckboxBlock
-            syncFieldConfig={getField("syncIds")}
+            syncFieldConfig={remoteFunction.fields.syncIds}
             initialSelectedIds={initialData?.syncIds || []}
         />
 

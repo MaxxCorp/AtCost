@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, uuid, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, integer, doublePrecision } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { contact } from "./contacts";
 
@@ -20,6 +20,9 @@ export const location = pgTable("location", {
     country: text("country"),
     isPublic: boolean("is_public").default(false).notNull(),
     inclusivitySupport: text("inclusivity_support"),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    what3words: text("what3words"),
     heroImage: text("hero_image"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),

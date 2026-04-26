@@ -3,7 +3,7 @@ import { db } from '$lib/server/db';
 import { location } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { createLocationSchema } from '$lib/validations/locations';
+import { createLocationSchema } from '@ac/validations';
 
 export const createLocation = form(createLocationSchema, async (data) => {
     console.log('--- createLocation START ---');
@@ -17,6 +17,8 @@ export const createLocation = form(createLocationSchema, async (data) => {
         const insertData: any = {
             userId: user.id,
             name: data.name,
+            description: data.description || null,
+            capacity: data.capacity || null,
             street: data.street || null,
             houseNumber: data.houseNumber || null,
             addressSuffix: data.addressSuffix || null,
@@ -38,14 +40,14 @@ export const createLocation = form(createLocationSchema, async (data) => {
 
         console.log('Insert payload:', insertData);
 
-        const result = await db.insert(location).values(insertData).returning();
+        const result = await db.insert(location as any).values(insertData).returning();
 
         if (result.length === 0) {
             throw new Error('Failed to create location');
         }
 
         const newLocation = result[0];
-        await listLocations().refresh();
+        void listLocations().refresh();
 
         console.log('--- createLocation SUCCESS ---');
         return { success: true, location: newLocation };

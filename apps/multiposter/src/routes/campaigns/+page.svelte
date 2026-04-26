@@ -8,7 +8,7 @@
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import { Megaphone, Pencil, Trash2 } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete } from "@ac/ui";
 
     type Campaign = Awaited<ReturnType<typeof listCampaigns>>["data"][number];
 </script>

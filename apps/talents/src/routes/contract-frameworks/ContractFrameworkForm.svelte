@@ -15,7 +15,7 @@
         cancelHref = "/contract-frameworks",
     }: any = $props();
 
-    const rf = $derived(typeof remoteFunction === "function" ? remoteFunction() : remoteFunction);
+    const rf = $derived((typeof remoteFunction === "function" ? remoteFunction() : remoteFunction) as any);
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -26,11 +26,7 @@
         prevIssuesLength = issues.length;
     });
 
-    function getField(name: string) {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
-        if (!rf?.fields) return def;
-        return rf.fields[name] ?? def;
-    }
+
 </script>
 
 <form
@@ -53,19 +49,19 @@
     })}
 >
     {#if isUpdating && initialData}
-        <input {...getField("id").as("hidden", initialData.id)} />
+        <input {...rf.fields.id.as("hidden", initialData.id)} />
     {/if}
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">Name</span>
         <input
-            {...getField("name").as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(getField('name').issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
+            {...rf.fields.name.as("text")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.name.issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
             placeholder="e.g. AWO Berlin TV"
             onblur={() => rf.validate()}
             value={initialData?.name ?? ""}
         />
-        {#each getField("name").issues() ?? [] as issue}
+        {#each rf.fields.name.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -73,7 +69,7 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">Description</span>
         <textarea
-            {...getField("description").as("text")}
+            {...rf.fields.description.as("text")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
             placeholder="Describe the contract framework"
             rows="3"

@@ -7,15 +7,12 @@
 	import {
 		createLocationSchema,
 		updateLocationSchema,
-	} from "$lib/validations/locations";
+	} from "@ac/validations";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import { MapPin, Pencil, Trash2, Home, Hash } from "@lucide/svelte";
-	import LocationForm from "$lib/components/locations/LocationForm.svelte";
-
-	import { EntityManager } from "@ac/ui";
-	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+	import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
 
 	// Type definition for the list items
 	type Location = Awaited<ReturnType<typeof listLocations>>["data"][number];
@@ -96,6 +93,43 @@
 						{initialData}
 						{onSuccess}
 						{onCancel}
+						labels={{
+							name: m.location_name(),
+							street: m.street(),
+							houseNumber: m.house_number(),
+							addressSuffix: m.address_suffix(),
+							zip: m.zip_code(),
+							city: m.city(),
+							state: m.state_region(),
+							country: m.country(),
+							roomId: m.room_id(),
+							latitude: m.latitude(),
+							longitude: m.longitude(),
+							what3words: m.what3words(),
+							inclusivitySupport: m.inclusivity_support(),
+							isPublic: m.public(),
+							heroImage: m.hero_image(),
+							saveChanges: m.save_changes(),
+							createLocation: m.create_location(),
+							cancel: m.cancel(),
+							saving: m.loading(),
+							creating: m.creating(),
+							successfullySaved: m.successfully_saved(),
+							errorSomethingWentWrong: m.something_went_wrong(),
+							enterLocationName: m.enter_location_name(),
+							streetName: m.street_placeholder(),
+							houseNumberPlaceholder: m.house_number_placeholder(),
+							addressSuffixPlaceholder: m.address_suffix_placeholder(),
+							zipCodePlaceholder: m.zip_code_placeholder(),
+							cityNamePlaceholder: m.city_placeholder(),
+							statePlaceholder: m.state_placeholder(),
+							countryPlaceholder: m.country_placeholder(),
+							enterRoomId: m.room_id_placeholder(),
+							latitudePlaceholder: m.latitude_placeholder(),
+							longitudePlaceholder: m.longitude_placeholder(),
+							what3wordsPlaceholder: m.what3words_placeholder(),
+							inclusivitySupportPlaceholder: m.accessibility_info(),
+						}}
 					/>
 				{/snippet}
 

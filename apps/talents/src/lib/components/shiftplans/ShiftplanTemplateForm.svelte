@@ -26,7 +26,9 @@
         validationSchema,
         isUpdating = false,
         initialData = null,
-    } = $props();
+    }: any = $props();
+
+    const rf = $derived(remoteFunction as any);
 
     // Derived prop shortcuts
     const initialSchedule = $derived(initialData?.schedule);
@@ -60,7 +62,7 @@
         }
     });
 
-    const getField = (name: string) => (remoteFunction as any).fields[name];
+
 
     const scheduleJson = $derived(JSON.stringify(schedule));
 
@@ -100,14 +102,14 @@
         class="space-y-8"
     >
         {#if isUpdating && initialData?.id}
-            <input {...getField("id").as("hidden", initialData.id)} />
+            <input {...rf.fields.id.as("hidden", initialData.id)} />
         {/if}
         {#if scheduleJson}
-            <input {...getField("schedule").as("hidden", scheduleJson)} />
+            <input {...rf.fields.schedule.as("hidden", scheduleJson)} />
         {/if}
         {#if selectedLocationId}
             <input
-                {...getField("locationId").as("hidden", selectedLocationId)}
+                {...rf.fields.locationId.as("hidden", selectedLocationId)}
             />
         {/if}
 
@@ -130,11 +132,11 @@
                         >Template Name</label
                     >
                     <input
-                        {...remoteFunction.fields["name"].as("text")}
+                        {...rf.fields.name.as("text")}
                         placeholder="e.g. Standard Weekday Rota"
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all outline-none"
                     />
-                    {#each getField("name").issues() ?? [] as issue}
+                    {#each rf.fields.name.issues() ?? [] as issue}
                         <p class="mt-1 text-xs text-red-500">{issue.message}</p>
                     {/each}
                 </div>

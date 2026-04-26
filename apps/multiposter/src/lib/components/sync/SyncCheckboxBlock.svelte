@@ -6,7 +6,7 @@
         syncFieldConfig,
         initialSelectedIds = []
     }: {
-        syncFieldConfig: any; // Result of getField("syncIds")
+        syncFieldConfig: any; // Remote Function field object
         initialSelectedIds?: string[];
     } = $props();
 
@@ -65,4 +65,7 @@
 
     
     <input {...syncFieldConfig.as("hidden", hiddenValue)} />
+    {#each syncFieldConfig.issues() as issue}
+        <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+    {/each}
 </div>

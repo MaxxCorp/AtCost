@@ -175,18 +175,10 @@
 
 	import * as m from "$lib/paraglide/messages";
 
-	function getField(name: string): any {
-		if (!(create as any).fields) return {};
-		const parts = name.split(".");
-		let current = (create as any).fields;
-		for (const part of parts) {
-			if (!current) return {};
-			current = current[part];
-		}
-		return current || {};
-	}
+
 
 	let prevIssuesLength = $state(0);
+	const fields = create.fields as any;
 	$effect(() => {
 		const issues = (create as any).allIssues?.() ?? [];
 		if (issues.length > 0 && prevIssuesLength === 0) {
@@ -241,7 +233,7 @@
 		<!-- Hidden Inputs required for form submission -->
 		{#if selectedProvider}
 			<input
-				{...getField("providerType").as("hidden", selectedProvider)}
+				{...fields.providerType.as("hidden", selectedProvider)}
 			/>
 		{/if}
 		<!-- providerId is handled by the text input below -->
@@ -333,19 +325,17 @@
 							Sync Name
 						</label>
 						<input
-							{...getField("name").as("text")}
+							{...fields.name.as("text")}
 							value={providerId}
 							name="name"
 							placeholder="e.g., my-work-calendar"
-							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-								'name',
-							).issues()?.length ?? 0) > 0
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(fields.name.issues()?.length ?? 0) > 0
 								? 'border-red-500'
 								: ''}"
 							oninput={(e) => (providerId = e.currentTarget.value)}
 							onblur={() => create.validate()}
 						/>
-						{#each getField("name").issues() ?? [] as issue}
+						{#each fields.name.issues() ?? [] as issue}
 							<p class="text-xs text-red-600 mt-1">
 								{issue.message}
 							</p>
@@ -364,7 +354,7 @@
 								Calendar ID
 							</label>
 							<input
-								{...getField("settings.calendarId").as("text")}
+								{...fields.settings.fields.calendarId.as("text")}
 								id="calendarId"
 								bind:value={calendarId}
 								placeholder="primary"
@@ -386,7 +376,7 @@
 								Company (Firma)
 							</label>
 							<input
-								{...getField("settings.company").as("text")}
+								{...fields.settings.fields.company.as("text")}
 								id="company"
 								bind:value={company}
 								placeholder="Your organization name"
@@ -406,7 +396,7 @@
 								Login Username
 							</label>
 							<input
-								{...getField("credentials.username").as("text")}
+								{...fields.credentials.fields.username.as("text")}
 								id="mhUsername"
 								bind:value={mhUsername}
 								placeholder="Username"
@@ -421,7 +411,7 @@
 								Login Password
 							</label>
 							<input
-								{...getField("credentials.password").as(
+								{...fields.credentials.fields.password.as(
 									"password",
 								)}
 								id="mhPassword"
@@ -441,7 +431,7 @@
 								Nebenan.de Email / Username
 							</label>
 							<input
-								{...getField("credentials.email").as("text")}
+								{...fields.credentials.fields.email.as("text")}
 								id="nebenanEmail"
 								placeholder="login@example.com"
 								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -455,7 +445,7 @@
 								Nebenan.de Password
 							</label>
 							<input
-								{...getField("credentials.password").as(
+								{...fields.credentials.fields.password.as(
 									"password",
 								)}
 								id="nebenanPassword"
@@ -471,7 +461,7 @@
 								Business Profile ID (Gewerbeprofil-ID)
 							</label>
 							<input
-								{...getField("settings.profileId").as("text")}
+								{...fields.settings.fields.profileId.as("text")}
 								id="nebenanProfileId"
 								placeholder="e.g. cbe780d1-9642-49e5-8928-d1c163698658"
 								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -491,7 +481,7 @@
 								WordPress Site URL
 							</label>
 							<input
-								{...getField("settings.baseUrl").as("url")}
+								{...fields.settings.fields.baseUrl.as("url")}
 								id="wpBaseUrl"
 								bind:value={wpBaseUrl}
 								placeholder="https://yoursite.com"
@@ -509,7 +499,7 @@
 								WordPress Username
 							</label>
 							<input
-								{...getField("settings.username").as("text")}
+								{...fields.settings.fields.username.as("text")}
 								id="wpUsername"
 								bind:value={wpUsername}
 								placeholder="admin"
@@ -527,7 +517,7 @@
 								Application Password
 							</label>
 							<input
-								{...getField("settings.applicationPassword").as(
+								{...fields.settings.fields.applicationPassword.as(
 									"password",
 								)}
 								id="wpAppPassword"
@@ -550,7 +540,7 @@
 							Sync Interval (minutes)
 						</label>
 						<input
-							{...getField("settings.syncIntervalMinutes").as(
+							{...fields.settings.fields.syncIntervalMinutes.as(
 								"number",
 							)}
 							id="syncInterval"
@@ -591,7 +581,7 @@
 								: ''}"
 						>
 							<input
-								{...getField("direction").as(
+								{...fields.direction.as(
 									"radio",
 									dir.value,
 								)}

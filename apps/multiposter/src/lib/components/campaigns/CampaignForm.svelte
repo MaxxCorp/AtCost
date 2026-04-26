@@ -7,7 +7,7 @@
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete } from "@ac/ui";
     import type { updateCampaign } from "../../../routes/campaigns/[id]/update.remote";
     import type { createCampaign } from "../../../routes/campaigns/new/create.remote";
 
@@ -18,16 +18,13 @@
         isUpdating = false,
         initialData = null,
     }: {
-        remoteFunction: typeof updateCampaign | typeof createCampaign;
+        remoteFunction: any;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: Campaign | null;
     } = $props();
 
-    function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
-        return (remoteFunction as any).fields[name] || {};
-    }
+
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -92,7 +89,7 @@
         <form
             {...remoteFunction
                 .preflight(validationSchema)
-                .enhance(async ({ submit }) => {
+                .enhance(async ({ submit }: { submit: any }) => {
                     try {
                         const result: any = await submit();
                         if (result?.error) {
@@ -114,7 +111,7 @@
             class="space-y-4"
         >
             {#if isUpdating && initialData}
-                <input {...getField("id").as("hidden", initialData.id)} />
+                <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
             {/if}
 
             <label class="block">
@@ -122,17 +119,14 @@
                     >{m.campaign_name()}</span
                 >
                 <input
-                    {...getField("name").as("text")}
-                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-                        'name',
-                    ).issues()?.length ?? 0) > 0
+                    {...remoteFunction.fields.name.as("text", initialData?.name ?? "")}
+                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(remoteFunction.fields.name.issues()?.length ?? 0) > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
                     placeholder={m.enter_campaign_name()}
-                    value={isUpdating ? initialData?.name : ""}
                     onblur={() => remoteFunction.validate()}
                 />
-                {#each getField("name").issues() ?? [] as issue}
+                {#each remoteFunction.fields.name.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">
                         {issue.message}
                     </p>
@@ -144,20 +138,15 @@
                     >{m.content_json()}</span
                 >
                 <textarea
-                    {...getField("content").as("text")}
+                    {...remoteFunction.fields.content.as("text", initialData?.content ? JSON.stringify(initialData.content) : "{}")}
                     rows="12"
-                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm {(getField(
-                        'content',
-                    ).issues()?.length ?? 0) > 0
+                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm {(remoteFunction.fields.content.issues()?.length ?? 0) > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
                     placeholder={"{}"}
-                    value={isUpdating
-                        ? JSON.stringify(initialData?.content)
-                        : "{}"}
                     onblur={() => remoteFunction.validate()}
                 ></textarea>
-                {#each getField("content").issues() ?? [] as issue}
+                {#each remoteFunction.fields.content.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">
                         {issue.message}
                     </p>

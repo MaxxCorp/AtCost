@@ -23,7 +23,7 @@
 	} from "@lucide/svelte";
 
 	import { EntityManager } from "@ac/ui";
-	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+	import { handleDelete } from "@ac/ui";
 	import WebhookToggleButton from "$lib/components/synchronizations/WebhookToggleButton.svelte";
 	import { authClient } from "$lib/auth";
 	import { hasAccess } from "$lib/authorization";

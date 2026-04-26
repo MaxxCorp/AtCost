@@ -27,7 +27,7 @@
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
     import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete } from "@ac/ui";
     import { User } from "@lucide/svelte";
 
     let {
@@ -36,22 +36,13 @@
         isUpdating = false,
         initialData = null,
     }: {
-        remoteFunction: typeof updateUser;
+        remoteFunction: any;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: any;
     } = $props();
 
-    function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
-        const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
-        for (const part of parts) {
-            if (!current) return {};
-            current = current[part];
-        }
-        return current || {};
-    }
+
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -120,24 +111,21 @@
         })}
 >
     {#if isUpdating && initialData}
-        <input {...getField("id").as("hidden", initialData.id)} />
+        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
     {/if}
 
-    <input {...getField("claims").as("hidden", claimsJson)} />
+    <input {...remoteFunction.fields.claims.as("hidden", claimsJson)} />
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
         <input
-            {...getField("name").as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-                'name',
-            ).issues()?.length ?? 0) > 0
+            {...remoteFunction.fields.name.as("text", initialData?.name ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(remoteFunction.fields.name.issues()?.length ?? 0) > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            value={initialData?.name ?? ""}
             onblur={() => remoteFunction.validate()}
         />
-        {#each getField("name").issues() ?? [] as issue}
+        {#each remoteFunction.fields.name.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -145,16 +133,13 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.email_address()}</span>
         <input
-            {...getField("email").as("email")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-                'email',
-            ).issues()?.length ?? 0) > 0
+            {...remoteFunction.fields.email.as("email", initialData?.email ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(remoteFunction.fields.email.issues()?.length ?? 0) > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            value={initialData?.email ?? ""}
             onblur={() => remoteFunction.validate()}
         />
-        {#each getField("email").issues() ?? [] as issue}
+        {#each remoteFunction.fields.email.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -163,8 +148,7 @@
         <h3 class="text-lg font-medium text-gray-900 mb-2">{m.roles()}</h3>
         <label class="flex items-center space-x-2">
             <input
-                {...getField("roles").as("checkbox", "admin")}
-                value="admin"
+                {...remoteFunction.fields.roles.as("checkbox", "admin")}
                 checked={isAdmin}
                 onchange={(e) => (isAdmin = e.currentTarget.checked)}
                 class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"

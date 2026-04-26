@@ -16,14 +16,14 @@
         cancelHref = "/contracts",
     }: any = $props();
 
-    const rf = $derived(typeof remoteFunction === "function" ? remoteFunction() : remoteFunction);
+    const rf = $derived((typeof remoteFunction === "function" ? remoteFunction() : remoteFunction) as any);
 
     let frameworks = $state<{id: string, name: string}[]>([]);
     
     onMount(async () => {
         try {
             const data = await listContractFrameworks({ page: 1, limit: 100 });
-            frameworks = data.data;
+            frameworks = data.data as any;
         } catch (err) {
             console.error("Failed to load generic framework data.");
         }
@@ -38,11 +38,7 @@
         prevIssuesLength = issues.length;
     });
 
-    function getField(name: string) {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
-        if (!rf?.fields) return def;
-        return rf.fields[name] ?? def;
-    }
+
 
     // Toggle multi-select utility helper
     function handleFrameworkSelection(id: string, currentSelections: string[], e: any) {
@@ -73,19 +69,19 @@
     })}
 >
     {#if isUpdating && initialData}
-        <input {...getField("id").as("hidden", initialData.id)} />
+        <input {...rf.fields.id.as("hidden", initialData.id)} />
     {/if}
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Talent ID</span>
             <input
-                {...getField("talentId").as("text")}
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(getField('talentId').issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
+                {...rf.fields.talentId.as("text")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.talentId.issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
                 placeholder="UUID of Talent"
                 value={initialData?.talentId ?? ""}
             />
-            {#each getField("talentId").issues() ?? [] as issue}
+            {#each rf.fields.talentId.issues() ?? [] as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </label>
@@ -102,7 +98,7 @@
                             type="checkbox"
                             checked={initialData?.frameworkIds?.includes(fw.id) ?? false}
                             oninput={(e) => {
-                                const currentValue = getField("frameworkIds").value();
+                                const currentValue = rf.fields.frameworkIds.value();
                                 const newArray = handleFrameworkSelection(fw.id, Array.isArray(currentValue) ? currentValue : (initialData?.frameworkIds || []), e);
                                 // Workaround to push arrays to the custom standard fields properly
                                 // since .as('checkbox') is generally for simple booleans
@@ -115,7 +111,7 @@
                 {/each}
             </div>
             <!-- Hack to submit array natively -->
-            {#each (getField("frameworkIds").value() || initialData?.frameworkIds || []) as fwid}
+            {#each (rf.fields.frameworkIds.value() || initialData?.frameworkIds || []) as fwid}
                  <input type="hidden" name="frameworkIds" value={fwid} />
             {/each}
         </label>
@@ -125,7 +121,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Start Date</span>
             <input
-                {...getField("startDate").as("text")}
+                {...rf.fields.startDate.as("text")}
                 type="date"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 value={initialData?.startDate?.split('T')[0] ?? ""}
@@ -134,7 +130,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">End Date (Optional)</span>
             <input
-                {...getField("endDate").as("text")}
+                {...rf.fields.endDate.as("text")}
                 type="date"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 value={initialData?.endDate?.split('T')[0] ?? ""}
@@ -146,7 +142,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Probation Period (Months)</span>
             <input
-                {...getField("probationPeriodMonths").as("number")}
+                {...rf.fields.probationPeriodMonths.as("number")}
                 type="number"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 value={initialData?.probationPeriodMonths ?? ""}
@@ -155,7 +151,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Holiday Allotment (Days)</span>
             <input
-                {...getField("holidayAllotmentDays").as("number")}
+                {...rf.fields.holidayAllotmentDays.as("number")}
                 type="number"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 value={initialData?.holidayAllotmentDays ?? ""}
@@ -166,7 +162,7 @@
     <div class="p-4 border rounded-md space-y-4">
         <h3 class="font-medium text-gray-800">Work Hours</h3>
         <p class="text-xs text-red-600 font-semibold mt-1">
-            {#each getField("workHoursPerDay").issues() ?? [] as issue}
+            {#each rf.fields.workHoursPerDay.issues() ?? [] as issue}
                 {issue.message}
             {/each}
         </p>
@@ -174,7 +170,7 @@
             <label class="block text-sm">
                 Per Day
                 <input
-                    {...getField("workHoursPerDay").as("number")}
+                    {...rf.fields.workHoursPerDay.as("number")}
                     type="number" step="any"
                     class="mt-1 w-full px-3 py-1 border rounded-md focus:ring-2 focus:ring-blue-500"
                     value={initialData?.workHoursPerDay ?? ""}
@@ -183,7 +179,7 @@
             <label class="block text-sm">
                 Per Week
                 <input
-                    {...getField("workHoursPerWeek").as("number")}
+                    {...rf.fields.workHoursPerWeek.as("number")}
                     type="number" step="any"
                     class="mt-1 w-full px-3 py-1 border rounded-md focus:ring-2 focus:ring-blue-500"
                     value={initialData?.workHoursPerWeek ?? ""}
@@ -192,7 +188,7 @@
             <label class="block text-sm">
                 Per Month
                 <input
-                    {...getField("workHoursPerMonth").as("number")}
+                    {...rf.fields.workHoursPerMonth.as("number")}
                     type="number" step="any"
                     class="mt-1 w-full px-3 py-1 border rounded-md focus:ring-2 focus:ring-blue-500"
                     value={initialData?.workHoursPerMonth ?? ""}
@@ -201,7 +197,7 @@
             <label class="block text-sm">
                 Per Year
                 <input
-                    {...getField("workHoursPerYear").as("number")}
+                    {...rf.fields.workHoursPerYear.as("number")}
                     type="number" step="any"
                     class="mt-1 w-full px-3 py-1 border rounded-md focus:ring-2 focus:ring-blue-500"
                     value={initialData?.workHoursPerYear ?? ""}
@@ -214,7 +210,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Wage Type</span>
             <select
-                {...getField("wageType").as("select")}
+                {...rf.fields.wageType.as("select")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white"
             >
                 <option value="monthly" selected={(!initialData) || initialData?.wageType === 'monthly'}>Monthly</option>
@@ -224,7 +220,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Wage Amount</span>
             <input
-                {...getField("wageAmount").as("number")}
+                {...rf.fields.wageAmount.as("number")}
                 type="number" step="any"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 value={initialData?.wageAmount ?? ""}
@@ -236,7 +232,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Entgeltgruppe</span>
             <input
-                {...getField("entgeltgruppe").as("text")}
+                {...rf.fields.entgeltgruppe.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g. E 9b"
                 value={initialData?.entgeltgruppe ?? ""}
@@ -245,7 +241,7 @@
         <label class="block">
             <span class="text-sm font-medium text-gray-700 mb-2">Erfahrungsstufe</span>
             <input
-                {...getField("erfahrungsstufe").as("number")}
+                {...rf.fields.erfahrungsstufe.as("number")}
                 type="number"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g. 1"

@@ -8,27 +8,27 @@
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
     import type { AllocationCalendar } from "$lib/validations/resources";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import { EntityManager } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
+    import { listLocations } from "../../../routes/locations/list.remote";
+    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact } from "@ac/validations";
-
     import {
+        fetchEntityContacts,
         addAssociation,
         removeAssociation,
-        fetchEntityContacts,
     } from "../../../routes/contacts/associate.remote";
     import { createContact } from "../../../routes/contacts/new/create.remote";
     import { updateContact } from "../../../routes/contacts/[id]/update.remote";
+    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import {
+        createLocationSchema,
+        updateLocationSchema,
         createContactSchema,
         updateContactSchema,
-    } from "$lib/validations/contacts";
-    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-    import { User, MapPin, Box } from "@lucide/svelte";
-    import LocationForm from "$lib/components/locations/LocationForm.svelte";
-    import { listLocations } from "../../../routes/locations/list.remote";
-    import { type Location } from "@ac/validations";
+        type Location,
+        type Contact,
+    } from "@ac/validations";
+    import { User, MapPin } from "@lucide/svelte";
 
     import {
         addLocationAssociation,
@@ -37,11 +37,6 @@
     } from "../../../routes/locations/associate.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
-    import {
-        createLocationSchema,
-        updateLocationSchema,
-    } from "$lib/validations/locations";
-    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
 
     let {
         remoteFunction,
@@ -62,17 +57,7 @@
     // Initialize remoteFunction if it's a definition function to ensure reactive context
     const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
 
-    function getField(name: string) {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
-        if (!(rf as any)?.fields) return def;
-        const parts = name.split(".");
-        let current: any = (rf as any).fields;
-        for (const part of parts) {
-            if (current?.[part] === undefined) return def;
-            current = current[part];
-        }
-        return current ?? def;
-    }
+
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -144,23 +129,20 @@
         })}
 >
     {#if isUpdating && initialData}
-        <input {...getField("id").as("hidden", initialData.id)} />
+        <input {...rf.fields.id.as("hidden", initialData.id)} />
     {/if}
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
         <input
-            {...getField("name").as("text")}
-            value={getField("name").value() ?? initialData?.name ?? ""}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-                'name',
-            ).issues()?.length ?? 0) > 0
+            {...rf.fields.name.as("text", initialData?.name ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.name.issues().length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_location_name()}
             onblur={() => rf.validate()}
         />
-        {#each getField("name").issues() ?? [] as issue}
+        {#each rf.fields.name.issues() as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -168,17 +150,14 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.direction()}</span>
         <input
-            {...getField("type").as("text")}
-            value={getField("type").value() ?? initialData?.type ?? ""}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-                'type',
-            ).issues()?.length ?? 0) > 0
+            {...rf.fields.type.as("text", initialData?.type ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.type.issues().length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.resource_type_placeholder()}
             onblur={() => rf.validate()}
         />
-        {#each getField("type").issues() ?? [] as issue}
+        {#each rf.fields.type.issues() as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -186,17 +165,14 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.inventory_number()}</span>
         <input
-            {...getField("inventoryNumber").as("text")}
-            value={getField("inventoryNumber").value() ?? initialData?.inventoryNumber ?? ""}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-                'inventoryNumber',
-            ).issues()?.length ?? 0) > 0
+            {...rf.fields.inventoryNumber.as("text", initialData?.inventoryNumber ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.inventoryNumber.issues().length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_inventory_number()}
             onblur={() => rf.validate()}
         />
-        {#each getField("inventoryNumber").issues() ?? [] as issue}
+        {#each rf.fields.inventoryNumber.issues() as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -204,8 +180,7 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.description()}</span>
         <textarea
-            {...getField("description").as("text")}
-            value={getField("description").value() ?? initialData?.description ?? ""}
+            {...rf.fields.description.as("text", initialData?.description ?? "")}
             rows="3"
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={m.description()}
@@ -216,8 +191,7 @@
         <span class="text-sm font-medium text-gray-700 mb-2">{m.max_occupancy()}</span
         >
         <input
-            {...getField("maxOccupancy").as("number")}
-            value={getField("maxOccupancy").value() ?? initialData?.maxOccupancy ?? ""}
+            {...rf.fields.maxOccupancy.as("number", initialData?.maxOccupancy)}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={m.enter_max_occupancy()}
         />
@@ -293,6 +267,43 @@
                     {onSuccess}
                     {onCancel}
                     isUpdating={!!id}
+                    labels={{
+                        name: m.location_name(),
+                        street: m.street(),
+                        houseNumber: m.house_number(),
+                        addressSuffix: m.address_suffix(),
+                        zip: m.zip_code(),
+                        city: m.city(),
+                        state: m.state_region(),
+                        country: m.country(),
+                        roomId: m.room_id(),
+                        latitude: m.latitude(),
+                        longitude: m.longitude(),
+                        what3words: m.what3words(),
+                        inclusivitySupport: m.inclusivity_support(),
+                        isPublic: m.public(),
+                        heroImage: m.hero_image(),
+                        saveChanges: m.save_changes(),
+                        createLocation: m.create_location(),
+                        cancel: m.cancel(),
+                        saving: m.loading(),
+                        creating: m.creating(),
+                        successfullySaved: m.successfully_saved(),
+                        errorSomethingWentWrong: m.something_went_wrong(),
+                        enterLocationName: m.enter_location_name(),
+                        streetName: m.street_placeholder(),
+                        houseNumberPlaceholder: m.house_number_placeholder(),
+                        addressSuffixPlaceholder: m.address_suffix_placeholder(),
+                        zipCodePlaceholder: m.zip_code_placeholder(),
+                        cityNamePlaceholder: m.city_placeholder(),
+                        statePlaceholder: m.state_placeholder(),
+                        countryPlaceholder: m.country_placeholder(),
+                        enterRoomId: m.room_id_placeholder(),
+                        latitudePlaceholder: m.latitude_placeholder(),
+                        longitudePlaceholder: m.longitude_placeholder(),
+                        what3wordsPlaceholder: m.what3words_placeholder(),
+                        inclusivitySupportPlaceholder: m.accessibility_info(),
+                    }}
                 />
             {/snippet}
         </EntityManager>
@@ -326,7 +337,7 @@
                             <!-- Prevent self-parenting -->
                             <label class="flex items-center gap-2">
                                 <input
-                                    {...getField("parentResourceIds").as(
+                                    {...rf.fields.parentResourceIds.as(
                                         "checkbox",
                                         resource.id,
                                     )}
@@ -412,7 +423,7 @@
         </div>
 
         <input
-            {...getField("allocationCalendars").as(
+            {...rf.fields.allocationCalendars.as(
                 "hidden",
                 JSON.stringify(allocationCalendars),
             )}

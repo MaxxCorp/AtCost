@@ -4,7 +4,7 @@
     import { listUsers } from "./list.remote";
     import { User as UserIcon, Mail, Shield, Calendar as CalendarIcon, Pencil, Trash2 } from "@lucide/svelte";
     import { deleteUser } from "./[id]/delete.remote";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete } from "@ac/ui";
 
     type User = Awaited<ReturnType<typeof listUsers>>["data"][number];
 

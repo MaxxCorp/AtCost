@@ -8,7 +8,8 @@ trigger: always_on
 - **No Legacy Patterns**: SvelteKit `load` functions and `actions` (in `+*.server.ts` or `+*.ts`) are strictly PROHIBITED. All data fetching must occur via Remote Functions (`query`/`form`) or established client-side state providers.
   - **Note**: Static configuration exports (e.g., `export const ssr = false;`) are permitted in `+layout.ts` or `+page.ts` if required for project-level settings.
 - **No REST Endpoints for Data Fetching**: Standard API routes (`+server.ts` GET/POST/etc.) are superseded for internal data fetching/mutation and should NOT be used unless explicitly interacting with a non-SvelteKit external client.
-- **Strict Fields API**: When submitting remote forms, ALWAYS use the official field API syntax: `{...formHandle.fields.fieldName.as('type', value)}`.
+- **Strict Fields API**: 
+  - DO NOT assume you know how to work with sveltekit fields values, do consult the full length of the forms block in the documentation https://svelte.dev/docs/kit/remote-functions#form EVERY time
   - DO NOT manually create HTML `<input type="hidden">` tags for form submissions.
   - DO wrap hidden fields that have a chance to empty in {#if ...} blocks to prevent the svelte static analyzer to throw an error
   - DO NOT use proxy helper functions (like a custom `getField` utility) to work around `fields` typings. Fix the underlying typing issues.
@@ -19,7 +20,7 @@ trigger: always_on
 - **Server-Side Data Synchronization**: In `create`, `update`, or `delete` Remote Functions, you MUST use `.refresh()` or `.set()` on related Remote Functions to keep client-side data in sync.
   - This is a server-side instruction for "single-flight mutations" where the server tells the client which queries to invalidate or update in the same response.
   - DO NOT call other remote functions directly; only use the specialized mutation instructions (`.refresh()`, `.set()`).
-  - Example: `await listEvents.refresh();` or `await readEvent.set(updatedEvent);`.
+  - Example: `void listEvents().refresh();` or `readEvent(updatedEvent.id).set(updatedEvent);`.
 
 ## Svelte 5 State and Navigation Standards
 
@@ -29,8 +30,6 @@ trigger: always_on
   - Hard reloads should be avoided unless explicitly required for external transitions or catastrophic state resets.
 - **Declarative Reactivity & Component Resets**: 
   - Use `$derived` for mirroring props or global state. 
-  - Use `{#key page.url.pathname}` in `+layout.svelte` around `{@render children()}` to force-reset entire page trees on navigation if state feels "stuck" or components fail to swap.
-  - Use `{#key identifier}` in components to force identity-based refreshes instead of relying on manual state synchronization.
 
 ## Svelte 5 Rune Best Practices
 

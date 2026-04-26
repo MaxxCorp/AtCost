@@ -20,7 +20,7 @@
     }>();
 
     // Reactive Form Proxy (initialized only in browser)
-    const rf = $derived(browser ? manageTimesheets : null);
+    const rf = $derived(browser ? (manageTimesheets as any) : null);
 
     // Local form state
     let formAction = $state<'clock_in' | 'clock_out'>('clock_in');
@@ -44,17 +44,7 @@
         prevIssuesLength = issues.length;
     });
 
-    function getFieldMetadata(name: string): any {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
-        if (!rf?.fields) return def;
-        const parts = name.split(".");
-        let current: any = (rf as any).fields; 
-        for (const part of parts) {
-            if (!current?.[part]) return def;
-            current = current[part];
-        }
-        return current ?? def;
-    }
+
 </script>
 
 {#if browser}
@@ -114,10 +104,10 @@
                             })}
                         >
                             {#if formAction === 'clock_in'}
-                                <input {...getFieldMetadata('action').as('hidden', formAction)} />
-                                <input {...getFieldMetadata('talentId').as('hidden', talentId)} />
-                                <input {...getFieldMetadata('type').as('hidden', 'manual')} />
-                                <input {...(getFieldMetadata('startTime') as any).as('hidden', startTimeOverride)} />
+                                <input {...rf.fields.action.as('hidden', formAction)} />
+                                <input {...rf.fields.talentId.as('hidden', talentId)} />
+                                <input {...rf.fields.type.as('hidden', 'manual')} />
+                                <input {...rf.fields.startTime.as('hidden', startTimeOverride)} />
                                 
                                 <div class="mb-4">
                                     <label for="start-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">Start Override</label>
@@ -129,10 +119,10 @@
                                     />
                                 </div>
                             {:else if formAction === 'clock_out'}
-                                <input {...getFieldMetadata('action').as('hidden', formAction)} />
-                                <input {...getFieldMetadata('talentId').as('hidden', talentId)} />
-                                <input {...getFieldMetadata('entryId').as('hidden', formEntryId)} />
-                                <input {...(getFieldMetadata('endTime') as any).as('hidden', endTimeOverride)} />
+                                <input {...rf.fields.action.as('hidden', formAction)} />
+                                <input {...rf.fields.talentId.as('hidden', talentId)} />
+                                <input {...rf.fields.entryId.as('hidden', formEntryId)} />
+                                <input {...rf.fields.endTime.as('hidden', endTimeOverride)} />
 
                                 <div class="mb-4">
                                     <label for="end-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">End Override</label>

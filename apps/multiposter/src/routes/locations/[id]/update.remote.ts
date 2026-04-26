@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { updateLocationSchema } from '$lib/validations/locations';
+import { updateLocationSchema } from '@ac/validations';
 
 export const updateLocation = form(updateLocationSchema, async (data) => {
     console.log('--- updateLocation START ---');
@@ -18,6 +18,8 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
 
         const updateData: any = {
             name: data.name,
+            description: data.description || null,
+            capacity: data.capacity || null,
             street: data.street || null,
             houseNumber: data.houseNumber || null,
             addressSuffix: data.addressSuffix || null,
@@ -53,7 +55,7 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
         }
 
         const updated = result[0];
-        readLocation(data.id).set(updated);
+        readLocation(data.id).set(updated as any);
         void listLocations().refresh();
 
         console.log('--- updateLocation SUCCESS ---');

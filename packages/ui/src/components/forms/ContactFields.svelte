@@ -56,7 +56,7 @@
         initialTags?: any[];
 
         labels?: any;
-        getField?: (name: string) => any;
+        rf?: any;
         onEmailChange?: () => void;
     }
 
@@ -81,7 +81,7 @@
         initialTags = [],
 
         labels,
-        getField,
+        rf,
         onEmailChange,
     }: Props = $props();
 
@@ -213,6 +213,7 @@
     function removeAddress(index: number) {
         addresses = addresses.filter((_, i) => i !== index);
     }
+    const contactFields = $derived(prefix === "contact" ? rf.fields.contact : rf.fields.data.fields.contact);
 </script>
 
 <div class="space-y-8">
@@ -229,14 +230,14 @@
                     >{i18n.displayName} <span class="text-red-500">*</span></label
                 >
                 <input
-                    {...getField?.(`${prefix}.displayName`).as("text")}
+                    {...contactFields.fields.displayName.as("text")}
                     name={`${prefix}.displayName`}
                     type="text"
                     bind:value={contactData.displayName}
                     required
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(getField?.(`${prefix}.displayName`).issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {contactFields.fields.displayName.issues().length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each getField?.(`${prefix}.displayName`).issues() ?? [] as issue}
+                {#each contactFields.fields.displayName.issues() as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -247,7 +248,7 @@
                     >{i18n.givenName}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.givenName`).as("text")}
+                    {...contactFields.fields.givenName.as("text")}
                     name={`${prefix}.givenName`}
                     type="text"
                     bind:value={contactData.givenName}
@@ -261,7 +262,7 @@
                     >{i18n.middleName}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.middleName`).as("text")}
+                    {...contactFields.fields.middleName.as("text")}
                     name={`${prefix}.middleName`}
                     type="text"
                     bind:value={contactData.middleName}
@@ -275,7 +276,7 @@
                     >{i18n.familyName}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.familyName`).as("text")}
+                    {...contactFields.fields.familyName.as("text")}
                     name={`${prefix}.familyName`}
                     type="text"
                     bind:value={contactData.familyName}
@@ -289,7 +290,7 @@
                     >{i18n.honorificPrefix}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.honorificPrefix`).as("text")}
+                    {...contactFields.fields.honorificPrefix.as("text")}
                     name={`${prefix}.honorificPrefix`}
                     type="text"
                     bind:value={contactData.honorificPrefix}
@@ -304,7 +305,7 @@
                     >{i18n.honorificSuffix}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.honorificSuffix`).as("text")}
+                    {...contactFields.fields.honorificSuffix.as("text")}
                     name={`${prefix}.honorificSuffix`}
                     type="text"
                     bind:value={contactData.honorificSuffix}
@@ -319,7 +320,7 @@
                     >{i18n.gender}</label
                 >
                 <select
-                    {...getField?.(`${prefix}.gender`).as("select")}
+                    {...contactFields.fields.gender.as("select")}
                     name={`${prefix}.gender`}
                     bind:value={contactData.gender}
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -339,7 +340,7 @@
                     >{i18n.birthday}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.birthday`).as("date")}
+                    {...contactFields.fields.birthday.as("date")}
                     name={`${prefix}.birthday`}
                     type="date"
                     bind:value={contactData.birthday}
@@ -353,7 +354,7 @@
                     >{i18n.company}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.company`).as("text")}
+                    {...contactFields.fields.company.as("text")}
                     name={`${prefix}.company`}
                     type="text"
                     bind:value={contactData.company}
@@ -367,7 +368,7 @@
                     >{i18n.department}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.department`).as("text")}
+                    {...contactFields.fields.department.as("text")}
                     name={`${prefix}.department`}
                     type="text"
                     bind:value={contactData.department}
@@ -380,7 +381,7 @@
                     class="block text-sm font-medium text-gray-700">{i18n.role}</label
                 >
                 <input
-                    {...getField?.(`${prefix}.role`).as("text")}
+                    {...contactFields.fields.role.as("text")}
                     name={`${prefix}.role`}
                     type="text"
                     bind:value={contactData.role}
@@ -393,7 +394,7 @@
                 >{i18n.notes}</label
             >
             <textarea
-                {...getField?.(`${prefix}.notes`).as("textarea")}
+                {...contactFields.fields.notes.as("textarea")}
                 name={`${prefix}.notes`}
                 bind:value={contactData.notes}
                 rows="3"
@@ -403,7 +404,7 @@
 
         <div class="flex items-center gap-2 pt-2">
             <input
-                {...getField?.(`${prefix}.isPublic`).as("checkbox")}
+                {...contactFields.fields.isPublic.as("checkbox")}
                 name={`${prefix}.isPublic`}
                 type="checkbox"
                 bind:checked={contactData.isPublic}

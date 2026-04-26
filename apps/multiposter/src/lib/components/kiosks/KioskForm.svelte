@@ -5,16 +5,14 @@
     import * as m from "$lib/paraglide/messages";
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import { EntityManager } from "@ac/ui";
-    import LocationForm from "$lib/components/locations/LocationForm.svelte";
+    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
-    } from "$lib/validations/locations";
+    } from "@ac/validations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
     import { MapPin } from "@lucide/svelte";
     import { onMount, untrack } from "svelte";
     import { toast } from "svelte-sonner";
@@ -28,7 +26,7 @@
         initialData = null,
         isUpdating = false,
     }: {
-        remoteFunction: typeof createKiosk | typeof updateKiosk;
+        remoteFunction: any;
         validationSchema: any;
         initialData?: any;
         isUpdating?: boolean;
@@ -83,17 +81,7 @@
         }
     });
  
-    // Helper to access form field helpers from the remote function
-    function getField(name: string) {
-        if (!(remoteFunction as any).fields) return {};
-        const parts = name.split(".");
-        let current = (remoteFunction as any).fields;
-        for (const part of parts) {
-            if (!current) return {};
-            current = current[part];
-        }
-        return current || {};
-    }
+
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -180,7 +168,7 @@
         class="space-y-6"
     >
         {#if isUpdating && initialData}
-            <input {...getField("id").as("hidden", initialData.id)} />
+            <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
         {/if}
 
         <div class="space-y-2">
@@ -188,13 +176,12 @@
                 >{m.kiosk_name()}</label
             >
             <input
-                {...getField("name").as("text")}
-                value={getField("name").value() ?? initialData?.name ?? ""}
+                {...remoteFunction.fields.name.as("text", initialData?.name ?? "")}
                 placeholder={m.kiosk_name_placeholder()}
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 onblur={() => remoteFunction.validate()}
             />
-            {#each getField("name").issues() ?? [] as issue}
+            {#each remoteFunction.fields.name.issues() ?? [] as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </div>
@@ -206,11 +193,8 @@
                 >{m.description()} ({m.other_label()})</label
             >
             <textarea
-                {...getField("description").as("text")}
+                {...remoteFunction.fields.description.as("text", initialData?.description ?? "")}
                 rows="3"
-                value={getField("description").value() ??
-                    initialData?.description ??
-                    ""}
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 onblur={() => remoteFunction.validate()}
             ></textarea>
@@ -292,17 +276,54 @@
                             initialData={formData}
                             {onSuccess}
                             {onCancel}
+                            labels={{
+                                name: m.location_name(),
+                                street: m.street(),
+                                houseNumber: m.house_number(),
+                                addressSuffix: m.address_suffix(),
+                                zip: m.zip_code(),
+                                city: m.city(),
+                                state: m.state_region(),
+                                country: m.country(),
+                                roomId: m.room_id(),
+                                latitude: m.latitude(),
+                                longitude: m.longitude(),
+                                what3words: m.what3words(),
+                                inclusivitySupport: m.inclusivity_support(),
+                                isPublic: m.public(),
+                                heroImage: m.hero_image(),
+                                saveChanges: m.save_changes(),
+                                createLocation: m.create_location(),
+                                cancel: m.cancel(),
+                                saving: m.loading(),
+                                creating: m.creating(),
+                                successfullySaved: m.successfully_saved(),
+                                errorSomethingWentWrong: m.something_went_wrong(),
+                                enterLocationName: m.enter_location_name(),
+                                streetName: m.street_placeholder(),
+                                houseNumberPlaceholder: m.house_number_placeholder(),
+                                addressSuffixPlaceholder: m.address_suffix_placeholder(),
+                                zipCodePlaceholder: m.zip_code_placeholder(),
+                                cityNamePlaceholder: m.city_placeholder(),
+                                statePlaceholder: m.state_placeholder(),
+                                countryPlaceholder: m.country_placeholder(),
+                                enterRoomId: m.room_id_placeholder(),
+                                latitudePlaceholder: m.latitude_placeholder(),
+                                longitudePlaceholder: m.longitude_placeholder(),
+                                what3wordsPlaceholder: m.what3words_placeholder(),
+                                inclusivitySupportPlaceholder: m.accessibility_info(),
+                            }}
                         />
                     {/snippet}
                 </EntityManager>
                 <!-- Hidden input for submission -->
                 <input
-                    {...getField("locationIds").as(
+                    {...remoteFunction.fields.locationIds.as(
                         "hidden",
                         JSON.stringify(selectedLocationIds),
                     )}
                 />
-                {#each getField("locationIds").issues() ?? [] as issue}
+                {#each remoteFunction.fields.locationIds.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             {/if}
@@ -324,7 +345,7 @@
                         >{m.visualization()}</label
                     >
                     <select
-                        {...getField("uiMode").as("text")}
+                        {...remoteFunction.fields.uiMode.as("text")}
                         value={uiMode}
                         onchange={(e) => {
                             uiMode = e.currentTarget.value;
@@ -344,7 +365,7 @@
                         >{m.time_range_mode()}</label
                     >
                     <select
-                        {...getField("rangeMode").as("text")}
+                        {...remoteFunction.fields.rangeMode.as("text")}
                         value={rangeMode}
                         onchange={(e) => {
                             rangeMode = e.currentTarget.value as any;
@@ -366,16 +387,13 @@
                     >{m.loop_duration_seconds()}</label
                 >
                 <input
-                    {...getField("loopDuration").as("number")}
-                    value={getField("loopDuration").value() ??
-                        initialData?.loopDuration ??
-                        5}
+                    {...remoteFunction.fields.loopDuration.as("number", initialData?.loopDuration ?? 5)}
                     min="3"
                     required
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 />
                 <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
-                {#each getField("loopDuration").issues() ?? [] as issue}
+                {#each remoteFunction.fields.loopDuration.issues() as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -388,14 +406,12 @@
                         >{m.look_ahead_days()}</label
                     >
                     <input
-                        {...getField("lookAheadDays").as("number")}
-                        value={getField("lookAheadDays").value() ??
-                            lookAheadDays}
+                        {...remoteFunction.fields.lookAheadDays.as("number", lookAheadDays)}
                         min="0"
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each getField("lookAheadDays").issues() ?? [] as issue}
+                    {#each remoteFunction.fields.lookAheadDays.issues() as issue}
                         <p class="mt-1 text-sm text-red-600">
                             {issue.message}
                         </p>
@@ -409,13 +425,12 @@
                         >{m.look_past_days()}</label
                     >
                     <input
-                        {...getField("lookPastDays").as("number")}
-                        value={getField("lookPastDays").value() ?? lookPastDays}
+                        {...remoteFunction.fields.lookPastDays.as("number", lookPastDays)}
                         min="0"
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each getField("lookPastDays").issues() ?? [] as issue}
+                    {#each remoteFunction.fields.lookPastDays.issues() as issue}
                         <p class="mt-1 text-sm text-red-600">
                             {issue.message}
                         </p>
@@ -486,7 +501,7 @@
                         >{m.start_date()}</label
                     >
                     <input
-                        {...getField("startDate").as("datetime-local")}
+                        {...remoteFunction.fields.startDate.as("datetime-local")}
                         value={startDate}
                         oninput={(e) => {
                             startDate = e.currentTarget.value;
@@ -504,7 +519,7 @@
                         >{m.end_date()}</label
                     >
                     <input
-                        {...getField("endDate").as("datetime-local")}
+                        {...remoteFunction.fields.endDate.as("datetime-local")}
                         value={endDate}
                         oninput={(e) => {
                             endDate = e.currentTarget.value;

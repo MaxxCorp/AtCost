@@ -4,7 +4,6 @@
     import { Button } from "../button";
     import { goto } from "$app/navigation";
     import type { Snippet } from "svelte";
-    import { untrack } from "svelte";
 
     let {
         remoteFunction,
@@ -30,82 +29,198 @@
         labels?: any;
     } = $props();
 
-    // Initialize remoteFunction if it's a definition function to ensure reactive context
-    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
-
-    const i18n = $derived({
-        name: labels?.name ?? "Name",
-        street: labels?.street ?? "Street",
-        houseNumber: labels?.houseNumber ?? "House Number",
-        addressSuffix: labels?.addressSuffix ?? "Address Suffix",
-        zip: labels?.zip ?? "ZIP Code",
-        city: labels?.city ?? "City",
-        state: labels?.state ?? "State/Region",
-        country: labels?.country ?? "Country",
-        roomId: labels?.roomId ?? "Room ID",
-        latitude: labels?.latitude ?? "Latitude",
-        longitude: labels?.longitude ?? "Longitude",
-        what3words: labels?.what3words ?? "what3words",
-        inclusivitySupport: labels?.inclusivitySupport ?? "Inclusivity Support",
-        isPublic: labels?.isPublic ?? "Public",
-        saveChanges: labels?.saveChanges ?? "Save Changes",
-        createLocation: labels?.createLocation ?? "Create Location",
-        cancel: labels?.cancel ?? "Cancel",
-        saving: labels?.saving ?? "Saving...",
-        creating: labels?.creating ?? "Creating...",
-        successfullySaved: labels?.successfullySaved ?? "Successfully Saved!",
-        errorSomethingWentWrong: labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong",
-        enterLocationName: labels?.enterLocationName ?? "Enter location name",
-        streetName: labels?.streetName ?? "Street name",
-        houseNumberPlaceholder: labels?.houseNumberPlaceholder ?? "e.g. 10A",
-        addressSuffixPlaceholder: labels?.addressSuffixPlaceholder ?? "e.g. Backyard, 2nd floor",
-        zipCodePlaceholder: labels?.zipCodePlaceholder ?? "Postal code",
-        cityNamePlaceholder: labels?.cityNamePlaceholder ?? "City name",
-        statePlaceholder: labels?.statePlaceholder ?? "State",
-        countryPlaceholder: labels?.countryPlaceholder ?? "Country",
-        enterRoomId: labels?.enterRoomId ?? "Enter room ID (e.g. 101)",
-        latitudePlaceholder: labels?.latitudePlaceholder ?? "Latitude",
-        longitudePlaceholder: labels?.longitudePlaceholder ?? "Longitude",
-        what3wordsPlaceholder: labels?.what3wordsPlaceholder ?? "e.g. filled.count.soap",
-        inclusivitySupportPlaceholder: labels?.inclusivitySupportPlaceholder ?? "Accessibility and inclusivity information",
-        heroImage: labels?.heroImage ?? "Hero Image",
-        pleaseFixValidation: labels?.pleaseFixValidation ?? "Please fix the validation errors in the form.",
-    });
+    const i18n = {
+        get name() {
+            return labels?.name ?? "Name";
+        },
+        get description() {
+            return labels?.description ?? "Description";
+        },
+        get capacity() {
+            return labels?.capacity ?? "Capacity";
+        },
+        get street() {
+            return labels?.street ?? "Street";
+        },
+        get houseNumber() {
+            return labels?.houseNumber ?? "House Number";
+        },
+        get addressSuffix() {
+            return labels?.addressSuffix ?? "Address Suffix";
+        },
+        get zip() {
+            return labels?.zip ?? "ZIP Code";
+        },
+        get city() {
+            return labels?.city ?? "City";
+        },
+        get state() {
+            return labels?.state ?? "State/Region";
+        },
+        get country() {
+            return labels?.country ?? "Country";
+        },
+        get roomId() {
+            return labels?.roomId ?? "Room ID";
+        },
+        get latitude() {
+            return labels?.latitude ?? "Latitude";
+        },
+        get longitude() {
+            return labels?.longitude ?? "Longitude";
+        },
+        get what3words() {
+            return labels?.what3words ?? "what3words";
+        },
+        get inclusivitySupport() {
+            return labels?.inclusivitySupport ?? "Inclusivity Support";
+        },
+        get isPublic() {
+            return labels?.isPublic ?? "Public";
+        },
+        get saveChanges() {
+            return labels?.saveChanges ?? "Save Changes";
+        },
+        get createLocation() {
+            return labels?.createLocation ?? "Create Location";
+        },
+        get cancel() {
+            return labels?.cancel ?? "Cancel";
+        },
+        get saving() {
+            return labels?.saving ?? "Saving...";
+        },
+        get creating() {
+            return labels?.creating ?? "Creating...";
+        },
+        get successfullySaved() {
+            return labels?.successfullySaved ?? "Successfully Saved!";
+        },
+        get errorSomethingWentWrong() {
+            return (
+                labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong"
+            );
+        },
+        get enterLocationName() {
+            return labels?.enterLocationName ?? "Enter location name";
+        },
+        get streetName() {
+            return labels?.streetName ?? "Street name";
+        },
+        get houseNumberPlaceholder() {
+            return labels?.houseNumberPlaceholder ?? "e.g. 10A";
+        },
+        get addressSuffixPlaceholder() {
+            return (
+                labels?.addressSuffixPlaceholder ?? "e.g. Backyard, 2nd floor"
+            );
+        },
+        get zipCodePlaceholder() {
+            return labels?.zipCodePlaceholder ?? "Postal code";
+        },
+        get cityNamePlaceholder() {
+            return labels?.cityNamePlaceholder ?? "City name";
+        },
+        get statePlaceholder() {
+            return labels?.statePlaceholder ?? "State";
+        },
+        get countryPlaceholder() {
+            return labels?.countryPlaceholder ?? "Country";
+        },
+        get enterRoomId() {
+            return labels?.enterRoomId ?? "Enter room ID (e.g. 101)";
+        },
+        get latitudePlaceholder() {
+            return labels?.latitudePlaceholder ?? "Latitude";
+        },
+        get longitudePlaceholder() {
+            return labels?.longitudePlaceholder ?? "Longitude";
+        },
+        get what3wordsPlaceholder() {
+            return labels?.what3wordsPlaceholder ?? "e.g. filled.count.soap";
+        },
+        get inclusivitySupportPlaceholder() {
+            return (
+                labels?.inclusivitySupportPlaceholder ??
+                "Accessibility and inclusivity information"
+            );
+        },
+        get heroImage() {
+            return labels?.heroImage ?? "Hero Image";
+        },
+        get pleaseFixValidation() {
+            return (
+                labels?.pleaseFixValidation ??
+                "Please fix the validation errors in the form."
+            );
+        },
+    };
 
     let submissionTriggered = $state(false);
     $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
+        const issues = (remoteFunction as any).allIssues?.() ?? [];
         if (submissionTriggered && issues.length > 0) {
             toast.error(i18n.pleaseFixValidation);
             submissionTriggered = false;
         }
     });
 
-    function getField(name: string) {
-        const def = { as: (type: string, value?: any) => ({ name, type, value }), issues: () => [], value: () => undefined };
-        if (!(rf as any)?.fields) return def;
-        const parts = name.split(".");
-        let current: any = (rf as any).fields;
-        for (const part of parts) {
-            if (current?.[part] === undefined) return def;
-            current = current[part];
+    $effect(() => {
+        const data = initialData || {};
+        console.log("LocationForm initialData:", data);
+        console.log("LocationForm validationSchema:", validationSchema);
+        
+        // Extract keys from Valibot schema (handles object, intersect, pipe, etc.)
+        const getKeys = (s: any): string[] => {
+            if (!s) return [];
+            // Handle v.object
+            if (s.entries) return Object.keys(s.entries);
+            // Handle v.intersect, v.union
+            if (s.options) return s.options.flatMap(getKeys);
+            // Handle v.optional, v.nullable, etc.
+            if (s.wrapped) return getKeys(s.wrapped);
+            // Handle v.pipe
+            if (s.pipe && Array.isArray(s.pipe) && s.pipe.length > 0) return getKeys(s.pipe[0]);
+            return [];
+        };
+
+        const schemaKeys = [...new Set(getKeys(validationSchema))];
+        console.log("LocationForm schemaKeys:", schemaKeys);
+        console.log("LocationForm remoteFunction fields:", Object.keys(remoteFunction.fields || {}));
+        
+        for (const key of schemaKeys) {
+            const value = data[key];
+            const defaultValue = key === "isPublic" ? true : "";
+            const finalValue = value ?? defaultValue;
+            
+            if (remoteFunction.fields[key]) {
+                console.log(`Setting field ${key} to:`, finalValue);
+                remoteFunction.fields[key].set(finalValue);
+            } else {
+                console.warn(`Field ${key} not found in remoteFunction.fields`);
+            }
         }
-        return current ?? def;
-    }
+    });
 </script>
 
 <form
     class="space-y-4"
-    {...remoteFunction.preflight(validationSchema).enhance(async ({ submit }: { submit: any }) => {
-            const handle = rf;
+    {...remoteFunction
+        .preflight(validationSchema)
+        .enhance(async ({ submit }: { submit: any }) => {
             submissionTriggered = false;
             try {
                 await submit();
-                const result = untrack(() => (handle as any).result);
-                if (untrack(() => (handle as any).error) || (result && result.success === false)) {
+                const result = (remoteFunction as any).result;
+                const error = (remoteFunction as any).error;
+
+                if (error || (result && result.success === false)) {
                     submissionTriggered = true;
                     toast.error(
-                        untrack(() => (handle as any).error?.message) || result?.error?.message || result?.error || i18n.errorSomethingWentWrong,
+                        error?.message ||
+                            result?.error?.message ||
+                            result?.error ||
+                            i18n.errorSomethingWentWrong,
                     );
                     return;
                 }
@@ -120,25 +235,43 @@
             }
         })}
 >
-    {#if isUpdating && initialData}
-        <input {...getField("id").as("hidden", initialData.id)} />
+    {#if isUpdating && initialData?.id}
+        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
     {/if}
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{i18n.name}</span>
         <input
-            {...getField("name").as("text", initialData?.name ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(getField(
-                'name',
-            ).issues()?.length ?? 0) > 0
+            {...remoteFunction.fields.name.as("text")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(remoteFunction.fields.name.issues()
+                ?.length ?? 0) > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={i18n.enterLocationName}
-            onblur={() => rf.validate()}
+            onblur={() => remoteFunction.validate()}
         />
-        {#each getField("name").issues() ?? [] as issue}
+        {#each remoteFunction.fields.name.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
+    </label>
+
+    <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.description}</span>
+        <textarea
+            {...remoteFunction.fields.description.as("text")}
+            class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Describe the location..."
+            rows="2"
+        ></textarea>
+    </label>
+
+    <label class="block">
+        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.capacity}</span>
+        <input
+            {...remoteFunction.fields.capacity.as("text")}
+            class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="e.g. 50 people"
+        />
     </label>
 
     {#if heroImageSlot}
@@ -146,9 +279,10 @@
     {/if}
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.street}</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.street}</span
+        >
         <input
-            {...getField("street").as("text", initialData?.street ?? "")}
+            {...remoteFunction.fields.street.as("text")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.streetName}
         />
@@ -160,7 +294,7 @@
                 >{i18n.houseNumber}</span
             >
             <input
-                {...getField("houseNumber").as("text", initialData?.houseNumber ?? "")}
+                {...remoteFunction.fields.houseNumber.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.houseNumberPlaceholder}
             />
@@ -170,7 +304,7 @@
                 >{i18n.addressSuffix}</span
             >
             <input
-                {...getField("addressSuffix").as("text", initialData?.addressSuffix ?? "")}
+                {...remoteFunction.fields.addressSuffix.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.addressSuffixPlaceholder}
             />
@@ -179,17 +313,21 @@
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">{i18n.zip}</span>
+            <span class="text-sm font-medium text-gray-700 mb-2"
+                >{i18n.zip}</span
+            >
             <input
-                {...getField("zip").as("text", initialData?.zip ?? "")}
+                {...remoteFunction.fields.zip.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.zipCodePlaceholder}
             />
         </label>
         <label class="block col-span-2">
-            <span class="text-sm font-medium text-gray-700 mb-2">{i18n.city}</span>
+            <span class="text-sm font-medium text-gray-700 mb-2"
+                >{i18n.city}</span
+            >
             <input
-                {...getField("city").as("text", initialData?.city ?? "")}
+                {...remoteFunction.fields.city.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.cityNamePlaceholder}
             />
@@ -202,15 +340,17 @@
                 >{i18n.state}</span
             >
             <input
-                {...getField("state").as("text", initialData?.state ?? "")}
+                {...remoteFunction.fields.state.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.statePlaceholder}
             />
         </label>
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">{i18n.country}</span>
+            <span class="text-sm font-medium text-gray-700 mb-2"
+                >{i18n.country}</span
+            >
             <input
-                {...getField("country").as("text", initialData?.country ?? "")}
+                {...remoteFunction.fields.country.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={i18n.countryPlaceholder}
             />
@@ -218,9 +358,10 @@
     </div>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.roomId}</span>
+        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.roomId}</span
+        >
         <input
-            {...getField("roomId").as("text", initialData?.roomId ?? "")}
+            {...remoteFunction.fields.roomId.as("text")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.enterRoomId}
         />
@@ -228,9 +369,11 @@
 
     <div class="grid grid-cols-2 gap-4">
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">{i18n.latitude}</span>
+            <span class="text-sm font-medium text-gray-700 mb-2"
+                >{i18n.latitude}</span
+            >
             <input
-                {...getField("latitude").as("text", initialData?.latitude ?? "")}
+                {...remoteFunction.fields.latitude.as("text")}
                 type="number"
                 step="any"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -238,10 +381,11 @@
             />
         </label>
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">{i18n.longitude}</span
+            <span class="text-sm font-medium text-gray-700 mb-2"
+                >{i18n.longitude}</span
             >
             <input
-                {...getField("longitude").as("text", initialData?.longitude ?? "")}
+                {...remoteFunction.fields.longitude.as("text")}
                 type="number"
                 step="any"
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -251,9 +395,11 @@
     </div>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.what3words}</span>
+        <span class="text-sm font-medium text-gray-700 mb-2"
+            >{i18n.what3words}</span
+        >
         <input
-            {...getField("what3words").as("text", initialData?.what3words ?? "")}
+            {...remoteFunction.fields.what3words.as("text")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.what3wordsPlaceholder}
         />
@@ -264,7 +410,7 @@
             >{i18n.inclusivitySupport}</span
         >
         <textarea
-            {...getField("inclusivitySupport").as("text", initialData?.inclusivitySupport ?? "")}
+            {...remoteFunction.fields.inclusivitySupport.as("text")}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder={i18n.inclusivitySupportPlaceholder}
             rows="3"
@@ -273,7 +419,7 @@
 
     <label class="flex items-center gap-2 cursor-pointer py-2">
         <input
-            {...getField("isPublic").as("checkbox", initialData?.isPublic ?? true)}
+            {...remoteFunction.fields.isPublic.as("checkbox", initialData?.isPublic ?? true)}
             type="checkbox"
             class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
         />
@@ -288,7 +434,7 @@
         <AsyncButton
             type="submit"
             loadingLabel={isUpdating ? i18n.saving : i18n.creating}
-            loading={(rf as any).pending}
+            loading={(remoteFunction as any).pending}
         >
             {isUpdating ? i18n.saveChanges : i18n.createLocation}
         </AsyncButton>

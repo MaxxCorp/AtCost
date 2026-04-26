@@ -10,7 +10,7 @@
     import { User, Pencil, Trash2, Eye, Phone, Mail, MapPin } from "@lucide/svelte";
 
     import { EntityManager } from "@ac/ui";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete } from "@ac/ui";
 
     // Type definition for the list items
     type Contact = Awaited<ReturnType<typeof listContacts>>["data"][number];

@@ -7,10 +7,8 @@
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import LocationForm from "$lib/components/locations/LocationForm.svelte";
-    import { EntityManager } from "@ac/ui";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
@@ -27,7 +25,7 @@
     import {
         createLocationSchema,
         updateLocationSchema,
-    } from "$lib/validations/locations";
+    } from "@ac/validations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import {
         fetchEntityLocations,
@@ -47,7 +45,7 @@
     import {
         createContactSchema,
         updateContactSchema,
-    } from "$lib/validations/contacts";
+    } from "@ac/validations";
     import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { onMount } from "svelte";
     import { MapPin, User } from "@lucide/svelte";
@@ -68,7 +66,7 @@
 
     // svelte-ignore state_referenced_locally
     let contentValue = $state(
-        getField("content").value() ?? initialData?.content ?? "",
+        initialData?.content ?? "",
     );
     // svelte-ignore state_referenced_locally
     let tagsString = $state(
@@ -109,21 +107,7 @@
         ),
     );
 
-    function getField(name: string) {
-        const def = {
-            as: () => ({}),
-            issues: () => [],
-            value: () => undefined,
-        };
-        if (!(rf as any)?.fields) return def;
-        const parts = name.split(".");
-        let current: any = (rf as any).fields;
-        for (const part of parts) {
-            if (current?.[part] === undefined) return def;
-            current = current[part];
-        }
-        return current ?? def;
-    }
+
 
     const formSetup = $derived(
         (rf as any)
@@ -191,16 +175,16 @@
 
     <form {...formSetup} class="space-y-6">
         {#if isUpdating && initialData}
-            <input {...getField("id").as("hidden", initialData.id)} />
+            <input {...rf.fields.id.as("hidden", initialData.id)} />
         {/if}
 
-        <input {...getField("isPublic").as("hidden", isPublic.toString())} />
+        <input {...rf.fields.isPublic.as("hidden", isPublic.toString())} />
         <!-- Send tagNames as JSON string -->
-        <input name="tagNames" value={tagNamesJson} type="hidden" />
+        <input {...rf.fields.tagNames.as("hidden", tagNamesJson)} />
         <!-- We no longer strictly need tagIds for submission if using names -->
 
         <input
-            {...getField("contactIds").as(
+            {...rf.fields.contactIds.as(
                 "hidden",
                 JSON.stringify(selectedContactIds),
             )}
@@ -219,15 +203,12 @@
                     {m.title()} <span class="text-red-500">*</span>
                 </label>
                 <input
-                    {...getField("title").as("text")}
+                    {...rf.fields.title.as("text", initialData?.title ?? "")}
                     required
-                    value={getField("title").value() ??
-                        initialData?.title ??
-                        ""}
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     placeholder={m.announcement_title_placeholder()}
                 />
-                {#each getField("title").issues() ?? [] as issue}
+                {#each rf.fields.title.issues() as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -243,11 +224,11 @@
                     <RichTextEditor bind:value={contentValue} />
                     {#if contentValue}
                         <input
-                            {...getField("content").as("hidden", contentValue)}
+                            {...rf.fields.content.as("hidden", contentValue)}
                         />
                     {/if}
                 </div>
-                {#each getField("content").issues() ?? [] as issue}
+                {#each rf.fields.content.issues() as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -440,6 +421,43 @@
                                 initialData={formData}
                                 {onSuccess}
                                 {onCancel}
+                                labels={{
+                                    name: m.location_name(),
+                                    street: m.street(),
+                                    houseNumber: m.house_number(),
+                                    addressSuffix: m.address_suffix(),
+                                    zip: m.zip_code(),
+                                    city: m.city(),
+                                    state: m.state_region(),
+                                    country: m.country(),
+                                    roomId: m.room_id(),
+                                    latitude: m.latitude(),
+                                    longitude: m.longitude(),
+                                    what3words: m.what3words(),
+                                    inclusivitySupport: m.inclusivity_support(),
+                                    isPublic: m.public(),
+                                    heroImage: m.hero_image(),
+                                    saveChanges: m.save_changes(),
+                                    createLocation: m.create_location(),
+                                    cancel: m.cancel(),
+                                    saving: m.loading(),
+                                    creating: m.creating(),
+                                    successfullySaved: m.successfully_saved(),
+                                    errorSomethingWentWrong: m.something_went_wrong(),
+                                    enterLocationName: m.enter_location_name(),
+                                    streetName: m.street_placeholder(),
+                                    houseNumberPlaceholder: m.house_number_placeholder(),
+                                    addressSuffixPlaceholder: m.address_suffix_placeholder(),
+                                    zipCodePlaceholder: m.zip_code_placeholder(),
+                                    cityNamePlaceholder: m.city_placeholder(),
+                                    statePlaceholder: m.state_placeholder(),
+                                    countryPlaceholder: m.country_placeholder(),
+                                    enterRoomId: m.room_id_placeholder(),
+                                    latitudePlaceholder: m.latitude_placeholder(),
+                                    longitudePlaceholder: m.longitude_placeholder(),
+                                    what3wordsPlaceholder: m.what3words_placeholder(),
+                                    inclusivitySupportPlaceholder: m.accessibility_info(),
+                                }}
                             />
                         {/snippet}
                     </EntityManager>
@@ -451,7 +469,7 @@
                     </div>
                 {/if}
                 <input
-                    {...getField("locationIds").as(
+                    {...rf.fields.locationIds.as(
                         "hidden",
                         JSON.stringify(selectedLocationIds),
                     )}
@@ -559,7 +577,7 @@
     </div>
 
         <SyncCheckboxBlock
-            syncFieldConfig={getField("syncIds")}
+            syncFieldConfig={rf.fields.syncIds}
             initialSelectedIds={initialData?.syncIds || []}
         />
 

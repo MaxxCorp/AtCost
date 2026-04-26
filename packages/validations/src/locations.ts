@@ -3,6 +3,8 @@ import type { Location as DbLocation } from '@ac/db';
 
 export const locationBaseSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
+    description: v.optional(v.string()),
+    capacity: v.optional(v.string()),
     street: v.optional(v.string()),
     houseNumber: v.optional(v.string()),
     addressSuffix: v.optional(v.string()),
@@ -39,3 +41,14 @@ export const LocationPaginationSchema = v.optional(v.object({
     search: v.optional(v.string()),
     city: v.optional(v.union([v.string(), v.array(v.string())])),
 }), {});
+
+export const locationAssociationSchema = v.object({
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk']),
+    entityId: v.string(),
+    locationId: v.pipe(v.string(), v.uuid()),
+});
+
+export const getLocationAssociationsSchema = v.object({
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk']),
+    entityId: v.string(),
+});

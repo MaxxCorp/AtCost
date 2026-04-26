@@ -322,16 +322,7 @@
 
     import * as m from "$lib/paraglide/messages";
 
-    function getFieldMetadata(name: string) {
-        if (!rf?.fields) return { as: () => ({}), issues: () => [] };
-        const parts = name.split(".");
-        let current = rf.fields;
-        for (const part of parts) {
-            if (!current?.[part]) return { as: () => ({}), issues: () => [] };
-            current = current[part];
-        }
-        return current;
-    }
+
 
     let prevIssuesLength = $state(0);
     function handleStatusChange(newStatus: string) {
@@ -372,7 +363,7 @@
     <!-- RPC-based hidden inputs with {#if} guards as requested by USER -->
     {#if talentId || talentData.id}
         <input
-            {...getFieldMetadata("talent.id").as(
+            {...rf.fields.talent.fields.id.as(
                 "hidden",
                 talentId || talentData.id,
             )}
@@ -405,7 +396,7 @@
                                 <Briefcase size={16} class="text-gray-400" />
                             </div>
                             <input
-                                {...getFieldMetadata("talent.jobTitle").as(
+                                {...rf.fields.talent.fields.jobTitle.as(
                                     "text",
                                 )}
                                 bind:value={talentData.jobTitle}
@@ -422,7 +413,7 @@
                             >Status</label
                         >
                         <select
-                            {...getFieldMetadata("talent.status").as("select")}
+                            {...rf.fields.talent.fields.status.as("select")}
                             bind:value={talentData.status}
                             onchange={(e) =>
                                 handleStatusChange(e.currentTarget.value)}
@@ -448,9 +439,7 @@
                                 <DollarSign size={16} class="text-gray-400" />
                             </div>
                             <input
-                                {...getFieldMetadata(
-                                    "talent.salaryExpectation",
-                                ).as("text")}
+                                {...rf.fields.talent.fields.salaryExpectation.as("text")}
                                 bind:value={talentData.salaryExpectation}
                                 placeholder="e.g. 85,000"
                                 class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -466,7 +455,7 @@
                         >
                         <input
                             type="date"
-                            {...getFieldMetadata("talent.availabilityDate").as(
+                            {...rf.fields.talent.fields.availabilityDate.as(
                                 "date",
                             )}
                             bind:value={talentData.availabilityDate}
@@ -481,7 +470,7 @@
                             >Onboarding</label
                         >
                         <input
-                            {...getFieldMetadata("talent.onboardingStatus").as(
+                            {...rf.fields.talent.fields.onboardingStatus.as(
                                 "text",
                             )}
                             bind:value={talentData.onboardingStatus}
@@ -502,7 +491,7 @@
                     Internal Notes
                 </h3>
                 <textarea
-                    {...getFieldMetadata("talent.internalNotes").as("textarea")}
+                    {...rf.fields.talent.fields.internalNotes.as("textarea")}
                     bind:value={talentData.internalNotes}
                     rows="4"
                     placeholder="Private notes for recruitment team..."
@@ -513,12 +502,12 @@
 
     {#if contactData.id}
         <input
-            {...getFieldMetadata("contact.id").as("hidden", contactData.id)}
+            {...rf.fields.contact.fields.id.as("hidden", contactData.id)}
         />
     {/if}
     {#if contactData.displayName}
         <input
-            {...getFieldMetadata("contact.displayName").as(
+            {...rf.fields.contact.fields.displayName.as(
                 "hidden",
                 contactData.displayName,
             )}
@@ -526,7 +515,7 @@
     {/if}
     {#if contactData.givenName}
         <input
-            {...getFieldMetadata("contact.givenName").as(
+            {...rf.fields.contact.fields.givenName.as(
                 "hidden",
                 contactData.givenName,
             )}
@@ -534,7 +523,7 @@
     {/if}
     {#if contactData.familyName}
         <input
-            {...getFieldMetadata("contact.familyName").as(
+            {...rf.fields.contact.fields.familyName.as(
                 "hidden",
                 contactData.familyName,
             )}
@@ -542,7 +531,7 @@
     {/if}
     {#if contactData.middleName}
         <input
-            {...getFieldMetadata("contact.middleName").as(
+            {...rf.fields.contact.fields.middleName.as(
                 "hidden",
                 contactData.middleName,
             )}
@@ -550,7 +539,7 @@
     {/if}
     {#if contactData.honorificPrefix}
         <input
-            {...getFieldMetadata("contact.honorificPrefix").as(
+            {...rf.fields.contact.fields.honorificPrefix.as(
                 "hidden",
                 contactData.honorificPrefix,
             )}
@@ -558,7 +547,7 @@
     {/if}
     {#if contactData.honorificSuffix}
         <input
-            {...getFieldMetadata("contact.honorificSuffix").as(
+            {...rf.fields.contact.fields.honorificSuffix.as(
                 "hidden",
                 contactData.honorificSuffix,
             )}
@@ -566,7 +555,7 @@
     {/if}
     {#if contactData.birthday}
         <input
-            {...getFieldMetadata("contact.birthday").as(
+            {...rf.fields.contact.fields.birthday.as(
                 "hidden",
                 contactData.birthday,
             )}
@@ -574,7 +563,7 @@
     {/if}
     {#if contactData.gender}
         <input
-            {...getFieldMetadata("contact.gender").as(
+            {...rf.fields.contact.fields.gender.as(
                 "hidden",
                 contactData.gender,
             )}
@@ -582,7 +571,7 @@
     {/if}
     {#if contactData.company}
         <input
-            {...getFieldMetadata("contact.company").as(
+            {...rf.fields.contact.fields.company.as(
                 "hidden",
                 contactData.company,
             )}
@@ -590,7 +579,7 @@
     {/if}
     {#if contactData.role}
         <input
-            {...getFieldMetadata("contact.role").as(
+            {...rf.fields.contact.fields.role.as(
                 "hidden",
                 contactData.role,
             )}
@@ -598,7 +587,7 @@
     {/if}
     {#if contactData.department}
         <input
-            {...getFieldMetadata("contact.department").as(
+            {...rf.fields.contact.fields.department.as(
                 "hidden",
                 contactData.department,
             )}
@@ -606,7 +595,7 @@
     {/if}
     {#if contactData.notes}
         <input
-            {...getFieldMetadata("contact.notes").as(
+            {...rf.fields.contact.fields.notes.as(
                 "hidden",
                 contactData.notes,
             )}
@@ -614,41 +603,41 @@
     {/if}
     {#if contactData.isPublic}
         <input
-            {...getFieldMetadata("contact.isPublic").as(
+            {...rf.fields.contact.fields.isPublic.as(
                 "hidden",
                 contactData.isPublic,
             )}
         />
     {/if}
     {#if emailsJson}
-        <input {...getFieldMetadata("emailsJson").as("hidden", emailsJson)} />
+        <input {...rf.fields.emailsJson.as("hidden", emailsJson)} />
     {/if}
     {#if phonesJson}
-        <input {...getFieldMetadata("phonesJson").as("hidden", phonesJson)} />
+        <input {...rf.fields.phonesJson.as("hidden", phonesJson)} />
     {/if}
     {#if relationsJson}
         <input
-            {...getFieldMetadata("relationsJson").as("hidden", relationsJson)}
+            {...rf.fields.relationsJson.as("hidden", relationsJson)}
         />
     {/if}
     {#if tagsJson}
-        <input {...getFieldMetadata("tagsJson").as("hidden", tagsJson)} />
+        <input {...rf.fields.tagsJson.as("hidden", tagsJson)} />
     {/if}
     {#if addressesJson}
         <input
-            {...getFieldMetadata("addressesJson").as("hidden", addressesJson)}
+            {...rf.fields.addressesJson.as("hidden", addressesJson)}
         />
     {/if}
     {#if locationIdsJson}
         <input
-            {...getFieldMetadata("locationIdsJson").as(
+            {...rf.fields.locationIdsJson.as(
                 "hidden",
                 locationIdsJson,
             )}
         />
     {/if}
     <input
-        {...getFieldMetadata("linkedUserId").as("hidden", linkedUserId || "")}
+        {...rf.fields.linkedUserId.as("hidden", linkedUserId || "")}
     />
 
     <div class="grid grid-cols-1 gap-6">
@@ -744,7 +733,7 @@
                                     const res = await listContacts();
                                     return res.data;
                                 }}
-                                getField={(name) => crf.fields?.[name] ?? { as: () => ({}), issues: () => [] }}
+                                rf={crf}
                                 onEmailChange={tryAutoLink}
                                 listTagsRemote={listTagsHandle}
                                 createTagRemote={createTagHandle}
@@ -834,11 +823,7 @@
                                     >({l.city})</span
                                 >
                             {/if}
-                            {#each getFieldMetadata("name").issues() ?? [] as issue}
-                                <p class="mt-1 text-xs text-red-500">
-                                    {issue.message}
-                                </p>
-                            {/each}
+
                         {/snippet}
 
                         {#snippet renderForm({

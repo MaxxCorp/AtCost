@@ -15,7 +15,7 @@
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
 	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+	import { handleDelete } from "@ac/ui";
 	import { toast } from "svelte-sonner";
 	import {
 		Calendar,

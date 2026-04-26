@@ -7,7 +7,7 @@
     import Button from "$lib/components/ui/button/button.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { EntityManager } from "@ac/ui";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete } from "@ac/ui";
     import { Megaphone, Calendar, Earth, Pencil, Trash2 } from "@lucide/svelte";
 
     type Announcement = Awaited<ReturnType<typeof listAnnouncements>>["data"][number];

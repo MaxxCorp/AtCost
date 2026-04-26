@@ -8,7 +8,7 @@
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { Monitor, Trash2, Pencil, MapPin } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
-    import { handleDelete } from "$lib/hooks/handleDelete.svelte";
+    import { handleDelete } from "@ac/ui";
 
     type Kiosk = Awaited<ReturnType<typeof listKiosks>>["data"][number];
 </script>

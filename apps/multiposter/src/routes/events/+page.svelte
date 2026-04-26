@@ -10,8 +10,7 @@
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-	import { handleDelete } from "$lib/hooks/handleDelete.svelte";
-	import { EntityManager } from "@ac/ui";
+	import { handleDelete, EntityManager } from "@ac/ui";
 	import {
 		Calendar,
 		MapPin,

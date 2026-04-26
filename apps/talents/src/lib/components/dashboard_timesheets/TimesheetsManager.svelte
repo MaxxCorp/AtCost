@@ -20,7 +20,7 @@
     }>();
 
     // Dedicated action handle
-    const rf = manageTimesheets;
+    const rf = manageTimesheets as any;
     const fields = rf.fields;
 
     // UI State for form submission
@@ -51,17 +51,7 @@
         // Re-run the server-side load function
         await invalidateAll();
     }
-    function getFieldMetadata(name: string): any {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
-        if (!rf?.fields) return def;
-        const parts = name.split(".");
-        let current: any = (rf as any).fields; 
-        for (const part of parts) {
-            if (!current?.[part]) return def;
-            current = current[part];
-        }
-        return current ?? def;
-    }
+
 </script>
 
 <div class="space-y-6">
@@ -124,19 +114,19 @@
                                     })}
                                 >
                                     <!-- Proper SvelteKit Remote Form Hidden Inputs -->
-                                    <input {...getFieldMetadata('action').as('hidden' as any, formAction)} />
+                                    <input {...rf.fields.action.as('hidden', formAction)} />
                                     {#if profile?.id}
-                                        <input {...getFieldMetadata('talentId').as('hidden' as any, profile.id)} />
+                                        <input {...rf.fields.talentId.as('hidden', profile.id)} />
                                     {/if}
                                     {#if formAction === 'clock_out' && formEntryId}
-                                        <input {...getFieldMetadata('entryId').as('hidden' as any, formEntryId)} />
+                                        <input {...rf.fields.entryId.as('hidden', formEntryId)} />
                                     {/if}
                                     
                                     {#if formAction === 'clock_in'}
-                                        <input {...getFieldMetadata('type').as('hidden' as any, 'manual')} />
-                                        <input {...getFieldMetadata('startTime').as('hidden' as any, startTimeOverride)} />
+                                        <input {...rf.fields.type.as('hidden', 'manual')} />
+                                        <input {...rf.fields.startTime.as('hidden', startTimeOverride)} />
                                     {:else}
-                                        <input {...getFieldMetadata('endTime').as('hidden' as any, endTimeOverride)} />
+                                        <input {...rf.fields.endTime.as('hidden', endTimeOverride)} />
                                     {/if}
 
                                     <div class="flex flex-col gap-6 w-full">

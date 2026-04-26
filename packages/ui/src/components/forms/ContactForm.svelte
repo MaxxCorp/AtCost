@@ -195,17 +195,7 @@
         ),
     );
 
-    function getField(name: string) {
-        const def = { as: () => ({}), issues: () => [], value: () => undefined };
-        if (!(rf as any)?.fields) return def;
-        const parts = name.split(".");
-        let current: any = (rf as any).fields;
-        for (const part of parts) {
-            if (!current?.[part]) return def;
-            current = current[part];
-        }
-        return current ?? def;
-    }
+
 
     const prefix = $derived(contactId ? "data.contact" : "contact");
 </script>
@@ -236,14 +226,14 @@
     class="space-y-8"
 >
     {#if contactId}
-        <input {...getField("id").as("hidden", contactId)} />
+        <input {...rf.fields.id.as("hidden", contactId)} />
     {/if}
 
-    <input {...getField("emailsJson").as("hidden", emailsJson ?? "[]")} />
-    <input {...getField("phonesJson").as("hidden", phonesJson ?? "[]")} />
-    <input {...getField("relationsJson").as("hidden", relationsJson ?? "[]")} />
-    <input {...getField("addressesJson").as("hidden", addressesJson ?? "[]")} />
-    <input {...getField("tagsJson").as("hidden", tagsJson ?? "[]")} />
+    <input {...rf.fields.emailsJson.as("hidden", emailsJson ?? "[]")} />
+    <input {...rf.fields.phonesJson.as("hidden", phonesJson ?? "[]")} />
+    <input {...rf.fields.relationsJson.as("hidden", relationsJson ?? "[]")} />
+    <input {...rf.fields.addressesJson.as("hidden", addressesJson ?? "[]")} />
+    <input {...rf.fields.tagsJson.as("hidden", tagsJson ?? "[]")} />
 
     <ContactFields
         bind:contactData
@@ -257,7 +247,7 @@
         {contactId}
         {listContactsRemote}
         {labels}
-        {getField}
+        {rf}
         {listTagsRemote}
         {createTagRemote}
         {deleteTagRemote}
@@ -273,7 +263,7 @@
         })}
     {/if}
 
-    <input {...getField("locationIdsJson").as("hidden", locationIdsJson)} />
+    <input {...rf.fields.locationIdsJson.as("hidden", locationIdsJson)} />
 
     <div class="flex justify-end gap-3 pt-6 border-t">
         {#if onCancel}
