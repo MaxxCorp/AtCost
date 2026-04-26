@@ -120,6 +120,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		updatedAt: result.updatedAt.toISOString(),
 		startDateTime: result.startDateTime?.toISOString() ?? null,
 		endDateTime: result.endDateTime?.toISOString() ?? null,
+		locations: result.locations.map(l => l.location),
 		resourceIds: result.resources.map(r => r.resourceId),
 		contactIds: result.contacts.map(c => c.contactId),
 		locationIds: result.locations.map(l => l.locationId),

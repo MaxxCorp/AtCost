@@ -393,36 +393,37 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			},
 		});
 
-		if (fullEventData) {
-			// Compute resolved contact (duplicated from read.remote for self-containment)
-			const c = fullEventData.contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'))?.contact || fullEventData.contacts[0]?.contact;
-			let resolvedContact = null;
-			if (c) {
-				resolvedContact = {
-					name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
-					email: c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '',
-					phone: c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '',
-					qrCodeDataUrl: c.qrCodePath || undefined
-				};
-			}
+			if (fullEventData) {
+				// Compute resolved contact (duplicated from read.remote for self-containment)
+				const c = fullEventData.contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'))?.contact || fullEventData.contacts[0]?.contact;
+				let resolvedContact = null;
+				if (c) {
+					resolvedContact = {
+						name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
+						email: c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '',
+						phone: c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '',
+						qrCodeDataUrl: c.qrCodePath || undefined
+					};
+				}
 
-			const transformed = {
-				...fullEventData,
-				createdAt: fullEventData.createdAt.toISOString(),
-				updatedAt: fullEventData.updatedAt.toISOString(),
-				startDateTime: fullEventData.startDateTime?.toISOString() ?? null,
-				endDateTime: fullEventData.endDateTime?.toISOString() ?? null,
-				resourceIds: fullEventData.resources.map(r => r.resourceId),
-				contactIds: fullEventData.contacts.map(c => c.contactId),
-				locationIds: fullEventData.locations.map(l => l.locationId),
-				tags: fullEventData.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
-				syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
-				resolvedContact,
-			};
-			readEvent(data.id).set(transformed);
-		} else {
-			void readEvent(data.id).refresh();
-		}
+				const transformed = {
+					...fullEventData,
+					createdAt: fullEventData.createdAt.toISOString(),
+					updatedAt: fullEventData.updatedAt.toISOString(),
+					startDateTime: fullEventData.startDateTime?.toISOString() ?? null,
+					endDateTime: fullEventData.endDateTime?.toISOString() ?? null,
+					locations: fullEventData.locations.map(l => l.location),
+					resourceIds: fullEventData.resources.map(r => r.resourceId),
+					contactIds: fullEventData.contacts.map(c => c.contactId),
+					locationIds: fullEventData.locations.map(l => l.locationId),
+					tags: fullEventData.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
+					syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
+					resolvedContact,
+				};
+				readEvent(data.id).set(transformed);
+			} else {
+				void readEvent(data.id).refresh();
+			}
 
 		void listEvents().refresh();
 		console.log('--- updateEvent DONE ---');

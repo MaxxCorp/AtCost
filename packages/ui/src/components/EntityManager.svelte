@@ -361,18 +361,46 @@
         }
     });
 
+    // Async association fetching
     $effect(() => {
         if (fetchQuery) {
+            console.log(`[EntityManager] fetchQuery changed for entityId: ${entityId}, type: ${type}`);
             fetchingAssociations = true;
-            fetchQuery
-                .then((data: any) => {
-                    associatedItems = data;
-                    fetchingAssociations = false;
-                })
-                .catch((err: any) => {
-                    console.error("Failed to fetch associations", err);
-                    fetchingAssociations = false;
+            
+            // Access properties to ensure tracking if it's a reactive Query object
+            // SvelteKit Remote Functions (query) return objects that have .data and .pending
+            const data = (fetchQuery as any).data;
+            const pending = (fetchQuery as any).pending;
+            const error = (fetchQuery as any).error;
+
+            if (pending) {
+                fetchingAssociations = true;
+            } else if (data !== undefined) {
+                untrack(() => {
+                    associatedItems = Array.isArray(data) ? data : (data?.data ?? []);
                 });
+                fetchingAssociations = false;
+            } else if (error) {
+                console.error("Failed to fetch associations", error);
+                fetchingAssociations = false;
+            }
+
+            // Fallback for simple Promises (if it's not a reactive Query object)
+            if (typeof fetchQuery.then === "function" && data === undefined && !pending && !error) {
+                fetchQuery
+                    .then((res: any) => {
+                        untrack(() => {
+                            associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
+                        });
+                        fetchingAssociations = false;
+                    })
+                    .catch((err: any) => {
+                        // Ignore common abort/stale context errors
+                        if (err.name === 'AbortError' || err.message?.includes('aborted')) return;
+                        console.error("Failed to fetch associations", err);
+                        fetchingAssociations = false;
+                    });
+            }
         }
     });
 
@@ -394,11 +422,16 @@
     };
 
     $effect(() => {
-        if (isStandalone) {
-            // Trigger refresh on params change
-            currentParams;
+        // ALWAYS track currentParams to ensure reactivity in both modes
+        const params = currentParams;
+        const _showSelector = showSelector;
+        const _isStandalone = isStandalone;
+
+        if (_isStandalone) {
+            console.log("[EntityManager] Standalone refresh triggered", params);
             refresh();
-        } else if (showSelector) {
+        } else if (_showSelector) {
+            console.log("[EntityManager] Embedded selector refresh triggered", params);
             // In embedded mode, if selector is open, refresh allItems when filters or search change
             refreshAllItems();
         }
@@ -1123,9 +1156,9 @@
                 ></div>
                 {loadingLabel}
             </div>
-        {:else if associatedItems.length > 0}
+        {:else if displayedItems.length > 0}
             <div class="grid gap-2">
-                {#each associatedItems as item}
+                {#each displayedItems as item}
                     <div
                         class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
                     >

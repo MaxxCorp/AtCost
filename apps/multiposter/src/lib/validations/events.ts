@@ -65,8 +65,9 @@ export const createEventSchema = eventBaseSchema;
 
 /**
  * Schema for updating events
+ * Using explicit v.object entries for better compatibility with Remote Function field extraction
  */
-export const updateEventSchema = v.intersect([
-	v.partial(eventBaseSchema),
-	v.object({ id: v.pipe(v.string(), v.uuid()) })
-]);
+export const updateEventSchema = v.object({
+    ...v.partial(eventBaseSchema).entries,
+    id: v.pipe(v.string(), v.uuid())
+});
