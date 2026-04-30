@@ -70,11 +70,13 @@
         validationSchema,
         isUpdating = false,
         initialData = null,
+        isEditingSeries = false,
     }: {
         remoteFunction: any;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: Event | null;
+        isEditingSeries?: boolean;
     } = $props();
 
     const type = "event";
@@ -560,7 +562,7 @@
         {/if}
 
         <!-- Recurrence Hidden Input -->
-        {#if recurrenceRule}
+        {#if recurrenceRule && (!isUpdating || isEditingSeries)}
             <input
                 {...remoteFunction.fields.recurrence.as("hidden", hiddenRecurrenceRule)}
             />
@@ -1141,22 +1143,32 @@
             </div>
 
             <!-- Recurrence Button -->
-            <div class="pt-4 border-t">
-                <button
-                    type="button"
-                    class="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
-                    onclick={() => (showRecurrenceDialog = true)}
-                >
-                    <CalendarClock size={16} />
-                    <span>{recurrenceText}</span>
-                </button>
-            </div>
+            {#if !isUpdating || isEditingSeries}
+                <div class="pt-4 border-t">
+                    <button
+                        type="button"
+                        class="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+                        onclick={() => (showRecurrenceDialog = true)}
+                    >
+                        <CalendarClock size={16} />
+                        <span>{recurrenceText}</span>
+                    </button>
+                </div>
+            {:else if isSeries}
+                <div class="pt-4 border-t">
+                    <p class="text-sm text-gray-500 italic">
+                        {((m as any).editing_single_instance_note) ? (m as any).editing_single_instance_note() : "Editing single instance. To change recurrence, edit the series."}
+                    </p>
+                </div>
+            {/if}
         </div>
 
-        <RecurrenceDialog
-            bind:open={showRecurrenceDialog}
-            bind:value={recurrenceRule}
-        />
+        {#if !isUpdating || isEditingSeries}
+            <RecurrenceDialog
+                bind:open={showRecurrenceDialog}
+                bind:value={recurrenceRule}
+            />
+        {/if}
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">
