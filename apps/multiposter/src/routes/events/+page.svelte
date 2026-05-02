@@ -83,7 +83,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-2">{m.no_items_found({ item: "Events" })}</h3>
                     <p class="text-gray-500 mb-8">{m.not_found_message({ item: "Events" })}</p>
-                    <Button variant="outline" onclick={() => { search = ""; page = 1; }}>{m.cancel()}</Button>
+                    <AsyncButton variant="outline" loading={isLoading} onclick={() => { search = ""; page = 1; }}>{m.cancel()}</AsyncButton>
                 </div>
             {:else}
                 <div class="grid grid-cols-1 gap-4">
@@ -159,27 +159,29 @@
                 <!-- Pagination -->
                 {#if totalPages > 1}
                     <div class="flex items-center justify-center gap-4 mt-8">
-                        <Button
+                        <AsyncButton
                             variant="outline"
                             size="icon"
                             disabled={page === 1}
-                            onclick={() => page--}
+                            loading={isLoading}
+                            onclick={() => { page-- }}
                             class="rounded-xl"
                         >
                             <ChevronLeft size={20} />
-                        </Button>
+                        </AsyncButton>
                         <span class="text-sm font-bold text-gray-600">
                             {m.page?.() ?? "Page"} {page} {m.of?.() ?? "of"} {totalPages}
                         </span>
-                        <Button
+                        <AsyncButton
                             variant="outline"
                             size="icon"
                             disabled={page === totalPages}
-                            onclick={() => page++}
+                            loading={isLoading}
+                            onclick={() => { page++ }}
                             class="rounded-xl"
                         >
                             <ChevronRight size={20} />
-                        </Button>
+                        </AsyncButton>
                     </div>
                 {/if}
             {/if}

@@ -68,6 +68,9 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         'Sport': ['9'],                 // Freizeit, Sport
         'Theater': ['10', '116'],         // Bühnen, Filme + Kunst, Kultur
         'Vermischtes': ['116'],               // Kunst, Kultur
+        'Volksfeste & Straßenfeste': ['2'],  // Feste, Events
+        'Wirtschaft': ['118'],                // Bildung, Schule
+        'Wissenschaft': ['118'],              // Bildung, Schule
     };
 
     async initialize(config: SyncConfig): Promise<void> {

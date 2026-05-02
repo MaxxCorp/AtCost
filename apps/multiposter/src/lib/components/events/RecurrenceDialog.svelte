@@ -2,13 +2,16 @@
     import * as Dialog from "$lib/components/ui/dialog";
     import { Button } from "$lib/components/ui/button";
     import { RRule, Frequency } from "$lib/utils/rrule-compat";
-    import { createEventDispatcher } from "svelte";
     import * as m from "$lib/paraglide/messages";
-
-    let { open = $bindable(false), value = $bindable<string | null>(null) } =
-        $props();
-
-    const dispatch = createEventDispatcher();
+    let { 
+        open = $bindable(false), 
+        value = $bindable<string | null>(null),
+        onchange 
+    } = $props<{
+        open?: boolean;
+        value?: string | null;
+        onchange?: (value: string | null) => void;
+    }>();
 
     // Internal state
     let freq = $state(RRule.WEEKLY);
@@ -202,7 +205,7 @@
             const rule = new RRule(options);
             value = rule.toString();
             open = false;
-            dispatch("change", value);
+            onchange?.(value);
         } catch (e) {
             console.error("Invalid RRule options", e);
         }
@@ -220,7 +223,7 @@
     function clear() {
         value = null;
         open = false;
-        dispatch("change", null);
+        onchange?.(null);
     }
 
     const frequencies = [

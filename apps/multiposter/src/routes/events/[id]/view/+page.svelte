@@ -25,6 +25,7 @@
         ChevronDown,
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
+    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
     const eventId = page.params.id || "";
@@ -422,13 +423,13 @@
                         {/if}
 
                         {#if canShare}
-                            <Button
+                            <AsyncButton
                                 variant="outline"
                                 class="flex items-center gap-2"
                                 onclick={() => handleShare(event)}
                             >
                                 <Share2 size={18} /> Share
-                            </Button>
+                            </AsyncButton>
                         {/if}
 
                         {#if checkCanEdit(event)}
@@ -467,22 +468,15 @@
                                 <!-- Delete dropdown for series events -->
                                 <DropdownMenu.Root>
                                     <DropdownMenu.Trigger>
-                                        <Button
+                                        <AsyncButton
                                             variant="outline"
                                             class="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
-                                            disabled={deletingSeriesId ===
-                                                event.id}
+                                            loading={deletingSeriesId === event.id}
+                                            loadingLabel="Deleting..."
                                         >
-                                            {#if deletingSeriesId === event.id}
-                                                <RefreshCw
-                                                    size={18}
-                                                    class="animate-spin"
-                                                /> Deleting...
-                                            {:else}
-                                                <Trash2 size={18} /> Delete
-                                                <ChevronDown size={16} />
-                                            {/if}
-                                        </Button>
+                                            <Trash2 size={18} /> Delete
+                                            <ChevronDown size={16} />
+                                        </AsyncButton>
                                     </DropdownMenu.Trigger>
                                     <DropdownMenu.Content align="end">
                                         <DropdownMenu.Item

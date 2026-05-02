@@ -115,7 +115,9 @@ export const readEvent = query(v.string(), async (id) => {
             tags: { with: { tag: true } },
             locations: { with: { location: true } },
             resources: { with: { resource: true } },
-            contacts: { with: { contact: { with: { emails: true, phones: true } } } }
+            contacts: { with: { contact: { with: { emails: true, phones: true } } } },
+            series: true,
+            campaign: true
         }
     });
 
@@ -134,6 +136,8 @@ export const readEvent = query(v.string(), async (id) => {
         locationIds: data.locations.map((el: any) => el.locationId),
         resourceIds: data.resources.map((er: any) => er.resourceId),
         contactIds: data.contacts.map((ec: any) => ec.contactId),
+        recurrence: data.series?.rrule ? [data.series.rrule] : (data.recurrence || []),
+        syncIds: data.campaign?.content ? ((data.campaign.content as any).syncIds || []) : [],
         resolvedContact: data.contacts[0]?.contact ? ((c: any) => ({
             name: c.displayName,
             email: c.emails?.find((e: any) => e.isPrimary)?.email || c.emails?.[0]?.email || null,
@@ -223,11 +227,22 @@ export const createEvent = form(createEventSchema, async (data) => {
                 seriesId,
                 summary: data.summary,
                 description: data.description || null,
+                location: data.location || null,
+                categoryBerlinDotDe: data.categoryBerlinDotDe || null,
+                ticketPrice: data.ticketPrice || null,
+                isAllDay: !!data.isAllDay,
+                status: data.status || 'confirmed',
                 startDateTime: date,
+                startTimeZone: data.startTimeZone || null,
                 endDateTime: instanceEnd || null,
+                endTimeZone: data.endTimeZone || null,
+                isPublic: !!data.isPublic,
+                heroImage: data.heroImage || null,
+                guestsCanInviteOthers: !!data.guestsCanInviteOthers,
+                guestsCanModify: !!data.guestsCanModify,
+                guestsCanSeeOtherGuests: !!data.guestsCanSeeOtherGuests,
                 recurringEventId: newEvent.id,
                 originalStartTime: { dateTime: date.toISOString() },
-                // ... copy other fields
             });
             await linkAssociations(instanceId, data);
             allEventIds.push(instanceId);
@@ -262,17 +277,56 @@ export const updateEvent = form(updateEventSchema, async (data) => {
     const start = data.startDate ? parseDate(data.startDate, data.startTime, data.startTimeZone || 'UTC') : undefined;
     const end = data.endDate ? parseDate(data.endDate, data.endTime, data.endTimeZone || data.startTimeZone || 'UTC') : undefined;
 
+    // Handle Recurrence Update
+    let seriesId = current.seriesId;
+    if (data.recurrence) {
+        const recurrenceRule = Array.isArray(data.recurrence) ? data.recurrence[0] : data.recurrence;
+        if (seriesId) {
+            await db.update(recurringSeries).set({
+                rrule: recurrenceRule,
+                anchorDate: start || current.startDateTime || new Date(),
+                anchorEndDate: end || current.endDateTime || null,
+            }).where(eq(recurringSeries.id, seriesId));
+        } else {
+            const [newSeries] = await db.insert(recurringSeries).values({
+                rrule: recurrenceRule,
+                anchorDate: start || current.startDateTime || new Date(),
+                anchorEndDate: end || current.endDateTime || null,
+                userId: user.id,
+            }).returning();
+            seriesId = newSeries.id;
+        }
+    } else if (data.recurrence === null && seriesId) {
+        // If explicitly set to null, remove series association (optional logic)
+        seriesId = null;
+    }
+
     await db.update(event).set({
         summary: data.summary,
         description: data.description,
         location: data.location,
+        seriesId,
         startDateTime: start,
+        startTimeZone: data.startTimeZone,
         endDateTime: end,
+        endTimeZone: data.endTimeZone,
         isAllDay: !!data.isAllDay,
         isPublic: !!data.isPublic,
+        status: data.status,
+        ticketPrice: data.ticketPrice,
+        categoryBerlinDotDe: data.categoryBerlinDotDe,
         heroImage: data.heroImage,
-        // ... other fields
+        guestsCanInviteOthers: !!data.guestsCanInviteOthers,
+        guestsCanModify: !!data.guestsCanModify,
+        guestsCanSeeOtherGuests: !!data.guestsCanSeeOtherGuests,
     }).where(eq(event.id, id));
+
+    // Update campaign sync settings
+    if (current.campaignId && data.syncIds) {
+        await db.update(campaign).set({
+            content: { syncIds: Array.isArray(data.syncIds) ? data.syncIds : [data.syncIds] }
+        }).where(eq(campaign.id, current.campaignId));
+    }
 
     // Update associations (simple wipe and reload for now to keep it stable)
     await db.delete(eventTag).where(eq(eventTag.eventId, id));
@@ -307,10 +361,17 @@ export const deleteEvent = command(deleteEventSchema, async (data) => {
     if (deleteAllInSeries && target.seriesId) {
         const related = await db.select({ id: event.id }).from(event).where(eq(event.seriesId, target.seriesId));
         const ids = related.map(r => r.id);
+        
+        // Clean up external syncs first
+        await syncService.deleteEventMappings(user.id, ids);
+        
         await db.delete(event).where(inArray(event.id, ids));
         await db.delete(recurringSeries).where(eq(recurringSeries.id, target.seriesId));
         await publishEventChange('delete', ids);
     } else {
+        // Clean up external syncs
+        await syncService.deleteEventMappings(user.id, [id]);
+        
         await db.delete(event).where(eq(event.id, id));
         await publishEventChange('delete', [id]);
     }

@@ -17,7 +17,7 @@
 			| "secondary"
 			| "ghost"
 			| "link";
-		size?: "default" | "sm" | "lg" | "icon";
+		size?: "default" | "sm" | "lg" | "icon" | "icon-sm" | "icon-lg";
 
 		// Additional classes
 		class?: string;
@@ -29,10 +29,10 @@
 		type?: "button" | "submit" | "reset";
 
 		// Click handler
-		onclick?: (event: MouseEvent) => void;
+		onclick?: (event: MouseEvent) => void | Promise<void>;
 
 		// Button text while loading
-		loadingLabel?: string;
+		loadingLabel?: string | null;
 
 		// Allow other HTML attributes
 		[key: string]: any;
@@ -61,6 +61,9 @@
 	// Determine if button should be disabled
 	const isDisabled = $derived(isLoading || disabled);
 
+	// Detect if this is an icon-only button
+	const isIcon = $derived(size.startsWith("icon"));
+
 	async function handleClick(e: MouseEvent) {
 		if (isDisabled) return;
 		if (onclick) {
@@ -85,8 +88,10 @@
 	{...rest}
 >
 	{#if isLoading}
-		<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
-		{loadingLabel}
+		<LoaderCircle class="{isIcon ? '' : 'mr-2'} h-4 w-4 animate-spin" />
+		{#if !isIcon && loadingLabel}
+			{loadingLabel}
+		{/if}
 	{:else if children}
 		{@render children()}
 	{/if}
