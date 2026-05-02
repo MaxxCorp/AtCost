@@ -1,6 +1,6 @@
 import { command, query } from '$app/server';
-import { db } from '$lib/server/db';
-import { talent, userTalent } from '$lib/server/db/schema';
+import { db } from '@ac/db';
+import { talent, userTalent } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { talentAssociationSchema, getTalentAssociationsSchema } from '@ac/validations';

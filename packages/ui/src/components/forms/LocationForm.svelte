@@ -165,41 +165,28 @@
         }
     });
 
-    $effect(() => {
+    function initializeFields() {
         const data = initialData || {};
-        console.log("LocationForm initialData:", data);
-        console.log("LocationForm validationSchema:", validationSchema);
-        
-        // Extract keys from Valibot schema (handles object, intersect, pipe, etc.)
-        const getKeys = (s: any): string[] => {
-            if (!s) return [];
-            // Handle v.object
-            if (s.entries) return Object.keys(s.entries);
-            // Handle v.intersect, v.union
-            if (s.options) return s.options.flatMap(getKeys);
-            // Handle v.optional, v.nullable, etc.
-            if (s.wrapped) return getKeys(s.wrapped);
-            // Handle v.pipe
-            if (s.pipe && Array.isArray(s.pipe) && s.pipe.length > 0) return getKeys(s.pipe[0]);
-            return [];
-        };
-
-        const schemaKeys = [...new Set(getKeys(validationSchema))];
-        console.log("LocationForm schemaKeys:", schemaKeys);
-        console.log("LocationForm remoteFunction fields:", Object.keys(remoteFunction.fields || {}));
-        
-        for (const key of schemaKeys) {
+        for (const key in remoteFunction.fields) {
+            const field = remoteFunction.fields[key];
             const value = data[key];
-            const defaultValue = key === "isPublic" ? true : "";
-            const finalValue = value ?? defaultValue;
-            
-            if (remoteFunction.fields[key]) {
-                console.log(`Setting field ${key} to:`, finalValue);
-                remoteFunction.fields[key].set(finalValue);
+
+            if (key === "isPublic") {
+                field.checked(value ?? true);
+            } else if (key === "id") {
+                field.value(value ?? "");
             } else {
-                console.warn(`Field ${key} not found in remoteFunction.fields`);
+                field.set(value ?? "");
             }
         }
+    }
+
+    // Initialize immediately for first render
+    initializeFields();
+
+    $effect.pre(() => {
+        // Re-initialize when props change
+        initializeFields();
     });
 </script>
 
@@ -256,7 +243,9 @@
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.description}</span>
+        <span class="text-sm font-medium text-gray-700 mb-2"
+            >{i18n.description}</span
+        >
         <textarea
             {...remoteFunction.fields.description.as("text")}
             class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -266,7 +255,9 @@
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.capacity}</span>
+        <span class="text-sm font-medium text-gray-700 mb-2"
+            >{i18n.capacity}</span
+        >
         <input
             {...remoteFunction.fields.capacity.as("text")}
             class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -419,8 +410,7 @@
 
     <label class="flex items-center gap-2 cursor-pointer py-2">
         <input
-            {...remoteFunction.fields.isPublic.as("checkbox", initialData?.isPublic ?? true)}
-            type="checkbox"
+            {...remoteFunction.fields.isPublic.as("checkbox")}
             class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
         />
         <span class="text-sm font-medium text-gray-700">{i18n.isPublic}</span>

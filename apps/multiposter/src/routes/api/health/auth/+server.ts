@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { sql } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ request }) => {

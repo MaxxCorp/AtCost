@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { announcement, campaign } from '@ac/db';
 import { eq, desc, inArray } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -43,7 +43,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 
     const { sql } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     const rawResults = await baseQuery
         .orderBy(desc(announcement.createdAt))

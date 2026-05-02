@@ -128,7 +128,7 @@
             }
         })}
 >
-    {#if isUpdating && initialData}
+    {#if initialData?.id}
         <input {...rf.fields.id.as("hidden", initialData.id)} />
     {/if}
 
@@ -307,11 +307,14 @@
                 />
             {/snippet}
         </EntityManager>
-        <input
-            type="hidden"
-            name="locationIds"
-            value={JSON.stringify(selectedLocationIds)}
-        />
+        {#if selectedLocationIds.length > 0}
+            <input
+                {...rf.fields.locationIds.as(
+                    "hidden",
+                    JSON.stringify(selectedLocationIds),
+                )}
+            />
+        {/if}
     </div>
 
     <label class="block">
@@ -422,12 +425,14 @@
             </button>
         </div>
 
-        <input
-            {...rf.fields.allocationCalendars.as(
-                "hidden",
-                JSON.stringify(allocationCalendars),
-            )}
-        />
+        {#if allocationCalendars.length > 0}
+            <input
+                {...rf.fields.allocationCalendars.as(
+                    "hidden",
+                    JSON.stringify(allocationCalendars),
+                )}
+            />
+        {/if}
     </div>
     <div class="block">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
@@ -515,11 +520,14 @@
         </EntityManager>
     </div>
 
-    <input
-        type="hidden"
-        name="contactIds"
-        value={JSON.stringify(selectedContactIds)}
-    />
+    {#if selectedContactIds.length > 0}
+        <input
+            {...rf.fields.contactIds.as(
+                "hidden",
+                JSON.stringify(selectedContactIds),
+            )}
+        />
+    {/if}
 
     <div class="flex gap-3 mt-6">
         <AsyncButton

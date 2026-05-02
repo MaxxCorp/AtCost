@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { type InferSelectModel } from 'drizzle-orm';
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { user } from '@ac/db';
 import { ensureAccess, getAuthenticatedUser, parseRoles } from '$lib/server/authorization';
 import { desc, ilike, or, and, sql } from 'drizzle-orm';
@@ -40,7 +40,7 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
 
     const { sql } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     const rawResults = await baseQuery
         .orderBy(desc(user.createdAt))

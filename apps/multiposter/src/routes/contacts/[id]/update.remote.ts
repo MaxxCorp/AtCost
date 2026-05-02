@@ -1,9 +1,9 @@
 import { form, getRequestEvent } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress,
     contactRelation, tag, contactTag, locationContact
-} from '$lib/server/db/schema';
+} from '@ac/db';
 import { eq, and, inArray } from 'drizzle-orm';
 import { updateContactSchema, type Contact } from '$lib/validations/contacts';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

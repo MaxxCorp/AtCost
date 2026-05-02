@@ -1,6 +1,7 @@
 import { createAuthClient } from "better-auth/svelte";
+import { PUBLIC_BASE_URL } from "$env/static/public";
 
 export const authClient = createAuthClient({
-  baseURL: typeof window !== 'undefined' ? window.location.origin : "http://localhost:5173",
+  baseURL: PUBLIC_BASE_URL,
   basePath: "/api/auth",
 });

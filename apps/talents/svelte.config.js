@@ -17,7 +17,8 @@ const config = {
             remoteFunctions: true
         },
         alias: {
-            "@": "./src/lib"
+            "@": "./src/lib",
+            "drizzle-orm": "./node_modules/drizzle-orm"
         }
     },
     compilerOptions: {

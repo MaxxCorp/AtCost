@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { type InferSelectModel, db, desc, and, or, ilike, sql } from '$lib/server/db';
+import { type InferSelectModel, db, desc, and, or, ilike, sql } from '@ac/db';
 import { query } from '$app/server';
 import { location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -38,7 +38,7 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
     }
 
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     const rawResults = await baseQuery
         .orderBy(desc(location.createdAt))

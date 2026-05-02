@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { contact, locationContact, contactTag, tag } from '@ac/db';
 import type { Contact as DbContact } from '@ac/db';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { desc, eq, inArray, and, or, ilike, sql } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { contactPaginationSchema as PaginationSchema, type Contact, type PaginatedResult } from '@ac/validations';
@@ -45,7 +45,7 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	}
 
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-	const total = Number(countResult[0]?.count || 0);
+	const total = Number(countResult.rows[0]?.count || 0);
 
 	const paginatedIdsResult = await baseQuery
 		.orderBy(desc(contact.createdAt))
@@ -66,6 +66,7 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 
 	const data = rawResults.map((row) => ({
 		...row,
+        id: String(row.id),
         displayName: row.displayName || '',
         givenName: row.givenName ?? undefined,
         familyName: row.familyName ?? undefined,

@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, shiftPlanTemplate, inArray } from '$lib/server/db';
+import { db, shiftPlanTemplate, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 

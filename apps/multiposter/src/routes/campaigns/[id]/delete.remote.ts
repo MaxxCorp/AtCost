@@ -1,6 +1,6 @@
 import { command } from '$app/server';
 import { error } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { eq, inArray } from 'drizzle-orm';
 import { campaign } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

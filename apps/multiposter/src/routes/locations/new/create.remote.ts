@@ -1,5 +1,5 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { location } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -40,7 +40,7 @@ export const createLocation = form(createLocationSchema, async (data) => {
 
         console.log('Insert payload:', insertData);
 
-        const result = await db.insert(location as any).values(insertData).returning();
+        const result = await db.insert(location).values(insertData).returning();
 
         if (result.length === 0) {
             throw new Error('Failed to create location');

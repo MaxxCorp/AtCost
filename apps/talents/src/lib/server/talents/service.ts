@@ -1,5 +1,5 @@
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, and, sql } from '$lib/server/db';
-// Unifying Drizzle operators via $lib/server/db
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, and, sql } from '@ac/db';
+// Unifying Drizzle operators via @ac/db
 
 export interface TalentProfile {
     id: string;

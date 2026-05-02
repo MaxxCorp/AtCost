@@ -1,5 +1,5 @@
 import { query, form, command } from '$app/server';
-import { db, desc, and, or, ilike, sql, eq, inArray, contractFramework } from '$lib/server/db';
+import { db, desc, and, or, ilike, sql, eq, inArray, contractFramework } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { PaginationSchema, type PaginatedResult } from '@ac/validations/pagination';
 import { contractFrameworkSchema } from '@ac/validations/contracts';
@@ -21,7 +21,7 @@ export const listContractFrameworks = query(v.optional(PaginationSchema), async 
     }
 
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     const rawResults = await baseQuery
         .orderBy(desc(contractFramework.createdAt))

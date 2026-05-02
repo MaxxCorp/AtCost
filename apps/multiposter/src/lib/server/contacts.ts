@@ -1,7 +1,7 @@
-import { db } from './db';
+import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress
-} from './db/schema';
+} from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { getRequestEvent } from '$app/server';
 import QRCode from 'qrcode';
@@ -288,6 +288,7 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         // Add participation status for events if present
         const result = {
             ...c,
+            id: String(c.id),
             participationStatus: a.participationStatus || 'needsAction'
         };
 
@@ -297,17 +298,17 @@ export async function getEntityContacts(type: string, entityId: string, includeS
                 createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
                 updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : c.updatedAt,
                 birthday: c.birthday instanceof Date ? c.birthday.toISOString() : (c.birthday || null),
-                emails: c.emails || [],
-                phones: c.phones || [],
-                addresses: c.addresses || [],
+                emails: (c.emails || []).map((e: any) => ({ ...e, id: e.id ? String(e.id) : undefined })),
+                phones: (c.phones || []).map((p: any) => ({ ...p, id: p.id ? String(p.id) : undefined })),
+                addresses: (c.addresses || []).map((adr: any) => ({ ...adr, id: adr.id ? String(adr.id) : undefined })),
                 relations: (c.relations || []).map((rel: any) => ({
-                    id: rel.id,
-                    targetContactId: rel.targetContactId,
+                    id: String(rel.id),
+                    targetContactId: String(rel.targetContactId),
                     relationType: rel.relationType,
-                    targetContact: rel.targetContact
+                    targetContact: rel.targetContact ? { ...rel.targetContact, id: String(rel.targetContact.id) } : undefined
                 })),
                 tags: (c.tags || []).map((t: any) => ({
-                    id: t.tag?.id,
+                    id: t.tag?.id ? String(t.tag.id) : undefined,
                     name: t.tag?.name
                 }))
             };

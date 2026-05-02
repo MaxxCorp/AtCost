@@ -6,8 +6,8 @@ import type {
 	SyncDirection
 } from '../types';
 import { env } from '$env/dynamic/private';
-import { db } from '../../db';
-import { syncMapping } from '../../db/schema';
+import { db } from '@ac/db';
+import { syncMapping } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
 import { parsePricing } from '../utils/pricing';

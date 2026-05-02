@@ -110,11 +110,13 @@
             }
         })}
 >
-    {#if isUpdating && initialData}
+    {#if initialData?.id}
         <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
     {/if}
 
-    <input {...remoteFunction.fields.claims.as("hidden", claimsJson)} />
+    {#if claimsJson}
+        <input {...remoteFunction.fields.claims.as("hidden", claimsJson)} />
+    {/if}
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>

@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db } from '@ac/db';
 import { getEntityContacts } from './contacts';
 import type { ExternalEvent } from './sync/types';
 

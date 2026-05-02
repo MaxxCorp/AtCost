@@ -1,4 +1,4 @@
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { cmsBlock, cmsSlot, cmsContentVersion, cmsPage } from '@ac/db';
 import { eq, and, desc } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';

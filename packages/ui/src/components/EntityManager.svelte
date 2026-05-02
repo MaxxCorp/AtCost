@@ -447,7 +447,7 @@
     }
 
     function selectAll() {
-        selectedIds = new Set(displayedItems.map((i: any) => i.id));
+        selectedIds = new Set(displayedItems.map((i: any) => String(i.id)));
     }
 
     function deselectAll() {
@@ -468,7 +468,7 @@
             allItems = allItems.filter((i) => !selectedIds.has(i.id));
             if (onchange)
                 onchange(
-                    associatedItems.map((i) => i.id),
+                    associatedItems.map((i) => String(i.id)),
                     associatedItems,
                 );
             deselectAll();
@@ -559,7 +559,7 @@
             }
             if (onchange)
                 onchange(
-                    associatedItems.map((i) => i.id),
+                    associatedItems.map((i) => String(i.id)),
                     associatedItems,
                 );
         } catch (error: any) {
@@ -572,7 +572,8 @@
     async function handleQuickCreateSuccess(result: any) {
         showQuickCreate = false;
 
-        const newId = result?.id || result?.tag?.id || result?.data?.id;
+        const newIdRaw = result?.id || result?.tag?.id || result?.data?.id;
+        const newId = newIdRaw ? String(newIdRaw) : undefined;
 
         if (newId) {
             const res: any = await listItemsRemote(currentParams);
@@ -598,7 +599,7 @@
                     associatedItems = [newItem, ...associatedItems];
                     if (onchange)
                         onchange(
-                            associatedItems.map((i) => i.id),
+                            associatedItems.map((i) => String(i.id)),
                             associatedItems,
                         );
                     toast.success(`${title} created and associated`);
@@ -628,7 +629,7 @@
             });
             if (onchange)
                 onchange(
-                    associatedItems.map((i) => i.id),
+                    associatedItems.map((i) => String(i.id)),
                     associatedItems,
                 );
             toast.success(`${title} updated`);
@@ -659,7 +660,7 @@
             associatedItems = associatedItems.filter((i) => i.id !== item.id);
             if (onchange)
                 onchange(
-                    associatedItems.map((i) => i.id),
+                    associatedItems.map((i) => String(i.id)),
                     associatedItems,
                 );
             
@@ -723,7 +724,7 @@
                             >System Filters</DropdownMenu.Label
                         >
                         <DropdownMenu.Separator class="bg-gray-50" />
-                        {#each effectiveFilters as filter}
+                        {#each (Array.isArray(effectiveFilters) ? effectiveFilters : []) as filter}
                             <DropdownMenu.Sub>
                                 <DropdownMenu.SubTrigger
                                     class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
@@ -919,7 +920,7 @@
                     {noItemsFoundLabel}
                 </div>
             {:else}
-                {#each filteredItems as item}
+                {#each (Array.isArray(filteredItems) ? filteredItems : []) as item}
                     {@const isAssociated = associatedItems.some((ai) => {
                         if (item.id && ai.id) return ai.id === item.id;
                         return ai.name === item.name;
@@ -959,9 +960,9 @@
                                 loading={linkingItemId === item.id}
                                 loadingLabel=""
                                 onclick={() => toggleAssociation(item)}
-                                title={isAssociated
+                                title={String(isAssociated
                                     ? unlinkLabel
-                                    : linkItemLabel}
+                                    : linkItemLabel)}
                             >
                                 {#if isAssociated}
                                     <Unlink size={16} />
@@ -978,7 +979,7 @@
                                     loading={deletingItemId === item.id}
                                     loadingLabel=""
                                     onclick={() => deleteItem(item)}
-                                    title={deleteForeverLabel}
+                                    title={String(deleteForeverLabel)}
                                 >
                                     <Trash2 size={16} />
                                 </AsyncButton>
@@ -1019,7 +1020,7 @@
         </div>
     {:else}
         <div class="grid gap-4">
-            {#each displayedItems as item (item.id)}
+            {#each (Array.isArray(displayedItems) ? displayedItems : []) as item (item.id)}
                 {#if renderListItem}
                     {@render renderListItem(item, {
                         isSelected: selectedIds.has(item.id),
@@ -1075,7 +1076,7 @@
                                     onclick={() => {
                                         editingItem = item;
                                     }}
-                                    title={editLabel}
+                                    title={String(editLabel)}
                                 >
                                     <Pencil size={20} />
                                 </button>
@@ -1088,7 +1089,7 @@
                                     loading={deletingItemId === item.id}
                                     loadingLabel=""
                                     onclick={() => deleteItem(item)}
-                                    title={deleteLabel}
+                                    title={String(deleteLabel)}
                                 >
                                     <Trash2 size={20} />
                                 </AsyncButton>
@@ -1158,7 +1159,7 @@
             </div>
         {:else if displayedItems.length > 0}
             <div class="grid gap-2">
-                {#each displayedItems as item}
+                {#each (Array.isArray(displayedItems) ? displayedItems : []) as item}
                     <div
                         class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
                     >
@@ -1198,7 +1199,7 @@
                                     onclick={() => {
                                         editingItem = item;
                                     }}
-                                    title={editLabel}
+                                    title={String(editLabel)}
                                 >
                                     <Pencil size={15} />
                                 </button>
@@ -1211,7 +1212,7 @@
                                 loading={linkingItemId === item.id}
                                 loadingLabel=""
                                 onclick={() => toggleAssociation(item)}
-                                title={confirmUnlinkLabel}
+                                title={String(confirmUnlinkLabel)}
                             >
                                 <Unlink size={15} />
                             </AsyncButton>
@@ -1224,7 +1225,7 @@
                                     loading={deletingItemId === item.id}
                                     loadingLabel=""
                                     onclick={() => deleteItem(item)}
-                                    title={deleteForeverLabel}
+                                    title={String(deleteForeverLabel)}
                                 >
                                     <Trash2 size={15} />
                                 </AsyncButton>

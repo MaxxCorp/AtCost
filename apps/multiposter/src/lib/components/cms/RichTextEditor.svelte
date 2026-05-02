@@ -4,7 +4,19 @@
     // Type-only import safe for SSR
     import type { ClassicEditor } from "ckeditor5";
 
-    let { value = $bindable(), disabled = false } = $props();
+    let {
+        value = $bindable(""),
+        disabled = false,
+        onchange,
+        label = "",
+        id = "editor",
+    }: {
+        value?: string;
+        disabled?: boolean;
+        onchange?: (data: string) => void;
+        label?: string;
+        id?: string;
+    } = $props();
 
     let editorElement: HTMLElement;
     let editorInstance = $state<ClassicEditor | null>(null);
@@ -155,7 +167,7 @@
                         "imageTextAlternative",
                     ],
                 },
-                initialData: value,
+                initialData: String(value ?? ""),
             });
             console.log("CKEditor initialized");
 
@@ -165,9 +177,10 @@
 
             // Bind change event
             editorInstance.model.document.on("change:data", () => {
-                const data = editorInstance?.getData();
-                if (data !== value) {
+                const data = editorInstance?.getData() ?? "";
+                if (data !== (value || "")) {
                     value = data;
+                    onchange?.(data);
                 }
             });
         } catch (error: any) {
@@ -177,8 +190,9 @@
     });
 
     $effect(() => {
-        if (editorInstance && value !== editorInstance.getData()) {
-            editorInstance.setData(value || "");
+        const stringValue = typeof value === 'string' ? value : "";
+        if (editorInstance && stringValue !== editorInstance.getData()) {
+            editorInstance.setData(stringValue);
         }
     });
 

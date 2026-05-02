@@ -1,8 +1,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SyncService } from './service';
-import { db } from '../db';
-import { syncMapping as syncMappingTable, event as eventTable } from '../db/schema';
+import { db } from '@ac/db';
+import { syncMapping as syncMappingTable, event as eventTable } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 
 // Mock the database

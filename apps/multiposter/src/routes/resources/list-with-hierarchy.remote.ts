@@ -2,7 +2,7 @@ import { type InferSelectModel, eq, getTableColumns, inArray, and } from 'drizzl
 import { query } from '$app/server';
 import { resource, resourceRelation, location, resourceLocation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 
 export type ResourceWithHierarchy = InferSelectModel<typeof resource> & {
     locationName?: string | null;
@@ -63,23 +63,28 @@ export const listResourcesWithHierarchy = query(async (): Promise<ResourceWithHi
 
     // Initialize maps
     resourcesWithLocation.forEach(r => {
-        resourceMap.set(r.id, {
+        const id = String(r.id);
+        resourceMap.set(id, {
             ...r,
+            id,
             parentIds: [],
             childIds: [],
             level: 0,
         });
-        parentMap.set(r.id, []);
-        childMap.set(r.id, []);
+        parentMap.set(id, []);
+        childMap.set(id, []);
     });
 
     // Populate parent-child relationships
     relations.forEach(rel => {
-        const parentIds = parentMap.get(rel.childResourceId);
-        if (parentIds) parentIds.push(rel.parentResourceId);
+        const childId = String(rel.childResourceId);
+        const parentId = String(rel.parentResourceId);
+        
+        const parentIds = parentMap.get(childId);
+        if (parentIds) parentIds.push(parentId);
 
-        const childIds = childMap.get(rel.parentResourceId);
-        if (childIds) childIds.push(rel.childResourceId);
+        const childIds = childMap.get(parentId);
+        if (childIds) childIds.push(childId);
     });
 
     // Apply relationships to resources

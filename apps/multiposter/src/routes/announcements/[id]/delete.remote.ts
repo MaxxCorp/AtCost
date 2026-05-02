@@ -1,5 +1,5 @@
 import { command } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { announcement } from '@ac/db';
 import { inArray } from 'drizzle-orm';
 import { listAnnouncements } from '../list.remote';

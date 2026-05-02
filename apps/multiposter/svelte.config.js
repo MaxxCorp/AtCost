@@ -27,7 +27,8 @@ const config = {
 			"@": "./src/lib",
 			"@ac/validations": "../../packages/validations/src",
 			"@ac/ui": "../../packages/ui/src",
-			"@ac/db": "../../packages/db/src"
+			"@ac/db": "../../packages/db/src",
+			"drizzle-orm": "./node_modules/drizzle-orm"
 		}
 	},
 	compilerOptions: {

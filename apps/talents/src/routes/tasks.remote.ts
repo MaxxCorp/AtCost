@@ -1,7 +1,7 @@
 import { query, form } from '$app/server';
-import { db, task, getSubordinateTree, getDirectReports } from '$lib/server/db';
+import { db, task, getSubordinateTree, getDirectReports } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { eq, and, or, desc, inArray } from '$lib/server/db';
+import { eq, and, or, desc, inArray } from '@ac/db';
 import * as v from 'valibot';
 import { getMyTalentIdCore } from '$lib/server/timesheets/service';
 import type { RemoteQuery } from '@sveltejs/kit';

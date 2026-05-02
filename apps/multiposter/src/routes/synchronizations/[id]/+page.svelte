@@ -138,7 +138,7 @@
 			<div class="max-w-4xl mx-auto">
 				<Breadcrumb
 					feature="synchronizations"
-					current={config.providerId ?? undefined}
+					current={config?.providerId ?? undefined}
 				/>
 
 				<div class="space-y-4">
@@ -496,7 +496,7 @@
 		<Breadcrumb feature="synchronizations" />
 		<ErrorSection
 			headline={m.failed_to_load({ item: "Sync" })}
-			message={error instanceof Error ? error.message : String(error)}
+			message={error.body?.message || error.message || String(error)}
 			href="/synchronizations"
 			button={m.back_to_list()}
 		/>

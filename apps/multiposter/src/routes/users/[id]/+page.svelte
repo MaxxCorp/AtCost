@@ -44,7 +44,7 @@
                     <LoadingSection message={m.loading_user()} />
                 {:then [user, session]}
                 {#if user}
-                    <Breadcrumb feature="users" current={user.name} />
+                    <Breadcrumb feature="users" current={user?.name} />
                     <div class="bg-white shadow rounded-lg p-6 space-y-4">
                         <div class="flex justify-between items-start mb-6">
                             <div>

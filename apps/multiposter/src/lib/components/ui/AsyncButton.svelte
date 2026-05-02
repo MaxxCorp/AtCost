@@ -64,11 +64,12 @@
 	async function handleClick(e: MouseEvent) {
 		if (isDisabled) return;
 		if (onclick) {
-			internalLoading = true;
+			// Only use internal loading for non-submit buttons to avoid blocking form submission
+			if (type !== "submit") internalLoading = true;
 			try {
 				await onclick(e);
 			} finally {
-				internalLoading = false;
+				if (type !== "submit") internalLoading = false;
 			}
 		}
 	}

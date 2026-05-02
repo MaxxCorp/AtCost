@@ -57,7 +57,7 @@
     {:then location}
         {#if location}
             <div class="max-w-2xl mx-auto">
-                <Breadcrumb feature="locations" current={location.name} />
+                <Breadcrumb feature="locations" current={location?.name} />
                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
                     <div class="flex justify-between items-start mb-6">
                         <div>

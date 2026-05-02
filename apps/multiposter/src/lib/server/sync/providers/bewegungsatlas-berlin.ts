@@ -7,8 +7,8 @@ import type {
 } from '../types';
 import { getAuthenticatedUser } from '$lib/server/authorization';
 import { getEntityContacts } from '../../contacts';
-import { db } from '../../db';
-import { user, eventResource } from '../../db/schema';
+import { db } from '@ac/db';
+import { user, eventResource } from '@ac/db';
 
 /**
  * Bewegungsatlas.Berlin sync provider implementation

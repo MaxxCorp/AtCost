@@ -92,9 +92,9 @@
                     let qrData = (item as any).qrCodeDataUrl;
 
                     // If it's an event and has a path but no dataUrl (or we want to ensure it's loaded), fetch it
-                    if ("qrCodePath" in item && item.qrCodePath && !qrData) {
+                    if ("qrCodePath" in item && (item as any).qrCodePath && !qrData) {
                         try {
-                            const res = await fetch(item.qrCodePath);
+                            const res = await fetch((item as any).qrCodePath);
                             if (res.ok) {
                                 const blob = await res.blob();
                                 qrData = await new Promise((resolve) => {
@@ -116,11 +116,11 @@
                     // Enrich contact QR code if it exists
                     if (
                         "resolvedContact" in item &&
-                        item.resolvedContact?.qrCodePath
+                        (item as any).resolvedContact?.qrCodePath
                     ) {
                         try {
                             const res = await fetch(
-                                item.resolvedContact.qrCodePath,
+                                (item as any).resolvedContact.qrCodePath,
                             );
                             if (res.ok) {
                                 const blob = await res.blob();
@@ -132,7 +132,7 @@
                                         reader.readAsDataURL(blob);
                                     },
                                 );
-                                item.resolvedContact.qrCodeDataUrl =
+                                (item as any).resolvedContact.qrCodeDataUrl =
                                     contactQrData;
                             }
                         } catch (e) {
@@ -147,7 +147,7 @@
                 }),
             );
 
-            items = enrichedItems;
+            items = enrichedItems as any;
 
             if (items.length > 1) {
                 startLoop();

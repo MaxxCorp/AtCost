@@ -1,5 +1,5 @@
 import { query, form, command } from '$app/server';
-import { db, desc, and, or, ilike, sql, eq, inArray } from '$lib/server/db';
+import { db, desc, and, or, ilike, sql, eq, inArray } from '@ac/db';
 import { contract, contractFrameworkContract } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { PaginationSchema, type PaginatedResult } from '@ac/validations/pagination';
@@ -40,7 +40,7 @@ export const listContracts = query(contractPaginationSchema, async (input) => {
 
     const { sql } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     if (total === 0) return { data: [], total: 0 };
 

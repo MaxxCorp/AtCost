@@ -10,20 +10,7 @@
         initialSelectedIds?: string[];
     } = $props();
 
-    // svelte-ignore state_referenced_locally
-    let selectedIds = $state<string[]>(initialSelectedIds?.length ? [...initialSelectedIds] : []);
     let configsPromise = list();
-
-    function toggleConfig(id: string) {
-        if (selectedIds.includes(id)) {
-            selectedIds = selectedIds.filter(x => x !== id);
-        } else {
-            selectedIds = [...selectedIds, id];
-        }
-    }
-
-    // Prepare JSON for hidden input
-    let hiddenValue = $derived(JSON.stringify(selectedIds));
 </script>
 
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
@@ -47,10 +34,8 @@
                     {#if config.enabled}
                         <label class="flex items-center gap-3 py-2 px-2 hover:bg-white border border-transparent hover:border-gray-200 rounded transition-colors cursor-pointer">
                             <input 
-                                type="checkbox"
+                                {...syncFieldConfig.as('checkbox', String(config.id))}
                                 class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-2"
-                                checked={selectedIds.includes(config.id)}
-                                onchange={() => toggleConfig(config.id)}
                             />
                             <div class="flex flex-col">
                                 <span class="text-sm font-medium text-gray-900 capitalize">{config.providerType?.replace(/-/g, ' ') ?? 'Unknown'}</span>
@@ -63,9 +48,8 @@
         {/if}
     {/await}
 
-    
-    <input {...syncFieldConfig.as("hidden", hiddenValue)} />
     {#each syncFieldConfig.issues() as issue}
         <p class="mt-1 text-sm text-red-600">{issue.message}</p>
     {/each}
 </div>
+

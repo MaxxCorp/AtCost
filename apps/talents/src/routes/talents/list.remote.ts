@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, talent, contact, eq, desc, inArray, ilike, or, and, sql, talentTimelineEntry, userContact, user } from '$lib/server/db';
+import { db, talent, contact, eq, desc, inArray, ilike, or, and, sql, talentTimelineEntry, userContact, user } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { talentPaginationSchema as PaginationSchema, type PaginatedResult } from '@ac/validations';
 
@@ -48,7 +48,7 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
     baseQuery = baseQuery.groupBy(talent.id) as any;
 
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     if (total === 0) return { data: [], total: 0 };
 

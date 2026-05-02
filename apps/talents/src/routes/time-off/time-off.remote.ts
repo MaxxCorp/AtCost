@@ -1,5 +1,5 @@
 import { query, form } from '$app/server';
-import { db, timeOffRequest, timeOffBalance, talent, eq, and, desc, or, ilike, sql } from '$lib/server/db';
+import { db, timeOffRequest, timeOffBalance, talent, eq, and, desc, or, ilike, sql } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { timeOffRequestSchema, type PaginatedResult } from '@ac/validations';
 
@@ -81,7 +81,7 @@ export const listTimeOffRequests = query(PaginationSchema, async (input): Promis
 
     const { sql, desc } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     const data = await baseQuery
         .orderBy(desc(timeOffRequest.startDate) as any)

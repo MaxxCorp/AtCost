@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db, user } from '$lib/server/db';
+import { db, user } from '@ac/db';
 import { getOptionalUser, parseRoles } from '$lib/server/authorization';
-import { desc, type InferSelectModel, sql, and, or, ilike } from '$lib/server/db';
+import { desc, type InferSelectModel, sql, and, or, ilike } from '@ac/db';
 import * as v from 'valibot';
 
 import { UserPaginationSchema as PaginationSchema, type User, type PaginatedResult } from '@ac/validations';
@@ -43,7 +43,7 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
         }
 
         const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-        const total = Number(countResult[0]?.count || 0);
+        const total = Number(countResult.rows[0]?.count || 0);
 
         const rawResults = await baseQuery
             .orderBy(desc(user.createdAt))

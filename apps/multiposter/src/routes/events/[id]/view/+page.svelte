@@ -1,8 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { readEvent } from "../read.remote";
+    import { readEvent, deleteEvent } from "../../events.remote";
     import { authClient } from "$lib/auth";
-    import { deleteSeries } from "../delete-series.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
@@ -26,7 +25,6 @@
         ChevronDown,
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
-    import { deleteEvents } from "../delete.remote";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
     const eventId = page.params.id || "";
@@ -90,24 +88,20 @@
     let deletingSeriesId = $state<string | null>(null);
 
     async function handleDeleteSeries(event: any) {
-        const seriesName = event.summary || "this series";
         const confirmed = confirm(
-            `Are you sure you want to delete the entire series "${seriesName}"?\n\nThis will delete ALL events in this series. This action cannot be undone.`,
+            `Are you sure you want to delete the entire series?`,
         );
-
         if (!confirmed) return;
 
         deletingSeriesId = event.id;
         try {
-            await deleteSeries(event.id);
+            await deleteEvent({
+                id: event.id as string,
+                deleteAllInSeries: true,
+            });
             await goto("/events");
         } catch (err) {
             console.error("Delete series error:", err);
-            alert(
-                err instanceof Error
-                    ? err.message
-                    : "An error occurred while deleting the series",
-            );
         } finally {
             deletingSeriesId = null;
         }
@@ -115,22 +109,16 @@
 
     async function handleDeleteInstance(event: any) {
         const confirmed = confirm(
-            `Are you sure you want to delete this event instance?\n\nOnly this single occurrence will be deleted.`,
+            `Are you sure you want to delete this event instance?`,
         );
-
         if (!confirmed) return;
 
         deletingSeriesId = event.id;
         try {
-            await deleteEvents([event.id]);
+            await deleteEvent({ id: event.id as string });
             await goto("/events");
         } catch (err) {
             console.error("Delete instance error:", err);
-            alert(
-                err instanceof Error
-                    ? err.message
-                    : "An error occurred while deleting",
-            );
         } finally {
             deletingSeriesId = null;
         }
@@ -143,7 +131,7 @@
             <LoadingSection message="Loading event data..." />
         {:then event}
             {#if event}
-                <Breadcrumb feature="events" current={event.summary} />
+                <Breadcrumb feature="events" current={event?.summary} />
 
                 <div
                     class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100 space-y-8"
@@ -538,9 +526,9 @@
         {:catch error}
             <ErrorSection
                 headline="Error"
-                message={error instanceof Error
-                    ? error.message
-                    : "Failed to load event data"}
+                message={error.body?.message ||
+                    error.message ||
+                    "Failed to load event data"}
                 href="/events"
                 button="Back to Events"
             />

@@ -1,8 +1,8 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { desc, eq, inArray, and, or, ilike, sql } from 'drizzle-orm';
+import { desc, eq, inArray, and, or, ilike, sql } from '@ac/db';
 import { kioskPaginationSchema as PaginationSchema, type Kiosk, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 
@@ -28,16 +28,16 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
 
     if (locationId) {
         const ids = Array.isArray(locationId) ? locationId : [locationId];
-        baseQuery = baseQuery.leftJoin(kioskLocation, eq(kiosk.id, kioskLocation.kioskId)) as any;
+        baseQuery = baseQuery.leftJoin(kioskLocation, eq(kiosk.id, kioskLocation.kioskId));
         conditions.push(inArray(kioskLocation.locationId, ids));
     }
 
     if (conditions.length > 0) {
-        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+        baseQuery = baseQuery.where(and(...conditions));
     }
 
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     const paginatedIdsResult = await baseQuery
         .orderBy(desc(kiosk.createdAt))
@@ -78,9 +78,9 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
         }
     });
 
-    const data = rawResults.map((row) => {
+    const data = rawResults.map((row: any) => {
         // Selection logic for the public contact QR codes per location
-        const locations = (row.locations || []).map((kl) => {
+        const locations = (row.locations || []).map((kl: any) => {
             const loc = kl.location;
             if (!loc) return null;
 
@@ -99,7 +99,7 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
                 name: loc.name,
                 publicContactQrCodePath
             };
-        }).filter(l => l !== null) as any[];
+        }).filter((l: any) => l !== null) as any[];
 
         const primaryQrCode = locations.find(l => l.publicContactQrCodePath)?.publicContactQrCodePath || null;
 

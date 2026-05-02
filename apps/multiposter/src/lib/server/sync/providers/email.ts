@@ -9,9 +9,9 @@ import type {
 import { getAuthenticatedUser } from '$lib/server/authorization';
 import { getEntityContacts } from '../../contacts';
 import { resolveEventContact } from '../../contact-resolution';
-import { db } from '../../db';
-import { user } from '../../db/schema';
-import { emailCampaign, emailEvent } from '../../db/schema';
+import { db } from '@ac/db';
+import { user } from '@ac/db';
+import { emailCampaign, emailEvent } from '@ac/db';
 import { renderEmailTemplates, type EmailTemplateData } from '../../email-templates';
 import { env } from '$env/dynamic/private';
 import fs from 'fs';

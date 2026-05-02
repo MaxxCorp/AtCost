@@ -7,7 +7,7 @@ import type {
 	SyncDirection,
 	ProviderType
 } from './types';
-import { db } from '../db';
+import { db } from '@ac/db';
 import {
 	syncConfig as syncConfigTable,
 	syncOperation as syncOperationTable,
@@ -27,7 +27,7 @@ import {
 	eventTag as eventTag,
 	recurringSeries as recurringSeries,
 	campaign as campaignTable
-} from '../db/schema';
+} from '@ac/db';
 import { getEntityContacts } from '../contacts';
 import { resolveEventContact } from '../contact-resolution';
 import { eq, and, isNull, lt, gt, gte, lte, or, inArray, desc } from 'drizzle-orm';

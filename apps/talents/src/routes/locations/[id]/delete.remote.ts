@@ -1,5 +1,5 @@
 import { command } from '$app/server';
-import { db, location, inArray } from '$lib/server/db';
+import { db, location, inArray } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';

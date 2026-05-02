@@ -1,5 +1,5 @@
 import { command, query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { announcementLocation, eventLocation, kioskLocation, location, resourceLocation } from '@ac/db';
 import { eq, and } from 'drizzle-orm';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '@ac/validations';

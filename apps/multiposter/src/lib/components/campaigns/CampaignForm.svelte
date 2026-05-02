@@ -110,7 +110,7 @@
                 })}
             class="space-y-4"
         >
-            {#if isUpdating && initialData}
+            {#if initialData?.id}
                 <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
             {/if}
 

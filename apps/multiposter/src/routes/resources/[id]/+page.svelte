@@ -26,7 +26,7 @@
     {:then [resource, locations, allResources]}
         {#if resource}
             <div class="max-w-2xl mx-auto">
-                <Breadcrumb feature="resources" current={resource.name} />
+                <Breadcrumb feature="resources" current={resource?.name} />
                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
                     <h1 class="text-3xl font-bold mb-6">{m.edit_resource()}</h1>
                     <ResourceForm

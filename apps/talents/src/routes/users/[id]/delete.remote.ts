@@ -1,6 +1,6 @@
 import { command } from '$app/server';
-import { db, user } from '$lib/server/db';
-import { inArray } from '$lib/server/db';
+import { db, user } from '@ac/db';
+import { inArray } from '@ac/db';
 import { listUsers } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess, parseRoles } from '$lib/server/authorization';
 import * as v from 'valibot';

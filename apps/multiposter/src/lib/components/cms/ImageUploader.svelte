@@ -12,7 +12,22 @@
     } from "@lucide/svelte";
     import * as m from "$lib/paraglide/messages";
 
-    let { value = $bindable(""), label = "", id = "image-uploader" } = $props();
+    let {
+        value = $bindable(""),
+        label = "",
+        id = "image-uploader",
+        onchange,
+    }: {
+        value?: string;
+        label?: string;
+        id?: string;
+        onchange?: (value: string) => void;
+    } = $props();
+
+    const safeValue = $derived(`${value ?? ""}`);
+    const safeLabel = $derived(`${label ?? ""}`);
+    const safeId = $derived(`${id || "image-uploader"}`);
+
 
     let isDragging = $state(false);
     let isUploading = $state(false);
@@ -39,6 +54,7 @@
 
                 if (result.success && result.urls) {
                     value = result.urls.default;
+                    onchange?.(value);
                     toast.success(m.successfully_saved());
                 } else {
                     toast.error(result.error || m.something_went_wrong());
@@ -113,6 +129,7 @@
 
             if (result.success && result.urls) {
                 value = result.urls.default;
+                onchange?.(value);
                 toast.success(m.successfully_saved());
             } else {
                 toast.error(result.error || m.something_went_wrong());
@@ -126,13 +143,14 @@
 
     function clear() {
         value = "";
+        onchange?.("");
     }
 </script>
 
 <div class="space-y-2">
-    {#if label}
-        <label for={id} class="block text-sm font-medium text-gray-700"
-            >{label}</label
+    {#if safeLabel}
+        <label for={safeId} class="block text-sm font-medium text-gray-700"
+            >{safeLabel}</label
         >
     {/if}
 
@@ -140,6 +158,7 @@
         role="button"
         tabindex="0"
         aria-label="Upload image"
+        id={safeId}
         class="relative border-2 border-dashed rounded-lg transition-all duration-200 overflow-hidden bg-gray-50 min-h-[200px] flex items-center justify-center
         {isDragging
             ? 'border-blue-500 bg-blue-50'
@@ -192,7 +211,7 @@
         {:else if value}
             <div class="relative group w-full h-full p-2">
                 <img
-                    src={value}
+                    src={safeValue}
                     alt="Preview"
                     class="w-full h-auto max-h-[400px] object-contain rounded-md shadow-sm"
                 />

@@ -167,7 +167,7 @@
             })}
         class="space-y-6"
     >
-        {#if isUpdating && initialData}
+        {#if initialData?.id}
             <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
         {/if}
 
@@ -201,9 +201,6 @@
         </div>
 
         <div class="space-y-2">
-            {#if !loaded}
-                <div class="animate-pulse h-10 bg-gray-100 rounded"></div>
-            {:else}
                 <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
                     <MapPin size={18} class="text-blue-600" />
                     {m.feature_locations_title()}
@@ -317,16 +314,17 @@
                     {/snippet}
                 </EntityManager>
                 <!-- Hidden input for submission -->
-                <input
-                    {...remoteFunction.fields.locationIds.as(
-                        "hidden",
-                        JSON.stringify(selectedLocationIds),
-                    )}
-                />
+                {#if selectedLocationIds.length > 0}
+                    <input
+                        {...remoteFunction.fields.locationIds.as(
+                            "hidden",
+                            JSON.stringify(selectedLocationIds),
+                        )}
+                    />
+                {/if}
                 {#each remoteFunction.fields.locationIds.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
-            {/if}
             <p class="text-xs text-gray-500">
                 {m.linked_events_description()}
             </p>

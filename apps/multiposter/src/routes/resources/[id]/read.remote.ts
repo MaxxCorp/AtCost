@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { resource, location, resourceRelation, resourceLocation, resourceContact } from '@ac/db';
 import { eq, and, getTableColumns } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

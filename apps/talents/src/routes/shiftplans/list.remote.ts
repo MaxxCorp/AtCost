@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike } from '$lib/server/db';
+import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { ShiftPlanTemplate } from '@ac/db';
 import * as v from 'valibot';
@@ -45,7 +45,7 @@ export const listShiftplans = query(PaginationSchema, async (input): Promise<Pag
     }
 
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     const data = (await baseQuery
         .orderBy(desc(shiftPlanTemplate.createdAt) as any)

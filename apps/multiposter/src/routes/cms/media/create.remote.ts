@@ -3,7 +3,7 @@ import { error } from '@sveltejs/kit';
 import { getStorageProvider } from '$lib/server/blob-storage';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { uploadImageSchema } from '$lib/validations/cms';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { cmsMedia } from '@ac/db';
 
 export const uploadMedia = command(uploadImageSchema, async (data) => {

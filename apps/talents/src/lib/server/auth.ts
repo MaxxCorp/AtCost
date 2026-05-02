@@ -2,15 +2,19 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { sveltekitCookies } from "better-auth/svelte-kit";
 import { getRequestEvent } from "$app/server";
-import { db } from "$lib/server/db";
+import { db, setDatabaseUrl } from "@ac/db";
 import { env } from '$env/dynamic/private';
+
+if (env.DATABASE_URL) {
+    setDatabaseUrl(env.DATABASE_URL);
+}
 
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
         provider: "pg",
     }),
     secret: env.BETTER_AUTH_SECRET || "development-secret-only-for-build",
-    baseURL: env.BETTER_AUTH_URL || "http://localhost:5175",
+    baseURL: env.BETTER_AUTH_URL || "http://localhost:5174",
     basePath: "/api/auth",
     trustHost: true,
     session: {

@@ -5,7 +5,7 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { user, eventResource } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import { resolveEventContact } from '$lib/server/contact-resolution';

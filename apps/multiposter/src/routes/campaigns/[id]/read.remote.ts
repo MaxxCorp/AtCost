@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { campaign } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import type { Campaign as DbCampaign } from '@ac/db';

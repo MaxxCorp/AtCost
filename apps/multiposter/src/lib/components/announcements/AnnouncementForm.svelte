@@ -174,21 +174,27 @@
     </div>
 
     <form {...formSetup} class="space-y-6">
-        {#if isUpdating && initialData}
+        {#if initialData?.id}
             <input {...rf.fields.id.as("hidden", initialData.id)} />
         {/if}
 
-        <input {...rf.fields.isPublic.as("hidden", isPublic.toString())} />
+        {#if isPublic !== undefined}
+            <input {...rf.fields.isPublic.as("hidden", isPublic.toString())} />
+        {/if}
         <!-- Send tagNames as JSON string -->
-        <input {...rf.fields.tagNames.as("hidden", tagNamesJson)} />
+        {#if tagNamesJson}
+            <input {...rf.fields.tagNames.as("hidden", tagNamesJson)} />
+        {/if}
         <!-- We no longer strictly need tagIds for submission if using names -->
 
-        <input
-            {...rf.fields.contactIds.as(
-                "hidden",
-                JSON.stringify(selectedContactIds),
-            )}
-        />
+        {#if selectedContactIds.length > 0}
+            <input
+                {...rf.fields.contactIds.as(
+                    "hidden",
+                    JSON.stringify(selectedContactIds),
+                )}
+            />
+        {/if}
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">
@@ -318,7 +324,6 @@
             </div>
 
             <div>
-                {#if locations.length > 0}
                     <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
                         <MapPin size={18} class="text-blue-600" />
                         {m.locations()}
@@ -461,19 +466,14 @@
                             />
                         {/snippet}
                     </EntityManager>
-                {:else}
-                    <div
-                        class="p-4 border border-dashed rounded-lg text-sm text-gray-500 text-center"
-                    >
-                        {m.loading_item({ item: m.locations() })}
-                    </div>
+                {#if selectedLocationIds.length > 0}
+                    <input
+                        {...rf.fields.locationIds.as(
+                            "hidden",
+                            JSON.stringify(selectedLocationIds),
+                        )}
+                    />
                 {/if}
-                <input
-                    {...rf.fields.locationIds.as(
-                        "hidden",
-                        JSON.stringify(selectedLocationIds),
-                    )}
-                />
             </div>
 
             <div class="flex items-center gap-2 mt-4">

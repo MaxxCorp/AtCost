@@ -524,5 +524,13 @@
 	"capacity": "Capacity",
 	"mode": "Mode",
 	"end": "End",
-	"ticket_price_required": "Ticket price is required"
+	"ticket_price_required": "Ticket price is required",
+	"start": "Start",
+	"media": "Media",
+	"settings": "Settings",
+	"public_event": "Public Event",
+	"guests_can_invite_others": "Guests can invite others",
+	"page": "Page",
+	"of": "of",
+	"successfully_deleted": "Successfully deleted!"
 }

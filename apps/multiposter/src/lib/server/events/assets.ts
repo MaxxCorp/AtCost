@@ -1,5 +1,5 @@
-import { db } from '../db';
-import { event as eventTable } from '../db/schema';
+import { db } from '@ac/db';
+import { event as eventTable } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';

@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { syncConfig } from '@ac/db';
 import type { SyncConfig as DbSyncConfig } from '@ac/db';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { desc, and, or, ilike, sql, inArray } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
@@ -42,7 +42,7 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 	}
 
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-	const total = Number(countResult[0]?.count || 0);
+	const total = Number(countResult.rows[0]?.count || 0);
 
 	const rawResults = await baseQuery
 		.orderBy(desc(syncConfig.createdAt))

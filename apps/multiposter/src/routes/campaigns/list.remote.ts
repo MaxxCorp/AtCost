@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { campaign } from '@ac/db';
 import type { Campaign as DbCampaign } from '@ac/db';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { desc } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
@@ -38,7 +38,7 @@ export const listCampaigns = query(PaginationSchema, async (input): Promise<Pagi
 
 	const { sql } = await import('drizzle-orm');
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-	const total = Number(countResult[0]?.count || 0);
+	const total = Number(countResult.rows[0]?.count || 0);
 
 	const rawResults = await baseQuery
 		.orderBy(desc(campaign.createdAt))

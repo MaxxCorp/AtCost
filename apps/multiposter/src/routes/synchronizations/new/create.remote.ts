@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { form } from '$app/server';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { syncConfig, account } from '@ac/db'; // Updated syncConfig import path
 import { eq, and } from 'drizzle-orm';
 import { syncService } from '$lib/server/sync/service';

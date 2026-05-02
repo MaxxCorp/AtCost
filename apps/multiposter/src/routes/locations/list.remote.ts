@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { location } from '@ac/db';
 import type { Location as DbLocation } from '@ac/db';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { desc } from 'drizzle-orm';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
@@ -48,7 +48,7 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 
 	const { sql } = await import('drizzle-orm');
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-	const total = Number(countResult[0]?.count || 0);
+	const total = Number(countResult.rows[0]?.count || 0);
 
 	if (total === 0) {
 		return { data: [], total: 0 };
@@ -70,6 +70,7 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 
 	const data = rawResults.map((row) => ({
 		...row,
+		id: String(row.id),
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	}));

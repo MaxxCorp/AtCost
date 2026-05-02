@@ -2,7 +2,7 @@ import { command } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { getAuthenticatedUser } from '$lib/server/authorization';
 import { updateImageSchema } from '$lib/validations/cms';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { cmsMedia } from '@ac/db';
 import { eq } from 'drizzle-orm';
 

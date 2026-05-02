@@ -1,5 +1,5 @@
 import { command, query } from '$app/server';
-import { db, userTalent, userContact, talent, locationContact, eq, and, inArray } from '$lib/server/db';
+import { db, userTalent, userContact, talent, locationContact, eq, and, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { talentAssociationSchema, getTalentAssociationsSchema } from '@ac/validations';
 

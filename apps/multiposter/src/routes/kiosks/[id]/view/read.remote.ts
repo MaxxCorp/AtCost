@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { listKioskEvents } from '../../../events/list-public.remote';
+import { listEvents } from '../../../events/events.remote';
 import { listKioskAnnouncements } from '../../../announcements/list.remote';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq } from 'drizzle-orm';
 import * as v from 'valibot';
@@ -32,7 +32,12 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         locations: locations
     };
 
-    const eventsResult = await listKioskEvents(kioskId);
+    const eventsResponse = await listEvents({ 
+        locationId: locations.map(l => l.id), 
+        page: 1, 
+        limit: 1000 
+    } as any);
+    const eventsResult = eventsResponse.data;
     const announcementsResult = await listKioskAnnouncements();
 
     const items = [...eventsResult, ...announcementsResult.data].sort((a, b) => {
