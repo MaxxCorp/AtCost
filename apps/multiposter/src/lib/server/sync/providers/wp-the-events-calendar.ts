@@ -879,7 +879,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 		// Map Website URL
 		if (event.metadata?.eventId && env.BETTER_AUTH_URL) {
-			wpEvent.website = `${env.BETTER_AUTH_URL}/events/${event.metadata.eventId}`;
+			wpEvent.website = `${env.BETTER_AUTH_URL}/events/${event.metadata.eventId}/view`;
 		} else if (event.source?.url) {
 			// Fallback to source URL
 			wpEvent.website = event.source.url;

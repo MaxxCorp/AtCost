@@ -77,7 +77,7 @@
 
             <!-- Meta Data Grid -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {#if event.location}
+                {#if event.locations && event.locations.length > 0}
                     <div
                         class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl"
                     >
@@ -86,7 +86,10 @@
                             <h3 class="font-semibold text-gray-900">
                                 {m.location()}
                             </h3>
-                            <p class="text-gray-600">{event.location}</p>
+                            <p class="text-gray-600">{event.locations[0].name}</p>
+                            {#if event.locations[0].street}
+                                <p class="text-xs text-gray-400 mt-1">{event.locations[0].street}</p>
+                            {/if}
                         </div>
                     </div>
                 {/if}

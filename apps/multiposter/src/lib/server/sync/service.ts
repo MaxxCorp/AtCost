@@ -828,7 +828,6 @@ export class SyncService {
 		};
 
 		if (external.description !== undefined) result.description = external.description;
-		if (external.location !== undefined) result.location = external.location;
 		if (external.startDateTime !== undefined) result.startDateTime = external.startDateTime;
 		if (external.startTimeZone !== undefined) result.startTimeZone = external.startTimeZone;
 		if (external.endDateTime !== undefined) result.endDateTime = external.endDateTime;
@@ -956,12 +955,6 @@ export class SyncService {
 				zip: primary.zip ?? undefined,
 				province: primary.state ?? undefined,
 			};
-		} else if (internal.location) {
-			// Fallback to text location if no structured location is linked
-			venue = {
-				name: internal.location
-			};
-			venues = [venue];
 		}
 
 		// Resolve Organizer (Contact with "Employee" tag)
@@ -1068,7 +1061,7 @@ export class SyncService {
 			providerId,
 			summary,
 			description,
-			location: venue?.name || internal.location || undefined,
+			location: venue?.name || undefined,
 			startDateTime: internal.startDateTime || internal.createdAt || new Date(),
 			startTimeZone: internal.startTimeZone || 'UTC',
 			endDateTime: internal.endDateTime || null,

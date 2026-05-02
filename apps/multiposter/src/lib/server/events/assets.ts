@@ -52,9 +52,8 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     vevent.addPropertyWithValue('summary', data.summary);
     if (data.description) vevent.addPropertyWithValue('description', data.description);
     
-    // Build location string from associations and free text
+    // Build location string from associations
     const locationParts: string[] = [];
-    if (data.location) locationParts.push(data.location);
     
     data.locations?.forEach((el: any) => {
         const l = el.location;

@@ -6,7 +6,7 @@
     startDateTime?: Date;
     endDate?: string;
     endDateTime?: Date;
-    location?: string;
+    locations?: { name: string; street?: string | null }[];
     recurrence?: string[];
   };
 
@@ -78,9 +78,9 @@
         </div>
         {/if}
 
-        {#if event.location}
+        {#if event.locations && event.locations.length > 0}
         <div class="detail-row">
-            <span class="detail-label">Ort:</span> {event.location}
+            <span class="detail-label">Ort:</span> {event.locations[0].name}{event.locations[0].street ? `, ${event.locations[0].street}` : ''}
         </div>
         {/if}
 

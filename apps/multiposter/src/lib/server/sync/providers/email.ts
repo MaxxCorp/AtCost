@@ -316,7 +316,7 @@ export class EmailProvider implements SyncProvider {
 				description: event.description,
 				startDateTime: event.startDateTime,
 				endDateTime: event.endDateTime,
-				location: event.location,
+				locations: event.venues?.map(v => ({ name: v.name, street: v.address })) || (event.location ? [{ name: event.location }] : []),
 				recurrence: event.recurrence
 			},
 			contactInfo

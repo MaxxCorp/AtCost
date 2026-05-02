@@ -23,7 +23,6 @@ export const event = pgTable("event", {
     seriesId: uuid("series_id").references((): AnyPgColumn => recurringSeries.id, { onDelete: "cascade" }),
     summary: text("summary").notNull(),
     description: text("description"),
-    location: text("location"),
     startDateTime: timestamp("start_date_time"),
     startTimeZone: text("start_time_zone"),
     endDateTime: timestamp("end_date_time"),

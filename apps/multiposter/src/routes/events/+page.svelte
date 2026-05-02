@@ -111,10 +111,10 @@
                                                 {event.isAllDay ? m.all_day() : `${formatTime(event.startDateTime)} - ${formatTime(event.endDateTime)}`}
                                             </span>
                                         </div>
-                                        {#if event.location}
+                                        {#if event.locations && event.locations.length > 0}
                                             <div class="flex items-center gap-1.5">
                                                 <MapPin size={14} class="text-red-500" />
-                                                <span class="font-medium truncate max-w-[200px]">{event.location}</span>
+                                                <span class="font-medium truncate max-w-[200px]">{event.locations[0].name}</span>
                                             </div>
                                         {/if}
                                     </div>

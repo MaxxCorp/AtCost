@@ -8,7 +8,7 @@ export interface EmailTemplateData {
     description?: string;
     startDateTime?: Date;
     endDateTime?: Date;
-    location?: string;
+    locations?: { name: string; street?: string | null }[];
     recurrence?: string[];
   };
   isAnnouncement?: boolean;
@@ -36,7 +36,7 @@ export async function renderEmailTemplates(data: EmailTemplateData): Promise<{ h
     .replace('{event.description ? `Beschreibung: ${event.description}\\n\\n` : \'\'}', data.event.description ? `Beschreibung: ${data.event.description}\n\n` : '')
     .replace('{startDate}', data.isAnnouncement ? '' : `Beginn: ${startDate}\n`)
     .replace('{endDate !== \'Nicht angegeben\' ? `Ende: ${endDate}\\n` : \'\'}', !data.isAnnouncement && endDate !== 'Nicht angegeben' ? `Ende: ${endDate}\n` : '')
-    .replace('{event.location ? `Ort: ${event.location}\\n` : \'\'}', data.event.location ? `Ort: ${data.event.location}\n` : '')
+    .replace('{event.location ? `Ort: ${event.location}\\n` : \'\'}', data.event.locations && data.event.locations.length > 0 ? `Ort: ${data.event.locations[0].name}${data.event.locations[0].street ? `, ${data.event.locations[0].street}` : ''}\n` : '')
     .replace('{event.recurrence && event.recurrence.length > 0 ? `Wiederholung: ${event.recurrence.join(\', \')}\\n` : \'\'}', data.event.recurrence && data.event.recurrence.length > 0 ? `Wiederholung: ${data.event.recurrence.join(', ')}\n` : '')
     .replace('{contactInfo.name}', data.contactInfo.name)
     .replace('{contactInfo.email}', data.contactInfo.email)
@@ -124,9 +124,9 @@ function renderSvelteComponent(Component: any, props: any): string {
         ` : ''}
         ` : ''}
 
-        ${event.location ? `
+        ${event.locations && event.locations.length > 0 ? `
         <div class="detail-row">
-            <span class="detail-label">Ort:</span> ${event.location}
+            <span class="detail-label">Ort:</span> ${event.locations[0].name}${event.locations[0].street ? `, ${event.locations[0].street}` : ''}
         </div>
         ` : ''}
 

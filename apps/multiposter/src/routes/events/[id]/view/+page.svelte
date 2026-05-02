@@ -240,26 +240,6 @@
                                             {/if}
                                         </div>
                                     </li>
-                                    {#if event.location}
-                                        <li
-                                            class="flex items-center gap-3 text-gray-700"
-                                        >
-                                            <MapPin
-                                                size={18}
-                                                class="text-red-500 flex-shrink-0"
-                                            />
-                                            <a
-                                                href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(
-                                                    event.location,
-                                                )}"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="hover:underline text-blue-600 break-all"
-                                            >
-                                                {event.location}
-                                            </a>
-                                        </li>
-                                    {/if}
 
                                     {#if event.locations && event.locations.length > 0}
                                         {#each event.locations as loc}

@@ -194,7 +194,6 @@ export const createEvent = form(createEventSchema, async (data) => {
         seriesId,
         summary: data.summary,
         description: data.description || null,
-        location: data.location || null,
         categoryBerlinDotDe: data.categoryBerlinDotDe || null,
         ticketPrice: data.ticketPrice || null,
         isAllDay: !!data.isAllDay,
@@ -227,7 +226,6 @@ export const createEvent = form(createEventSchema, async (data) => {
                 seriesId,
                 summary: data.summary,
                 description: data.description || null,
-                location: data.location || null,
                 categoryBerlinDotDe: data.categoryBerlinDotDe || null,
                 ticketPrice: data.ticketPrice || null,
                 isAllDay: !!data.isAllDay,
@@ -304,7 +302,6 @@ export const updateEvent = form(updateEventSchema, async (data) => {
     await db.update(event).set({
         summary: data.summary,
         description: data.description,
-        location: data.location,
         seriesId,
         startDateTime: start,
         startTimeZone: data.startTimeZone,
