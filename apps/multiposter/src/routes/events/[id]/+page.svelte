@@ -78,8 +78,12 @@
                     rf.fields.resourceIds.set(initialData.resourceIds || []);
                     rf.fields.contactIds.set(initialData.contactIds || []);
                     rf.fields.syncIds.set(initialData.syncIds || []);
-                    rf.fields.categoryBerlinDotDe.set(initialData.categoryBerlinDotDe || "");
-                    (rf.fields as any).recurrence?.set(initialData.recurrence || []);
+                    rf.fields.categoryBerlinDotDe.set(
+                        initialData.categoryBerlinDotDe || "",
+                    );
+                    (rf.fields as any).recurrence?.set(
+                        initialData.recurrence || [],
+                    );
 
                     // Date/Time
                     if (initialData.startDateTime) {
@@ -174,7 +178,7 @@
                 class="space-y-8"
             >
                 <input {...rf.fields.id.as("hidden", idValue)} />
-                
+
                 <EventsForm
                     {rf}
                     {locations}

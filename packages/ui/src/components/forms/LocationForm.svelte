@@ -165,11 +165,19 @@
         }
     });
 
+    const rf = $derived.by(() => {
+        return (remoteFunction as any).then(initializeFields());
+    });
+
     function initializeFields() {
         const data = initialData || {};
-        for (const key in remoteFunction.fields) {
-            const field = remoteFunction.fields[key];
+
+        for (const key in rf.fields) {
+            const field = rf.fields[key];
             const value = data[key];
+            console.log("key", key);
+            console.log("field", field);
+            console.log("value", value);
 
             if (key === "isPublic") {
                 field.checked(value ?? true);
@@ -180,14 +188,6 @@
             }
         }
     }
-
-    // Initialize immediately for first render
-    initializeFields();
-
-    $effect.pre(() => {
-        // Re-initialize when props change
-        initializeFields();
-    });
 </script>
 
 <form
