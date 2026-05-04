@@ -1,7 +1,7 @@
 import { command } from '$app/server';
 import { db } from '$lib/server/db';
 import { event } from '@ac/db';
-import { inArray, eq, and } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { listEvents } from './list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
@@ -31,6 +31,18 @@ export const deleteEvents = command(v.array(v.string()), async (ids: string[]) =
       iCalPath: true
     }
   });
+
+  // Detach child instances that reference any of the to-be-deleted events
+  // via recurringEventId, so they are NOT cascade-deleted.
+  await db.update(event)
+    .set({ recurringEventId: null })
+    .where(inArray(event.recurringEventId, ids));
+
+  // Also clear seriesId on the events being deleted so the cascade from
+  // recurring_series does not interfere (series record itself stays intact).
+  await db.update(event)
+    .set({ seriesId: null })
+    .where(inArray(event.id, ids));
 
   await db.delete(event).where(inArray(event.id, ids));
 

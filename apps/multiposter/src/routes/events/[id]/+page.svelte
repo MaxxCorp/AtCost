@@ -9,6 +9,7 @@
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
 	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
 	const eventId = page.params.id || "";
+	const isEditingSeries = page.url.searchParams.get("editSeries") === "true";
 </script>
 
 {#if browser}
@@ -21,6 +22,7 @@
 			validationSchema={updateEventSchema}
 			isUpdating={true}
 			initialData={event}
+			isEditingSeries={isEditingSeries}
 		/>
 	{:else}
 		<ErrorSection
