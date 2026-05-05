@@ -4,7 +4,7 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import Button from "$lib/components/ui/button/button.svelte";
-    import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
+    import SyncCheckboxBlock from "$lib/components/synchronizations/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
     import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
