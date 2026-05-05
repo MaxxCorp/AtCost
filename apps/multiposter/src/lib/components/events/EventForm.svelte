@@ -7,7 +7,7 @@
 
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
+    import SyncCheckboxBlock from "$lib/components/synchronizations/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
     import { handleDelete, EntityManager, LocationForm } from "@ac/ui";
