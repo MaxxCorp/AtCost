@@ -4,7 +4,15 @@
     // Type-only import safe for SSR
     import type { ClassicEditor } from "ckeditor5";
 
-    let { value = $bindable(), disabled = false } = $props();
+    let { 
+        value = $bindable(), 
+        disabled = false,
+        onchange 
+    }: {
+        value?: string;
+        disabled?: boolean;
+        onchange?: (value: string) => void;
+    } = $props();
 
     let editorElement: HTMLElement;
     let editorInstance = $state<ClassicEditor | null>(null);
@@ -167,7 +175,8 @@
             editorInstance.model.document.on("change:data", () => {
                 const data = editorInstance?.getData();
                 if (data !== value) {
-                    value = data;
+                    value = data ?? "";
+                    onchange?.(value);
                 }
             });
         } catch (error: any) {

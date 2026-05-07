@@ -153,11 +153,11 @@
 										{formatEventTime(event)}
 									</span>
 								</div>
-								{#if event.location}
+								{#if event.locations && event.locations.length > 0}
 									<div class="flex items-center gap-2 min-w-0">
 										<MapPin size={14} class="text-red-500 shrink-0" />
 										<span class="text-xs text-gray-400 break-all text-pretty">
-											{event.location}
+											{event.locations.map(l => l.name).join(", ")}
 										</span>
 									</div>
 								{/if}

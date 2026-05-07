@@ -41,7 +41,6 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		if (data.summary !== undefined) updateData.summary = data.summary;
 		if (data.description !== undefined) updateData.description = data.description;
-		if (data.location !== undefined) updateData.location = data.location;
 		if (data.status !== undefined) updateData.status = data.status;
 		if (data.categoryBerlinDotDe !== undefined) updateData.categoryBerlinDotDe = data.categoryBerlinDotDe;
 		if (data.ticketPrice !== undefined) updateData.ticketPrice = data.ticketPrice;
@@ -291,7 +290,6 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							campaignId: updatedEvent.campaignId,
 							summary: updatedEvent.summary,
 							description: updatedEvent.description,
-							location: updatedEvent.location,
 							categoryBerlinDotDe: updatedEvent.categoryBerlinDotDe,
 							ticketPrice: updatedEvent.ticketPrice,
 							isAllDay: updatedEvent.isAllDay,

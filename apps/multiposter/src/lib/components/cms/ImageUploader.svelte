@@ -12,7 +12,17 @@
     } from "@lucide/svelte";
     import * as m from "$lib/paraglide/messages";
 
-    let { value = $bindable(""), label = "", id = "image-uploader" } = $props();
+    let { 
+        value = $bindable(""), 
+        label = "", 
+        id = "image-uploader",
+        onchange
+    }: {
+        value?: string;
+        label?: string;
+        id?: string;
+        onchange?: (value: string) => void;
+    } = $props();
 
     let isDragging = $state(false);
     let isUploading = $state(false);
@@ -39,6 +49,7 @@
 
                 if (result.success && result.urls) {
                     value = result.urls.default;
+                    onchange?.(value);
                     toast.success(m.successfully_saved());
                 } else {
                     toast.error(result.error || m.something_went_wrong());
@@ -113,6 +124,7 @@
 
             if (result.success && result.urls) {
                 value = result.urls.default;
+                onchange?.(value);
                 toast.success(m.successfully_saved());
             } else {
                 toast.error(result.error || m.something_went_wrong());
@@ -126,6 +138,7 @@
 
     function clear() {
         value = "";
+        onchange?.("");
     }
 </script>
 

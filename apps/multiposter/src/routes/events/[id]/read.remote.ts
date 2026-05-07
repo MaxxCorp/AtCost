@@ -97,7 +97,6 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			endDateTime: result.endDateTime?.toISOString() ?? null,
 			isAllDay: result.isAllDay,
 			isPublic: result.isPublic,
-			location: result.location,
 			heroImage: result.heroImage,
 			ticketPrice: result.ticketPrice,
 			categoryBerlinDotDe: result.categoryBerlinDotDe,

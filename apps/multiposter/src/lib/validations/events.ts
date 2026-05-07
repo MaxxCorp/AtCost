@@ -29,7 +29,6 @@ const remindersSchema = v.object({
 export const eventBaseSchema = v.object({
 	summary: v.pipe(v.string(), v.minLength(1, 'Event title is required')),
 	description: v.optional(v.string()),
-	location: v.optional(v.string()),
 	locationIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	// RemoteFormInput only allows string | number | boolean | File | ...
 	// So we use string and parse to Date manually where needed.

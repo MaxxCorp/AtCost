@@ -1,18 +1,12 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
     import * as m from "$lib/paraglide/messages";
     import { type Event, type Tag } from "@ac/validations";
-    import { deleteEvents as deleteEventAction } from "../../../routes/events/[id]/delete.remote";
-    import { deleteSeries as deleteSeriesAction } from "../../../routes/events/[id]/delete-series.remote";
-
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+    
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
     import { handleDelete, EntityManager, LocationForm } from "@ac/ui";
-    import type { updateEvent } from "../../../routes/events/[id]/update.remote";
-    import type { createEvent } from "../../../routes/events/new/create.remote";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import { listLocations } from "../../../routes/locations/list.remote";
@@ -22,6 +16,8 @@
     import { onMount, type Snippet } from "svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
+    import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
+    import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
 
     import {
         addAssociation,
@@ -51,13 +47,8 @@
         CalendarClock,
         User,
         MapPin,
-        ExternalLink,
-        Trash2,
-        ChevronDown,
-        RefreshCw,
         Tag as TagIcon
     } from "@lucide/svelte";
-    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
@@ -67,17 +58,32 @@
 
     let {
         remoteFunction,
-        validationSchema,
         isUpdating = false,
         initialData = null,
     }: {
         remoteFunction: any;
-        validationSchema: any;
         isUpdating?: boolean;
         initialData?: Event | null;
     } = $props();
 
     const type = "event";
+    const BERLIN_DE_CATEGORIES = [
+        "Ausstellung",
+        "Berliner Bühnen",
+        "Bildung",
+        "Feste",
+        "Freizeit",
+        "Kinder",
+        "Kino",
+        "Klassik",
+        "Konzerte",
+        "Literatur",
+        "Messen",
+        "Party",
+        "Rund ums Haus",
+        "Sport",
+        "Sonstiges",
+    ];
 
     function parseDateTime(dt: string | null | undefined) {
         if (!dt) return { date: "", time: "" };
@@ -133,15 +139,10 @@
 
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    // svelte-ignore state_referenced_locally
-    const startParsed = parseDateTime(initialData?.startDateTime);
-    // svelte-ignore state_referenced_locally
-    const endParsed = parseDateTime(initialData?.endDateTime);
+    const startParsed = $derived(parseDateTime(initialData?.startDateTime));
+    const endParsed = $derived(parseDateTime(initialData?.endDateTime));
     const localNow = getLocalNow();
-    // svelte-ignore state_referenced_locally
-    const initialEnd = getInitialEndDateTime(startParsed, endParsed, localNow);
-
-
+    const initialEnd = $derived(getInitialEndDateTime(startParsed, endParsed, localNow));
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -152,106 +153,62 @@
         prevIssuesLength = issues.length;
     });
 
-    // State derived from initialData
-    // svelte-ignore state_referenced_locally
-    let isAllDay = $state(initialData?.isAllDay ?? false);
-    // svelte-ignore state_referenced_locally
-    let hasEndTime = $state(initialData ? !!initialData.endDateTime : true);
-    // svelte-ignore state_referenced_locally
-    let useDefaultReminders = $state(
-        (initialData?.reminders as any)?.useDefault ?? true,
-    );
-    // svelte-ignore state_referenced_locally
-    let reminders = $state(
-        (initialData?.reminders as any)?.overrides ?? [
-            { method: "popup", minutes: 10 },
-        ],
-    );
-
-    // svelte-ignore state_referenced_locally
-    let guestsCanInviteOthers = $state(
-        initialData?.guestsCanInviteOthers ?? false,
-    );
-    // svelte-ignore state_referenced_locally
-    let guestsCanModify = $state(initialData?.guestsCanModify ?? false);
-    // svelte-ignore state_referenced_locally
-    let guestsCanSeeOtherGuests = $state(
-        initialData?.guestsCanSeeOtherGuests ?? false,
-    );
-    // svelte-ignore state_referenced_locally
-    let isPublic = $state(initialData?.isPublic ?? true);
-
-    // Recurrence State
-    // svelte-ignore state_referenced_locally
-    let recurrence = $state<string[]>((initialData?.recurrence as any) || []);
-    // svelte-ignore state_referenced_locally
-    let recurrenceRule = $state<string | null>(recurrence[0] || null);
     let showRecurrenceDialog = $state(false);
-
-    // svelte-ignore state_referenced_locally
-    let tags = $state<Tag[]>(initialData?.tags || []);
-    // svelte-ignore state_referenced_locally
-    let tagsString = $state(tags.map(t => t.name).join(", "));
-    // svelte-ignore state_referenced_locally
-    let heroImage = $state(initialData?.heroImage ?? "");
-
-    // Resource and location state
-    let locations = $state<Location[]>([]);
-    let resources = $state<ResourceWithHierarchy[]>([]);
-    let locationsLoaded = $state(false);
-    let resourcesLoaded = $state(false);
 
     let locationsPromise = listLocations();
     let resourcesPromise = listResourcesWithHierarchy();
+    // No-op for removed state initializations
 
-    onMount(async () => {
-        const [resResources, resLocations] = await Promise.all([resourcesPromise, locationsPromise]);
-        resources = (resResources as any).data ?? resResources;
-        resourcesLoaded = true;
-        locations = (resLocations as any).data ?? resLocations;
-        locationsLoaded = true;
 
-        // Fallback logic for legacy single-string location finding
-        if ((!initialData?.locationIds || initialData.locationIds.length === 0) && initialData?.location) {
-            const id = await findInitialLocationId();
-            if (id) {
-                selectedLocationIds = [id];
-                useFreeTextLocation = false;
-            }
-        }
-    });
-    // svelte-ignore state_referenced_locally
-    let selectedResourceIds = $state<string[]>(initialData?.resourceIds || []);
-    // svelte-ignore state_referenced_locally
-    let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
-    // svelte-ignore state_referenced_locally
-    let freeTextLocation = $state(initialData?.location || "");
-    // svelte-ignore state_referenced_locally
-    let startTimeZoneInput = $state(
-        initialData?.startTimeZone || browserTimezone,
-    );
-    // svelte-ignore state_referenced_locally
-    let endTimeZoneInput = $state(
-        initialData?.endTimeZone ||
-            initialData?.startTimeZone ||
-            browserTimezone,
-    );
-    // svelte-ignore state_referenced_locally
-    let descriptionValue = $state(
-        initialData?.description ?? "",
-    );
-    // svelte-ignore state_referenced_locally
-    let startDateInput = $state(startParsed.date || localNow.date);
-    // svelte-ignore state_referenced_locally
-    let startTimeInput = $state(startParsed.time || localNow.time);
-    // svelte-ignore state_referenced_locally
-    let endDateInput = $state(initialEnd.date);
-    // svelte-ignore state_referenced_locally
-    let endTimeInput = $state(initialEnd.time);
+    // Date/Time handling
+    const timezones = Intl.supportedValuesOf
+        ? Intl.supportedValuesOf("timeZone")
+        : [];
 
-    // Helper to format RRule text
-    const recurrenceText = $derived(
-        recurrenceRule
+    function updateEndDateTime(rf: any) {
+        const startDate = rf.fields.startDate.value;
+        const startTime = rf.fields.startTime.value;
+        if (!startDate || !startTime) return;
+
+        const start = new Date(`${startDate}T${startTime}:00`);
+        if (isNaN(start.getTime())) return;
+
+        const end = new Date(start.getTime() + 60 * 60000);
+        rf.fields.endDate.set(end.toISOString().split("T")[0]);
+        rf.fields.endTime.set(end.toTimeString().slice(0, 5));
+    }
+
+    function getDefaultEndTime(rf: any) {
+        const startDate = rf.fields.startDate.value;
+        const startTime = rf.fields.startTime.value;
+        if (!startDate || !startTime) return "";
+        const start = new Date(`${startDate}T${startTime}:00`);
+        const end = new Date(start.getTime() + 60 * 60000);
+        return end.toTimeString().slice(0, 5);
+    }
+
+    function addReminder(rf: any) {
+        const currentReminders = rf.fields.reminders.fields.overrides.value ?? [];
+        rf.fields.reminders.fields.overrides.set([...currentReminders, { method: "popup", minutes: 10 }]);
+    }
+
+    function removeReminder(rf: any, index: number) {
+        const currentReminders = rf.fields.reminders.fields.overrides.value ?? [];
+        rf.fields.reminders.fields.overrides.set(currentReminders.filter((_: any, i: number) => i !== index));
+    }
+</script>
+
+{#await remoteFunction}
+    <LoadingSection message={m.loading()} />
+{:then rf}
+    <datalist id="timezones">
+        {#each timezones as tz}
+            <option value={tz}></option>
+        {/each}
+    </datalist>
+
+    {@const recurrenceRule = rf.fields.recurrence.value}
+    {@const recurrenceText = recurrenceRule
             ? (() => {
                   try {
                       return RRule.fromString(recurrenceRule).toText();
@@ -259,602 +216,315 @@
                       return m.custom_recurrence();
                   }
               })()
-            : m.recurrence(),
-    );
+            : m.recurrence()}
 
-    const hiddenRecurrenceRule = $derived(recurrenceRule ?? "");
-    const hiddenTagsString = $derived(tagsString ?? "");
+    {@const isAllDay = rf.fields.isAllDay.value === true || rf.fields.isAllDay.value === 'true' || rf.fields.isAllDay.value === 'on'}
+    {@const hasEndTime = rf.fields.hasEndTime.value === true || rf.fields.hasEndTime.value === 'true'}
+    {@const selectedLocationIds = JSON.parse(rf.fields.locationIds.value || '[]')}
+    {@const selectedResourceIds = JSON.parse(rf.fields.resourceIds.value || '[]')}
+    {@const selectedContactIds = JSON.parse(rf.fields.contactIds.value || '[]')}
+    {@const useDefaultReminders = rf.fields.reminders.fields.useDefault.value === true || rf.fields.reminders.fields.useDefault.value === 'true'}
+    {@const reminders = rf.fields.reminders.fields.overrides.value ?? []}
 
-    const isSeries = $derived(
-        !!(
-            initialData?.seriesId ||
-            initialData?.recurringEventId ||
-            (recurrenceRule && recurrenceRule.length > 0)
-        ),
-    );
+    <input {...rf.fields.id.as("hidden", initialData?.id)} />
+    <input {...rf.fields.heroImage.as("hidden", initialData?.heroImage ?? "")} />
+    <input {...rf.fields.recurrence.as("hidden", initialData?.recurrence?.[0] ?? "")} />
+    <input {...rf.fields.tags.as("hidden", (initialData?.tags ?? []).map(t => t.name).join(", "))} />
+    <input {...rf.fields.description.as("hidden", initialData?.description ?? "")} />
+    <input {...rf.fields.remindersJson.as("hidden")} />
 
-    // Helper to find location ID from text (for initial matching)
-    async function findInitialLocationId() {
-        if (!initialData?.location) return "";
-        const allLocs = await locationsPromise;
-        const match = allLocs.data.find((l: Location) => {
-            const parts = [l.name];
-            if (l.roomId) parts.push(l.roomId);
-            // Simple check for start of string or full match
-            const fullStr = parts.join(", ");
-            return initialData.location?.startsWith(fullStr);
-        });
-        return match ? match.id : "";
-    }
+    <div class="bg-white shadow rounded-lg p-6 space-y-4">
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">
+            {m.basic_information()}
+        </h2>
 
-    // Selected locations state - initialized from props
-    // svelte-ignore state_referenced_locally
-    let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
-
-    const BERLIN_DE_CATEGORIES = [
-        "Ausstellungen",
-        "Bälle & Galas",
-        "Bildung & Vorträge",
-        "Festivals",
-        "Jazz & Blues",
-        "Kabarett & Comedy",
-        "Kinderveranstaltungen",
-        "Klassische Konzerte",
-        "Literatur",
-        "Musical",
-        "Oper & Tanz",
-        "Pop, Rock & HipHop",
-        "Schlager & Volksmusik",
-        "Show",
-        "Sport",
-        "Theater",
-        "Vermischtes",
-    ];
-
-    // svelte-ignore state_referenced_locally
-    let useFreeTextLocation = $state(
-        !!initialData?.location &&
-            (!initialData?.locationIds || initialData.locationIds.length === 0),
-    );
-
-    const hiddenDescription = $derived(descriptionValue ?? "");
-
-    // Date/Time handling
-    const timezones = Intl.supportedValuesOf
-        ? Intl.supportedValuesOf("timeZone")
-        : [];
-
-    const remindersJson = $derived(
-        JSON.stringify({
-            useDefault: useDefaultReminders,
-            overrides: reminders,
-        }),
-    );
-
-    // Sync default end time when start time changes if end time is empty
-    function updateEndDateTime() {
-        if (!startDateInput || !startTimeInput) return;
-
-        const start = new Date(`${startDateInput}T${startTimeInput}:00`);
-        if (isNaN(start.getTime())) return;
-
-        const end = new Date(start.getTime() + 60 * 60000);
-        const year = end.getFullYear();
-        const month = String(end.getMonth() + 1).padStart(2, "0");
-        const day = String(end.getDate()).padStart(2, "0");
-        const hours = String(end.getHours()).padStart(2, "0");
-        const minutes = String(end.getMinutes()).padStart(2, "0");
-
-        endDateInput = `${year}-${month}-${day}`;
-        endTimeInput = `${hours}:${minutes}`;
-    }
-
-    // Auto-set end time logic
-    function getDefaultEndTime() {
-        if (!startDateInput || !startTimeInput) return "";
-        const start = new Date(`${startDateInput}T${startTimeInput}:00`);
-        const end = new Date(start.getTime() + 60 * 60000);
-        return end.toTimeString().slice(0, 5);
-    }
-
-    async function toggleResource(resourceId: string) {
-        if (selectedResourceIds.includes(resourceId)) {
-            selectedResourceIds = selectedResourceIds.filter(
-                (id) => id !== resourceId,
-            );
-        } else {
-            selectedResourceIds = [...selectedResourceIds, resourceId];
-            // Prefill location if empty
-            if (selectedLocationIds.length === 0 && !useFreeTextLocation) {
-                const allRes = await resourcesPromise;
-                const res = allRes.find(
-                    (r: ResourceWithHierarchy) => r.id === resourceId,
-                );
-                if (
-                    res?.locationId &&
-                    !selectedLocationIds.includes(res.locationId)
-                ) {
-                    selectedLocationIds = [
-                        ...selectedLocationIds,
-                        res.locationId,
-                    ];
-                }
-            }
-        }
-    }
-
-    async function onLocationSelect(id: string) {
-        selectedLocationIds = [id];
-        const allLocs = await locationsPromise;
-        const l = allLocs.data.find((x: Location) => x.id === id);
-        if (l) {
-            const parts = [l.name];
-            if (l.roomId) parts.push(l.roomId);
-            if (l.street) {
-                let s = l.street;
-                if (l.houseNumber) s += ` ${l.houseNumber}`;
-                if (l.addressSuffix) s += `, ${l.addressSuffix}`;
-                parts.push(s);
-            }
-            if (l.zip || l.city)
-                parts.push(`${l.zip ?? ""} ${l.city ?? ""}`.trim());
-            if (l.state) parts.push(l.state);
-            if (l.country) parts.push(l.country);
-            freeTextLocation = parts.filter(Boolean).join(", ");
-        } else {
-            freeTextLocation = "";
-        }
-    }
-
-    function addReminder() {
-        reminders = [...reminders, { method: "popup", minutes: 10 }];
-    }
-
-    function removeReminder(index: number) {
-        reminders = reminders.filter((_: any, i: number) => i !== index);
-    }
-</script>
-
-<div class="max-w-3xl mx-auto px-4 py-8 text-left">
-    <Breadcrumb
-        feature="events"
-        // svelte-ignore state_referenced_locally
-        current={initialData?.summary ??
-            m.create_new({ item: m.feature_events_title() })}
-    />
-
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold">
-            {isUpdating
-                ? m.edit_item({ item: m.feature_events_title() })
-                : m.create_new({ item: m.feature_events_title() })}
-        </h1>
-        {#if isUpdating && initialData}
-            {#if isSeries}
-                <DropdownMenu.Root>
-                    <DropdownMenu.Trigger>
-                        <Button
-                            variant="destructive"
-                            class="flex items-center gap-2"
-                        >
-                            <Trash2 size={16} />
-                            {m.delete()}
-                            <ChevronDown size={14} />
-                        </Button>
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content align="end">
-                        <DropdownMenu.Item
-                            onclick={async () => {
-                                await handleDelete({
-                                    ids: [initialData.id],
-                                    deleteFn: deleteEventAction,
-                                    itemName: m.instance().toLowerCase(),
-                                });
-                                goto("/events");
-                            }}
-                        >
-                            <Trash2 size={14} class="mr-2" />
-                            {m.delete()}
-                            {m.instance()}
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item
-                            class="text-red-600"
-                            onclick={async () => {
-                                if (!confirm(m.delete_series_confirm())) return;
-                                try {
-                                    await deleteSeriesAction(initialData.id);
-                                    toast.success(m.series_deleted());
-                                    goto("/events");
-                                } catch (err: any) {
-                                    toast.error(
-                                        err.message ||
-                                            "Failed to delete series",
-                                    );
-                                }
-                            }}
-                        >
-                            <RefreshCw size={14} class="mr-2" />
-                            {m.delete()}
-                            {m.series()}
-                        </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                </DropdownMenu.Root>
-            {:else}
-                <AsyncButton
-                    type="button"
-                    variant="destructive"
-                    loading={deleteEventAction.pending}
-                    onclick={async () => {
-                        await handleDelete({
-                            ids: [initialData.id],
-                            deleteFn: deleteEventAction,
-                            itemName: m.event_label(),
-                        });
-                        goto("/events");
-                    }}
-                >
-                    {m.delete()}
-                </AsyncButton>
-            {/if}
-        {/if}
-    </div>
-
-    <form
-        {...remoteFunction
-            .preflight(validationSchema)
-            .enhance(async ({ submit }: any) => {
-                console.log("--- EventForm submission started ---");
-                try {
-                    const result: any = await submit();
-                    console.log(
-                        "--- EventForm submission result ---",
-                        JSON.stringify(result, null, 2),
-                    );
-                    if (result?.error) {
-                        toast.error(
-                            result.error.message || m.something_went_wrong(),
-                        );
-                        return;
-                    }
-                    toast.success(m.successfully_saved());
-                    goto("/events");
-                } catch (error: any) {
-                    console.error("--- EventForm submission catch ---", error);
-                    toast.error(error?.message || m.something_went_wrong());
-                }
-            })}
-        class="space-y-6"
-    >
-        <datalist id="timezones">
-            {#each timezones as tz}
-                <option value={tz}></option>
-            {/each}
-        </datalist>
-
-        {#if isUpdating && initialData}
-            <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
-        {/if}
-        <input {...remoteFunction.fields.remindersJson.as("hidden", remindersJson)} />
-        <input {...remoteFunction.fields.isAllDay.as("hidden", isAllDay.toString())} />
-        <input {...remoteFunction.fields.isPublic.as("hidden", isPublic.toString())} />
-        <input
-            {...remoteFunction.fields.guestsCanInviteOthers.as(
-                "hidden",
-                guestsCanInviteOthers.toString(),
-            )}
-        />
-        <input
-            {...remoteFunction.fields.guestsCanModify.as(
-                "hidden",
-                guestsCanModify.toString(),
-            )}
-        />
-        <input
-            {...remoteFunction.fields.guestsCanSeeOtherGuests.as(
-                "hidden",
-                guestsCanSeeOtherGuests.toString(),
-            )}
-        />
-        {#if heroImage}
-            <input {...remoteFunction.fields.heroImage.as("hidden", heroImage)} />
-        {/if}
-
-        <!-- Recurrence Hidden Input -->
-        {#if recurrenceRule}
+        <div>
+            <label
+                for="summary"
+                class="block text-sm font-medium text-gray-700 mb-1"
+            >
+                {m.title()} <span class="text-red-500">*</span>
+            </label>
             <input
-                {...remoteFunction.fields.recurrence.as("hidden", hiddenRecurrenceRule)}
+                {...rf.fields.summary.as("text", initialData?.summary ?? "")}
+                required
+                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.summary.issues()?.length ?? 0) > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300'}"
+                placeholder={m.title()}
+                onblur={() => rf.validate()}
             />
-        {/if}
+            {#each rf.fields.summary.issues() ?? [] as issue}
+                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            {/each}
+        </div>
 
-        <!-- Tags Hidden Input -->
-        {#if hiddenTagsString}
-            <input {...remoteFunction.fields.tags.as("hidden", hiddenTagsString)} />
-        {/if}
+        <div>
+            <label
+                for="status"
+                class="block text-sm font-medium text-gray-700 mb-1"
+            >
+                {m.status()}
+            </label>
+            <select
+                {...rf.fields.status.as(
+                    "text",
+                    initialData?.status ?? "confirmed",
+                )}
+                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+            >
+                <option value="confirmed">{m.confirmed()}</option>
+                <option value="tentative">{m.tentative()}</option>
+                <option value="cancelled">{m.cancelled()}</option>
+            </select>
+        </div>
 
-        <div class="bg-white shadow rounded-lg p-6 space-y-4">
-            <h2 class="text-xl font-semibold mb-4 border-b pb-2">
-                {m.basic_information()}
-            </h2>
+        <ImageUploader 
+            value={rf.fields.heroImage.value} 
+            onchange={(val: string) => rf.fields.heroImage.set(val)}
+            label={m.hero_image()} 
+        />
 
+        <div>
+            <label
+                for="description"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >{m.description()}</label
+            >
+            <div class="prose max-w-none">
+                <RichTextEditor 
+                    value={rf.fields.description.value} 
+                    onchange={(val: string) => rf.fields.description.set(val)}
+                />
+            </div>
+        </div>
+
+        <div>
+            <h3
+                class="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"
+            >
+                <TagIcon size={16} class="text-indigo-500" />
+                {m.tags()}
+            </h3>
+            <EntityManager
+                title={m.tags()}
+                icon={TagIcon}
+                mode="embedded"
+                initialItems={initialData?.tags || []}
+                listItemsRemote={listTagsRemote}
+                onchange={(ids, items) => {
+                    rf.fields.tags.set(items.map((i) => i.name).join(", "));
+                }}
+                createRemote={createTagRemote}
+                createSchema={v.object({
+                    name: v.pipe(v.string(), v.minLength(1)),
+                })}
+                updateRemote={updateTagRemote}
+                updateSchema={v.object({
+                    name: v.pipe(v.string(), v.minLength(1)),
+                })}
+                deleteItemRemote={async (ids: string[]) => {
+                    return await handleDelete({
+                        ids,
+                        deleteFn: deleteTagRemote,
+                        itemName: m.tags(),
+                    });
+                }}
+                getFormData={(t: any) => t}
+                searchPredicate={(t: any, q: string) =>
+                    t.name.toLowerCase().includes(q.toLowerCase())}
+                loadingLabel={m.loading_item({ item: m.tags() })}
+                noItemsLabel={m.no_items_associated_label({ item: m.tags() })}
+                noItemsFoundLabel={m.no_items_found({ item: m.tags() })}
+                searchPlaceholder={m.search_placeholder({ item: m.tags() })}
+                linkItemLabel={m.link_item_label({ item: m.tags() })}
+                associatedItemLabel={m.associated_item_label({
+                    item: m.tags(),
+                })}
+                quickCreateLabel={m.quick_create()}
+                closeSearchLabel={m.close_search()}
+                editLabel={m.edit()}
+                deleteLabel={m.delete()}
+                unlinkLabel={m.unlink()}
+                selectAllLabel={m.select_all()}
+                deselectAllLabel={m.deselect_all()}
+            >
+                {#snippet renderItemLabel(tag)}
+                    {tag.name}
+                {/snippet}
+                {#snippet renderForm({ remoteFunction: rfState, schema, initialData: formData, onSuccess, onCancel, id })}
+                    <form
+                        {...rfState.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
+                            try {
+                                const res = await submit();
+                                if (res && res.success !== false) {
+                                    onSuccess(res);
+                                }
+                            } catch (err) {
+                                console.error(
+                                    "[EventForm] Quick Create Error:",
+                                    err,
+                                );
+                            }
+                        })}
+                        class="space-y-4 p-4"
+                    >
+                        {#if id && rfState.fields?.id}
+                            <input {...rfState.fields.id.as("hidden", id)} />
+                        {/if}
+                        <div>
+                            <label
+                                for="tag-name"
+                                class="block text-sm font-medium text-gray-700"
+                                >{m.summary()}</label
+                            >
+                            <input
+                                {...rfState.fields.name.as("text")}
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                value={formData?.name ?? ""}
+                            />
+                            {#each rfState.fields.name.issues() ?? [] as issue}
+                                <p class="mt-1 text-sm text-red-600">
+                                    {issue.message}
+                                </p>
+                            {/each}
+                        </div>
+                        <div class="flex justify-end gap-2 pt-4 border-t">
+                            <Button
+                                variant="outline"
+                                type="button"
+                                onclick={onCancel}>{m.cancel()}</Button
+                            >
+                            <AsyncButton type="submit" loading={rfState.pending}>
+                                {id
+                                    ? m.save_changes()
+                                    : m.create_item({ item: "Tag" })}
+                            </AsyncButton>
+                        </div>
+                    </form>
+                {/snippet}
+            </EntityManager>
+        </div>
+
+        <div>
+            <span class="block text-sm font-medium text-gray-700 mb-2"
+                >{m.feature_resources_title()} ({m.optional()})</span
+            >
+            {#await resourcesPromise}
+                <LoadingSection
+                    message={m.loading_item({
+                        item: m.feature_resources_title().toLowerCase(),
+                    })}
+                />
+            {:then resResources}
+                {@const resources = (resResources as any).data ?? resResources}
+                <div
+                    class="space-y-1 border rounded-md p-4 max-h-64 overflow-y-auto bg-gray-50"
+                >
+                    {#each resources as resource}
+                        <label
+                            class="flex items-center gap-2 py-1 px-2 hover:bg-white rounded transition-colors"
+                            style="padding-left: {resource.level * 24 + 8}px"
+                        >
+                            <input
+                                type="checkbox"
+                                class="w-4 h-4 text-blue-600 flex-shrink-0"
+                                checked={selectedResourceIds.includes(
+                                    resource.id,
+                                )}
+                                onclick={() => {
+                                    const next = selectedResourceIds.includes(resource.id)
+                                        ? selectedResourceIds.filter((id: string) => id !== resource.id)
+                                        : [...selectedResourceIds, resource.id];
+                                    rf.fields.resourceIds.set(JSON.stringify(next));
+                                }}
+                            />
+                            <span
+                                class="text-sm {resource.level === 0
+                                    ? 'font-semibold'
+                                    : 'text-gray-600'}"
+                                >{resource.name}</span
+                            >
+                            <span class="text-xs text-gray-500"
+                                >({resource.type === "room"
+                                    ? m.room_type_suffix()
+                                    : m.equipment_type_suffix()})</span
+                            >
+                        </label>
+                    {/each}
+                </div>
+            {:catch error}
+                <ErrorSection
+                    headline={m.error()}
+                    message={error.message || m.something_went_wrong()}
+                />
+            {/await}
+            <input
+                {...rf.fields.resourceIds.as(
+                    "hidden",
+                    JSON.stringify(initialData?.resourceIds || []),
+                )}
+            />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label
-                    for="summary"
+                    for="categoryBerlinDotDe"
                     class="block text-sm font-medium text-gray-700 mb-1"
                 >
-                    {m.title()} <span class="text-red-500">*</span>
+                    {m.berlin_de_category()}
+                </label>
+                <select
+                    {...rf.fields.categoryBerlinDotDe.as(
+                        "text",
+                        initialData?.categoryBerlinDotDe ?? "",
+                    )}
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                >
+                    <option value="">{m.select_category()}</option>
+                    {#each BERLIN_DE_CATEGORIES as cat}
+                        <option value={cat}>{cat}</option>
+                    {/each}
+                </select>
+            </div>
+            <div>
+                <label
+                    for="ticketPrice"
+                    class="block text-sm font-medium text-gray-700 mb-1"
+                >
+                    {m.ticket_price()} <span class="text-red-500">*</span>
                 </label>
                 <input
-                    {...remoteFunction.fields.summary.as("text", initialData?.summary ?? "")}
+                    {...rf.fields.ticketPrice.as(
+                        "text",
+                        initialData?.ticketPrice ?? "",
+                    )}
                     required
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(remoteFunction.fields.summary.issues()?.length ?? 0) > 0
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues()?.length ?? 0) > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
-                    placeholder={m.title()}
-                    onblur={() => remoteFunction.validate()}
+                    placeholder={m.ticket_price_placeholder()}
+                    onblur={() => rf.validate()}
                 />
-                {#each remoteFunction.fields.summary.issues() ?? [] as issue}
+                {#each rf.fields.ticketPrice.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
+        </div>
 
-            <div>
-                <label
-                    for="status"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                >
-                    {m.status()}
-                </label>
-                <select
-                    {...remoteFunction.fields.status.as("text", initialData?.status ?? "confirmed")}
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                >
-                    <option value="confirmed">{m.confirmed()}</option>
-                    <option value="tentative">{m.tentative()}</option>
-                    <option value="cancelled">{m.cancelled()}</option>
-                </select>
-            </div>
-
-            <ImageUploader bind:value={heroImage} label={m.hero_image()} />
-
-            <div>
-                <label
-                    for="description"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                    >{m.description()}</label
-                >
-                <div class="prose max-w-none">
-                    <RichTextEditor bind:value={descriptionValue} />
-                    {#if hiddenDescription}
-                        <input
-                            {...remoteFunction.fields.description.as(
-                                "hidden",
-                                hiddenDescription,
-                            )}
-                        />
-                    {/if}
-                </div>
-            </div>
-
-            <div>
-                <h3 class="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
-                    <TagIcon size={16} class="text-indigo-500" />
-                    {m.tags()}
-                </h3>
-                <EntityManager
-                    title={m.tags()}
-                    icon={TagIcon}
-                    mode="embedded"
-                    initialItems={initialData?.tags || []}
-                    listItemsRemote={listTagsRemote}
-                    onchange={(ids, items) => {
-                        tagsString = items.map(i => i.name).join(", ");
-                    }}
-                    createRemote={createTagRemote}
-                    createSchema={v.object({
-                        name: v.pipe(v.string(), v.minLength(1)),
-                    })}
-                    updateRemote={updateTagRemote}
-                    updateSchema={v.object({
-                        name: v.pipe(v.string(), v.minLength(1)),
-                    })}
-                    deleteItemRemote={async (ids: string[]) => {
-                        return await handleDelete({
-                            ids,
-                            deleteFn: deleteTagRemote,
-                            itemName: m.tags(),
-                        });
-                    }}
-                    getFormData={(t: any) => t}
-                    searchPredicate={(t: any, q: string) => t.name.toLowerCase().includes(q.toLowerCase())}
-                    loadingLabel={m.loading_item({ item: m.tags() })}
-                    noItemsLabel={m.no_items_associated_label({ item: m.tags() })}
-                    noItemsFoundLabel={m.no_items_found({ item: m.tags() })}
-                    searchPlaceholder={m.search_placeholder({ item: m.tags() })}
-                    linkItemLabel={m.link_item_label({ item: m.tags() })}
-                    associatedItemLabel={m.associated_item_label({ item: m.tags() })}
-                    quickCreateLabel={m.quick_create()}
-                    closeSearchLabel={m.close_search()}
-                    editLabel={m.edit()}
-                    deleteLabel={m.delete()}
-                    unlinkLabel={m.unlink()}
-                    selectAllLabel={m.select_all()}
-                    deselectAllLabel={m.deselect_all()}
-                >
-                    {#snippet renderItemLabel(tag)}
-                        {tag.name}
-                    {/snippet}
-                    {#snippet renderForm({ remoteFunction: rfState, schema, initialData: formData, onSuccess, onCancel, id })}
-                        <form
-                            {...rfState.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
-                                try {
-                                    const res = await submit();
-                                    if (res && res.success !== false) {
-                                        onSuccess(res);
-                                    }
-                                } catch (err) {
-                                    console.error("[EventForm] Quick Create Error:", err);
-                                }
-                            })}
-                            class="space-y-4 p-4"
-                        >
-                            {#if id && rfState.fields?.id}
-                                <input {...rfState.fields.id.as("hidden", id)} />
-                            {/if}
-                            <div>
-                                <label for="tag-name" class="block text-sm font-medium text-gray-700">{m.summary()}</label>
-                                <input 
-                                    {...rfState.fields.name.as("text")}
-                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                    value={formData?.name ?? ""}
-                                />
-                                {#each rfState.fields.name.issues() ?? [] as issue}
-                                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
-                                {/each}
-                            </div>
-                            <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" type="button" onclick={onCancel}>{m.cancel()}</Button>
-                                <AsyncButton 
-                                    type="submit" 
-                                    loading={rfState.pending}
-                                >
-                                    {id ? m.save_changes() : m.create_item({ item: "Tag" })}
-                                </AsyncButton>
-                            </div>
-                        </form>
-                    {/snippet}
-                </EntityManager>
-            </div>
-
-            <div>
-                <span class="block text-sm font-medium text-gray-700 mb-2"
-                    >{m.feature_resources_title()} ({m.optional()})</span
-                >
-                {#if !resourcesLoaded}
-                    <p class="text-sm text-gray-500">
-                        {m.loading_item({
-                            item: m.feature_resources_title().toLowerCase(),
-                        })}
-                    </p>
-                {:else}
-                    <div
-                        class="space-y-1 border rounded-md p-4 max-h-64 overflow-y-auto bg-gray-50"
-                    >
-                        {#each resources as resource}
-                            <label
-                                class="flex items-center gap-2 py-1 px-2 hover:bg-white rounded transition-colors"
-                                style="padding-left: {resource.level * 24 +
-                                    8}px"
-                            >
-                                <input
-                                    {...remoteFunction.fields.resourceIds.as(
-                                        "checkbox",
-                                        resource.id,
-                                    )}
-                                    class="w-4 h-4 text-blue-600 flex-shrink-0"
-                                    checked={selectedResourceIds.includes(
-                                        resource.id,
-                                    )}
-                                    onclick={() => toggleResource(resource.id)}
-                                />
-                                <span
-                                    class="text-sm {resource.level === 0
-                                        ? 'font-semibold'
-                                        : 'text-gray-600'}"
-                                    >{resource.name}</span
-                                >
-                                <span class="text-xs text-gray-500"
-                                    >({resource.type === "room"
-                                        ? m.room_type_suffix()
-                                        : m.equipment_type_suffix()})</span
-                                >
-                            </label>
-                        {/each}
-                    </div>
-                {/if}
-                <input
-                    {...remoteFunction.fields.resourceIds.as(
-                        "hidden",
-                        JSON.stringify(selectedResourceIds),
-                    )}
-                />
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label
-                        for="categoryBerlinDotDe"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                        {m.berlin_de_category()}
-                    </label>
-                    <select
-                        {...remoteFunction.fields.categoryBerlinDotDe.as("text", initialData?.categoryBerlinDotDe ?? "")}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    >
-                        <option value="">{m.select_category()}</option>
-                        {#each BERLIN_DE_CATEGORIES as cat}
-                            <option value={cat}>{cat}</option>
-                        {/each}
-                    </select>
-                </div>
-                <div>
-                    <label
-                        for="ticketPrice"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                        {m.ticket_price()} <span class="text-red-500">*</span>
-                    </label>
-                    <input
-                        {...remoteFunction.fields.ticketPrice.as("text", initialData?.ticketPrice ?? "")}
-                        required
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(remoteFunction.fields.ticketPrice.issues()?.length ?? 0) > 0
-                            ? 'border-red-500'
-                            : 'border-gray-300'}"
-                        placeholder={m.ticket_price_placeholder()}
-                        onblur={() => remoteFunction.validate()}
-                    />
-                    {#each remoteFunction.fields.ticketPrice.issues() ?? [] as issue}
-                        <p class="mt-1 text-sm text-red-600">{issue.message}</p>
-                    {/each}
-                </div>
-            </div>
-
-            <div>
-                <span class="block text-sm font-medium text-gray-700 mb-2"
-                    >{m.location()}</span
-                >
-                <div class="flex items-center gap-2 mb-2">
-                    <input
-                        id="useFreeTextLocation"
-                        type="checkbox"
-                        checked={useFreeTextLocation}
-                        onclick={() =>
-                            (useFreeTextLocation = !useFreeTextLocation)}
-                        class="w-4 h-4 text-blue-600"
-                    />
-                    <label
-                        for="useFreeTextLocation"
-                        class="text-sm text-gray-700"
-                        >{m.use_custom_location()}</label
-                    >
-                </div>
-                {#if useFreeTextLocation}
-                    <input
-                        {...remoteFunction.fields.location.as("text")}
-                        value={freeTextLocation}
-                        oninput={(e) =>
-                            (freeTextLocation = e.currentTarget.value)}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                        placeholder={m.enter_custom_location()}
-                        onblur={() => remoteFunction.validate()}
-                    />
-                {:else if !locationsLoaded}
-                    <p class="text-sm text-gray-500">
-                        {m.loading_item({
+        <div>
+            <span class="block text-sm font-medium text-gray-700 mb-2"
+                >{m.location()}</span
+            >
+                {#await locationsPromise}
+                    <LoadingSection
+                        message={m.loading_item({
                             item: m.feature_locations_title().toLowerCase(),
                         })}
-                    </p>
-                {:else}
+                    />
+                {:then resLocations}
+                    {@const locations = (resLocations as any).data ?? resLocations}
                     <!-- Using Multi-Location Selector -->
                     <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
                         <MapPin size={18} class="text-blue-600" />
@@ -870,7 +540,7 @@
                             selectedLocationIds.includes(l.id),
                         )}
                         onchange={(ids: string[]) =>
-                            (selectedLocationIds = ids)}
+                            rf.fields.locationIds.set(JSON.stringify(ids))}
                         listItemsRemote={listLocations as any}
                         deleteItemRemote={async (ids: string[]) => {
                             return await handleDelete({
@@ -886,9 +556,7 @@
                         getFormData={(l: Location) => l}
                         searchPredicate={(l: Location, q: string) => {
                             return (
-                                l.name
-                                    .toLowerCase()
-                                    .includes(q.toLowerCase()) ||
+                                l.name.toLowerCase().includes(q.toLowerCase()) ||
                                 (l.roomId
                                     ?.toLowerCase()
                                     .includes(q.toLowerCase()) ??
@@ -988,16 +656,16 @@
                             />
                         {/snippet}
                     </EntityManager>
-                    <!-- Populate freeTextLocation based on selection if needed, or leave independent -->
-                {/if}
+                {:catch error}
+                    <ErrorSection
+                        headline={m.error()}
+                        message={error.message || m.something_went_wrong()}
+                    />
+                {/await}
                 <input
                     {...remoteFunction.fields.locationIds.as(
                         "hidden",
-                        JSON.stringify(
-                            useFreeTextLocation
-                                ? []
-                                : (selectedLocationIds ?? []),
-                        ),
+                        JSON.stringify(selectedLocationIds ?? []),
                     )}
                 />
             </div>
@@ -1010,10 +678,8 @@
 
             <div class="flex items-center gap-2">
                 <input
+                    {...rf.fields.isAllDay.as("checkbox", initialData?.isAllDay ?? false)}
                     id="isAllDay"
-                    type="checkbox"
-                    checked={isAllDay}
-                    onclick={() => (isAllDay = !isAllDay)}
                     class="w-4 h-4 text-blue-600"
                 />
                 <label for="isAllDay" class="text-sm font-medium text-gray-700"
@@ -1026,48 +692,43 @@
                 <div class="space-y-4">
                     <div>
                         <label
-                            for="startDateInput"
+                            for="startDate"
                             class="block text-sm font-medium text-gray-700 mb-1"
                             >{m.start_date()}
                             <span class="text-red-500">*</span></label
                         >
                         <input
-                            name="startDate"
-                            type="date"
+                            {...rf.fields.startDate.as("date", startParsed.date || localNow.date)}
                             required
-                            bind:value={startDateInput}
-                            onchange={updateEndDateTime}
+                            onchange={() => updateEndDateTime(rf)}
                             class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                         />
                     </div>
                     {#if !isAllDay}
                         <div>
                             <label
-                                for="startTimeInput"
+                                for="startTime"
                                 class="block text-sm font-medium text-gray-700 mb-1"
                                 >{m.start_time()}
                                 <span class="text-red-500">*</span></label
                             >
                             <input
-                                name="startTime"
-                                type="time"
+                                {...rf.fields.startTime.as("time", startParsed.time || localNow.time)}
                                 required
-                                bind:value={startTimeInput}
-                                onchange={updateEndDateTime}
+                                onchange={() => updateEndDateTime(rf)}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                             />
                         </div>
                     {/if}
                     <div>
                         <label
-                            for="startTimeZoneInput"
+                            for="startTimeZone"
                             class="block text-sm font-medium text-gray-700 mb-1"
                             >{m.timezone()}</label
                         >
                         <input
-                            name="startTimeZone"
+                            {...rf.fields.startTimeZone.as("text", initialData?.startTimeZone || browserTimezone)}
                             list="timezones"
-                            bind:value={startTimeZoneInput}
                             placeholder={browserTimezone}
                             class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                         />
@@ -1078,10 +739,8 @@
                 <div class="space-y-4">
                     <div class="flex items-center gap-2 h-6 md:mb-1">
                         <input
+                            {...rf.fields.hasEndTime.as("checkbox", initialData ? !!initialData.endDateTime : true)}
                             id="hasEndTime"
-                            type="checkbox"
-                            checked={hasEndTime}
-                            onclick={() => (hasEndTime = !hasEndTime)}
                             class="w-4 h-4 text-blue-600"
                         />
                         <label
@@ -1094,45 +753,40 @@
                     {#if hasEndTime}
                         <div>
                             <label
-                                for="endDateInput"
+                                for="endDate"
                                 class="block text-sm font-medium text-gray-700 mb-1"
                                 >{m.end_date()}</label
                             >
                             <input
-                                name="endDate"
-                                type="date"
-                                bind:value={endDateInput}
-                                placeholder={startDateInput}
+                                {...rf.fields.endDate.as("date", initialEnd.date)}
+                                placeholder={rf.fields.startDate.value}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                             />
                         </div>
                         {#if !isAllDay}
                             <div>
                                 <label
-                                    for="endTimeInput"
+                                    for="endTime"
                                     class="block text-sm font-medium text-gray-700 mb-1"
                                     >{m.end_time()}</label
                                 >
                                 <input
-                                    name="endTime"
-                                    type="time"
-                                    bind:value={endTimeInput}
-                                    placeholder={getDefaultEndTime()}
+                                    {...rf.fields.endTime.as("time", initialEnd.time)}
+                                    placeholder={getDefaultEndTime(rf)}
                                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                                 />
                             </div>
                         {/if}
                         <div>
                             <label
-                                for="endTimeZoneInput"
+                                for="endTimeZone"
                                 class="block text-sm font-medium text-gray-700 mb-1"
                                 >{m.end_time()} {m.timezone()}</label
                             >
                             <input
-                                name="endTimeZone"
+                                {...rf.fields.endTimeZone.as("text", initialData?.endTimeZone || initialData?.startTimeZone || browserTimezone)}
                                 list="timezones"
-                                bind:value={endTimeZoneInput}
-                                placeholder={startTimeZoneInput}
+                                placeholder={rf.fields.startTimeZone.value}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                             />
                         </div>
@@ -1155,7 +809,8 @@
 
         <RecurrenceDialog
             bind:open={showRecurrenceDialog}
-            bind:value={recurrenceRule}
+            value={rf.fields.recurrence.value}
+            onchange={(val: string | null) => rf.fields.recurrence.set(val ?? "")}
         />
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
@@ -1166,8 +821,7 @@
             <div class="space-y-3">
                 <label class="flex items-center gap-2">
                     <input
-                        type="checkbox"
-                        bind:checked={guestsCanInviteOthers}
+                        {...rf.fields.guestsCanInviteOthers.as("checkbox", initialData?.guestsCanInviteOthers ?? false)}
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
@@ -1176,8 +830,7 @@
                 </label>
                 <label class="flex items-center gap-2">
                     <input
-                        type="checkbox"
-                        bind:checked={guestsCanModify}
+                        {...rf.fields.guestsCanModify.as("checkbox", initialData?.guestsCanModify ?? false)}
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
@@ -1186,8 +839,7 @@
                 </label>
                 <label class="flex items-center gap-2">
                     <input
-                        type="checkbox"
-                        bind:checked={guestsCanSeeOtherGuests}
+                        {...rf.fields.guestsCanSeeOtherGuests.as("checkbox", initialData?.guestsCanSeeOtherGuests ?? false)}
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
@@ -1196,8 +848,7 @@
                 </label>
                 <label class="flex items-center gap-2">
                     <input
-                        type="checkbox"
-                        bind:checked={isPublic}
+                        {...rf.fields.isPublic.as("checkbox", initialData?.isPublic ?? true)}
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
@@ -1206,14 +857,14 @@
                 </label>
             </div>
 
+
             <div class="mt-6">
                 <h3 class="text-sm font-medium text-gray-700 mb-2">
                     {m.reminders()}
                 </h3>
                 <label class="flex items-center gap-2 mb-4">
                     <input
-                        type="checkbox"
-                        bind:checked={useDefaultReminders}
+                        {...rf.fields.reminders.fields.useDefault.as("checkbox", (initialData?.reminders as any)?.useDefault ?? true)}
                         class="w-4 h-4 text-blue-600"
                     />
                     <span class="text-sm text-gray-700"
@@ -1221,20 +872,18 @@
                     >
                 </label>
 
-                <input
-                    {...remoteFunction.fields.reminders.fields.useDefault.as(
-                        "hidden",
-                        useDefaultReminders?.toString() ?? "true",
-                    )}
-                />
-
                 {#if !useDefaultReminders}
                     <div class="space-y-3">
                         {#each reminders as reminder, i}
                             <div class="flex gap-2 items-center">
                                 <div class="flex-1">
                                     <select
-                                        bind:value={reminder.method}
+                                        value={reminder.method}
+                                        onchange={(e) => {
+                                            const next = [...reminders];
+                                            next[i] = { ...reminder, method: e.currentTarget.value };
+                                            rf.fields.reminders.fields.overrides.set(next);
+                                        }}
                                         class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="popup"
@@ -1248,7 +897,12 @@
                                 <div class="flex-1">
                                     <input
                                         type="number"
-                                        bind:value={reminder.minutes}
+                                        value={reminder.minutes}
+                                        oninput={(e) => {
+                                            const next = [...reminders];
+                                            next[i] = { ...reminder, minutes: Number(e.currentTarget.value) };
+                                            rf.fields.reminders.fields.overrides.set(next);
+                                        }}
                                         class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                                         min="0"
                                     />
@@ -1256,11 +910,7 @@
                                 <button
                                     type="button"
                                     class="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                                    onclick={() => {
-                                        reminders = reminders.filter(
-                                            (_: any, idx: number) => idx !== i,
-                                        );
-                                    }}
+                                    onclick={() => removeReminder(rf, i)}
                                 >
                                     &times;
                                 </button>
@@ -1269,19 +919,13 @@
                         <button
                             type="button"
                             class="text-sm text-blue-600 hover:text-blue-800"
-                            onclick={() => {
-                                reminders = [
-                                    ...reminders,
-                                    { method: "popup", minutes: 10 },
-                                ];
-                            }}
+                            onclick={() => addReminder(rf)}
                         >
                             + {m.add_item({ item: m.reminder_label() })}
                         </button>
                     </div>
                 {/if}
             </div>
-        </div>
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
             <User size={18} class="text-blue-600" />
             {m.feature_contacts_title()}
@@ -1292,7 +936,8 @@
             mode="embedded"
             type="event"
             entityId={initialData?.id}
-            onchange={(ids: string[]) => (selectedContactIds = ids)}
+            initialItems={[]}
+            onchange={(ids: string[]) => rf.fields.contactIds.set(JSON.stringify(ids))}
             listItemsRemote={listContacts as any}
             fetchAssociationsRemote={fetchEntityContacts as any}
             addAssociationRemote={async (p: any) =>
@@ -1387,7 +1032,7 @@
             {/snippet}
 
             {#snippet renderForm({
-                remoteFunction: rf,
+                remoteFunction: rfContact,
                 schema,
                 initialData: formData = {},
                 onSuccess,
@@ -1395,7 +1040,7 @@
                 id,
             })}
                 <ContactForm
-                    remoteFunction={rf}
+                    remoteFunction={rfContact}
                     {schema}
                     initialData={formData}
                     {onSuccess}
@@ -1500,20 +1145,20 @@
                                         : ""}
                                 {/snippet}
                                 {#snippet renderForm({
-                                    remoteFunction: rf,
-                                    schema,
-                                    id,
-                                    initialData: formData = null,
-                                    onSuccess,
-                                    onCancel,
+                                    remoteFunction: rfLocation,
+                                    schema: locSchema,
+                                    id: locId,
+                                    initialData: locFormData = null,
+                                    onSuccess: locSuccess,
+                                    onCancel: locCancel,
                                 }: any)}
                                     <LocationForm
-                                        remoteFunction={rf}
-                                        validationSchema={schema}
-                                        isUpdating={!!id}
-                                        initialData={formData}
-                                        {onSuccess}
-                                        {onCancel}
+                                        remoteFunction={rfLocation}
+                                        validationSchema={locSchema}
+                                        isUpdating={!!locId}
+                                        initialData={locFormData}
+                                        onSuccess={locSuccess}
+                                        onCancel={locCancel}
                                         labels={{
                                             name: m.location_name(),
                                             street: m.street(),
@@ -1560,31 +1205,22 @@
             {/snippet}
         </EntityManager>
         <input
-            {...remoteFunction.fields.contactIds.as(
+            {...rf.fields.contactIds.as(
                 "hidden",
-                JSON.stringify(selectedContactIds ?? []),
+                JSON.stringify(initialData?.contactIds || []),
             )}
         />
 
         <SyncCheckboxBlock
-            syncFieldConfig={remoteFunction.fields.syncIds}
+            syncFieldConfig={rf.fields.syncIds}
             initialSelectedIds={initialData?.syncIds || []}
         />
-
-        <div class="flex gap-3 pt-4">
-            <AsyncButton
-                type="submit"
-                loadingLabel={m.saving()}
-                loading={remoteFunction.pending}
-                class="px-8"
-            >
-                {isUpdating
-                    ? m.save_changes()
-                    : m.create_item({ item: m.feature_events_title() })}
-            </AsyncButton>
-            <Button variant="secondary" href="/events" size="default">
-                {m.cancel()}
-            </Button>
-        </div>
-    </form>
-</div>
+    </div>
+{:catch error}
+    <div class="p-8">
+        <ErrorSection
+            headline={m.error()}
+            message={error.message || m.something_went_wrong()}
+        />
+    </div>
+{/await}
