@@ -226,14 +226,14 @@
     class="space-y-8"
 >
     {#if contactId}
-        <input {...rf.fields.id.as("hidden", contactId)} />
+        <input {...rf.fields.id.as("text", contactId)} class="hidden" />
     {/if}
 
-    <input {...rf.fields.emailsJson.as("hidden", emailsJson ?? "[]")} />
-    <input {...rf.fields.phonesJson.as("hidden", phonesJson ?? "[]")} />
-    <input {...rf.fields.relationsJson.as("hidden", relationsJson ?? "[]")} />
-    <input {...rf.fields.addressesJson.as("hidden", addressesJson ?? "[]")} />
-    <input {...rf.fields.tagsJson.as("hidden", tagsJson ?? "[]")} />
+    <input {...rf.fields.emailsJson.as("text", emailsJson ?? "[]")} class="hidden" />
+    <input {...rf.fields.phonesJson.as("text", phonesJson ?? "[]")} class="hidden" />
+    <input {...rf.fields.relationsJson.as("text", relationsJson ?? "[]")} class="hidden" />
+    <input {...rf.fields.addressesJson.as("text", addressesJson ?? "[]")} class="hidden" />
+    <input {...rf.fields.tagsJson.as("text", tagsJson ?? "[]")} class="hidden" />
 
     <ContactFields
         bind:contactData
@@ -263,7 +263,7 @@
         })}
     {/if}
 
-    <input {...rf.fields.locationIdsJson.as("hidden", locationIdsJson)} />
+    <input {...rf.fields.locationIdsJson.as("text", locationIdsJson)} class="hidden" />
 
     <div class="flex justify-end gap-3 pt-6 border-t">
         {#if onCancel}

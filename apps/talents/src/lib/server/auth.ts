@@ -2,8 +2,13 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { sveltekitCookies } from "better-auth/svelte-kit";
 import { getRequestEvent } from "$app/server";
-import { db } from "$lib/server/db";
+import { db, setConnectionString } from "@ac/db";
 import { env } from '$env/dynamic/private';
+
+// Initialize DB connection string from SvelteKit environment
+if (env.DATABASE_URL) {
+    setConnectionString(env.DATABASE_URL);
+}
 
 export const auth = betterAuth({
     database: drizzleAdapter(db, {

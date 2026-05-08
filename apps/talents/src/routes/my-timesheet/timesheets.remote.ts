@@ -1,5 +1,5 @@
 import { query, form, command } from '$app/server';
-import { db, timesheetEntry, shiftPlan, eq, and, isNull, desc } from '$lib/server/db';
+import { db, timesheetEntry, shiftPlan, eq, and, isNull, desc } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as service from '$lib/server/timesheets/service';
 import { manageTimesheetsSchema } from '@ac/validations';

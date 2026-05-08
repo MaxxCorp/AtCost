@@ -1,12 +1,12 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '@ac/db';
 import { updateAnnouncementSchema } from '$lib/validations/announcements';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
 import { listAnnouncements } from '../list.remote';
 import { readAnnouncement } from './read.remote';
-import { eq } from 'drizzle-orm';
+import { eq } from '@ac/db';
 import { syncService } from '$lib/server/sync/service';
 import { type Announcement } from '@ac/validations';
 

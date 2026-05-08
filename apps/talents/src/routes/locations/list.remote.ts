@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { type InferSelectModel, db, desc, and, or, ilike, sql } from '$lib/server/db';
+import { type InferSelectModel, db, desc, and, or, ilike, sql } from '@ac/db';
 import { query } from '$app/server';
 import { location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

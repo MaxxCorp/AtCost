@@ -1,6 +1,6 @@
 import { query } from '$app/server';
-import { db, user } from '$lib/server/db';
-import { eq } from '$lib/server/db';
+import { db, user } from '@ac/db';
+import { eq } from '@ac/db';
 import type { User } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';

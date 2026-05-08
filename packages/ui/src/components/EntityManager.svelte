@@ -281,11 +281,20 @@
         ...selectedFilters,
     });
 
-    const fetchQuery = $derived(
-        !isStandalone && entityId && type && fetchAssociationsRemote
-            ? fetchAssociationsRemote({ type, entityId })
-            : null,
-    );
+    const associationsPromise = $derived.by(() => {
+        if (!isStandalone && entityId && type) {
+            if (fetchAssociationsRemote) {
+                return fetchAssociationsRemote({ type, entityId });
+            } else {
+                return listItemsRemote({ 
+                    ...currentParams, 
+                    associatedWith: { type, id: entityId } 
+                });
+            }
+        }
+        return Promise.resolve(initialItems ?? []);
+    });
+
 
     // svelte-ignore state_referenced_locally
     let associatedItems = $state<any[]>(initialItems ?? []);
@@ -348,61 +357,16 @@
               }),
     );
 
-    let fetchingAssociations = $state(false);
-
     $effect(() => {
-        if (
-            !isStandalone &&
-            initialItems !== undefined &&
-            !fetchAssociationsRemote &&
-            !loadingItems
-        ) {
-            associatedItems = initialItems;
-        }
+        associationsPromise.then(res => {
+            untrack(() => {
+                associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
+            });
+        }).catch(err => {
+            console.error("Failed to fetch associations", err);
+        });
     });
 
-    // Async association fetching
-    $effect(() => {
-        if (fetchQuery) {
-            console.log(`[EntityManager] fetchQuery changed for entityId: ${entityId}, type: ${type}`);
-            fetchingAssociations = true;
-            
-            // Access properties to ensure tracking if it's a reactive Query object
-            // SvelteKit Remote Functions (query) return objects that have .data and .pending
-            const data = (fetchQuery as any).data;
-            const pending = (fetchQuery as any).pending;
-            const error = (fetchQuery as any).error;
-
-            if (pending) {
-                fetchingAssociations = true;
-            } else if (data !== undefined) {
-                untrack(() => {
-                    associatedItems = Array.isArray(data) ? data : (data?.data ?? []);
-                });
-                fetchingAssociations = false;
-            } else if (error) {
-                console.error("Failed to fetch associations", error);
-                fetchingAssociations = false;
-            }
-
-            // Fallback for simple Promises (if it's not a reactive Query object)
-            if (typeof fetchQuery.then === "function" && data === undefined && !pending && !error) {
-                fetchQuery
-                    .then((res: any) => {
-                        untrack(() => {
-                            associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
-                        });
-                        fetchingAssociations = false;
-                    })
-                    .catch((err: any) => {
-                        // Ignore common abort/stale context errors
-                        if (err.name === 'AbortError' || err.message?.includes('aborted')) return;
-                        console.error("Failed to fetch associations", err);
-                        fetchingAssociations = false;
-                    });
-            }
-        }
-    });
 
     const refresh = async () => {
         loadingItems = true;
@@ -1147,7 +1111,7 @@
 {:else}
     <!-- Embedded Content -->
     <div class="space-y-2">
-        {#if fetchingAssociations}
+        {#await associationsPromise}
             <div
                 class="text-center py-10 animate-pulse text-gray-400 font-medium"
             >
@@ -1156,7 +1120,9 @@
                 ></div>
                 {loadingLabel}
             </div>
-        {:else if displayedItems.length > 0}
+        {:then _unused}
+            {#if displayedItems.length > 0}
+
             <div class="grid gap-2">
                 {#each displayedItems as item}
                     <div
@@ -1241,8 +1207,16 @@
                     {noItemsLabel}
                 </p>
             </div>
-        {/if}
+            {/if}
+        {:catch error}
+            <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+                <p class="text-sm font-medium text-red-600">
+                    {error.message || "Failed to load associations"}
+                </p>
+            </div>
+        {/await}
     </div>
+
 {/if}
 
 <!-- Dialog for Create/Edit (shared by both modes) -->

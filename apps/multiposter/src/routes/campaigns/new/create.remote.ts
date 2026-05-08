@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { campaign } from '@ac/db';
 import { listCampaigns } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

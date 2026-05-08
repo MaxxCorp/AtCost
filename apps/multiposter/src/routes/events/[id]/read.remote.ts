@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { event, contactEmail, contactPhone, tag } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';

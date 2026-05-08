@@ -48,8 +48,9 @@
 	});
 
 	let prevIssuesLength = $state(0);
+	const rf = update.preflight(updateSynchronizationSchema);
 	$effect(() => {
-		const issues = (update as any).allIssues?.() ?? [];
+		const issues = (rf as any).allIssues?.() ?? [];
 		if (issues.length > 0 && prevIssuesLength === 0) {
 			toast.error(m.please_fix_validation());
 		}
@@ -172,9 +173,7 @@
 								{m.sync_now()}
 							</AsyncButton>
 							<form
-								{...update
-									.preflight(updateSynchronizationSchema)
-									.enhance(async ({ submit }) => {
+								{...rf.enhance(async ({ submit }) => {
 										const result: any = await submit();
 										if (result?.error) {
 											toast.error(
@@ -189,9 +188,8 @@
 								class="inline-block"
 							>
 								<input
-									type="hidden"
-									name="enabled"
-									value={!config.enabled}
+									{...rf.fields.enabled.as("text", (!config.enabled).toString())}
+									class="hidden"
 								/>
 								<AsyncButton
 									variant={config.enabled
@@ -391,7 +389,7 @@
 								</p>
 							{:else if operations}
 								<div class="space-y-2">
-									{#each operations as operation}
+									{#each Array.from($state.snapshot(operations)) as operation}
 										{@const Icon = getStatusIcon(
 											operation.status,
 										)}

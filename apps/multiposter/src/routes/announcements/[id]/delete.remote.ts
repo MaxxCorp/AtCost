@@ -1,7 +1,7 @@
 import { command } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { announcement } from '@ac/db';
-import { inArray } from 'drizzle-orm';
+import { inArray } from '@ac/db';
 import { listAnnouncements } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';

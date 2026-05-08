@@ -1,8 +1,8 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { desc, eq, inArray, and, or, ilike, sql } from 'drizzle-orm';
+import { desc, eq, inArray, and, or, ilike, sql } from '@ac/db';
 import { kioskPaginationSchema as PaginationSchema, type Kiosk, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 

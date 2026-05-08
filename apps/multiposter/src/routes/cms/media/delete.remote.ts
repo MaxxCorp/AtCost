@@ -3,9 +3,9 @@ import { error } from '@sveltejs/kit';
 import { getStorageProvider } from '$lib/server/blob-storage';
 import { getAuthenticatedUser } from '$lib/server/authorization';
 import { deleteImageSchema } from '$lib/validations/cms';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { cmsMedia } from '@ac/db';
-import { eq } from 'drizzle-orm';
+import { eq } from '@ac/db';
 
 export const deleteMedia = command(deleteImageSchema, async (data) => {
     try {

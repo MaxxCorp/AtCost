@@ -1,7 +1,7 @@
 import { command } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { event } from '@ac/db';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';

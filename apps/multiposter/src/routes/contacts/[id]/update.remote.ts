@@ -1,10 +1,10 @@
 import { form, getRequestEvent } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress,
     contactRelation, tag, contactTag, locationContact
-} from '$lib/server/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+} from '@ac/db';
+import { eq, and, inArray } from '@ac/db';
 import { updateContactSchema, type Contact } from '$lib/validations/contacts';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { generateContactAssets } from '$lib/server/contacts';

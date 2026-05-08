@@ -1,5 +1,5 @@
 import { query, form, command } from '$app/server';
-import { db, desc, and, or, ilike, sql, eq, inArray } from '$lib/server/db';
+import { db, desc, and, or, ilike, sql, eq, inArray } from '@ac/db';
 import { contract, contractFrameworkContract } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { PaginationSchema, type PaginatedResult } from '@ac/validations/pagination';

@@ -148,4 +148,9 @@ export const contactPaginationSchema = v.optional(v.object({
 	search: v.optional(v.string()),
 	locationId: FilterableIdSchema,
 	tagId: FilterableIdSchema,
+    associatedWith: v.optional(v.object({
+        type: v.string(),
+        id: v.string()
+    }))
 }), {});
+

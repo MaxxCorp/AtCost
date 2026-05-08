@@ -54,10 +54,8 @@
         allResources: any[];
     } = $props();
 
-    // Initialize remoteFunction if it's a definition function to ensure reactive context
-    const rf = $derived(typeof remoteFunction === "function" ? (remoteFunction as any)() : remoteFunction);
-
-
+    // svelte-ignore state_referenced_locally
+    const rf = (remoteFunction as any).preflight(validationSchema);
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -104,14 +102,11 @@
     // Sync state from props
     let selectedContactIds = $state<string[]>([]);
     let selectedLocationIds = $state<string[]>([]);
-
 </script>
 
 <form
     class="space-y-4"
-    {...(rf as any)
-        .preflight(validationSchema)
-        .enhance(async ({ submit }: { submit: any }) => {
+    {...rf.enhance(async ({ submit }: { submit: any }) => {
             try {
                 const result: any = await submit();
                 if (result?.error) {
@@ -128,21 +123,21 @@
             }
         })}
 >
-    {#if isUpdating && initialData}
-        <input {...rf.fields.id.as("hidden", initialData.id)} />
+    {#if isUpdating && initialData?.id}
+        <input {...rf.fields.id.as("text", initialData.id)} class="hidden" />
     {/if}
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
         <input
             {...rf.fields.name.as("text", initialData?.name ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.name.issues().length > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.name.issues()?.length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_location_name()}
             onblur={() => rf.validate()}
         />
-        {#each rf.fields.name.issues() as issue}
+        {#each rf.fields.name.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -151,13 +146,13 @@
         <span class="text-sm font-medium text-gray-700 mb-2">{m.direction()}</span>
         <input
             {...rf.fields.type.as("text", initialData?.type ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.type.issues().length > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.type.issues()?.length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.resource_type_placeholder()}
             onblur={() => rf.validate()}
         />
-        {#each rf.fields.type.issues() as issue}
+        {#each rf.fields.type.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -166,13 +161,13 @@
         <span class="text-sm font-medium text-gray-700 mb-2">{m.inventory_number()}</span>
         <input
             {...rf.fields.inventoryNumber.as("text", initialData?.inventoryNumber ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.inventoryNumber.issues().length > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.inventoryNumber.issues()?.length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_inventory_number()}
             onblur={() => rf.validate()}
         />
-        {#each rf.fields.inventoryNumber.issues() as issue}
+        {#each rf.fields.inventoryNumber.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -308,9 +303,11 @@
             {/snippet}
         </EntityManager>
         <input
-            type="hidden"
-            name="locationIds"
-            value={JSON.stringify(selectedLocationIds)}
+            {...rf.fields.locationIds.as(
+                "text",
+                JSON.stringify(selectedLocationIds),
+            )}
+            class="hidden"
         />
     </div>
 
@@ -424,9 +421,10 @@
 
         <input
             {...rf.fields.allocationCalendars.as(
-                "hidden",
+                "text",
                 JSON.stringify(allocationCalendars),
             )}
+            class="hidden"
         />
     </div>
     <div class="block">
@@ -516,9 +514,11 @@
     </div>
 
     <input
-        type="hidden"
-        name="contactIds"
-        value={JSON.stringify(selectedContactIds)}
+        {...rf.fields.contactIds.as(
+            "text",
+            JSON.stringify(selectedContactIds),
+        )}
+        class="hidden"
     />
 
     <div class="flex gap-3 mt-6">

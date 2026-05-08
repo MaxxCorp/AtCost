@@ -1,5 +1,5 @@
 import { form } from '$app/server';
-import { db, location, eq } from '$lib/server/db';
+import { db, location, eq } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';

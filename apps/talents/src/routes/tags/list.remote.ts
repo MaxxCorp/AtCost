@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { tag } from '@ac/db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc } from '@ac/db';
 import { getAuthenticatedUser } from '$lib/server/authorization';
 import { PaginationSchema } from '@ac/validations';
 

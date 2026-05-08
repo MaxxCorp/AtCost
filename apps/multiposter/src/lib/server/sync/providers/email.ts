@@ -9,9 +9,9 @@ import type {
 import { getAuthenticatedUser } from '$lib/server/authorization';
 import { getEntityContacts } from '../../contacts';
 import { resolveEventContact } from '../../contact-resolution';
-import { db } from '../../db';
-import { user } from '../../db/schema';
-import { emailCampaign, emailEvent } from '../../db/schema';
+import { db } from '@ac/db';
+import { user } from '@ac/db';
+import { emailCampaign, emailEvent } from '@ac/db';
 import { renderEmailTemplates, type EmailTemplateData } from '../../email-templates';
 import { env } from '$env/dynamic/private';
 import fs from 'fs';
@@ -79,7 +79,7 @@ export class EmailProvider implements SyncProvider {
 
 		// Get user record for sender info
 		const userRecord = await db.query.user.findFirst({
-			where: (u, { eq }) => eq(u.id, this.config!.userId)
+			where: (u: any, { eq }: any) => eq(u.id, this.config!.userId)
 		});
 
 		if (!userRecord) {
@@ -223,7 +223,7 @@ export class EmailProvider implements SyncProvider {
 			try {
 				// Find the campaign by Brevo campaign ID
 				const campaign = await db.query.emailCampaign.findFirst({
-					where: (c, { eq }) => eq(c.brevoCampaignId, event.campaignId?.toString())
+					where: (c: any, { eq }: any) => eq(c.brevoCampaignId, event.campaignId?.toString())
 				});
 
 				if (campaign) {

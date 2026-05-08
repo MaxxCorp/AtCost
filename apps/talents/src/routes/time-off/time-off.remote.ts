@@ -1,8 +1,10 @@
 import { query, form } from '$app/server';
-import { db, timeOffRequest, timeOffBalance, talent, eq, and, desc, or, ilike, sql } from '$lib/server/db';
+import { 
+    db, timeOffRequest, timeOffBalance, talent, 
+    eq, and, desc, or, ilike, sql, inArray
+} from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { timeOffRequestSchema, type PaginatedResult } from '@ac/validations';
-
 import * as v from 'valibot';
 
 /**
@@ -15,14 +17,14 @@ async function getMyTimeOffBalancesCore(talentId: string) {
         where: and(
             eq(timeOffBalance.talentId, talentId),
             eq(timeOffBalance.year, currentYear)
-        ) as any
+        )
     });
 }
 
 async function getMyTimeOffRequestsCore(talentId: string) {
     return await db.query.timeOffRequest.findMany({
-        where: eq(timeOffRequest.talentId, talentId) as any,
-        orderBy: [desc(timeOffRequest.startDate) as any],
+        where: eq(timeOffRequest.talentId, talentId),
+        orderBy: [desc(timeOffRequest.startDate)],
         limit: 5
     });
 }
@@ -54,37 +56,33 @@ export const listTimeOffRequests = query(PaginationSchema, async (input): Promis
         talentId: timeOffRequest.talentId,
         talentName: contact.displayName,
     }).from(timeOffRequest)
-    .leftJoin(talent, eq(timeOffRequest.talentId, talent.id) as any)
-    .leftJoin(contact, eq(talent.contactId, contact.id) as any)
+    .leftJoin(talent, eq(timeOffRequest.talentId, talent.id))
+    .leftJoin(contact, eq(talent.contactId, contact.id))
     .$dynamic();
     
     const conditions = [];
     if (talentId) {
-        const { inArray } = await import('drizzle-orm');
         const ids = Array.isArray(talentId) ? talentId : [talentId];
         conditions.push(inArray(timeOffRequest.talentId, ids));
     }
     
     if (search) {
-        const { or, ilike } = await import('drizzle-orm');
         conditions.push(or(
-            ilike(timeOffRequest.reason as any, `%${search}%`),
-            ilike(timeOffRequest.type as any, `%${search}%`),
+            ilike(timeOffRequest.reason, `%${search}%`),
+            ilike(timeOffRequest.type, `%${search}%`),
             ilike(contact.displayName, `%${search}%`)
         ));
     }
 
     if (conditions.length > 0) {
-        const { and } = await import('drizzle-orm');
-        baseQuery = baseQuery.where(and(...conditions as any)) as any;
+        baseQuery = baseQuery.where(and(...conditions));
     }
 
-    const { sql, desc } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
     const data = await baseQuery
-        .orderBy(desc(timeOffRequest.startDate) as any)
+        .orderBy(desc(timeOffRequest.startDate))
         .limit(limit)
         .offset(offset);
 
@@ -122,13 +120,13 @@ export const requestTimeOff = form(timeOffRequestSchema, async (data) => {
         where: and(
             eq(timeOffBalance.talentId, data.talentId),
             eq(timeOffBalance.year, currentYear)
-        ) as any
+        )
     });
 
     if (balance) {
         await db.update(timeOffBalance).set({
             pendingDays: (balance.pendingDays || 0) + days
-        }).where(eq(timeOffBalance.id, balance.id) as any);
+        }).where(eq(timeOffBalance.id, balance.id));
     } else {
         await db.insert(timeOffBalance).values({
             talentId: data.talentId,

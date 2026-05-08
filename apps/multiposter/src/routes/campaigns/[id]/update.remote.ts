@@ -1,9 +1,9 @@
 import * as v from 'valibot';
 import { form } from '$app/server';
 import { error } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { campaign } from '@ac/db';
-import { eq } from 'drizzle-orm';
+import { eq } from '@ac/db';
 import type { Campaign } from '@ac/db';
 import { readCampaign } from './read.remote';
 import { listCampaigns } from '../list.remote';

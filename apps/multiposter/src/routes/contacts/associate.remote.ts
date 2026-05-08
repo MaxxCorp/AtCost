@@ -1,10 +1,10 @@
 import { command, query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { 
     userContact, locationContact, resourceContact, eventContact, announcementContact,
     contact, contactEmail, contactPhone, contactAddress, contactRelation, contactTag, tag
-} from '$lib/server/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+} from '@ac/db';
+import { eq, and, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, hasAccess } from '$lib/server/authorization';
 import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '$lib/validations/contacts';
 import { getEntityContacts } from '$lib/server/contacts';

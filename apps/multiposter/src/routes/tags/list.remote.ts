@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { tag } from '@ac/db';
-import { desc } from 'drizzle-orm';
+import { desc } from '@ac/db';
 import { PaginationSchema } from '@ac/validations';
 
 export const listTags = query(PaginationSchema, async (input) => {

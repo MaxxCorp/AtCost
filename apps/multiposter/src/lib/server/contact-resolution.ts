@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db } from '@ac/db';
 import { getEntityContacts } from './contacts';
 import type { ExternalEvent } from './sync/types';
 
@@ -46,7 +46,7 @@ export async function resolveContactForEventId(eventId: string | undefined, filt
 
 	// 2. If no Employee-tagged event contact, check location contacts
 	const resources = await db.query.eventResource.findMany({
-		where: (er, { eq }) => eq(er.eventId, eventId),
+		where: (er: any, { eq }: any) => eq(er.eventId, eventId),
 		with: {
 			resource: {
 				with: {

@@ -1,6 +1,6 @@
 import { query, form } from '$app/server';
 import { db, talent, type Talent, type Contact } from '@ac/db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createTalentSchema, updateTalentSchema } from '@ac/validations';
 import * as v from 'valibot';

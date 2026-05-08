@@ -1,6 +1,6 @@
-import { db } from '../db';
-import { event as eventTable } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { db } from '@ac/db';
+import { event as eventTable } from '@ac/db';
+import { eq } from '@ac/db';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';
 import { getStorageProvider } from '../blob-storage';

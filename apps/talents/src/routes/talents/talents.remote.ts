@@ -1,5 +1,5 @@
 import { query, form, command } from '$app/server';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql } from '$lib/server/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
 import {
     talentTimelineEntrySchema,

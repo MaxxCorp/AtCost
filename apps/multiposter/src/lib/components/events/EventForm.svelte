@@ -47,7 +47,8 @@
         CalendarClock,
         User,
         MapPin,
-        Tag as TagIcon
+        Tag as TagIcon,
+        Database
     } from "@lucide/svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -58,14 +59,18 @@
 
     let {
         remoteFunction,
+        validationSchema,
         isUpdating = false,
         initialData = null,
     }: {
         remoteFunction: any;
+        validationSchema: any;
         isUpdating?: boolean;
         initialData?: Event | null;
     } = $props();
-
+    
+    // svelte-ignore state_referenced_locally
+    const rf = (remoteFunction as any).preflight(validationSchema);
     const type = "event";
     const BERLIN_DE_CATEGORIES = [
         "Ausstellung",
@@ -146,7 +151,7 @@
 
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = (remoteFunction as any).allIssues?.() ?? [];
+        const issues = (rf as any).allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(m.please_fix_validation());
         }
@@ -155,19 +160,14 @@
 
     let showRecurrenceDialog = $state(false);
 
-    let locationsPromise = listLocations();
-    let resourcesPromise = listResourcesWithHierarchy();
-    // No-op for removed state initializations
-
-
     // Date/Time handling
     const timezones = Intl.supportedValuesOf
         ? Intl.supportedValuesOf("timeZone")
         : [];
 
     function updateEndDateTime(rf: any) {
-        const startDate = rf.fields.startDate.value;
-        const startTime = rf.fields.startTime.value;
+        const startDate = rf.fields.startDate.value();
+        const startTime = rf.fields.startTime.value();
         if (!startDate || !startTime) return;
 
         const start = new Date(`${startDate}T${startTime}:00`);
@@ -179,8 +179,8 @@
     }
 
     function getDefaultEndTime(rf: any) {
-        const startDate = rf.fields.startDate.value;
-        const startTime = rf.fields.startTime.value;
+        const startDate = rf.fields.startDate.value();
+        const startTime = rf.fields.startTime.value();
         if (!startDate || !startTime) return "";
         const start = new Date(`${startDate}T${startTime}:00`);
         const end = new Date(start.getTime() + 60 * 60000);
@@ -188,27 +188,17 @@
     }
 
     function addReminder(rf: any) {
-        const currentReminders = rf.fields.reminders.fields.overrides.value ?? [];
+        const currentReminders = rf.fields.reminders.fields.overrides.value() ?? [];
         rf.fields.reminders.fields.overrides.set([...currentReminders, { method: "popup", minutes: 10 }]);
     }
 
     function removeReminder(rf: any, index: number) {
-        const currentReminders = rf.fields.reminders.fields.overrides.value ?? [];
+        const currentReminders = rf.fields.reminders.fields.overrides.value() ?? [];
         rf.fields.reminders.fields.overrides.set(currentReminders.filter((_: any, i: number) => i !== index));
     }
-</script>
 
-{#await remoteFunction}
-    <LoadingSection message={m.loading()} />
-{:then rf}
-    <datalist id="timezones">
-        {#each timezones as tz}
-            <option value={tz}></option>
-        {/each}
-    </datalist>
-
-    {@const recurrenceRule = rf.fields.recurrence.value}
-    {@const recurrenceText = recurrenceRule
+    let recurrenceRule = $derived(rf.fields.recurrence.value());
+    let recurrenceText = $derived(recurrenceRule
             ? (() => {
                   try {
                       return RRule.fromString(recurrenceRule).toText();
@@ -216,22 +206,29 @@
                       return m.custom_recurrence();
                   }
               })()
-            : m.recurrence()}
+            : m.recurrence());
 
-    {@const isAllDay = rf.fields.isAllDay.value === true || rf.fields.isAllDay.value === 'true' || rf.fields.isAllDay.value === 'on'}
-    {@const hasEndTime = rf.fields.hasEndTime.value === true || rf.fields.hasEndTime.value === 'true'}
-    {@const selectedLocationIds = JSON.parse(rf.fields.locationIds.value || '[]')}
-    {@const selectedResourceIds = JSON.parse(rf.fields.resourceIds.value || '[]')}
-    {@const selectedContactIds = JSON.parse(rf.fields.contactIds.value || '[]')}
-    {@const useDefaultReminders = rf.fields.reminders.fields.useDefault.value === true || rf.fields.reminders.fields.useDefault.value === 'true'}
-    {@const reminders = rf.fields.reminders.fields.overrides.value ?? []}
+    let isAllDay = $derived(rf.fields.isAllDay.value() === true || rf.fields.isAllDay.value() === 'true' || rf.fields.isAllDay.value() === 'on');
+    let hasEndTime = $derived(rf.fields.hasEndTime.value() === true || rf.fields.hasEndTime.value() === 'true');
+    let useDefaultReminders = $derived(rf.fields.reminders.fields.useDefault.value() === true || rf.fields.reminders.fields.useDefault.value() === 'true');
+    let reminders = $derived(rf.fields.reminders.fields.overrides.value() ?? []);
+</script>
 
-    <input {...rf.fields.id.as("hidden", initialData?.id)} />
-    <input {...rf.fields.heroImage.as("hidden", initialData?.heroImage ?? "")} />
-    <input {...rf.fields.recurrence.as("hidden", initialData?.recurrence?.[0] ?? "")} />
-    <input {...rf.fields.tags.as("hidden", (initialData?.tags ?? []).map(t => t.name).join(", "))} />
-    <input {...rf.fields.description.as("hidden", initialData?.description ?? "")} />
-    <input {...rf.fields.remindersJson.as("hidden")} />
+    <datalist id="timezones">
+        {#each timezones as tz}
+            <option value={tz}></option>
+        {/each}
+    </datalist>
+
+
+    {#if initialData?.id}
+        <input {...rf.fields.id.as("text", initialData.id)} class="hidden" />
+    {/if}
+    <input {...rf.fields.heroImage.as("text", initialData?.heroImage ?? "")} class="hidden" />
+    <input {...rf.fields.recurrence.as("text", initialData?.recurrence?.[0] ?? "")} class="hidden" />
+    <input {...rf.fields.tags.as("text", (initialData?.tags ?? []).map(t => t.name).join(", "))} class="hidden" />
+    <input {...rf.fields.description.as("text", initialData?.description ?? "")} class="hidden" />
+    <input {...rf.fields.remindersJson.as("text")} class="hidden" />
 
     <div class="bg-white shadow rounded-lg p-6 space-y-4">
         <h2 class="text-xl font-semibold mb-4 border-b pb-2">
@@ -248,7 +245,7 @@
             <input
                 {...rf.fields.summary.as("text", initialData?.summary ?? "")}
                 required
-                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.summary.issues()?.length ?? 0) > 0
+                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {rf.fields.summary.issues()?.length > 0
                     ? 'border-red-500'
                     : 'border-gray-300'}"
                 placeholder={m.title()}
@@ -280,7 +277,7 @@
         </div>
 
         <ImageUploader 
-            value={rf.fields.heroImage.value} 
+            value={rf.fields.heroImage.value()} 
             onchange={(val: string) => rf.fields.heroImage.set(val)}
             label={m.hero_image()} 
         />
@@ -293,7 +290,7 @@
             >
             <div class="prose max-w-none">
                 <RichTextEditor 
-                    value={rf.fields.description.value} 
+                    value={rf.fields.description.value()} 
                     onchange={(val: string) => rf.fields.description.set(val)}
                 />
             </div>
@@ -370,7 +367,7 @@
                         class="space-y-4 p-4"
                     >
                         {#if id && rfState.fields?.id}
-                            <input {...rfState.fields.id.as("hidden", id)} />
+                            <input {...rfState.fields.id.as("text", id)} class="hidden" />
                         {/if}
                         <div>
                             <label
@@ -380,14 +377,18 @@
                             >
                             <input
                                 {...rfState.fields.name.as("text")}
+                                id="name"
+                                type="text"
                                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 value={formData?.name ?? ""}
                             />
-                            {#each rfState.fields.name.issues() ?? [] as issue}
-                                <p class="mt-1 text-sm text-red-600">
+                            <div class="px-2">
+                            {#each rf.fields.name.issues() ?? [] as issue}
+                                <p class="text-sm text-red-600">
                                     {issue.message}
                                 </p>
                             {/each}
+                            </div>
                         </div>
                         <div class="flex justify-end gap-2 pt-4 border-t">
                             <Button
@@ -410,62 +411,44 @@
             <span class="block text-sm font-medium text-gray-700 mb-2"
                 >{m.feature_resources_title()} ({m.optional()})</span
             >
-            {#await resourcesPromise}
-                <LoadingSection
-                    message={m.loading_item({
-                        item: m.feature_resources_title().toLowerCase(),
-                    })}
-                />
-            {:then resResources}
-                {@const resources = (resResources as any).data ?? resResources}
-                <div
-                    class="space-y-1 border rounded-md p-4 max-h-64 overflow-y-auto bg-gray-50"
-                >
-                    {#each resources as resource}
-                        <label
-                            class="flex items-center gap-2 py-1 px-2 hover:bg-white rounded transition-colors"
-                            style="padding-left: {resource.level * 24 + 8}px"
-                        >
-                            <input
-                                type="checkbox"
-                                class="w-4 h-4 text-blue-600 flex-shrink-0"
-                                checked={selectedResourceIds.includes(
-                                    resource.id,
-                                )}
-                                onclick={() => {
-                                    const next = selectedResourceIds.includes(resource.id)
-                                        ? selectedResourceIds.filter((id: string) => id !== resource.id)
-                                        : [...selectedResourceIds, resource.id];
-                                    rf.fields.resourceIds.set(JSON.stringify(next));
-                                }}
-                            />
-                            <span
-                                class="text-sm {resource.level === 0
-                                    ? 'font-semibold'
-                                    : 'text-gray-600'}"
-                                >{resource.name}</span
-                            >
-                            <span class="text-xs text-gray-500"
-                                >({resource.type === "room"
-                                    ? m.room_type_suffix()
-                                    : m.equipment_type_suffix()})</span
-                            >
-                        </label>
-                    {/each}
-                </div>
-            {:catch error}
-                <ErrorSection
-                    headline={m.error()}
-                    message={error.message || m.something_went_wrong()}
-                />
-            {/await}
+            <EntityManager
+                title={m.feature_resources_title()}
+                icon={Database}
+                mode="embedded"
+                type="event"
+                entityId={initialData?.id}
+                listItemsRemote={listResourcesWithHierarchy as any}
+                onchange={(ids: string[]) => rf.fields.resourceIds.set(JSON.stringify(ids))}
+                searchPredicate={(r: any, q: string) => r.name.toLowerCase().includes(q.toLowerCase())}
+                loadingLabel={m.loading_item({ item: m.feature_resources_title().toLowerCase() })}
+                noItemsLabel={m.no_items_associated_label({ item: m.feature_resources_title().toLowerCase() })}
+                searchPlaceholder={m.search_placeholder({ item: m.feature_resources_title().toLowerCase() })}
+                linkItemLabel={m.link_item_label({ item: m.feature_resources_title().toLowerCase() })}
+                associatedItemLabel={m.associated_item_label({ item: m.feature_resources_title().toLowerCase() })}
+                quickCreateLabel={m.quick_create()}
+                closeSearchLabel={m.close_search()}
+                unlinkLabel={m.unlink()}
+                selectAllLabel={m.select_all()}
+                deselectAllLabel={m.deselect_all()}
+            >
+                {#snippet renderItemLabel(resource)}
+                    <span style="padding-left: {resource.level * 12}px">
+                        {resource.name}
+                        <span class="text-xs text-gray-500 font-normal ml-2">
+                            ({resource.type === "room" ? m.room_type_suffix() : m.equipment_type_suffix()})
+                        </span>
+                    </span>
+                {/snippet}
+            </EntityManager>
             <input
                 {...rf.fields.resourceIds.as(
-                    "hidden",
+                    "text",
                     JSON.stringify(initialData?.resourceIds || []),
                 )}
+                class="hidden"
             />
         </div>
+
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -498,13 +481,12 @@
                 <input
                     {...rf.fields.ticketPrice.as(
                         "text",
-                        initialData?.ticketPrice ?? "",
+                        initialData?.ticketPrice?.toString() ?? "",
                     )}
-                    required
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues()?.length ?? 0) > 0
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {rf.fields.ticketPrice.issues()?.length > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
-                    placeholder={m.ticket_price_placeholder()}
+                    placeholder="e.g. 15.50"
                     onblur={() => rf.validate()}
                 />
                 {#each rf.fields.ticketPrice.issues() ?? [] as issue}
@@ -517,157 +499,143 @@
             <span class="block text-sm font-medium text-gray-700 mb-2"
                 >{m.location()}</span
             >
-                {#await locationsPromise}
-                    <LoadingSection
-                        message={m.loading_item({
-                            item: m.feature_locations_title().toLowerCase(),
-                        })}
-                    />
-                {:then resLocations}
-                    {@const locations = (resLocations as any).data ?? resLocations}
-                    <!-- Using Multi-Location Selector -->
-                    <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
-                        <MapPin size={18} class="text-blue-600" />
-                        {m.feature_locations_title()}
-                    </h3>
-                    <EntityManager
-                        title={m.feature_locations_title()}
-                        icon={MapPin}
-                        mode="embedded"
-                        {type}
-                        entityId={initialData?.id}
-                        initialItems={locations.filter((l: any) =>
-                            selectedLocationIds.includes(l.id),
-                        )}
-                        onchange={(ids: string[]) =>
-                            rf.fields.locationIds.set(JSON.stringify(ids))}
-                        listItemsRemote={listLocations as any}
-                        deleteItemRemote={async (ids: string[]) => {
-                            return await handleDelete({
-                                ids,
-                                deleteFn: deleteLocation,
-                                itemName: m.location_label().toLowerCase(),
-                            });
-                        }}
-                        createRemote={createLocation}
-                        createSchema={createLocationSchema}
-                        updateRemote={updateLocation}
-                        updateSchema={updateLocationSchema}
-                        getFormData={(l: Location) => l}
-                        searchPredicate={(l: Location, q: string) => {
-                            return (
-                                l.name.toLowerCase().includes(q.toLowerCase()) ||
-                                (l.roomId
-                                    ?.toLowerCase()
-                                    .includes(q.toLowerCase()) ??
-                                    false)
-                            );
-                        }}
-                        loadingLabel={m.loading_item({
-                            item: m.feature_locations_title(),
-                        })}
-                        noItemsLabel={m.no_items_associated_label({
-                            item: m.feature_locations_title(),
-                        })}
-                        noItemsFoundLabel={m.no_items_found({
-                            item: m.feature_locations_title(),
-                        })}
-                        searchPlaceholder={m.search_placeholder({
-                            item: m.feature_locations_title(),
-                        })}
-                        linkItemLabel={m.link_item_label({
-                            item: m.feature_locations_title(),
-                        })}
-                        associatedItemLabel={m.associated_item_label({
-                            item: m.feature_locations_title(),
-                        })}
-                        quickCreateLabel={m.quick_create()}
-                        closeSearchLabel={m.close_search()}
-                        editLabel={m.edit()}
-                        deleteLabel={m.delete()}
-                        unlinkLabel={m.unlink()}
-                        deleteForeverLabel={m.delete_forever({
-                            item: m.location(),
-                        })}
-                        bulkDeleteLabel={m.delete_selected({ count: 0 })}
-                        selectAllLabel={m.select_all()}
-                        deselectAllLabel={m.deselect_all()}
-                        confirmUnlinkLabel={m.confirm_unlink_label({
-                            item: m.location(),
-                        })}
-                    >
-                        {#snippet renderItemLabel(location)}
-                            {location.name}
-                            {location.roomId ? `(${location.roomId})` : ""}
-                        {/snippet}
+                <!-- Using Multi-Location Selector -->
+                <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                    <MapPin size={18} class="text-blue-600" />
+                    {m.feature_locations_title()}
+                </h3>
+                <EntityManager
+                    title={m.feature_locations_title()}
+                    icon={MapPin}
+                    mode="embedded"
+                    {type}
+                    entityId={initialData?.id}
+                    onchange={(ids: string[]) =>
+                        rf.fields.locationIds.set(JSON.stringify(ids))}
+                    listItemsRemote={listLocations as any}
+                    deleteItemRemote={async (ids: string[]) => {
+                        return await handleDelete({
+                            ids,
+                            deleteFn: deleteLocation,
+                            itemName: m.location_label().toLowerCase(),
+                        });
+                    }}
+                    createRemote={createLocation}
+                    createSchema={createLocationSchema}
+                    updateRemote={updateLocation}
+                    updateSchema={updateLocationSchema}
+                    getFormData={(l: Location) => l}
+                    searchPredicate={(l: Location, q: string) => {
+                        return (
+                            l.name.toLowerCase().includes(q.toLowerCase()) ||
+                            (l.roomId
+                                ?.toLowerCase()
+                                .includes(q.toLowerCase()) ??
+                                false)
+                        );
+                    }}
+                    loadingLabel={m.loading_item({
+                        item: m.feature_locations_title(),
+                    })}
+                    noItemsLabel={m.no_items_associated_label({
+                        item: m.feature_locations_title(),
+                    })}
+                    noItemsFoundLabel={m.no_items_found({
+                        item: m.feature_locations_title(),
+                    })}
+                    searchPlaceholder={m.search_placeholder({
+                        item: m.feature_locations_title(),
+                    })}
+                    linkItemLabel={m.link_item_label({
+                        item: m.feature_locations_title(),
+                    })}
+                    associatedItemLabel={m.associated_item_label({
+                        item: m.feature_locations_title(),
+                    })}
+                    quickCreateLabel={m.quick_create()}
+                    closeSearchLabel={m.close_search()}
+                    editLabel={m.edit()}
+                    deleteLabel={m.delete()}
+                    unlinkLabel={m.unlink()}
+                    deleteForeverLabel={m.delete_forever({
+                        item: m.location(),
+                    })}
+                    bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                    selectAllLabel={m.select_all()}
+                    deselectAllLabel={m.deselect_all()}
+                    confirmUnlinkLabel={m.confirm_unlink_label({
+                        item: m.location(),
+                    })}
+                >
+                    {#snippet renderItemLabel(location)}
+                        {location.name}
+                        {location.roomId ? `(${location.roomId})` : ""}
+                    {/snippet}
 
-                        {#snippet renderForm({
-                            remoteFunction: rf,
-                            schema,
-                            id,
-                            initialData: formData = null,
-                            onSuccess,
-                            onCancel,
-                        })}
-                            <LocationForm
-                                remoteFunction={rf}
-                                validationSchema={schema}
-                                isUpdating={!!id}
-                                initialData={formData}
-                                {onSuccess}
-                                {onCancel}
-                                labels={{
-                                    name: m.location_name(),
-                                    street: m.street(),
-                                    houseNumber: m.house_number(),
-                                    addressSuffix: m.address_suffix(),
-                                    zip: m.zip_code(),
-                                    city: m.city(),
-                                    state: m.state_region(),
-                                    country: m.country(),
-                                    roomId: m.room_id(),
-                                    latitude: m.latitude(),
-                                    longitude: m.longitude(),
-                                    what3words: m.what3words(),
-                                    inclusivitySupport: m.inclusivity_support(),
-                                    isPublic: m.public(),
-                                    heroImage: m.hero_image(),
-                                    saveChanges: m.save_changes(),
-                                    createLocation: m.create_location(),
-                                    cancel: m.cancel(),
-                                    saving: m.loading(),
-                                    creating: m.creating(),
-                                    successfullySaved: m.successfully_saved(),
-                                    errorSomethingWentWrong: m.something_went_wrong(),
-                                    enterLocationName: m.enter_location_name(),
-                                    streetName: m.street_placeholder(),
-                                    houseNumberPlaceholder: m.house_number_placeholder(),
-                                    addressSuffixPlaceholder: m.address_suffix_placeholder(),
-                                    zipCodePlaceholder: m.zip_code_placeholder(),
-                                    cityNamePlaceholder: m.city_placeholder(),
-                                    statePlaceholder: m.state_placeholder(),
-                                    countryPlaceholder: m.country_placeholder(),
-                                    enterRoomId: m.room_id_placeholder(),
-                                    latitudePlaceholder: m.latitude_placeholder(),
-                                    longitudePlaceholder: m.longitude_placeholder(),
-                                    what3wordsPlaceholder: m.what3words_placeholder(),
-                                    inclusivitySupportPlaceholder: m.accessibility_info(),
-                                }}
-                            />
-                        {/snippet}
-                    </EntityManager>
-                {:catch error}
-                    <ErrorSection
-                        headline={m.error()}
-                        message={error.message || m.something_went_wrong()}
-                    />
-                {/await}
+                    {#snippet renderForm({
+                        remoteFunction: rf,
+                        schema,
+                        id,
+                        initialData: formData = null,
+                        onSuccess,
+                        onCancel,
+                    })}
+                        <LocationForm
+                            remoteFunction={rf}
+                            validationSchema={schema}
+                            isUpdating={!!id}
+                            initialData={formData}
+                            {onSuccess}
+                            {onCancel}
+                            labels={{
+                                name: m.location_name(),
+                                street: m.street(),
+                                houseNumber: m.house_number(),
+                                addressSuffix: m.address_suffix(),
+                                zip: m.zip_code(),
+                                city: m.city(),
+                                state: m.state_region(),
+                                country: m.country(),
+                                roomId: m.room_id(),
+                                latitude: m.latitude(),
+                                longitude: m.longitude(),
+                                what3words: m.what3words(),
+                                inclusivitySupport: m.inclusivity_support(),
+                                isPublic: m.public(),
+                                heroImage: m.hero_image(),
+                                saveChanges: m.save_changes(),
+                                createLocation: m.create_location(),
+                                cancel: m.cancel(),
+                                saving: m.loading(),
+                                creating: m.creating(),
+                                successfullySaved: m.successfully_saved(),
+                                errorSomethingWentWrong: m.something_went_wrong(),
+                                enterLocationName: m.enter_location_name(),
+                                streetName: m.street_placeholder(),
+                                houseNumberPlaceholder: m.house_number_placeholder(),
+                                addressSuffixPlaceholder: m.address_suffix_placeholder(),
+                                zipCodePlaceholder: m.zip_code_placeholder(),
+                                cityNamePlaceholder: m.city_placeholder(),
+                                statePlaceholder: m.state_placeholder(),
+                                countryPlaceholder: m.country_placeholder(),
+                                enterRoomId: m.room_id_placeholder(),
+                                latitudePlaceholder: m.latitude_placeholder(),
+                                longitudePlaceholder: m.longitude_placeholder(),
+                                what3wordsPlaceholder: m.what3words_placeholder(),
+                                inclusivitySupportPlaceholder: m.accessibility_info(),
+                            }}
+                        />
+                    {/snippet}
+                </EntityManager>
+
                 <input
-                    {...remoteFunction.fields.locationIds.as(
-                        "hidden",
-                        JSON.stringify(selectedLocationIds ?? []),
+                    {...rf.fields.locationIds.as(
+                        "text",
+                        JSON.stringify(initialData?.locationIds ?? []),
                     )}
+                    class="hidden"
                 />
+
             </div>
         </div>
 
@@ -759,7 +727,7 @@
                             >
                             <input
                                 {...rf.fields.endDate.as("date", initialEnd.date)}
-                                placeholder={rf.fields.startDate.value}
+                                placeholder={rf.fields.startDate.value()}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                             />
                         </div>
@@ -786,7 +754,7 @@
                             <input
                                 {...rf.fields.endTimeZone.as("text", initialData?.endTimeZone || initialData?.startTimeZone || browserTimezone)}
                                 list="timezones"
-                                placeholder={rf.fields.startTimeZone.value}
+                                placeholder={rf.fields.startTimeZone.value()}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                             />
                         </div>
@@ -809,7 +777,7 @@
 
         <RecurrenceDialog
             bind:open={showRecurrenceDialog}
-            value={rf.fields.recurrence.value}
+            value={rf.fields.recurrence.value()}
             onchange={(val: string | null) => rf.fields.recurrence.set(val ?? "")}
         />
 
@@ -936,7 +904,7 @@
             mode="embedded"
             type="event"
             entityId={initialData?.id}
-            initialItems={[]}
+
             onchange={(ids: string[]) => rf.fields.contactIds.set(JSON.stringify(ids))}
             listItemsRemote={listContacts as any}
             fetchAssociationsRemote={fetchEntityContacts as any}
@@ -1206,9 +1174,10 @@
         </EntityManager>
         <input
             {...rf.fields.contactIds.as(
-                "hidden",
+                "text",
                 JSON.stringify(initialData?.contactIds || []),
             )}
+            class="hidden"
         />
 
         <SyncCheckboxBlock
@@ -1216,11 +1185,3 @@
             initialSelectedIds={initialData?.syncIds || []}
         />
     </div>
-{:catch error}
-    <div class="p-8">
-        <ErrorSection
-            headline={m.error()}
-            message={error.message || m.something_went_wrong()}
-        />
-    </div>
-{/await}

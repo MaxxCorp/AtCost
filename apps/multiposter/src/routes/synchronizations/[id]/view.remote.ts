@@ -1,14 +1,12 @@
 import { query } from '$app/server';
 import * as v from 'valibot';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { db } from '$lib/server/db';
-import { syncConfig, syncOperation } from '@ac/db';
-import { eq, and, desc } from 'drizzle-orm';
+import { db, syncConfig, syncOperation, eq, and, desc, type SyncConfig, type SyncOperation } from '@ac/db';
 
 /**
  * Query: Get a sync configuration and its recent logs
  */
-export const view = query(v.string(), async (id: string) => {
+export const view = query(v.string(), async (id: string): Promise<SyncConfig> => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'synchronizations', 'use');
 
@@ -27,7 +25,7 @@ export const view = query(v.string(), async (id: string) => {
 /**
  * Query: Get recent sync logs for a configuration
  */
-export const getOperations = query(v.string(), async (configId: string) => {
+export const getOperations = query(v.string(), async (configId: string): Promise<SyncOperation[]> => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'synchronizations', 'use');
 

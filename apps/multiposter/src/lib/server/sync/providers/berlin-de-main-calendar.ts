@@ -5,9 +5,9 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { user, eventResource } from '@ac/db';
-import { eq } from 'drizzle-orm';
+import { eq } from '@ac/db';
 import { resolveEventContact } from '$lib/server/contact-resolution';
 import { parsePricing } from '../utils/pricing';
 import { env } from '$env/dynamic/private';

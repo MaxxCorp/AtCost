@@ -24,6 +24,7 @@
 
     // Prepare JSON for hidden input
     let hiddenValue = $derived(JSON.stringify(selectedIds));
+
 </script>
 
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
@@ -64,8 +65,8 @@
     {/await}
 
     
-    <input {...syncFieldConfig.as("hidden", hiddenValue)} />
-    {#each syncFieldConfig.issues() as issue}
+    <input {...syncFieldConfig.as("text", hiddenValue)} class="hidden" />
+    {#each syncFieldConfig.issues() ?? [] as issue}
         <p class="mt-1 text-sm text-red-600">{issue.message}</p>
     {/each}
 </div>

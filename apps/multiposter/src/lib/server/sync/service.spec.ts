@@ -1,12 +1,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SyncService } from './service';
-import { db } from '../db';
-import { syncMapping as syncMappingTable, event as eventTable } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { db } from '@ac/db';
+import { syncMapping as syncMappingTable, event as eventTable } from '@ac/db';
+import { eq, and } from '@ac/db';
 
 // Mock the database
-vi.mock('../db', () => ({
+vi.mock('@ac/db', () => ({
 	db: {
 		select: vi.fn().mockReturnThis(),
 		from: vi.fn().mockReturnThis(),

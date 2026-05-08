@@ -59,8 +59,9 @@
         initialData = null,
     } = $props();
 
-    // Initialize remoteFunction if it's a definition function to ensure reactive context
-    const rf = $derived(remoteFunction);
+    // Initialize form state
+    // svelte-ignore state_referenced_locally
+    const rf = (remoteFunction as any).preflight(validationSchema);
 
     const type = "announcement";
 
@@ -109,28 +110,6 @@
 
 
 
-    const formSetup = $derived(
-        (rf as any)
-            .preflight(validationSchema)
-            .enhance(async ({ submit }: { submit: any }) => {
-                try {
-                    await submit();
-                    const result = (rf as any).result;
-                    if (result?.error) {
-                        toast.error(
-                            result.error.message || m.something_went_wrong(),
-                        );
-                        return;
-                    }
-
-                    toast.success(m.successfully_saved());
-                    goto("/announcements");
-                } catch (error: any) {
-                    toast.error(error.message || m.something_went_wrong());
-                }
-            }),
-    );
-
     let prevIssuesLength = $state(0);
     $effect(() => {
         const issues = (rf as any).allIssues?.() ?? [];
@@ -173,21 +152,38 @@
         {/if}
     </div>
 
-    <form {...formSetup} class="space-y-6">
-        {#if isUpdating && initialData}
-            <input {...rf.fields.id.as("hidden", initialData.id)} />
+    <form {...rf.enhance(async ({ submit }: { submit: any }) => {
+        try {
+            await submit();
+            const result = (rf as any).result;
+            if (result?.error) {
+                toast.error(
+                    result.error.message || m.something_went_wrong(),
+                );
+                return;
+            }
+
+            toast.success(m.successfully_saved());
+            goto("/announcements");
+        } catch (error: any) {
+            toast.error(error.message || m.something_went_wrong());
+        }
+    })} class="space-y-6">
+        {#if isUpdating && initialData?.id}
+            <input {...rf.fields.id.as("text", initialData.id)} class="hidden" />
         {/if}
 
-        <input {...rf.fields.isPublic.as("hidden", isPublic.toString())} />
+        <input {...rf.fields.isPublic.as("text", isPublic.toString())} class="hidden" />
         <!-- Send tagNames as JSON string -->
-        <input {...rf.fields.tagNames.as("hidden", tagNamesJson)} />
+        <input {...rf.fields.tagNames.as("text", tagNamesJson)} class="hidden" />
         <!-- We no longer strictly need tagIds for submission if using names -->
 
         <input
             {...rf.fields.contactIds.as(
-                "hidden",
+                "text",
                 JSON.stringify(selectedContactIds),
             )}
+            class="hidden"
         />
 
         <div class="bg-white shadow rounded-lg p-6 space-y-4">
@@ -208,7 +204,7 @@
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     placeholder={m.announcement_title_placeholder()}
                 />
-                {#each rf.fields.title.issues() as issue}
+                {#each rf.fields.title.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -224,11 +220,12 @@
                     <RichTextEditor bind:value={contentValue} />
                     {#if contentValue}
                         <input
-                            {...rf.fields.content.as("hidden", contentValue)}
+                            {...rf.fields.content.as("text", contentValue)}
+                            class="hidden"
                         />
                     {/if}
                 </div>
-                {#each rf.fields.content.issues() as issue}
+                {#each rf.fields.content.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -275,9 +272,10 @@
                     {#snippet renderItemLabel(tag)}
                         {tag.name}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction: rfState, schema, initialData: formData, onSuccess, onCancel, id })}
+                    {#snippet renderForm({ remoteFunction, schema, initialData: formData, onSuccess, onCancel, id })}
+                        {@const rfState = remoteFunction.preflight(schema)}
                         <form
-                            {...rfState.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
+                            {...rfState.enhance(async ({ submit }: { submit: any }) => {
                                 try {
                                     const res = await submit();
                                     if (res && res.success !== false) {
@@ -290,7 +288,7 @@
                             class="space-y-4 p-4"
                         >
                             {#if id && rfState.fields?.id}
-                                <input {...rfState.fields.id.as("hidden", id)} />
+                                <input {...rfState.fields.id.as("text", id)} class="hidden" />
                             {/if}
                             <div>
                                 <label for="tag-name" class="block text-sm font-medium text-gray-700">{m.summary()}</label>
@@ -299,7 +297,7 @@
                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                     value={formData?.name ?? ""}
                                 />
-                                {#each rfState.fields.name.issues() as issue}
+                                {#each rfState.fields.name.issues() ?? [] as issue}
                                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                                 {/each}
                             </div>
@@ -470,9 +468,10 @@
                 {/if}
                 <input
                     {...rf.fields.locationIds.as(
-                        "hidden",
+                        "text",
                         JSON.stringify(selectedLocationIds),
                     )}
+                    class="hidden"
                 />
             </div>
 

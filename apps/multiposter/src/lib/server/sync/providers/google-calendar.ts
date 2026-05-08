@@ -9,9 +9,9 @@ import type {
 import { calendar, type calendar_v3 } from '@googleapis/calendar';
 import { OAuth2Client, type Credentials } from 'google-auth-library';
 import { env } from '$env/dynamic/private';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { account } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '@ac/db';
 
 /**
  * Google Calendar sync provider implementation

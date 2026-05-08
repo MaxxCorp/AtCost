@@ -1,7 +1,7 @@
 import { command, query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { announcementLocation, eventLocation, kioskLocation, location, resourceLocation } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '@ac/db';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '@ac/validations';
 
 export const addLocationAssociation = command(locationAssociationSchema, async (data) => {

@@ -40,7 +40,12 @@ export const LocationPaginationSchema = v.optional(v.object({
     limit: v.optional(v.number(), 50),
     search: v.optional(v.string()),
     city: v.optional(v.union([v.string(), v.array(v.string())])),
+    associatedWith: v.optional(v.object({
+        type: v.string(),
+        id: v.string()
+    }))
 }), {});
+
 
 export const locationAssociationSchema = v.object({
     type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk']),

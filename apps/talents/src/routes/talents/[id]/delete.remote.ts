@@ -1,5 +1,5 @@
 import { command } from '$app/server';
-import { db, talent, eq } from '$lib/server/db';
+import { db, talent, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 

@@ -1,7 +1,7 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { resource, resourceRelation, resourceLocation as resourceLocationTable } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '@ac/db';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
 import { readResource } from './read.remote';

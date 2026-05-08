@@ -1,10 +1,13 @@
-import { type InferSelectModel, eq, getTableColumns, inArray, and } from 'drizzle-orm';
+import { type InferSelectModel, eq, getTableColumns, inArray, and } from '@ac/db';
 import { query } from '$app/server';
 import { resource, resourceRelation, location, resourceLocation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
+import { PaginationSchema } from '@ac/validations';
+
 
 export type ResourceWithHierarchy = InferSelectModel<typeof resource> & {
+
     locationName?: string | null;
     parentIds: string[];
     childIds: string[];
@@ -14,16 +17,29 @@ export type ResourceWithHierarchy = InferSelectModel<typeof resource> & {
 /**
  * Query: List all resources with their parent-child relationships
  */
-export const listResourcesWithHierarchy = query(async (): Promise<ResourceWithHierarchy[]> => {
+export const listResourcesWithHierarchy = query(PaginationSchema, async (input): Promise<ResourceWithHierarchy[]> => {
+    const { associatedWith } = input || {};
+
     const user = getAuthenticatedUser();
     ensureAccess(user, 'resources');
 
-    // Fetch all resources
-    const resources = await db
+    let baseQuery = db
         .select({
             ...getTableColumns(resource),
         })
-        .from(resource);
+        .from(resource)
+        .$dynamic();
+
+    if (associatedWith) {
+        if (associatedWith.type === 'event') {
+            const { eventResource } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(eventResource, eq(resource.id, eventResource.resourceId)) as any;
+            baseQuery = baseQuery.where(eq(eventResource.eventId, associatedWith.id)) as any;
+        }
+    }
+
+    const resources = await baseQuery;
+
 
     // Fetch all location associations for these resources
     const resourceIds = resources.map(r => r.id);

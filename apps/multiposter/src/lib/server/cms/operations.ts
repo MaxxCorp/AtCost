@@ -1,6 +1,6 @@
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { cmsBlock, cmsSlot, cmsContentVersion, cmsPage } from '@ac/db';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc } from '@ac/db';
 import { error } from '@sveltejs/kit';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 

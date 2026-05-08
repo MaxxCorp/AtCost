@@ -2,8 +2,8 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { contact, locationContact, contactTag, tag } from '@ac/db';
 import type { Contact as DbContact } from '@ac/db';
-import { db } from '$lib/server/db';
-import { desc, eq, inArray, and, or, ilike, sql } from 'drizzle-orm';
+import { db } from '@ac/db';
+import { desc, eq, inArray, and, or, ilike, sql } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { contactPaginationSchema as PaginationSchema, type Contact, type PaginatedResult } from '@ac/validations';
 
@@ -14,12 +14,21 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'contacts');
 
-	const { page = 1, limit = 50, search = '', locationId, tagId } = input || {};
+	const { page = 1, limit = 50, search = '', locationId, tagId, associatedWith } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: contact.id }).from(contact).$dynamic();
 	
 	const conditions = [];
+
+    if (associatedWith) {
+        if (associatedWith.type === 'event') {
+            const { eventContact } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(eventContact, eq(contact.id, eventContact.contactId)) as any;
+            conditions.push(eq(eventContact.eventId, associatedWith.id));
+        }
+    }
+
 	if (search) {
 		conditions.push(or(
 			ilike(contact.displayName, `%${search}%`),

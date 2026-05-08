@@ -2,8 +2,8 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { event, eventTag, tag, campaign } from '@ac/db';
 import type { Event as DbEvent } from '@ac/db';
-import { db } from '$lib/server/db';
-import { eq, desc, inArray, ilike, and, sql } from 'drizzle-orm';
+import { db } from '@ac/db';
+import { eq, desc, inArray, ilike, and, sql } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 /**

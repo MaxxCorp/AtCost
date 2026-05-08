@@ -1,8 +1,8 @@
 import { form } from '$app/server';
-import { db, shiftPlanTemplate } from '$lib/server/db';
+import { db, shiftPlanTemplate } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateShiftplanSchema } from '@ac/validations';
-import { eq } from '$lib/server/db';
+import { eq } from '@ac/db';
 
 export const updateShiftplan = form(updateShiftplanSchema, async (data): Promise<{ success: boolean; error?: { message: string } }> => {
     const user = getAuthenticatedUser();

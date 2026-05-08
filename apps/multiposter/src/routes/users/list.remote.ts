@@ -1,10 +1,10 @@
 import * as v from 'valibot';
-import { type InferSelectModel } from 'drizzle-orm';
+import { type InferSelectModel } from '@ac/db';
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { user } from '@ac/db';
 import { ensureAccess, getAuthenticatedUser, parseRoles } from '$lib/server/authorization';
-import { desc, ilike, or, and, sql } from 'drizzle-orm';
+import { desc, ilike, or, and, sql } from '@ac/db';
 
 import { PaginationSchema, type User, type PaginatedResult } from '@ac/validations';
 
@@ -26,7 +26,7 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
     
     const conditions = [];
     if (search) {
-        const { ilike, or } = await import('drizzle-orm');
+        const { ilike, or } = await import('@ac/db');
         conditions.push(or(
             ilike(user.name, `%${search}%`),
             ilike(user.email, `%${search}%`)
@@ -34,11 +34,11 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
     }
 
     if (conditions.length > 0) {
-        const { and } = await import('drizzle-orm');
+        const { and } = await import('@ac/db');
         baseQuery = baseQuery.where(and(...conditions as any)) as any;
     }
 
-    const { sql } = await import('drizzle-orm');
+    const { sql } = await import('@ac/db');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 

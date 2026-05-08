@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { announcement, campaign } from '@ac/db';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { eq, desc, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { Announcement as DbAnnouncement } from '@ac/db';
 import { announcementPaginationSchema as PaginationSchema, type Announcement, type PaginatedResult } from '@ac/validations';
@@ -21,7 +21,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     
     const conditions = [];
     if (search) {
-        const { ilike } = await import('drizzle-orm');
+        const { ilike } = await import('@ac/db');
         conditions.push(ilike(announcement.title, `%${search}%`));
     }
 
@@ -37,11 +37,11 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     }
 
     if (conditions.length > 0) {
-        const { and } = await import('drizzle-orm');
+        const { and } = await import('@ac/db');
         baseQuery = baseQuery.where(and(...conditions)) as any;
     }
 
-    const { sql } = await import('drizzle-orm');
+    const { sql } = await import('@ac/db');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 

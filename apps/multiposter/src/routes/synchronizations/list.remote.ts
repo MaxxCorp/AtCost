@@ -2,8 +2,8 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { syncConfig } from '@ac/db';
 import type { SyncConfig as DbSyncConfig } from '@ac/db';
-import { db } from '$lib/server/db';
-import { desc, and, or, ilike, sql, inArray } from 'drizzle-orm';
+import { db } from '@ac/db';
+import { desc, and, or, ilike, sql, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 
@@ -25,7 +25,7 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 	
 	const conditions = [];
 	if (search) {
-		const { ilike, or } = await import('drizzle-orm');
+		const { ilike, or } = await import('@ac/db');
 		conditions.push(or(
 			ilike(syncConfig.name, `%${search}%`),
 			ilike(syncConfig.providerType, `%${search}%`)

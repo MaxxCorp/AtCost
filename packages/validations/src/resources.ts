@@ -13,4 +13,9 @@ export const resourcePaginationSchema = v.optional(v.object({
 	limit: v.optional(v.number(), 50),
 	search: v.optional(v.string()),
 	locationId: FilterableIdSchema,
+    associatedWith: v.optional(v.object({
+        type: v.string(),
+        id: v.string()
+    }))
 }), {});
+

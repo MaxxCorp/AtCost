@@ -44,9 +44,12 @@
 
 
 
+    // svelte-ignore state_referenced_locally
+    const rf = (remoteFunction as any).preflight(validationSchema);
+
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = (remoteFunction as any).allIssues?.() ?? [];
+        const issues = (rf as any).allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(m.please_fix_validation());
         }
@@ -86,16 +89,16 @@
         }
         return JSON.stringify(c);
     });
+
+
 </script>
 
 <form
     class="space-y-4"
-    {...remoteFunction
-        .preflight(validationSchema)
-        .enhance(async ({ submit }: any) => {
+    {...rf.enhance(async ({ submit }: any) => {
             try {
                 await submit();
-                const result = (remoteFunction as any).result;
+                const result = (rf as any).result;
                 if (result?.error) {
                     toast.error(
                         result.error.message || m.something_went_wrong(),
@@ -110,22 +113,22 @@
             }
         })}
 >
-    {#if isUpdating && initialData}
-        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
+    {#if isUpdating && initialData?.id}
+        <input {...rf.fields.id.as("text", initialData.id)} class="hidden" />
     {/if}
 
-    <input {...remoteFunction.fields.claims.as("hidden", claimsJson)} />
+    <input {...rf.fields.claims.as("text", claimsJson)} class="hidden" />
 
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
         <input
-            {...remoteFunction.fields.name.as("text", initialData?.name ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(remoteFunction.fields.name.issues()?.length ?? 0) > 0
+            {...rf.fields.name.as("text", initialData?.name ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.name.issues()?.length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
-        {#each remoteFunction.fields.name.issues() ?? [] as issue}
+        {#each rf.fields.name.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>
@@ -133,13 +136,13 @@
     <label class="block">
         <span class="text-sm font-medium text-gray-700 mb-2">{m.email_address()}</span>
         <input
-            {...remoteFunction.fields.email.as("email", initialData?.email ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(remoteFunction.fields.email.issues()?.length ?? 0) > 0
+            {...rf.fields.email.as("email", initialData?.email ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.email.issues()?.length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
-        {#each remoteFunction.fields.email.issues() ?? [] as issue}
+        {#each rf.fields.email.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{issue.message}</p>
         {/each}
     </label>

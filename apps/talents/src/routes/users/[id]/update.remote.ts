@@ -1,6 +1,6 @@
 import { form } from '$app/server';
-import { db, user } from '$lib/server/db';
-import { eq } from '$lib/server/db';
+import { db, user } from '@ac/db';
+import { eq } from '@ac/db';
 import { listUsers } from '../list.remote';
 import { readUser } from './read.remote';
 import { getAuthenticatedUser, ensureAccess, parseRoles } from '$lib/server/authorization';

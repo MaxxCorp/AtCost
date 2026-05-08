@@ -1,8 +1,8 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { resource, resourceLocation, location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { desc, getTableColumns, and, inArray, eq } from 'drizzle-orm';
+import { desc, getTableColumns, and, inArray, eq } from '@ac/db';
 import { resourcePaginationSchema as PaginationSchema, type Resource, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
 
@@ -20,7 +20,7 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
     
     const conditions = [];
     if (search) {
-        const { ilike } = await import('drizzle-orm');
+        const { ilike } = await import('@ac/db');
         conditions.push(ilike(resource.name, `%${search}%`));
     }
 
@@ -34,7 +34,7 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
         baseQuery = baseQuery.where(and(...conditions)) as any;
     }
 
-    const { sql } = await import('drizzle-orm');
+    const { sql } = await import('@ac/db');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 

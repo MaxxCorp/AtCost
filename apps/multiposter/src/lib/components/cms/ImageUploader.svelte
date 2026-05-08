@@ -6,7 +6,7 @@
         Upload,
         Camera,
         X,
-        Image as ImageIcon,
+        FileImage as ImageIcon,
         Loader2,
         Trash2,
     } from "@lucide/svelte";
@@ -18,11 +18,29 @@
         id = "image-uploader",
         onchange
     }: {
-        value?: string;
+        value?: string | null;
         label?: string;
         id?: string;
         onchange?: (value: string) => void;
     } = $props();
+
+    // Local state to ensure we always have primitives in the template
+    let localValue = $state("");
+    let localLabel = $state("");
+    let localId = $state("image-uploader");
+
+    // Sync from props to local state
+    $effect(() => {
+        // Use $state.snapshot to get the raw value and String() to guarantee string type
+        const rawValue = $state.snapshot(value);
+        localValue = typeof rawValue === 'string' ? rawValue : "";
+        
+        const rawLabel = $state.snapshot(label);
+        localLabel = typeof rawLabel === 'string' ? rawLabel : "";
+        
+        const rawId = $state.snapshot(id);
+        localId = typeof rawId === 'string' ? rawId : "image-uploader";
+    });
 
     let isDragging = $state(false);
     let isUploading = $state(false);
@@ -143,9 +161,9 @@
 </script>
 
 <div class="space-y-2">
-    {#if label}
-        <label for={id} class="block text-sm font-medium text-gray-700"
-            >{label}</label
+    {#if localLabel}
+        <label for={localId} class="block text-sm font-medium text-gray-700"
+            >{localLabel}</label
         >
     {/if}
 
@@ -202,10 +220,10 @@
                     ></button>
                 </div>
             </div>
-        {:else if value}
+        {:else if localValue}
             <div class="relative group w-full h-full p-2">
                 <img
-                    src={value}
+                    src={localValue}
                     alt="Preview"
                     class="w-full h-auto max-h-[400px] object-contain rounded-md shadow-sm"
                 />

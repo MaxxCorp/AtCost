@@ -140,6 +140,9 @@
 			p.description.toLowerCase().includes(searchTerm.toLowerCase())
 		)
 	);
+
+
+
 	let providerId = $state("");
 	let direction = $state<"pull" | "push" | "bidirectional">("bidirectional");
 	let calendarId = $state("primary");
@@ -178,9 +181,10 @@
 
 
 	let prevIssuesLength = $state(0);
-	const fields = create.fields as any;
+	const rf = create.preflight(createSynchronizationSchema);
+	const fields = rf.fields as any;
 	$effect(() => {
-		const issues = (create as any).allIssues?.() ?? [];
+		const issues = (rf as any).allIssues?.() ?? [];
 		if (issues.length > 0 && prevIssuesLength === 0) {
 			toast.error(m.please_fix_validation());
 		}
@@ -204,9 +208,7 @@
 
 	<form
 		class="space-y-4"
-		{...create
-			.preflight(createSynchronizationSchema)
-			.enhance(async ({ submit }) => {
+		{...rf.enhance(async ({ submit }) => {
 				const result: any = await submit();
 				if (result?.error) {
 					toast.error(
@@ -329,11 +331,11 @@
 							value={providerId}
 							name="name"
 							placeholder="e.g., my-work-calendar"
-							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(fields.name.issues()?.length ?? 0) > 0
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {fields.name.issues()?.length > 0
 								? 'border-red-500'
 								: ''}"
 							oninput={(e) => (providerId = e.currentTarget.value)}
-							onblur={() => create.validate()}
+							onblur={() => rf.validate()}
 						/>
 						{#each fields.name.issues() ?? [] as issue}
 							<p class="text-xs text-red-600 mt-1">

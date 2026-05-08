@@ -1,6 +1,6 @@
 import { query } from '$app/server';
-import { db } from '$lib/server/db';
-import { eq, and, or, gte, lte, desc, isNull, inArray, ilike } from 'drizzle-orm';
+import { db } from '@ac/db';
+import { eq, and, or, gte, lte, desc, isNull, inArray, ilike } from '@ac/db';
 import { event, eventContact, contact, contactEmail, contactPhone, contactAddress, eventResource, resource, location, kiosk, kioskLocation, eventLocation, contactTag, tag, locationContact, eventTag } from '@ac/db';
 import * as v from 'valibot';
 import { type Event, type PublicEvent, type PaginatedResult } from '@ac/validations';

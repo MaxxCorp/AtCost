@@ -236,7 +236,7 @@
         })}
 >
     {#if isUpdating && initialData?.id}
-        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
+        <input {...remoteFunction.fields.id.as("text", initialData.id)} class="hidden" />
     {/if}
 
     <label class="block">

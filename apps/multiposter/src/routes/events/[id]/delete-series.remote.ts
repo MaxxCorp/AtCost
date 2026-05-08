@@ -1,7 +1,7 @@
 import { command } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
-import { eq, or } from 'drizzle-orm';
+import { eq, or } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';

@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db, shiftPlanTemplateTalent, talent, contact, contactEmail } from '$lib/server/db';
+import { db, shiftPlanTemplateTalent, talent, contact, contactEmail } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { eq, and } from '$lib/server/db';
+import { eq, and } from '@ac/db';
 import * as v from 'valibot';
 
 const entityArgs = v.object({ 

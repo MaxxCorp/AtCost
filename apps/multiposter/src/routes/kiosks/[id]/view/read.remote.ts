@@ -1,9 +1,9 @@
 import { query } from '$app/server';
 import { listKioskEvents } from '../../../events/list-public.remote';
 import { listKioskAnnouncements } from '../../../announcements/list.remote';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
-import { eq } from 'drizzle-orm';
+import { eq } from '@ac/db';
 import * as v from 'valibot';
 
 export const readKioskView = query(v.string(), async (kioskId) => {

@@ -1,8 +1,8 @@
 import { form } from '$app/server';
 import { error } from "@sveltejs/kit";
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createEventSchema } from '$lib/validations/events';

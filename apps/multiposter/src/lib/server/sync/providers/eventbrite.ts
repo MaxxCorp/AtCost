@@ -6,9 +6,9 @@ import type {
 	SyncDirection
 } from '../types';
 import { env } from '$env/dynamic/private';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { account } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '@ac/db';
 
 /**
  * Eventbrite sync provider implementation

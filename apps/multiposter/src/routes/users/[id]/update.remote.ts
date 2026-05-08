@@ -1,7 +1,7 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { user } from '@ac/db';
-import { eq } from 'drizzle-orm';
+import { eq } from '@ac/db';
 import { listUsers } from '../list.remote';
 import { readUser } from './read.remote';
 import { getAuthenticatedUser, ensureAccess, parseRoles } from '$lib/server/authorization';

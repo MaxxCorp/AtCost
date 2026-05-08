@@ -1,5 +1,5 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { tag } from '@ac/db';
 import { ensureAccess, getAuthenticatedUser } from '$lib/server/authorization';
 import * as v from 'valibot';

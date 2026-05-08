@@ -23,9 +23,7 @@
     </div>
 
     <form
-        {...createEvent
-            .preflight(createEventSchema)
-            .enhance(async ({ submit }: any) => {
+        {...createEvent.preflight(createEventSchema).enhance(async ({ submit }: any) => {
                 try {
                     const result: any = await submit();
                     if (result?.error) {
@@ -44,6 +42,7 @@
     >
         <EventForm
             remoteFunction={createEvent}
+            validationSchema={createEventSchema}
         />
 
         <div class="flex gap-3 pt-4">

@@ -1,7 +1,7 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateKioskSchema } from '$lib/validations/kiosks';
 import { getKiosk } from './read.remote';

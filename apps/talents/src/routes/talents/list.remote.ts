@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, talent, contact, eq, desc, inArray, ilike, or, and, sql, talentTimelineEntry, userContact, user } from '$lib/server/db';
+import { db, talent, contact, eq, desc, inArray, ilike, or, and, sql, talentTimelineEntry, userContact, user } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { talentPaginationSchema as PaginationSchema, type PaginatedResult } from '@ac/validations';
 

@@ -3,8 +3,13 @@ import * as v from 'valibot';
 export const PaginationBaseSchema = v.object({
     page: v.optional(v.number(), 1),
     limit: v.optional(v.number(), 50),
-    search: v.optional(v.string())
+    search: v.optional(v.string()),
+    associatedWith: v.optional(v.object({
+        type: v.string(),
+        id: v.string()
+    }))
 });
+
 
 export const PaginationSchema = v.optional(PaginationBaseSchema, {});
 

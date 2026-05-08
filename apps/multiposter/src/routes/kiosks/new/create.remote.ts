@@ -1,5 +1,5 @@
 import { form } from '$app/server';
-import { db } from '$lib/server/db';
+import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createKioskSchema } from '$lib/validations/kiosks';

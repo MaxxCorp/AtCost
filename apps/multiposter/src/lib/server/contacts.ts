@@ -1,8 +1,7 @@
-import { db } from './db';
+import { db } from '@ac/db';
 import {
-    contact, contactEmail, contactPhone, contactAddress
-} from './db/schema';
-import { eq } from 'drizzle-orm';
+    contact, contactEmail, contactPhone, contactAddress, eq
+} from '@ac/db';
 import { getRequestEvent } from '$app/server';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';
@@ -24,7 +23,7 @@ function getFingerprint(content: string | Buffer): string {
  */
 export async function generateContactAssets(contactId: string, origin?: string) {
     const data = await db.query.contact.findFirst({
-        where: (table, { eq }) => eq(table.id, contactId),
+        where: (table: any, { eq }: any) => eq(table.id, contactId),
         with: {
             emails: true,
             phones: true,

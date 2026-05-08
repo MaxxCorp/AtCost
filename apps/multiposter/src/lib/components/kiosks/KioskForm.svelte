@@ -83,9 +83,12 @@
  
 
 
+    // svelte-ignore state_referenced_locally
+    const rf = (remoteFunction as any).preflight(validationSchema);
+
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = (remoteFunction as any).allIssues?.() ?? [];
+        const issues = (rf as any).allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(m.please_fix_validation());
         }
@@ -146,9 +149,7 @@
 
 <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
     <form
-        {...remoteFunction
-            .preflight(validationSchema)
-            .enhance(async ({ submit }: any) => {
+        {...rf.enhance(async ({ submit }: any) => {
                 try {
                     const result: any = await submit();
                     if (result?.error) {
@@ -167,8 +168,8 @@
             })}
         class="space-y-6"
     >
-        {#if isUpdating && initialData}
-            <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
+        {#if isUpdating && initialData?.id}
+            <input {...rf.fields.id.as("text", initialData.id)} class="hidden" />
         {/if}
 
         <div class="space-y-2">
@@ -176,12 +177,12 @@
                 >{m.kiosk_name()}</label
             >
             <input
-                {...remoteFunction.fields.name.as("text", initialData?.name ?? "")}
+                {...rf.fields.name.as("text", initialData?.name ?? "")}
                 placeholder={m.kiosk_name_placeholder()}
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                onblur={() => remoteFunction.validate()}
+                onblur={() => rf.validate()}
             />
-            {#each remoteFunction.fields.name.issues() ?? [] as issue}
+            {#each rf.fields.name.issues() ?? [] as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </div>
@@ -193,10 +194,10 @@
                 >{m.description()} ({m.other_label()})</label
             >
             <textarea
-                {...remoteFunction.fields.description.as("text", initialData?.description ?? "")}
+                {...rf.fields.description.as("text", initialData?.description ?? "")}
                 rows="3"
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                onblur={() => remoteFunction.validate()}
+                onblur={() => rf.validate()}
             ></textarea>
         </div>
 
@@ -316,14 +317,14 @@
                         />
                     {/snippet}
                 </EntityManager>
-                <!-- Hidden input for submission -->
                 <input
-                    {...remoteFunction.fields.locationIds.as(
-                        "hidden",
+                    {...rf.fields.locationIds.as(
+                        "text",
                         JSON.stringify(selectedLocationIds),
                     )}
+                    class="hidden"
                 />
-                {#each remoteFunction.fields.locationIds.issues() ?? [] as issue}
+                {#each rf.fields.locationIds.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             {/if}
@@ -345,11 +346,11 @@
                         >{m.visualization()}</label
                     >
                     <select
-                        {...remoteFunction.fields.uiMode.as("text")}
+                        {...rf.fields.uiMode.as("text", uiMode)}
                         value={uiMode}
                         onchange={(e) => {
                             uiMode = e.currentTarget.value;
-                            remoteFunction.validate();
+                            rf.validate();
                         }}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
@@ -365,11 +366,11 @@
                         >{m.time_range_mode()}</label
                     >
                     <select
-                        {...remoteFunction.fields.rangeMode.as("text")}
+                        {...rf.fields.rangeMode.as("text", rangeMode)}
                         value={rangeMode}
                         onchange={(e) => {
                             rangeMode = e.currentTarget.value as any;
-                            remoteFunction.validate();
+                            rf.validate();
                         }}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
@@ -387,13 +388,14 @@
                     >{m.loop_duration_seconds()}</label
                 >
                 <input
-                    {...remoteFunction.fields.loopDuration.as("number", initialData?.loopDuration ?? 5)}
+                    {...rf.fields.loopDuration.as("number", initialData?.loopDuration ?? 5)}
                     min="3"
                     required
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                    onblur={() => rf.validate()}
                 />
                 <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
-                {#each remoteFunction.fields.loopDuration.issues() as issue}
+                {#each rf.fields.loopDuration.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -406,12 +408,13 @@
                         >{m.look_ahead_days()}</label
                     >
                     <input
-                        {...remoteFunction.fields.lookAheadDays.as("number", lookAheadDays)}
+                        {...rf.fields.lookAheadDays.as("number", lookAheadDays)}
                         min="0"
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        onblur={() => rf.validate()}
                     />
-                    {#each remoteFunction.fields.lookAheadDays.issues() as issue}
+                    {#each rf.fields.lookAheadDays.issues() ?? [] as issue}
                         <p class="mt-1 text-sm text-red-600">
                             {issue.message}
                         </p>
@@ -425,12 +428,13 @@
                         >{m.look_past_days()}</label
                     >
                     <input
-                        {...remoteFunction.fields.lookPastDays.as("number", lookPastDays)}
+                        {...rf.fields.lookPastDays.as("number", lookPastDays)}
                         min="0"
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        onblur={() => rf.validate()}
                     />
-                    {#each remoteFunction.fields.lookPastDays.issues() as issue}
+                    {#each rf.fields.lookPastDays.issues() ?? [] as issue}
                         <p class="mt-1 text-sm text-red-600">
                             {issue.message}
                         </p>
@@ -456,41 +460,6 @@
                         >
                             {m.next_month()}
                         </button>
-                        <button
-                            type="button"
-                            class="text-xs bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-md transition-colors"
-                            onclick={() => {
-                                const now = new Date();
-                                const start = new Date(
-                                    now.getFullYear(),
-                                    now.getMonth(),
-                                    now.getDate(),
-                                    0,
-                                    0,
-                                );
-                                startDate = formatForInput(start);
-                            }}
-                        >
-                            {m.reset_start_time()}
-                        </button>
-                        <button
-                            type="button"
-                            class="text-xs bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-md transition-colors"
-                            onclick={() => {
-                                const val = endDate ? new Date(endDate) : new Date();
-                                const end = new Date(
-                                    val.getFullYear(),
-                                    val.getMonth(),
-                                    val.getDate(),
-                                    23,
-                                    59,
-                                    33,
-                                );
-                                endDate = formatForInput(end);
-                            }}
-                        >
-                            {m.reset_end_time()}
-                        </button>
                     </div>
                 </div>
 
@@ -501,15 +470,18 @@
                         >{m.start_date()}</label
                     >
                     <input
-                        {...remoteFunction.fields.startDate.as("datetime-local")}
+                        {...rf.fields.startDate.as("datetime-local", startDate)}
                         value={startDate}
                         oninput={(e) => {
                             startDate = e.currentTarget.value;
-                            remoteFunction.validate();
+                            rf.validate();
                         }}
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
+                    {#each rf.fields.startDate.issues() ?? [] as issue}
+                        <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    {/each}
                 </div>
 
                 <div class="space-y-2">
@@ -519,15 +491,18 @@
                         >{m.end_date()}</label
                     >
                     <input
-                        {...remoteFunction.fields.endDate.as("datetime-local")}
+                        {...rf.fields.endDate.as("datetime-local", endDate)}
                         value={endDate}
                         oninput={(e) => {
                             endDate = e.currentTarget.value;
-                            remoteFunction.validate();
+                            rf.validate();
                         }}
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
+                    {#each rf.fields.endDate.issues() ?? [] as issue}
+                        <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    {/each}
                 </div>
             {/if}
         </div>
@@ -536,7 +511,7 @@
             <Button href="/kiosks" variant="outline" type="button"
                 >{m.cancel()}</Button
             >
-            <AsyncButton type="submit" loading={remoteFunction.pending}>
+            <AsyncButton type="submit" loading={rf.pending}>
                 {isUpdating ? m.save_changes() : m.create_kiosk()}
             </AsyncButton>
         </div>

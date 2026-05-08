@@ -2,8 +2,8 @@ import * as v from 'valibot';
 import { query } from '$app/server';
 import { campaign } from '@ac/db';
 import type { Campaign as DbCampaign } from '@ac/db';
-import { db } from '$lib/server/db';
-import { desc } from 'drizzle-orm';
+import { db } from '@ac/db';
+import { desc } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
 /**
@@ -27,16 +27,16 @@ export const listCampaigns = query(PaginationSchema, async (input): Promise<Pagi
 	
 	const conditions = [];
 	if (search) {
-		const { ilike } = await import('drizzle-orm');
+		const { ilike } = await import('@ac/db');
 		conditions.push(ilike(campaign.name, `%${search}%`));
 	}
 
 	if (conditions.length > 0) {
-		const { and } = await import('drizzle-orm');
+		const { and } = await import('@ac/db');
 		baseQuery = baseQuery.where(and(...conditions as any)) as any;
 	}
 
-	const { sql } = await import('drizzle-orm');
+	const { sql } = await import('@ac/db');
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
 	const total = Number(countResult[0]?.count || 0);
 
