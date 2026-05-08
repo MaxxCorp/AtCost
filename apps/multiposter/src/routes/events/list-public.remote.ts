@@ -308,11 +308,10 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
             const workEmails = emails.filter(e => e.contactId === chosenContactId && e.type === 'work');
             const workPhones = phones.filter(p => p.contactId === chosenContactId && p.type === 'work');
 
-            let publicQrCodePath = chosenContactDetails.qrCodePath || undefined;
-            if (publicQrCodePath && !publicQrCodePath.includes('_public')) {
-                publicQrCodePath = publicQrCodePath.replace('/qr.png', '/qr_public.png');
+            let publicQrCodePath = chosenContactDetails.qrCodePath;
+            if (!publicQrCodePath || !publicQrCodePath.includes('/api/')) {
+                publicQrCodePath = `/api/contacts/${chosenContactId}/qr.png`;
             }
-
             resolvedContact = {
                 name: chosenContactDetails.displayName || `${chosenContactDetails.givenName || ''} ${chosenContactDetails.familyName || ''}`.trim(),
                 company: chosenContactDetails.company,

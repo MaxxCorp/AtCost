@@ -64,16 +64,21 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
         const workEmails = result.emails?.filter((e: any) => e.type?.toLowerCase() === 'work') || [];
         const workPhones = result.phones?.filter((p: any) => p.type?.toLowerCase() === 'work') || [];
         const workAddresses = result.addresses?.filter((a: any) => a.type?.toLowerCase() === 'work') || [];
-
-        // Use public versions of files (replace paths with _public suffix versions)
+        // Use dynamic API paths
         let publicQrCodePath = result.qrCodePath;
         let publicVCardPath = result.vCardPath;
 
-        if (publicQrCodePath && !publicQrCodePath.includes('_public')) {
-            publicQrCodePath = publicQrCodePath.replace('/qr.png', '/qr_public.png');
+        // Ensure paths point to the dynamic API
+        if (!publicQrCodePath || !publicQrCodePath.includes('/api/')) {
+            publicQrCodePath = `/api/contacts/${id}/qr.png`;
         }
-        if (publicVCardPath && !publicVCardPath.includes('_public')) {
-            publicVCardPath = publicVCardPath.replace('.vcf', '_public.vcf');
+        if (!publicVCardPath || !publicVCardPath.includes('/api/')) {
+            publicVCardPath = `/api/contacts/${id}/contact.vcf`;
+        }
+
+        // For public view, append public query param to vCard
+        if (publicVCardPath && !publicVCardPath.includes('public')) {
+            publicVCardPath += '?public';
         }
 
         return {
@@ -103,9 +108,10 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
         };
     }
 
-    // Full data for authorized users
     return {
         ...result,
+        vCardPath: result.vCardPath?.includes('/api/') ? result.vCardPath : `/api/contacts/${id}/contact.vcf`,
+        qrCodePath: result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/contacts/${id}/qr.png`,
         tags: result.tags.map((t: any) => ({
             id: t.tag.id,
             name: t.tag.name

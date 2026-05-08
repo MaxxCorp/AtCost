@@ -89,9 +89,8 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
             ) || loc.locationContacts[0];
 
             let publicContactQrCodePath: string | null = null;
-            if (employeeLocContact?.contact?.qrCodePath) {
-                const path = employeeLocContact.contact.qrCodePath;
-                publicContactQrCodePath = path.includes('_public') ? path : path.replace('/qr.png', '/qr_public.png');
+            if (employeeLocContact?.contact?.id) {
+                publicContactQrCodePath = `/api/contacts/${employeeLocContact.contact.id}/qr.png`;
             }
 
             return {

@@ -5,13 +5,6 @@ import {
 import { getRequestEvent } from '$app/server';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';
-import { getStorageProvider } from './blob-storage';
-import { env } from '$env/dynamic/private';
-import { createHash } from 'crypto';
-
-function getFingerprint(content: string | Buffer): string {
-    return createHash('sha256').update(content).digest('hex');
-}
 
 /**
  * Backend logic for managing contacts and their associations.
@@ -149,65 +142,13 @@ export async function generateContactAssets(contactId: string, origin?: string) 
         }
     });
 
-    const storage = getStorageProvider();
-    const fullNameSlug = fullName.replace(/\s+/g, '_');
+    const vCardUrl = `/api/contacts/${contactId}/contact.vcf`;
+    const qrCodeUrl = `/api/contacts/${contactId}/qr.png`;
 
-    const oldVCardPath = data.vCardPath;
-    const oldQrCodePath = data.qrCodePath;
-    const fingerprints = (data.fingerprints as Record<string, string>) || {};
-    const newFingerprints = { ...fingerprints };
-
-    // Full vCard Upload
-    const vCardContent = card.toString();
-    const vCardFingerprint = getFingerprint(vCardContent);
-    const vCardFileName = `contacts/${contactId}/${fullNameSlug}.vcf`;
-    
-    let vCardUrl = oldVCardPath;
-    if (vCardFingerprint !== fingerprints.vcard || !oldVCardPath || !oldVCardPath.includes(fullNameSlug)) {
-        vCardUrl = (await storage.put(vCardFileName, vCardContent, 'text/vcard')) ?? null;
-        newFingerprints.vcard = vCardFingerprint;
-    }
-
-    // Public vCard Upload
-    const publicVCardContent = publicCard.toString();
-    const publicVCardFingerprint = getFingerprint(publicVCardContent);
-    const publicVCardFileName = `contacts/${contactId}/${fullNameSlug}_public.vcf`;
-    
-    if (publicVCardFingerprint !== fingerprints.vcard_public) {
-        await storage.put(publicVCardFileName, publicVCardContent, 'text/vcard');
-        newFingerprints.vcard_public = publicVCardFingerprint;
-    }
-
-    // QR Code generation — resolve base URL with multiple fallbacks
-    const baseUrl = env.PUBLIC_BASE_URL || origin || env.BETTER_AUTH_URL || "";
-    const contactUrl = `${baseUrl}/contacts/${contactId}/view`;
-    const contactUrlFingerprint = getFingerprint(contactUrl);
-
-    let qrCodeUrl = oldQrCodePath;
-    if (contactUrlFingerprint !== fingerprints.qrcode || !oldQrCodePath) {
-        // Generate QR as Buffer
-        const qrBuffer = await QRCode.toBuffer(contactUrl, {
-            width: 300,
-            margin: 2,
-            color: { dark: '#1e40af', light: '#ffffff' }
-        });
-
-        const qrCodeFileName = `contacts/${contactId}/qr.png`;
-        qrCodeUrl = (await storage.put(qrCodeFileName, qrBuffer, 'image/png')) ?? null;
-
-        const publicQrCodeFileName = `contacts/${contactId}/qr_public.png`;
-        await storage.put(publicQrCodeFileName, qrBuffer, 'image/png');
-        
-        newFingerprints.qrcode = contactUrlFingerprint;
-    }
-
-    // Update paths and fingerprints in DB
+    // Update paths in DB if they are not already set to the local API paths
     const updateData: any = {};
-    if (vCardUrl && vCardUrl !== oldVCardPath) updateData.vCardPath = vCardUrl;
-    if (qrCodeUrl && qrCodeUrl !== oldQrCodePath) updateData.qrCodePath = qrCodeUrl;
-    if (JSON.stringify(newFingerprints) !== JSON.stringify(fingerprints)) {
-        updateData.fingerprints = newFingerprints;
-    }
+    if (data.vCardPath !== vCardUrl) updateData.vCardPath = vCardUrl;
+    if (data.qrCodePath !== qrCodeUrl) updateData.qrCodePath = qrCodeUrl;
 
     if (Object.keys(updateData).length > 0) {
         await db.update(contact)
@@ -215,9 +156,6 @@ export async function generateContactAssets(contactId: string, origin?: string) 
             .where(eq(contact.id, contactId));
     }
 
-    // Clean up old assets if paths changed
-    if (oldVCardPath && vCardUrl && oldVCardPath !== vCardUrl) await storage.delete(oldVCardPath);
-    if (oldQrCodePath && qrCodeUrl && oldQrCodePath !== qrCodeUrl) await storage.delete(oldQrCodePath);
 }
 
 

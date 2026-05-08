@@ -30,8 +30,8 @@ export const deleteContact = command(deleteContactsSchema, async (ids) => {
     // Clean up assets for deleted contacts
     for (const contactItem of contactsToDelete) {
         if (deletedIds.includes(contactItem.id)) {
-            if (contactItem.vCardPath) await storage.delete(contactItem.vCardPath);
-            if (contactItem.qrCodePath) await storage.delete(contactItem.qrCodePath);
+            if (contactItem.vCardPath && contactItem.vCardPath.startsWith('http')) await storage.delete(contactItem.vCardPath);
+            if (contactItem.qrCodePath && contactItem.qrCodePath.startsWith('http')) await storage.delete(contactItem.qrCodePath);
         }
     }
 

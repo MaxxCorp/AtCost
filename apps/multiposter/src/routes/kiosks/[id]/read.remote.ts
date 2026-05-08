@@ -83,7 +83,7 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
                     name: contactDetails.displayName || `${contactDetails.givenName || ''} ${contactDetails.familyName || ''}`.trim(),
                     email: contactDetails.emails[0]?.value,
                     phone: contactDetails.phones[0]?.value,
-                    qrCodePath: contactDetails.qrCodePath ? (contactDetails.qrCodePath.includes('_public') ? contactDetails.qrCodePath : contactDetails.qrCodePath.replace('/qr.png', '/qr_public.png')) : undefined,
+                    qrCodePath: `/api/contacts/${contactDetails.id}/qr.png`,
                 } : null
             };
         }),

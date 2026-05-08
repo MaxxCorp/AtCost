@@ -40,10 +40,10 @@ export const deleteEvents = command(v.array(v.string()), async (ids: string[]) =
   // Clean up assets from storage
   const storage = getStorageProvider();
   for (const eventItem of eventsToDelete) {
-    if (eventItem.qrCodePath) {
+    if (eventItem.qrCodePath && eventItem.qrCodePath.startsWith('http')) {
       await storage.delete(eventItem.qrCodePath);
     }
-    if (eventItem.iCalPath) {
+    if (eventItem.iCalPath && eventItem.iCalPath.startsWith('http')) {
       await storage.delete(eventItem.iCalPath);
     }
   }

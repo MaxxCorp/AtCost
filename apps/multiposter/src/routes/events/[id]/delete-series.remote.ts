@@ -64,8 +64,8 @@ export const deleteSeries = command(
 
             // Clean up assets
             for (const e of seriesEvents) {
-                if (e.qrCodePath) await storage.delete(e.qrCodePath);
-                if (e.iCalPath) await storage.delete(e.iCalPath);
+                if (e.qrCodePath && e.qrCodePath.startsWith('http')) await storage.delete(e.qrCodePath);
+                if (e.iCalPath && e.iCalPath.startsWith('http')) await storage.delete(e.iCalPath);
             }
 
             console.log(`Deleted ${seriesEvents.length} events and series record ${targetEvent.seriesId}`);
@@ -101,8 +101,8 @@ export const deleteSeries = command(
             // Clean up legacy assets
             const legacyToClean = legacyEvents.filter(e => legacyIds.includes(e.id));
             for (const e of legacyToClean) {
-                if (e.qrCodePath) await storage.delete(e.qrCodePath);
-                if (e.iCalPath) await storage.delete(e.iCalPath);
+                if (e.qrCodePath && e.qrCodePath.startsWith('http')) await storage.delete(e.qrCodePath);
+                if (e.iCalPath && e.iCalPath.startsWith('http')) await storage.delete(e.iCalPath);
             }
 
             // Delete master and all instances

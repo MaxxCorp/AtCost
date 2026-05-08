@@ -80,7 +80,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				name, 
 				email: primaryEmail, 
 				phone: primaryPhone,
-				qrCodeDataUrl: c.qrCodePath || undefined
+				qrCodeDataUrl: c.qrCodePath?.includes('/api/') ? c.qrCodePath : `/api/contacts/${c.id}/qr.png`
 			};
 		}
 	}
@@ -115,6 +115,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	// Full object
 	return {
 		...result,
+		iCalPath: result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`,
+		qrCodePath: result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`,
 		createdAt: result.createdAt.toISOString(),
 		updatedAt: result.updatedAt.toISOString(),
 		startDateTime: result.startDateTime?.toISOString() ?? null,

@@ -400,7 +400,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
 						email: c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '',
 						phone: c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '',
-						qrCodeDataUrl: c.qrCodePath || undefined
+						qrCodeDataUrl: c.qrCodePath?.includes('/api/') ? c.qrCodePath : `/api/contacts/${c.id}/qr.png`
 					};
 				}
 

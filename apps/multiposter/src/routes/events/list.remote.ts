@@ -82,6 +82,8 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 
 	const results = rawResults.map((row) => ({
 		...row,
+		iCalPath: row.iCalPath?.includes('/api/') ? row.iCalPath : `/api/events/${row.id}/event.ics`,
+		qrCodePath: row.qrCodePath?.includes('/api/') ? row.qrCodePath : `/api/events/${row.id}/qr.png`,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 		startDateTime: row.startDateTime?.toISOString() ?? null,

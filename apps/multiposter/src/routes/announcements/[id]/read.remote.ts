@@ -65,7 +65,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 				name, 
 				email: primaryEmail, 
 				phone: primaryPhone,
-				qrCodeDataUrl: c.qrCodePath || undefined
+				qrCodeDataUrl: c.qrCodePath?.includes('/api/') ? c.qrCodePath : `/api/contacts/${c.id}/qr.png`
 			};
 		}
 	}
