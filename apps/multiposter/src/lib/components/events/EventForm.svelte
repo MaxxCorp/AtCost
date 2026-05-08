@@ -352,7 +352,8 @@
             <TagIcon size={16} class="text-indigo-500" />
             {m.tags()}
         </h3>
-        <EntityManager
+        {#key initialData?.id || "new"}
+            <EntityManager
             title={m.tags()}
             icon={TagIcon}
             mode="embedded"
@@ -466,105 +467,108 @@
                 </form>
             {/snippet}
         </EntityManager>
+        {/key}
     </div>
 
     <div>
         <span class="block text-sm font-medium text-gray-700 mb-2"
             >{m.feature_resources_title()} ({m.optional()})</span
         >
-        <EntityManager
-            title={m.feature_resources_title()}
-            icon={Database}
-            mode="embedded"
-            type="event"
-            entityId={initialData?.id}
-            listItemsRemote={listResourcesWithHierarchy as any}
-            fetchAssociationsRemote={fetchEntityResources as any}
-            addAssociationRemote={async (p: any) =>
-                addResourceAssociation({ ...p, resourceId: p.itemId } as any)}
-            removeAssociationRemote={async (p: any) =>
-                removeResourceAssociation({ ...p, resourceId: p.itemId } as any)}
-            onchange={(ids: string[]) =>
-                rf.fields.resourceIds.set(JSON.stringify(ids))}
-            deleteItemRemote={async (ids: string[]) => {
-                return await handleDelete({
-                    ids,
-                    deleteFn: deleteResourceRemote,
-                    itemName: m.feature_resources_title().toLowerCase(),
-                });
-            }}
-            createRemote={createResource}
-            createSchema={createResourceSchema}
-            updateRemote={updateResource}
-            updateSchema={updateResourceSchema}
-            getFormData={(r: any) => r}
-            searchPredicate={(r: any, q: string) =>
-                r.name.toLowerCase().includes(q.toLowerCase())}
-            loadingLabel={m.loading_item({
-                item: m.feature_resources_title().toLowerCase(),
-            })}
-            noItemsLabel={m.no_items_associated_label({
-                item: m.feature_resources_title().toLowerCase(),
-            })}
-            searchPlaceholder={m.search_placeholder({
-                item: m.feature_resources_title().toLowerCase(),
-            })}
-            linkItemLabel={m.link_item_label({
-                item: m.feature_resources_title().toLowerCase(),
-            })}
-            associatedItemLabel={m.associated_item_label({
-                item: m.feature_resources_title().toLowerCase(),
-            })}
-            quickCreateLabel={m.quick_create()}
-            closeSearchLabel={m.close_search()}
-            editLabel={m.edit()}
-            deleteLabel={m.delete()}
-            unlinkLabel={m.unlink()}
-            selectAllLabel={m.select_all()}
-            deselectAllLabel={m.deselect_all()}
-        >
-            {#snippet renderItemLabel(resource: any)}
-                <span style="padding-left: {resource.level * 12}px">
-                    {resource.name}
-                    <span class="text-xs text-gray-500 font-normal ml-2">
-                        ({resource.type === "room"
-                            ? m.room_type_suffix()
-                            : m.equipment_type_suffix()})
+        {#key initialData?.id || "new"}
+            <EntityManager
+                title={m.feature_resources_title()}
+                icon={Database}
+                mode="embedded"
+                type="event"
+                entityId={initialData?.id}
+                listItemsRemote={listResourcesWithHierarchy as any}
+                fetchAssociationsRemote={fetchEntityResources as any}
+                addAssociationRemote={async (p: any) =>
+                    addResourceAssociation({ ...p, resourceId: p.itemId } as any)}
+                removeAssociationRemote={async (p: any) =>
+                    removeResourceAssociation({ ...p, resourceId: p.itemId } as any)}
+                onchange={(ids: string[]) =>
+                    rf.fields.resourceIds.set(JSON.stringify(ids))}
+                deleteItemRemote={async (ids: string[]) => {
+                    return await handleDelete({
+                        ids,
+                        deleteFn: deleteResourceRemote,
+                        itemName: m.feature_resources_title().toLowerCase(),
+                    });
+                }}
+                createRemote={createResource}
+                createSchema={createResourceSchema}
+                updateRemote={updateResource}
+                updateSchema={updateResourceSchema}
+                getFormData={(r: any) => r}
+                searchPredicate={(r: any, q: string) =>
+                    r.name.toLowerCase().includes(q.toLowerCase())}
+                loadingLabel={m.loading_item({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
+                noItemsLabel={m.no_items_associated_label({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
+                searchPlaceholder={m.search_placeholder({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
+                linkItemLabel={m.link_item_label({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
+                associatedItemLabel={m.associated_item_label({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
+                quickCreateLabel={m.quick_create()}
+                closeSearchLabel={m.close_search()}
+                editLabel={m.edit()}
+                deleteLabel={m.delete()}
+                unlinkLabel={m.unlink()}
+                selectAllLabel={m.select_all()}
+                deselectAllLabel={m.deselect_all()}
+            >
+                {#snippet renderItemLabel(resource: any)}
+                    <span style="padding-left: {resource.level * 12}px">
+                        {resource.name}
+                        <span class="text-xs text-gray-500 font-normal ml-2">
+                            ({resource.type === "room"
+                                ? m.room_type_suffix()
+                                : m.equipment_type_suffix()})
+                        </span>
                     </span>
-                </span>
-            {/snippet}
-            {#snippet renderForm({
-                remoteFunction: rfForm,
-                schema,
-                id,
-                initialData: formData,
-                onSuccess,
-                onCancel,
-            }: any)}
-                {#await Promise.all([listLocations(), listResources()])}
-                    <div class="p-4 flex justify-center">
-                        <LoadingSection />
-                    </div>
-                {:then [locs, ress]}
-                    <div class="p-4">
-                        <ResourceForm
-                            remoteFunction={rfForm}
-                            validationSchema={schema}
-                            isUpdating={!!id}
-                            initialData={formData}
-                            {onSuccess}
-                            {onCancel}
-                            locations={locs.data}
-                            allResources={ress.data}
-                        />
-                    </div>
-                {:catch error}
-                    <div class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center">
-                        {error.message || m.something_went_wrong()}
-                    </div>
-                {/await}
-            {/snippet}
-        </EntityManager>
+                {/snippet}
+                {#snippet renderForm({
+                    remoteFunction: rfForm,
+                    schema,
+                    id,
+                    initialData: formData,
+                    onSuccess,
+                    onCancel,
+                }: any)}
+                    {#await Promise.all([listLocations(), listResources()])}
+                        <div class="p-4 flex justify-center">
+                            <LoadingSection />
+                        </div>
+                    {:then [locs, ress]}
+                        <div class="p-4">
+                            <ResourceForm
+                                remoteFunction={rfForm}
+                                validationSchema={schema}
+                                isUpdating={!!id}
+                                initialData={formData}
+                                {onSuccess}
+                                {onCancel}
+                                locations={locs.data}
+                                allResources={ress.data}
+                            />
+                        </div>
+                    {:catch error}
+                        <div class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center">
+                            {error.message || m.something_went_wrong()}
+                        </div>
+                    {/await}
+                {/snippet}
+            </EntityManager>
+        {/key}
         <input
             {...rf.fields.resourceIds.as(
                 "text",
@@ -629,132 +633,134 @@
             <MapPin size={18} class="text-blue-600" />
             {m.feature_locations_title()}
         </h3>
-        <EntityManager
-            title={m.feature_locations_title()}
-            icon={MapPin}
-            mode="embedded"
-            {type}
-            entityId={initialData?.id}
-            listItemsRemote={listLocations as any}
-            fetchAssociationsRemote={fetchEntityLocations as any}
-            addAssociationRemote={async (p: any) =>
-                addLocationAssociation({ ...p, locationId: p.itemId } as any)}
-            removeAssociationRemote={async (p: any) =>
-                removeLocationAssociation({ ...p, locationId: p.itemId } as any)}
-            onchange={(ids: string[]) =>
-                rf.fields.locationIds.set(JSON.stringify(ids))}
-            deleteItemRemote={async (ids: string[]) => {
-                return await handleDelete({
-                    ids,
-                    deleteFn: deleteLocation,
-                    itemName: m.location_label().toLowerCase(),
-                });
-            }}
-            createRemote={createLocation}
-            createSchema={createLocationSchema}
-            updateRemote={updateLocation}
-            updateSchema={updateLocationSchema}
-            getFormData={(l: Location) => l}
-            searchPredicate={(l: Location, q: string) => {
-                return (
-                    l.name.toLowerCase().includes(q.toLowerCase()) ||
-                    (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false)
-                );
-            }}
-            loadingLabel={m.loading_item({
-                item: m.feature_locations_title(),
-            })}
-            noItemsLabel={m.no_items_associated_label({
-                item: m.feature_locations_title(),
-            })}
-            noItemsFoundLabel={m.no_items_found({
-                item: m.feature_locations_title(),
-            })}
-            searchPlaceholder={m.search_placeholder({
-                item: m.feature_locations_title(),
-            })}
-            linkItemLabel={m.link_item_label({
-                item: m.feature_locations_title(),
-            })}
-            associatedItemLabel={m.associated_item_label({
-                item: m.feature_locations_title(),
-            })}
-            quickCreateLabel={m.quick_create()}
-            closeSearchLabel={m.close_search()}
-            editLabel={m.edit()}
-            deleteLabel={m.delete()}
-            unlinkLabel={m.unlink()}
-            deleteForeverLabel={m.delete_forever({
-                item: m.location(),
-            })}
-            bulkDeleteLabel={m.delete_selected({ count: 0 })}
-            selectAllLabel={m.select_all()}
-            deselectAllLabel={m.deselect_all()}
-            confirmUnlinkLabel={m.confirm_unlink_label({
-                item: m.location(),
-            })}
-        >
-            {#snippet renderItemLabel(location: any)}
-                {location.name}
-                {location.roomId ? `(${location.roomId})` : ""}
-            {/snippet}
+        {#key initialData?.id || "new"}
+            <EntityManager
+                title={m.feature_locations_title()}
+                icon={MapPin}
+                mode="embedded"
+                {type}
+                entityId={initialData?.id}
+                listItemsRemote={listLocations as any}
+                fetchAssociationsRemote={fetchEntityLocations as any}
+                addAssociationRemote={async (p: any) =>
+                    addLocationAssociation({ ...p, locationId: p.itemId } as any)}
+                removeAssociationRemote={async (p: any) =>
+                    removeLocationAssociation({ ...p, locationId: p.itemId } as any)}
+                onchange={(ids: string[]) =>
+                    rf.fields.locationIds.set(JSON.stringify(ids))}
+                deleteItemRemote={async (ids: string[]) => {
+                    return await handleDelete({
+                        ids,
+                        deleteFn: deleteLocation,
+                        itemName: m.location_label().toLowerCase(),
+                    });
+                }}
+                createRemote={createLocation}
+                createSchema={createLocationSchema}
+                updateRemote={updateLocation}
+                updateSchema={updateLocationSchema}
+                getFormData={(l: Location) => l}
+                searchPredicate={(l: Location, q: string) => {
+                    return (
+                        l.name.toLowerCase().includes(q.toLowerCase()) ||
+                        (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false)
+                    );
+                }}
+                loadingLabel={m.loading_item({
+                    item: m.feature_locations_title(),
+                })}
+                noItemsLabel={m.no_items_associated_label({
+                    item: m.feature_locations_title(),
+                })}
+                noItemsFoundLabel={m.no_items_found({
+                    item: m.feature_locations_title(),
+                })}
+                searchPlaceholder={m.search_placeholder({
+                    item: m.feature_locations_title(),
+                })}
+                linkItemLabel={m.link_item_label({
+                    item: m.feature_locations_title(),
+                })}
+                associatedItemLabel={m.associated_item_label({
+                    item: m.feature_locations_title(),
+                })}
+                quickCreateLabel={m.quick_create()}
+                closeSearchLabel={m.close_search()}
+                editLabel={m.edit()}
+                deleteLabel={m.delete()}
+                unlinkLabel={m.unlink()}
+                deleteForeverLabel={m.delete_forever({
+                    item: m.location(),
+                })}
+                bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                selectAllLabel={m.select_all()}
+                deselectAllLabel={m.deselect_all()}
+                confirmUnlinkLabel={m.confirm_unlink_label({
+                    item: m.location(),
+                })}
+            >
+                {#snippet renderItemLabel(location: any)}
+                    {location.name}
+                    {location.roomId ? `(${location.roomId})` : ""}
+                {/snippet}
 
-            {#snippet renderForm({
-                remoteFunction: rf,
-                schema,
-                id,
-                initialData: formData = null,
-                onSuccess,
-                onCancel,
-            }: any)}
-                <LocationForm
-                    remoteFunction={rf}
-                    validationSchema={schema}
-                    isUpdating={!!id}
-                    initialData={formData}
-                    {onSuccess}
-                    {onCancel}
-                    labels={{
-                        name: m.location_name(),
-                        street: m.street(),
-                        houseNumber: m.house_number(),
-                        addressSuffix: m.address_suffix(),
-                        zip: m.zip_code(),
-                        city: m.city(),
-                        state: m.state_region(),
-                        country: m.country(),
-                        roomId: m.room_id(),
-                        latitude: m.latitude(),
-                        longitude: m.longitude(),
-                        what3words: m.what3words(),
-                        inclusivitySupport: m.inclusivity_support(),
-                        isPublic: m.public(),
-                        heroImage: m.hero_image(),
-                        saveChanges: m.save_changes(),
-                        createLocation: m.create_location(),
-                        cancel: m.cancel(),
-                        saving: m.loading(),
-                        creating: m.creating(),
-                        successfullySaved: m.successfully_saved(),
-                        errorSomethingWentWrong: m.something_went_wrong(),
-                        enterLocationName: m.enter_location_name(),
-                        streetName: m.street_placeholder(),
-                        houseNumberPlaceholder: m.house_number_placeholder(),
-                        addressSuffixPlaceholder:
-                            m.address_suffix_placeholder(),
-                        zipCodePlaceholder: m.zip_code_placeholder(),
-                        cityNamePlaceholder: m.city_placeholder(),
-                        statePlaceholder: m.state_placeholder(),
-                        countryPlaceholder: m.country_placeholder(),
-                        enterRoomId: m.room_id_placeholder(),
-                        latitudePlaceholder: m.latitude_placeholder(),
-                        longitudePlaceholder: m.longitude_placeholder(),
-                        what3wordsPlaceholder: m.what3words_placeholder(),
-                        inclusivitySupportPlaceholder: m.accessibility_info(),
-                    }}
-                />
-            {/snippet}
-        </EntityManager>
+                {#snippet renderForm({
+                    remoteFunction: rf,
+                    schema,
+                    id,
+                    initialData: formData = null,
+                    onSuccess,
+                    onCancel,
+                }: any)}
+                    <LocationForm
+                        remoteFunction={rf}
+                        validationSchema={schema}
+                        isUpdating={!!id}
+                        initialData={formData}
+                        {onSuccess}
+                        {onCancel}
+                        labels={{
+                            name: m.location_name(),
+                            street: m.street(),
+                            houseNumber: m.house_number(),
+                            addressSuffix: m.address_suffix(),
+                            zip: m.zip_code(),
+                            city: m.city(),
+                            state: m.state_region(),
+                            country: m.country(),
+                            roomId: m.room_id(),
+                            latitude: m.latitude(),
+                            longitude: m.longitude(),
+                            what3words: m.what3words(),
+                            inclusivitySupport: m.inclusivity_support(),
+                            isPublic: m.public(),
+                            heroImage: m.hero_image(),
+                            saveChanges: m.save_changes(),
+                            createLocation: m.create_location(),
+                            cancel: m.cancel(),
+                            saving: m.loading(),
+                            creating: m.creating(),
+                            successfullySaved: m.successfully_saved(),
+                            errorSomethingWentWrong: m.something_went_wrong(),
+                            enterLocationName: m.enter_location_name(),
+                            streetName: m.street_placeholder(),
+                            houseNumberPlaceholder: m.house_number_placeholder(),
+                            addressSuffixPlaceholder:
+                                m.address_suffix_placeholder(),
+                            zipCodePlaceholder: m.zip_code_placeholder(),
+                            cityNamePlaceholder: m.city_placeholder(),
+                            statePlaceholder: m.state_placeholder(),
+                            countryPlaceholder: m.country_placeholder(),
+                            enterRoomId: m.room_id_placeholder(),
+                            latitudePlaceholder: m.latitude_placeholder(),
+                            longitudePlaceholder: m.longitude_placeholder(),
+                            what3wordsPlaceholder: m.what3words_placeholder(),
+                            inclusivitySupportPlaceholder: m.accessibility_info(),
+                        }}
+                    />
+                {/snippet}
+            </EntityManager>
+        {/key}
 
         <input
             {...rf.fields.locationIds.as(
@@ -1060,6 +1066,7 @@
         <User size={18} class="text-blue-600" />
         {m.feature_contacts_title()}
     </h3>
+    {#key initialData?.id || "new"}
     <EntityManager
         title={m.feature_contacts_title()}
         icon={User}
@@ -1184,7 +1191,8 @@
                             <MapPin size={18} class="text-blue-600" />
                             {m.feature_locations_title()}
                         </h3>
-                        <EntityManager
+                        {#key id || "new"}
+                            <EntityManager
                             title={m.feature_locations_title()}
                             icon={MapPin}
                             mode="embedded"
@@ -1339,11 +1347,13 @@
                                 />
                             {/snippet}
                         </EntityManager>
+        {/key}
                     </div>
                 {/snippet}
             </ContactForm>
         {/snippet}
     </EntityManager>
+    {/key}
     <input
         {...rf.fields.contactIds.as(
             "text",

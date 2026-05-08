@@ -220,84 +220,123 @@
                     <TagIcon size={16} class="text-indigo-500" />
                     {m.tags()}
                 </h3>
-                <EntityManager
-                    title={m.tags()}
-                    icon={TagIcon}
-                    mode="embedded"
-                    initialItems={initialData?.tags || []}
-                    listItemsRemote={listTagsRemote}
-                    onchange={(ids: any, items: any[]) => {
-                        tagsString = items.map(i => i.name).join(", ");
-                    }}
-                    deleteItemRemote={deleteTagRemote}
-                    createRemote={createTagRemote}
-                    createSchema={v.object({
-                        name: v.pipe(v.string(), v.minLength(1)),
-                    })}
-                    updateRemote={updateTagRemote}
-                    updateSchema={v.object({
-                        name: v.pipe(v.string(), v.minLength(1)),
-                    })}
-                    getFormData={(t: any) => t}
-                    searchPredicate={(t: any, q: string) => t.name.toLowerCase().includes(q.toLowerCase())}
-                    loadingLabel={m.loading_item({ item: m.tags() })}
-                    noItemsLabel={m.no_items_associated_label({ item: m.tags() })}
-                    noItemsFoundLabel={m.no_items_found({ item: m.tags() })}
-                    searchPlaceholder={m.search_placeholder({ item: m.tags() })}
-                    linkItemLabel={m.link_item_label({ item: m.tags() })}
-                    associatedItemLabel={m.associated_item_label({ item: m.tags() })}
-                    quickCreateLabel={m.quick_create()}
-                    closeSearchLabel={m.close_search()}
-                    editLabel={m.edit()}
-                    deleteLabel={m.delete()}
-                    unlinkLabel={m.unlink()}
-                    selectAllLabel={m.select_all()}
-                    deselectAllLabel={m.deselect_all()}
-                >
-                    {#snippet renderItemLabel(tag: any)}
-                        {tag.name}
-                    {/snippet}
-                    {#snippet renderForm({ remoteFunction, schema, initialData: formData, onSuccess, onCancel, id }: any)}
-                        {@const rfState = remoteFunction.preflight(schema)}
-                        <form
-                            {...rfState.enhance(async ({ submit }: { submit: any }) => {
-                                try {
-                                    const res = await submit();
-                                    if (res && res.success !== false) {
-                                        onSuccess(res);
-                                    }
-                                } catch (err) {
-                                    console.error("[AnnouncementForm] Quick Create Error:", err);
-                                }
-                            })}
-                            class="space-y-4 p-4"
-                        >
-                            {#if id && rfState.fields?.id}
-                                <input {...rfState.fields.id.as("text", id)} class="hidden" />
-                            {/if}
-                            <div>
-                                <label for="tag-name" class="block text-sm font-medium text-gray-700">{m.summary()}</label>
-                                <input 
-                                    {...rfState.fields.name.as("text")}
-                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                    value={formData?.name ?? ""}
-                                />
-                                {#each rfState.fields.name.issues() ?? [] as issue}
-                                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
-                                {/each}
-                            </div>
-                            <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" type="button" onclick={onCancel}>{m.cancel()}</Button>
-                                <AsyncButton 
-                                    type="submit" 
-                                    loading={rfState.pending}
+                {#key initialData?.id || "new"}
+                    <EntityManager
+                        title={m.tags()}
+                        icon={TagIcon}
+                        mode="embedded"
+                        initialItems={initialData?.tags || []}
+                        listItemsRemote={listTagsRemote}
+                        onchange={(ids: any, items: any[]) => {
+                            tagsString = items.map((i) => i.name).join(", ");
+                        }}
+                        deleteItemRemote={deleteTagRemote}
+                        createRemote={createTagRemote}
+                        createSchema={v.object({
+                            name: v.pipe(v.string(), v.minLength(1)),
+                        })}
+                        updateRemote={updateTagRemote}
+                        updateSchema={v.object({
+                            name: v.pipe(v.string(), v.minLength(1)),
+                        })}
+                        getFormData={(t: any) => t}
+                        searchPredicate={(t: any, q: string) =>
+                            t.name.toLowerCase().includes(q.toLowerCase())}
+                        loadingLabel={m.loading_item({ item: m.tags() })}
+                        noItemsLabel={m.no_items_associated_label({
+                            item: m.tags(),
+                        })}
+                        noItemsFoundLabel={m.no_items_found({ item: m.tags() })}
+                        searchPlaceholder={m.search_placeholder({
+                            item: m.tags(),
+                        })}
+                        linkItemLabel={m.link_item_label({ item: m.tags() })}
+                        associatedItemLabel={m.associated_item_label({
+                            item: m.tags(),
+                        })}
+                        quickCreateLabel={m.quick_create()}
+                        closeSearchLabel={m.close_search()}
+                        editLabel={m.edit()}
+                        deleteLabel={m.delete()}
+                        unlinkLabel={m.unlink()}
+                        selectAllLabel={m.select_all()}
+                        deselectAllLabel={m.deselect_all()}
+                    >
+                        {#snippet renderItemLabel(tag: any)}
+                            {tag.name}
+                        {/snippet}
+                        {#snippet renderForm({
+                            remoteFunction,
+                            schema,
+                            initialData: formData,
+                            onSuccess,
+                            onCancel,
+                            id,
+                        }: any)}
+                            {@const rfState = remoteFunction.preflight(schema)}
+                            <form
+                                {...rfState.enhance(
+                                    async ({ submit }: { submit: any }) => {
+                                        try {
+                                            const res = await submit();
+                                            if (res && res.success !== false) {
+                                                onSuccess(res);
+                                            }
+                                        } catch (err) {
+                                            console.error(
+                                                "[AnnouncementForm] Quick Create Error:",
+                                                err,
+                                            );
+                                        }
+                                    },
+                                )}
+                                class="space-y-4 p-4"
+                            >
+                                {#if id && rfState.fields?.id}
+                                    <input
+                                        {...rfState.fields.id.as("text", id)}
+                                        class="hidden"
+                                    />
+                                {/if}
+                                <div>
+                                    <label
+                                        for="tag-name"
+                                        class="block text-sm font-medium text-gray-700"
+                                        >{m.summary()}</label
+                                    >
+                                    <input
+                                        {...rfState.fields.name.as("text")}
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        value={formData?.name ?? ""}
+                                    />
+                                    {#each rfState.fields.name.issues() ?? [] as issue}
+                                        <p class="mt-1 text-sm text-red-600">
+                                            {issue.message}
+                                        </p>
+                                    {/each}
+                                </div>
+                                <div
+                                    class="flex justify-end gap-2 pt-4 border-t"
                                 >
-                                    {id ? m.save_changes() : m.create_item({ item: "Tag" })}
-                                </AsyncButton>
-                            </div>
-                        </form>
-                    {/snippet}
-                </EntityManager>
+                                    <Button
+                                        variant="outline"
+                                        type="button"
+                                        onclick={onCancel}
+                                        >{m.cancel()}</Button
+                                    >
+                                    <AsyncButton
+                                        type="submit"
+                                        loading={rfState.pending}
+                                    >
+                                        {id
+                                            ? m.save_changes()
+                                            : m.create_item({ item: "Tag" })}
+                                    </AsyncButton>
+                                </div>
+                            </form>
+                        {/snippet}
+                    </EntityManager>
+                {/key}
             </div>
 
             <div>
@@ -314,144 +353,161 @@
                         <MapPin size={18} class="text-blue-600" />
                         {m.locations()}
                     </h3>
-                    <EntityManager
-                        title={m.locations()}
-                        icon={MapPin}
-                        mode="embedded"
-                        {type}
-                        entityId={initialData?.id}
-                        initialItems={locs.data.filter((l: any) =>
-                            selectedLocationIds.includes(l.id),
-                        )}
-                        onchange={(ids: string[]) =>
-                            (selectedLocationIds = ids)}
-                        listItemsRemote={listLocations as any}
-                        fetchAssociationsRemote={fetchEntityLocations as any}
-                        addAssociationRemote={async (p: any) =>
-                            addLocationAssociation({
-                                ...p,
-                                locationId: p.itemId,
-                                // @ts-ignore
-                            } as any)}
-                        removeAssociationRemote={async (p: any) =>
-                            removeLocationAssociation({
-                                ...p,
-                                locationId: p.itemId,
-                                // @ts-ignore
-                            } as any)}
-                        deleteItemRemote={async (ids: string[]) => {
-                            return await handleDelete({
-                                ids,
-                                deleteFn: deleteLocation,
-                                itemName: m.location().toLowerCase(),
-                            });
-                        }}
-                        createRemote={createLocation}
-                        createSchema={createLocationSchema}
-                        updateRemote={updateLocation}
-                        updateSchema={updateLocationSchema}
-                        getFormData={(l: Location) => l}
-                        searchPredicate={(l: Location, q: string) => {
-                            return (
-                                l.name
-                                    .toLowerCase()
-                                    .includes(q.toLowerCase()) ||
-                                (l.roomId
-                                    ?.toLowerCase()
-                                    .includes(q.toLowerCase()) ??
-                                    false)
-                            );
-                        }}
-                        loadingLabel={m.loading_item({ item: m.locations() })}
-                        noItemsLabel={m.no_items_associated_label({
-                            item: m.locations(),
-                        })}
-                        noItemsFoundLabel={m.no_items_found({
-                            item: m.locations(),
-                        })}
-                        searchPlaceholder={m.search_placeholder({
-                            item: m.locations(),
-                        })}
-                        linkItemLabel={m.link_item_label({
-                            item: m.locations(),
-                        })}
-                        associatedItemLabel={m.associated_item_label({
-                            item: m.locations(),
-                        })}
-                        quickCreateLabel={m.quick_create()}
-                        closeSearchLabel={m.close_search()}
-                        editLabel={m.edit()}
-                        deleteLabel={m.delete()}
-                        unlinkLabel={m.unlink()}
-                        deleteForeverLabel={m.delete_forever({
-                            item: m.location(),
-                        })}
-                        bulkDeleteLabel={m.delete_selected({ count: 0 })}
-                        selectAllLabel={m.select_all()}
-                        deselectAllLabel={m.deselect_all()}
-                        confirmUnlinkLabel={m.confirm_unlink_label({
-                            item: m.location(),
-                        })}
-                    >
-                        {#snippet renderItemLabel(location: any)}
-                            {location.name}
-                            {location.roomId ? `(${location.roomId})` : ""}
-                        {/snippet}
-                        {#snippet renderForm({
-                            remoteFunction: rf,
-                            schema,
-                            id,
-                            initialData: formData,
-                            onSuccess,
-                            onCancel,
-                        }: any)}
-                            <LocationForm
-                                remoteFunction={rf}
-                                validationSchema={schema}
-                                isUpdating={!!id}
-                                initialData={formData}
-                                {onSuccess}
-                                {onCancel}
-                                labels={{
-                                    name: m.location_name(),
-                                    street: m.street(),
-                                    houseNumber: m.house_number(),
-                                    addressSuffix: m.address_suffix(),
-                                    zip: m.zip_code(),
-                                    city: m.city(),
-                                    state: m.state_region(),
-                                    country: m.country(),
-                                    roomId: m.room_id(),
-                                    latitude: m.latitude(),
-                                    longitude: m.longitude(),
-                                    what3words: m.what3words(),
-                                    inclusivitySupport: m.inclusivity_support(),
-                                    isPublic: m.public(),
-                                    heroImage: m.hero_image(),
-                                    saveChanges: m.save_changes(),
-                                    createLocation: m.create_location(),
-                                    cancel: m.cancel(),
-                                    saving: m.loading(),
-                                    creating: m.creating(),
-                                    successfullySaved: m.successfully_saved(),
-                                    errorSomethingWentWrong: m.something_went_wrong(),
-                                    enterLocationName: m.enter_location_name(),
-                                    streetName: m.street_placeholder(),
-                                    houseNumberPlaceholder: m.house_number_placeholder(),
-                                    addressSuffixPlaceholder: m.address_suffix_placeholder(),
-                                    zipCodePlaceholder: m.zip_code_placeholder(),
-                                    cityNamePlaceholder: m.city_placeholder(),
-                                    statePlaceholder: m.state_placeholder(),
-                                    countryPlaceholder: m.country_placeholder(),
-                                    enterRoomId: m.room_id_placeholder(),
-                                    latitudePlaceholder: m.latitude_placeholder(),
-                                    longitudePlaceholder: m.longitude_placeholder(),
-                                    what3wordsPlaceholder: m.what3words_placeholder(),
-                                    inclusivitySupportPlaceholder: m.accessibility_info(),
-                                }}
-                            />
-                        {/snippet}
-                    </EntityManager>
+                    {#key initialData?.id || "new"}
+                        <EntityManager
+                            title={m.locations()}
+                            icon={MapPin}
+                            mode="embedded"
+                            {type}
+                            entityId={initialData?.id}
+                            initialItems={locs.data.filter((l: any) =>
+                                selectedLocationIds.includes(l.id),
+                            )}
+                            onchange={(ids: string[]) =>
+                                (selectedLocationIds = ids)}
+                            listItemsRemote={listLocations as any}
+                            fetchAssociationsRemote={fetchEntityLocations as any}
+                            addAssociationRemote={async (p: any) =>
+                                addLocationAssociation({
+                                    ...p,
+                                    locationId: p.itemId,
+                                    // @ts-ignore
+                                } as any)}
+                            removeAssociationRemote={async (p: any) =>
+                                removeLocationAssociation({
+                                    ...p,
+                                    locationId: p.itemId,
+                                    // @ts-ignore
+                                } as any)}
+                            deleteItemRemote={async (ids: string[]) => {
+                                return await handleDelete({
+                                    ids,
+                                    deleteFn: deleteLocation,
+                                    itemName: m.location().toLowerCase(),
+                                });
+                            }}
+                            createRemote={createLocation}
+                            createSchema={createLocationSchema}
+                            updateRemote={updateLocation}
+                            updateSchema={updateLocationSchema}
+                            getFormData={(l: Location) => l}
+                            searchPredicate={(l: Location, q: string) => {
+                                return (
+                                    l.name
+                                        .toLowerCase()
+                                        .includes(q.toLowerCase()) ||
+                                    (l.roomId
+                                        ?.toLowerCase()
+                                        .includes(q.toLowerCase()) ??
+                                        false)
+                                );
+                            }}
+                            loadingLabel={m.loading_item({
+                                item: m.locations(),
+                            })}
+                            noItemsLabel={m.no_items_associated_label({
+                                item: m.locations(),
+                            })}
+                            noItemsFoundLabel={m.no_items_found({
+                                item: m.locations(),
+                            })}
+                            searchPlaceholder={m.search_placeholder({
+                                item: m.locations(),
+                            })}
+                            linkItemLabel={m.link_item_label({
+                                item: m.locations(),
+                            })}
+                            associatedItemLabel={m.associated_item_label({
+                                item: m.locations(),
+                            })}
+                            quickCreateLabel={m.quick_create()}
+                            closeSearchLabel={m.close_search()}
+                            editLabel={m.edit()}
+                            deleteLabel={m.delete()}
+                            unlinkLabel={m.unlink()}
+                            deleteForeverLabel={m.delete_forever({
+                                item: m.location(),
+                            })}
+                            bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                            selectAllLabel={m.select_all()}
+                            deselectAllLabel={m.deselect_all()}
+                            confirmUnlinkLabel={m.confirm_unlink_label({
+                                item: m.location(),
+                            })}
+                        >
+                            {#snippet renderItemLabel(location: any)}
+                                {location.name}
+                                {location.roomId ? `(${location.roomId})` : ""}
+                            {/snippet}
+                            {#snippet renderForm({
+                                remoteFunction: rf,
+                                schema,
+                                id,
+                                initialData: formData,
+                                onSuccess,
+                                onCancel,
+                            }: any)}
+                                <LocationForm
+                                    remoteFunction={rf}
+                                    validationSchema={schema}
+                                    isUpdating={!!id}
+                                    initialData={formData}
+                                    {onSuccess}
+                                    {onCancel}
+                                    labels={{
+                                        name: m.location_name(),
+                                        street: m.street(),
+                                        houseNumber: m.house_number(),
+                                        addressSuffix: m.address_suffix(),
+                                        zip: m.zip_code(),
+                                        city: m.city(),
+                                        state: m.state_region(),
+                                        country: m.country(),
+                                        roomId: m.room_id(),
+                                        latitude: m.latitude(),
+                                        longitude: m.longitude(),
+                                        what3words: m.what3words(),
+                                        inclusivitySupport:
+                                            m.inclusivity_support(),
+                                        isPublic: m.public(),
+                                        heroImage: m.hero_image(),
+                                        saveChanges: m.save_changes(),
+                                        createLocation: m.create_location(),
+                                        cancel: m.cancel(),
+                                        saving: m.loading(),
+                                        creating: m.creating(),
+                                        successfullySaved:
+                                            m.successfully_saved(),
+                                        errorSomethingWentWrong:
+                                            m.something_went_wrong(),
+                                        enterLocationName:
+                                            m.enter_location_name(),
+                                        streetName: m.street_placeholder(),
+                                        houseNumberPlaceholder:
+                                            m.house_number_placeholder(),
+                                        addressSuffixPlaceholder:
+                                            m.address_suffix_placeholder(),
+                                        zipCodePlaceholder:
+                                            m.zip_code_placeholder(),
+                                        cityNamePlaceholder:
+                                            m.city_placeholder(),
+                                        statePlaceholder: m.state_placeholder(),
+                                        countryPlaceholder:
+                                            m.country_placeholder(),
+                                        enterRoomId: m.room_id_placeholder(),
+                                        latitudePlaceholder:
+                                            m.latitude_placeholder(),
+                                        longitudePlaceholder:
+                                            m.longitude_placeholder(),
+                                        what3wordsPlaceholder:
+                                            m.what3words_placeholder(),
+                                        inclusivitySupportPlaceholder:
+                                            m.accessibility_info(),
+                                    }}
+                                />
+                            {/snippet}
+                        </EntityManager>
+                    {/key}
                 {:catch error}
                     <div
                         class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center"
@@ -486,86 +542,94 @@
                 <User size={18} class="text-blue-600" />
                 {m.contacts()}
             </h3>
-            <EntityManager
-            title={m.contacts()}
-            icon={User}
-            mode="embedded"
-            {type}
-            entityId={initialData?.id}
-            onchange={(ids: string[]) => (selectedContactIds = ids)}
-            listItemsRemote={listContacts as any}
-            fetchAssociationsRemote={fetchEntityContacts as any}
-            addAssociationRemote={async (p: any) =>
-                addAssociation({ ...p, contactId: p.itemId } as any)}
-            removeAssociationRemote={async (p: any) =>
-                removeAssociation({ ...p, contactId: p.itemId } as any)}
-            deleteItemRemote={async (ids: string[]) => {
-                return await handleDelete({
-                    ids,
-                    deleteFn: deleteContact,
-                    itemName: m.contact().toLowerCase(),
-                });
-            }}
-            createRemote={createContact}
-            createSchema={createContactSchema}
-            updateRemote={updateContact}
-            updateSchema={updateContactSchema}
-            getFormData={(c: Contact) => ({
-                contact: c,
-                emails: c.emails,
-                phones: c.phones,
-                addresses: c.addresses,
-                relations: c.relations,
-                tags: c.tags,
-            })}
-            searchPredicate={(c: Contact, q: string) => {
-                const name = (
-                    c.displayName ||
-                    `${c.givenName || ""} ${c.familyName || ""}`
-                ).toLowerCase();
-                return name.includes(q.toLowerCase());
-            }}
-            loadingLabel={m.loading_item({ item: m.contacts() })}
-            noItemsLabel={m.no_items_associated_label({ item: m.contacts() })}
-            noItemsFoundLabel={m.no_items_found({ item: m.contacts() })}
-            searchPlaceholder={m.search_placeholder({ item: m.contacts() })}
-            linkItemLabel={m.link_item_label({ item: m.contacts() })}
-            associatedItemLabel={m.associated_item_label({
-                item: m.contacts(),
-            })}
-            quickCreateLabel={m.quick_create()}
-            closeSearchLabel={m.close_search()}
-            editLabel={m.edit()}
-            deleteLabel={m.delete()}
-            unlinkLabel={m.unlink()}
-            deleteForeverLabel={m.delete_forever({ item: m.contact() })}
-            bulkDeleteLabel={m.delete_selected({ count: 0 })}
-            selectAllLabel={m.select_all()}
-            deselectAllLabel={m.deselect_all()}
-            confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
-        >
-            {#snippet renderItemLabel(contact: any)}
-                {contact.displayName ||
-                    `${contact.givenName || ""} ${contact.familyName || ""}`}
-            {/snippet}
-            {#snippet renderForm({
-                remoteFunction: rf,
-                schema,
-                initialData: formData,
-                onSuccess,
-                onCancel,
-                id,
-            }: any)}
-                <ContactForm
-                    remoteFunction={rf}
-                    {schema}
-                    initialData={formData}
-                    {onSuccess}
-                    {onCancel}
-                    contactId={id}
-                />
-            {/snippet}
-        </EntityManager>
+            {#key initialData?.id || "new"}
+                <EntityManager
+                    title={m.contacts()}
+                    icon={User}
+                    mode="embedded"
+                    {type}
+                    entityId={initialData?.id}
+                    onchange={(ids: string[]) => (selectedContactIds = ids)}
+                    listItemsRemote={listContacts as any}
+                    fetchAssociationsRemote={fetchEntityContacts as any}
+                    addAssociationRemote={async (p: any) =>
+                        addAssociation({ ...p, contactId: p.itemId } as any)}
+                    removeAssociationRemote={async (p: any) =>
+                        removeAssociation({ ...p, contactId: p.itemId } as any)}
+                    deleteItemRemote={async (ids: string[]) => {
+                        return await handleDelete({
+                            ids,
+                            deleteFn: deleteContact,
+                            itemName: m.contact().toLowerCase(),
+                        });
+                    }}
+                    createRemote={createContact}
+                    createSchema={createContactSchema}
+                    updateRemote={updateContact}
+                    updateSchema={updateContactSchema}
+                    getFormData={(c: Contact) => ({
+                        contact: c,
+                        emails: c.emails,
+                        phones: c.phones,
+                        addresses: c.addresses,
+                        relations: c.relations,
+                        tags: c.tags,
+                    })}
+                    searchPredicate={(c: Contact, q: string) => {
+                        const name = (
+                            c.displayName ||
+                            `${c.givenName || ""} ${c.familyName || ""}`
+                        ).toLowerCase();
+                        return name.includes(q.toLowerCase());
+                    }}
+                    loadingLabel={m.loading_item({ item: m.contacts() })}
+                    noItemsLabel={m.no_items_associated_label({
+                        item: m.contacts(),
+                    })}
+                    noItemsFoundLabel={m.no_items_found({ item: m.contacts() })}
+                    searchPlaceholder={m.search_placeholder({
+                        item: m.contacts(),
+                    })}
+                    linkItemLabel={m.link_item_label({ item: m.contacts() })}
+                    associatedItemLabel={m.associated_item_label({
+                        item: m.contacts(),
+                    })}
+                    quickCreateLabel={m.quick_create()}
+                    closeSearchLabel={m.close_search()}
+                    editLabel={m.edit()}
+                    deleteLabel={m.delete()}
+                    unlinkLabel={m.unlink()}
+                    deleteForeverLabel={m.delete_forever({ item: m.contact() })}
+                    bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                    selectAllLabel={m.select_all()}
+                    deselectAllLabel={m.deselect_all()}
+                    confirmUnlinkLabel={m.confirm_unlink_label({
+                        item: m.contact(),
+                    })}
+                >
+                    {#snippet renderItemLabel(contact: any)}
+                        {contact.displayName ||
+                            `${contact.givenName || ""} ${contact.familyName || ""}`}
+                    {/snippet}
+                    {#snippet renderForm({
+                        remoteFunction: rf,
+                        schema,
+                        initialData: formData,
+                        onSuccess,
+                        onCancel,
+                        id,
+                    }: any)}
+                        <ContactForm
+                            remoteFunction={rf}
+                            {schema}
+                            initialData={formData}
+                            {onSuccess}
+                            {onCancel}
+                            contactId={id}
+                        />
+                    {/snippet}
+                </EntityManager>
+            {/key}
     </div>
 
         <SyncCheckboxBlock

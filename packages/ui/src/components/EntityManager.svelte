@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends { id?: string | null; name?: string }">
-    import { onMount, type Component, type Snippet } from "svelte";
+    import { onMount, untrack, type Component, type Snippet } from "svelte";
     import type { FilterDefinition, FilterAssociation, ListItemContext } from "./EntityManager.types";
     import {
         Search,
@@ -172,6 +172,11 @@
         deselectAllLabel = "Deselect All",
         confirmUnlinkLabel = "Remove link",
     }: Props<T> = $props();
+    
+    let mounted = true;
+    onMount(() => {
+        return () => { mounted = false; };
+    });
 
     const isStandalone = $derived(mode === "standalone");
 
@@ -209,6 +214,8 @@
 
     let refreshCounter = $state(0);
 
+
+
     const currentParams = $derived({
         page,
         limit,
@@ -226,35 +233,57 @@
     }
 
     // Main list promise (Standalone list OR Embedded selector)
-    const listPromise = $derived.by(() => {
+    let listPromise = $state<Promise<{ data: T[]; total: number }>>(
+        Promise.resolve({ data: [], total: 0 }),
+    );
+
+    $effect(() => {
+        if (!mounted) return;
+        void refreshCounter; // track
         if (isStandalone || showSelector) {
-            void refreshCounter; // track
-            return listItemsRemote(currentParams).then(normalize);
+            const params = untrack(() => currentParams);
+            listPromise = listItemsRemote(params).then(normalize);
         }
-        return Promise.resolve({ data: [], total: 0 });
     });
 
     // Embedded associations promise
-    const associationsPromise = $derived.by(() => {
+    let associationsPromise = $state<Promise<{ data: T[]; total: number }>>(
+        Promise.resolve({ data: [], total: 0 }),
+    );
+
+    $effect(() => {
+        if (!mounted) return;
+        void refreshCounter; // track
         if (!isStandalone) {
-            void refreshCounter; // track
             if (entityId && type) {
                 if (fetchAssociationsRemote) {
-                    return fetchAssociationsRemote({ type, entityId }).then(normalize);
+                    associationsPromise = fetchAssociationsRemote({
+                        type,
+                        entityId,
+                    }).then(normalize);
                 } else {
-                    return listItemsRemote({ 
-                        associatedWith: { type, id: entityId } 
+                    associationsPromise = listItemsRemote({
+                        associatedWith: { type, id: entityId },
                     }).then(normalize);
                 }
+            } else {
+                associationsPromise = Promise.resolve({
+                    data: localAssociatedItems,
+                    total: localAssociatedItems.length,
+                });
             }
-            // Fallback to local state if no remote entity or not fetching
-            return Promise.resolve({ data: localAssociatedItems, total: localAssociatedItems.length });
         }
-        return Promise.resolve({ data: [], total: 0 });
     });
 
     // --- STATE ---
     let localAssociatedItems = $state<T[]>(initialItems ?? []);
+    $effect(() => {
+        if (initialItems) {
+            untrack(() => {
+                localAssociatedItems = initialItems;
+            });
+        }
+    });
     let showSelector = $state(false);
     function toggleSelector() {
         showSelector = !showSelector;
@@ -361,15 +390,17 @@
                             itemId: item.id!,
                         });
                     }
+                    if (!mounted) return;
                     const newList = [...currentList, item];
                     localAssociatedItems = newList;
                     onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
                 }
             }
-        } catch (error: any) {
-            toast.error(error.message || "Failed to update association");
+        } catch (e: any) {
+            if (!mounted) return;
+            toast.error(e.message || "Failed to update association");
         } finally {
-            linkingItemId = null;
+            if (mounted) linkingItemId = null;
         }
     }
 
@@ -386,12 +417,12 @@
             onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
             
             if (result !== true) {
-                toast.success("Deleted successfully");
+                if (mounted) toast.success("Deleted successfully");
             }
         } catch (e: any) {
-            toast.error(e.message || "Failed to delete item");
+            if (mounted) toast.error(e.message || "Failed to delete item");
         } finally {
-            deletingItemId = null;
+            if (mounted) deletingItemId = null;
         }
     }
 
@@ -409,12 +440,12 @@
             deselectAll();
             
             if (result !== true) {
-                toast.success(`Deleted successfully`);
+                if (mounted) toast.success(`Deleted successfully`);
             }
         } catch (e: any) {
-            toast.error(e.message || "Failed to delete some items");
+            if (mounted) toast.error(e.message || "Failed to delete some items");
         } finally {
-            bulkDeleting = false;
+            if (mounted) bulkDeleting = false;
         }
     }
 
@@ -423,11 +454,13 @@
         const newId = result?.id || result?.tag?.id || result?.data?.id;
 
         if (newId) {
-            const res = await listItemsRemote(currentParams);
+            const params = untrack(() => currentParams);
+            const res = await listItemsRemote(params);
             const { data: items } = normalize(res);
             const newItem = items.find((i: any) => i.id === newId);
 
             if (isStandalone) {
+                if (!mounted) return;
                 toast.success(`${title} created`);
                 refreshCounter++;
             } else if (newItem) {
@@ -438,6 +471,7 @@
                         itemId: newItem.id!,
                     });
                 }
+                if (!mounted) return;
                 const newList = [newItem, ...currentList];
                 localAssociatedItems = newList;
                 onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
@@ -452,11 +486,13 @@
         editingItem = null;
         if (!targetId) return;
 
-        const res = await listItemsRemote(currentParams);
+        const params = untrack(() => currentParams);
+        const res = await listItemsRemote(params);
         const { data: items } = normalize(res);
         const updatedItem = items.find((i: any) => i.id === targetId);
 
         if (updatedItem) {
+            if (!mounted) return;
             const newList = currentList.map((i) => (i.id === targetId ? updatedItem : i));
             localAssociatedItems = newList;
             onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
@@ -693,9 +729,10 @@
 </div>
 
 {#if showSelector && !isStandalone}
-    <div
-        class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
-    >
+    {#key showSelector}
+        <div
+            class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
+        >
         <div class="max-h-64 overflow-y-auto space-y-1 p-1">
             {#await listPromise}
                 <div class="text-xs text-center py-8 text-gray-400 font-medium">
@@ -787,6 +824,7 @@
             {/await}
         </div>
     </div>
+    {/key}
 {/if}
 
 {#if isStandalone}
@@ -1079,7 +1117,8 @@
             </Dialog.Header>
 
             <div style="overflow-y: auto; flex: 1; min-height: 0;">
-                {#await isStandalone ? listPromise : associationsPromise then res}
+                {#key (editingItem?.id || "new") + showQuickCreate}
+                    {#await isStandalone ? listPromise : associationsPromise then res}
                     {@const currentList = res?.data ?? []}
                     {#if editingItem && getFormData}
                         {@render renderForm({
@@ -1102,7 +1141,8 @@
                             },
                         })}
                     {/if}
-                {/await}
+                    {/await}
+                {/key}
             </div>
         </Dialog.Content>
     </Dialog.Root>
