@@ -215,7 +215,7 @@
     function removeAddress(index: number) {
         addresses = addresses.filter((_, i) => i !== index);
     }
-    const contactFields = $derived(prefix === "contact" ? rf.fields.contact : rf.fields.data.fields.contact);
+    const contactFields = $derived(rf?.fields && (prefix === "contact" ? rf.fields.contact : rf.fields.data?.fields?.contact));
 </script>
 
 <div class="space-y-8">
@@ -232,14 +232,14 @@
                     >{i18n.displayName} <span class="text-red-500">*</span></label
                 >
                 <input
-                    {...contactFields.fields.displayName.as("text")}
+                    {...contactFields?.fields?.displayName?.as("text")}
                     name={`${prefix}.displayName`}
                     type="text"
                     bind:value={contactData.displayName}
                     required
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {contactFields.fields.displayName.issues().length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.displayName?.issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each contactFields.fields.displayName.issues() as issue}
+                {#each contactFields?.fields?.displayName?.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -250,7 +250,7 @@
                     >{i18n.givenName}</label
                 >
                 <input
-                    {...contactFields.fields.givenName.as("text")}
+                    {...contactFields?.fields?.givenName?.as("text")}
                     name={`${prefix}.givenName`}
                     type="text"
                     bind:value={contactData.givenName}
@@ -264,7 +264,7 @@
                     >{i18n.middleName}</label
                 >
                 <input
-                    {...contactFields.fields.middleName.as("text")}
+                    {...contactFields?.fields?.middleName?.as("text")}
                     name={`${prefix}.middleName`}
                     type="text"
                     bind:value={contactData.middleName}
@@ -278,7 +278,7 @@
                     >{i18n.familyName}</label
                 >
                 <input
-                    {...contactFields.fields.familyName.as("text")}
+                    {...contactFields?.fields?.familyName?.as("text")}
                     name={`${prefix}.familyName`}
                     type="text"
                     bind:value={contactData.familyName}
@@ -292,7 +292,7 @@
                     >{i18n.honorificPrefix}</label
                 >
                 <input
-                    {...contactFields.fields.honorificPrefix.as("text")}
+                    {...contactFields?.fields?.honorificPrefix?.as("text")}
                     name={`${prefix}.honorificPrefix`}
                     type="text"
                     bind:value={contactData.honorificPrefix}
@@ -307,7 +307,7 @@
                     >{i18n.honorificSuffix}</label
                 >
                 <input
-                    {...contactFields.fields.honorificSuffix.as("text")}
+                    {...contactFields?.fields?.honorificSuffix?.as("text")}
                     name={`${prefix}.honorificSuffix`}
                     type="text"
                     bind:value={contactData.honorificSuffix}
@@ -322,7 +322,7 @@
                     >{i18n.gender}</label
                 >
                 <select
-                    {...contactFields.fields.gender.as("select")}
+                    {...contactFields?.fields?.gender?.as("select")}
                     name={`${prefix}.gender`}
                     bind:value={contactData.gender}
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -342,7 +342,7 @@
                     >{i18n.birthday}</label
                 >
                 <input
-                    {...contactFields.fields.birthday.as("date")}
+                    {...contactFields?.fields?.birthday?.as("date")}
                     name={`${prefix}.birthday`}
                     type="date"
                     bind:value={contactData.birthday}
@@ -356,7 +356,7 @@
                     >{i18n.company}</label
                 >
                 <input
-                    {...contactFields.fields.company.as("text")}
+                    {...contactFields?.fields?.company?.as("text")}
                     name={`${prefix}.company`}
                     type="text"
                     bind:value={contactData.company}
@@ -370,7 +370,7 @@
                     >{i18n.department}</label
                 >
                 <input
-                    {...contactFields.fields.department.as("text")}
+                    {...contactFields?.fields?.department?.as("text")}
                     name={`${prefix}.department`}
                     type="text"
                     bind:value={contactData.department}
@@ -383,7 +383,7 @@
                     class="block text-sm font-medium text-gray-700">{i18n.role}</label
                 >
                 <input
-                    {...contactFields.fields.role.as("text")}
+                    {...contactFields?.fields?.role?.as("text")}
                     name={`${prefix}.role`}
                     type="text"
                     bind:value={contactData.role}
@@ -396,7 +396,7 @@
                 >{i18n.notes}</label
             >
             <textarea
-                {...contactFields.fields.notes.as("textarea")}
+                {...contactFields?.fields?.notes?.as("textarea")}
                 name={`${prefix}.notes`}
                 bind:value={contactData.notes}
                 rows="3"
@@ -406,7 +406,7 @@
 
         <div class="flex items-center gap-2 pt-2">
             <input
-                {...contactFields.fields.isPublic.as("checkbox")}
+                {...contactFields?.fields?.isPublic?.as("checkbox")}
                 name={`${prefix}.isPublic`}
                 type="checkbox"
                 bind:checked={contactData.isPublic}
@@ -469,16 +469,16 @@
                             class="space-y-4 p-4"
                         >
                             {#if id && state.fields?.id}
-                                <input {...state.fields.id.as("hidden", id)} />
+                                <input {...state.fields?.id?.as("hidden", id)} />
                             {/if}
                             <div>
                                 <label for="tag-name" class="block text-sm font-medium text-gray-700">{i18n.summary}</label>
                                 <input 
-                                    {...state.fields.name.as("text")}
+                                    {...state.fields?.name?.as("text")}
                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                     value={formData?.name ?? ""}
                                 />
-                                {#each state.fields.name.issues() as issue}
+                                {#each state.fields?.name?.issues() ?? [] as issue}
                                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                                 {/each}
                             </div>
