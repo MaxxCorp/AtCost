@@ -45,7 +45,7 @@
                 createHref="/resources/new"
                 createLabel={m.create_item({ item: "Resource" })}
             >
-                {#snippet renderListItem(resource: Resource, { isSelected, toggleSelection, deleteItem })}
+                {#snippet renderListItem(resource: Resource, { isSelected, toggleSelection, deleteItem }: any)}
                     <div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
                         <input
                             type="checkbox"

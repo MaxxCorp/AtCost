@@ -60,7 +60,7 @@
                     req.type.toLowerCase().includes(q.toLowerCase())
                 }
             >
-                {#snippet renderListItem(req: TimeOffRequest, { isSelected, toggleSelection })}
+                {#snippet renderListItem(req: TimeOffRequest, { isSelected, toggleSelection }: any)}
                     {@const status = statusMap[req.status] || statusMap.pending}
                     <div class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-amber-200 transition-all duration-300">
                         <div class="flex flex-col sm:flex-row items-start justify-between gap-6">
@@ -116,7 +116,7 @@
                     </div>
                 {/snippet}
 
-                {#snippet renderForm({ remoteFunction, onSuccess, onCancel, initialData })}
+                {#snippet renderForm({ remoteFunction, onSuccess, onCancel, initialData }: any)}
                     <div class="p-6 space-y-6">
                         <div class="space-y-2">
                             <h2 class="text-2xl font-black tracking-tight">New Leave Request</h2>

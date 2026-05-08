@@ -1,6 +1,6 @@
 <script lang="ts">
     import { FileText } from "@lucide/svelte";
-    import EntityManager from "@ac/ui/components/EntityManager.svelte";
+    import { EntityManager } from "@ac/ui";
     import ContractForm from "./ContractForm.svelte";
     import { listContracts, createContract, updateContract, deleteContract } from "./contracts.remote";
     import { listTalents } from "../talents/list.remote";

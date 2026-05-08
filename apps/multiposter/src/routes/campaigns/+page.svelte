@@ -36,7 +36,7 @@
                 noItemsFoundLabel={m.no_items({ items: m.feature_campaigns_title() })}
                 searchPredicate={(c: Campaign, q: string) => c.name.toLowerCase().includes(q.toLowerCase())}
             >
-                {#snippet renderListItem(campaign: Campaign, { isSelected, toggleSelection, deleteItem })}
+                {#snippet renderListItem(campaign: Campaign, { isSelected, toggleSelection, deleteItem }: any)}
                     <div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
                         <input
                             type="checkbox"

@@ -258,7 +258,7 @@
                         return searchStr.includes(q.toLowerCase());
                     }}
                 >
-                    {#snippet renderItemLabel(talent)}
+                    {#snippet renderItemLabel(talent: any)}
                         <span class="font-medium"
                             >{talent.contact?.displayName ||
                                 talent.contactName ||
@@ -266,13 +266,13 @@
                         >
                     {/snippet}
 
-                    {#snippet renderItemBadge(talent)}
+                    {#snippet renderItemBadge(talent: any)}
                         <span class="text-xs text-gray-500"
                             >{talent.jobTitle || "No Title"}</span
                         >
                     {/snippet}
 
-                    {#snippet participationSnippet(talent)}
+                    {#snippet participationSnippet(talent: any)}
                         <ShiftplanTalentParticipation {talent} />
                     {/snippet}
                 </EntityManager>

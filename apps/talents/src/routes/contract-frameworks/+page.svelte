@@ -1,6 +1,6 @@
 <script lang="ts">
     import { FileSignature } from "@lucide/svelte";
-    import EntityManager from "@ac/ui/components/EntityManager.svelte";
+    import { EntityManager } from "@ac/ui";
     import ContractFrameworkForm from "./ContractFrameworkForm.svelte";
     import { listContractFrameworks, createContractFramework, updateContractFramework, deleteContractFramework } from "./frameworks.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";

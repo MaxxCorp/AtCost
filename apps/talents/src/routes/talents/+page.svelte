@@ -110,7 +110,7 @@
                 t.jobTitle?.toLowerCase().includes(q.toLowerCase())
             }
         >
-            {#snippet renderListItem(talent: Talent, { isSelected, toggleSelection, deleteItem })}
+            {#snippet renderListItem(talent: Talent, { isSelected, toggleSelection, deleteItem }: any)}
                 <div class="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col md:flex-row items-center gap-6 transition-all hover:shadow-lg hover:border-indigo-100 group">
                     <div class="flex items-center gap-4 flex-1 w-full">
                         <input 

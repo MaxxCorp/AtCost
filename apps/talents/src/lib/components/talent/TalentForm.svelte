@@ -683,7 +683,7 @@
                             ?.toLowerCase()
                             .includes(term.toLowerCase())}
                 >
-                    {#snippet renderItemLabel(item)}
+                    {#snippet renderItemLabel(item: any)}
                         <div class="flex flex-col">
                             <span class="text-sm font-medium"
                                 >{item.displayName}</span

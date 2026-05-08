@@ -258,7 +258,7 @@
                     deselectAllLabel={m.deselect_all()}
                     confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
                 >
-                    {#snippet renderItemLabel(location)}
+                    {#snippet renderItemLabel(location: any)}
                         {location.name}
                         {location.roomId ? `(${location.roomId})` : ""}
                     {/snippet}
@@ -269,7 +269,7 @@
                         initialData: formData,
                         onSuccess,
                         onCancel,
-                    })}
+                    }: any)}
                         <LocationForm
                             remoteFunction={rf}
                             validationSchema={schema}

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from "svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import * as m from "$lib/paraglide/messages";
     import { toast } from "svelte-sonner";
@@ -67,22 +68,15 @@
     });
 
     // Allocation calendars management
-    let allocationCalendars = $state<AllocationCalendar[]>([]);
+    let allocationCalendars = $state<AllocationCalendar[]>(untrack(() => initialData?.allocationCalendars || []));
     let newProvider = $state("google-calendar");
     let newCalendarId = $state("");
 
-    // Initialize state from initialData
-    $effect(() => {
-        console.log('ResourceForm syncing initialData:', JSON.stringify(initialData, null, 2));
-        if (initialData?.allocationCalendars) {
-            allocationCalendars = initialData.allocationCalendars;
-        }
-        hasParent = (initialData?.parentResourceIds?.length || 0) > 0;
-        if (initialData?.locationIds) {
-            selectedLocationIds = initialData.locationIds;
-        }
-    });
+    let hasParent = $state(untrack(() => (initialData?.parentResourceIds?.length || 0) > 0));
 
+    // Sync state from props
+    let selectedContactIds = $state<string[]>(untrack(() => initialData?.contactIds || []));
+    let selectedLocationIds = $state<string[]>(untrack(() => initialData?.locationIds || []));
     function addAllocationCalendar() {
         if (newCalendarId.trim()) {
             allocationCalendars = [
@@ -96,12 +90,6 @@
     function removeAllocationCalendar(index: number) {
         allocationCalendars = allocationCalendars.filter((_, i) => i !== index);
     }
-
-    let hasParent = $state(false);
-
-    // Sync state from props
-    let selectedContactIds = $state<string[]>([]);
-    let selectedLocationIds = $state<string[]>([]);
 </script>
 
 <form
@@ -204,7 +192,7 @@
             type="resource"
             entityId={isUpdating ? initialData?.id : null}
             initialItems={initialData?.locationIds ? locations.filter(l => initialData.locationIds.includes(l.id)) : []}
-            onchange={(ids) => (selectedLocationIds = ids)}
+            onchange={(ids: any) => (selectedLocationIds = ids)}
             listItemsRemote={listLocations as any}
             fetchAssociationsRemote={fetchEntityLocations as any}
             addAssociationRemote={async (p: any) =>
@@ -244,7 +232,7 @@
             deselectAllLabel={m.deselect_all()}
             confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
         >
-            {#snippet renderItemLabel(location)}
+            {#snippet renderItemLabel(location: any)}
                 {location.name} {location.roomId ? `(${location.roomId})` : ""}
             {/snippet}
             {#snippet renderForm({
@@ -254,7 +242,7 @@
                 onSuccess,
                 onCancel,
                 id,
-            })}
+            }: any)}
                 <LocationForm
                     remoteFunction={rf}
                     validationSchema={schema}
@@ -439,7 +427,7 @@
             type="resource"
             mode="embedded"
             entityId={isUpdating ? initialData?.id : null}
-            onchange={(ids) => (selectedContactIds = ids)}
+            onchange={(ids: any) => (selectedContactIds = ids)}
             listItemsRemote={listContacts as any}
             fetchAssociationsRemote={fetchEntityContacts as any}
             addAssociationRemote={async (p: any) =>
@@ -489,7 +477,7 @@
             deselectAllLabel={m.deselect_all()}
             confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
         >
-            {#snippet renderItemLabel(contact)}
+            {#snippet renderItemLabel(contact: any)}
                 {contact.displayName ||
                     `${contact.givenName || ""} ${contact.familyName || ""}`}
             {/snippet}
@@ -500,7 +488,7 @@
                 onSuccess,
                 onCancel,
                 id,
-            })}
+            }: any)}
                 <ContactForm
                     remoteFunction={rf}
                     {schema}

@@ -45,7 +45,7 @@
                 createHref="/announcements/new"
                 createLabel={m.create_item({ item: m.announcement() })}
             >
-                {#snippet renderListItem(announcement: Announcement, { isSelected, toggleSelection, deleteItem })}
+                {#snippet renderListItem(announcement: Announcement, { isSelected, toggleSelection, deleteItem }: any)}
                     <div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
                         <input
                             type="checkbox"

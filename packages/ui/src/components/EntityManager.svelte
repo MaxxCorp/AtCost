@@ -1,11 +1,11 @@
-<script lang="ts" generics="T extends { id?: string | null }">
-    import { onMount, untrack, type Component, type Snippet } from "svelte";
+<script lang="ts" generics="T extends { id?: string | null; name?: string }">
+    import { onMount, type Component, type Snippet } from "svelte";
+    import type { FilterDefinition, FilterAssociation, ListItemContext } from "./EntityManager.types";
     import {
         Search,
         Plus,
         Link,
         Unlink,
-        ExternalLink,
         Pencil,
         X,
         Trash2,
@@ -21,26 +21,9 @@
     import EmptyState from "./EmptyState.svelte";
     import { toast } from "svelte-sonner";
 
-    export interface FilterDefinition {
-        id: string;
-        label: string;
-        type: "select";
-        optionsRemote: (
-            params?: any,
-        ) => Promise<any[] | { data: any[]; total: number }>;
-        options?: { value: string; label: string }[];
-    }
 
-    export interface FilterAssociation {
-        id: string;
-        label: string;
-        listRemote: (
-            params?: any,
-        ) => Promise<any[] | { data: any[]; total: number }>;
-        getOptionLabel: (item: any) => string;
-    }
 
-    interface Props<T extends { id?: string | null }> {
+    interface Props<T extends { id?: string | null; name?: string }> {
         title: string;
         icon: Component<any>;
         mode?: "embedded" | "standalone";
@@ -56,7 +39,7 @@
         fetchAssociationsRemote?: (params: {
             type: any;
             entityId: string;
-        }) => Promise<T[]>;
+        }) => Promise<T[] | { data: T[]; total?: number }>;
         addAssociationRemote?: (params: {
             type: any;
             entityId: string;
@@ -91,19 +74,7 @@
         >;
 
         // Rendering snippets
-        renderListItem?: Snippet<
-            [
-                T,
-                {
-                    isSelected: boolean;
-                    toggleSelection: (id: string) => void;
-                    deleteItem: (item: T) => void;
-                    isAssociated: boolean;
-                    toggleAssociation: (item: T) => void;
-                    singleSelect: boolean;
-                },
-            ]
-        >;
+        renderListItem?: Snippet<[T, ListItemContext<T>]>;
         renderItemLabel?: Snippet<[T]>;
         renderItemBadge?: Snippet<[T]>;
         renderItemDetail?: Snippet<[T]>;
@@ -202,29 +173,10 @@
         confirmUnlinkLabel = "Remove link",
     }: Props<T> = $props();
 
-    const effectiveFilters = $derived([
-        ...filters,
-        ...filterAssociations.map((assoc) => ({
-            id: assoc.id,
-            label: assoc.label,
-            type: "select" as const,
-            optionsRemote: async (params: any) => {
-                const result = await assoc.listRemote(params);
-                const items = Array.isArray(result) ? result : result.data;
-                return items.map((item) => ({
-                    label: assoc.getOptionLabel(item),
-                    value: item.id,
-                }));
-            },
-        })),
-    ]);
-
     const isStandalone = $derived(mode === "standalone");
 
     let page = $state(1);
     let limit = $state(50);
-    let totalItems = $state(0);
-
     let searchQuery = $state("");
 
     // Filter persistence
@@ -255,151 +207,90 @@
         }
     });
 
-    let filterOptions = $state<
-        Record<string, { value: string; label: string }[]>
-    >({});
-
-    $effect(() => {
-        if (filters && filters.length > 0) {
-            for (const filter of filters) {
-                if (filter.optionsRemote) {
-                    filter.optionsRemote().then((opts) => {
-                        const items = Array.isArray(opts) ? opts : opts.data;
-                        filterOptions[filter.id] = items;
-                    });
-                } else if (filter.options) {
-                    filterOptions[filter.id] = filter.options;
-                }
-            }
-        }
-    });
+    let refreshCounter = $state(0);
 
     const currentParams = $derived({
         page,
         limit,
         search: searchQuery,
+        refreshCounter,
         ...selectedFilters,
     });
 
-    const associationsPromise = $derived.by(() => {
-        if (!isStandalone && entityId && type) {
-            if (fetchAssociationsRemote) {
-                return fetchAssociationsRemote({ type, entityId });
-            } else {
-                return listItemsRemote({ 
-                    ...currentParams, 
-                    associatedWith: { type, id: entityId } 
-                });
-            }
+    // --- PROMISES ---
+    
+    function normalize(res: T[] | { data: T[]; total?: number }) {
+        const data = Array.isArray(res) ? res : (res?.data ?? []);
+        const total = Array.isArray(res) ? res.length : (res?.total ?? data.length);
+        return { data, total };
+    }
+
+    // Main list promise (Standalone list OR Embedded selector)
+    const listPromise = $derived.by(() => {
+        if (isStandalone || showSelector) {
+            void refreshCounter; // track
+            return listItemsRemote(currentParams).then(normalize);
         }
-        return Promise.resolve(initialItems ?? []);
+        return Promise.resolve({ data: [], total: 0 });
     });
 
+    // Embedded associations promise
+    const associationsPromise = $derived.by(() => {
+        if (!isStandalone) {
+            void refreshCounter; // track
+            if (entityId && type) {
+                if (fetchAssociationsRemote) {
+                    return fetchAssociationsRemote({ type, entityId }).then(normalize);
+                } else {
+                    return listItemsRemote({ 
+                        associatedWith: { type, id: entityId } 
+                    }).then(normalize);
+                }
+            }
+            // Fallback to local state if no remote entity or not fetching
+            return Promise.resolve({ data: localAssociatedItems, total: localAssociatedItems.length });
+        }
+        return Promise.resolve({ data: [], total: 0 });
+    });
 
-    // svelte-ignore state_referenced_locally
-    let associatedItems = $state<any[]>(initialItems ?? []);
-    let allItems = $state<any[]>([]);
+    // --- STATE ---
+    let localAssociatedItems = $state<T[]>(initialItems ?? []);
     let showSelector = $state(false);
+    function toggleSelector() {
+        showSelector = !showSelector;
+    }
     let showQuickCreate = $state(false);
-    let loadingSearch = $state(false);
-    let loadingItems = $state(false);
     let linkingItemId = $state<string | null>(null);
     let deletingItemId = $state<string | null>(null);
     let editingItem = $state<any | null>(null);
     let selectedIds = $state<Set<string>>(new Set());
     let bulkDeleting = $state(false);
 
-    const filteredItems = $derived(
-        allItems.filter((i) => searchPredicate(i, searchQuery)),
-    );
+    // --- HELPERS ---
+    const effectiveFilters = $derived([
+        ...filters,
+        ...filterAssociations.map((assoc) => ({
+            id: assoc.id,
+            label: assoc.label,
+            type: "select" as const,
+            optionsRemote: async (params: any) => {
+                const result = await assoc.listRemote(params);
+                const { data } = normalize(result as any);
+                return data.map((item: any) => ({
+                    label: assoc.getOptionLabel(item),
+                    value: item.id,
+                }));
+            },
+        })),
+    ]);
 
-    const displayedItems = $derived(
-        isStandalone
-            ? searchQuery
-                ? associatedItems.filter((i) => searchPredicate(i, searchQuery))
-                : associatedItems
-            : associatedItems.filter((item) => {
-                  // Search
-                  if (
-                      searchQuery &&
-                      searchPredicate &&
-                      !searchPredicate(item, searchQuery)
-                  ) {
-                      return false;
-                  }
-
-                  // Filters
-                  for (const [key, values] of Object.entries(selectedFilters)) {
-                      if (!values || values.length === 0) continue;
-
-                      // Check if the item has the property directly
-                      if (
-                          item[key] !== undefined &&
-                          !values.includes(item[key])
-                      ) {
-                          return false;
-                      }
-
-                      // Fallback for nested objects if key might be an ID but item has object
-                      // (e.g. key is 'locationId' and item has 'location: { id: ... }')
-                      if (key.endsWith("Id")) {
-                          const objKey = key.slice(0, -2);
-                          if (
-                              item[objKey]?.id !== undefined &&
-                              !values.includes(item[objKey].id)
-                          ) {
-                              return false;
-                          }
-                      }
-                  }
-
-                  return true;
-              }),
-    );
-
-    $effect(() => {
-        associationsPromise.then(res => {
-            untrack(() => {
-                associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
-            });
-        }).catch(err => {
-            console.error("Failed to fetch associations", err);
+    function isAssociated(item: T, list: T[]) {
+        return list.some((ai) => {
+            if (item.id && ai.id) return ai.id === item.id;
+            if (item.name && ai.name) return ai.name === item.name;
+            return false;
         });
-    });
-
-
-    const refresh = async () => {
-        loadingItems = true;
-        try {
-            const res = await listItemsRemote(currentParams);
-            untrack(() => {
-                associatedItems = Array.isArray(res) ? res : (res?.data ?? []);
-                totalItems = Array.isArray(res)
-                    ? res.length
-                    : (res?.total ?? associatedItems.length);
-            });
-        } catch (e) {
-            console.error("Failed to load items", e);
-        } finally {
-            loadingItems = false;
-        }
-    };
-
-    $effect(() => {
-        // ALWAYS track currentParams to ensure reactivity in both modes
-        const params = currentParams;
-        const _showSelector = showSelector;
-        const _isStandalone = isStandalone;
-
-        if (_isStandalone) {
-            console.log("[EntityManager] Standalone refresh triggered", params);
-            refresh();
-        } else if (_showSelector) {
-            console.log("[EntityManager] Embedded selector refresh triggered", params);
-            // In embedded mode, if selector is open, refresh allItems when filters or search change
-            refreshAllItems();
-        }
-    });
+    }
 
     function toggleSelection(id: string) {
         if (selectedIds.has(id)) {
@@ -410,15 +301,101 @@
         selectedIds = new Set(selectedIds);
     }
 
-    function selectAll() {
-        selectedIds = new Set(displayedItems.map((i: any) => i.id));
+    function selectAll(items: T[]) {
+        selectedIds = new Set(items.map((i: any) => i.id!).filter(Boolean));
     }
 
     function deselectAll() {
         selectedIds = new Set();
     }
 
-    async function bulkDelete() {
+    async function toggleAssociation(item: T, currentList: T[]) {
+        linkingItemId = item.id ?? null;
+        const associated = isAssociated(item, currentList);
+        
+        try {
+            if (associated) {
+                if (entityId && removeAssociationRemote) {
+                    await removeAssociationRemote({
+                        type: type!,
+                        entityId,
+                        itemId: item.id!,
+                    });
+                }
+                const newList = currentList.filter((ai) => {
+                    if (item.id && ai.id) return ai.id !== item.id;
+                    if (item.name && ai.name) return ai.name !== item.name;
+                    return true;
+                });
+                localAssociatedItems = newList;
+                onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
+            } else {
+                if (singleSelect) {
+                    if (entityId && removeAssociationRemote) {
+                        for (const existing of currentList) {
+                            if (existing.id) {
+                                await removeAssociationRemote({
+                                    type: type!,
+                                    entityId,
+                                    itemId: existing.id,
+                                });
+                            }
+                        }
+                    }
+                    if (entityId && addAssociationRemote) {
+                        await addAssociationRemote({
+                            type: type!,
+                            entityId,
+                            itemId: item.id!,
+                        });
+                    }
+                    const newList = [item];
+                    localAssociatedItems = newList;
+                    onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
+                    showSelector = false;
+                } else {
+                    if (entityId && addAssociationRemote) {
+                        await addAssociationRemote({
+                            type: type!,
+                            entityId,
+                            itemId: item.id!,
+                        });
+                    }
+                    const newList = [...currentList, item];
+                    localAssociatedItems = newList;
+                    onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
+                }
+            }
+        } catch (error: any) {
+            toast.error(error.message || "Failed to update association");
+        } finally {
+            linkingItemId = null;
+        }
+    }
+
+    async function deleteItem(item: T, currentList: T[]) {
+        if (!item.id || !deleteItemRemote) return;
+        deletingItemId = item.id;
+        try {
+            const result = await deleteItemRemote([item.id]);
+            const success = result === true || (result && result.success !== false);
+            if (!success) return;
+
+            const newList = currentList.filter((i) => i.id !== item.id);
+            localAssociatedItems = newList;
+            onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
+            
+            if (result !== true) {
+                toast.success("Deleted successfully");
+            }
+        } catch (e: any) {
+            toast.error(e.message || "Failed to delete item");
+        } finally {
+            deletingItemId = null;
+        }
+    }
+
+    async function bulkDelete(items: T[]) {
         if (!deleteItemRemote || selectedIds.size === 0) return;
         bulkDeleting = true;
         try {
@@ -426,18 +403,11 @@
             const success = result === true || (result && result.success !== false);
             if (!success) return;
 
-            associatedItems = associatedItems.filter(
-                (i) => !selectedIds.has(i.id),
-            );
-            allItems = allItems.filter((i) => !selectedIds.has(i.id));
-            if (onchange)
-                onchange(
-                    associatedItems.map((i) => i.id),
-                    associatedItems,
-                );
+            const newList = items.filter((i) => !selectedIds.has(i.id!));
+            localAssociatedItems = newList;
+            onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
             deselectAll();
-            // Success toast is usually handled by deleteItemRemote (e.g. handleDelete)
-            // but if not, we can show one. However, avoid doubling up.
+            
             if (result !== true) {
                 toast.success(`Deleted successfully`);
             }
@@ -448,194 +418,50 @@
         }
     }
 
-    async function refreshAllItems() {
-        loadingSearch = true;
-        try {
-            const res = await listItemsRemote(currentParams);
-            allItems = Array.isArray(res) ? res : (res?.data ?? []);
-        } catch (err: any) {
-            // Ignore abort errors common in reactive systems
-            if (err.name === "AbortError" || err.message?.includes("aborted")) {
-                return;
-            }
-            toast.error(`${noItemsFoundLabel}: ${err.message}`);
-        } finally {
-            loadingSearch = false;
-        }
-    }
-
-    async function toggleSelector() {
-        showSelector = !showSelector;
-        // Effect at line 396 automatically handles the first-time/reactive refresh
-    }
-
-    async function toggleAssociation(item: any) {
-        linkingItemId = item.id;
-        const isAssociated = associatedItems.some((ai) => {
-            if (item.id && ai.id) return item.id === ai.id;
-            // Fallback for ID-less items (like tags initialized by name)
-            return item.name === ai.name;
-        });
-        try {
-            if (isAssociated) {
-                if (entityId && removeAssociationRemote) {
-                    await removeAssociationRemote({
-                        type: type!,
-                        entityId,
-                        itemId: item.id,
-                    });
-                }
-                associatedItems = associatedItems.filter((ai) => {
-                    if (item.id && ai.id) return ai.id !== item.id;
-                    return ai.name !== item.name;
-                });
-            } else {
-                if (singleSelect) {
-                    // In single-select mode, replace instead of append
-                    if (entityId && removeAssociationRemote) {
-                        for (const existing of associatedItems) {
-                            await removeAssociationRemote({
-                                type: type!,
-                                entityId,
-                                itemId: existing.id,
-                            });
-                        }
-                    }
-                    if (entityId && addAssociationRemote) {
-                        await addAssociationRemote({
-                            type: type!,
-                            entityId,
-                            itemId: item.id,
-                        });
-                    }
-                    associatedItems = [item];
-                    showSelector = false;
-                } else {
-                    if (entityId && addAssociationRemote) {
-                        await addAssociationRemote({
-                            type: type!,
-                            entityId,
-                            itemId: item.id,
-                        });
-                    }
-                    associatedItems = [...associatedItems, item];
-                }
-            }
-            if (onchange)
-                onchange(
-                    associatedItems.map((i) => i.id),
-                    associatedItems,
-                );
-        } catch (error: any) {
-            toast.error(error.message || "Failed to update association");
-        } finally {
-            linkingItemId = null;
-        }
-    }
-
-    async function handleQuickCreateSuccess(result: any) {
+    async function handleQuickCreateSuccess(result: any, currentList: T[]) {
         showQuickCreate = false;
-
         const newId = result?.id || result?.tag?.id || result?.data?.id;
 
         if (newId) {
-            const res: any = await listItemsRemote(currentParams);
-            const items = Array.isArray(res) ? res : (res?.data ?? []);
+            const res = await listItemsRemote(currentParams);
+            const { data: items } = normalize(res);
+            const newItem = items.find((i: any) => i.id === newId);
 
             if (isStandalone) {
-                associatedItems = items;
-                totalItems = Array.isArray(res)
-                    ? res.length
-                    : (res?.total ?? items.length);
                 toast.success(`${title} created`);
-            } else {
-                const newItem = items.find((i: any) => i.id === newId);
-                if (newItem) {
-                    if (entityId && addAssociationRemote) {
-                        await addAssociationRemote({
-                            type: type!,
-                            entityId,
-                            itemId: newItem.id,
-                        });
-                    }
-                    allItems = [newItem, ...allItems];
-                    associatedItems = [newItem, ...associatedItems];
-                    if (onchange)
-                        onchange(
-                            associatedItems.map((i) => i.id),
-                            associatedItems,
-                        );
-                    toast.success(`${title} created and associated`);
+                refreshCounter++;
+            } else if (newItem) {
+                if (entityId && addAssociationRemote) {
+                    await addAssociationRemote({
+                        type: type!,
+                        entityId,
+                        itemId: newItem.id!,
+                    });
                 }
+                const newList = [newItem, ...currentList];
+                localAssociatedItems = newList;
+                onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
+                toast.success(`${title} created and associated`);
+                refreshCounter++;
             }
         }
     }
 
-    async function handleInPlaceUpdateSuccess(result: any) {
+    async function handleInPlaceUpdateSuccess(result: any, currentList: T[]) {
         const targetId = editingItem?.id;
         editingItem = null;
-
         if (!targetId) return;
 
-        const res: any = await listItemsRemote(currentParams);
-        const items = Array.isArray(res) ? res : (res?.data ?? []);
+        const res = await listItemsRemote(currentParams);
+        const { data: items } = normalize(res);
         const updatedItem = items.find((i: any) => i.id === targetId);
 
         if (updatedItem) {
-            associatedItems = associatedItems.map((i) => {
-                const isMatch = targetId && i.id ? i.id === targetId : i.name === updatedItem.name;
-                return isMatch ? updatedItem : i;
-            });
-            allItems = allItems.map((i) => {
-                const isMatch = targetId && i.id ? i.id === targetId : i.name === updatedItem.name;
-                return isMatch ? updatedItem : i;
-            });
-            if (onchange)
-                onchange(
-                    associatedItems.map((i) => i.id),
-                    associatedItems,
-                );
+            const newList = currentList.map((i) => (i.id === targetId ? updatedItem : i));
+            localAssociatedItems = newList;
+            onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
             toast.success(`${title} updated`);
-        }
-    }
-
-    async function deleteItem(item: T) {
-        if (!item.id || !deleteItemRemote) return;
-        deletingItemId = item.id;
-        try {
-            console.log(`[EntityManager] Deleting item:`, item.id);
-            const result = await deleteItemRemote([item.id]);
-            console.log(`[EntityManager] Deletion result:`, result);
-            
-            // If result is false, it means handleDelete showed its own error or user cancelled
-            if (result === false) {
-                console.log(`[EntityManager] Deletion was cancelled or failed in the wrapper`);
-                return;
-            }
-
-            const success = result === true || (result && result.success !== false);
-            if (!success) {
-                console.log(`[EntityManager] Deletion reported failure:`, result);
-                return;
-            }
-
-            allItems = allItems.filter((i) => i.id !== item.id);
-            associatedItems = associatedItems.filter((i) => i.id !== item.id);
-            if (onchange)
-                onchange(
-                    associatedItems.map((i) => i.id),
-                    associatedItems,
-                );
-            
-            // Avoid redundant toast if handleDelete already showed one (result would be true)
-            if (result !== true) {
-                toast.success("Deleted successfully");
-            }
-        } catch (e: any) {
-            console.error(`[EntityManager] Exception during deleteItem:`, e);
-            toast.error(e.message || "Failed to delete item");
-        } finally {
-            deletingItemId = null;
+            refreshCounter++;
         }
     }
 </script>
@@ -821,29 +647,31 @@
                 </div>
             {:else if !isStandalone}
                 <div class="flex items-center gap-1.5 ml-auto">
-                    {#if !singleSelect || associatedItems.length === 0}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onclick={toggleSelector}
-                            class="h-9 px-3 rounded-xl {showSelector
-                                ? 'bg-blue-50 text-blue-600'
-                                : 'text-gray-500 hover:bg-gray-100'}"
-                        >
-                            {#if showSelector}
-                                <X size={16} class="mr-1.5" />
-                                <span class="text-sm font-semibold"
-                                    >{closeSearchLabel}</span
-                                >
-                            {:else}
-                                <Link size={16} class="mr-1.5" />
-                                <span class="text-sm font-semibold"
-                                    >{linkItemLabel}</span
-                                >
-                            {/if}
-                        </Button>
-                    {/if}
+                    {#await associationsPromise then { data: currentAssociations }}
+                        {#if !singleSelect || currentAssociations.length === 0}
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onclick={toggleSelector}
+                                class="h-9 px-3 rounded-xl {showSelector
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-500 hover:bg-gray-100'}"
+                            >
+                                {#if showSelector}
+                                    <X size={16} class="mr-1.5" />
+                                    <span class="text-sm font-semibold"
+                                        >{closeSearchLabel}</span
+                                    >
+                                {:else}
+                                    <Link size={16} class="mr-1.5" />
+                                    <span class="text-sm font-semibold"
+                                        >{linkItemLabel}</span
+                                    >
+                                {/if}
+                            </Button>
+                        {/if}
+                    {/await}
                     {#if renderForm && showQuickCreateButton}
                         <Button
                             type="button"
@@ -869,245 +697,257 @@
         class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
     >
         <div class="max-h-64 overflow-y-auto space-y-1 p-1">
-            {#if loadingSearch}
+            {#await listPromise}
                 <div class="text-xs text-center py-8 text-gray-400 font-medium">
                     <div
                         class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"
                     ></div>
                     {loadingLabel}
                 </div>
-            {:else if filteredItems.length === 0}
-                <div
-                    class="text-xs text-center py-8 text-gray-400 font-medium italic"
-                >
-                    {noItemsFoundLabel}
-                </div>
-            {:else}
-                {#each filteredItems as item}
-                    {@const isAssociated = associatedItems.some((ai) => {
-                        if (item.id && ai.id) return ai.id === item.id;
-                        return ai.name === item.name;
-                    })}
+            {:then { data: allItems }}
+                {@const filteredItems = searchPredicate ? allItems.filter(i => searchPredicate(i, searchQuery)) : allItems}
+                {#if filteredItems.length === 0}
                     <div
-                        class="flex items-center gap-3 transition-all rounded-xl p-2 {isAssociated
-                            ? 'bg-blue-50/50'
-                            : 'hover:bg-gray-50'}"
+                        class="text-xs text-center py-8 text-gray-400 font-medium italic"
                     >
-                        <div class="flex-1 min-w-0">
-                            <div
-                                class="text-sm font-bold {isAssociated
-                                    ? 'text-blue-700'
-                                    : 'text-gray-900'} truncate"
-                            >
-                                {#if renderItemLabel}
-                                    {@render renderItemLabel(item)}
-                                {:else}
-                                    {item.id || "Unnamed Item"}
-                                {/if}
-                            </div>
-                            {#if renderItemBadge}
-                                <div class="mt-0.5">
-                                    {@render renderItemBadge(item)}
-                                </div>
-                            {/if}
-                        </div>
-
-                        <div class="flex items-center gap-1">
-                            <AsyncButton
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                class="h-8 w-8 p-0 rounded-lg {isAssociated
-                                    ? 'text-blue-600 bg-blue-100/50'
-                                    : 'text-gray-400 hover:text-blue-500'}"
-                                loading={linkingItemId === item.id}
-                                loadingLabel=""
-                                onclick={() => toggleAssociation(item)}
-                                title={isAssociated
-                                    ? unlinkLabel
-                                    : linkItemLabel}
-                            >
-                                {#if isAssociated}
-                                    <Unlink size={16} />
-                                {:else}
-                                    <Link size={16} />
-                                {/if}
-                            </AsyncButton>
-                            {#if deleteItemRemote}
-                                <AsyncButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-500"
-                                    loading={deletingItemId === item.id}
-                                    loadingLabel=""
-                                    onclick={() => deleteItem(item)}
-                                    title={deleteForeverLabel}
-                                >
-                                    <Trash2 size={16} />
-                                </AsyncButton>
-                            {/if}
-                        </div>
+                        {noItemsFoundLabel}
                     </div>
-                {/each}
-            {/if}
+                {:else}
+                    {#await associationsPromise then { data: currentAssociations }}
+                        {#each filteredItems as item}
+                            {@const isLinked = isAssociated(item, currentAssociations)}
+                            <div
+                                class="flex items-center gap-3 transition-all rounded-xl p-2 {isLinked
+                                    ? 'bg-blue-50/50'
+                                    : 'hover:bg-gray-50'}"
+                            >
+                                <div class="flex-1 min-w-0">
+                                    <div
+                                        class="text-sm font-bold {isLinked
+                                            ? 'text-blue-700'
+                                            : 'text-gray-900'} truncate"
+                                    >
+                                        {#if renderItemLabel}
+                                            {@render renderItemLabel(item)}
+                                        {:else}
+                                            {item.name || item.id || "Unnamed Item"}
+                                        {/if}
+                                    </div>
+                                    {#if renderItemBadge}
+                                        <div class="mt-0.5">
+                                            {@render renderItemBadge(item)}
+                                        </div>
+                                    {/if}
+                                </div>
+
+                                <div class="flex items-center gap-1">
+                                    <AsyncButton
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="h-8 w-8 p-0 rounded-lg {isLinked
+                                            ? 'text-blue-600 bg-blue-100/50'
+                                            : 'text-gray-400 hover:text-blue-500'}"
+                                        loading={linkingItemId === item.id}
+                                        loadingLabel=""
+                                        onclick={() => { void toggleAssociation(item, currentAssociations); }}
+                                        title={isLinked
+                                            ? unlinkLabel
+                                            : linkItemLabel}
+                                    >
+                                        {#if isLinked}
+                                            <Unlink size={16} />
+                                        {:else}
+                                            <Link size={16} />
+                                        {/if}
+                                    </AsyncButton>
+                                    {#if deleteItemRemote}
+                                        <AsyncButton
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-500"
+                                            loading={deletingItemId === item.id}
+                                            loadingLabel=""
+                                            onclick={() => { void deleteItem(item, currentAssociations); }}
+                                            title={deleteForeverLabel}
+                                        >
+                                            <Trash2 size={16} />
+                                        </AsyncButton>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/each}
+                    {/await}
+                {/if}
+            {:catch error}
+                <div class="text-xs text-center py-8 text-red-500 font-medium">
+                    {error.message || "Failed to load items"}
+                </div>
+            {/await}
         </div>
     </div>
 {/if}
 
 {#if isStandalone}
-    {#if loadingItems}
+    {#await listPromise}
         <div class="text-center py-20 text-gray-400 font-medium animate-pulse">
             {loadingLabel}
         </div>
-    {:else if associatedItems.length === 0 && !searchQuery && activeFiltersCount === 0}
-        <div class="py-10">
-            <EmptyState
-                icon={Icon}
-                title={emptyTitle || `No ${title}`}
-                description={emptyDescription ||
-                    `No ${title.toLowerCase()} were found in this selection.`}
-                actionLabel={emptyActionLabel ||
-                    `Create First ${title.replace(/s$/, "")}`}
-                onclick={renderForm
-                    ? () => (showQuickCreate = true)
-                    : undefined}
-                actionHref={!renderForm ? createHref : undefined}
-            />
-        </div>
-    {:else if displayedItems.length === 0}
-        <div
-            class="text-center py-20 text-gray-400 font-medium italic bg-gray-50/50 rounded-2xl border border-dashed border-gray-200"
-        >
-            {noItemsFoundLabel}
-        </div>
-    {:else}
-        <div class="grid gap-4">
-            {#each displayedItems as item (item.id)}
-                {#if renderListItem}
-                    {@render renderListItem(item, {
-                        isSelected: selectedIds.has(item.id),
-                        toggleSelection,
-                        deleteItem,
-                        isAssociated: true,
-                        toggleAssociation,
-                        singleSelect,
-                    })}
-                {:else}
-                    <div
-                        class="bg-white rounded-2xl p-5 flex items-center gap-6 border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all group/item"
-                    >
-                        {#if !singleSelect}
-                            <input
-                                type="checkbox"
-                                checked={selectedIds.has(item.id)}
-                                onchange={() => toggleSelection(item.id)}
-                                class="w-5 h-5 text-blue-600 rounded-lg border-gray-200 focus:ring-blue-500 transition-all cursor-pointer"
-                            />
-                        {/if}
-
-                        <div class="flex-1 min-w-0">
-                            <div
-                                class="text-lg font-black text-gray-900 group-hover/item:text-blue-600 transition-colors"
-                            >
-                                {#if renderItemLabel}
-                                    {@render renderItemLabel(item)}
-                                {:else}
-                                    {item.id}
-                                {/if}
-                            </div>
-                            <div
-                                class="flex flex-wrap items-center gap-3 mt-1.5"
-                            >
-                                {#if renderItemBadge}
-                                    {@render renderItemBadge(item)}
-                                {/if}
-                                {#if renderItemDetail}
-                                    <div
-                                        class="text-xs font-bold text-gray-400 uppercase tracking-widest"
-                                    >
-                                        {@render renderItemDetail(item)}
-                                    </div>
-                                {/if}
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            {#if updateRemote && renderForm && getFormData}
-                                <button
-                                    type="button"
-                                    class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                                    onclick={() => {
-                                        editingItem = item;
-                                    }}
-                                    title={editLabel}
-                                >
-                                    <Pencil size={20} />
-                                </button>
-                            {/if}
-                            {#if deleteItemRemote}
-                                <AsyncButton
-                                    type="button"
-                                    variant="ghost"
-                                    class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                    loading={deletingItemId === item.id}
-                                    loadingLabel=""
-                                    onclick={() => deleteItem(item)}
-                                    title={deleteLabel}
-                                >
-                                    <Trash2 size={20} />
-                                </AsyncButton>
-                            {/if}
-                        </div>
-                    </div>
-                {/if}
-            {/each}
-        </div>
-
-        {#if totalItems > limit}
-            <div
-                class="flex flex-col sm:flex-row justify-between items-center py-6 gap-4 border-t border-gray-50 mt-6"
-            >
-                <div
-                    class="text-xs font-bold text-gray-400 uppercase tracking-widest"
-                >
-                    Showing <span class="text-gray-900"
-                        >{(page - 1) * limit + 1}</span
-                    >
-                    to
-                    <span class="text-gray-900"
-                        >{Math.min(page * limit, totalItems)}</span
-                    >
-                    of <span class="text-gray-900">{totalItems}</span>
-                </div>
-                <div class="flex gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="rounded-xl font-bold px-4 hover:bg-gray-50"
-                        disabled={page === 1}
-                        onclick={() => {
-                            page--;
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="rounded-xl font-bold px-4 hover:bg-gray-50"
-                        disabled={page * limit >= totalItems}
-                        onclick={() => {
-                            page++;
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                    >
-                        Next
-                    </Button>
-                </div>
+    {:then { data: items, total }}
+        {#if items.length === 0 && !searchQuery && activeFiltersCount === 0}
+            <div class="py-10">
+                <EmptyState
+                    icon={Icon}
+                    title={emptyTitle || `No ${title}`}
+                    description={emptyDescription ||
+                        `No ${title.toLowerCase()} were found in this selection.`}
+                    actionLabel={emptyActionLabel ||
+                        `Create First ${title.replace(/s$/, "")}`}
+                    onclick={renderForm
+                        ? () => (showQuickCreate = true)
+                        : undefined}
+                    actionHref={!renderForm ? createHref : undefined}
+                />
             </div>
+        {:else if items.length === 0}
+            <div
+                class="text-center py-20 text-gray-400 font-medium italic bg-gray-50/50 rounded-2xl border border-dashed border-gray-200"
+            >
+                {noItemsFoundLabel}
+            </div>
+        {:else}
+            <div class="grid gap-4">
+                {#each items as item (item.id)}
+                    {#if renderListItem}
+                        {@render renderListItem(item, {
+                            isSelected: selectedIds.has(item.id!),
+                            toggleSelection,
+                            deleteItem: (i: T) => { void deleteItem(i, items); },
+                            isAssociated: true,
+                            toggleAssociation: (i: T) => { void toggleAssociation(i, items); },
+                            singleSelect,
+                        })}
+                    {:else}
+                        <div
+                            class="bg-white rounded-2xl p-5 flex items-center gap-6 border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all group/item"
+                        >
+                            {#if !singleSelect}
+                                <input
+                                    type="checkbox"
+                                    checked={selectedIds.has(item.id!)}
+                                    onchange={() => toggleSelection(item.id!)}
+                                    class="w-5 h-5 text-blue-600 rounded-lg border-gray-200 focus:ring-blue-500 transition-all cursor-pointer"
+                                />
+                            {/if}
+
+                            <div class="flex-1 min-w-0">
+                                <div
+                                    class="text-lg font-black text-gray-900 group-hover/item:text-blue-600 transition-colors"
+                                >
+                                    {#if renderItemLabel}
+                                        {@render renderItemLabel(item)}
+                                    {:else}
+                                        {item.name || item.id}
+                                    {/if}
+                                </div>
+                                <div
+                                    class="flex flex-wrap items-center gap-3 mt-1.5"
+                                >
+                                    {#if renderItemBadge}
+                                        {@render renderItemBadge(item)}
+                                    {/if}
+                                    {#if renderItemDetail}
+                                        <div
+                                            class="text-xs font-bold text-gray-400 uppercase tracking-widest"
+                                        >
+                                            {@render renderItemDetail(item)}
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                {#if updateRemote && renderForm && getFormData}
+                                    <button
+                                        type="button"
+                                        class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                        onclick={() => {
+                                            editingItem = item;
+                                        }}
+                                        title={editLabel}
+                                    >
+                                        <Pencil size={20} />
+                                    </button>
+                                {/if}
+                                {#if deleteItemRemote}
+                                    <AsyncButton
+                                        type="button"
+                                        variant="ghost"
+                                        class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                        loading={deletingItemId === item.id}
+                                        loadingLabel=""
+                                        onclick={() => deleteItem(item, items)}
+                                        title={deleteLabel}
+                                    >
+                                        <Trash2 size={20} />
+                                    </AsyncButton>
+                                {/if}
+                            </div>
+                        </div>
+                    {/if}
+                {/each}
+            </div>
+
+            {#if total > limit}
+                <div
+                    class="flex flex-col sm:flex-row justify-between items-center py-6 gap-4 border-t border-gray-50 mt-6"
+                >
+                    <div
+                        class="text-xs font-bold text-gray-400 uppercase tracking-widest"
+                    >
+                        Showing <span class="text-gray-900"
+                            >{(page - 1) * limit + 1}</span
+                        >
+                        to
+                        <span class="text-gray-900"
+                            >{Math.min(page * limit, total)}</span
+                        >
+                        of <span class="text-gray-900">{total}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="rounded-xl font-bold px-4 hover:bg-gray-50"
+                            disabled={page === 1}
+                            onclick={() => {
+                                page--;
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                        >
+                            Previous
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            class="rounded-xl font-bold px-4 hover:bg-gray-50"
+                            disabled={page * limit >= total}
+                            onclick={() => {
+                                page++;
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                        >
+                            Next
+                        </Button>
+                    </div>
+                </div>
+            {/if}
         {/if}
-    {/if}
+    {:catch error}
+        <div class="text-center py-20 text-red-500 font-medium">
+            {error.message || "Failed to load items"}
+        </div>
+    {/await}
 {:else}
     <!-- Embedded Content -->
     <div class="space-y-2">
@@ -1120,93 +960,93 @@
                 ></div>
                 {loadingLabel}
             </div>
-        {:then _unused}
-            {#if displayedItems.length > 0}
-
-            <div class="grid gap-2">
-                {#each displayedItems as item}
-                    <div
-                        class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
-                    >
-                        <div class="flex-1 min-w-0">
-                            <div
-                                class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
-                            >
-                                {#if renderItemLabel}
-                                    {@render renderItemLabel(item)}
-                                {:else}
-                                    {item.id}
-                                {/if}
-                            </div>
-                            <div class="flex items-center gap-2 mt-0.5">
-                                {#if renderItemBadge}
-                                    {@render renderItemBadge(item)}
-                                {/if}
-                                {#if renderItemDetail}
-                                    <div
-                                        class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
-                                    >
-                                        {@render renderItemDetail(item)}
-                                    </div>
-                                {/if}
-                            </div>
-                        </div>
-
-                        {#if participationSnippet}
-                            {@render participationSnippet(item)}
-                        {/if}
-
-                        <div class="flex items-center gap-1">
-                            {#if updateRemote && renderForm && getFormData}
-                                <button
-                                    type="button"
-                                    class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                    onclick={() => {
-                                        editingItem = item;
-                                    }}
-                                    title={editLabel}
+        {:then { data: currentAssociations }}
+            {@const items = searchPredicate ? currentAssociations.filter((i: any) => searchPredicate(i, searchQuery)) : currentAssociations}
+            {#if items.length > 0}
+                <div class="grid gap-2">
+                    {#each items as item (item.id)}
+                        <div
+                            class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
+                        >
+                            <div class="flex-1 min-w-0">
+                                <div
+                                    class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
                                 >
-                                    <Pencil size={15} />
-                                </button>
+                                    {#if renderItemLabel}
+                                        {@render renderItemLabel(item)}
+                                    {:else}
+                                        {item.name || item.id}
+                                    {/if}
+                                </div>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    {#if renderItemBadge}
+                                        {@render renderItemBadge(item)}
+                                    {/if}
+                                    {#if renderItemDetail}
+                                        <div
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
+                                        >
+                                            {@render renderItemDetail(item)}
+                                        </div>
+                                    {/if}
+                                </div>
+                            </div>
+
+                            {#if participationSnippet}
+                                {@render participationSnippet(item)}
                             {/if}
-                            <AsyncButton
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                loading={linkingItemId === item.id}
-                                loadingLabel=""
-                                onclick={() => toggleAssociation(item)}
-                                title={confirmUnlinkLabel}
-                            >
-                                <Unlink size={15} />
-                            </AsyncButton>
-                            {#if deleteItemRemote}
+
+                            <div class="flex items-center gap-1">
+                                {#if updateRemote && renderForm && getFormData}
+                                    <button
+                                        type="button"
+                                        class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                        onclick={() => {
+                                            editingItem = item;
+                                        }}
+                                        title={editLabel}
+                                    >
+                                        <Pencil size={15} />
+                                    </button>
+                                {/if}
                                 <AsyncButton
                                     type="button"
                                     variant="ghost"
                                     size="sm"
                                     class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                    loading={deletingItemId === item.id}
+                                    loading={linkingItemId === item.id}
                                     loadingLabel=""
-                                    onclick={() => deleteItem(item)}
-                                    title={deleteForeverLabel}
+                                    onclick={() => toggleAssociation(item, currentAssociations)}
+                                    title={confirmUnlinkLabel}
                                 >
-                                    <Trash2 size={15} />
+                                    <Unlink size={15} />
                                 </AsyncButton>
-                            {/if}
+                                {#if deleteItemRemote}
+                                    <AsyncButton
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                        loading={deletingItemId === item.id}
+                                        loadingLabel=""
+                                        onclick={() => deleteItem(item, currentAssociations)}
+                                        title={deleteForeverLabel}
+                                    >
+                                        <Trash2 size={15} />
+                                    </AsyncButton>
+                                {/if}
+                            </div>
                         </div>
-                    </div>
-                {/each}
-            </div>
-        {:else}
-            <div
-                class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
-            >
-                <p class="text-sm font-medium text-gray-400 italic">
-                    {noItemsLabel}
-                </p>
-            </div>
+                    {/each}
+                </div>
+            {:else}
+                <div
+                    class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
+                >
+                    <p class="text-sm font-medium text-gray-400 italic">
+                        {noItemsLabel}
+                    </p>
+                </div>
             {/if}
         {:catch error}
             <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
@@ -1216,7 +1056,6 @@
             </div>
         {/await}
     </div>
-
 {/if}
 
 <!-- Dialog for Create/Edit (shared by both modes) -->
@@ -1240,27 +1079,30 @@
             </Dialog.Header>
 
             <div style="overflow-y: auto; flex: 1; min-height: 0;">
-                {#if editingItem && getFormData}
-                    {@render renderForm({
-                        remoteFunction: updateRemote,
-                        schema: updateSchema,
-                        initialData: getFormData(editingItem),
-                        onSuccess: handleInPlaceUpdateSuccess,
-                        onCancel: () => {
-                            editingItem = null;
-                        },
-                        id: editingItem.id,
-                    })}
-                {:else if showQuickCreate}
-                    {@render renderForm({
-                        remoteFunction: createRemote,
-                        schema: createSchema,
-                        onSuccess: handleQuickCreateSuccess,
-                        onCancel: () => {
-                            showQuickCreate = false;
-                        },
-                    })}
-                {/if}
+                {#await isStandalone ? listPromise : associationsPromise then res}
+                    {@const currentList = res?.data ?? []}
+                    {#if editingItem && getFormData}
+                        {@render renderForm({
+                            remoteFunction: updateRemote,
+                            schema: updateSchema,
+                            initialData: getFormData(editingItem),
+                            onSuccess: (result) => { void handleInPlaceUpdateSuccess(result, currentList); },
+                            onCancel: () => {
+                                editingItem = null;
+                            },
+                            id: editingItem.id,
+                        })}
+                    {:else if showQuickCreate}
+                        {@render renderForm({
+                            remoteFunction: createRemote,
+                            schema: createSchema,
+                            onSuccess: (result) => { void handleQuickCreateSuccess(result, currentList); },
+                            onCancel: () => {
+                                showQuickCreate = false;
+                            },
+                        })}
+                    {/if}
+                {/await}
             </div>
         </Dialog.Content>
     </Dialog.Root>

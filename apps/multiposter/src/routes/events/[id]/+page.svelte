@@ -24,7 +24,6 @@
     } from "@lucide/svelte";
 
 	const eventId = page.params.id || "";
-    const rf = updateEvent.preflight(updateEventSchema);
 </script>
 
 {#if browser}
@@ -112,45 +111,47 @@
                 {/if}
             </div>
 
-            <form
-                {...rf.enhance(async ({ submit }: any) => {
-                    try {
-                        const result: any = await submit();
-                        if (result?.error) {
-                            toast.error(
-                                result.error.message || m.something_went_wrong(),
-                            );
-                            return;
+            {#key eventId}
+                <form
+                    {...updateEvent.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
+                        try {
+                            const result: any = await submit();
+                            if (result?.error) {
+                                toast.error(
+                                    result.error.message || m.something_went_wrong(),
+                                );
+                                return;
+                            }
+                            toast.success(m.successfully_saved());
+                            goto("/events");
+                        } catch (error: any) {
+                            toast.error(error?.message || m.something_went_wrong());
                         }
-                        toast.success(m.successfully_saved());
-                        goto("/events");
-                    } catch (error: any) {
-                        toast.error(error?.message || m.something_went_wrong());
-                    }
-                })}
-                class="space-y-6"
-            >
-                <EventForm
-                    remoteFunction={updateEvent}
-                    validationSchema={updateEventSchema}
-                    isUpdating={true}
-                    initialData={event}
-                />
+                    })}
+                    class="space-y-6"
+                >
+                    <EventForm
+                        remoteFunction={updateEvent}
+                        validationSchema={updateEventSchema}
+                        isUpdating={true}
+                        initialData={event}
+                    />
 
-                <div class="flex gap-3 pt-4">
-                    <AsyncButton
-                        type="submit"
-                        loadingLabel={m.saving()}
-                        loading={updateEvent.pending}
-                        class="px-8"
-                    >
-                        {m.save_changes()}
-                    </AsyncButton>
-                    <Button variant="secondary" href="/events" size="default">
-                        {m.cancel()}
-                    </Button>
-                </div>
-            </form>
+                    <div class="flex gap-3 pt-4">
+                        <AsyncButton
+                            type="submit"
+                            loadingLabel={m.saving()}
+                            loading={updateEvent.pending}
+                            class="px-8"
+                        >
+                            {m.save_changes()}
+                        </AsyncButton>
+                        <Button variant="secondary" href="/events" size="default">
+                            {m.cancel()}
+                        </Button>
+                    </div>
+                </form>
+            {/key}
         </div>
 	{:else}
 		<ErrorSection

@@ -13,7 +13,9 @@
 
     import Button from "../button/button.svelte";
     import AsyncButton from "../AsyncButton.svelte";
-    import EntityManager from "../EntityManager.svelte";
+    // @ts-ignore
+    import EntityManager_ from "../EntityManager.svelte";
+    const EntityManager = EntityManager_ as any;
     import { Tag as TagIcon } from "@lucide/svelte";
     import { handleDelete } from "../../hooks/handleDelete.svelte";
 
@@ -427,8 +429,8 @@
                     mode="embedded"
                     initialItems={initialTags}
                     listItemsRemote={listTagsRemote}
-                    onchange={(ids, items) => {
-                        tagsInput = items.map(i => i.name || i).join(", ");
+                    onchange={(ids: any, items: any) => {
+                        tagsInput = items.map((i: any) => i.name || i).join(", ");
                     }}
                     createRemote={createTagRemote}
                     createSchema={createTagSchema}
@@ -449,10 +451,10 @@
                     noItemsLabel={labels?.noTags ?? "No tags associated."}
                     quickCreateLabel={labels?.quickCreateTag ?? "Quick Create Tag"}
                 >
-                    {#snippet renderItemLabel(tag)}
+                    {#snippet renderItemLabel(tag: any)}
                         {tag.name}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction: state, schema, initialData: formData, onSuccess, onCancel, id })}
+                    {#snippet renderForm({ remoteFunction: state, schema, initialData: formData, onSuccess, onCancel, id }: any)}
                         <form
                             {...state.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
                                 try {

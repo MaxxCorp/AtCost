@@ -135,7 +135,7 @@
 
 				{#snippet renderListItem(
 					location: Location,
-					{ isSelected, toggleSelection, deleteItem },
+					{ isSelected, toggleSelection, deleteItem }: any,
 				)}
 					<div
 						class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md"

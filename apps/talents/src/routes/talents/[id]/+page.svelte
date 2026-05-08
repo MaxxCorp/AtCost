@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import * as m from "$lib/paraglide/messages";
-    import { LoadingSection, ErrorSection, TalentTimeline, Button } from "@ac/ui";
+    import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager } from "@ac/ui";
     import { Calendar, ArrowLeft, ExternalLink, FileText } from "@lucide/svelte";
     import { 
         readTalent, 
@@ -12,7 +12,7 @@
     } from '../talents.remote';
     import { listContracts, deleteContract, createContract, updateContract } from '../../contracts/contracts.remote';
     import ContractForm from '../../contracts/ContractForm.svelte';
-    import EntityManager from "@ac/ui/components/EntityManager.svelte";
+
     import { contractSchema } from "@ac/validations/contracts";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";

@@ -260,7 +260,7 @@
 				}
 			]}
 		>
-			{#snippet renderListItem(config: Synchronization, { isSelected, toggleSelection, deleteItem })}
+			{#snippet renderListItem(config: Synchronization, { isSelected, toggleSelection, deleteItem }: any)}
 				{@const Icon = getProviderIcon(config.providerType)}
 				{@const statusColor = getStatusColor(
 					config.enabled,

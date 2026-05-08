@@ -47,7 +47,7 @@
         updateContactSchema,
     } from "@ac/validations";
     import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
-    import { onMount } from "svelte";
+    import { onMount, untrack } from "svelte";
     import { MapPin, User } from "@lucide/svelte";
 
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
@@ -66,29 +66,22 @@
     const type = "announcement";
 
     // svelte-ignore state_referenced_locally
-    let contentValue = $state(
-        initialData?.content ?? "",
-    );
+    let contentValue = $state(untrack(() => initialData?.content ?? ""));
     // svelte-ignore state_referenced_locally
     let tagsString = $state(
-        isUpdating && initialData?.tags
+        untrack(() => isUpdating && initialData?.tags
             ? initialData.tags.map((t: any) => t.name).join(", ")
-            : "News",
+            : "News")
     );
     // svelte-ignore state_referenced_locally
-    let selectedContactIds = $state<string[]>(initialData?.contactIds || []);
+    let selectedContactIds = $state<string[]>(untrack(() => initialData?.contactIds || []));
     // svelte-ignore state_referenced_locally
-    let isPublic = $state(initialData?.isPublic ?? false);
+    let isPublic = $state(untrack(() => initialData?.isPublic ?? false));
     let locations = $state<Location[]>([]);
     // svelte-ignore state_referenced_locally
-    let selectedLocationIds = $state<string[]>(initialData?.locationIds || []);
+    let selectedLocationIds = $state<string[]>(untrack(() => initialData?.locationIds || []));
 
-    // Keep contentValue in sync with form state ONLY IF it's empty (initial load)
-    $effect(() => {
-        if (!contentValue && initialData?.content) {
-            contentValue = initialData.content;
-        }
-    });
+
 
     onMount(async () => {
         try {
@@ -241,7 +234,7 @@
                     mode="embedded"
                     initialItems={initialData?.tags || []}
                     listItemsRemote={listTagsRemote}
-                    onchange={(ids, items) => {
+                    onchange={(ids: any, items: any[]) => {
                         tagsString = items.map(i => i.name).join(", ");
                     }}
                     deleteItemRemote={deleteTagRemote}
@@ -269,10 +262,10 @@
                     selectAllLabel={m.select_all()}
                     deselectAllLabel={m.deselect_all()}
                 >
-                    {#snippet renderItemLabel(tag)}
+                    {#snippet renderItemLabel(tag: any)}
                         {tag.name}
                     {/snippet}
-                    {#snippet renderForm({ remoteFunction, schema, initialData: formData, onSuccess, onCancel, id })}
+                    {#snippet renderForm({ remoteFunction, schema, initialData: formData, onSuccess, onCancel, id }: any)}
                         {@const rfState = remoteFunction.preflight(schema)}
                         <form
                             {...rfState.enhance(async ({ submit }: { submit: any }) => {
@@ -400,7 +393,7 @@
                             item: m.location(),
                         })}
                     >
-                        {#snippet renderItemLabel(location)}
+                        {#snippet renderItemLabel(location: any)}
                             {location.name}
                             {location.roomId ? `(${location.roomId})` : ""}
                         {/snippet}
@@ -411,7 +404,7 @@
                             initialData: formData,
                             onSuccess,
                             onCancel,
-                        })}
+                        }: any)}
                             <LocationForm
                                 remoteFunction={rf}
                                 validationSchema={schema}
@@ -551,7 +544,7 @@
             deselectAllLabel={m.deselect_all()}
             confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
         >
-            {#snippet renderItemLabel(contact)}
+            {#snippet renderItemLabel(contact: any)}
                 {contact.displayName ||
                     `${contact.givenName || ""} ${contact.familyName || ""}`}
             {/snippet}
@@ -562,7 +555,7 @@
                 onSuccess,
                 onCancel,
                 id,
-            })}
+            }: any)}
                 <ContactForm
                     remoteFunction={rf}
                     {schema}

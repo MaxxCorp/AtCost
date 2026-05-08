@@ -137,7 +137,7 @@
                                             contactId: p.entityId,
                                         });
                                     }}
-                                    deleteItemRemote={async (ids) => {
+                                    deleteItemRemote={async (ids: any) => {
                                         return await handleDelete({
                                             ids: Array.isArray(ids)
                                                 ? ids
@@ -152,8 +152,8 @@
                                     createSchema={createLocationSchema}
                                     updateRemote={updateLocation}
                                     updateSchema={updateLocationSchema}
-                                    getFormData={(l) => l}
-                                    searchPredicate={(l, q) => {
+                                    getFormData={(l: any) => l}
+                                    searchPredicate={(l: any, q: string) => {
                                         return (
                                             l.name
                                                 .toLowerCase()
@@ -183,13 +183,13 @@
                                     deselectAllLabel={m.deselect_all()}
                                     confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
                                 >
-                                    {#snippet renderItemLabel(location)}
+                                    {#snippet renderItemLabel(location: any)}
                                         {location.name}
                                         {location.roomId
                                             ? `(${location.roomId})`
                                             : ""}
                                     {/snippet}
-                                    {#snippet renderForm({ remoteFunction: rf, schema, id, initialData: formData, onSuccess, onCancel })}
+                                    {#snippet renderForm({ remoteFunction: rf, schema, id, initialData: formData, onSuccess, onCancel }: any)}
                                         <LocationForm
                                             remoteFunction={rf}
                                             validationSchema={schema}

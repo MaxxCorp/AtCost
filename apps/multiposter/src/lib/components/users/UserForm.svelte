@@ -266,7 +266,7 @@
             deselectAllLabel={m.deselect_all()}
             confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
         >
-            {#snippet renderItemLabel(contact)}
+            {#snippet renderItemLabel(contact: any)}
                 {contact.displayName ||
                     `${contact.givenName || ""} ${contact.familyName || ""}`}
             {/snippet}
@@ -277,7 +277,7 @@
                 onSuccess,
                 onCancel,
                 id,
-            })}
+            }: any)}
                 <ContactForm
                     remoteFunction={rf}
                     {schema}

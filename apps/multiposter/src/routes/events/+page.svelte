@@ -125,7 +125,7 @@
 				createLabel={m.create_item({ item: "Event" })}
 				filterAssociations={eventAssociations}
 			>
-				{#snippet renderListItem(event: Event, { isSelected, toggleSelection, deleteItem })}
+				{#snippet renderListItem(event: Event, { isSelected, toggleSelection, deleteItem }: any)}
 					<div class="bg-white border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
 						<input
 							type="checkbox"

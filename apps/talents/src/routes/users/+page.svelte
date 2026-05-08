@@ -31,7 +31,7 @@
                 title={m.users()}
                 icon={UserIcon}
                 mode="standalone"
-                listItemsRemote={listUsers as any}
+                listItemsRemote={listUsers}
                 loadingLabel="Synchronizing users..."
                 noItemsFoundLabel="No users found."
                 searchPredicate={(user: User, q: string) => 
@@ -52,7 +52,7 @@
                     }
                 ]}
             >
-                {#snippet renderListItem(user: User, { isSelected, toggleSelection, deleteItem })}
+                {#snippet renderListItem(user: User, { isSelected, toggleSelection, deleteItem }: any)}
                     <div class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-300">
                         <div class="flex flex-col sm:flex-row items-start gap-6">
                             <div class="flex items-center gap-4 shrink-0">

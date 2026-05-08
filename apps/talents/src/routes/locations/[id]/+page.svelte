@@ -141,7 +141,7 @@
                                 }
                             })}
                         >
-                            {#snippet renderItemLabel(talent)}
+                            {#snippet renderItemLabel(talent: any)}
                                 <div class="flex flex-col">
                                     <span class="font-bold text-sm tracking-tight text-gray-900">{talent.contact?.displayName || 'Unknown Talent'}</span>
                                     {#if talent.jobTitle}
@@ -150,7 +150,7 @@
                                 </div>
                             {/snippet}
                             
-                            {#snippet renderItemBadge(talent)}
+                            {#snippet renderItemBadge(talent: any)}
                                 <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-gray-100
                                     {talent.status === 'active' ? 'bg-green-50 text-green-700 border-green-100' : 
                                      talent.status === 'applicant' ? 'bg-blue-50 text-blue-700 border-blue-100' : 
@@ -159,7 +159,7 @@
                                 </span>
                             {/snippet}
 
-                            {#snippet renderForm({ remoteFunction: rf, id, initialData, onSuccess, onCancel })}
+                            {#snippet renderForm({ remoteFunction: rf, id, initialData, onSuccess, onCancel }: any)}
                                 <TalentForm
                                     remoteFunction={rf}
                                     talentId={id}

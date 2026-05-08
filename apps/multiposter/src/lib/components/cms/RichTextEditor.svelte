@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
+    import { onMount, onDestroy, untrack } from "svelte";
     import "ckeditor5/ckeditor5.css";
     // Type-only import safe for SSR
     import type { ClassicEditor } from "ckeditor5";
@@ -18,6 +18,7 @@
     let editorInstance = $state<ClassicEditor | null>(null);
     let isMounted = $state(false);
     let errorMsg = $state("");
+    let destroyed = false;
 
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
 
@@ -173,6 +174,7 @@
 
             // Bind change event
             editorInstance.model.document.on("change:data", () => {
+                if (destroyed) return;
                 const data = editorInstance?.getData();
                 if (data !== value) {
                     value = data ?? "";
@@ -187,7 +189,10 @@
 
     $effect(() => {
         if (editorInstance && value !== editorInstance.getData()) {
-            editorInstance.setData(value || "");
+            const currentEditor = editorInstance;
+            untrack(() => {
+                currentEditor.setData(value || "");
+            });
         }
     });
 
@@ -202,6 +207,7 @@
     });
 
     onDestroy(() => {
+        destroyed = true;
         editorInstance?.destroy();
     });
 </script>

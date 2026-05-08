@@ -9,7 +9,9 @@ export { cn, type WithoutChild, type WithoutChildren, type WithoutChildrenOrChil
 export { ICONS, type IconDef } from "./icons.js";
 
 // Components
-export { default as EntityManager } from './components/EntityManager.svelte';
+// @ts-ignore
+import _EntityManager from './components/EntityManager.svelte';
+export const EntityManager = _EntityManager as any;
 export { default as ContactManager } from './components/ContactManager.svelte';
 export { default as AsyncButton } from './components/AsyncButton.svelte';
 export { default as BulkActionToolbar } from './components/BulkActionToolbar.svelte';

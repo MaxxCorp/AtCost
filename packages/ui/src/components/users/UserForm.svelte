@@ -258,7 +258,7 @@
     {/if}
 
     {#if isUpdating && initialData?.id && extraEntities}
-        {@render extraEntities(initialData)}
+        {@render extraEntities(initialData!)}
     {/if}
 
     <div class="flex gap-3 mt-6">

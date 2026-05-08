@@ -38,7 +38,7 @@
                     (plan.locationName?.toLowerCase().includes(q.toLowerCase()) ?? false)
                 }
             >
-                {#snippet renderListItem(plan: Shiftplan, { isSelected, toggleSelection, deleteItem })}
+                {#snippet renderListItem(plan: Shiftplan, { isSelected, toggleSelection, deleteItem }: any)}
                     <div class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-purple-200 transition-all duration-300">
                         <div class="flex items-start justify-between gap-4 mb-4">
                             <div class="flex items-center gap-3">
