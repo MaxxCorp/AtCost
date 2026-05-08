@@ -863,7 +863,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		const stzLocations = [
 			'STZ Biesdorf - Gelbe Villa',
 			'STZ Biesdorf - Historischer Pferdestall',
-			'Schloss Biesdorf'
+			'Schloss Biesdorf',
+			'Haus der Zukunft am ukb'
 		];
 
 		const venues =
