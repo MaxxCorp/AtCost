@@ -34,8 +34,8 @@
  
     const type = "kiosk";
  
-    let locations = $state<Location[]>([]);
-    let loaded = $state(false);
+
+
     let selectedLocationIds = $state<string[]>(
         untrack(() => initialData?.locationIds || (initialData?.locationId ? [initialData.locationId] : []))
     );
@@ -71,15 +71,15 @@
         endDate = initialData.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : "";
     });
  
-    onMount(async () => {
-        try {
-            locations = (await listLocations()).data;
-            loaded = true;
-        } catch (e) {
-            console.error("Failed to load locations", e);
-            toast.error(m.failed_to_load({ item: m.feature_locations_title().toLowerCase() }));
-        }
-    });
+
+
+
+
+
+
+
+
+
  
 
 
@@ -202,9 +202,11 @@
         </div>
 
         <div class="space-y-2">
-            {#if !loaded}
+            {#await listLocations()}
+
                 <div class="animate-pulse h-10 bg-gray-100 rounded"></div>
-            {:else}
+                        {:then locs}
+
                 <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
                     <MapPin size={18} class="text-blue-600" />
                     {m.feature_locations_title()}
@@ -215,7 +217,8 @@
                     mode="embedded"
                     {type}
                     entityId={initialData?.id}
-                    initialItems={locations.filter((l: any) =>
+                                        initialItems={locs.data.filter((l: any) =>
+
                         selectedLocationIds.includes(l.id),
                     )}
                     onchange={(ids: string[]) => (selectedLocationIds = ids)}
@@ -327,7 +330,12 @@
                 {#each rf.fields.locationIds.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
-            {/if}
+                        {:catch error}
+                <div class="text-red-600 p-4 border border-red-200 rounded">
+                    {error.message || m.something_went_wrong()}
+                </div>
+            {/await}
+
             <p class="text-xs text-gray-500">
                 {m.linked_events_description()}
             </p>

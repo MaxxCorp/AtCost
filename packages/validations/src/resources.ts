@@ -18,4 +18,13 @@ export const resourcePaginationSchema = v.optional(v.object({
         id: v.string()
     }))
 }), {});
+export const resourceAssociationSchema = v.object({
+    type: v.picklist(['event', 'user', 'location', 'announcement', 'kiosk']),
+    entityId: v.string(),
+    resourceId: v.pipe(v.string(), v.uuid()),
+});
 
+export const getResourceAssociationsSchema = v.object({
+    type: v.picklist(['event', 'user', 'location', 'announcement', 'kiosk']),
+    entityId: v.string(),
+});

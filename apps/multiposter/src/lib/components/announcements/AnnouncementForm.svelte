@@ -77,19 +77,11 @@
     let selectedContactIds = $state<string[]>(untrack(() => initialData?.contactIds || []));
     // svelte-ignore state_referenced_locally
     let isPublic = $state(untrack(() => initialData?.isPublic ?? false));
-    let locations = $state<Location[]>([]);
     // svelte-ignore state_referenced_locally
     let selectedLocationIds = $state<string[]>(untrack(() => initialData?.locationIds || []));
 
 
 
-    onMount(async () => {
-        try {
-            locations = (await listLocations()).data;
-        } catch (e) {
-            console.error("Failed to load locations", e);
-        }
-    });
 
     // Derived JSON for submission
     let tagNamesJson = $derived(
@@ -309,8 +301,16 @@
             </div>
 
             <div>
-                {#if locations.length > 0}
-                    <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                {#await listLocations()}
+                    <div
+                        class="p-4 border border-dashed rounded-lg text-sm text-gray-500 text-center"
+                    >
+                        {m.loading_item({ item: m.locations() })}
+                    </div>
+                {:then locs}
+                    <h3
+                        class="text-lg font-semibold mb-2 flex items-center gap-2"
+                    >
                         <MapPin size={18} class="text-blue-600" />
                         {m.locations()}
                     </h3>
@@ -320,7 +320,7 @@
                         mode="embedded"
                         {type}
                         entityId={initialData?.id}
-                        initialItems={locations.filter((l: any) =>
+                        initialItems={locs.data.filter((l: any) =>
                             selectedLocationIds.includes(l.id),
                         )}
                         onchange={(ids: string[]) =>
@@ -452,13 +452,13 @@
                             />
                         {/snippet}
                     </EntityManager>
-                {:else}
+                {:catch error}
                     <div
-                        class="p-4 border border-dashed rounded-lg text-sm text-gray-500 text-center"
+                        class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center"
                     >
-                        {m.loading_item({ item: m.locations() })}
+                        {error.message || m.something_went_wrong()}
                     </div>
-                {/if}
+                {/await}
                 <input
                     {...rf.fields.locationIds.as(
                         "text",

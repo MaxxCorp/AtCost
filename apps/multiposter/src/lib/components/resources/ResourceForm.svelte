@@ -46,6 +46,8 @@
         initialData = null,
         locations = [],
         allResources = [],
+        onSuccess,
+        onCancel,
     }: {
         remoteFunction: typeof updateResource | typeof createResource;
         validationSchema: any;
@@ -53,6 +55,8 @@
         initialData?: any;
         locations: any[];
         allResources: any[];
+        onSuccess?: (result: any) => void;
+        onCancel?: () => void;
     } = $props();
 
     // svelte-ignore state_referenced_locally
@@ -104,7 +108,11 @@
                     return;
                 }
                 toast.success(m.successfully_saved());
-                await goto("/resources");
+                if (onSuccess) {
+                    onSuccess(result);
+                } else {
+                    await goto("/resources");
+                }
             } catch (error: unknown) {
                 const err = error as { message?: string };
                 toast.error(err?.message || m.something_went_wrong());
@@ -517,8 +525,14 @@
         >
             {isUpdating ? m.save_changes() : m.create_resource()}
         </AsyncButton>
-        <Button variant="secondary" href="/resources" size="default">
-            {m.cancel()}
-        </Button>
+        {#if onCancel}
+            <Button variant="secondary" type="button" onclick={onCancel} size="default">
+                {m.cancel()}
+            </Button>
+        {:else}
+            <Button variant="secondary" href="/resources" size="default">
+                {m.cancel()}
+            </Button>
+        {/if}
     </div>
 </form>

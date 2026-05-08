@@ -34,5 +34,12 @@ export const announcementLocation = pgTable("announcement_location", {
     locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.announcementId, table.locationId] })]);
 
+import { resource } from "./resources";
+
+export const announcementResource = pgTable("announcement_resource", {
+    announcementId: uuid("announcement_id").notNull().references(() => announcement.id, { onDelete: "cascade" }),
+    resourceId: uuid("resource_id").notNull().references(() => resource.id, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.announcementId, table.resourceId] })]);
+
 export type Announcement = typeof announcement.$inferSelect;
 export type NewAnnouncement = typeof announcement.$inferInsert;

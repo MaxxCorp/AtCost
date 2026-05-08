@@ -26,5 +26,12 @@ export const kioskLocation = pgTable("kiosk_location", {
     locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.kioskId, table.locationId] })]);
 
+import { resource } from "./resources";
+
+export const kioskResource = pgTable("kiosk_resource", {
+    kioskId: uuid("kiosk_id").notNull().references(() => kiosk.id, { onDelete: "cascade" }),
+    resourceId: uuid("resource_id").notNull().references(() => resource.id, { onDelete: "cascade" }),
+}, (table) => [primaryKey({ columns: [table.kioskId, table.resourceId] })]);
+
 export type Kiosk = typeof kiosk.$inferSelect;
 export type NewKiosk = typeof kiosk.$inferInsert;

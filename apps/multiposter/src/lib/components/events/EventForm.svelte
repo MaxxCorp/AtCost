@@ -9,6 +9,12 @@
     import { handleDelete, EntityManager, LocationForm } from "@ac/ui";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
+    import ResourceForm from "$lib/components/resources/ResourceForm.svelte";
+    import { createResource } from "../../../routes/resources/new/create.remote";
+    import { updateResource } from "../../../routes/resources/[id]/update.remote";
+    import { deleteResource as deleteResourceRemote } from "../../../routes/resources/[id]/delete.remote";
+    import { listResources } from "../../../routes/resources/list.remote";
+    import { createResourceSchema, updateResourceSchema } from "$lib/validations/resources";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { type Location } from "@ac/validations";
 
@@ -36,6 +42,16 @@
         updateLocationSchema,
     } from "@ac/validations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import {
+        addLocationAssociation,
+        removeLocationAssociation,
+        fetchEntityLocations,
+    } from "../../../routes/locations/associate.remote";
+    import {
+        addResourceAssociation,
+        removeResourceAssociation,
+        fetchEntityResources,
+    } from "../../../routes/resources/associate.remote";
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
     import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
@@ -463,8 +479,25 @@
             type="event"
             entityId={initialData?.id}
             listItemsRemote={listResourcesWithHierarchy as any}
+            fetchAssociationsRemote={fetchEntityResources as any}
+            addAssociationRemote={async (p: any) =>
+                addResourceAssociation({ ...p, resourceId: p.itemId } as any)}
+            removeAssociationRemote={async (p: any) =>
+                removeResourceAssociation({ ...p, resourceId: p.itemId } as any)}
             onchange={(ids: string[]) =>
                 rf.fields.resourceIds.set(JSON.stringify(ids))}
+            deleteItemRemote={async (ids: string[]) => {
+                return await handleDelete({
+                    ids,
+                    deleteFn: deleteResourceRemote,
+                    itemName: m.feature_resources_title().toLowerCase(),
+                });
+            }}
+            createRemote={createResource}
+            createSchema={createResourceSchema}
+            updateRemote={updateResource}
+            updateSchema={updateResourceSchema}
+            getFormData={(r: any) => r}
             searchPredicate={(r: any, q: string) =>
                 r.name.toLowerCase().includes(q.toLowerCase())}
             loadingLabel={m.loading_item({
@@ -484,6 +517,8 @@
             })}
             quickCreateLabel={m.quick_create()}
             closeSearchLabel={m.close_search()}
+            editLabel={m.edit()}
+            deleteLabel={m.delete()}
             unlinkLabel={m.unlink()}
             selectAllLabel={m.select_all()}
             deselectAllLabel={m.deselect_all()}
@@ -497,6 +532,37 @@
                             : m.equipment_type_suffix()})
                     </span>
                 </span>
+            {/snippet}
+            {#snippet renderForm({
+                remoteFunction: rfForm,
+                schema,
+                id,
+                initialData: formData,
+                onSuccess,
+                onCancel,
+            }: any)}
+                {#await Promise.all([listLocations(), listResources()])}
+                    <div class="p-4 flex justify-center">
+                        <LoadingSection />
+                    </div>
+                {:then [locs, ress]}
+                    <div class="p-4">
+                        <ResourceForm
+                            remoteFunction={rfForm}
+                            validationSchema={schema}
+                            isUpdating={!!id}
+                            initialData={formData}
+                            {onSuccess}
+                            {onCancel}
+                            locations={locs.data}
+                            allResources={ress.data}
+                        />
+                    </div>
+                {:catch error}
+                    <div class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center">
+                        {error.message || m.something_went_wrong()}
+                    </div>
+                {/await}
             {/snippet}
         </EntityManager>
         <input
@@ -569,9 +635,14 @@
             mode="embedded"
             {type}
             entityId={initialData?.id}
+            listItemsRemote={listLocations as any}
+            fetchAssociationsRemote={fetchEntityLocations as any}
+            addAssociationRemote={async (p: any) =>
+                addLocationAssociation({ ...p, locationId: p.itemId } as any)}
+            removeAssociationRemote={async (p: any) =>
+                removeLocationAssociation({ ...p, locationId: p.itemId } as any)}
             onchange={(ids: string[]) =>
                 rf.fields.locationIds.set(JSON.stringify(ids))}
-            listItemsRemote={listLocations as any}
             deleteItemRemote={async (ids: string[]) => {
                 return await handleDelete({
                     ids,

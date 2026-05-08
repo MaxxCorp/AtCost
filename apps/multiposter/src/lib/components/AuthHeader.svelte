@@ -4,22 +4,11 @@
 	import * as m from "$lib/paraglide/messages";
 	import { setLocale, getLocale } from "$lib/paraglide/runtime";
 
-	let user = $state<any>(null);
-	let loading = $state(true);
+	let sessionPromise = $state(authClient.getSession());
 	let isOpen = $state(false);
 	let signingIn = $state(false);
 	let showProviderMenu = $state(false);
 
-	onMount(async () => {
-		try {
-			const session = await authClient.getSession();
-			user = session?.data?.user;
-		} catch (error) {
-			console.error("Failed to load session:", error);
-		} finally {
-			loading = false;
-		}
-	});
 
 	async function handleSignIn(provider: "google" | "microsoft") {
 		try {
@@ -39,7 +28,7 @@
 			await authClient.signOut({
 				fetchOptions: {
 					onSuccess: () => {
-						user = null;
+						sessionPromise = authClient.getSession();
 						isOpen = false;
 						showProviderMenu = false;
 						window.location.href = "/";
@@ -115,100 +104,37 @@
 					DE
 				</button>
 			</div>
-			{#if loading}
+			{#await sessionPromise}
 				<div class="text-sm text-gray-600">{m.loading()}</div>
-			{:else if user}
-				<div class="relative">
-					<button
-						onclick={toggleMenu}
-						class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-					>
-						{#if user.image}
-							<img
-								src={user.image}
-								alt={user.name}
-								class="w-6 h-6 rounded-full object-cover"
-							/>
-						{:else}
-							<div
-								class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-semibold text-white"
-							>
-								{user.name?.charAt(0).toUpperCase() ||
-									user.email?.charAt(0).toUpperCase()}
-							</div>
-						{/if}
-						<span class="max-w-[150px] truncate"
-							>{user.name || user.email}</span
+			{:then session}
+				{@const user = session?.data?.user}
+				{#if user}
+					<div class="relative">
+						<button
+							onclick={toggleMenu}
+							class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
 						>
-						<svg
-							class="w-4 h-4 ml-1 transition-transform {isOpen
-								? 'rotate-180'
-								: ''}"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 14l-7 7m0 0l-7-7m7 7V3"
-							/>
-						</svg>
-					</button>
-
-					{#if isOpen}
-						<div
-							class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
-							role="menu"
-							aria-orientation="vertical"
-						>
-							<div class="px-4 py-3 border-b border-gray-200">
-								<p class="font-semibold text-gray-900">
-									{user.name || user.email}
-								</p>
-								<p class="text-sm text-gray-500">
-									{user.email}
-								</p>
-								{#if user.emailVerified}
-									<p class="text-xs text-green-600 mt-1">
-										âœ“ {m.verified()}
-									</p>
-								{/if}
-							</div>
-							<button
-								onclick={handleSignOut}
-								class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-								role="menuitem"
-							>
-								<svg
-									class="w-4 h-4"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
+							{#if user.image}
+								<img
+									src={user.image}
+									alt={user.name}
+									class="w-6 h-6 rounded-full object-cover"
+								/>
+							{:else}
+								<div
+									class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-semibold text-white"
 								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-									/>
-								</svg>
-								{m.sign_out()}
-							</button>
-						</div>
-					{/if}
-				</div>
-			{:else}
-				<div class="relative">
-					<button
-						onclick={toggleProviderMenu}
-						disabled={signingIn}
-						class="px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-					>
-						{#if signingIn}
+									{user.name?.charAt(0).toUpperCase() ||
+										user.email?.charAt(0).toUpperCase()}
+								</div>
+							{/if}
+							<span class="max-w-[150px] truncate"
+								>{user.name || user.email}</span
+							>
 							<svg
-								class="w-4 h-4 animate-spin"
+								class="w-4 h-4 ml-1 transition-transform {isOpen
+									? 'rotate-180'
+									: ''}"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -217,117 +143,185 @@
 									stroke-linecap="round"
 									stroke-linejoin="round"
 									stroke-width="2"
-									d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+									d="M19 14l-7 7m0 0l-7-7m7 7V3"
 								/>
 							</svg>
-							{m.signing_in()}
-						{:else}
-							{m.sign_in()}
-						{/if}
-						<svg
-							class="w-4 h-4 transition-transform {showProviderMenu
-								? 'rotate-180'
-								: ''}"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 14l-7 7m0 0l-7-7m7 7V3"
-							/>
-						</svg>
-					</button>
+						</button>
 
-					{#if showProviderMenu}
-						<div
-							class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
-							role="menu"
-							aria-orientation="vertical"
+						{#if isOpen}
+							<div
+								class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
+								role="menu"
+								aria-orientation="vertical"
+							>
+								<div class="px-4 py-3 border-b border-gray-200">
+									<p class="font-semibold text-gray-900">
+										{user.name || user.email}
+									</p>
+									<p class="text-sm text-gray-500">
+										{user.email}
+									</p>
+									{#if user.emailVerified}
+										<p class="text-xs text-green-600 mt-1">
+											âœ“ {m.verified()}
+										</p>
+									{/if}
+								</div>
+								<button
+									onclick={handleSignOut}
+									class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+									role="menuitem"
+								>
+									<svg
+										class="w-4 h-4"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+										/>
+									</svg>
+									{m.sign_out()}
+								</button>
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<div class="relative">
+						<button
+							onclick={toggleProviderMenu}
+							disabled={signingIn}
+							class="px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
 						>
-							<button
-								onclick={() => handleSignIn("google")}
-								disabled={signingIn}
-								class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-								role="menuitem"
-							>
-								<svg class="w-5 h-5" viewBox="0 0 24 24">
+							{#if signingIn}
+								<svg
+									class="w-4 h-4 animate-spin"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
 									<path
-										fill="currentColor"
-										d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-									/>
-									<path
-										fill="currentColor"
-										d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-									/>
-									<path
-										fill="currentColor"
-										d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-									/>
-									<path
-										fill="currentColor"
-										d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
 									/>
 								</svg>
-								Google
-							</button>
-							<button
-								onclick={() => handleSignIn("microsoft")}
-								disabled={signingIn}
-								class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-								role="menuitem"
+								{m.signing_in()}
+							{:else}
+								{m.sign_in()}
+							{/if}
+							<svg
+								class="w-4 h-4 transition-transform {showProviderMenu
+									? 'rotate-180'
+									: ''}"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
 							>
-								<svg class="w-5 h-5" viewBox="0 0 23 23">
-									<rect
-										width="11"
-										height="11"
-										fill="#F25022"
-									/>
-									<rect
-										x="12"
-										width="11"
-										height="11"
-										fill="#7FBA00"
-									/>
-									<rect
-										y="12"
-										width="11"
-										height="11"
-										fill="#00A4EF"
-									/>
-									<rect
-										x="12"
-										y="12"
-										width="11"
-										height="11"
-										fill="#FFB900"
-									/>
-								</svg>
-								Microsoft
-							</button>
-							<div class="border-t border-gray-100 mt-2 pt-2 px-4">
-								<p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{m.language()}</p>
-								<div class="flex gap-2">
-									<button
-										onclick={() => setLocale("en")}
-										class="flex-1 px-2 py-1 text-xs font-medium rounded border {getLocale() === 'en' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition-colors"
-									>
-										EN
-									</button>
-									<button
-										onclick={() => setLocale("de")}
-										class="flex-1 px-2 py-1 text-xs font-medium rounded border {getLocale() === 'de' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition-colors"
-									>
-										DE
-									</button>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 14l-7 7m0 0l-7-7m7 7V3"
+								/>
+							</svg>
+						</button>
+
+						{#if showProviderMenu}
+							<div
+								class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+								role="menu"
+								aria-orientation="vertical"
+							>
+								<button
+									onclick={() => handleSignIn("google")}
+									disabled={signingIn}
+									class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+									role="menuitem"
+								>
+									<svg class="w-5 h-5" viewBox="0 0 24 24">
+										<path
+											fill="currentColor"
+											d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+										/>
+										<path
+											fill="currentColor"
+											d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+										/>
+										<path
+											fill="currentColor"
+											d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+										/>
+										<path
+											fill="currentColor"
+											d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+										/>
+									</svg>
+									Google
+								</button>
+								<button
+									onclick={() => handleSignIn("microsoft")}
+									disabled={signingIn}
+									class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+									role="menuitem"
+								>
+									<svg class="w-5 h-5" viewBox="0 0 23 23">
+										<rect
+											width="11"
+											height="11"
+											fill="#F25022"
+										/>
+										<rect
+											x="12"
+											width="11"
+											height="11"
+											fill="#7FBA00"
+										/>
+										<rect
+											y="12"
+											width="11"
+											height="11"
+											fill="#00A4EF"
+										/>
+										<rect
+											x="12"
+											y="12"
+											width="11"
+											height="11"
+											fill="#FFB900"
+										/>
+									</svg>
+									Microsoft
+								</button>
+								<div class="border-t border-gray-100 mt-2 pt-2 px-4">
+									<p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{m.language()}</p>
+									<div class="flex gap-2">
+										<button
+											onclick={() => setLocale("en")}
+											class="flex-1 px-2 py-1 text-xs font-medium rounded border {getLocale() === 'en' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition-colors"
+										>
+											EN
+										</button>
+										<button
+											onclick={() => setLocale("de")}
+											class="flex-1 px-2 py-1 text-xs font-medium rounded border {getLocale() === 'de' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition-colors"
+										>
+											DE
+										</button>
+									</div>
 								</div>
 							</div>
-						</div>
-					{/if}
-				</div>
-			{/if}
+						{/if}
+					</div>
+				{/if}
+			{:catch error}
+				<div class="text-xs text-red-500">{error.message}</div>
+			{/await}
 		</div>
 	</nav>
 </header>

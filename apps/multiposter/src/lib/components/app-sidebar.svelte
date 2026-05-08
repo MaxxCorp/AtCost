@@ -21,33 +21,8 @@
 		...restProps
 	}: ComponentProps<typeof Sidebar.Root> = $props();
 
-	let user = $state<any>(null);
-	let navMain = $state<any[]>([]);
+	let sessionPromise = $state(authClient.getSession());
 
-	onMount(async () => {
-		const session = await authClient.getSession();
-		if (session?.data?.user) {
-			user = session.data.user;
-
-			const platformFeatures = getVisibleFeatures(user, hasAccess).map(
-				(f) => ({
-					title: f.title(),
-					url: f.href,
-					iconPath: ICONS[f.icon].path,
-				}),
-			);
-
-			navMain = [
-				{
-					title: m.features(),
-					url: "#",
-					icon: LayersIcon,
-					isActive: true,
-					items: platformFeatures,
-				},
-			];
-		}
-	});
 </script>
 
 <Sidebar.Root {collapsible} {...restProps}>
@@ -80,67 +55,96 @@
 		</Sidebar.Menu>
 	</Sidebar.Header>
 
-	<Sidebar.Content>
-		<NavMain items={navMain} />
-	</Sidebar.Content>
+	{#await sessionPromise}
+		<Sidebar.Content>
+			<div class="p-4 animate-pulse flex flex-col gap-4">
+				<div class="h-8 bg-gray-100 rounded w-full"></div>
+				<div class="h-8 bg-gray-100 rounded w-3/4"></div>
+				<div class="h-8 bg-gray-100 rounded w-1/2"></div>
+			</div>
+		</Sidebar.Content>
+	{:then session}
+		{@const user = session?.data?.user}
+		<Sidebar.Content>
+			{#if user}
+				{@const navMain = [
+					{
+						title: m.features(),
+						url: "#",
+						icon: LayersIcon,
+						isActive: true,
+						items: getVisibleFeatures(user, hasAccess).map(
+							(f) => ({
+								title: f.title(),
+								url: f.href,
+								iconPath: ICONS[f.icon].path,
+							}),
+						),
+					},
+				]}
+				<NavMain items={navMain} />
+			{/if}
+		</Sidebar.Content>
 
-	<Sidebar.Footer>
-		<Sidebar.Menu>
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton tooltipContent={m.imprint()}>
-					{#snippet child({ props })}
-						<a href="/imprint" {...props}>
-							<FileTextIcon />
-							<span>{m.imprint()}</span>
-						</a>
-					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton tooltipContent={m.data_privacy()}>
-					{#snippet child({ props })}
-						<a href="/GDPR" {...props}>
-							<FileTextIcon />
-							<span>{m.data_privacy()}</span>
-						</a>
-					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
-		</Sidebar.Menu>
-
-		{#if user}
-			<NavUser
-				user={{
-					name: user.name || user.email,
-					email: user.email,
-					avatar: user.image,
-				}}
-			/>
-		{:else}
+		<Sidebar.Footer>
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent={m.log_in()}>
+					<Sidebar.MenuButton tooltipContent={m.imprint()}>
 						{#snippet child({ props })}
-							<a href="/login" {...props}>
-								<LogInIcon />
-								<span>{m.log_in()}</span>
+							<a href="/imprint" {...props}>
+								<FileTextIcon />
+								<span>{m.imprint()}</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent={m.sign_up()}>
+					<Sidebar.MenuButton tooltipContent={m.data_privacy()}>
 						{#snippet child({ props })}
-							<a href="/signup" {...props}>
-								<UserPlusIcon />
-								<span>{m.sign_up()}</span>
+							<a href="/GDPR" {...props}>
+								<FileTextIcon />
+								<span>{m.data_privacy()}</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
 			</Sidebar.Menu>
-		{/if}
-	</Sidebar.Footer>
+
+			{#if user}
+				<NavUser
+					user={{
+						name: user.name || user.email,
+						email: user.email,
+						avatar: user.image ?? undefined,
+					}}
+				/>
+			{:else}
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton tooltipContent={m.log_in()}>
+							{#snippet child({ props })}
+								<a href="/login" {...props}>
+									<LogInIcon />
+									<span>{m.log_in()}</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton tooltipContent={m.sign_up()}>
+							{#snippet child({ props })}
+								<a href="/signup" {...props}>
+									<UserPlusIcon />
+									<span>{m.sign_up()}</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			{/if}
+		</Sidebar.Footer>
+	{/await}
+
 
 	<Sidebar.Rail />
 </Sidebar.Root>

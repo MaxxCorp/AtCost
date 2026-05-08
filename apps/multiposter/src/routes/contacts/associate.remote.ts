@@ -2,12 +2,29 @@ import { command, query } from '$app/server';
 import { db } from '@ac/db';
 import { 
     userContact, locationContact, resourceContact, eventContact, announcementContact,
-    contact, contactEmail, contactPhone, contactAddress, contactRelation, contactTag, tag
+    eventContact as eventContactTable
 } from '@ac/db';
-import { eq, and, inArray } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess, hasAccess } from '$lib/server/authorization';
+import { eq, and } from '@ac/db';
+import { getAuthenticatedUser, hasAccess } from '$lib/server/authorization';
 import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '$lib/validations/contacts';
 import { getEntityContacts } from '$lib/server/contacts';
+import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
+
+const tableMap = {
+    user: userContact,
+    location: locationContact,
+    resource: resourceContact,
+    event: eventContact,
+    announcement: announcementContact
+} as const;
+
+const fieldMap = {
+    user: 'userId',
+    location: 'locationId',
+    resource: 'resourceId',
+    event: 'eventId',
+    announcement: 'announcementId'
+} as const;
 
 export const addAssociation = command(associationSchema, async (data) => {
     const user = getAuthenticatedUser();
@@ -18,29 +35,14 @@ export const addAssociation = command(associationSchema, async (data) => {
         throw new Error('Forbidden');
     }
 
-    const tableMap = {
-        user: userContact,
-        location: locationContact,
-        resource: resourceContact,
-        event: eventContact,
-        announcement: announcementContact
-    } as const;
-
-    const fieldMap = {
-        user: 'userId',
-        location: 'locationId',
-        resource: 'resourceId',
-        event: 'eventId',
-        announcement: 'announcementId'
-    } as const;
-
-    const table = tableMap[type as keyof typeof tableMap];
-    const entityField = fieldMap[type as keyof typeof fieldMap];
-
-    await (db.insert(table as any) as any).values({
-        [entityField as any]: entityId,
-        contactId
-    }).onConflictDoNothing();
+    await dbAddAssociation({
+        type,
+        entityId,
+        itemId: contactId,
+        tableMap,
+        fieldMap,
+        itemField: 'contactId'
+    });
 
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
@@ -55,29 +57,14 @@ export const removeAssociation = command(associationSchema, async (data) => {
         throw new Error('Forbidden');
     }
 
-    const tableMap = {
-        user: userContact,
-        location: locationContact,
-        resource: resourceContact,
-        event: eventContact,
-        announcement: announcementContact
-    } as const;
-
-    const fieldMap = {
-        user: 'userId',
-        location: 'locationId',
-        resource: 'resourceId',
-        event: 'eventId',
-        announcement: 'announcementId'
-    } as const;
-
-    const table = tableMap[type as keyof typeof tableMap];
-    const entityField = fieldMap[type as keyof typeof fieldMap];
-
-    await db.delete(table as any).where(and(
-        eq((table as any)[entityField as any], entityId),
-        eq((table as any).contactId, contactId)
-    ));
+    await dbRemoveAssociation({
+        type,
+        entityId,
+        itemId: contactId,
+        tableMap,
+        fieldMap,
+        itemField: 'contactId'
+    });
 
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
@@ -95,11 +82,11 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
         throw new Error('Only event associations support participation status');
     }
 
-    await db.update(eventContact)
+    await db.update(eventContactTable)
         .set({ participationStatus: status })
         .where(and(
-            eq(eventContact.eventId, entityId),
-            eq(eventContact.contactId, contactId)
+            eq(eventContactTable.eventId, entityId),
+            eq(eventContactTable.contactId, contactId)
         ));
 
     await fetchEntityContacts({ type, entityId }).refresh();
