@@ -11,6 +11,7 @@
         Trash2,
         Filter as FilterIcon,
         Database,
+        Loader2,
     } from "@lucide/svelte";
 
     import * as DropdownMenu from "./dropdown-menu";
@@ -178,7 +179,6 @@
         return () => { mounted = false; };
     });
 
-    const isStandalone = $derived(mode === "standalone");
 
     let page = $state(1);
     let limit = $state(50);
@@ -212,68 +212,80 @@
         }
     });
 
-    let refreshCounter = $state(0);
+    const getParams = () => {
+        const params = {
+            page: Number(page),
+            limit: Number(limit),
+            search: searchQuery || undefined,
+            ...selectedFilters,
+        };
+        // Use $state.snapshot to ensure we pass a plain object without reactive proxies/symbols
+        // that could interfere with serialization or trigger derived_inert warnings.
+        try {
+            return JSON.parse(JSON.stringify(params));
+        } catch (e) {
+            return params;
+        }
+    };
 
-
-
-    const currentParams = $derived({
-        page,
-        limit,
-        search: searchQuery,
-        refreshCounter,
-        ...selectedFilters,
-    });
-
-    // --- PROMISES ---
-    
-    function normalize(res: T[] | { data: T[]; total?: number }) {
+    // --- HELPERS ---
+    function normalize(res: any) {
+        if (!res) return { data: [], total: 0 };
         const data = Array.isArray(res) ? res : (res?.data ?? []);
         const total = Array.isArray(res) ? res.length : (res?.total ?? data.length);
         return { data, total };
     }
 
-    // Main list promise (Standalone list OR Embedded selector)
-    let listPromise = $state<Promise<{ data: T[]; total: number }>>(
-        Promise.resolve({ data: [], total: 0 }),
-    );
-
-    $effect(() => {
-        if (!mounted) return;
-        void refreshCounter; // track
-        if (isStandalone || showSelector) {
-            const params = untrack(() => currentParams);
-            listPromise = listItemsRemote(params).then(normalize);
+    /**
+     * Safely calls a remote function. 
+     * SvelteKit Query handles should use .run() when called outside of a managed 
+     * reactive context to avoid "not created in a reactive context" errors.
+     */
+    function invokeRemote(fn: any, params?: any) {
+        if (!fn) return Promise.resolve(null);
+        if (typeof fn.run === 'function') {
+            return fn.run(params);
         }
+        return fn(params);
+    }
+
+    // --- DATA STATE ---
+    let refreshCounter = $state(0);
+
+    export function refresh() {
+        refreshCounter++;
+        // Invalidate handle-level cache to ensure subsequent calls return a new promise
+        if (typeof (listItemsRemote as any)?.refresh === 'function') {
+            void (listItemsRemote as any).refresh();
+        }
+        if (typeof (fetchAssociationsRemote as any)?.refresh === 'function') {
+            void (fetchAssociationsRemote as any).refresh();
+        }
+    }
+
+    const mainListPromise = $derived.by(() => {
+        const _ = refreshCounter;
+        if (mode !== "standalone") return Promise.resolve({ data: [], total: 0 });
+        return invokeRemote(listItemsRemote, getParams());
     });
 
-    // Embedded associations promise
-    let associationsPromise = $state<Promise<{ data: T[]; total: number }>>(
-        Promise.resolve({ data: [], total: 0 }),
-    );
-
-    $effect(() => {
-        if (!mounted) return;
-        void refreshCounter; // track
-        if (!isStandalone) {
-            if (entityId && type) {
-                if (fetchAssociationsRemote) {
-                    associationsPromise = fetchAssociationsRemote({
-                        type,
-                        entityId,
-                    }).then(normalize);
-                } else {
-                    associationsPromise = listItemsRemote({
-                        associatedWith: { type, id: entityId },
-                    }).then(normalize);
-                }
-            } else {
-                associationsPromise = Promise.resolve({
-                    data: localAssociatedItems,
-                    total: localAssociatedItems.length,
-                });
-            }
+    const associationsPromise = $derived.by(() => {
+        const _ = { refreshCounter, entityId, type };
+        if (entityId && type) {
+            return fetchAssociationsRemote 
+                ? invokeRemote(fetchAssociationsRemote, { type, entityId })
+                : invokeRemote(listItemsRemote, { associatedWith: { type, id: entityId } });
         }
+        return Promise.resolve(localAssociatedItems);
     });
+
+    const selectorListPromise = $derived.by(() => {
+        const _ = { refreshCounter, showSelector };
+        if (!showSelector) return Promise.resolve({ data: [], total: 0 });
+        return invokeRemote(listItemsRemote, getParams());
+    });
+
+    // Manual refreshes are now handled via refreshCounter in $effects
 
     // --- STATE ---
     let localAssociatedItems = $state<T[]>(initialItems ?? []);
@@ -400,7 +412,11 @@
             if (!mounted) return;
             toast.error(e.message || "Failed to update association");
         } finally {
-            if (mounted) linkingItemId = null;
+            if (mounted) {
+                linkingItemId = null;
+                // Trigger refresh if handle exists
+                refresh();
+            }
         }
     }
 
@@ -408,7 +424,7 @@
         if (!item.id || !deleteItemRemote) return;
         deletingItemId = item.id;
         try {
-            const result = await deleteItemRemote([item.id]);
+            const result = await invokeRemote(deleteItemRemote, [item.id]);
             const success = result === true || (result && result.success !== false);
             if (!success) return;
 
@@ -416,8 +432,9 @@
             localAssociatedItems = newList;
             onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
             
-            if (result !== true) {
-                if (mounted) toast.success("Deleted successfully");
+            if (success && mounted) {
+                toast.success("Deleted successfully");
+                refresh();
             }
         } catch (e: any) {
             if (mounted) toast.error(e.message || "Failed to delete item");
@@ -430,7 +447,7 @@
         if (!deleteItemRemote || selectedIds.size === 0) return;
         bulkDeleting = true;
         try {
-            const result = await deleteItemRemote(Array.from(selectedIds));
+            const result = await invokeRemote(deleteItemRemote, Array.from(selectedIds));
             const success = result === true || (result && result.success !== false);
             if (!success) return;
 
@@ -439,8 +456,9 @@
             onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
             deselectAll();
             
-            if (result !== true) {
-                if (mounted) toast.success(`Deleted successfully`);
+            if (success && mounted) {
+                toast.success(`Deleted successfully`);
+                refresh();
             }
         } catch (e: any) {
             if (mounted) toast.error(e.message || "Failed to delete some items");
@@ -454,15 +472,15 @@
         const newId = result?.id || result?.tag?.id || result?.data?.id;
 
         if (newId) {
-            const params = untrack(() => currentParams);
-            const res = await listItemsRemote(params);
+            const params = untrack(() => getParams());
+            const res = await invokeRemote(listItemsRemote, params);
             const { data: items } = normalize(res);
             const newItem = items.find((i: any) => i.id === newId);
 
-            if (isStandalone) {
+            if (mode === "standalone") {
                 if (!mounted) return;
                 toast.success(`${title} created`);
-                refreshCounter++;
+                refresh();
             } else if (newItem) {
                 if (entityId && addAssociationRemote) {
                     await addAssociationRemote({
@@ -476,7 +494,7 @@
                 localAssociatedItems = newList;
                 onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
                 toast.success(`${title} created and associated`);
-                refreshCounter++;
+                refresh();
             }
         }
     }
@@ -486,8 +504,8 @@
         editingItem = null;
         if (!targetId) return;
 
-        const params = untrack(() => currentParams);
-        const res = await listItemsRemote(params);
+        const params = untrack(() => getParams());
+        const res = await invokeRemote(listItemsRemote, params);
         const { data: items } = normalize(res);
         const updatedItem = items.find((i: any) => i.id === targetId);
 
@@ -497,24 +515,24 @@
             localAssociatedItems = newList;
             onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
             toast.success(`${title} updated`);
-            refreshCounter++;
+            refresh();
         }
     }
 </script>
 
 <!-- Action Bar (Search, Filter, Actions) -->
-<div class="flex flex-col gap-3 {isStandalone ? 'mb-4' : 'mb-3'}">
+<div class="flex flex-col gap-3 {mode === "standalone" ? 'mb-4' : 'mb-3'}">
     <div class="flex flex-col md:flex-row gap-3">
         <div class="relative flex-1">
             <Search
-                size={isStandalone ? 16 : 14}
+                size={mode === "standalone" ? 16 : 14}
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
                 type="text"
                 placeholder={searchPlaceholder}
                 bind:value={searchQuery}
-                class="pl-9 w-full {isStandalone
+                class="pl-9 w-full {mode === "standalone"
                     ? 'px-3 py-2'
                     : 'px-2 py-1.5'} border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all bg-gray-50/50"
             />
@@ -526,10 +544,10 @@
                     <DropdownMenu.Trigger>
                         <Button
                             variant="outline"
-                            size={isStandalone ? "icon" : "sm"}
+                            size={mode === "standalone" ? "icon" : "sm"}
                             class="relative border-gray-200 rounded-xl hover:bg-gray-50"
                         >
-                            <FilterIcon size={isStandalone ? 18 : 16} />
+                            <FilterIcon size={mode === "standalone" ? 18 : 16} />
 
                             {#if activeFiltersCount > 0}
                                 <span
@@ -652,7 +670,7 @@
                 {@render filtersSnippet()}
             {/if}
 
-            {#if isStandalone && showCreateButton && (renderForm || createHref)}
+            {#if mode === "standalone" && showCreateButton && (renderForm || createHref)}
                 <div class="flex items-center gap-1.5 ml-auto">
                     {#if renderForm}
                         <Button
@@ -681,10 +699,15 @@
                         </Button>
                     {/if}
                 </div>
-            {:else if !isStandalone}
+            {:else if mode !== "standalone"}
                 <div class="flex items-center gap-1.5 ml-auto">
-                    {#await associationsPromise then { data: currentAssociations }}
-                        {#if !singleSelect || currentAssociations.length === 0}
+                    {#await associationsPromise}
+                        <div class="flex items-center justify-center p-1">
+                            <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+                        </div>
+                    {:then res}
+                            {@const { data: currentAssociations } = normalize(res)}
+                            {#if !singleSelect || currentAssociations.length === 0}
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -728,30 +751,35 @@
     </div>
 </div>
 
-{#if showSelector && !isStandalone}
-    {#key showSelector}
-        <div
-            class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
-        >
+{#if showSelector && mode !== "standalone"}
+    <div
+        class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
+    >
         <div class="max-h-64 overflow-y-auto space-y-1 p-1">
-            {#await listPromise}
+            {#await selectorListPromise}
                 <div class="text-xs text-center py-8 text-gray-400 font-medium">
                     <div
                         class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"
                     ></div>
                     {loadingLabel}
                 </div>
-            {:then { data: allItems }}
-                {@const filteredItems = searchPredicate ? allItems.filter(i => searchPredicate(i, searchQuery)) : allItems}
+            {:then res}
+                {@const { data: allItems } = normalize(res)}
+                {@const filteredItems = searchPredicate ? allItems.filter((i: any) => searchPredicate(i, searchQuery)) : allItems}
                 {#if filteredItems.length === 0}
                     <div
                         class="text-xs text-center py-8 text-gray-400 font-medium italic"
                     >
-                        {noItemsFoundLabel}
+                        {searchQuery ? noItemsFoundLabel : noItemsLabel}
                     </div>
                 {:else}
-                    {#await associationsPromise then { data: currentAssociations }}
-                        {#each filteredItems as item}
+                    {#await associationsPromise}
+                         <div class="p-4 flex justify-center">
+                            <div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                        </div>
+                    {:then ares}
+                        {@const { data: currentAssociations } = normalize(ares)}
+                        {#each filteredItems as item (item.id)}
                             {@const isLinked = isAssociated(item, currentAssociations)}
                             <div
                                 class="flex items-center gap-3 transition-all rounded-xl p-2 {isLinked
@@ -770,11 +798,6 @@
                                             {item.name || item.id || "Unnamed Item"}
                                         {/if}
                                     </div>
-                                    {#if renderItemBadge}
-                                        <div class="mt-0.5">
-                                            {@render renderItemBadge(item)}
-                                        </div>
-                                    {/if}
                                 </div>
 
                                 <div class="flex items-center gap-1">
@@ -798,20 +821,6 @@
                                             <Link size={16} />
                                         {/if}
                                     </AsyncButton>
-                                    {#if deleteItemRemote}
-                                        <AsyncButton
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-500"
-                                            loading={deletingItemId === item.id}
-                                            loadingLabel=""
-                                            onclick={() => { void deleteItem(item, currentAssociations); }}
-                                            title={deleteForeverLabel}
-                                        >
-                                            <Trash2 size={16} />
-                                        </AsyncButton>
-                                    {/if}
                                 </div>
                             </div>
                         {/each}
@@ -824,168 +833,168 @@
             {/await}
         </div>
     </div>
-    {/key}
 {/if}
 
-{#if isStandalone}
-    {#await listPromise}
+{#if mode === "standalone"}
+        {#await mainListPromise}
         <div class="text-center py-20 text-gray-400 font-medium animate-pulse">
             {loadingLabel}
         </div>
-    {:then { data: items, total }}
-        {#if items.length === 0 && !searchQuery && activeFiltersCount === 0}
-            <div class="py-10">
-                <EmptyState
-                    icon={Icon}
-                    title={emptyTitle || `No ${title}`}
-                    description={emptyDescription ||
-                        `No ${title.toLowerCase()} were found in this selection.`}
-                    actionLabel={emptyActionLabel ||
-                        `Create First ${title.replace(/s$/, "")}`}
-                    onclick={renderForm
-                        ? () => (showQuickCreate = true)
-                        : undefined}
-                    actionHref={!renderForm ? createHref : undefined}
-                />
-            </div>
-        {:else if items.length === 0}
-            <div
-                class="text-center py-20 text-gray-400 font-medium italic bg-gray-50/50 rounded-2xl border border-dashed border-gray-200"
-            >
-                {noItemsFoundLabel}
-            </div>
-        {:else}
-            <div class="grid gap-4">
-                {#each items as item (item.id)}
-                    {#if renderListItem}
-                        {@render renderListItem(item, {
-                            isSelected: selectedIds.has(item.id!),
-                            toggleSelection,
-                            deleteItem: (i: T) => { void deleteItem(i, items); },
-                            isAssociated: true,
-                            toggleAssociation: (i: T) => { void toggleAssociation(i, items); },
-                            singleSelect,
-                        })}
-                    {:else}
-                        <div
-                            class="bg-white rounded-2xl p-5 flex items-center gap-6 border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all group/item"
-                        >
-                            {#if !singleSelect}
-                                <input
-                                    type="checkbox"
-                                    checked={selectedIds.has(item.id!)}
-                                    onchange={() => toggleSelection(item.id!)}
-                                    class="w-5 h-5 text-blue-600 rounded-lg border-gray-200 focus:ring-blue-500 transition-all cursor-pointer"
-                                />
-                            {/if}
-
-                            <div class="flex-1 min-w-0">
-                                <div
-                                    class="text-lg font-black text-gray-900 group-hover/item:text-blue-600 transition-colors"
-                                >
-                                    {#if renderItemLabel}
-                                        {@render renderItemLabel(item)}
-                                    {:else}
-                                        {item.name || item.id}
-                                    {/if}
-                                </div>
-                                <div
-                                    class="flex flex-wrap items-center gap-3 mt-1.5"
-                                >
-                                    {#if renderItemBadge}
-                                        {@render renderItemBadge(item)}
-                                    {/if}
-                                    {#if renderItemDetail}
-                                        <div
-                                            class="text-xs font-bold text-gray-400 uppercase tracking-widest"
-                                        >
-                                            {@render renderItemDetail(item)}
-                                        </div>
-                                    {/if}
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                {#if updateRemote && renderForm && getFormData}
-                                    <button
-                                        type="button"
-                                        class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                                        onclick={() => {
-                                            editingItem = item;
-                                        }}
-                                        title={editLabel}
-                                    >
-                                        <Pencil size={20} />
-                                    </button>
-                                {/if}
-                                {#if deleteItemRemote}
-                                    <AsyncButton
-                                        type="button"
-                                        variant="ghost"
-                                        class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                        loading={deletingItemId === item.id}
-                                        loadingLabel=""
-                                        onclick={() => deleteItem(item, items)}
-                                        title={deleteLabel}
-                                    >
-                                        <Trash2 size={20} />
-                                    </AsyncButton>
-                                {/if}
-                            </div>
-                        </div>
-                    {/if}
-                {/each}
-            </div>
-
-            {#if total > limit}
-                <div
-                    class="flex flex-col sm:flex-row justify-between items-center py-6 gap-4 border-t border-gray-50 mt-6"
-                >
-                    <div
-                        class="text-xs font-bold text-gray-400 uppercase tracking-widest"
-                    >
-                        Showing <span class="text-gray-900"
-                            >{(page - 1) * limit + 1}</span
-                        >
-                        to
-                        <span class="text-gray-900"
-                            >{Math.min(page * limit, total)}</span
-                        >
-                        of <span class="text-gray-900">{total}</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            class="rounded-xl font-bold px-4 hover:bg-gray-50"
-                            disabled={page === 1}
-                            onclick={() => {
-                                page--;
-                                window.scrollTo({ top: 0, behavior: "smooth" });
-                            }}
-                        >
-                            Previous
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            class="rounded-xl font-bold px-4 hover:bg-gray-50"
-                            disabled={page * limit >= total}
-                            onclick={() => {
-                                page++;
-                                window.scrollTo({ top: 0, behavior: "smooth" });
-                            }}
-                        >
-                            Next
-                        </Button>
-                    </div>
+    {:then res}
+        {@const { data: items, total } = normalize(res)}
+            {#if items.length === 0 && !searchQuery && activeFiltersCount === 0}
+                <div class="py-10">
+                    <EmptyState
+                        icon={Icon}
+                        title={emptyTitle || `No ${title}`}
+                        description={emptyDescription ||
+                            `No ${title.toLowerCase()} were found in this selection.`}
+                        actionLabel={emptyActionLabel ||
+                            `Create First ${title.replace(/s$/, "")}`}
+                        onclick={renderForm
+                            ? () => (showQuickCreate = true)
+                            : undefined}
+                        actionHref={!renderForm ? createHref : undefined}
+                    />
                 </div>
+            {:else if items.length === 0}
+                <div
+                    class="text-center py-20 text-gray-400 font-medium italic bg-gray-50/50 rounded-2xl border border-dashed border-gray-200"
+                >
+                    {noItemsFoundLabel}
+                </div>
+            {:else}
+                <div class="grid gap-4">
+                    {#each items as item (item.id)}
+                        {#if renderListItem}
+                            {@render renderListItem(item, {
+                                isSelected: selectedIds.has(item.id!),
+                                toggleSelection,
+                                deleteItem: (i: T) => { void deleteItem(i, items); },
+                                isAssociated: true,
+                                toggleAssociation: (i: T) => { void toggleAssociation(i, items); },
+                                singleSelect,
+                            })}
+                        {:else}
+                            <div
+                                class="bg-white rounded-2xl p-5 flex items-center gap-6 border border-gray-100 hover:shadow-xl hover:border-blue-100 transition-all group/item"
+                            >
+                                {#if !singleSelect}
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.has(item.id!)}
+                                        onchange={() => toggleSelection(item.id!)}
+                                        class="w-5 h-5 text-blue-600 rounded-lg border-gray-200 focus:ring-blue-500 transition-all cursor-pointer"
+                                    />
+                                {/if}
+
+                                <div class="flex-1 min-w-0">
+                                    <div
+                                        class="text-lg font-black text-gray-900 group-hover/item:text-blue-600 transition-colors"
+                                    >
+                                        {#if renderItemLabel}
+                                            {@render renderItemLabel(item)}
+                                        {:else}
+                                            {item.name || item.id}
+                                        {/if}
+                                    </div>
+                                    <div
+                                        class="flex flex-wrap items-center gap-3 mt-1.5"
+                                    >
+                                        {#if renderItemBadge}
+                                            {@render renderItemBadge(item)}
+                                        {/if}
+                                        {#if renderItemDetail}
+                                            <div
+                                                class="text-xs font-bold text-gray-400 uppercase tracking-widest"
+                                            >
+                                                {@render renderItemDetail(item)}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    {#if updateRemote && renderForm && getFormData}
+                                        <button
+                                            type="button"
+                                            class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                            onclick={() => {
+                                                editingItem = item;
+                                            }}
+                                            title={editLabel}
+                                        >
+                                            <Pencil size={20} />
+                                        </button>
+                                    {/if}
+                                    {#if deleteItemRemote}
+                                        <AsyncButton
+                                            type="button"
+                                            variant="ghost"
+                                            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                            loading={deletingItemId === item.id}
+                                            loadingLabel=""
+                                            onclick={() => deleteItem(item, items)}
+                                            title={deleteLabel}
+                                        >
+                                            <Trash2 size={20} />
+                                        </AsyncButton>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/if}
+                    {/each}
+                </div>
+
+                {#if total > limit}
+                    <div
+                        class="flex flex-col sm:flex-row justify-between items-center py-6 gap-4 border-t border-gray-50 mt-6"
+                    >
+                        <div
+                            class="text-xs font-bold text-gray-400 uppercase tracking-widest"
+                        >
+                            Showing <span class="text-gray-900"
+                                >{(page - 1) * limit + 1}</span
+                            >
+                            to
+                            <span class="text-gray-900"
+                                >{Math.min(page * limit, total)}</span
+                            >
+                            of <span class="text-gray-900">{total}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                class="rounded-xl font-bold px-4 hover:bg-gray-50"
+                                disabled={page === 1}
+                                onclick={() => {
+                                    page--;
+                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                }}
+                            >
+                                Previous
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                class="rounded-xl font-bold px-4 hover:bg-gray-50"
+                                disabled={page * limit >= total}
+                                onclick={() => {
+                                    page++;
+                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                }}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                {/if}
             {/if}
-        {/if}
-    {:catch error}
-        <div class="text-center py-20 text-red-500 font-medium">
-            {error.message || "Failed to load items"}
-        </div>
-    {/await}
+        {:catch error}
+            <div class="text-center py-20 text-red-500 font-medium">
+                {error.message || "Failed to load items"}
+            </div>
+        {/await}
 {:else}
     <!-- Embedded Content -->
     <div class="space-y-2">
@@ -998,101 +1007,102 @@
                 ></div>
                 {loadingLabel}
             </div>
-        {:then { data: currentAssociations }}
+        {:then res}
+            {@const { data: currentAssociations } = normalize(res)}
             {@const items = searchPredicate ? currentAssociations.filter((i: any) => searchPredicate(i, searchQuery)) : currentAssociations}
-            {#if items.length > 0}
-                <div class="grid gap-2">
-                    {#each items as item (item.id)}
-                        <div
-                            class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
-                        >
-                            <div class="flex-1 min-w-0">
-                                <div
-                                    class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
-                                >
-                                    {#if renderItemLabel}
-                                        {@render renderItemLabel(item)}
-                                    {:else}
-                                        {item.name || item.id}
-                                    {/if}
-                                </div>
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    {#if renderItemBadge}
-                                        {@render renderItemBadge(item)}
-                                    {/if}
-                                    {#if renderItemDetail}
-                                        <div
-                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
-                                        >
-                                            {@render renderItemDetail(item)}
-                                        </div>
-                                    {/if}
-                                </div>
-                            </div>
-
-                            {#if participationSnippet}
-                                {@render participationSnippet(item)}
-                            {/if}
-
-                            <div class="flex items-center gap-1">
-                                {#if updateRemote && renderForm && getFormData}
-                                    <button
-                                        type="button"
-                                        class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                        onclick={() => {
-                                            editingItem = item;
-                                        }}
-                                        title={editLabel}
+                {#if items.length > 0}
+                    <div class="grid gap-2">
+                        {#each items as item (item.id)}
+                            <div
+                                class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
+                            >
+                                <div class="flex-1 min-w-0">
+                                    <div
+                                        class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
                                     >
-                                        <Pencil size={15} />
-                                    </button>
+                                        {#if renderItemLabel}
+                                            {@render renderItemLabel(item)}
+                                        {:else}
+                                            {item.name || item.id}
+                                        {/if}
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        {#if renderItemBadge}
+                                            {@render renderItemBadge(item)}
+                                        {/if}
+                                        {#if renderItemDetail}
+                                            <div
+                                                class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
+                                            >
+                                                {@render renderItemDetail(item)}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
+
+                                {#if participationSnippet}
+                                    {@render participationSnippet(item)}
                                 {/if}
-                                <AsyncButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                    loading={linkingItemId === item.id}
-                                    loadingLabel=""
-                                    onclick={() => toggleAssociation(item, currentAssociations)}
-                                    title={confirmUnlinkLabel}
-                                >
-                                    <Unlink size={15} />
-                                </AsyncButton>
-                                {#if deleteItemRemote}
+
+                                <div class="flex items-center gap-1">
+                                    {#if updateRemote && renderForm && getFormData}
+                                        <button
+                                            type="button"
+                                            class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                            onclick={() => {
+                                                editingItem = item;
+                                            }}
+                                            title={editLabel}
+                                        >
+                                            <Pencil size={15} />
+                                        </button>
+                                    {/if}
                                     <AsyncButton
                                         type="button"
                                         variant="ghost"
                                         size="sm"
                                         class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                        loading={deletingItemId === item.id}
+                                        loading={linkingItemId === item.id}
                                         loadingLabel=""
-                                        onclick={() => deleteItem(item, currentAssociations)}
-                                        title={deleteForeverLabel}
+                                        onclick={() => toggleAssociation(item, currentAssociations)}
+                                        title={confirmUnlinkLabel}
                                     >
-                                        <Trash2 size={15} />
+                                        <Unlink size={15} />
                                     </AsyncButton>
-                                {/if}
+                                    {#if deleteItemRemote}
+                                        <AsyncButton
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                            loading={deletingItemId === item.id}
+                                            loadingLabel=""
+                                            onclick={() => deleteItem(item, currentAssociations)}
+                                            title={deleteForeverLabel}
+                                        >
+                                            <Trash2 size={15} />
+                                        </AsyncButton>
+                                    {/if}
+                                </div>
                             </div>
-                        </div>
-                    {/each}
-                </div>
-            {:else}
-                <div
-                    class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
-                >
-                    <p class="text-sm font-medium text-gray-400 italic">
-                        {noItemsLabel}
+                        {/each}
+                    </div>
+                {:else}
+                    <div
+                        class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
+                    >
+                        <p class="text-sm font-medium text-gray-400 italic">
+                            {noItemsLabel}
+                        </p>
+                    </div>
+                {/if}
+            {:catch error}
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+                    <p class="text-sm font-medium text-red-600">
+                        {error.message || "Failed to load associations"}
                     </p>
                 </div>
-            {/if}
-        {:catch error}
-            <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
-                <p class="text-sm font-medium text-red-600">
-                    {error.message || "Failed to load associations"}
-                </p>
-            </div>
-        {/await}
+            {/await}
     </div>
 {/if}
 
@@ -1117,9 +1127,12 @@
             </Dialog.Header>
 
             <div style="overflow-y: auto; flex: 1; min-height: 0;">
-                {#key (editingItem?.id || "new") + showQuickCreate}
-                    {#await isStandalone ? listPromise : associationsPromise then res}
-                    {@const currentList = res?.data ?? []}
+                {#await (mode === "standalone" ? mainListPromise : associationsPromise)}
+                    <div class="p-8 flex justify-center">
+                        <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    </div>
+                {:then res}
+                    {@const { data: currentList } = normalize(res)}
                     {#if editingItem && getFormData}
                         {@render renderForm({
                             remoteFunction: updateRemote,
@@ -1142,7 +1155,6 @@
                         })}
                     {/if}
                     {/await}
-                {/key}
             </div>
         </Dialog.Content>
     </Dialog.Root>

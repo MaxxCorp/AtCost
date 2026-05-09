@@ -194,7 +194,7 @@ export const createContact = form(createContactSchema, async (input) => {
         } as Contact;
 
         console.log('--- createContact SUCCESS --- returning contact:', transformed.id);
-        await listContacts().refresh();
+        void listContacts().refresh();
         return { success: true, id: contactId, contact: transformed };
 
     } catch (err: any) {

@@ -1,6 +1,6 @@
 import { command, query } from '$app/server';
 import { db } from '@ac/db';
-import { announcementLocation, eventLocation, kioskLocation, location, resourceLocation } from '@ac/db';
+import { announcementLocation, eventLocation, kioskLocation, location, resourceLocation, locationContact } from '@ac/db';
 import { eq } from '@ac/db';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
@@ -9,14 +9,16 @@ const tableMap = {
     announcement: announcementLocation,
     event: eventLocation,
     kiosk: kioskLocation,
-    resource: resourceLocation
+    resource: resourceLocation,
+    contact: locationContact
 } as const;
 
 const fieldMap = {
     announcement: 'announcementId',
     event: 'eventId',
     kiosk: 'kioskId',
-    resource: 'resourceId'
+    resource: 'resourceId',
+    contact: 'contactId'
 } as const;
 
 export const addLocationAssociation = command(locationAssociationSchema, async (data) => {

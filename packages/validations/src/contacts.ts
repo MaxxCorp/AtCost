@@ -124,7 +124,7 @@ export const updateContactSchema = v.object({
 
 
 export const associationSchema = v.object({
-    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement']),
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk', 'contact']),
     entityId: v.string(),
     contactId: v.pipe(v.string(), v.uuid()),
 });
@@ -137,7 +137,7 @@ export const updateAssociationSchema = v.object({
 });
 
 export const getAssociationsSchema = v.object({
-    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement']),
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk', 'contact']),
     entityId: v.string(),
 });
 import { FilterableIdSchema } from './pagination.js';

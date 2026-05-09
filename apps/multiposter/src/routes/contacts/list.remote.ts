@@ -15,6 +15,7 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	ensureAccess(user, 'contacts');
 
 	const { page = 1, limit = 50, search = '', locationId, tagId, associatedWith } = input || {};
+	console.log("[listContacts] input:", { page, limit, search, locationId, tagId, associatedWith });
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: contact.id }).from(contact).$dynamic();
@@ -64,6 +65,7 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	const ids = paginatedIdsResult.map(r => r.id);
 
 	if (ids.length === 0) {
+		console.log("[listContacts] No IDs found for query");
 		return { data: [], total };
 	}
 

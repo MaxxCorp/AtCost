@@ -102,8 +102,6 @@
         updateTagSchema,
     }: Props = $props();
 
-    // Initialize remoteFunction if it's a definition function to ensure reactive context
-    const rf = $derived(remoteFunction);
 
     const i18n = $derived({
         saveContact: labels?.saveContact ?? "Save Contact",
@@ -117,7 +115,7 @@
 
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = (rf as any)?.allIssues?.() ?? [];
+        const issues = (remoteFunction as any)?.allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(i18n.pleaseFixValidation);
         }
@@ -201,11 +199,9 @@
 </script>
 
 <form
-    {...(rf as any).preflight(schema).enhance(async ({ submit }: { submit: any }) => {
-        const handle = rf;
+    {...(remoteFunction as any).preflight(schema).enhance(async ({ submit }: { submit: any }) => {
         try {
-            await submit();
-            const result = untrack(() => (handle as any).result);
+            const result = await submit();
 
             if (result?.success === false || result?.error) {
                 const msg =
@@ -225,25 +221,25 @@
     })}
     class="space-y-8"
 >
-    {#if rf?.fields}
-        {#if contactId && rf.fields.id}
-            <input {...rf.fields.id.as("text", contactId)} class="hidden" />
+    {#if remoteFunction?.fields}
+        {#if contactId && remoteFunction.fields.id}
+            <input {...remoteFunction.fields.id.as("text", contactId)} class="hidden" />
         {/if}
 
-        {#if rf.fields.emailsJson}
-            <input {...rf.fields.emailsJson.as("text", emailsJson ?? "[]")} class="hidden" />
+        {#if remoteFunction.fields.emailsJson}
+            <input {...remoteFunction.fields.emailsJson.as("text", emailsJson ?? "[]")} class="hidden" />
         {/if}
-        {#if rf.fields.phonesJson}
-            <input {...rf.fields.phonesJson.as("text", phonesJson ?? "[]")} class="hidden" />
+        {#if remoteFunction.fields.phonesJson}
+            <input {...remoteFunction.fields.phonesJson.as("text", phonesJson ?? "[]")} class="hidden" />
         {/if}
-        {#if rf.fields.relationsJson}
-            <input {...rf.fields.relationsJson.as("text", relationsJson ?? "[]")} class="hidden" />
+        {#if remoteFunction.fields.relationsJson}
+            <input {...remoteFunction.fields.relationsJson.as("text", relationsJson ?? "[]")} class="hidden" />
         {/if}
-        {#if rf.fields.addressesJson}
-            <input {...rf.fields.addressesJson.as("text", addressesJson ?? "[]")} class="hidden" />
+        {#if remoteFunction.fields.addressesJson}
+            <input {...remoteFunction.fields.addressesJson.as("text", addressesJson ?? "[]")} class="hidden" />
         {/if}
-        {#if rf.fields.tagsJson}
-            <input {...rf.fields.tagsJson.as("text", tagsJson ?? "[]")} class="hidden" />
+        {#if remoteFunction.fields.tagsJson}
+            <input {...remoteFunction.fields.tagsJson.as("text", tagsJson ?? "[]")} class="hidden" />
         {/if}
     {/if}
 
@@ -259,7 +255,7 @@
         {contactId}
         {listContactsRemote}
         {labels}
-        {rf}
+        rf={remoteFunction}
         {listTagsRemote}
         {createTagRemote}
         {deleteTagRemote}
@@ -275,8 +271,8 @@
         })}
     {/if}
 
-    {#if rf?.fields?.locationIdsJson}
-        <input {...rf.fields.locationIdsJson.as("text", locationIdsJson)} class="hidden" />
+    {#if remoteFunction?.fields?.locationIdsJson}
+        <input {...remoteFunction.fields.locationIdsJson.as("text", locationIdsJson)} class="hidden" />
     {/if}
 
     <div class="flex justify-end gap-3 pt-6 border-t">
@@ -291,7 +287,7 @@
         {/if}
         <AsyncButton
             type="submit"
-            loading={(rf && rf.pending) || loading}
+            loading={(remoteFunction && remoteFunction.pending) || loading}
             loadingLabel={i18n.saving}
         >
             {i18n.saveContact}
