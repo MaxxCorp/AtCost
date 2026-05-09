@@ -215,7 +215,7 @@
     function removeAddress(index: number) {
         addresses = addresses.filter((_, i) => i !== index);
     }
-    const contactFields = $derived(rf?.fields && (prefix === "contact" ? rf.fields.contact : rf.fields.data?.fields?.contact));
+    const contactFields = $derived(rf?.fields ? (prefix === "contact" ? rf.fields.contact : rf.fields.data?.fields?.contact) : undefined);
 </script>
 
 <div class="space-y-8">
@@ -237,9 +237,9 @@
                     type="text"
                     bind:value={contactData.displayName}
                     required
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.displayName?.issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.displayName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each contactFields?.fields?.displayName?.issues() ?? [] as issue}
+                {#each (contactFields?.fields?.displayName?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -254,8 +254,11 @@
                     name={`${prefix}.givenName`}
                     type="text"
                     bind:value={contactData.givenName}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.givenName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.givenName?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -268,8 +271,11 @@
                     name={`${prefix}.middleName`}
                     type="text"
                     bind:value={contactData.middleName}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.middleName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.middleName?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -282,8 +288,11 @@
                     name={`${prefix}.familyName`}
                     type="text"
                     bind:value={contactData.familyName}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.familyName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.familyName?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -297,8 +306,11 @@
                     type="text"
                     bind:value={contactData.honorificPrefix}
                     placeholder="e.g. Dr., Prof."
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.honorificPrefix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.honorificPrefix?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -312,8 +324,11 @@
                     type="text"
                     bind:value={contactData.honorificSuffix}
                     placeholder="e.g. PhD, MD"
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.honorificSuffix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.honorificSuffix?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -325,7 +340,7 @@
                     {...contactFields?.fields?.gender?.as("select")}
                     name={`${prefix}.gender`}
                     bind:value={contactData.gender}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.gender?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 >
                     <option value="">Select...</option>
                     <option value="male">Male</option>
@@ -334,6 +349,9 @@
                     <option value="prefer-not-to-say">Prefer not to say</option>
                     <option value="other">Other</option>
                 </select>
+                {#each (contactFields?.fields?.gender?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -346,8 +364,11 @@
                     name={`${prefix}.birthday`}
                     type="date"
                     bind:value={contactData.birthday}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.birthday?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.birthday?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -360,8 +381,11 @@
                     name={`${prefix}.company`}
                     type="text"
                     bind:value={contactData.company}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.company?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.company?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -374,8 +398,11 @@
                     name={`${prefix}.department`}
                     type="text"
                     bind:value={contactData.department}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.department?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.department?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
             <div>
                 <label
@@ -387,8 +414,11 @@
                     name={`${prefix}.role`}
                     type="text"
                     bind:value={contactData.role}
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.role?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
+                {#each (contactFields?.fields?.role?.issues?.() ?? []) as issue}
+                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                {/each}
             </div>
         </div>
         <div>
@@ -478,7 +508,7 @@
                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                     value={formData?.name ?? ""}
                                 />
-                                {#each state.fields?.name?.issues() ?? [] as issue}
+                                {#each (state.fields?.name?.issues?.() ?? []) as issue}
                                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                                 {/each}
                             </div>

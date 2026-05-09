@@ -117,7 +117,7 @@
 
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
+        const issues = (rf as any)?.allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(i18n.pleaseFixValidation);
         }
@@ -225,15 +225,27 @@
     })}
     class="space-y-8"
 >
-    {#if contactId}
-        <input {...rf.fields.id.as("text", contactId)} class="hidden" />
-    {/if}
+    {#if rf?.fields}
+        {#if contactId && rf.fields.id}
+            <input {...rf.fields.id.as("text", contactId)} class="hidden" />
+        {/if}
 
-    <input {...rf.fields.emailsJson.as("text", emailsJson ?? "[]")} class="hidden" />
-    <input {...rf.fields.phonesJson.as("text", phonesJson ?? "[]")} class="hidden" />
-    <input {...rf.fields.relationsJson.as("text", relationsJson ?? "[]")} class="hidden" />
-    <input {...rf.fields.addressesJson.as("text", addressesJson ?? "[]")} class="hidden" />
-    <input {...rf.fields.tagsJson.as("text", tagsJson ?? "[]")} class="hidden" />
+        {#if rf.fields.emailsJson}
+            <input {...rf.fields.emailsJson.as("text", emailsJson ?? "[]")} class="hidden" />
+        {/if}
+        {#if rf.fields.phonesJson}
+            <input {...rf.fields.phonesJson.as("text", phonesJson ?? "[]")} class="hidden" />
+        {/if}
+        {#if rf.fields.relationsJson}
+            <input {...rf.fields.relationsJson.as("text", relationsJson ?? "[]")} class="hidden" />
+        {/if}
+        {#if rf.fields.addressesJson}
+            <input {...rf.fields.addressesJson.as("text", addressesJson ?? "[]")} class="hidden" />
+        {/if}
+        {#if rf.fields.tagsJson}
+            <input {...rf.fields.tagsJson.as("text", tagsJson ?? "[]")} class="hidden" />
+        {/if}
+    {/if}
 
     <ContactFields
         bind:contactData
@@ -263,7 +275,9 @@
         })}
     {/if}
 
-    <input {...rf.fields.locationIdsJson.as("text", locationIdsJson)} class="hidden" />
+    {#if rf?.fields?.locationIdsJson}
+        <input {...rf.fields.locationIdsJson.as("text", locationIdsJson)} class="hidden" />
+    {/if}
 
     <div class="flex justify-end gap-3 pt-6 border-t">
         {#if onCancel}

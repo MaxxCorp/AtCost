@@ -332,7 +332,7 @@
         }
     }
     $effect(() => {
-        const issues = (rf as any)?.allIssues ?? [];
+        const issues = (rf as any)?.allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(m.please_fix_validation());
         }
@@ -361,7 +361,7 @@
     })}
 >
     <!-- RPC-based hidden inputs with {#if} guards as requested by USER -->
-    {#if talentId || talentData.id}
+    {#if rf?.fields?.talent?.fields?.id && (talentId || talentData.id)}
         <input
             {...rf.fields.talent.fields.id.as(
                 "hidden",
@@ -395,14 +395,16 @@
                             >
                                 <Briefcase size={16} class="text-gray-400" />
                             </div>
-                            <input
-                                {...rf.fields.talent.fields.jobTitle.as(
-                                    "text",
-                                )}
-                                bind:value={talentData.jobTitle}
-                                placeholder="e.g. Senior Software Engineer"
-                                class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
+                            {#if rf?.fields?.talent?.fields?.jobTitle}
+                                <input
+                                    {...rf.fields.talent.fields.jobTitle.as(
+                                        "text",
+                                    )}
+                                    bind:value={talentData.jobTitle}
+                                    placeholder="e.g. Senior Software Engineer"
+                                    class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                            {/if}
                         </div>
                     </div>
 
@@ -412,18 +414,20 @@
                             class="block text-sm font-medium text-gray-700"
                             >Status</label
                         >
-                        <select
-                            {...rf.fields.talent.fields.status.as("select")}
-                            bind:value={talentData.status}
-                            onchange={(e) =>
-                                handleStatusChange(e.currentTarget.value)}
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="applicant">Applicant</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
+                        {#if rf?.fields?.talent?.fields?.status}
+                            <select
+                                {...rf.fields.talent.fields.status.as("select")}
+                                bind:value={talentData.status}
+                                onchange={(e) =>
+                                    handleStatusChange(e.currentTarget.value)}
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="applicant">Applicant</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        {/if}
                     </div>
 
                     <div>
@@ -438,12 +442,14 @@
                             >
                                 <DollarSign size={16} class="text-gray-400" />
                             </div>
-                            <input
-                                {...rf.fields.talent.fields.salaryExpectation.as("text")}
-                                bind:value={talentData.salaryExpectation}
-                                placeholder="e.g. 85,000"
-                                class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
+                            {#if rf?.fields?.talent?.fields?.salaryExpectation}
+                                <input
+                                    {...rf.fields.talent.fields.salaryExpectation.as("text")}
+                                    bind:value={talentData.salaryExpectation}
+                                    placeholder="e.g. 85,000"
+                                    class="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                            {/if}
                         </div>
                     </div>
 
@@ -453,14 +459,16 @@
                             class="block text-sm font-medium text-gray-700"
                             >Availability</label
                         >
-                        <input
-                            type="date"
-                            {...rf.fields.talent.fields.availabilityDate.as(
-                                "date",
-                            )}
-                            bind:value={talentData.availabilityDate}
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
+                        {#if rf?.fields?.talent?.fields?.availabilityDate}
+                            <input
+                                type="date"
+                                {...rf.fields.talent.fields.availabilityDate.as(
+                                    "date",
+                                )}
+                                bind:value={talentData.availabilityDate}
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        {/if}
                     </div>
 
                     <div>
@@ -469,14 +477,16 @@
                             class="block text-sm font-medium text-gray-700"
                             >Onboarding</label
                         >
-                        <input
-                            {...rf.fields.talent.fields.onboardingStatus.as(
-                                "text",
-                            )}
-                            bind:value={talentData.onboardingStatus}
-                            placeholder="Status..."
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
+                        {#if rf?.fields?.talent?.fields?.onboardingStatus}
+                            <input
+                                {...rf.fields.talent.fields.onboardingStatus.as(
+                                    "text",
+                                )}
+                                bind:value={talentData.onboardingStatus}
+                                placeholder="Status..."
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        {/if}
                     </div>
                 </div>
             </div>
@@ -490,108 +500,112 @@
                     <FileText size={20} class="text-gray-500" />
                     Internal Notes
                 </h3>
-                <textarea
-                    {...rf.fields.talent.fields.internalNotes.as("textarea")}
-                    bind:value={talentData.internalNotes}
-                    rows="4"
-                    placeholder="Private notes for recruitment team..."
-                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                ></textarea>
+                {#if rf?.fields?.talent?.fields?.internalNotes}
+                    <textarea
+                        {...rf.fields.talent.fields.internalNotes.as("textarea")}
+                        bind:value={talentData.internalNotes}
+                        rows="4"
+                        placeholder="Private notes for recruitment team..."
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    ></textarea>
+                {/if}
             </div>
         </div>
 
-    {#if contactData.id}
-        <input
-            {...rf.fields.contact.fields.id.as("hidden", contactData.id)}
-        />
-    {/if}
-    {#if contactData.displayName}
-        <input
-            {...rf.fields.contact.fields.displayName.as(
-                "hidden",
-                contactData.displayName,
-            )}
-        />
-    {/if}
-    {#if contactData.givenName}
-        <input
-            {...rf.fields.contact.fields.givenName.as(
-                "hidden",
-                contactData.givenName,
-            )}
-        />
-    {/if}
-    {#if contactData.familyName}
-        <input
-            {...rf.fields.contact.fields.familyName.as(
-                "hidden",
-                contactData.familyName,
-            )}
-        />
-    {/if}
-    {#if contactData.middleName}
-        <input
-            {...rf.fields.contact.fields.middleName.as(
-                "hidden",
-                contactData.middleName,
-            )}
-        />
-    {/if}
-    {#if contactData.honorificPrefix}
-        <input
-            {...rf.fields.contact.fields.honorificPrefix.as(
-                "hidden",
-                contactData.honorificPrefix,
-            )}
-        />
-    {/if}
-    {#if contactData.honorificSuffix}
-        <input
-            {...rf.fields.contact.fields.honorificSuffix.as(
-                "hidden",
-                contactData.honorificSuffix,
-            )}
-        />
-    {/if}
-    {#if contactData.birthday}
-        <input
-            {...rf.fields.contact.fields.birthday.as(
-                "hidden",
-                contactData.birthday,
-            )}
-        />
-    {/if}
-    {#if contactData.gender}
-        <input
-            {...rf.fields.contact.fields.gender.as(
-                "hidden",
-                contactData.gender,
-            )}
-        />
-    {/if}
-    {#if contactData.company}
-        <input
-            {...rf.fields.contact.fields.company.as(
-                "hidden",
-                contactData.company,
-            )}
-        />
-    {/if}
-    {#if contactData.role}
-        <input
-            {...rf.fields.contact.fields.role.as(
-                "hidden",
-                contactData.role,
-            )}
-        />
-    {/if}
-    {#if contactData.department}
-        <input
-            {...rf.fields.contact.fields.department.as(
-                "hidden",
-                contactData.department,
-            )}
-        />
+    {#if rf?.fields?.contact?.fields}
+        {#if contactData.id && rf.fields.contact.fields.id}
+            <input
+                {...rf.fields.contact.fields.id.as("hidden", contactData.id)}
+            />
+        {/if}
+        {#if contactData.displayName && rf.fields.contact.fields.displayName}
+            <input
+                {...rf.fields.contact.fields.displayName.as(
+                    "hidden",
+                    contactData.displayName,
+                )}
+            />
+        {/if}
+        {#if contactData.givenName && rf.fields.contact.fields.givenName}
+            <input
+                {...rf.fields.contact.fields.givenName.as(
+                    "hidden",
+                    contactData.givenName,
+                )}
+            />
+        {/if}
+        {#if contactData.familyName && rf.fields.contact.fields.familyName}
+            <input
+                {...rf.fields.contact.fields.familyName.as(
+                    "hidden",
+                    contactData.familyName,
+                )}
+            />
+        {/if}
+        {#if contactData.middleName && rf.fields.contact.fields.middleName}
+            <input
+                {...rf.fields.contact.fields.middleName.as(
+                    "hidden",
+                    contactData.middleName,
+                )}
+            />
+        {/if}
+        {#if contactData.honorificPrefix && rf.fields.contact.fields.honorificPrefix}
+            <input
+                {...rf.fields.contact.fields.honorificPrefix.as(
+                    "hidden",
+                    contactData.honorificPrefix,
+                )}
+            />
+        {/if}
+        {#if contactData.honorificSuffix && rf.fields.contact.fields.honorificSuffix}
+            <input
+                {...rf.fields.contact.fields.honorificSuffix.as(
+                    "hidden",
+                    contactData.honorificSuffix,
+                )}
+            />
+        {/if}
+        {#if contactData.birthday && rf.fields.contact.fields.birthday}
+            <input
+                {...rf.fields.contact.fields.birthday.as(
+                    "hidden",
+                    contactData.birthday,
+                )}
+            />
+        {/if}
+        {#if contactData.gender && rf.fields.contact.fields.gender}
+            <input
+                {...rf.fields.contact.fields.gender.as(
+                    "hidden",
+                    contactData.gender,
+                )}
+            />
+        {/if}
+        {#if contactData.company && rf.fields.contact.fields.company}
+            <input
+                {...rf.fields.contact.fields.company.as(
+                    "hidden",
+                    contactData.company,
+                )}
+            />
+        {/if}
+        {#if contactData.role && rf.fields.contact.fields.role}
+            <input
+                {...rf.fields.contact.fields.role.as(
+                    "hidden",
+                    contactData.role,
+                )}
+            />
+        {/if}
+        {#if contactData.department && rf.fields.contact.fields.department}
+            <input
+                {...rf.fields.contact.fields.department.as(
+                    "hidden",
+                    contactData.department,
+                )}
+            />
+        {/if}
     {/if}
     {#if contactData.notes}
         <input

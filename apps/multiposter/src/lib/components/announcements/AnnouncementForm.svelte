@@ -189,7 +189,7 @@
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     placeholder={m.announcement_title_placeholder()}
                 />
-                {#each rf.fields.title.issues() ?? [] as issue}
+                {#each (rf.fields.title.issues() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -210,7 +210,7 @@
                         />
                     {/if}
                 </div>
-                {#each rf.fields.content.issues() ?? [] as issue}
+                {#each (rf.fields.content.issues() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -309,7 +309,7 @@
                                         class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                         value={formData?.name ?? ""}
                                     />
-                                    {#each rfState.fields.name.issues() ?? [] as issue}
+                                    {#each (rfState.fields.name.issues() ?? []) as issue}
                                         <p class="mt-1 text-sm text-red-600">
                                             {issue.message}
                                         </p>

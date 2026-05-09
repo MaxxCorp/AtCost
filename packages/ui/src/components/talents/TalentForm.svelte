@@ -90,7 +90,7 @@
                     class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
             </div>
-            {#each rf.fields.data.fields.jobTitle.issues() ?? [] as issue}
+            {#each (rf.fields.data.fields.jobTitle.issues() ?? []) as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </label>
@@ -108,7 +108,7 @@
                 <option value="hired">Hired</option>
                 <option value="rejected">Rejected</option>
             </select>
-            {#each rf.fields.data.fields.status.issues() ?? [] as issue}
+            {#each (rf.fields.data.fields.status.issues() ?? []) as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </label>
@@ -124,7 +124,7 @@
                     class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
             </div>
-            {#each rf.fields.data.fields.salaryExpectation.issues() ?? [] as issue}
+            {#each (rf.fields.data.fields.salaryExpectation.issues() ?? []) as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </label>
@@ -140,7 +140,7 @@
                     class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
             </div>
-            {#each rf.fields.data.fields.availabilityDate.issues() ?? [] as issue}
+            {#each (rf.fields.data.fields.availabilityDate.issues() ?? []) as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </label>
@@ -153,7 +153,7 @@
                 placeholder="e.g. Pending background check"
                 class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             />
-            {#each rf.fields.data.fields.onboardingStatus.issues() ?? [] as issue}
+            {#each (rf.fields.data.fields.onboardingStatus.issues() ?? []) as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </label>
@@ -170,7 +170,7 @@
                     class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 ></textarea>
             </div>
-            {#each rf.fields.data.fields.internalNotes.issues() as issue}
+            {#each (rf.fields.data.fields.internalNotes.issues() ?? []) as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </label>

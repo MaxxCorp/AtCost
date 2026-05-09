@@ -121,7 +121,7 @@
                 >
                 <input
                     {...rf.fields.name.as("text", initialData?.name ?? "")}
-                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.name.issues()?.length > 0
+                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.name.issues() ?? []).length > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
                     placeholder={m.enter_campaign_name()}
@@ -141,7 +141,7 @@
                 <textarea
                     {...rf.fields.content.as("text", initialData?.content ? JSON.stringify(initialData.content) : "{}")}
                     rows="12"
-                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm {rf.fields.content.issues()?.length > 0
+                    class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm {(rf.fields.content.issues() ?? []).length > 0
                         ? 'border-red-500'
                         : 'border-gray-300'}"
                     placeholder={"{}"}

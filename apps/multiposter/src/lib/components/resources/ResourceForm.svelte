@@ -127,7 +127,7 @@
         <span class="text-sm font-medium text-gray-700 mb-2">{m.summary()}</span>
         <input
             {...rf.fields.name.as("text", initialData?.name ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.name.issues()?.length > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.name.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_location_name()}
@@ -142,7 +142,7 @@
         <span class="text-sm font-medium text-gray-700 mb-2">{m.direction()}</span>
         <input
             {...rf.fields.type.as("text", initialData?.type ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.type.issues()?.length > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.type.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.resource_type_placeholder()}
@@ -157,7 +157,7 @@
         <span class="text-sm font-medium text-gray-700 mb-2">{m.inventory_number()}</span>
         <input
             {...rf.fields.inventoryNumber.as("text", initialData?.inventoryNumber ?? "")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {rf.fields.inventoryNumber.issues()?.length > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.inventoryNumber.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_inventory_number()}

@@ -173,7 +173,7 @@
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 onblur={() => rf.validate()}
             />
-            {#each rf.fields.name.issues() ?? [] as issue}
+            {#each (rf.fields.name.issues() ?? []) as issue}
                 <p class="mt-1 text-sm text-red-600">{issue.message}</p>
             {/each}
         </div>
@@ -345,7 +345,7 @@
                     )}
                     class="hidden"
                 />
-                {#each rf.fields.locationIds.issues() ?? [] as issue}
+                {#each (rf.fields.locationIds.issues() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             {:catch error}
@@ -421,7 +421,7 @@
                     onblur={() => rf.validate()}
                 />
                 <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
-                {#each rf.fields.loopDuration.issues() ?? [] as issue}
+                {#each (rf.fields.loopDuration.issues() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                 {/each}
             </div>
@@ -440,7 +440,7 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         onblur={() => rf.validate()}
                     />
-                    {#each rf.fields.lookAheadDays.issues() ?? [] as issue}
+                    {#each (rf.fields.lookAheadDays.issues() ?? []) as issue}
                         <p class="mt-1 text-sm text-red-600">
                             {issue.message}
                         </p>
@@ -460,7 +460,7 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         onblur={() => rf.validate()}
                     />
-                    {#each rf.fields.lookPastDays.issues() ?? [] as issue}
+                    {#each (rf.fields.lookPastDays.issues() ?? []) as issue}
                         <p class="mt-1 text-sm text-red-600">
                             {issue.message}
                         </p>
@@ -505,7 +505,7 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each rf.fields.startDate.issues() ?? [] as issue}
+                    {#each (rf.fields.startDate.issues() ?? []) as issue}
                         <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                     {/each}
                 </div>
@@ -526,7 +526,7 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each rf.fields.endDate.issues() ?? [] as issue}
+                    {#each (rf.fields.endDate.issues() ?? []) as issue}
                         <p class="mt-1 text-sm text-red-600">{issue.message}</p>
                     {/each}
                 </div>

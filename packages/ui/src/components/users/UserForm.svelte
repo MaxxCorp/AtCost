@@ -145,8 +145,7 @@
         >
         <input
             {...rf.fields.name.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.name.issues()
-                ?.length ?? 0) > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.name.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             value={initialData?.name ?? ""}
@@ -163,8 +162,7 @@
         >
         <input
             {...rf.fields.email.as("email")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.email.issues()
-                ?.length ?? 0) > 0
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.email.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             value={initialData?.email ?? ""}

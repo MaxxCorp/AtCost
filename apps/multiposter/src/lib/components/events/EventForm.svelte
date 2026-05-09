@@ -296,8 +296,7 @@
         <input
             {...rf.fields.summary.as("text", initialData?.summary ?? "")}
             required
-            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {rf.fields.summary.issues()
-                ?.length > 0
+            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.summary.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.title()}
@@ -445,7 +444,7 @@
                             value={formData?.name ?? ""}
                         />
                         <div class="px-2">
-                            {#each rf.fields.name.issues() ?? [] as issue}
+                            {#each (rf.fields.name.issues() ?? []) as issue}
                                 <p class="text-sm text-red-600">
                                     {issue.message}
                                 </p>
@@ -611,8 +610,7 @@
                     "text",
                     initialData?.ticketPrice?.toString() ?? "",
                 )}
-                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {rf.fields.ticketPrice.issues()
-                    ?.length > 0
+                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
                     ? 'border-red-500'
                     : 'border-gray-300'}"
                 placeholder="e.g. 15.50"

@@ -331,7 +331,7 @@
 							value={providerId}
 							name="name"
 							placeholder="e.g., my-work-calendar"
-							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {fields.name.issues()?.length > 0
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(fields.name.issues() ?? []).length > 0
 								? 'border-red-500'
 								: ''}"
 							oninput={(e) => (providerId = e.currentTarget.value)}

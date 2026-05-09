@@ -19,7 +19,7 @@
 
     let prevIssuesLength = $state(0);
     $effect(() => {
-        const issues = rf.allIssues?.() ?? [];
+        const issues = rf?.allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error("Please fix the validation errors in the form.");
         }
@@ -48,37 +48,43 @@
         }
     })}
 >
-    {#if isUpdating && initialData}
-        <input {...rf.fields.id.as("hidden", initialData.id)} />
+    {#if rf?.fields}
+        {#if isUpdating && initialData && rf.fields.id}
+            <input {...rf.fields.id.as("hidden", initialData.id)} />
+        {/if}
     {/if}
 
-    <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Name</span>
-        <input
-            {...rf.fields.name.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.name.issues()?.length ?? 0) > 0 ? 'border-red-500' : 'border-gray-300'}"
-            placeholder="e.g. AWO Berlin TV"
-            onblur={() => rf.validate()}
-            value={initialData?.name ?? ""}
-        />
-        {#each rf.fields.name.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
-        {/each}
-    </label>
+    {#if rf?.fields?.name}
+        <label class="block">
+            <span class="text-sm font-medium text-gray-700 mb-2">Name</span>
+            <input
+                {...rf.fields.name.as("text")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.name.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                placeholder="e.g. AWO Berlin TV"
+                onblur={() => rf.validate()}
+                value={initialData?.name ?? ""}
+            />
+            {#each rf.fields.name.issues?.() ?? [] as issue}
+                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            {/each}
+        </label>
+    {/if}
 
-    <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">Description</span>
-        <textarea
-            {...rf.fields.description.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-            placeholder="Describe the contract framework"
-            rows="3"
-            value={initialData?.description ?? ""}
-        ></textarea>
-    </label>
+    {#if rf?.fields?.description}
+        <label class="block">
+            <span class="text-sm font-medium text-gray-700 mb-2">Description</span>
+            <textarea
+                {...rf.fields.description.as("text")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                placeholder="Describe the contract framework"
+                rows="3"
+                value={initialData?.description ?? ""}
+            ></textarea>
+        </label>
+    {/if}
 
     <div class="flex justify-end gap-3 mt-6">
-        <AsyncButton type="submit" loadingLabel={isUpdating ? "Saving..." : "Creating..."} loading={rf.pending}>
+        <AsyncButton type="submit" loadingLabel={isUpdating ? "Saving..." : "Creating..."} loading={rf && rf.pending}>
             {isUpdating ? "Save Changes" : "Create Framework"}
         </AsyncButton>
         {#if onCancel}
