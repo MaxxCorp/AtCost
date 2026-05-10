@@ -865,7 +865,7 @@
                 </div>
             {:else}
                 <div class="grid gap-4">
-                    {#each items as item (item.id)}
+                    {#each items as item, index (item.id)}
                         {#if renderListItem}
                             {@render renderListItem(item, {
                                 isSelected: selectedIds.has(item.id!),
@@ -874,6 +874,8 @@
                                 isAssociated: true,
                                 toggleAssociation: (i: T) => { void toggleAssociation(i, items); },
                                 singleSelect,
+                                index,
+                                allItems: items,
                             })}
                         {:else}
                             <div

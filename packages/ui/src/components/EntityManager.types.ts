@@ -24,4 +24,6 @@ export interface ListItemContext<T> {
     isAssociated: boolean;
     toggleAssociation: (item: T) => void;
     singleSelect: boolean;
+    index: number;
+    allItems: T[];
 }

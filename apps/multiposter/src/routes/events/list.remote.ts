@@ -20,14 +20,24 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'events');
 
-	const { page, limit, locationId, tagId, contactId, search } = input;
+	const { page, limit, locationId, tagId, contactId, search, grouped, seriesId } = input;
 	const offset = (page - 1) * limit;
 
 	// Build the base query for filtering
-	let baseQuery = db.select({ id: event.id }).from(event);
+	let baseQuery = db.select({ 
+		id: event.id,
+		seriesId: event.seriesId,
+		createdAt: event.createdAt,
+		summary: event.summary,
+		startDateTime: event.startDateTime
+	}).from(event);
 	
 	const conditions = [];
-	// Actually we should filter by locationId if provided:
+	
+	if (seriesId) {
+		conditions.push(eq(event.seriesId, seriesId));
+	}
+
 	if (locationId) {
 		const { eventLocation } = await import('@ac/db');
 		baseQuery = baseQuery.innerJoin(eventLocation, eq(eventLocation.eventId, event.id)) as any;
@@ -49,7 +59,6 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 		conditions.push(inArray(eventContact.contactId, ids));
 	}
 	
-	// Add search logic if needed (e.g., ilike summary)
 	if (search) {
 		conditions.push(ilike(event.summary, `%${search}%`));
 	}
@@ -58,17 +67,46 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 		baseQuery = baseQuery.where(and(...conditions)) as any;
 	}
 
-	// First, get total count (doing a simple count of the filtered IDs)
-	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-    const total = Number(countResult[0]?.count || 0);
+	let total = 0;
+	let paginatedIds: string[] = [];
+	const instanceCounts = new Map<string, number>();
 
-	if (total === 0) {
-		return { data: [], total: 0 };
+	const subquery = baseQuery.as('filtered_events');
+
+	if (grouped) {
+		const groupsQuery = db.select({
+			representativeId: sql<string>`(array_agg(${subquery.id} ORDER BY ${subquery.startDateTime} ASC NULLS LAST))[1]`,
+			count: sql<number>`count(*)::int`,
+		})
+		.from(subquery)
+		.groupBy(sql`COALESCE(${subquery.seriesId}, ${subquery.id})`)
+		.orderBy(sql`max(${subquery.createdAt}) DESC`);
+
+		const allGroups = await groupsQuery;
+		total = allGroups.length;
+		
+		const pagedGroups = allGroups.slice(offset, offset + limit);
+		paginatedIds = pagedGroups.map(g => g.representativeId).filter(Boolean);
+		
+		for (const g of pagedGroups) {
+			if (g.representativeId) {
+				instanceCounts.set(g.representativeId, g.count);
+			}
+		}
+	} else {
+		const countResult = await db.select({ count: sql<number>`count(*)::int` }).from(subquery);
+		total = Number(countResult[0]?.count || 0);
+
+		if (total > 0) {
+			const paginatedIdsQuery = db.select({ id: subquery.id })
+				.from(subquery)
+				.orderBy(desc(subquery.createdAt))
+				.limit(limit)
+				.offset(offset);
+			const rows = await paginatedIdsQuery;
+			paginatedIds = rows.map((r) => r.id);
+		}
 	}
-
-	// Then, fetch paginated records
-	const paginatedIdsQuery = baseQuery.orderBy(desc(event.createdAt)).limit(limit).offset(offset);
-	const paginatedIds = (await paginatedIdsQuery).map((r) => r.id);
 
 	if (paginatedIds.length === 0) {
 		return { data: [], total };
@@ -88,6 +126,8 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 		updatedAt: row.updatedAt.toISOString(),
 		startDateTime: row.startDateTime?.toISOString() ?? null,
 		endDateTime: row.endDateTime?.toISOString() ?? null,
+		isSeries: (grouped && (instanceCounts.get(row.id) ?? 1) > 1) || (!!row.seriesId && grouped),
+		instanceCount: grouped ? (instanceCounts.get(row.id) ?? 1) : 1,
 	}));
 
 	// Fetch tags for these paginated events
@@ -141,3 +181,4 @@ export const listEvents = query(PaginationSchema, async (input): Promise<Paginat
 		total,
 	};
 });
+

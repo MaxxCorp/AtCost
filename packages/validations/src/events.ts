@@ -35,6 +35,8 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	} | null;
 	qrCodePath?: string | null;
 	iCalPath?: string | null;
+	isSeries?: boolean;
+	instanceCount?: number;
 };
 
 export type PublicEvent = Omit<Event, 'resolvedContact'> & {
@@ -86,4 +88,6 @@ export const eventPaginationSchema = v.optional(v.object({
 	locationId: FilterableIdSchema,
 	tagId: FilterableIdSchema,
 	contactId: FilterableIdSchema,
+	grouped: v.optional(v.boolean(), false),
+	seriesId: v.optional(v.string()),
 }), {});

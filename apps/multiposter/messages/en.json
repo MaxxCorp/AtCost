@@ -326,6 +326,8 @@
 	"series": "Series",
 	"delete_series_confirm": "Delete all events in this series?",
 	"series_deleted": "Series deleted",
+	"plus_more": "+ {count} more",
+	"instances": "Instances",
 	"loading_event_data": "Loading event data...",
 	"event_not_found": "Event Not Found",
 	"event_not_found_message": "The event you are looking for does not exist.",

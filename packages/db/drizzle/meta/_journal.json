@@ -43,6 +43,13 @@
       "when": 1777198038994,
       "tag": "0005_lively_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778441871467,
+      "tag": "0006_pretty_vision",
+      "breakpoints": true
     }
   ]
 }

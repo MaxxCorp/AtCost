@@ -326,6 +326,8 @@
 	"series": "Serie",
 	"delete_series_confirm": "Alle Veranstaltungen in dieser Serie löschen?",
 	"series_deleted": "Serie gelöscht",
+	"plus_more": "+ {count} weitere",
+	"instances": "Instanzen",
 	"loading_event_data": "Veranstaltungsdaten werden geladen...",
 	"event_not_found": "Veranstaltung nicht gefunden",
 	"event_not_found_message": "Die gesuchte Veranstaltung existiert nicht.",
