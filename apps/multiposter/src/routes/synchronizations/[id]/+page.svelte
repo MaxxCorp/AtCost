@@ -188,7 +188,7 @@
 								class="inline-block"
 							>
 								<input
-									{...rf.fields.enabled.as("text", (!config.enabled).toString())}
+									{...rf.fields.enabled.as("checkbox", config.enabled)}
 									class="hidden"
 								/>
 								<AsyncButton

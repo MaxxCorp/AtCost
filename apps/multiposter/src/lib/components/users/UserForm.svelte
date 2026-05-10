@@ -151,7 +151,7 @@
         <h3 class="text-lg font-medium text-gray-900 mb-2">{m.roles()}</h3>
         <label class="flex items-center space-x-2">
             <input
-                {...remoteFunction.fields.roles.as("checkbox", "admin")}
+                {...rf.fields.roles.as("checkbox", "admin")}
                 checked={isAdmin}
                 onchange={(e) => (isAdmin = e.currentTarget.checked)}
                 class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"

@@ -356,7 +356,7 @@
 								Calendar ID
 							</label>
 							<input
-								{...fields.settings.fields.calendarId.as("text")}
+								{...fields.settings.calendarId.as("text")}
 								id="calendarId"
 								bind:value={calendarId}
 								placeholder="primary"
@@ -378,7 +378,7 @@
 								Company (Firma)
 							</label>
 							<input
-								{...fields.settings.fields.company.as("text")}
+								{...fields.settings.company.as("text")}
 								id="company"
 								bind:value={company}
 								placeholder="Your organization name"
@@ -398,7 +398,7 @@
 								Login Username
 							</label>
 							<input
-								{...fields.credentials.fields.username.as("text")}
+								{...fields.credentials.username.as("text")}
 								id="mhUsername"
 								bind:value={mhUsername}
 								placeholder="Username"
@@ -413,7 +413,7 @@
 								Login Password
 							</label>
 							<input
-								{...fields.credentials.fields.password.as(
+								{...fields.credentials.password.as(
 									"password",
 								)}
 								id="mhPassword"
@@ -433,7 +433,7 @@
 								Nebenan.de Email / Username
 							</label>
 							<input
-								{...fields.credentials.fields.email.as("text")}
+								{...fields.credentials.email.as("text")}
 								id="nebenanEmail"
 								placeholder="login@example.com"
 								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -447,7 +447,7 @@
 								Nebenan.de Password
 							</label>
 							<input
-								{...fields.credentials.fields.password.as(
+								{...fields.credentials.password.as(
 									"password",
 								)}
 								id="nebenanPassword"
@@ -463,7 +463,7 @@
 								Business Profile ID (Gewerbeprofil-ID)
 							</label>
 							<input
-								{...fields.settings.fields.profileId.as("text")}
+								{...fields.settings.profileId.as("text")}
 								id="nebenanProfileId"
 								placeholder="e.g. cbe780d1-9642-49e5-8928-d1c163698658"
 								class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -483,7 +483,7 @@
 								WordPress Site URL
 							</label>
 							<input
-								{...fields.settings.fields.baseUrl.as("url")}
+								{...fields.settings.baseUrl.as("url")}
 								id="wpBaseUrl"
 								bind:value={wpBaseUrl}
 								placeholder="https://yoursite.com"
@@ -501,7 +501,7 @@
 								WordPress Username
 							</label>
 							<input
-								{...fields.settings.fields.username.as("text")}
+								{...fields.settings.username.as("text")}
 								id="wpUsername"
 								bind:value={wpUsername}
 								placeholder="admin"
@@ -519,7 +519,7 @@
 								Application Password
 							</label>
 							<input
-								{...fields.settings.fields.applicationPassword.as(
+								{...fields.settings.applicationPassword.as(
 									"password",
 								)}
 								id="wpAppPassword"
@@ -542,7 +542,7 @@
 							Sync Interval (minutes)
 						</label>
 						<input
-							{...fields.settings.fields.syncIntervalMinutes.as(
+							{...fields.settings.syncIntervalMinutes.as(
 								"number",
 							)}
 							id="syncInterval"

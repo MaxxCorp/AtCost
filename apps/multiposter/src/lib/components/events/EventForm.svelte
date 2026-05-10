@@ -205,8 +205,8 @@
 
     function addReminder(rf: any) {
         const currentReminders =
-            rf.fields.reminders.fields.overrides.value() ?? [];
-        rf.fields.reminders.fields.overrides.set([
+            rf.fields.reminders.overrides.value() ?? [];
+        rf.fields.reminders.overrides.set([
             ...currentReminders,
             { method: "popup", minutes: 10 },
         ]);
@@ -214,8 +214,8 @@
 
     function removeReminder(rf: any, index: number) {
         const currentReminders =
-            rf.fields.reminders.fields.overrides.value() ?? [];
-        rf.fields.reminders.fields.overrides.set(
+            rf.fields.reminders.overrides.value() ?? [];
+        rf.fields.reminders.overrides.set(
             currentReminders.filter((_: any, i: number) => i !== index),
         );
     }
@@ -243,11 +243,12 @@
             rf.fields.hasEndTime.value() === "true",
     );
     let useDefaultReminders = $derived(
-        rf.fields.reminders.fields.useDefault.value() === true ||
-            rf.fields.reminders.fields.useDefault.value() === "true",
+        rf.fields.reminders.useDefault.value() === true ||
+            rf.fields.reminders.useDefault.value() === "true" ||
+            rf.fields.reminders.useDefault.value() === "on",
     );
     let reminders = $derived(
-        rf.fields.reminders.fields.overrides.value() ?? [],
+        rf.fields.reminders.overrides.value() ?? [],
     );
 </script>
 
@@ -279,7 +280,6 @@
     {...rf.fields.description.as("text", initialData?.description ?? "")}
     class="hidden"
 />
-<input {...rf.fields.remindersJson.as("text")} class="hidden" />
 
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
     <h2 class="text-xl font-semibold mb-4 border-b pb-2">
@@ -988,7 +988,7 @@
         </h3>
         <label class="flex items-center gap-2 mb-4">
             <input
-                {...rf.fields.reminders.fields.useDefault.as(
+                {...rf.fields.reminders.useDefault.as(
                     "checkbox",
                     (initialData?.reminders as any)?.useDefault ?? true,
                 )}
@@ -1001,21 +1001,11 @@
 
         {#if !useDefaultReminders}
             <div class="space-y-3">
-                {#each reminders as reminder, i}
+                {#each reminders as _, i}
                     <div class="flex gap-2 items-center">
                         <div class="flex-1">
                             <select
-                                value={reminder.method}
-                                onchange={(e) => {
-                                    const next = [...reminders];
-                                    next[i] = {
-                                        ...reminder,
-                                        method: e.currentTarget.value,
-                                    };
-                                    rf.fields.reminders.fields.overrides.set(
-                                        next,
-                                    );
-                                }}
+                                {...rf.fields.reminders.overrides[i].method.as("text")}
                                 class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="popup">{m.notification()}</option
@@ -1025,18 +1015,7 @@
                         </div>
                         <div class="flex-1">
                             <input
-                                type="number"
-                                value={reminder.minutes}
-                                oninput={(e) => {
-                                    const next = [...reminders];
-                                    next[i] = {
-                                        ...reminder,
-                                        minutes: Number(e.currentTarget.value),
-                                    };
-                                    rf.fields.reminders.fields.overrides.set(
-                                        next,
-                                    );
-                                }}
+                                {...rf.fields.reminders.overrides[i].minutes.as("number")}
                                 class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                                 min="0"
                             />

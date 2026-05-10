@@ -22,17 +22,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		ensureAccess(user, 'events');
 		console.log('User authenticated:', user.id);
 
-		// Handle serialized reminders if provided
-		let reminders = data.reminders;
-		if (data.remindersJson) {
-			console.log('Parsing remindersJson...');
-			try {
-				reminders = JSON.parse(data.remindersJson);
-				console.log('Parsed reminders:', JSON.stringify(reminders));
-			} catch (e) {
-				console.error('Failed to parse remindersJson', e);
-			}
-		}
+		// Handle reminders
+		const reminders = data.reminders;
 
 		// Prepare update object
 		const updateData: any = {
