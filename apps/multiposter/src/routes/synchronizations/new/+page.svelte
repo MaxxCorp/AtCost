@@ -30,7 +30,7 @@
 			name: "Microsoft Calendar",
 			description: "Sync with Outlook/Microsoft 365",
 			icon: Calendar,
-			available: false,
+			available: true,
 		},
 		{
 			id: "berlin-de-main-calendar" as const,
@@ -347,7 +347,7 @@
 						</p>
 					</div>
 
-					{#if selectedProvider === "google-calendar"}
+					{#if selectedProvider === "google-calendar" || selectedProvider === "microsoft-calendar"}
 						<div>
 							<label
 								for="calendarId"

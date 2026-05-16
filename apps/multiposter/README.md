@@ -84,7 +84,6 @@ BETTER_AUTH_URL=https://localhost:5173
 ### Testing Stage Notes
 
 - While your app is in **Testing** status (not published), only users added to the Test users list can sign in
-- You can add up to 100 test users
 - Test users won't see the "This app isn't verified" warning
 - For production, you'll need to submit your app for verification or publish it
 
@@ -114,21 +113,22 @@ MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
 
 Notes:
 - `DATABASE_URL` is required. The app will throw if it's missing.
-- `BETTER_AUTH_URL` should be **`https://localhost:5173`** for local dev (required for Google Calendar webhooks)
-- The dev server runs with HTTPS using `vite-plugin-mkcert` (automatic self-signed certificate)
-- OAuth callback URLs to configure with your providers:
-	- Google: `https://localhost:5173/api/auth/callback/google` (use HTTPS)
-	- Microsoft: `https://localhost:5173/api/auth/callback/microsoft` (use HTTPS)
-	- Microsoft scope used: `Calendars.ReadWrite` and `offline_access`
-
-Notes:
-- `DATABASE_URL` is required. The app will throw if it's missing.
-- `BETTER_AUTH_URL` should be **`https://localhost:5173`** for local dev (required for Google Calendar webhooks)
+- `BETTER_AUTH_URL` should be **`https://localhost:5173`** for local dev (required for Google/Microsoft Calendar webhooks)
 - The dev server runs with HTTPS using `vite-plugin-mkcert` (automatic self-signed certificate)
 - OAuth callback URLs to configure with your providers (must use HTTPS):
 	- Google: `https://localhost:5173/api/auth/callback/google`
 	- Microsoft: `https://localhost:5173/api/auth/callback/microsoft`
 	- Microsoft scope used: `Calendars.ReadWrite` and `offline_access`
+
+## Setting up Microsoft OAuth (Required for Calendar Sync)
+
+To enable Microsoft Calendar synchronization, you need to register an application in the Microsoft Entra ID admin center.
+
+For detailed, step-by-step instructions on setting up Microsoft OAuth and Webhooks, please see:
+[**MICROSOFT_SYNC_SETUP.md**](./MICROSOFT_SYNC_SETUP.md)
+
+---
+
 
 ## 3) Initialize the database
 

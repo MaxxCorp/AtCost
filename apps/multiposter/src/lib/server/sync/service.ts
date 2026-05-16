@@ -32,6 +32,7 @@ import { getEntityContacts } from '../contacts';
 import { resolveEventContact } from '../contact-resolution';
 import { eq, and, isNull, lt, gt, gte, lte, or, inArray, desc } from '@ac/db';
 import { GoogleCalendarProvider } from './providers/google-calendar';
+import { MicrosoftCalendarProvider } from './providers/microsoft-calendar';
 import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
 import { BerlinDeMhCalendarProvider } from './providers/berlin-de-mh-calendar';
 import { WpTheEventsCalendarProvider } from './providers/wp-the-events-calendar';
@@ -54,6 +55,7 @@ export class SyncService {
 	constructor() {
 		// Register built-in providers
 		this.registerProvider('google-calendar', GoogleCalendarProvider);
+		this.registerProvider('microsoft-calendar', MicrosoftCalendarProvider);
 		this.registerProvider('berlin-de-main-calendar', BerlinDeMainCalendarProvider);
 		this.registerProvider('berlin-de-mh-calendar', BerlinDeMhCalendarProvider);
 		this.registerProvider('wp-the-events-calendar', WpTheEventsCalendarProvider);
