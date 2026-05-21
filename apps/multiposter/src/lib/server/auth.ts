@@ -55,7 +55,25 @@ export const auth = betterAuth({
         microsoft: {
             clientId: env.MICROSOFT_CLIENT_ID || "",
             clientSecret: env.MICROSOFT_CLIENT_SECRET || "",
-            scope: ["Calendars.ReadWrite", "offline_access"],
+            scope: [
+                "openid",
+                "profile",
+                "email",
+                "Calendars.ReadWrite",
+                "offline_access"
+            ],
+            mapProfileToUser: (profile) => {
+                const email = (profile as any).email || (profile as any).mail || (profile as any).userPrincipalName || (profile as any).preferred_username;
+                return {
+                    email: email,
+                    name: profile.name || (profile as any).displayName || (profile as any).userPrincipalName,
+                    image: profile.picture,
+                    claims: {
+                        ...(profile as any),
+                        email: email
+                    }
+                };
+            },
         }
     },
     plugins: [sveltekitCookies(getRequestEvent)],
