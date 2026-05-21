@@ -288,7 +288,7 @@
     // Manual refreshes are now handled via refreshCounter in $effects
 
     // --- STATE ---
-    let localAssociatedItems = $state<T[]>(initialItems ?? []);
+    let localAssociatedItems = $state<T[]>(untrack(() => initialItems ?? []));
     $effect(() => {
         if (initialItems) {
             untrack(() => {

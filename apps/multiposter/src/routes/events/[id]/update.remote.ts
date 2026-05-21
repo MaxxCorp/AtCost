@@ -313,6 +313,57 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						updatedEvent.seriesId = null;
 					}
 				}
+			} else {
+				// data.recurrence is undefined, meaning recurrence structure did not change.
+				// If the updated event is a master event and belongs to a series, propagate updates to instances.
+				if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
+					console.log('Propagating common field updates to recurring instances...');
+					const affectedInstances = await tx
+						.select({ id: event.id })
+						.from(event)
+						.where(
+							and(
+								eq(event.recurringEventId, updatedEvent.id),
+								eq(event.isException, false)
+							)
+						);
+
+					if (affectedInstances.length > 0) {
+						const instanceUpdatePayload: any = {
+							updatedAt: new Date()
+						};
+						if (updateData.summary !== undefined) instanceUpdatePayload.summary = updateData.summary;
+						if (updateData.description !== undefined) instanceUpdatePayload.description = updateData.description;
+						if (updateData.status !== undefined) instanceUpdatePayload.status = updateData.status;
+						if (updateData.categoryBerlinDotDe !== undefined) instanceUpdatePayload.categoryBerlinDotDe = updateData.categoryBerlinDotDe;
+						if (updateData.ticketPrice !== undefined) instanceUpdatePayload.ticketPrice = updateData.ticketPrice;
+						if (updateData.isAllDay !== undefined) instanceUpdatePayload.isAllDay = updateData.isAllDay;
+						if (updateData.startTimeZone !== undefined) instanceUpdatePayload.startTimeZone = updateData.startTimeZone;
+						if (updateData.endTimeZone !== undefined) instanceUpdatePayload.endTimeZone = updateData.endTimeZone;
+						if (updateData.attendees !== undefined) instanceUpdatePayload.attendees = updateData.attendees;
+						if (updateData.reminders !== undefined) instanceUpdatePayload.reminders = updateData.reminders;
+						if (updateData.isPublic !== undefined) instanceUpdatePayload.isPublic = updateData.isPublic;
+						if (updateData.guestsCanInviteOthers !== undefined) instanceUpdatePayload.guestsCanInviteOthers = updateData.guestsCanInviteOthers;
+						if (updateData.guestsCanModify !== undefined) instanceUpdatePayload.guestsCanModify = updateData.guestsCanModify;
+						if (updateData.guestsCanSeeOtherGuests !== undefined) instanceUpdatePayload.guestsCanSeeOtherGuests = updateData.guestsCanSeeOtherGuests;
+						if (updateData.heroImage !== undefined) instanceUpdatePayload.heroImage = updateData.heroImage;
+						if (updatedEvent.campaignId !== undefined) instanceUpdatePayload.campaignId = updatedEvent.campaignId;
+
+						await tx
+							.update(event)
+							.set(instanceUpdatePayload)
+							.where(
+								and(
+									eq(event.recurringEventId, updatedEvent.id),
+									eq(event.isException, false)
+								)
+							);
+
+						for (const inst of affectedInstances) {
+							await linkAssociations(inst.id, tx);
+						}
+					}
+				}
 			}
 			return updatedEvent;
 		});
@@ -328,7 +379,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		console.log('Regenerating assets after update...');
 		await generateEventAssets(data.id, origin);
 
-		if (data.recurrence !== undefined) {
+		if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
 			const instances = await db.query.event.findMany({
 				where: (e, { eq, and, ne }) => and(
 					eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),
@@ -344,7 +395,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		if (updatedEvent) {
 			let allAffectedIds = [updatedEvent.id];
-			if (data.recurrence !== undefined && updatedEvent.seriesId) {
+			if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
 				const instances = await db.query.event.findMany({
 					where: (e, { eq, and, ne }) => and(
 						eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),

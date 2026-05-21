@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike } from '@ac/db';
+import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { ShiftPlanTemplate } from '@ac/db';
 import * as v from 'valibot';
@@ -33,7 +33,6 @@ export const listShiftplans = query(PaginationSchema, async (input): Promise<Pag
         }
 
         if (locationId) {
-            const { inArray } = await import('drizzle-orm');
             const ids = Array.isArray(locationId) ? locationId : [locationId];
             if (ids.length > 0) {
                 conditions.push(inArray(shiftPlanTemplate.locationId, ids as any));

@@ -1,12 +1,11 @@
 import { db } from '@ac/db';
 import { and, eq } from '@ac/db';
-import type { PgTable } from 'drizzle-orm/pg-core';
 
 export interface AssociationOptions {
     type: string;
     entityId: string;
     itemId: string;
-    tableMap: Record<string, PgTable>;
+    tableMap: Record<string, any>;
     fieldMap: Record<string, string>;
     itemField: string;
 }

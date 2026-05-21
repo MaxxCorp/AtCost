@@ -26,7 +26,8 @@ import {
 	eventLocation as eventLocationTable,
 	eventTag as eventTag,
 	recurringSeries as recurringSeries,
-	campaign as campaignTable
+	campaign as campaignTable,
+	emailCampaign as emailCampaignTable
 } from '@ac/db';
 import { getEntityContacts } from '../contacts';
 import { resolveEventContact } from '../contact-resolution';
@@ -1502,6 +1503,26 @@ export class SyncService {
 			}
 		} catch (error) {
 			console.error(`[SyncService] Failed to trigger push sync for user ${userId}:`, error);
+		}
+	}
+
+	/**
+	 * Get email campaigns by sync configuration ID
+	 */
+	async getEmailCampaigns(configId: string): Promise<any[]> {
+		try {
+			const campaigns = await db
+				.select()
+				.from(emailCampaignTable)
+				.where(eq(emailCampaignTable.syncConfigId, configId));
+			
+			return campaigns.map(c => ({
+				...c,
+				sentAt: c.sentAt.toISOString()
+			}));
+		} catch (error) {
+			console.error(`[SyncService] Failed to get email campaigns for config ${configId}:`, error);
+			return [];
 		}
 	}
 }

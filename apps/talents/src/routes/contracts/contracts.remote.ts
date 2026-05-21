@@ -38,7 +38,6 @@ export const listContracts = query(contractPaginationSchema, async (input) => {
     // Deduplicate
     baseQuery = baseQuery.groupBy(contract.id) as any;
 
-    const { sql } = await import('drizzle-orm');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
