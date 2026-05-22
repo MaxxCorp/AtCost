@@ -49,18 +49,33 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
         return { data: [], total };
     }
 
-    const rawResults = await db.select({
+    const resources = await db.select({
         ...getTableColumns(resource),
-        locationName: location.name,
     })
     .from(resource)
-    .leftJoin(resourceLocation, eq(resource.id, resourceLocation.resourceId))
-    .leftJoin(location, eq(resourceLocation.locationId, location.id))
     .where(inArray(resource.id, ids))
     .orderBy(desc(resource.createdAt));
 
-    const data = rawResults.map((row) => ({
+    // Fetch all location associations for these resource IDs to group them in memory
+    const locationMap = new Map<string, string[]>();
+    const locAssociations = await db
+        .select({
+            resourceId: resourceLocation.resourceId,
+            locationName: location.name,
+        })
+        .from(resourceLocation)
+        .innerJoin(location, eq(resourceLocation.locationId, location.id))
+        .where(inArray(resourceLocation.resourceId, ids));
+
+    locAssociations.forEach(assoc => {
+        const names = locationMap.get(assoc.resourceId) || [];
+        names.push(assoc.locationName);
+        locationMap.set(assoc.resourceId, names);
+    });
+
+    const data = resources.map((row) => ({
         ...row,
+        locationName: locationMap.get(row.id)?.join(', ') || null,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
     }));

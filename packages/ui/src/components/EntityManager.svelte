@@ -254,6 +254,7 @@
 
     export function refresh() {
         refreshCounter++;
+        optionsCache.clear();
         // Invalidate handle-level cache to ensure subsequent calls return a new promise
         if (typeof (listItemsRemote as any)?.refresh === 'function') {
             void (listItemsRemote as any).refresh();
@@ -303,9 +304,20 @@
     let showQuickCreate = $state(false);
     let linkingItemId = $state<string | null>(null);
     let deletingItemId = $state<string | null>(null);
+    let bulkDeleting = $state(false);
     let editingItem = $state<any | null>(null);
     let selectedIds = $state<Set<string>>(new Set());
-    let bulkDeleting = $state(false);
+    // Cache map for optionsRemote promises to avoid infinite refetches on re-renders
+    const optionsCache = new Map<string, Promise<any>>();
+    function getOptionsCached(filter: any) {
+        if (!filter.optionsRemote) return Promise.resolve([]);
+        const cached = optionsCache.get(filter.id);
+        if (cached) return cached;
+
+        const promise = filter.optionsRemote({ limit: 100 });
+        optionsCache.set(filter.id, promise);
+        return promise;
+    }
 
     // --- HELPERS ---
     const effectiveFilters = $derived([
@@ -584,7 +596,7 @@
                                 <DropdownMenu.SubContent
                                     class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
                                 >
-                                    {#await filter.optionsRemote( { limit: 100 }, )}
+                                    {#await getOptionsCached(filter)}
                                         <div
                                             class="p-3 text-xs text-muted-foreground animate-pulse text-center"
                                         >
