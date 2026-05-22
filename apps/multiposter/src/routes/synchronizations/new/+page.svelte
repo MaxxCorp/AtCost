@@ -177,6 +177,7 @@
 
 
 	import * as m from "$lib/paraglide/messages";
+	import { translateIssue } from "@ac/ui";
 
 
 
@@ -339,7 +340,7 @@
 						/>
 						{#each fields.name.issues() ?? [] as issue}
 							<p class="text-xs text-red-600 mt-1">
-								{issue.message}
+								{translateIssue(issue.message, m)}
 							</p>
 						{/each}
 						<p class="text-xs text-gray-500 mt-1">

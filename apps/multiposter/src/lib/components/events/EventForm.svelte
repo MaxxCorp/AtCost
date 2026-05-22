@@ -6,7 +6,7 @@
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
-    import { handleDelete, EntityManager, LocationForm } from "@ac/ui";
+    import { handleDelete, EntityManager, LocationForm, translateIssue } from "@ac/ui";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import ResourceForm from "$lib/components/resources/ResourceForm.svelte";
@@ -305,7 +305,7 @@
             onblur={() => rf.validate()}
         />
         {#each rf.fields.summary.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </div>
 
@@ -458,7 +458,7 @@
                         <div class="px-2">
                             {#each (rf.fields.name.issues() ?? []) as issue}
                                 <p class="text-sm text-red-600">
-                                    {issue.message}
+                                    {translateIssue(issue.message, m)}
                                 </p>
                             {/each}
                         </div>
@@ -629,7 +629,7 @@
                 onblur={() => rf.validate()}
             />
             {#each rf.fields.ticketPrice.issues() ?? [] as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </div>
     </div>
@@ -797,7 +797,7 @@
             class="w-4 h-4 text-blue-600"
         />
         <label for="isAllDay" class="text-sm font-medium text-gray-700"
-            >{m.all_day()} {m.event_label()}</label
+            >{m.all_day_event()}</label
         >
     </div>
 
@@ -994,7 +994,7 @@
                 class="w-4 h-4 text-blue-600"
             />
             <span class="text-sm text-gray-700"
-                >{m.public()} {m.event_label()}</span
+                >{m.public_event()}</span
             >
         </label>
     </div>

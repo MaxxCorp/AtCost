@@ -1,6 +1,8 @@
 <script lang="ts">
     import { list } from "../../../routes/synchronizations/list.remote";
     import RefreshCw from "$lib/components/icons/refresh-cw.svelte";
+    import * as m from "$lib/paraglide/messages";
+    import { translateIssue } from "@ac/ui";
     
     let {
         syncFieldConfig,
@@ -30,18 +32,18 @@
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
     <div class="flex gap-2 items-center mb-4 border-b pb-2">
         <RefreshCw class="w-5 h-5 text-gray-600" />
-        <h2 class="text-xl font-semibold">Synchronization</h2>
+        <h2 class="text-xl font-semibold">{m.synchronization()}</h2>
     </div>
 
     <p class="text-sm text-gray-600 mb-4">
-        Select which external providers should include this item.
+        {m.sync_description()}
     </p>
 
     {#await configsPromise}
-        <p class="text-sm text-gray-500">Loading synchronizations...</p>
+        <p class="text-sm text-gray-500">{m.loading_item({ item: m.feature_synchronizations_title() })}</p>
     {:then result}
         {#if !result.data || result.data.length === 0}
-            <p class="text-sm text-gray-500 italic">No synchronizations configured.</p>
+            <p class="text-sm text-gray-500 italic">{m.no_syncs_configured()}</p>
         {:else}
             <div class="space-y-2 border rounded-md p-4 bg-gray-50 max-h-64 overflow-y-auto">
                 {#each result.data as config}
@@ -67,6 +69,6 @@
     
     <input {...syncFieldConfig.as("text", hiddenValue)} class="hidden" />
     {#each syncFieldConfig.issues() ?? [] as issue}
-        <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+        <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
     {/each}
 </div>

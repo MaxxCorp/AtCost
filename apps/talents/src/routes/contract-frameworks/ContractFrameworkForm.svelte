@@ -4,6 +4,8 @@
     import { Button } from "@ac/ui/components/button";
     import { goto } from "$app/navigation";
     import { untrack } from "svelte";
+    import * as m from "$lib/paraglide/messages";
+    import { translateIssue } from "@ac/ui";
 
     let {
         remoteFunction,
@@ -21,7 +23,7 @@
     $effect(() => {
         const issues = rf?.allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error("Please fix the validation errors in the form.");
+            toast.error(m.please_fix_validation());
         }
         prevIssuesLength = issues.length;
     });
@@ -36,15 +38,15 @@
             await submit();
             const result = untrack(() => rf.result);
             if (untrack(() => rf.error)) {
-                toast.error(untrack(() => rf.error.message) || "Something went wrong.");
+                toast.error(untrack(() => rf.error.message) || m.something_went_wrong());
                 return;
             }
 
-            toast.success("Successfully Saved!");
+            toast.success(m.successfully_saved());
             if (onSuccess) onSuccess(result);
             else await goto(cancelHref);
         } catch (error: any) {
-            toast.error(error?.message || "Something went wrong.");
+            toast.error(error?.message || m.something_went_wrong());
         }
     })}
 >
@@ -56,27 +58,27 @@
 
     {#if rf?.fields?.name}
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">Name</span>
+            <span class="text-sm font-medium text-gray-700 mb-2">{m.name()}</span>
             <input
                 {...rf.fields.name.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.name.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
-                placeholder="e.g. AWO Berlin TV"
+                placeholder={m.enter_framework_name()}
                 onblur={() => rf.validate()}
                 value={initialData?.name ?? ""}
             />
             {#each rf.fields.name.issues?.() ?? [] as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </label>
     {/if}
 
     {#if rf?.fields?.description}
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">Description</span>
+            <span class="text-sm font-medium text-gray-700 mb-2">{m.description()}</span>
             <textarea
                 {...rf.fields.description.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                placeholder="Describe the contract framework"
+                placeholder={m.describe_framework()}
                 rows="3"
                 value={initialData?.description ?? ""}
             ></textarea>
@@ -84,16 +86,16 @@
     {/if}
 
     <div class="flex justify-end gap-3 mt-6">
-        <AsyncButton type="submit" loadingLabel={isUpdating ? "Saving..." : "Creating..."} loading={rf && rf.pending}>
-            {isUpdating ? "Save Changes" : "Create Framework"}
+        <AsyncButton type="submit" loadingLabel={isUpdating ? m.save_changes() : m.creating()} loading={rf && rf.pending}>
+            {isUpdating ? m.save_changes() : m.create_framework()}
         </AsyncButton>
         {#if onCancel}
             <Button variant="secondary" type="button" size="default" onclick={onCancel}>
-                Cancel
+                {m.cancel()}
             </Button>
         {:else}
             <Button variant="secondary" href={cancelHref} size="default">
-                Cancel
+                {m.cancel()}
             </Button>
         {/if}
     </div>

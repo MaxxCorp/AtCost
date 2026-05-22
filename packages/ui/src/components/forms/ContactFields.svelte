@@ -18,6 +18,7 @@
     const EntityManager = EntityManager_ as any;
     import { Tag as TagIcon } from "@lucide/svelte";
     import { handleDelete } from "../../hooks/handleDelete.svelte";
+    import { translateIssue } from "../../utils.js";
 
     interface Props {
         // Bindable state
@@ -59,6 +60,7 @@
 
         labels?: any;
         rf?: any;
+        m?: any;
         onEmailChange?: () => void;
     }
 
@@ -84,6 +86,7 @@
 
         labels,
         rf,
+        m,
         onEmailChange,
     }: Props = $props();
 
@@ -240,7 +243,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.displayName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.displayName?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -257,7 +260,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.givenName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.givenName?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -274,7 +277,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.middleName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.middleName?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -291,7 +294,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.familyName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.familyName?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -309,7 +312,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.honorificPrefix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.honorificPrefix?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -327,7 +330,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.honorificSuffix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.honorificSuffix?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -350,7 +353,7 @@
                     <option value="other">Other</option>
                 </select>
                 {#each (contactFields?.fields?.gender?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -367,7 +370,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.birthday?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.birthday?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -384,7 +387,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.company?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.company?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -401,7 +404,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.department?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.department?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
             <div>
@@ -417,7 +420,7 @@
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.role?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
                 {#each (contactFields?.fields?.role?.issues?.() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
         </div>
@@ -509,7 +512,7 @@
                                     value={formData?.name ?? ""}
                                 />
                                 {#each (state.fields?.name?.issues?.() ?? []) as issue}
-                                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                                 {/each}
                             </div>
                             <div class="flex justify-end gap-2 pt-4 border-t">

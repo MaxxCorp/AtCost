@@ -5,6 +5,8 @@
     import { goto } from "$app/navigation";
     import { untrack, onMount } from "svelte";
     import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
+    import * as m from "$lib/paraglide/messages";
+    import { translateIssue } from "@ac/ui";
 
     let {
         remoteFunction,
@@ -33,12 +35,10 @@
     $effect(() => {
         const issues = rf?.allIssues?.() ?? [];
         if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error("Please fix the validation errors in the form.");
+            toast.error(m.please_fix_validation());
         }
         prevIssuesLength = issues.length;
     });
-
-
 
     // Toggle multi-select utility helper
     function handleFrameworkSelection(id: string, currentSelections: string[], e: any) {
@@ -56,15 +56,15 @@
             await submit();
             const result = untrack(() => rf.result);
             if (untrack(() => rf.error)) {
-                toast.error(untrack(() => rf.error.message) || "Something went wrong.");
+                toast.error(untrack(() => rf.error.message) || m.something_went_wrong());
                 return;
             }
 
-            toast.success("Successfully Saved!");
+            toast.success(m.successfully_saved());
             if (onSuccess) onSuccess(result);
             else await goto(cancelHref);
         } catch (error: any) {
-            toast.error(error?.message || "Something went wrong.");
+            toast.error(error?.message || m.something_went_wrong());
         }
     })}
 >
@@ -76,24 +76,24 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">Talent ID</span>
+            <span class="text-sm font-medium text-gray-700 mb-2">{m.talent_id()}</span>
             {#if rf?.fields?.talentId}
                 <input
                     {...rf.fields.talentId.as("text")}
                     class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.talentId.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
-                    placeholder="UUID of Talent"
+                    placeholder={m.talent_id_placeholder()}
                     value={initialData?.talentId ?? ""}
                 />
                 {#each rf.fields.talentId.issues?.() ?? [] as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             {/if}
         </label>
         
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2">Frameworks</span>
+            <span class="text-sm font-medium text-gray-700 mb-2">{m.frameworks()}</span>
             {#if frameworks.length === 0}
-                <div class="mt-2 text-sm text-gray-500 italic">No frameworks found or loading...</div>
+                <div class="mt-2 text-sm text-gray-500 italic">{m.no_frameworks_found()}</div>
             {/if}
             <div class="mt-2 flex flex-col gap-2 max-h-40 overflow-y-auto p-2 border rounded-md border-gray-300">
                 {#each frameworks as fw}
@@ -128,7 +128,7 @@
     {#if rf?.fields}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">Start Date</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.start_date()}</span>
                 {#if rf.fields.startDate}
                     <input
                         {...rf.fields.startDate.as("text")}
@@ -139,7 +139,7 @@
                 {/if}
             </label>
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">End Date (Optional)</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.end_date_optional()}</span>
                 {#if rf.fields.endDate}
                     <input
                         {...rf.fields.endDate.as("text")}
@@ -153,7 +153,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">Probation Period (Months)</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.probation_period_months()}</span>
                 {#if rf.fields.probationPeriodMonths}
                     <input
                         {...rf.fields.probationPeriodMonths.as("number")}
@@ -164,7 +164,7 @@
                 {/if}
             </label>
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">Holiday Allotment (Days)</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.holiday_allotment_days()}</span>
                 {#if rf.fields.holidayAllotmentDays}
                     <input
                         {...rf.fields.holidayAllotmentDays.as("number")}
@@ -177,17 +177,17 @@
         </div>
 
         <div class="p-4 border rounded-md space-y-4">
-            <h3 class="font-medium text-gray-800">Work Hours</h3>
+            <h3 class="font-medium text-gray-800">{m.work_hours()}</h3>
             {#if rf.fields.workHoursPerDay}
                 <p class="text-xs text-red-600 font-semibold mt-1">
                     {#each rf.fields.workHoursPerDay.issues?.() ?? [] as issue}
-                        {issue.message}
+                        {translateIssue(issue.message, m)}
                     {/each}
                 </p>
             {/if}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <label class="block text-sm">
-                    Per Day
+                    {m.per_day()}
                     {#if rf.fields.workHoursPerDay}
                         <input
                             {...rf.fields.workHoursPerDay.as("number")}
@@ -198,7 +198,7 @@
                     {/if}
                 </label>
                 <label class="block text-sm">
-                    Per Week
+                    {m.per_week()}
                     {#if rf.fields.workHoursPerWeek}
                         <input
                             {...rf.fields.workHoursPerWeek.as("number")}
@@ -209,7 +209,7 @@
                     {/if}
                 </label>
                 <label class="block text-sm">
-                    Per Month
+                    {m.per_month()}
                     {#if rf.fields.workHoursPerMonth}
                         <input
                             {...rf.fields.workHoursPerMonth.as("number")}
@@ -220,7 +220,7 @@
                     {/if}
                 </label>
                 <label class="block text-sm">
-                    Per Year
+                    {m.per_year()}
                     {#if rf.fields.workHoursPerYear}
                         <input
                             {...rf.fields.workHoursPerYear.as("number")}
@@ -235,19 +235,19 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">Wage Type</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.wage_type()}</span>
                 {#if rf.fields.wageType}
                     <select
                         {...rf.fields.wageType.as("select")}
                         class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 bg-white"
                     >
-                        <option value="monthly" selected={(!initialData) || initialData?.wageType === 'monthly'}>Monthly</option>
-                        <option value="hourly" selected={initialData?.wageType === 'hourly'}>Hourly</option>
+                        <option value="monthly" selected={(!initialData) || initialData?.wageType === 'monthly'}>{m.monthly()}</option>
+                        <option value="hourly" selected={initialData?.wageType === 'hourly'}>{m.hourly()}</option>
                     </select>
                 {/if}
             </label>
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">Wage Amount</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.wage_amount()}</span>
                 {#if rf.fields.wageAmount}
                     <input
                         {...rf.fields.wageAmount.as("number")}
@@ -261,24 +261,24 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">Entgeltgruppe</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.entgeltgruppe()}</span>
                 {#if rf.fields.entgeltgruppe}
                     <input
                         {...rf.fields.entgeltgruppe.as("text")}
                         class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g. E 9b"
+                        placeholder={m.entgeltgruppe_placeholder()}
                         value={initialData?.entgeltgruppe ?? ""}
                     />
                 {/if}
             </label>
             <label class="block">
-                <span class="text-sm font-medium text-gray-700 mb-2">Erfahrungsstufe</span>
+                <span class="text-sm font-medium text-gray-700 mb-2">{m.erfahrungsstufe()}</span>
                 {#if rf.fields.erfahrungsstufe}
                     <input
                         {...rf.fields.erfahrungsstufe.as("number")}
                         type="number"
                         class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g. 1"
+                        placeholder={m.erfahrungsstufe_placeholder()}
                         value={initialData?.erfahrungsstufe ?? ""}
                     />
                 {/if}
@@ -287,16 +287,16 @@
     {/if}
 
     <div class="flex justify-end gap-3 mt-6">
-        <AsyncButton type="submit" loadingLabel={isUpdating ? "Saving..." : "Creating..."} loading={(rf && rf.pending)}>
-            {isUpdating ? "Save Changes" : "Create Contract"}
+        <AsyncButton type="submit" loadingLabel={isUpdating ? m.saving() : m.creating()} loading={(rf && rf.pending)}>
+            {isUpdating ? m.save_changes() : m.create_contract()}
         </AsyncButton>
         {#if onCancel}
             <Button variant="secondary" type="button" size="default" onclick={onCancel}>
-                Cancel
+                {m.cancel()}
             </Button>
         {:else}
             <Button variant="secondary" href={cancelHref} size="default">
-                Cancel
+                {m.cancel()}
             </Button>
         {/if}
     </div>

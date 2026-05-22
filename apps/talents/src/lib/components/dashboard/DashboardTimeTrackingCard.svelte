@@ -55,8 +55,8 @@
                     <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
                 <div>
-                    <h3 class="font-bold text-gray-900 leading-tight">Time Tracking</h3>
-                    <p class="text-xs text-gray-500 font-medium">Manage your active shift</p>
+                    <h3 class="font-bold text-gray-900 leading-tight">{m.time_tracking()}</h3>
+                    <p class="text-xs text-gray-500 font-medium">{m.manage_active_shift()}</p>
                 </div>
             </div>
         </div>
@@ -64,8 +64,8 @@
         <div class="flex-1 p-6 flex flex-col justify-center">
             {#if !status}
                 <div class="text-center py-4">
-                    <p class="text-xs text-red-500 font-medium">Failed to fetch status</p>
-                    <button onclick={() => onRefresh()} class="text-xs text-indigo-600 underline mt-1">Try again</button>
+                    <p class="text-xs text-red-500 font-medium">{m.failed_to_fetch_status()}</p>
+                    <button onclick={() => onRefresh()} class="text-xs text-indigo-600 underline mt-1">{m.try_again()}</button>
                 </div>
             {:else}
                 {@const isActive = !!status.activeEntry}
@@ -79,10 +79,10 @@
                     
                     <div>
                         <p class="text-sm font-bold {isActive ? 'text-emerald-600' : 'text-gray-400'}">
-                            {isActive ? 'Currently Clocked In' : 'Currently Offline'}
+                            {isActive ? m.currently_clocked_in() : m.currently_offline()}
                         </p>
                         {#if isActive && status.activeEntry}
-                            <p class="text-[10px] text-gray-400 font-medium">Started at {format(new Date(status.activeEntry.startTime), 'HH:mm')}</p>
+                            <p class="text-[10px] text-gray-400 font-medium">{m.started_at()} {format(new Date(status.activeEntry.startTime), 'HH:mm')}</p>
                         {/if}
                     </div>
 
@@ -93,13 +93,13 @@
                                 try {
                                     const result: any = await submit();
                                     if (result?.success) {
-                                        toast.success(formAction === 'clock_in' ? 'Clocked In!' : 'Clocked Out!');
+                                        toast.success(formAction === 'clock_in' ? m.clocked_in_toast() : m.clocked_out_toast());
                                         onRefresh();
                                     } else {
-                                        toast.error(result?.error?.message || result?.message || 'Error');
+                                        toast.error(result?.error?.message || result?.message || m.something_went_wrong());
                                     }
                                 } catch (e: any) {
-                                    toast.error('Sync failed');
+                                    toast.error(m.sync_failed_toast());
                                 }
                             })}
                         >
@@ -110,7 +110,7 @@
                                 <input {...rf.fields.startTime.as('hidden', startTimeOverride)} />
                                 
                                 <div class="mb-4">
-                                    <label for="start-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">Start Override</label>
+                                    <label for="start-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">{m.start_override()}</label>
                                     <input 
                                         id="start-override"
                                         type="datetime-local" 
@@ -125,7 +125,7 @@
                                 <input {...rf.fields.endTime.as('hidden', endTimeOverride)} />
 
                                 <div class="mb-4">
-                                    <label for="end-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">End Override</label>
+                                    <label for="end-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">{m.end_override()}</label>
                                     <input 
                                         id="end-override"
                                         type="datetime-local" 
@@ -142,7 +142,7 @@
                                     loading={rf.pending}
                                     class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-3 font-bold text-sm shadow-lg shadow-emerald-50 transition-all hover:scale-[1.02] active:scale-95"
                                 >
-                                    Start Shift
+                                    {m.start_shift()}
                                 </AsyncButton>
                             {:else if status.activeEntry}
                                 <AsyncButton 
@@ -151,7 +151,7 @@
                                     loading={rf.pending}
                                     class="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-xl py-3 font-bold text-sm shadow-lg shadow-rose-50 transition-all hover:scale-[1.02] active:scale-95"
                                 >
-                                    End Shift
+                                    {m.end_shift()}
                                 </AsyncButton>
                             {/if}
                         </form>
@@ -162,12 +162,12 @@
 
         <div class="p-4 bg-gray-50/50 border-t border-gray-50">
             <a href="/my-timesheet" class="block text-center text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
-                View Full Timesheet →
+                {m.view_full_timesheet()}
             </a>
         </div>
     </div>
 {:else}
     <div class="h-64 flex items-center justify-center bg-white rounded-3xl shadow-sm border border-gray-100">
-        <div class="animate-pulse text-gray-400">Loading module...</div>
+        <div class="animate-pulse text-gray-400">{m.loading_module()}</div>
     </div>
 {/if}

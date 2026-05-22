@@ -7,7 +7,7 @@
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
-    import { handleDelete } from "@ac/ui";
+    import { handleDelete, translateIssue } from "@ac/ui";
     import type { updateCampaign } from "../../../routes/campaigns/[id]/update.remote";
     import type { createCampaign } from "../../../routes/campaigns/new/create.remote";
 
@@ -129,7 +129,7 @@
                 />
                 {#each rf.fields.name.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">
-                        {issue.message}
+                        {translateIssue(issue.message, m)}
                     </p>
                 {/each}
             </label>
@@ -149,7 +149,7 @@
                 ></textarea>
                 {#each rf.fields.content.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">
-                        {issue.message}
+                        {translateIssue(issue.message, m)}
                     </p>
                 {/each}
                 <p class="mt-1 text-sm text-gray-500">

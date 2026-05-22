@@ -348,15 +348,15 @@
             const result = rf.result;
             if (result?.success === false || result?.error) {
                 toast.error(
-                    result?.error?.message || result?.error || "Save Failed",
+                    result?.error?.message || result?.error || m.save_failed()
                 );
                 return;
             }
-            toast.success(talentId ? "Talent updated!" : "Talent registered!");
+            toast.success(talentId ? m.talent_updated() : m.talent_registered());
             if (onSuccess) onSuccess(result);
             else goto(cancelHref);
         } catch (error: any) {
-            toast.error(error.message || "Error");
+            toast.error(error.message || m.something_went_wrong());
         }
     })}
 >
@@ -379,7 +379,7 @@
                     class="text-lg font-bold text-indigo-900 flex items-center gap-2"
                 >
                     <Briefcase size={20} class="text-indigo-500" />
-                    Talent Information
+                    {m.talent_information()}
                 </h3>
 
                 <div class="grid grid-cols-1 gap-4">
@@ -387,7 +387,7 @@
                         <label
                             for="jobTitle"
                             class="block text-sm font-medium text-gray-700"
-                            >Job Title</label
+                            >{m.job_title()}</label
                         >
                         <div class="mt-1 relative">
                             <div
@@ -412,7 +412,7 @@
                         <label
                             for="status"
                             class="block text-sm font-medium text-gray-700"
-                            >Status</label
+                            >{m.status()}</label
                         >
                         {#if rf?.fields?.talent?.fields?.status}
                             <select
@@ -422,10 +422,10 @@
                                     handleStatusChange(e.currentTarget.value)}
                                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <option value="applicant">Applicant</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                                <option value="rejected">Rejected</option>
+                                <option value="applicant">{m.status_applicant()}</option>
+                                <option value="active">{m.status_active()}</option>
+                                <option value="inactive">{m.status_inactive()}</option>
+                                <option value="rejected">{m.status_rejected()}</option>
                             </select>
                         {/if}
                     </div>
@@ -434,7 +434,7 @@
                         <label
                             for="salaryExpectation"
                             class="block text-sm font-medium text-gray-700"
-                            >Salary Expectation</label
+                            >{m.salary_expectation()}</label
                         >
                         <div class="mt-1 relative">
                             <div
@@ -457,7 +457,7 @@
                         <label
                             for="availabilityDate"
                             class="block text-sm font-medium text-gray-700"
-                            >Availability</label
+                            >{m.availability()}</label
                         >
                         {#if rf?.fields?.talent?.fields?.availabilityDate}
                             <input
@@ -475,7 +475,7 @@
                         <label
                             for="onboardingStatus"
                             class="block text-sm font-medium text-gray-700"
-                            >Onboarding</label
+                            >{m.onboarding()}</label
                         >
                         {#if rf?.fields?.talent?.fields?.onboardingStatus}
                             <input
@@ -498,14 +498,14 @@
                     class="text-lg font-bold text-gray-900 flex items-center gap-2"
                 >
                     <FileText size={20} class="text-gray-500" />
-                    Internal Notes
+                    {m.internal_notes()}
                 </h3>
                 {#if rf?.fields?.talent?.fields?.internalNotes}
                     <textarea
                         {...rf.fields.talent.fields.internalNotes.as("textarea")}
                         bind:value={talentData.internalNotes}
                         rows="4"
-                        placeholder="Private notes for recruitment team..."
+                        placeholder={m.private_notes_placeholder()}
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     ></textarea>
                 {/if}
@@ -682,10 +682,10 @@
                     }}
                     createRemote={createTalent}
                     createSchema={createTalentSchema}
-                    linkItemLabel="Search Existing"
-                    associatedItemLabel="Selected Contact"
-                    searchPlaceholder="Search contacts by name..."
-                    noItemsLabel="No contact selected yet."
+                    linkItemLabel={m.search_existing()}
+                    associatedItemLabel={m.selected_contact()}
+                    searchPlaceholder={m.search_contacts_placeholder()}
+                    noItemsLabel={m.no_contact_selected()}
                     searchPredicate={(item: any, term: string) =>
                         item.displayName
                             ?.toLowerCase()
@@ -780,12 +780,12 @@
                             {/if}
 
                             <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" type="button" onclick={oc}>Cancel</Button>
+                                <Button variant="outline" type="button" onclick={oc}>{m.cancel()}</Button>
                                 <AsyncButton
                                     type="submit"
                                     loading={crf.pending}
                                 >
-                                    Create Contact
+                                    {m.create_contact()}
                                 </AsyncButton>
                             </div>
                         </form>
@@ -800,10 +800,10 @@
                         {m.locations()}
                     </h3>
                     <p class="text-sm text-gray-500">
-                        Manage associated locations and branch offices.
+                        {m.manage_locations_description()}
                     </p>
                     <EntityManager
-                        title="Locations"
+                        title={m.locations()}
                         icon={MapPin}
                         mode="embedded"
                         initialItems={allLocations.filter((l) =>
@@ -871,10 +871,10 @@
         <Button
             variant="outline"
             onclick={() => (onCancel ? onCancel() : goto(cancelHref))}
-            >Cancel</Button
+            >{m.cancel()}</Button
         >
         <AsyncButton type="submit" loading={rf.pending}
-            >Register Talent</AsyncButton
+            >{talentId ? m.save_changes() : m.register_talent()}</AsyncButton
         >
     </div>
 </form>

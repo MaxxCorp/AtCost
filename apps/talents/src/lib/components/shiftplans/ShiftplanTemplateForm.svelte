@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import * as m from "$lib/paraglide/messages";
-    import { EntityManager, Button, AsyncButton } from "@ac/ui";
+    import { EntityManager, Button, AsyncButton, translateIssue } from "@ac/ui";
     import {
         MapPin,
         Users,
@@ -137,7 +137,7 @@
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all outline-none"
                     />
                     {#each rf.fields.name.issues() ?? [] as issue}
-                        <p class="mt-1 text-xs text-red-500">{issue.message}</p>
+                        <p class="mt-1 text-xs text-red-500">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
 

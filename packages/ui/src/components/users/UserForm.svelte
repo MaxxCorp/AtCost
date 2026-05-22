@@ -1,6 +1,7 @@
 <script lang="ts">
     import { untrack } from "svelte";
     import AsyncButton from "../AsyncButton.svelte";
+    import { translateIssue } from "../../utils.js";
 
     import { toast } from "svelte-sonner";
     import { Button } from "../button";
@@ -152,7 +153,7 @@
             onblur={() => rf.validate()}
         />
         {#each rf.fields.name.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
 
@@ -169,7 +170,7 @@
             onblur={() => rf.validate()}
         />
         {#each rf.fields.email.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
 

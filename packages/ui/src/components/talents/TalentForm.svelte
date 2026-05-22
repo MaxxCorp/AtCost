@@ -6,6 +6,8 @@
     import AsyncButton from "../../components/AsyncButton.svelte";
     import Button from "../../components/button/button.svelte";
 
+    import { translateIssue } from "../../utils.js";
+
     interface Props {
         initialData?: any;
         remoteFunction: any;
@@ -14,6 +16,7 @@
         onCancel: () => void;
         id?: string;
         systemUsers?: any[];
+        m?: any;
     }
 
     let {
@@ -24,6 +27,7 @@
         onCancel,
         id,
         systemUsers = [],
+        m,
     }: Props = $props();
 
     // Initialize remoteFunction if it's a definition function to ensure reactive context
@@ -91,7 +95,7 @@
                 />
             </div>
             {#each (rf.fields.data.fields.jobTitle.issues() ?? []) as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </label>
 
@@ -109,7 +113,7 @@
                 <option value="rejected">Rejected</option>
             </select>
             {#each (rf.fields.data.fields.status.issues() ?? []) as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </label>
 
@@ -125,7 +129,7 @@
                 />
             </div>
             {#each (rf.fields.data.fields.salaryExpectation.issues() ?? []) as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </label>
 
@@ -141,7 +145,7 @@
                 />
             </div>
             {#each (rf.fields.data.fields.availabilityDate.issues() ?? []) as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </label>
 
@@ -154,7 +158,7 @@
                 class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             />
             {#each (rf.fields.data.fields.onboardingStatus.issues() ?? []) as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </label>
         
@@ -171,7 +175,7 @@
                 ></textarea>
             </div>
             {#each (rf.fields.data.fields.internalNotes.issues() ?? []) as issue}
-                <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </label>
     </div>

@@ -9,7 +9,7 @@
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
     import type { AllocationCalendar } from "$lib/validations/resources";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
@@ -134,7 +134,7 @@
             onblur={() => rf.validate()}
         />
         {#each rf.fields.name.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
 
@@ -149,7 +149,7 @@
             onblur={() => rf.validate()}
         />
         {#each rf.fields.type.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
 
@@ -164,7 +164,7 @@
             onblur={() => rf.validate()}
         />
         {#each rf.fields.inventoryNumber.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
 

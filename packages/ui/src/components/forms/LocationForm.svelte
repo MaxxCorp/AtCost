@@ -4,6 +4,7 @@
     import { Button } from "../button";
     import { goto } from "$app/navigation";
     import type { Snippet } from "svelte";
+    import { translateIssue } from "../../utils.js";
 
     let {
         remoteFunction,
@@ -16,6 +17,7 @@
         children,
         heroImageSlot,
         labels = {},
+        m = undefined,
     }: {
         remoteFunction: any;
         validationSchema: any;
@@ -27,6 +29,7 @@
         children?: Snippet<[]>;
         heroImageSlot?: Snippet<[]>;
         labels?: any;
+        m?: any;
     } = $props();
 
     const i18n = {
@@ -250,7 +253,7 @@
             onblur={() => remoteFunction.validate()}
         />
         {#each remoteFunction.fields.name.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
 

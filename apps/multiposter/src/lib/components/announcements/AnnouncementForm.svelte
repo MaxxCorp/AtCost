@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
-    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue } from "@ac/ui";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -190,7 +190,7 @@
                     placeholder={m.announcement_title_placeholder()}
                 />
                 {#each (rf.fields.title.issues() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -211,7 +211,7 @@
                     {/if}
                 </div>
                 {#each (rf.fields.content.issues() ?? []) as issue}
-                    <p class="mt-1 text-sm text-red-600">{issue.message}</p>
+                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -311,7 +311,7 @@
                                     />
                                     {#each (rfState.fields.name.issues() ?? []) as issue}
                                         <p class="mt-1 text-sm text-red-600">
-                                            {issue.message}
+                                            {translateIssue(issue.message, m)}
                                         </p>
                                     {/each}
                                 </div>
