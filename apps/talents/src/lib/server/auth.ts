@@ -51,6 +51,7 @@ export const auth = betterAuth({
         microsoft: {
             clientId: env.MICROSOFT_CLIENT_ID || "",
             clientSecret: env.MICROSOFT_CLIENT_SECRET || "",
+            tenantId: env.MICROSOFT_TENANT_ID || "common",
         }
     },
     plugins: [sveltekitCookies(getRequestEvent)],

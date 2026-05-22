@@ -260,7 +260,8 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	private async refreshAccessToken(): Promise<string> {
 		if (!this.refreshToken) throw new Error("No refresh token available");
 		
-		const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+		const tenantId = env.MICROSOFT_TENANT_ID || 'common';
+		const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 			body: new URLSearchParams({
