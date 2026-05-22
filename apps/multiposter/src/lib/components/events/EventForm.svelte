@@ -84,6 +84,12 @@
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
     const type = "event";
+    // svelte-ignore state_referenced_locally
+    let descriptionValue = $state(untrack(() => initialData?.description ?? ""));
+    // svelte-ignore state_referenced_locally
+    let heroImageValue = $state(untrack(() => initialData?.heroImage ?? ""));
+    // svelte-ignore state_referenced_locally
+    let recurrenceValue = $state(untrack(() => initialData?.recurrence?.[0] ?? ""));
     const BERLIN_DE_CATEGORIES = [
         "Ausstellung",
         "Berliner Bühnen",
@@ -234,18 +240,25 @@
     );
 
     let isAllDay = $derived(
-        rf.fields.isAllDay.value() === true ||
-            rf.fields.isAllDay.value() === "true" ||
-            rf.fields.isAllDay.value() === "on",
+        rf.fields.isAllDay.value() !== undefined
+            ? (rf.fields.isAllDay.value() === true ||
+               rf.fields.isAllDay.value() === "true" ||
+               rf.fields.isAllDay.value() === "on")
+            : (initialData?.isAllDay ?? false),
     );
     let hasEndTime = $derived(
-        rf.fields.hasEndTime.value() === true ||
-            rf.fields.hasEndTime.value() === "true",
+        rf.fields.hasEndTime.value() !== undefined
+            ? (rf.fields.hasEndTime.value() === true ||
+               rf.fields.hasEndTime.value() === "true" ||
+               rf.fields.hasEndTime.value() === "on")
+            : (initialData ? !!initialData.endDateTime : true),
     );
     let useDefaultReminders = $derived(
-        rf.fields.reminders.useDefault.value() === true ||
-            rf.fields.reminders.useDefault.value() === "true" ||
-            rf.fields.reminders.useDefault.value() === "on",
+        rf.fields.reminders.useDefault.value() !== undefined
+            ? (rf.fields.reminders.useDefault.value() === true ||
+               rf.fields.reminders.useDefault.value() === "true" ||
+               rf.fields.reminders.useDefault.value() === "on")
+            : ((initialData?.reminders as any)?.useDefault ?? true),
     );
     let reminders = $derived(
         rf.fields.reminders.overrides.value() ?? [],
@@ -261,23 +274,12 @@
 {#if initialData?.id}
     <input {...rf.fields.id.as("text", initialData.id)} class="hidden" />
 {/if}
-<input
-    {...rf.fields.heroImage.as("text", initialData?.heroImage ?? "")}
-    class="hidden"
-/>
-<input
-    {...rf.fields.recurrence.as("text", initialData?.recurrence?.[0] ?? "")}
-    class="hidden"
-/>
+
 <input
     {...rf.fields.tags.as(
         "text",
         (initialData?.tags ?? []).map((t) => t.name).join(", "),
     )}
-    class="hidden"
-/>
-<input
-    {...rf.fields.description.as("text", initialData?.description ?? "")}
     class="hidden"
 />
 
@@ -324,11 +326,18 @@
         </select>
     </div>
 
-    <ImageUploader
-        value={rf.fields.heroImage.value()}
-        onchange={(val: string) => rf.fields.heroImage.set(val)}
-        label={m.hero_image()}
-    />
+    <div>
+        <ImageUploader
+            bind:value={heroImageValue}
+            label={m.hero_image()}
+        />
+        {#if heroImageValue !== undefined && heroImageValue !== null}
+            <input
+                {...rf.fields.heroImage.as("text", heroImageValue)}
+                class="hidden"
+            />
+        {/if}
+    </div>
 
     <div>
         <label
@@ -337,10 +346,13 @@
             >{m.description()}</label
         >
         <div class="prose max-w-none">
-            <RichTextEditor
-                value={rf.fields.description.value()}
-                onchange={(val: string) => rf.fields.description.set(val)}
-            />
+            <RichTextEditor bind:value={descriptionValue} />
+            {#if descriptionValue !== undefined && descriptionValue !== null}
+                <input
+                    {...rf.fields.description.as("text", descriptionValue)}
+                    class="hidden"
+                />
+            {/if}
         </div>
     </div>
 
@@ -928,9 +940,14 @@
 
 <RecurrenceDialog
     bind:open={showRecurrenceDialog}
-    value={rf.fields.recurrence.value()}
-    onchange={(val: string | null) => rf.fields.recurrence.set(val ?? "")}
+    bind:value={recurrenceValue}
 />
+{#if recurrenceValue !== undefined && recurrenceValue !== null}
+    <input
+        {...rf.fields.recurrence.as("text", recurrenceValue)}
+        class="hidden"
+    />
+{/if}
 
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
     <h2 class="text-xl font-semibold mb-4 border-b pb-2">
