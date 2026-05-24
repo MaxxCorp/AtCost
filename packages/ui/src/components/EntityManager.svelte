@@ -236,55 +236,11 @@
         return { data, total };
     }
 
-    /**
-     * Safely calls a remote function. 
-     * SvelteKit Query handles should use .run() when called outside of a managed 
-     * reactive context to avoid "not created in a reactive context" errors.
-     */
-    function invokeRemote(fn: any, params?: any) {
-        if (!fn) return Promise.resolve(null);
-        if (typeof fn.run === 'function') {
-            return fn.run(params);
-        }
-        return fn(params);
-    }
 
-    // --- DATA STATE ---
-    let refreshCounter = $state(0);
 
-    export function refresh() {
-        refreshCounter++;
-        optionsCache.clear();
-        // Invalidate handle-level cache to ensure subsequent calls return a new promise
-        if (typeof (listItemsRemote as any)?.refresh === 'function') {
-            void (listItemsRemote as any).refresh();
-        }
-        if (typeof (fetchAssociationsRemote as any)?.refresh === 'function') {
-            void (fetchAssociationsRemote as any).refresh();
-        }
-    }
 
-    const mainListPromise = $derived.by(() => {
-        const _ = refreshCounter;
-        if (mode !== "standalone") return Promise.resolve({ data: [], total: 0 });
-        return invokeRemote(listItemsRemote, getParams());
-    });
 
-    const associationsPromise = $derived.by(() => {
-        const _ = { refreshCounter, entityId, type };
-        if (entityId && type) {
-            return fetchAssociationsRemote 
-                ? invokeRemote(fetchAssociationsRemote, { type, entityId })
-                : invokeRemote(listItemsRemote, { associatedWith: { type, id: entityId } });
-        }
-        return Promise.resolve(localAssociatedItems);
-    });
 
-    const selectorListPromise = $derived.by(() => {
-        const _ = { refreshCounter, showSelector };
-        if (!showSelector) return Promise.resolve({ data: [], total: 0 });
-        return invokeRemote(listItemsRemote, getParams());
-    });
 
     // Manual refreshes are now handled via refreshCounter in $effects
 
@@ -318,6 +274,21 @@
         optionsCache.set(filter.id, promise);
         return promise;
     }
+
+
+    const mainListPromise = $derived(
+        mode === "standalone" 
+            ? (listItemsRemote as any)(getParams()) 
+            : Promise.resolve({ data: [], total: 0 })
+    );
+
+    const associationsPromise = $derived(
+        entityId && type
+            ? fetchAssociationsRemote 
+                ? (fetchAssociationsRemote as any)({ type, entityId })
+                : (listItemsRemote as any)({ associatedWith: { type, id: entityId } })
+            : Promise.resolve(localAssociatedItems)
+    );
 
     // --- HELPERS ---
     const effectiveFilters = $derived([
@@ -426,8 +397,6 @@
         } finally {
             if (mounted) {
                 linkingItemId = null;
-                // Trigger refresh if handle exists
-                refresh();
             }
         }
     }
@@ -436,7 +405,7 @@
         if (!item.id || !deleteItemRemote) return;
         deletingItemId = item.id;
         try {
-            const result = await invokeRemote(deleteItemRemote, [item.id]);
+            const result = await (deleteItemRemote as any)([item.id]);
             const success = result === true || (result && result.success !== false);
             if (!success) return;
 
@@ -446,7 +415,6 @@
             
             if (success && mounted) {
                 toast.success("Deleted successfully");
-                refresh();
             }
         } catch (e: any) {
             if (mounted) toast.error(e.message || "Failed to delete item");
@@ -459,7 +427,7 @@
         if (!deleteItemRemote || selectedIds.size === 0) return;
         bulkDeleting = true;
         try {
-            const result = await invokeRemote(deleteItemRemote, Array.from(selectedIds));
+            const result = await (deleteItemRemote as any)(Array.from(selectedIds));
             const success = result === true || (result && result.success !== false);
             if (!success) return;
 
@@ -470,7 +438,6 @@
             
             if (success && mounted) {
                 toast.success(`Deleted successfully`);
-                refresh();
             }
         } catch (e: any) {
             if (mounted) toast.error(e.message || "Failed to delete some items");
@@ -485,14 +452,14 @@
 
         if (newId) {
             const params = untrack(() => getParams());
-            const res = await invokeRemote(listItemsRemote, params);
+            const queryObj = (listItemsRemote as any)(params);
+            const res = await (typeof queryObj?.run === 'function' ? queryObj.run() : queryObj);
             const { data: items } = normalize(res);
             const newItem = items.find((i: any) => i.id === newId);
 
             if (mode === "standalone") {
                 if (!mounted) return;
                 toast.success(`${title} created`);
-                refresh();
             } else if (newItem) {
                 if (entityId && addAssociationRemote) {
                     await addAssociationRemote({
@@ -506,7 +473,6 @@
                 localAssociatedItems = newList;
                 onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
                 toast.success(`${title} created and associated`);
-                refresh();
             }
         }
     }
@@ -517,7 +483,8 @@
         if (!targetId) return;
 
         const params = untrack(() => getParams());
-        const res = await invokeRemote(listItemsRemote, params);
+        const queryObj = (listItemsRemote as any)(params);
+        const res = await (typeof queryObj?.run === 'function' ? queryObj.run() : queryObj);
         const { data: items } = normalize(res);
         const updatedItem = items.find((i: any) => i.id === targetId);
 
@@ -527,7 +494,6 @@
             localAssociatedItems = newList;
             onchange?.(newList.map(i => i.id!).filter(Boolean), newList);
             toast.success(`${title} updated`);
-            refresh();
         }
     }
 </script>
@@ -768,7 +734,7 @@
         class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
     >
         <div class="max-h-64 overflow-y-auto space-y-1 p-1">
-            {#await selectorListPromise}
+            {#await (listItemsRemote as any)(getParams())}
                 <div class="text-xs text-center py-8 text-gray-400 font-medium">
                     <div
                         class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"
