@@ -263,7 +263,7 @@
     <div class="flex gap-3 mt-6">
         <AsyncButton
             type="submit"
-            loadingLabel={isUpdating ? m.loading() : m.creating()}
+            loadingLabel={isUpdating ? m.saving() : m.creating()}
             loading={rf.pending}
         >
             {isUpdating ? m.save_changes() : m.create_user()}

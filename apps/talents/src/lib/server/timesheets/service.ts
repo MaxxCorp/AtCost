@@ -1,4 +1,4 @@
-import { db, timesheetEntry, timesheetAuditTrail, shiftPlan, talent, userTalent, userContact, task, getSuperior, eq, and, isNull, desc } from "@ac/db";
+import { db, timesheetEntry, timesheetAuditTrail, shiftPlan, talent, userTalent, userContact, task, getSuperior, eq, and, isNull, desc, sql } from "@ac/db";
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from "$lib/server/authorization";
 
 export interface ClockInData {
@@ -123,8 +123,8 @@ export async function approveEntry(entryId: string, managerId: string, comment?:
         await tx.update(task)
             .set({ status: "completed" })
             .where(and(
-                eq(task.type as any, "timesheet_approval"),
-                eq(task.data as any, { timesheetEntryId: entryId } as any)
+                eq(task.type, "timesheet_approval"),
+                sql`${task.data}->>'timesheetEntryId' = ${entryId}`
             ));
 
         return updatedEntry;
@@ -161,8 +161,8 @@ export async function rejectEntry(entryId: string, managerId: string, comment?: 
         await tx.update(task)
             .set({ status: "completed" })
             .where(and(
-                eq(task.type as any, "timesheet_approval"),
-                eq(task.data as any, { timesheetEntryId: entryId } as any)
+                eq(task.type, "timesheet_approval"),
+                sql`${task.data}->>'timesheetEntryId' = ${entryId}`
             ));
 
         // Create a correction task for the talent
@@ -299,8 +299,8 @@ async function ensureApprovalTask(tx: any, entryId: string, talentId: string) {
         where: and(
             eq(task.type, "timesheet_approval"),
             eq(task.status, "pending"),
-            eq(task.data, { timesheetEntryId: entryId } as any)
-        ) as any
+            sql`${task.data}->>'timesheetEntryId' = ${entryId}`
+        )
     });
 
     if (existingTask) {

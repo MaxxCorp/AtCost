@@ -4,6 +4,7 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as service from '$lib/server/timesheets/service';
 import { manageTimesheetsSchema } from '@ac/validations';
 import * as v from 'valibot';
+import { listTasks, listCompletedTasks } from '../tasks.remote';
 
 export const getMyTalentId = query(v.undefined_(), async (): Promise<string | null> => {
     return await service.getMyTalentIdCore();
@@ -92,6 +93,11 @@ const manageTimesheetsHandler = async (data: v.InferInput<typeof manageTimesheet
                 entry = await service.rejectEntry(data.entryId, authUser.id, (data as any).comment);
                 break;
         }
+
+        // Trigger server-side data synchronization
+        void listTasks().refresh();
+        void listCompletedTasks().refresh();
+        void listPendingApprovals().refresh();
 
         const sanitizedEntry = entry ? JSON.parse(JSON.stringify(entry)) : null;
         return { success: true, entry: sanitizedEntry };

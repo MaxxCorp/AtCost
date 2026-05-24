@@ -17,10 +17,13 @@ export const listTasks = query(v.undefined_(), async (): Promise<{ self: any[]; 
     const subordinateIds = subordinateTree.map(r => r.id).filter(id => !directReportIds.includes(id) && id !== talentId);
 
     const allTasks = await db.query.task.findMany({
-        where: or(
-            eq(task.assigneeId, talentId),
-            directReportIds.length > 0 ? inArray(task.assigneeId, directReportIds) : undefined,
-            subordinateIds.length > 0 ? inArray(task.assigneeId, subordinateIds) : undefined
+        where: and(
+            eq(task.status, 'pending'),
+            or(
+                eq(task.assigneeId, talentId),
+                directReportIds.length > 0 ? inArray(task.assigneeId, directReportIds) : undefined,
+                subordinateIds.length > 0 ? inArray(task.assigneeId, subordinateIds) : undefined
+            )
         ),
         with: {
             assignee: {
@@ -57,6 +60,9 @@ export const completeTask = form(v.object({ taskId: v.string() }), async (data):
         .set({ status: 'completed', updatedAt: new Date() })
         .where(eq(task.id, data.taskId))
         .returning();
+
+    void listTasks().refresh();
+    void listCompletedTasks().refresh();
 
     return { success: true, task: updatedTask };
 });
