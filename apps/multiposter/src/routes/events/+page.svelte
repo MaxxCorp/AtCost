@@ -6,7 +6,6 @@
 	import * as m from "$lib/paraglide/messages.js";
 	import type { Event } from "@ac/validations";
 	import { deleteEvents } from "./delete.remote";
-	import { deleteSeries } from "./[id]/delete-series.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
@@ -125,7 +124,7 @@
 				deleteItemRemote={async (ids: string[]) => {
 					return await handleDelete({
 						ids,
-						deleteFn: deleteEvents,
+						deleteFn: async (ids) => await deleteEvents({ ids }),
 						itemName: m.event_label().toLowerCase(),
 					});
 				}}
@@ -262,7 +261,7 @@
 											onclick={async () => {
 												await handleDelete({
 													ids: [event.id],
-													deleteFn: deleteEvents,
+													deleteFn: async (ids) => await deleteEvents({ ids }),
 													itemName: m.instance().toLowerCase(),
 												});
 												// Note: Deselect All is handled by EntityManager if items are deleted via default actions, 
@@ -275,7 +274,7 @@
 										<DropdownMenu.Item
 											onclick={async () => {
 												if (!confirm(m.delete_series_confirm())) return;
-												await deleteSeries(event.id);
+												await deleteEvents({ ids: [event.id], deleteSeries: true });
 												toast.success(m.series_deleted());
 												// Note: Requires a hard page reload or EntityManager query reset in the future
 												location.reload(); 

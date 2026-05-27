@@ -6,8 +6,7 @@
     import { toast } from "svelte-sonner";
 	import { readEvent } from "./read.remote";
 	import { updateEvent } from "./update.remote";
-    import { deleteEvents as deleteEventAction } from "./delete.remote";
-    import { deleteSeries as deleteSeriesAction } from "./delete-series.remote";
+    import { deleteEvents as deleteEventAction } from "../delete.remote";
 	import { updateEventSchema } from "$lib/validations/events";
 	import EventForm from "$lib/components/events/EventForm.svelte";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
@@ -60,7 +59,7 @@
                                 onclick={async () => {
                                     await handleDelete({
                                         ids: [event.id],
-                                        deleteFn: deleteEventAction,
+                                        deleteFn: async (ids) => await deleteEventAction({ ids }),
                                         itemName: m.instance().toLowerCase(),
                                     });
                                     goto("/events");
@@ -75,7 +74,7 @@
                                 onclick={async () => {
                                     if (!confirm(m.delete_series_confirm())) return;
                                     try {
-                                        await deleteSeriesAction(event.id);
+                                        await deleteEventAction({ ids: [event.id], deleteSeries: true });
                                         toast.success(m.series_deleted());
                                         goto("/events");
                                     } catch (err: any) {
@@ -100,7 +99,7 @@
                         onclick={async () => {
                             await handleDelete({
                                 ids: [event.id],
-                                deleteFn: deleteEventAction,
+                                deleteFn: async (ids) => await deleteEventAction({ ids }),
                                 itemName: m.event_label(),
                             });
                             goto("/events");

@@ -3,7 +3,7 @@
     import { page } from "$app/state";
     import { readEvent } from "../read.remote";
     import { authClient } from "$lib/auth";
-    import { deleteSeries } from "../delete-series.remote";
+    import { deleteEvents } from "../../delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
@@ -27,7 +27,7 @@
         ChevronDown,
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
-    import { deleteEvents } from "../delete.remote";
+
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
     const eventId = page.params.id || "";
@@ -97,7 +97,7 @@
 
         deletingSeriesId = event.id;
         try {
-            await deleteSeries(event.id);
+            await deleteEvents({ ids: [event.id], deleteSeries: true });
             await goto("/events");
         } catch (err) {
             console.error("Delete series error:", err);
@@ -118,7 +118,7 @@
 
         deletingSeriesId = event.id;
         try {
-            await deleteEvents([event.id]);
+            await deleteEvents({ ids: [event.id] });
             await goto("/events");
         } catch (err) {
             console.error("Delete instance error:", err);

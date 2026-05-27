@@ -43,7 +43,7 @@ export const deleteSeries = command(
         if (targetEvent.seriesId) {
             // Get all events in this series for notification and asset cleanup
             const seriesEvents = await db
-                .select({ 
+                .select({
                     id: event.id,
                     qrCodePath: event.qrCodePath,
                     iCalPath: event.iCalPath
@@ -77,7 +77,7 @@ export const deleteSeries = command(
 
         // Get all events linked to this master
         const legacyEvents = await db
-            .select({ 
+            .select({
                 id: event.id,
                 qrCodePath: event.qrCodePath,
                 iCalPath: event.iCalPath
@@ -118,7 +118,7 @@ export const deleteSeries = command(
             await publishEventChange('delete', deletedEventIds);
         }
 
-        await listEvents().refresh();
+        void listEvents().refresh();
 
         console.log('--- deleteSeries DONE ---');
         return { success: true, deletedCount: deletedEventIds.length };
