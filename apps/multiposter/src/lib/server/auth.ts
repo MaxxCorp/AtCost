@@ -18,6 +18,12 @@ export const auth = betterAuth({
     baseURL: env.BETTER_AUTH_URL || "http://localhost:5173",
     basePath: "/api/auth",
     trustHost: true,
+    onAPIError: {
+        throw: true,
+        onError: (error) => {
+            console.error("[BetterAuth API Error]:", error);
+        }
+    },
     session: {
         cookieCache: {
             enabled: true,
