@@ -62,24 +62,26 @@
                                     onchange={() => toggleSelection(user.id)}
                                     class="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500"
                                 />
-                                {#if user.image}
-                                    <img
-                                        src={user.image}
-                                        alt={user.name}
-                                        class="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md group-hover:scale-105 transition-transform"
-                                    />
-                                {:else}
-                                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border border-blue-200 shadow-sm group-hover:scale-105 transition-transform">
-                                        <UserIcon size={28} class="text-blue-600" />
-                                    </div>
-                                {/if}
+                                <a href={`/users/${user.id}`} class="shrink-0">
+                                    {#if user.image}
+                                        <img
+                                            src={user.image}
+                                            alt={user.name}
+                                            class="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md group-hover:scale-105 transition-transform"
+                                        />
+                                    {:else}
+                                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border border-blue-200 shadow-sm group-hover:scale-105 transition-transform">
+                                            <UserIcon size={28} class="text-blue-600" />
+                                        </div>
+                                    {/if}
+                                </a>
                             </div>
 
                             <div class="flex-1 min-w-0 space-y-3">
                                 <div>
-                                    <h2 class="text-xl font-black text-gray-900 group-hover:text-blue-600 transition-colors truncate">
+                                    <a href={`/users/${user.id}`} class="text-xl font-black text-gray-900 hover:underline group-hover:text-blue-600 transition-colors truncate block">
                                         {user.name}
-                                    </h2>
+                                    </a>
                                     <div class="flex items-center gap-2 text-gray-500 mt-1">
                                         <Mail size={14} class="text-blue-400" />
                                         <span class="text-sm font-medium truncate">{user.email}</span>
