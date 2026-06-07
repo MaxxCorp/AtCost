@@ -97,7 +97,7 @@
 
         deletingSeriesId = event.id;
         try {
-            await deleteEvents({ ids: [event.id], deleteSeries: true });
+            await deleteEvents({ ids: [event.id] });
             await goto("/events");
         } catch (err) {
             console.error("Delete series error:", err);

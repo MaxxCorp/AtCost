@@ -47,7 +47,7 @@ export async function generateEventAssets(eventId: string, origin?: string) {
     
     // Build location string from associations and free text
     const locationParts: string[] = [];
-    if (data.location) locationParts.push(data.location);
+    // data.location is removed
     
     data.locations?.forEach((el: any) => {
         const l = el.location;

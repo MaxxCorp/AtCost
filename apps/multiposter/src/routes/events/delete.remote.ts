@@ -12,7 +12,20 @@ import { getStorageProvider } from '$lib/server/blob-storage';
 /**
  * Command for bulk deleting events or series
  */
+
 export const deleteEvents = command(
+  v.object({
+    ids: v.array(v.string()),
+  }),
+  async ({ ids }) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'events');
+    await db.delete(event).where(inArray(event.id, ids));
+    void listEvents().refresh();
+  }
+)
+
+/* export const deleteEvents = command(
   v.object({
     ids: v.array(v.string()),
     deleteSeries: v.optional(v.boolean())
@@ -124,4 +137,4 @@ export const deleteEvents = command(
     void listEvents().refresh();
     return { success: true, deletedCount: deletedEventIds.length };
   }
-);
+); */

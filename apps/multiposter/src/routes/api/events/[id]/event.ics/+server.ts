@@ -27,7 +27,7 @@ export const GET: RequestHandler = async ({ params }) => {
     if (data.description) vevent.addPropertyWithValue('description', data.description);
     
     const locationParts: string[] = [];
-    if (data.location) locationParts.push(data.location);
+    // data.location is removed
     data.locations?.forEach((el: any) => {
         const l = el.location;
         if (l) {

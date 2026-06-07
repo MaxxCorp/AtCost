@@ -831,7 +831,7 @@ export class SyncService {
 		};
 
 		if (external.description !== undefined) result.description = external.description;
-		if (external.location !== undefined) result.location = external.location;
+		// if (external.location !== undefined) result.location = external.location;
 		if (external.startDateTime !== undefined) result.startDateTime = external.startDateTime;
 		if (external.startTimeZone !== undefined) result.startTimeZone = external.startTimeZone;
 		if (external.endDateTime !== undefined) result.endDateTime = external.endDateTime;

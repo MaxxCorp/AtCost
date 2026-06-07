@@ -567,5 +567,7 @@
 	"synchronization": "Synchronisation",
 	"sync_description": "Wählen Sie aus, welche externen Anbieter dieses Element enthalten sollen.",
 	"no_syncs_configured": "Keine Synchronisationen konfiguriert.",
-	"edit_event": "Veranstaltung bearbeiten"
+	"edit_event": "Veranstaltung bearbeiten",
+	"delete_successful": "Erfolgreich gelöscht",
+	"untitled_event": "Unbenannte Veranstaltung"
 }

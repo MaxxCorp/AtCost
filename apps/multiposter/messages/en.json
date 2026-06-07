@@ -567,5 +567,7 @@
 	"synchronization": "Synchronization",
 	"sync_description": "Select which external providers should include this item.",
 	"no_syncs_configured": "No synchronizations configured.",
-	"edit_event": "Edit Event"
+	"edit_event": "Edit Event",
+	"delete_successful": "Delete successful",
+	"untitled_event": "Untitled Event"
 }

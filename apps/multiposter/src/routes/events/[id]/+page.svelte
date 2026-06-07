@@ -74,7 +74,7 @@
                                 onclick={async () => {
                                     if (!confirm(m.delete_series_confirm())) return;
                                     try {
-                                        await deleteEventAction({ ids: [event.id], deleteSeries: true });
+                                        await deleteEventAction({ ids: [event.id] });
                                         toast.success(m.series_deleted());
                                         goto("/events");
                                     } catch (err: any) {
