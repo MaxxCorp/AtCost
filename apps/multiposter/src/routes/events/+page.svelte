@@ -164,7 +164,7 @@
 						<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
 							{m.updated_on({ date: new Date(event.updatedAt).toLocaleDateString() })}
 							{#if event.user}
-								| {event.user.name || event.user.email || 'User'}
+								| <a href="/users/{event.user.id}" class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors">{event.user.name || event.user.email || 'User'}</a>
 							{/if}
 						</div>
 
