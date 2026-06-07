@@ -1,26 +1,89 @@
 import { test, expect } from '@playwright/test';
 
-test('create a new event', async ({ page }) => {
-    // Navigate to the events page
-    await page.goto('/events/new');
+test.describe('Events CRUD', () => {
+    test('full CRUD flow', async ({ page }) => {
+        // 1. Navigate to events page
+        await page.goto('/events');
+        await expect(page).toHaveURL(/\/events/);
 
-    // Fill in basic information
-    await page.fill('#summary', 'Test Event from E2E');
-    await page.fill('#description', 'This event was created by an automated test.');
+        // 2. CREATE
+        await page.goto('/events/new');
+        await page.waitForLoadState('networkidle');
+        await page.fill('input[name="summary"]', 'E2E Test A');
+        await page.fill('textarea[name="description"]', 'Desc A');
+        
+        const today = new Date().toISOString().split('T')[0];
+        await page.fill('input[type="date"]', today);
 
-    // Set a date (default is today, but let's ensure it's filled)
-    // The id is startDate
-    const today = new Date().toISOString().split('T')[0];
-    await page.fill('#startDate', today);
+        await page.click('button:has-text("Save")');
+        // Wait for redirect to /events or success message
+        await page.waitForURL(/\/events/);
+        
+        // Verify 'E2E Test A' is in the list
+        await expect(page.locator('h3', { hasText: 'E2E Test A' })).toBeVisible();
 
-    // Click Create Event
-    // Using AsyncButton which might have a specific selector or just the text
-    await page.click('button:has-text("Create Event")');
+        // 3. UPDATE
+        // Find the Edit button for 'E2E Test A'
+        const eventACard = page.locator('.bg-white', { hasText: 'E2E Test A' }).first();
+        await eventACard.locator('a:has-text("Edit")').click();
 
-    // Verify redirect to /events or success toast
-    await expect(page).toHaveURL(/\/events/);
+        // Wait for form to load
+        await page.waitForLoadState('networkidle');
 
-    // Check for success toast (if possible)
-    const successToast = page.getByText('Successfully Saved!');
-    await expect(successToast).toBeVisible();
+        // Verify prefill
+        await expect(page.locator('input[name="summary"]')).toHaveValue('E2E Test A');
+
+        // Update summary
+        await page.fill('input[name="summary"]', 'E2E Test A - Updated');
+        await page.click('button:has-text("Save")');
+
+        await page.waitForURL(/\/events/);
+        
+        // Verify update in list
+        await expect(page.locator('h3', { hasText: 'E2E Test A - Updated' })).toBeVisible();
+        await expect(page.locator('h3', { hasText: 'E2E Test A' })).toHaveCount(0); // The exact old text shouldn't be a standalone heading anymore
+
+        // 4. CREATE SECOND ITEM
+        await page.goto('/events/new');
+        await page.waitForLoadState('networkidle');
+        
+        // Ensure no bleed
+        await expect(page.locator('input[name="summary"]')).toHaveValue('');
+
+        await page.fill('input[name="summary"]', 'E2E Test B');
+        await page.fill('textarea[name="description"]', 'Desc B');
+        await page.fill('input[type="date"]', today);
+        await page.click('button:has-text("Save")');
+
+        await page.waitForURL(/\/events/);
+        await expect(page.locator('h3', { hasText: 'E2E Test B' })).toBeVisible();
+
+        // 5. UPDATE SECOND ITEM
+        const eventBCard = page.locator('.bg-white', { hasText: 'E2E Test B' }).first();
+        await eventBCard.locator('a:has-text("Edit")').click();
+        await page.waitForLoadState('networkidle');
+
+        // Verify prefill again
+        await expect(page.locator('input[name="summary"]')).toHaveValue('E2E Test B');
+        await page.click('button:has-text("Save")');
+        await page.waitForURL(/\/events/);
+
+        // 6. DELETE BOTH
+        // Handle confirm dialogs automatically
+        page.on('dialog', dialog => dialog.accept());
+
+        // Delete B
+        const cardB = page.locator('.bg-white', { hasText: 'E2E Test B' }).first();
+        await cardB.locator('button:has-text("Delete")').click();
+        
+        // Wait for it to disappear
+        await expect(page.locator('h3', { hasText: 'E2E Test B' })).toHaveCount(0);
+
+        // Delete A
+        const cardA = page.locator('.bg-white', { hasText: 'E2E Test A - Updated' }).first();
+        await cardA.locator('button:has-text("Delete")').click();
+
+        // Wait for it to disappear
+        await expect(page.locator('h3', { hasText: 'E2E Test A - Updated' })).toHaveCount(0);
+    });
 });
