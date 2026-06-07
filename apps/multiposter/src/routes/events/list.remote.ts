@@ -1,16 +1,109 @@
+import * as v from 'valibot';
 import { query } from '$app/server';
-import { db } from '@ac/db';
+import { db, event, eventContact, eventLocation, eventTag, contact, location, tag, eq, inArray, and, or, ilike, sql, desc, asc, exists } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { eventPaginationSchema as PaginationSchema, type PaginatedResult, type Event } from '@ac/validations';
 
-
-/**
- * List all events for the authenticated user, paginated.
- */
-export const listEvents = query(async () => {
+export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'events');
 
-	const result = await db.query.event.findMany({
+	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
+	const offset = (page - 1) * limit;
+
+	let baseQuery = db.select({ id: event.id }).from(event).$dynamic();
+	const conditions = [];
+
+	// Search filter: Summary, Description, Location Names, Contact Names
+	if (search) {
+		const searchPattern = `%${search}%`;
+		conditions.push(or(
+			ilike(event.summary, searchPattern),
+			ilike(event.description, searchPattern),
+			sql`EXISTS (
+				SELECT 1 FROM ${eventLocation} el
+				JOIN ${location} l ON el.location_id = l.id
+				WHERE el.event_id = ${event.id} AND l.name ILIKE ${searchPattern}
+			)`,
+			sql`EXISTS (
+				SELECT 1 FROM ${eventContact} ec
+				JOIN ${contact} c ON ec.contact_id = c.id
+				WHERE ec.event_id = ${event.id} AND (c.display_name ILIKE ${searchPattern} OR c.given_name ILIKE ${searchPattern} OR c.family_name ILIKE ${searchPattern})
+			)`
+		));
+	}
+
+	// Location filter
+	if (locationId) {
+		const ids = Array.isArray(locationId) ? locationId : [locationId];
+		if (ids.length > 0) {
+			conditions.push(
+				exists(
+					db.select({ id: sql`1` })
+					  .from(eventLocation)
+					  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, ids)))
+				)
+			);
+		}
+	}
+
+	// Tag filter
+	if (tagId) {
+		const ids = Array.isArray(tagId) ? tagId : [tagId];
+		if (ids.length > 0) {
+			conditions.push(
+				exists(
+					db.select({ id: sql`1` })
+					  .from(eventTag)
+					  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, ids)))
+				)
+			);
+		}
+	}
+
+	// Contact filter
+	if (contactId) {
+		const ids = Array.isArray(contactId) ? contactId : [contactId];
+		if (ids.length > 0) {
+			conditions.push(
+				exists(
+					db.select({ id: sql`1` })
+					  .from(eventContact)
+					  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, ids)))
+				)
+			);
+		}
+	}
+
+	if (conditions.length > 0) {
+		baseQuery = baseQuery.where(and(...conditions as any)) as any;
+	}
+
+	// Total count
+	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+	const total = Number(countResult[0]?.count || 0);
+
+	// Sorting
+	const orderClause = sortOrder === 'desc' ? desc : asc;
+	let orderField: any = event.updatedAt;
+	if (sortField === 'startDateTime') orderField = event.startDateTime;
+	else if (sortField === 'createdAt') orderField = event.createdAt;
+
+	// Pagination
+	const paginatedIdsResult = await baseQuery
+		.orderBy(orderClause(orderField))
+		.limit(limit)
+		.offset(offset);
+
+	const ids = paginatedIdsResult.map(r => r.id);
+
+	if (ids.length === 0) {
+		return { data: [], total };
+	}
+
+	// Fetch full data for the paginated IDs
+	const rawResults = await db.query.event.findMany({
+		where: inArray(event.id, ids),
 		with: {
 			contacts: true,
 			locations: {
@@ -26,9 +119,9 @@ export const listEvents = query(async () => {
 			},
 			campaign: true,
 			user: true
-		}
-	})
+		},
+		orderBy: [orderClause(orderField)]
+	});
 
-	return result;
+	return { data: rawResults, total };
 });
-

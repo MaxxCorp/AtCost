@@ -88,6 +88,8 @@ export const eventPaginationSchema = v.optional(v.object({
 	locationId: FilterableIdSchema,
 	tagId: FilterableIdSchema,
 	contactId: FilterableIdSchema,
+	sortField: v.optional(v.union([v.literal('updatedAt'), v.literal('startDateTime'), v.literal('createdAt')])),
+	sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 	grouped: v.optional(v.boolean(), false),
 	seriesId: v.optional(v.string()),
 }), {});
