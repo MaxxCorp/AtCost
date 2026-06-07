@@ -90,7 +90,7 @@
 			{:else if eventsQuery.error}
 				<div class="text-red-500 p-4">{m.error_loading_item({ item: m.feature_events_title() })}</div>
 			{:else}
-				{#each groupedEvents as event}
+				{#each groupedEvents as event (event.id)}
 					<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
 						
 						<div class="flex-1 mb-5">
@@ -101,7 +101,7 @@
 									</h3>
 									{#if event.tags && event.tags.length > 0}
 										<div class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]">
-											{#each event.tags as t}
+											{#each event.tags as t (t.tag?.id || t.tagName)}
 												{#if t.tag}
 													<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
 														{t.tag.name}
@@ -121,7 +121,7 @@
 								<div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
 									<MapPin class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
 									<span class="truncate">
-										{#each event.locations as l, i}
+										{#each event.locations as l, i (l.location?.id || i)}
 											{#if l.location}
 												<a href="/locations/{l.location.id}" class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors">{l.location.name}</a>{#if i < event.locations.length - 1}, {/if}
 											{/if}
@@ -172,7 +172,7 @@
 						{#if expandedSeries[event.id] && event.instances.length > 0}
 							<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg p-4 space-y-3">
 								<h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{m.instances()}</h4>
-								{#each event.instances as instance}
+								{#each event.instances as instance (instance.id)}
 									<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-700">
 										<div class="flex items-center text-sm text-gray-600 dark:text-gray-300">
 											<Clock class="w-3.5 h-3.5 mr-2 text-primary-400 shrink-0" />
