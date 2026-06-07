@@ -49,15 +49,19 @@
 		expandedSeries[id] = !expandedSeries[id];
 	}
 
-	function handleDelete(event: any, isSeriesMaster: boolean) {
-		if (isSeriesMaster) {
-			if (!window.confirm(m.delete_series_confirm())) return;
-			deleteEvents({ ids: [event.id], deleteSeries: true });
-		} else {
-			if (!window.confirm(m.delete_confirm({ item: m.event_label() }))) return;
-			deleteEvents({ ids: [event.id] });
+	async function handleDelete(event: any, isSeriesMaster: boolean) {
+		try {
+			if (isSeriesMaster) {
+				if (!window.confirm(m.delete_series_confirm())) return;
+				await deleteEvents({ ids: [event.id], deleteSeries: true });
+			} else {
+				if (!window.confirm(m.delete_confirm({ item: m.event_label() }))) return;
+				await deleteEvents({ ids: [event.id] });
+			}
+			toast.success(m.delete_successful());
+		} catch (error: any) {
+			toast.error(error?.message || m.something_went_wrong());
 		}
-		toast.success(m.delete_successful());
 	}
 </script>
 
@@ -84,16 +88,29 @@
 			{#if eventsQuery.loading && !eventsQuery.current}
 				<div class="flex items-center text-gray-500 dark:text-gray-400 p-4">{m.loading()}</div>
 			{:else if eventsQuery.error}
-				<div class="text-red-500 p-4">Error loading events.</div>
+				<div class="text-red-500 p-4">{m.error_loading_item({ item: m.feature_events_title() })}</div>
 			{:else}
 				{#each groupedEvents as event}
 					<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
 						
 						<div class="flex-1 mb-5">
-							<a href="/events/{event.id}/view" class="block group">
-								<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 mb-2 transition-colors">
-									{event.summary || m.untitled_event()}
-								</h3>
+							<a href="/events/{event.id}/view" class="block group mb-2">
+								<div class="flex items-start justify-between gap-4">
+									<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
+										{event.summary || m.untitled_event()}
+									</h3>
+									{#if event.tags && event.tags.length > 0}
+										<div class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]">
+											{#each event.tags as t}
+												{#if t.tag}
+													<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
+														{t.tag.name}
+													</span>
+												{/if}
+											{/each}
+										</div>
+									{/if}
+								</div>
 							</a>
 							
 							<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
@@ -147,13 +164,7 @@
 						<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
 							{m.updated_on({ date: new Date(event.updatedAt).toLocaleDateString() })}
 							{#if event.user}
-								{#if event.user.userContacts && event.user.userContacts.length > 0 && event.user.userContacts[0].contact}
-									| <a href="/contacts/{event.user.userContacts[0].contact.id}" class="hover:underline hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-										{event.user.userContacts[0].contact.displayName || event.user.userContacts[0].contact.givenName || event.user.name || 'User'}
-									</a>
-								{:else}
-									| {event.user.name || event.user.email || 'User'}
-								{/if}
+								| {event.user.name || event.user.email || 'User'}
 							{/if}
 						</div>
 

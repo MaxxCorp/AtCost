@@ -19,17 +19,13 @@ export const listEvents = query(async () => {
 				}
 			},
 			resources: true,
-			tags: true,
-			campaign: true,
-			user: {
+			tags: {
 				with: {
-					userContacts: {
-						with: {
-							contact: true
-						}
-					}
+					tag: true
 				}
-			}
+			},
+			campaign: true,
+			user: true
 		}
 	})
 
