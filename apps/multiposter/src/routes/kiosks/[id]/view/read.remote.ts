@@ -32,8 +32,13 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         locations: locations
     };
 
+    const locationIds = locations.map(l => l.id);
+    
     const eventsResult = await listKioskEvents(kioskId);
-    const announcementsResult = await listKioskAnnouncements();
+    const announcementsResult = await listKioskAnnouncements({
+        limit: 100,
+        locationId: locationIds.length > 0 ? locationIds : undefined
+    });
 
     const items = [...eventsResult, ...announcementsResult.data].sort((a, b) => {
         return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();

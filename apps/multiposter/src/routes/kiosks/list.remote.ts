@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { desc, eq, inArray, and, or, ilike, sql } from '@ac/db';
+import { desc, asc, eq, inArray, and, or, ilike, sql } from '@ac/db';
 import { kioskPaginationSchema as PaginationSchema, type Kiosk, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 
@@ -13,7 +13,7 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
     const user = getAuthenticatedUser();
     ensureAccess(user, 'kiosks'); // Using 'kiosks' feature access
 
-    const { page = 1, limit = 50, search = '', locationId } = input || {};
+    const { page = 1, limit = 50, search = '', locationId, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select({ id: kiosk.id }).from(kiosk).$dynamic();
@@ -39,8 +39,13 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
+    const orderClause = sortOrder === 'desc' ? desc : asc;
+    let orderField: any = kiosk.updatedAt;
+    if (sortField === 'createdAt') orderField = kiosk.createdAt;
+    else if (sortField === 'name') orderField = kiosk.name;
+
     const paginatedIdsResult = await baseQuery
-        .orderBy(desc(kiosk.createdAt))
+        .orderBy(orderClause(orderField))
         .limit(limit)
         .offset(offset);
 
@@ -52,7 +57,7 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
 
     const rawResults = await db.query.kiosk.findMany({
         where: inArray(kiosk.id, ids),
-        orderBy: desc(kiosk.createdAt),
+        orderBy: [orderClause(orderField)],
         with: {
             locations: {
                 with: {

@@ -16,5 +16,7 @@ export const kioskPaginationSchema = v.optional(v.object({
 	limit: v.optional(v.number(), 50),
 	search: v.optional(v.string()),
 	locationId: FilterableIdSchema,
+	sortField: v.optional(v.picklist(['updatedAt', 'createdAt', 'name']), 'updatedAt'),
+	sortOrder: v.optional(v.picklist(['asc', 'desc']), 'desc'),
     _t: v.optional(v.number()),
 }), {});

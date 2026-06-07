@@ -9,8 +9,7 @@
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
 
-    let kioskId = $derived(page.params.id!);
-    let kioskPromise = $derived(getKiosk(kioskId));
+    const kioskId = page.params.id || "";
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -19,7 +18,7 @@
 
         <h1 class="text-3xl font-bold mb-8">{m.edit_kiosk()}</h1>
 
-        {#await kioskPromise}
+        {#await getKiosk(kioskId)}
             <LoadingSection message={m.loading_kiosk()} />
         {:then kiosk}
             {#if kiosk}

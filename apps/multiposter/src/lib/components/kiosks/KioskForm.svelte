@@ -34,40 +34,13 @@
  
  
 
-    let selectedLocationIds = $state<string[]>(
-        untrack(() => initialData?.locationIds || (initialData?.locationId ? [initialData.locationId] : []))
-    );
-    let lookAheadDays = $state(
-        untrack(() => initialData?.lookAhead ? Math.round(initialData.lookAhead / 86400) : 28)
-    );
-    let lookPastDays = $state(
-        untrack(() => initialData?.lookPast ? Math.round(initialData.lookPast / 86400) : 0)
-    );
+    let selectedLocationIds = $state<string[]>(untrack(() => initialData?.locationIds || (initialData?.locationId ? [initialData.locationId] : [])));
+    let lookAheadDays = $state(untrack(() => initialData?.lookAhead ? Math.round(initialData.lookAhead / 86400) : 28));
+    let lookPastDays = $state(untrack(() => initialData?.lookPast ? Math.round(initialData.lookPast / 86400) : 0));
     let uiMode = $state(untrack(() => initialData?.uiMode || "carousel"));
     let rangeMode = $state(untrack(() => initialData?.rangeMode || "rolling"));
-    let startDate = $state(
-        untrack(() => initialData?.startDate
-            ? new Date(initialData.startDate).toISOString().slice(0, 16)
-            : "")
-    );
-    let endDate = $state(
-        untrack(() => initialData?.endDate
-            ? new Date(initialData.endDate).toISOString().slice(0, 16)
-            : "")
-    );
- 
-    $effect(() => {
-        // Update state if initialData changes (e.g. from null to loaded)
-        if (!initialData) return;
-        
-        selectedLocationIds = initialData.locationIds || (initialData?.locationId ? [initialData.locationId] : []);
-        lookAheadDays = initialData.lookAhead ? Math.round(initialData.lookAhead / 86400) : 28;
-        lookPastDays = initialData.lookPast ? Math.round(initialData.lookPast / 86400) : 0;
-        uiMode = initialData.uiMode || "carousel";
-        rangeMode = initialData.rangeMode || "rolling";
-        startDate = initialData.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : "";
-        endDate = initialData.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : "";
-    });
+    let startDate = $state(untrack(() => initialData?.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : ""));
+    let endDate = $state(untrack(() => initialData?.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : ""));
  
 
 
@@ -206,8 +179,6 @@
                         title={m.feature_locations_title()}
                         icon={MapPin}
                         mode="embedded"
-                        {type}
-                        entityId={initialData?.id}
                         initialItems={locs.data.filter((l: any) =>
                             selectedLocationIds.includes(l.id),
                         )}
@@ -372,7 +343,7 @@
                         >{m.visualization()}</label
                     >
                     <select
-                        {...rf.fields.uiMode.as("text", uiMode)}
+                        name="uiMode"
                         value={uiMode}
                         onchange={(e) => {
                             uiMode = e.currentTarget.value;
@@ -392,7 +363,7 @@
                         >{m.time_range_mode()}</label
                     >
                     <select
-                        {...rf.fields.rangeMode.as("text", rangeMode)}
+                        name="rangeMode"
                         value={rangeMode}
                         onchange={(e) => {
                             rangeMode = e.currentTarget.value as any;

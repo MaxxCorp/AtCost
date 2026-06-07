@@ -137,7 +137,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 			description: data.description || null,
 			categoryBerlinDotDe: data.categoryBerlinDotDe || null,
 			ticketPrice: data.ticketPrice || null,
-			isAllDay: data.isAllDay === 'true' || data.isAllDay === true,
+			isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
 			status: data.status || 'confirmed',
 			startDateTime: start,
 			startTimeZone: data.startTimeZone || null,
@@ -150,11 +150,11 @@ export const createEvent = form(createEventSchema, async (data) => {
 			recurrence: recurrenceRule ? [recurrenceRule] : null,
 			attendees: (data.attendees as any) || null,
 			reminders: reminders as any,
-			isPublic: data.isPublic === 'true',
+			isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
 			heroImage: data.heroImage || null,
-			guestsCanInviteOthers: data.guestsCanInviteOthers === 'true',
-			guestsCanModify: data.guestsCanModify === 'true',
-			guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true',
+			guestsCanInviteOthers: data.guestsCanInviteOthers === 'true' || data.guestsCanInviteOthers === true || data.guestsCanInviteOthers === 'on',
+			guestsCanModify: data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on',
+			guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on',
 		} as any).returning();
 
 		if (!newEvent) {
@@ -238,7 +238,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 						description: data.description || null,
 						categoryBerlinDotDe: data.categoryBerlinDotDe || null,
                         ticketPrice: data.ticketPrice || null,
-                        isAllDay: data.isAllDay === 'true' || data.isAllDay === true,
+                        isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
                         status: data.status || 'confirmed',
                         startDateTime: date,
 						startTimeZone: data.startTimeZone || null,
@@ -253,11 +253,11 @@ export const createEvent = form(createEventSchema, async (data) => {
 						originalStartTime: { dateTime: date.toISOString() }, // The date this instance represents
 						attendees: (data.attendees as any) || null,
 						reminders: reminders as any,
-						isPublic: data.isPublic === 'true',
+						isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
 						heroImage: data.heroImage || null,
-						guestsCanInviteOthers: data.guestsCanInviteOthers === 'true',
-						guestsCanModify: data.guestsCanModify === 'true',
-						guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true',
+						guestsCanInviteOthers: data.guestsCanInviteOthers === 'true' || data.guestsCanInviteOthers === true || data.guestsCanInviteOthers === 'on',
+						guestsCanModify: data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on',
+						guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on',
 					} as any);
 
 					// Link associations for instance

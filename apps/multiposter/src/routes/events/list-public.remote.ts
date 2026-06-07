@@ -8,7 +8,7 @@ import { type Event, type PublicEvent, type PaginatedResult } from '@ac/validati
 
 export const listPublicEvents = query(async (): Promise<PublicEvent[]> => {
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     const results = await db
         .select()
@@ -16,7 +16,10 @@ export const listPublicEvents = query(async (): Promise<PublicEvent[]> => {
         .where(
             and(
                 eq(event.isPublic, true),
-                gte(event.endDateTime, now)
+                or(
+                    gte(event.endDateTime, now),
+                    and(isNull(event.endDateTime), gte(event.startDateTime, startOfToday))
+                )
             )
         )
         .orderBy(desc(event.startDateTime));
@@ -29,9 +32,7 @@ export const listPublicEvents = query(async (): Promise<PublicEvent[]> => {
 
 export const listKioskEvents = query(v.string(), async (kioskId: string): Promise<PublicEvent[]> => {
     // 1. Fetch Kiosk and its Locations
-    const kioskData = await db.query.kiosk.findFirst({
-        where: eq(kiosk.id, kioskId),
-    });
+    const [kioskData] = await db.select().from(kiosk).where(eq(kiosk.id, kioskId));
 
     if (!kioskData) return [];
 
@@ -51,7 +52,10 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
 
     if (kioskData.rangeMode === 'fixed') {
         if (kioskData.startDate) {
-            conditions.push(gte(event.endDateTime, kioskData.startDate));
+            conditions.push(or(
+                gte(event.endDateTime, kioskData.startDate),
+                and(isNull(event.endDateTime), gte(event.startDateTime, kioskData.startDate))
+            )!);
         }
         if (kioskData.endDate) {
             conditions.push(lte(event.startDateTime, kioskData.endDate));
@@ -60,7 +64,10 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
         const lookPastDate = new Date(now.getTime() - (kioskData.lookPast * 1000));
         const lookAheadDate = new Date(now.getTime() + (kioskData.lookAhead * 1000));
 
-        conditions.push(gte(event.endDateTime, lookPastDate));
+        conditions.push(or(
+            gte(event.endDateTime, lookPastDate),
+            and(isNull(event.endDateTime), gte(event.startDateTime, lookPastDate))
+        )!);
         conditions.push(lte(event.startDateTime, lookAheadDate));
     }
 
@@ -88,10 +95,21 @@ export const listKioskEvents = query(v.string(), async (kioskId: string): Promis
         }
     }
 
+    console.log("Kiosk ID:", kioskId);
+    console.log("Kiosk Data:", kioskData);
+    console.log("Kiosk Location IDs:", kioskLocationIds);
+    console.log("Time Now:", now);
+
     const results = await db
         .selectDistinct({ id: event.id })
         .from(event)
         .where(and(...conditions));
+
+    console.log("Found Event IDs for Kiosk:", results.map(r => r.id));
+
+    // Debug what public events exist at all
+    const allPublicEvents = await db.select({ id: event.id, summary: event.summary, start: event.startDateTime, end: event.endDateTime }).from(event).where(eq(event.isPublic, true));
+    console.log("All Public Events in DB:", allPublicEvents);
 
     if (results.length === 0) return [];
 

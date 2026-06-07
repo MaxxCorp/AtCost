@@ -25,6 +25,7 @@
     let { items, kiosk }: { 
         items: (PublicEvent | Announcement)[], 
         kiosk: {
+            name?: string;
             loopDuration?: number;
             locations: LocationInfo[];
         }
@@ -38,7 +39,15 @@
         const result: { location: LocationInfo, items: PublicEvent[] }[] = [];
         const ITEMS_PER_PAGE = 5; // Reduced as requested to ensure it fits vertically
 
-        if (!kiosk?.locations) return [];
+        if (!kiosk?.locations || kiosk.locations.length === 0) {
+            for (let i = 0; i < events.length; i += ITEMS_PER_PAGE) {
+                result.push({
+                    location: { name: kiosk?.name || "All Events" } as any,
+                    items: events.slice(i, i + ITEMS_PER_PAGE)
+                });
+            }
+            return result;
+        }
 
         for (const loc of kiosk.locations) {
             // Find events that belong to this location ID

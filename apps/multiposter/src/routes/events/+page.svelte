@@ -108,23 +108,11 @@
 		sortOrder,
 	});
 
-	const eventsQuery = $derived(listEvents(filterState));
 	const tagsQuery = listTags({ limit: 100 });
 	const locationsQuery = listLocations({ limit: 100 });
 
 	const tags = $derived(tagsQuery.current || []);
 	const locations = $derived(locationsQuery.current?.data || []);
-
-	const groupedEvents = $derived(
-		(eventsQuery.current?.data || [])
-			.filter((e: any) => !e.recurringEventId)
-			.map((master: any) => {
-				const instances = (eventsQuery.current?.data || []).filter(
-					(e: any) => e.recurringEventId === master.id,
-				);
-				return { ...master, instances };
-			}),
-	);
 
 	function toggleSeries(id: string) {
 		expandedSeries[id] = !expandedSeries[id];
@@ -143,7 +131,7 @@
 				await deleteEvents({ ids: [event.id] });
 			}
 			toast.success(m.delete_successful());
-			eventsQuery.refresh();
+			listEvents(filterState).refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
@@ -165,6 +153,17 @@
 			selectedLocations = [...selectedLocations, id];
 		}
 		page = 1;
+	}
+
+	function groupEvents(rawEvents: any[]) {
+		return rawEvents
+			.filter((e: any) => !e.recurringEventId)
+			.map((master: any) => {
+				const instances = rawEvents.filter(
+					(e: any) => e.recurringEventId === master.id,
+				);
+				return { ...master, instances };
+			});
 	}
 </script>
 
@@ -359,176 +358,96 @@
 
 		<!-- List using exactly the requested reactive pattern -->
 		<div class="grid grid-cols-1 gap-5">
-			{#if eventsQuery.loading && (!eventsQuery.current || !eventsQuery.current.data)}
+			{#each groupEvents((await listEvents(filterState)).data || []) as event (event.id)}
 				<div
-					class="flex items-center text-gray-500 dark:text-gray-400 p-4"
+					class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
 				>
-					{m.loading()}
-				</div>
-			{:else if eventsQuery.error}
-				<div class="text-red-500 p-4">
-					{m.error_loading_item({ item: m.feature_events_title() })}
-				</div>
-			{:else if groupedEvents.length === 0}
-				<div
-					class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
-				>
-					<CalendarDays
-						class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3"
-					/>
-					<h3
-						class="text-lg font-medium text-gray-900 dark:text-gray-100"
-					>
-						No events found
-					</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						Try adjusting your search or filters.
-					</p>
-				</div>
-			{:else}
-				{#each groupedEvents as event (event.id)}
-					<div
-						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
-					>
-						<div class="flex-1 mb-5">
-							<a
-								href="/events/{event.id}/view"
-								class="block group mb-2"
-							>
-								<div
-									class="flex items-start justify-between gap-4"
-								>
-									<h3
-										class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors"
-									>
-										{event.summary || m.untitled_event()}
-									</h3>
-									{#if event.tags && event.tags.length > 0}
-										<div
-											class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]"
-										>
-											{#each event.tags as t (t.tag?.id || t.tagName)}
-												{#if t.tag}
-													<span
-														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
-													>
-														{t.tag.name}
-													</span>
-												{/if}
-											{/each}
-										</div>
-									{/if}
-								</div>
-							</a>
-
+					<div class="flex-1 mb-5">
+						<a
+							href="/events/{event.id}/view"
+							class="block group mb-2"
+						>
 							<div
-								class="flex items-center text-sm text-gray-500 dark:text-gray-400"
+								class="flex items-start justify-between gap-4"
 							>
-								<Clock
-									class="w-4 h-4 mr-2 text-primary-500 shrink-0"
-								/>
-								<span class="truncate font-medium"
-									>{formatEventTime(event)}</span
+								<h3
+									class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors"
 								>
-							</div>
-							{#if event.locations && event.locations.length > 0}
-								<div
-									class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2"
-								>
-									<MapPin
-										class="w-4 h-4 mr-2 text-primary-500 shrink-0"
-									/>
-									<span class="truncate">
-										{#each event.locations as l, i (l.location?.id || i)}
-											{#if l.location}
-												<a
-													href="/locations/{l.location
-														.id}"
-													class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-													>{l.location.name}</a
-												>{#if i < event.locations.length - 1},
-												{/if}
+									{event.summary || m.untitled_event()}
+								</h3>
+								{#if event.tags && event.tags.length > 0}
+									<div
+										class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]"
+									>
+										{#each event.tags as t (t.tag?.id || t.tagName)}
+											{#if t.tag}
+												<span
+													class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+												>
+													{t.tag.name}
+												</span>
 											{/if}
 										{/each}
-									</span>
-								</div>
-							{/if}
-						</div>
+									</div>
+								{/if}
+							</div>
+						</a>
 
 						<div
-							class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+							class="flex items-center text-sm text-gray-500 dark:text-gray-400"
 						>
-							{#if event.instances && event.instances.length > 0}
+							<Clock
+								class="w-4 h-4 mr-2 text-primary-500 shrink-0"
+							/>
+							<span class="truncate font-medium"
+								>{formatEventTime(event)}</span
+							>
+						</div>
+						{#if event.locations && event.locations.length > 0}
+							<div
+								class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2"
+							>
+								<MapPin
+									class="w-4 h-4 mr-2 text-primary-500 shrink-0"
+								/>
+								<span class="truncate">
+									{#each event.locations as l, i (l.location?.id || i)}
+										{#if l.location}
+											<a
+												href="/locations/{l.location
+													.id}"
+												class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+												>{l.location.name}</a
+											>{i <
+											event.locations.length - 1
+												? ", "
+												: ""}
+										{/if}
+									{/each}
+								</span>
+							</div>
+						{/if}
+
+						{#if event.instances && event.instances.length > 0}
+							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 								<button
 									class="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
 									onclick={() => toggleSeries(event.id)}
 								>
-									<CalendarDays
-										class="w-4 h-4 mr-2 text-primary-500"
-									/>
-									{event.instances.length}
-									{m.instances()}
+									<CalendarDays class="w-4 h-4 mr-2 text-primary-500" />
+									{event.instances.length} {m.instances()}
 									{#if expandedSeries[event.id]}
 										<ChevronDown class="w-4 h-4 ml-1" />
 									{:else}
 										<ChevronRight class="w-4 h-4 ml-1" />
 									{/if}
 								</button>
-							{:else}
-								<div></div>
-							{/if}
-
-							<div
-								class="flex justify-end gap-2 w-full sm:w-auto"
-							>
-								<Button
-									variant="outline"
-									size="sm"
-									href="/events/{event.id}"
-									class="flex-1 sm:flex-none"
-								>
-									<Pencil class="w-4 h-4 mr-2" />
-									{m.edit()}
-								</Button>
-								<button
-									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-									onclick={() =>
-										handleDelete(
-											event,
-											event.instances &&
-												event.instances.length > 0,
-										)}
-								>
-									<Trash2 class="w-4 h-4 mr-2" />
-									{m.delete()}
-								</button>
 							</div>
-						</div>
-						<div
-							class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2"
-						>
-							{m.updated_on({
-								date: new Date(
-									event.updatedAt,
-								).toLocaleDateString(),
-							})}
-							{#if event.user}
-								| <a
-									href="/users/{event.user.id}"
-									class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-									>{event.user.name ||
-										event.user.email ||
-										"User"}</a
-								>
-							{/if}
-						</div>
 
-						<!-- Instances List -->
-						{#if expandedSeries[event.id] && event.instances && event.instances.length > 0}
-							<div
-								class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg p-4 space-y-3"
-							>
-								<h4
+							<!-- Instances List -->
+							{#if expandedSeries[event.id]}
+								<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg p-4 space-y-3">
+									<h4
 									class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3"
 								>
 									{m.instances()}
@@ -581,51 +500,109 @@
 								{/each}
 							</div>
 						{/if}
+						{/if}
 					</div>
-				{/each}
-			{/if}
+
+					<div
+						class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto"
+					>
+						<Button
+							variant="outline"
+							size="sm"
+							href="/events/{event.id}"
+							class="flex-1 sm:flex-none"
+						>
+							<Pencil class="w-4 h-4 mr-2" />
+							{m.edit()}
+						</Button>
+						<button
+							class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
+							onclick={() => handleDelete(event, event.instances && event.instances.length > 0)}
+						>
+							<Trash2 class="w-4 h-4 mr-2" />
+							{m.delete()}
+						</button>
+					</div>
+					<div
+						class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2"
+					>
+						{m.updated_on({
+							date: new Date(
+								event.updatedAt,
+							).toLocaleDateString(),
+						})}
+						{#if event.user}
+							| <a
+								href="/users/{event.user.id}"
+								class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+								>{event.user.name ||
+									event.user.email ||
+									"User"}</a
+							>
+						{/if}
+					</div>
+				</div>
+			{:else}
+				<div
+					class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
+				>
+					<CalendarDays
+						class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3"
+					/>
+					<h3
+						class="text-lg font-medium text-gray-900 dark:text-gray-100"
+					>
+						No events found
+					</h3>
+					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+						Try adjusting your search or filters.
+					</p>
+				</div>
+			{/each}
 		</div>
 
 		<!-- Pagination -->
-		{#if eventsQuery.current && eventsQuery.current.total > limit}
-			{@const totalPages = Math.ceil(eventsQuery.current.total / limit)}
-			<div
-				class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
-			>
-				<div class="text-sm text-gray-500 dark:text-gray-400">
-					Showing {(page - 1) * limit + 1} to {Math.min(
-						page * limit,
-						eventsQuery.current.total,
-					)} of {eventsQuery.current.total}
-				</div>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={page === 1}
-						onclick={() => page > 1 && page--}
-						class="h-9 px-3 border-gray-200 dark:border-gray-700"
-					>
-						<ArrowLeft size={16} class="mr-1.5" />
-						Previous
-					</Button>
-					<div
-						class="flex items-center gap-1 px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
-					>
-						{page} / {totalPages}
+		{#await listEvents(filterState) then res}
+			{#if res && res.total > limit}
+				{@const totalPages = Math.ceil(res.total / limit)}
+				<div
+					class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
+				>
+					<div class="text-sm text-gray-500 dark:text-gray-400">
+						Showing {(page - 1) * limit + 1} to {Math.min(
+							page * limit,
+							res.total,
+						)} of {res.total}
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={page === totalPages}
-						onclick={() => page < totalPages && page++}
-						class="h-9 px-3 border-gray-200 dark:border-gray-700"
-					>
-						Next
-						<ArrowRight size={16} class="ml-1.5" />
-					</Button>
+					<div class="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={page === 1}
+							onclick={() => page > 1 && page--}
+							class="h-9 px-3 border-gray-200 dark:border-gray-700"
+						>
+							<ArrowLeft size={16} class="mr-1.5" />
+							Previous
+						</Button>
+						<div
+							class="flex items-center gap-1 px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
+						>
+							{page} / {totalPages}
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={page === totalPages}
+							onclick={() => page < totalPages && page++}
+							class="h-9 px-3 border-gray-200 dark:border-gray-700"
+						>
+							Next
+							<ArrowRight size={16} class="ml-1.5" />
+						</Button>
+					</div>
 				</div>
-			</div>
-		{/if}
+			{/if}
+		{/await}
 	</div>
 </div>

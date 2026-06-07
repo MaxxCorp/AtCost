@@ -9,9 +9,9 @@ export const getKiosk = query(v.string(), async (id: string) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'kiosks');
 
-    const result = await db.query.kiosk.findFirst({
-        where: eq(kiosk.id, id),
-    });
+    console.log("getKiosk called for id:", id);
+    const [result] = await db.select().from(kiosk).where(eq(kiosk.id, id));
+    console.log("getKiosk result from db:", result ? "found" : "not found");
 
     if (!result) return null;
 
@@ -20,18 +20,18 @@ export const getKiosk = query(v.string(), async (id: string) => {
         .from(kioskLocation)
         .where(eq(kioskLocation.kioskId, id));
 
-    return {
+    const finalData = {
         ...result,
         locationIds: locations.map((l: any) => l.id),
     };
+    console.log("getKiosk returning:", finalData);
+    return finalData;
 });
 
 export const getKioskForDisplay = query(v.string(), async (id: string) => {
     // Public access allowed for Kiosk display
 
-    const result = await db.query.kiosk.findFirst({
-        where: eq(kiosk.id, id),
-    });
+    const [result] = await db.select().from(kiosk).where(eq(kiosk.id, id));
 
     if (!result) return null;
 

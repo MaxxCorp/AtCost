@@ -356,7 +356,7 @@
             </p>
             <p class="text-sm">
                 Location: {kiosk?.locations && kiosk.locations.length > 0
-                    ? kiosk.locations.join(", ")
+                    ? kiosk.locations.map((l: any) => l.name).join(", ")
                     : "All Locations"}
             </p>
         </div>

@@ -85,7 +85,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			}
 		}
 
-		if (data.isAllDay !== undefined) updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true;
+		if (data.isAllDay !== undefined) updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on';
 
 		if (data.recurrence !== undefined) {
 			// If empty string, treat as null (clearing recurrence)
@@ -99,10 +99,10 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		if (data.attendees !== undefined) updateData.attendees = data.attendees || null;
 		if (reminders !== undefined) updateData.reminders = reminders || null;
 
-		if (data.isPublic !== undefined) updateData.isPublic = data.isPublic === 'true';
-		if (data.guestsCanInviteOthers !== undefined) updateData.guestsCanInviteOthers = data.guestsCanInviteOthers === 'true';
-		if (data.guestsCanModify !== undefined) updateData.guestsCanModify = data.guestsCanModify === 'true';
-		if (data.guestsCanSeeOtherGuests !== undefined) updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true';
+		if (data.isPublic !== undefined) updateData.isPublic = data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on';
+		if (data.guestsCanInviteOthers !== undefined) updateData.guestsCanInviteOthers = data.guestsCanInviteOthers === 'true' || data.guestsCanInviteOthers === true || data.guestsCanInviteOthers === 'on';
+		if (data.guestsCanModify !== undefined) updateData.guestsCanModify = data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on';
+		if (data.guestsCanSeeOtherGuests !== undefined) updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
 		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
