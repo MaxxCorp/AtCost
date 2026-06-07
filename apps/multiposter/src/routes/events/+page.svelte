@@ -4,7 +4,7 @@
 	import { deleteEvents } from "./delete.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
-	import { Pencil, Trash2, Plus, Clock, MapPin } from "@lucide/svelte";
+	import { Pencil, Trash2, Plus, Clock, MapPin, ChevronDown, ChevronRight, CalendarDays } from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 
 	// Simple date formatter function
@@ -33,6 +33,32 @@
 		
 		return `${startDateStr}, ${startTime}`;
 	}
+
+	// State for expanded series
+	let expandedSeries = $state<Record<string, boolean>>({});
+
+	const eventsQuery = listEvents();
+	const groupedEvents = $derived(
+		(eventsQuery.current || []).filter((e: any) => !e.recurringEventId).map((master: any) => {
+			const instances = (eventsQuery.current || []).filter((e: any) => e.recurringEventId === master.id);
+			return { ...master, instances };
+		})
+	);
+
+	function toggleSeries(id: string) {
+		expandedSeries[id] = !expandedSeries[id];
+	}
+
+	function handleDelete(event: any, isSeriesMaster: boolean) {
+		if (isSeriesMaster) {
+			if (!window.confirm(m.delete_series_confirm())) return;
+			deleteEvents({ ids: [event.id], deleteSeries: true });
+		} else {
+			if (!window.confirm(m.delete_confirm({ item: m.event_label() }))) return;
+			deleteEvents({ ids: [event.id] });
+		}
+		toast.success(m.delete_successful());
+	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -54,52 +80,71 @@
 		</div>
 
 		<!-- List using exactly the requested reactive pattern -->
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-			{#each await listEvents() as event}
-				<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
-					
-					<div class="flex-1 mb-5">
-						<a href="/events/{event.id}/view" class="block group">
-							<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 mb-2 transition-colors">
-								{event.summary || m.untitled_event()}
-							</h3>
-						</a>
+		<div class="grid grid-cols-1 gap-5">
+			{#if eventsQuery.loading && !eventsQuery.current}
+				<div class="flex items-center text-gray-500 dark:text-gray-400 p-4">{m.loading()}</div>
+			{:else if eventsQuery.error}
+				<div class="text-red-500 p-4">Error loading events.</div>
+			{:else}
+				{#each groupedEvents as event}
+					<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
 						
-						<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-							<Clock class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
-							<span class="truncate font-medium">{formatEventTime(event)}</span>
-						</div>
-						{#if event.locations && event.locations.length > 0}
-							<div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
-								<MapPin class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
-								<span class="truncate">
-									{#each event.locations as l, i}
-										{#if l.location}
-											<a href="/locations/{l.location.id}" class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors">{l.location.name}</a>{#if i < event.locations.length - 1}, {/if}
-										{/if}
-									{/each}
-								</span>
+						<div class="flex-1 mb-5">
+							<a href="/events/{event.id}/view" class="block group">
+								<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 mb-2 transition-colors">
+									{event.summary || m.untitled_event()}
+								</h3>
+							</a>
+							
+							<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+								<Clock class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
+								<span class="truncate font-medium">{formatEventTime(event)}</span>
 							</div>
-						{/if}
-					</div>
-
-					<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800">
-						<div class="flex justify-end gap-2 mb-2">
-							<Button variant="outline" size="sm" href="/events/{event.id}" class="flex-1 md:flex-none">
-								<Pencil class="w-4 h-4 mr-2" />
-								{m.edit()}
-							</Button>
-							<button 
-								class="flex-1 md:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500" 
-								onclick={() => {
-									deleteEvents({ ids: [event.id] });
-									toast.success(m.delete_successful());
-								}}>
-								<Trash2 class="w-4 h-4 mr-2" />
-								{m.delete()}
-							</button>
+							{#if event.locations && event.locations.length > 0}
+								<div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
+									<MapPin class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
+									<span class="truncate">
+										{#each event.locations as l, i}
+											{#if l.location}
+												<a href="/locations/{l.location.id}" class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors">{l.location.name}</a>{#if i < event.locations.length - 1}, {/if}
+											{/if}
+										{/each}
+									</span>
+								</div>
+							{/if}
 						</div>
-						<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1">
+
+						<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+							{#if event.instances.length > 0}
+								<button 
+									class="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+									onclick={() => toggleSeries(event.id)}>
+									<CalendarDays class="w-4 h-4 mr-2 text-primary-500" />
+									{event.instances.length} {m.instances()}
+									{#if expandedSeries[event.id]}
+										<ChevronDown class="w-4 h-4 ml-1" />
+									{:else}
+										<ChevronRight class="w-4 h-4 ml-1" />
+									{/if}
+								</button>
+							{:else}
+								<div></div>
+							{/if}
+
+							<div class="flex justify-end gap-2 w-full sm:w-auto">
+								<Button variant="outline" size="sm" href="/events/{event.id}" class="flex-1 sm:flex-none">
+									<Pencil class="w-4 h-4 mr-2" />
+									{m.edit()}
+								</Button>
+								<button 
+									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500" 
+									onclick={() => handleDelete(event, event.instances.length > 0)}>
+									<Trash2 class="w-4 h-4 mr-2" />
+									{m.delete()}
+								</button>
+							</div>
+						</div>
+						<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
 							{m.updated_on({ date: new Date(event.updatedAt).toLocaleDateString() })}
 							{#if event.user}
 								{#if event.user.userContacts && event.user.userContacts.length > 0 && event.user.userContacts[0].contact}
@@ -111,9 +156,36 @@
 								{/if}
 							{/if}
 						</div>
+
+						<!-- Instances List -->
+						{#if expandedSeries[event.id] && event.instances.length > 0}
+							<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg p-4 space-y-3">
+								<h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{m.instances()}</h4>
+								{#each event.instances as instance}
+									<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-700">
+										<div class="flex items-center text-sm text-gray-600 dark:text-gray-300">
+											<Clock class="w-3.5 h-3.5 mr-2 text-primary-400 shrink-0" />
+											<span>{formatEventTime(instance)}</span>
+										</div>
+										<div class="flex gap-2 w-full sm:w-auto">
+											<Button variant="outline" size="sm" href="/events/{instance.id}" class="flex-1 sm:flex-none h-8 px-2 text-xs">
+												<Pencil class="w-3.5 h-3.5 mr-1" />
+												{m.edit()}
+											</Button>
+											<button 
+												class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-8 px-2 text-red-500" 
+												onclick={() => handleDelete(instance, false)}>
+												<Trash2 class="w-3.5 h-3.5 mr-1" />
+												{m.delete()}
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
 					</div>
-				</div>
-			{/each}
+				{/each}
+			{/if}
 		</div>
 	</div>
 </div>
