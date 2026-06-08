@@ -21,6 +21,7 @@
         ChevronDown,
         RefreshCw,
     } from "@lucide/svelte";
+    import { RRule } from "rrule";
 
 	const eventId = page.params.id || "";
 </script>

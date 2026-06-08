@@ -55,8 +55,9 @@
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
     import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
-    import { RRule } from "$lib/utils/rrule-compat";
+    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import {
+        RefreshCw,
         CalendarClock,
         User,
         MapPin,
@@ -226,16 +227,9 @@
         );
     }
 
-    let recurrenceRule = $derived(rf.fields.recurrence.value());
     let recurrenceText = $derived(
-        recurrenceRule
-            ? (() => {
-                  try {
-                      return RRule.fromString(recurrenceRule).toText();
-                  } catch {
-                      return m.custom_recurrence();
-                  }
-              })()
+        recurrenceValue
+            ? formatRecurrenceText(recurrenceValue)
             : m.recurrence(),
     );
 
@@ -926,15 +920,25 @@
     </div>
 
     <!-- Recurrence Button -->
-    <div class="pt-4 border-t">
+    <div class="pt-4 border-t flex flex-wrap items-center justify-between gap-4">
         <button
             type="button"
             class="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
             onclick={() => (showRecurrenceDialog = true)}
         >
-            <CalendarClock size={16} />
-            <span>{recurrenceText}</span>
+            <RefreshCw size={16} />
+            <span class="text-left">{recurrenceText}</span>
         </button>
+
+        {#if initialData?.recurringEventId}
+            <a href={`/events/${initialData.recurringEventId}`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
+                {m.view_series()}
+            </a>
+        {:else if initialData?.seriesId && !initialData?.recurringEventId && initialData?.recurrence && initialData.recurrence.length > 0}
+            <a href={`/events/${initialData.id}/view`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
+                {m.instances()}
+            </a>
+        {/if}
     </div>
 </div>
 

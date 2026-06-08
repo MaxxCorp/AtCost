@@ -10,15 +10,15 @@
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import {
-        updateLocationSchema,
-        locationAssociationSchema,
-        getLocationAssociationsSchema,
-        type Location,
-        type Contact,
-    } from "@ac/validations";
+    import { updateLocationSchema, type Location, type Contact } from "@ac/validations";
     import { User } from "@lucide/svelte";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import { listContacts } from "../../contacts/list.remote";
+    import { fetchEntityContacts, addAssociation, removeAssociation } from "../../contacts/associate.remote";
+    import { deleteContact } from "../../contacts/[id]/delete.remote";
+    import { createContact } from "../../contacts/new/create.remote";
+    import { updateContact } from "../../contacts/[id]/update.remote";
+    import { createContactSchema, updateContactSchema } from "@ac/validations";
 </script>
 
 {#snippet contactLabel(item: any)}
@@ -146,55 +146,71 @@
                         {#snippet children()}
                             <div class="mt-8 pt-8 border-t">
                                 <EntityManager
-                                    title={m.associated_contacts()}
+                                    title={m.feature_contacts_title()}
                                     icon={User}
                                     mode="embedded"
-                                    listItemsRemote={() =>
-                                        import(
-                                            "../../contacts/associate.remote"
-                                        ).then((r) =>
-                                            r.fetchEntityContacts({
-                                                type: "location",
-                                                entityId: location.id,
-                                            }),
-                                        )}
-                                    createRemote={(data: any) =>
-                                        import(
-                                            "../../contacts/associate.remote"
-                                        ).then((r) =>
-                                            r.addAssociation({
-                                                ...data,
-                                                type: "location",
-                                                entityId: location.id,
-                                            }),
-                                        )}
-                                    createSchema={locationAssociationSchema}
-                                    deleteItemRemote={(ids: string[]) =>
-                                        import(
-                                            "../../contacts/associate.remote"
-                                        ).then((r) =>
-                                            Promise.all(
-                                                ids.map((id) =>
-                                                    r.removeAssociation({
-                                                        type: "location",
-                                                        entityId: location.id,
-                                                        contactId: id,
-                                                    }),
-                                                ),
-                                            ),
-                                        )}
+                                    type="location"
+                                    entityId={location.id}
+                                    listItemsRemote={listContacts as any}
+                                    fetchAssociationsRemote={fetchEntityContacts as any}
+                                    addAssociationRemote={async (p: any) =>
+                                        addAssociation({ ...p, contactId: p.itemId } as any)}
+                                    removeAssociationRemote={async (p: any) =>
+                                        removeAssociation({ ...p, contactId: p.itemId } as any)}
+                                    deleteItemRemote={async (ids: string[]) => {
+                                        return await handleDelete({
+                                            ids,
+                                            deleteFn: deleteContact,
+                                            itemName: m.contact_label().toLowerCase(),
+                                        });
+                                    }}
+                                    createRemote={createContact}
+                                    createSchema={createContactSchema}
+                                    updateRemote={updateContact}
+                                    updateSchema={updateContactSchema}
+                                    getFormData={(c: Contact) => ({
+                                        contact: c,
+                                        emails: c.emails,
+                                        phones: c.phones,
+                                        addresses: c.addresses,
+                                        relations: c.relations,
+                                        tags: c.tags,
+                                        locationAssociations: c.locationAssociations,
+                                    })}
                                     renderItemLabel={contactLabel}
-                                    searchPredicate={(
-                                        item: any,
-                                        query: string,
-                                    ) =>
-                                        (item.givenName || "")
-                                            .toLowerCase()
-                                            .includes(query.toLowerCase()) ||
-                                        (item.familyName || "")
-                                            .toLowerCase()
-                                            .includes(query.toLowerCase())}
+                                    searchPredicate={(c: Contact, q: string) => {
+                                        const name = (
+                                            c.displayName || `${c.givenName || ""} ${c.familyName || ""}`
+                                        ).toLowerCase();
+                                        return name.includes(q.toLowerCase());
+                                    }}
                                     renderForm={contactForm}
+                                    loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
+                                    noItemsLabel={m.no_items_associated_label({
+                                        item: m.feature_contacts_title(),
+                                    })}
+                                    noItemsFoundLabel={m.no_items_found({
+                                        item: m.feature_contacts_title(),
+                                    })}
+                                    searchPlaceholder={m.search_placeholder({
+                                        item: m.feature_contacts_title(),
+                                    })}
+                                    linkItemLabel={m.link_item_label({
+                                        item: m.feature_contacts_title(),
+                                    })}
+                                    associatedItemLabel={m.associated_item_label({
+                                        item: m.feature_contacts_title(),
+                                    })}
+                                    quickCreateLabel={m.quick_create()}
+                                    closeSearchLabel={m.close_search()}
+                                    editLabel={m.edit()}
+                                    deleteLabel={m.delete()}
+                                    unlinkLabel={m.unlink()}
+                                    deleteForeverLabel={m.delete_forever({ item: m.contact() })}
+                                    bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                                    selectAllLabel={m.select_all()}
+                                    deselectAllLabel={m.deselect_all()}
+                                    confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
                                 />
                             </div>
                         {/snippet}

@@ -1,7 +1,7 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
 import { event, contactEmail, contactPhone, tag } from '@ac/db';
-import { eq, and } from '@ac/db';
+import { eq, and, asc } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
@@ -85,6 +85,22 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		}
 	}
 
+	// 3.5. Fetch instances if this is a series master
+	let instances: any[] = [];
+	if (!result.recurringEventId && result.seriesId) {
+		const fetchedInstances = await db.query.event.findMany({
+			where: eq(event.recurringEventId, result.id),
+			orderBy: [asc(event.startDateTime)],
+		});
+		instances = fetchedInstances.map((inst: any) => ({
+			id: inst.id,
+			summary: inst.summary,
+			startDateTime: inst.startDateTime?.toISOString() ?? null,
+			endDateTime: inst.endDateTime?.toISOString() ?? null,
+			status: inst.status,
+		}));
+	}
+
 	// 4. Return Data
 	if (!isAuthorized) {
 		// Public safe object
@@ -109,6 +125,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			resourceIds: [],
 			contactIds: [],
 			syncIds: [],
+			instances: instances.length > 0 ? instances : undefined,
 		} as any;
 	}
 
@@ -128,5 +145,6 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 		syncIds: (result.campaign?.content as any)?.syncIds || [],
 		resolvedContact,
+		instances: instances.length > 0 ? instances : undefined,
 	} as any;
 });

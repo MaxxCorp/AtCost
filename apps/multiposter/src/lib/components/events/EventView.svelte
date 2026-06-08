@@ -52,31 +52,22 @@
 </script>
 
 <div
-    class="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-100"
+    class="max-w-7xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-100"
 >
     <!-- Header / Banner -->
-    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 text-white">
-        <h1 class="text-4xl font-extrabold tracking-tight mb-2">
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 text-white flex flex-col md:flex-row md:items-center justify-between gap-2">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
             {event.summary}
         </h1>
-        <div class="flex items-center gap-2 text-blue-100 text-lg">
-            <Calendar class="w-5 h-5" />
+        <div class="flex items-center gap-2 text-blue-100 text-sm sm:text-base font-medium">
+            <Calendar class="w-4 h-4" />
             <span>{displayDate}</span>
         </div>
     </div>
 
-    <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-        <!-- Main Content -->
-        <div class="md:col-span-2 space-y-8">
-            <!-- Description -->
-            <div class="prose prose-lg text-gray-600 max-w-none">
-                <div class="whitespace-pre-wrap">
-                    {@html event.description || m.no_description_provided()}
-                </div>
-            </div>
-
-            <!-- Meta Data Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="p-4 md:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+        <!-- Meta Data Column -->
+        <div class="space-y-4">
                 {#if event.locations && event.locations.length > 0}
                     <div
                         class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl"
@@ -166,7 +157,7 @@
                                         src={event.resolvedContact
                                             .qrCodeDataUrl}
                                         alt="Contact QR"
-                                        class="w-24 h-24 object-contain border rounded-lg bg-white p-1"
+                                        class="w-32 h-32 object-contain border rounded-lg bg-white p-1"
                                     />
                                     <p class="text-xs text-gray-500 mt-1">
                                         {m.scan_contact_info()}
@@ -176,15 +167,23 @@
                         </div>
                     </div>
                 {/if}
+        </div>
+
+        <!-- Description Column -->
+        <div class="space-y-4">
+            <div class="prose prose-lg text-gray-600 max-w-none">
+                <div class="whitespace-pre-wrap">
+                    {@html event.description || m.no_description_provided()}
+                </div>
             </div>
         </div>
 
         <!-- Sidebar / Visuals -->
-        <div class="space-y-6">
+        <div class="space-y-3 md:space-y-4">
             <!-- QR Code Card -->
             {#if event.qrCodeDataUrl || event.qrCodePath}
                 <div
-                    class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col items-center text-center"
+                    class="bg-white border border-gray-200 rounded-xl p-4 md:p-6 shadow-sm flex flex-col items-center text-center"
                 >
                     <div class="bg-gray-100 p-4 rounded-lg mb-4">
                         {#if event.qrCodeDataUrl}
@@ -216,7 +215,7 @@
             <!-- Event Details Sidebar -->
             {#if event.ticketPrice || event.categoryBerlinDotDe || (event.confirmedParticipants !== undefined && event.confirmedParticipants > 0) || (event.inclusivityInformation && event.inclusivityInformation.length > 0)}
                 <div
-                    class="bg-indigo-50 rounded-xl p-6 border border-indigo-100"
+                    class="bg-indigo-50 rounded-xl p-4 md:p-6 border border-indigo-100"
                 >
                     <h3
                         class="font-semibold text-indigo-900 mb-4 flex items-center gap-2"

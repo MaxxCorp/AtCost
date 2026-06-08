@@ -19,12 +19,16 @@
 		Search,
 		ArrowLeft,
 		ArrowRight,
+		ChevronsLeft,
+		ChevronsRight,
 		X,
+		RefreshCw,
 	} from "@lucide/svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { formatRecurrenceText } from "$lib/utils/format-recurrence";
 
 	// Simple date formatter function
 	function formatEventTime(event: any): string {
@@ -428,6 +432,13 @@
 							</div>
 						{/if}
 
+						{#if event.recurrence && event.recurrence.length > 0}
+							<div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
+								<RefreshCw class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
+								<span class="truncate">{formatRecurrenceText(event.recurrence)}</span>
+							</div>
+						{/if}
+
 						{#if event.instances && event.instances.length > 0}
 							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 								<button
@@ -529,7 +540,13 @@
 						{m.updated_on({
 							date: new Date(
 								event.updatedAt,
-							).toLocaleDateString(),
+							).toLocaleString([], {
+								year: "numeric",
+								month: "2-digit",
+								day: "2-digit",
+								hour: "2-digit",
+								minute: "2-digit",
+							}),
 						})}
 						{#if event.user}
 							| <a
@@ -566,39 +583,76 @@
 			{#if res && res.total > limit}
 				{@const totalPages = Math.ceil(res.total / limit)}
 				<div
-					class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
+					class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
 				>
-					<div class="text-sm text-gray-500 dark:text-gray-400">
-						Showing {(page - 1) * limit + 1} to {Math.min(
-							page * limit,
-							res.total,
-						)} of {res.total}
+					<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, res.total)} of {res.total}</span>
+						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+							<select
+								bind:value={limit}
+								onchange={() => (page = 1)}
+								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
+							>
+								<option value={10}>10 per page</option>
+								<option value={20}>20 per page</option>
+								<option value={50}>50 per page</option>
+								<option value={100}>100 per page</option>
+							</select>
+						</div>
 					</div>
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-1 sm:gap-2">
+						<Button
+							variant="outline"
+							size="icon"
+							disabled={page === 1}
+							onclick={() => page = 1}
+							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+							title="First page"
+						>
+							<ChevronsLeft size={16} />
+						</Button>
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={page === 1}
 							onclick={() => page > 1 && page--}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700"
+							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 						>
-							<ArrowLeft size={16} class="mr-1.5" />
+							<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
 							Previous
 						</Button>
 						<div
-							class="flex items-center gap-1 px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
+							class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
 						>
-							{page} / {totalPages}
+							<select
+								bind:value={page}
+								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
+							>
+								{#each Array(totalPages) as _, i}
+									<option value={i + 1}>{i + 1}</option>
+								{/each}
+							</select>
+							<span class="text-gray-400">/ {totalPages}</span>
 						</div>
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={page === totalPages}
 							onclick={() => page < totalPages && page++}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700"
+							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 						>
 							Next
-							<ArrowRight size={16} class="ml-1.5" />
+							<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+						</Button>
+						<Button
+							variant="outline"
+							size="icon"
+							disabled={page === totalPages}
+							onclick={() => page = totalPages}
+							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+							title="Last page"
+						>
+							<ChevronsRight size={16} />
 						</Button>
 					</div>
 				</div>

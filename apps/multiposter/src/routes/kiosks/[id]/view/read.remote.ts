@@ -13,19 +13,49 @@ export const readKioskView = query(v.string(), async (kioskId) => {
 
     if (!kioskData) return null;
 
-    const locations = await db
-        .select({
-            id: location.id,
-            name: location.name,
-            street: location.street,
-            houseNumber: location.houseNumber,
-            zip: location.zip,
-            city: location.city,
-            country: location.country
-        })
-        .from(kioskLocation)
-        .innerJoin(location, eq(kioskLocation.locationId, location.id))
-        .where(eq(kioskLocation.kioskId, kioskId));
+    const kioskLocationsData = await db.query.kioskLocation.findMany({
+        where: eq(kioskLocation.kioskId, kioskId),
+        with: {
+            location: {
+                with: {
+                    locationContacts: {
+                        with: {
+                            contact: {
+                                with: {
+                                    emails: true,
+                                    phones: true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    const locations = kioskLocationsData.map(kl => {
+        const loc = kl.location;
+        const mainContact = loc.locationContacts?.[0]?.contact;
+        let publicQrCodePath = mainContact?.qrCodePath;
+        if (mainContact && (!publicQrCodePath || !publicQrCodePath.includes('/api/'))) {
+            publicQrCodePath = `/api/contacts/${mainContact.id}/qr.png`;
+        }
+        return {
+            id: loc.id,
+            name: loc.name,
+            street: loc.street,
+            houseNumber: loc.houseNumber,
+            zip: loc.zip,
+            city: loc.city,
+            country: loc.country,
+            contact: mainContact ? {
+                name: mainContact.displayName || `${mainContact.givenName || ''} ${mainContact.familyName || ''}`.trim(),
+                email: mainContact.emails?.find((e: any) => e.type === 'work')?.value || mainContact.emails?.[0]?.value,
+                phone: mainContact.phones?.find((p: any) => p.type === 'work')?.value || mainContact.phones?.[0]?.value,
+                qrCodePath: publicQrCodePath
+            } : null
+        };
+    });
 
     const kioskWithLocations = {
         ...kioskData,

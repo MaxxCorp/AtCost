@@ -37,6 +37,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	iCalPath?: string | null;
 	isSeries?: boolean;
 	instanceCount?: number;
+	instances?: Event[];
 };
 
 export type PublicEvent = Omit<Event, 'resolvedContact'> & {

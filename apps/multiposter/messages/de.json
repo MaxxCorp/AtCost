@@ -569,5 +569,10 @@
 	"no_syncs_configured": "Keine Synchronisationen konfiguriert.",
 	"edit_event": "Veranstaltung bearbeiten",
 	"delete_successful": "Erfolgreich gelöscht",
-	"untitled_event": "Unbenannte Veranstaltung"
+	"untitled_event": "Unbenannte Veranstaltung",
+	"part_of_series": "Dieses Ereignis ist Teil einer Serie",
+	"view_series": "Serie anzeigen",
+	"for": "für",
+	"series": "Serie",
+	"instances": "Termine"
 }

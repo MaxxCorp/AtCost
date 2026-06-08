@@ -569,5 +569,10 @@
 	"no_syncs_configured": "No synchronizations configured.",
 	"edit_event": "Edit Event",
 	"delete_successful": "Delete successful",
-	"untitled_event": "Untitled Event"
+	"untitled_event": "Untitled Event",
+	"part_of_series": "This event is part of a series",
+	"view_series": "View Series",
+	"for": "for",
+	"series": "Series",
+	"instances": "Instances"
 }

@@ -147,6 +147,31 @@
                 }),
             );
 
+            // Enrich kiosk locations with QR code data URLs
+            if (kiosk?.locations) {
+                kiosk.locations = await Promise.all(
+                    kiosk.locations.map(async (loc: any) => {
+                        if (loc.contact?.qrCodePath && !loc.contact?.qrCodeDataUrl) {
+                            try {
+                                const res = await fetch(loc.contact.qrCodePath);
+                                if (res.ok) {
+                                    const blob = await res.blob();
+                                    const qrData = await new Promise<string>((resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => resolve(reader.result as string);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                    loc.contact.qrCodeDataUrl = qrData;
+                                }
+                            } catch (e) {
+                                console.error("Failed to cache QR code for location contact", loc.id, e);
+                            }
+                        }
+                        return loc;
+                    })
+                );
+            }
+
             items = enrichedItems;
 
             if (items.length > 1) {

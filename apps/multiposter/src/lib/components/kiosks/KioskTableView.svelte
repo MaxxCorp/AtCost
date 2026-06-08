@@ -19,6 +19,7 @@
             email?: string;
             phone?: string;
             qrCodePath?: string;
+            qrCodeDataUrl?: string;
         } | null;
     }
 
@@ -110,6 +111,12 @@
                 </div>
                 
                 <div class="flex gap-8 text-xl text-gray-400 font-medium pl-6">
+                    {#if currentPageData.location.contact?.qrCodePath || currentPageData.location.contact?.qrCodeDataUrl}
+                        <div class="bg-white p-1 rounded-lg shadow-lg shrink-0 mt-0.5 self-start">
+                            <img src={currentPageData.location.contact.qrCodeDataUrl || currentPageData.location.contact.qrCodePath} alt="Location QR" class="w-16 h-16" />
+                        </div>
+                    {/if}
+
                     {#if currentPageData.location.street}
                         <div class="leading-snug">
                             {currentPageData.location.street} {currentPageData.location.houseNumber || ''}<br/>
@@ -121,11 +128,6 @@
                         <div class="border-l border-gray-800 pl-8 space-y-1">
                             <span class="text-blue-400 uppercase text-xs font-bold tracking-widest block mb-1">Contact</span>
                             <div class="flex items-start gap-4">
-                                {#if currentPageData.location.contact.qrCodePath}
-                                    <div class="bg-white p-1 rounded-lg shadow-lg shrink-0 mt-0.5">
-                                        <img src={currentPageData.location.contact.qrCodePath} alt="Contact QR" class="w-12 h-12" />
-                                    </div>
-                                {/if}
                                 <div class="space-y-0.5">
                                     <div class="text-white text-2xl font-bold leading-tight">{currentPageData.location.contact.name}</div>
                                     <div class="flex flex-wrap gap-x-6 text-gray-500 text-lg font-medium">

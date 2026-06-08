@@ -27,8 +27,10 @@
         ChevronDown,
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
+    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
 
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+    import * as Dialog from "$lib/components/ui/dialog";
 
     const eventId = page.params.id || "";
     let dataPromise = $state(readEvent(eventId));
@@ -133,8 +135,8 @@
     }
 </script>
 
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-4xl mx-auto">
+<div class="container mx-auto px-4 py-4 md:py-6">
+    <div class="max-w-7xl mx-auto">
         {#await dataPromise}
             <LoadingSection message={m.loading_event_data()} />
         {:then event}
@@ -142,11 +144,11 @@
                 <Breadcrumb feature="events" current={event.summary} />
 
                 <div
-                    class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100 space-y-8"
+                    class="bg-white shadow-xl rounded-2xl p-5 md:p-6 mt-4 border border-gray-100 space-y-6"
                 >
                     <!-- Header with Title and QR -->
                     <div
-                        class="flex flex-col md:flex-row justify-between items-start gap-6"
+                        class="flex flex-col md:flex-row justify-between items-start gap-4"
                     >
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2 flex-wrap">
@@ -198,9 +200,98 @@
                         {/if}
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                        <!-- Contact Column -->
+                        <div class="space-y-4 md:space-y-6">
+                            {#if event.resolvedContact}
+                                <section>
+                                    <h3
+                                        class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
+                                    >
+                                        <Users size={16} /> {m.contact()}
+                                    </h3>
+                                    <div
+                                        class="bg-gray-50 p-4 rounded-lg relative border border-gray-100"
+                                    >
+                                        <p
+                                            class="font-bold text-gray-900 truncate"
+                                        >
+                                            {event.resolvedContact.name}
+                                        </p>
+                                        <div class="flex gap-4 items-start">
+                                            {#if event.resolvedContact.qrCodeDataUrl}
+                                                <div
+                                                    class="bg-white p-1 rounded border shadow-sm flex-shrink-0"
+                                                >
+                                                    <img
+                                                        src={event
+                                                            .resolvedContact
+                                                            .qrCodeDataUrl}
+                                                        alt={m.contact_qr()}
+                                                        class="w-32 h-32 object-contain"
+                                                    />
+                                                </div>
+                                            {/if}
+                                            <div
+                                                class="flex flex-col gap-1 text-sm min-w-0 flex-1"
+                                            >
+                                                {#if event.resolvedContact.phone}
+                                                    <a
+                                                        href="tel:{event
+                                                            .resolvedContact
+                                                            .phone}"
+                                                        class="flex items-center gap-2 text-blue-600 hover:underline break-all text-pretty"
+                                                    >
+                                                        <Phone size={14} />
+                                                        {event.resolvedContact
+                                                            .phone}
+                                                    </a>
+                                                {/if}
+                                                {#if event.resolvedContact.email}
+                                                    <a
+                                                        href="mailto:{event
+                                                            .resolvedContact
+                                                            .email}"
+                                                        class="flex items-center gap-2 text-blue-600 hover:underline break-all text-pretty"
+                                                    >
+                                                        <Mail size={14} />
+                                                        {event.resolvedContact
+                                                            .email}
+                                                    </a>
+                                                {/if}
+                                            </div>
+                                        </div>
+                                        <a
+                                            href={`data:text/vcard;charset=utf-8,${encodeURIComponent(`BEGIN:VCARD\nVERSION:3.0\nFN:${event.resolvedContact.name}\nEMAIL:${event.resolvedContact.email}\nTEL:${event.resolvedContact.phone}\nEND:VCARD`)}`}
+                                            download={`${event.resolvedContact.name.replace(/[^a-z0-9]/gi, "_")}.vcf`}
+                                            class="inline-flex items-center gap-1 mt-2 text-xs font-medium text-gray-600 hover:text-gray-900 border px-2 py-1 rounded bg-white hover:bg-gray-50 w-max transition-colors"
+                                        >
+                                            <Download size={12} /> {m.save_contact()}
+                                        </a>
+                                    </div>
+                                </section>
+                            {/if}
+                        </div>
+                        <!-- Description Column -->
+                        <div class="space-y-4 md:space-y-6">
+                            {#if event.description}
+                                <section>
+                                    <h3
+                                        class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
+                                    >
+                                        <Info size={16} /> {m.about_this_event()}
+                                    </h3>
+                                    <div
+                                        class="prose max-w-none text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-100"
+                                    >
+                                        {@html event.description}
+                                    </div>
+                                </section>
+                            {/if}
+                        </div>
+
                         <!-- Event Details Column -->
-                        <div class="space-y-6">
+                        <div class="space-y-4 md:space-y-6">
                             <section>
                                 <h3
                                     class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
@@ -244,6 +335,46 @@
                                                         event.endDateTime,
                                                     )}
                                                 </span>
+                                            {/if}
+
+                                            {#if event.recurringEventId || (event.seriesId && !event.recurringEventId && event.recurrence && (event.recurrence as string[]).length > 0)}
+                                                <div class="mt-1">
+                                                    {#if !event.recurringEventId && event.instances && event.instances.length > 0}
+                                                        <Dialog.Root>
+                                                            <Dialog.Trigger class="text-sm text-blue-600 hover:underline flex items-center gap-1 text-left">
+                                                                <RefreshCw size={14} class="flex-shrink-0" />
+                                                                {formatRecurrenceText((event.recurrence as string[])[0])}
+                                                            </Dialog.Trigger>
+                                                            <Dialog.Content class="sm:max-w-[425px]">
+                                                                <Dialog.Header>
+                                                                    <Dialog.Title>{m.instances()}</Dialog.Title>
+                                                                    <Dialog.Description>
+                                                                        {formatRecurrenceText((event.recurrence as string[])[0])}
+                                                                    </Dialog.Description>
+                                                                </Dialog.Header>
+                                                                <div class="max-h-[60vh] overflow-y-auto pr-2 mt-4 space-y-2">
+                                                                    {#each event.instances as instance}
+                                                                        <a href={`/events/${instance.id}/view`} class="block p-3 rounded-lg border hover:bg-gray-50 transition-colors">
+                                                                            <div class="font-medium text-gray-900">{instance.summary}</div>
+                                                                            <div class="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                                                                                <Calendar size={14} />
+                                                                                {formatDate(instance.startDateTime)} 
+                                                                                {#if instance.startDateTime}
+                                                                                    {formatTime(instance.startDateTime)}
+                                                                                {/if}
+                                                                            </div>
+                                                                        </a>
+                                                                    {/each}
+                                                                </div>
+                                                            </Dialog.Content>
+                                                        </Dialog.Root>
+                                                    {:else if event.recurringEventId && event.recurrence && (event.recurrence as string[]).length > 0}
+                                                        <a href={`/events/${event.recurringEventId}/view`} class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                                                            <RefreshCw size={14} class="flex-shrink-0" />
+                                                            {formatRecurrenceText((event.recurrence as string[])[0])}
+                                                        </a>
+                                                    {/if}
+                                                </div>
                                             {/if}
                                         </div>
                                     </li>
@@ -307,97 +438,12 @@
                                 </ul>
                             </section>
 
-                            {#if event.resolvedContact}
-                                <section>
-                                    <h3
-                                        class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
-                                    >
-                                        <Users size={16} /> {m.contact()}
-                                    </h3>
-                                    <div
-                                        class="bg-gray-50 p-4 rounded-lg relative border border-gray-100"
-                                    >
-                                        <p
-                                            class="font-bold text-gray-900 truncate"
-                                        >
-                                            {event.resolvedContact.name}
-                                        </p>
-                                        <div class="flex gap-4 items-start">
-                                            {#if event.resolvedContact.qrCodeDataUrl}
-                                                <div
-                                                    class="bg-white p-1 rounded border shadow-sm flex-shrink-0"
-                                                >
-                                                    <img
-                                                        src={event
-                                                            .resolvedContact
-                                                            .qrCodeDataUrl}
-                                                        alt={m.contact_qr()}
-                                                        class="w-16 h-16"
-                                                    />
-                                                </div>
-                                            {/if}
-                                            <div
-                                                class="flex flex-col gap-1 text-sm min-w-0 flex-1"
-                                            >
-                                                {#if event.resolvedContact.phone}
-                                                    <a
-                                                        href="tel:{event
-                                                            .resolvedContact
-                                                            .phone}"
-                                                        class="flex items-center gap-2 text-blue-600 hover:underline break-all text-pretty"
-                                                    >
-                                                        <Phone size={14} />
-                                                        {event.resolvedContact
-                                                            .phone}
-                                                    </a>
-                                                {/if}
-                                                {#if event.resolvedContact.email}
-                                                    <a
-                                                        href="mailto:{event
-                                                            .resolvedContact
-                                                            .email}"
-                                                        class="flex items-center gap-2 text-blue-600 hover:underline break-all text-pretty"
-                                                    >
-                                                        <Mail size={14} />
-                                                        {event.resolvedContact
-                                                            .email}
-                                                    </a>
-                                                {/if}
-                                            </div>
-                                        </div>
-                                        <a
-                                            href={`data:text/vcard;charset=utf-8,${encodeURIComponent(`BEGIN:VCARD\nVERSION:3.0\nFN:${event.resolvedContact.name}\nEMAIL:${event.resolvedContact.email}\nTEL:${event.resolvedContact.phone}\nEND:VCARD`)}`}
-                                            download={`${event.resolvedContact.name.replace(/[^a-z0-9]/gi, "_")}.vcf`}
-                                            class="inline-flex items-center gap-1 mt-2 text-xs font-medium text-gray-600 hover:text-gray-900 border px-2 py-1 rounded bg-white hover:bg-gray-50 w-max transition-colors"
-                                        >
-                                            <Download size={12} /> {m.save_contact()}
-                                        </a>
-                                    </div>
-                                </section>
-                            {/if}
                         </div>
 
-                        <!-- Description Column -->
-                        <div class="space-y-6">
-                            {#if event.description}
-                                <section>
-                                    <h3
-                                        class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"
-                                    >
-                                        <Info size={16} /> {m.about_this_event()}
-                                    </h3>
-                                    <div
-                                        class="prose max-w-none text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-100"
-                                    >
-                                        {@html event.description}
-                                    </div>
-                                </section>
-                            {/if}
-                        </div>
                     </div>
 
                     <!-- Actions -->
-                    <div class="flex flex-wrap gap-4 pt-8 border-t">
+                    <div class="flex flex-wrap gap-4 pt-5 md:pt-6 border-t mt-6">
                         {#if event.iCalPath}
                             <Button
                                 href={event.iCalPath}

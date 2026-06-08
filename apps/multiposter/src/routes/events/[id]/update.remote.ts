@@ -28,6 +28,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		// Prepare update object
 		const updateData: any = {
 			updatedAt: new Date(),
+			userId: user.id,
 		};
 
 		if (data.summary !== undefined) updateData.summary = data.summary;

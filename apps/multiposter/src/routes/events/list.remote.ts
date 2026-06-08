@@ -84,14 +84,15 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	const total = Number(countResult[0]?.count || 0);
 
 	// Sorting
-	const orderClause = sortOrder === 'desc' ? desc : asc;
 	let orderField: any = event.updatedAt;
 	if (sortField === 'startDateTime') orderField = event.startDateTime;
 	else if (sortField === 'createdAt') orderField = event.createdAt;
 
+	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
 	// Pagination
 	const paginatedIdsResult = await baseQuery
-		.orderBy(orderClause(orderField))
+		.orderBy(orderExpression)
 		.limit(limit)
 		.offset(offset);
 
@@ -120,7 +121,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			campaign: true,
 			user: true
 		},
-		orderBy: [orderClause(orderField)]
+		orderBy: [orderExpression]
 	});
 
 	return { data: rawResults, total };
