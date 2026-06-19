@@ -130,8 +130,8 @@ export const updateResource = form(updateResourceSchema, async (data) => {
         };
 
         readResource(data.id).set(updatedResource);
-        void listResources().refresh();
-        void listResourcesWithHierarchy().refresh();
+        await 
+        await 
 
         console.log('--- updateResource SUCCESS ---');
         return { success: true, resource: updated };

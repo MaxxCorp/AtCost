@@ -29,6 +29,11 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
         qrCodeDataUrl?: string;
         qrCodePath?: string;
     } | null;
+    user?: {
+		id: string;
+		name: string | null;
+		email: string;
+	};
 };
 
 import { FilterableIdSchema } from './pagination.js';
@@ -38,4 +43,6 @@ export const announcementPaginationSchema = v.optional(v.object({
 	limit: v.optional(v.number(), 50),
 	search: v.optional(v.string()),
 	locationId: FilterableIdSchema,
+    sortField: v.optional(v.string()),
+    sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});

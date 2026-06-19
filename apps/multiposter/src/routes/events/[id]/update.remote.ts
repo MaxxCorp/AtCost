@@ -466,7 +466,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				void readEvent(data.id).refresh();
 			}
 
-		void listEvents().refresh();
+		await listEvents().refresh();
 		console.log('--- updateEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {

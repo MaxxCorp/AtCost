@@ -29,8 +29,8 @@
     } from "../../locations/associate.remote";
 
 
-    const contactId = page.params.id || "";
-    let itemsPromise = $state(readContact(contactId));
+    const contactId = $derived(page.params.id || "");
+    const query = $derived(readContact(contactId));
 
     function handleSuccess(result: any) {
         // Redirect to list page on success
@@ -40,14 +40,15 @@
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-3xl mx-auto">
-        {#await itemsPromise}
+        {#if query.loading && !query.current}
             <Breadcrumb feature="contacts" />
             <div
                 class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
             >
                 <LoadingSection message="Loading contact profile..." />
             </div>
-        {:then contact}
+        {:else if query.current}
+            {@const contact = query.current}
             {#if !contact}
                 <Breadcrumb feature="contacts" />
                 <div
@@ -88,6 +89,7 @@
                             {m.delete()}
                         </AsyncButton>
                     </div>
+                    {#key contactId}
                     <ContactForm
                         remoteFunction={updateContact}
                         schema={updateContactSchema}
@@ -114,7 +116,7 @@
                                 <EntityManager
                                     title={m.feature_locations_title()}
                                     icon={MapPin}
-                                    mode="embedded"
+
                                     type="contact"
                                     entityId={contactId}
                                     initialItems={(
@@ -236,9 +238,11 @@
                             </div>
                         {/snippet}
                     </ContactForm>
+                    {/key}
                 </div>
             {/if}
-        {:catch error}
+        {:else if query.error}
+            {@const error = query.error}
             <Breadcrumb feature="contacts" />
             <div
                 class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
@@ -250,6 +254,6 @@
                     button="Back to Contacts"
                 />
             </div>
-        {/await}
+        {/if}
     </div>
 </div>

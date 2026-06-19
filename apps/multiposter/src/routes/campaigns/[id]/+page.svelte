@@ -7,25 +7,30 @@
 	import CampaignForm from "$lib/components/campaigns/CampaignForm.svelte";
 	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
 	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-	const campaignPromise = $state(readCampaign(page.params.id ?? ""));
+	const campaignId = $derived(page.params.id || "");
+	const query = $derived(readCampaign(campaignId));
 </script>
 
-{#await campaignPromise}
+{#if query.loading && !query.current}
 	<LoadingSection message={m.loading_item({ item: m.feature_campaigns_title() })} />
-{:then campaign}
+{:else if query.current}
+	{@const campaign = query.current}
 	{#if campaign}
+		{#key campaignId}
 		<CampaignForm
 			remoteFunction={updateCampaign}
 			validationSchema={updateCampaignSchema}
 			isUpdating={true}
 			initialData={campaign}
 		/>
+		{/key}
 	{:else}
 		<ErrorSection
 			headline={m.not_found({ item: m.feature_campaigns_title() })}
 			message={m.not_found_message({ item: m.feature_campaigns_title() })}
 		/>
 	{/if}
-{:catch error}
+{:else if query.error}
+	{@const error = query.error}
 	<ErrorSection headline={m.something_went_wrong()} message={error.message} />
-{/await}
+{/if}

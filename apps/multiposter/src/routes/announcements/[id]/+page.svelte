@@ -3,27 +3,22 @@
     import { updateAnnouncement } from "./update.remote";
     import { updateAnnouncementSchema } from "$lib/validations/announcements";
     import { readAnnouncement } from "./read.remote";
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
 
-    let announcement = $state<any>(null);
-    let id = $derived($page.params.id);
-
-    $effect(() => {
-        if (id) {
-            readAnnouncement(id).then((res) => {
-                announcement = res;
-            });
-        }
-    });
+    let id = $derived(page.params.id || "");
 </script>
 
-{#if announcement}
+{#await readAnnouncement(id)}
+    <div class="p-8 text-center text-gray-500">Loading...</div>
+{:then announcement}
+    {#key id}
     <AnnouncementForm
-        remoteFunction={updateAnnouncement}
+        remoteFunction={updateAnnouncement.for(id)}
         validationSchema={updateAnnouncementSchema}
         isUpdating={true}
         initialData={announcement}
     />
-{:else}
-    <div class="p-8 text-center text-gray-500">Loading...</div>
-{/if}
+    {/key}
+{:catch}
+    <div class="p-8 text-center text-red-500">Error loading announcement</div>
+{/await}

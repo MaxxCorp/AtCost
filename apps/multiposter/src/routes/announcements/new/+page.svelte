@@ -4,7 +4,9 @@
     import { createAnnouncementSchema } from "$lib/validations/announcements";
 </script>
 
+{#key "new"}
 <AnnouncementForm
     remoteFunction={createAnnouncement}
     validationSchema={createAnnouncementSchema}
 />
+{/key}

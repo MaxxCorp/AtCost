@@ -1,7 +1,7 @@
 {
 	"name": "@ac/monorepo",
 	"private": true,
-	"packageManager": "pnpm@11.5.2",
+	"packageManager": "pnpm@11.7.0",
 	"engines": {
 		"node": ">=24.0.0"
 	},
@@ -32,8 +32,8 @@
 		}
 	},
 	"dependencies": {
-		"@rolldown/binding-win32-x64-msvc": "1.1.0",
-		"@tailwindcss/oxide-win32-x64-msvc": "^4.3.0",
+		"@rolldown/binding-win32-x64-msvc": "1.1.2",
+		"@tailwindcss/oxide-win32-x64-msvc": "^4.3.1",
 		"valibot": "^1.4.1"
 	}
 }

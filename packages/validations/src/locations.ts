@@ -27,6 +27,11 @@ export const locationBaseSchema = v.object({
 export type Location = Omit<DbLocation, 'createdAt' | 'updatedAt'> & {
 	createdAt: string;
 	updatedAt: string;
+	user?: {
+		id: string;
+		name: string | null;
+		email: string;
+	};
 };
 
 export const createLocationSchema = locationBaseSchema;
@@ -43,7 +48,9 @@ export const LocationPaginationSchema = v.optional(v.object({
     associatedWith: v.optional(v.object({
         type: v.string(),
         id: v.string()
-    }))
+    })),
+    sortField: v.optional(v.union([v.literal('updatedAt'), v.literal('createdAt'), v.literal('name')])),
+	sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});
 
 

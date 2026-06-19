@@ -85,12 +85,6 @@
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
     const type = "event";
-    // svelte-ignore state_referenced_locally
-    let descriptionValue = $state(untrack(() => initialData?.description ?? ""));
-    // svelte-ignore state_referenced_locally
-    let heroImageValue = $state(untrack(() => initialData?.heroImage ?? ""));
-    // svelte-ignore state_referenced_locally
-    let recurrenceValue = $state(untrack(() => initialData?.recurrence?.[0] ?? ""));
     const BERLIN_DE_CATEGORIES = [
         "Ausstellung",
         "Berliner Bühnen",
@@ -228,8 +222,8 @@
     }
 
     let recurrenceText = $derived(
-        recurrenceValue
-            ? formatRecurrenceText(recurrenceValue)
+        rf.fields.recurrence.value()
+            ? formatRecurrenceText(rf.fields.recurrence.value() as string)
             : m.recurrence(),
     );
 
@@ -322,12 +316,13 @@
 
     <div>
         <ImageUploader
-            bind:value={heroImageValue}
+            value={rf.fields.heroImage.value() ?? initialData?.heroImage ?? ""}
+            onchange={(val) => rf.fields.heroImage.set(val)}
             label={m.hero_image()}
         />
-        {#if heroImageValue !== undefined && heroImageValue !== null}
+        {#if (rf.fields.heroImage.value() ?? initialData?.heroImage) !== undefined && (rf.fields.heroImage.value() ?? initialData?.heroImage) !== null}
             <input
-                {...rf.fields.heroImage.as("text", heroImageValue)}
+                {...rf.fields.heroImage.as("text", initialData?.heroImage ?? "")}
                 class="hidden"
             />
         {/if}
@@ -340,10 +335,13 @@
             >{m.description()}</label
         >
         <div class="prose max-w-none">
-            <RichTextEditor bind:value={descriptionValue} />
-            {#if descriptionValue !== undefined && descriptionValue !== null}
+            <RichTextEditor 
+                value={rf.fields.description.value() ?? initialData?.description ?? ""} 
+                onchange={(v) => rf.fields.description.set(v)}
+            />
+            {#if (rf.fields.description.value() ?? initialData?.description) !== undefined && (rf.fields.description.value() ?? initialData?.description) !== null}
                 <input
-                    {...rf.fields.description.as("text", descriptionValue)}
+                    {...rf.fields.description.as("text", initialData?.description ?? "")}
                     class="hidden"
                 />
             {/if}
@@ -944,11 +942,12 @@
 
 <RecurrenceDialog
     bind:open={showRecurrenceDialog}
-    bind:value={recurrenceValue}
+    value={rf.fields.recurrence.value() ?? initialData?.recurrence?.[0] ?? ""}
+    onchange={(val) => rf.fields.recurrence.set(val)}
 />
-{#if recurrenceValue !== undefined && recurrenceValue !== null}
+{#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
     <input
-        {...rf.fields.recurrence.as("text", recurrenceValue)}
+        {...rf.fields.recurrence.as("text", initialData?.recurrence?.[0] ?? "")}
         class="hidden"
     />
 {/if}

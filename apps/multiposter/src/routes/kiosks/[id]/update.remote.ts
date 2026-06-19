@@ -52,9 +52,7 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
 
         // Refresh caches - Fetch the full state to ensure absolute consistency and avoid partial state wiping
         getKiosk(id).set({ ...updated, locationIds });
-        void listKiosks().refresh();
-
-
+        await listKiosks().refresh();
         return { success: true };
     } catch (e: any) {
         console.error('Failed to update kiosk', e);

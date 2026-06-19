@@ -48,7 +48,7 @@
 	});
 
 	let prevIssuesLength = $state(0);
-	const rf = update.preflight(updateSynchronizationSchema);
+	const rf = $derived(update.for(configId).preflight(updateSynchronizationSchema));
 	$effect(() => {
 		const issues = (rf as any).allIssues?.() ?? [];
 		if (issues.length > 0 && prevIssuesLength === 0) {

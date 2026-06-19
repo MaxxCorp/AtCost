@@ -42,8 +42,19 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
+    if (total === 0) {
+        return { data: [], total: 0 };
+    }
+
+    const { sortField = 'createdAt', sortOrder = 'desc' } = input || {};
+    let orderField: any = user.createdAt;
+    if (sortField === 'name') orderField = user.name;
+    else if (sortField === 'email') orderField = user.email;
+
+    const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
     const rawResults = await baseQuery
-        .orderBy(desc(user.createdAt))
+        .orderBy(orderExpression)
         .limit(limit)
         .offset(offset);
 

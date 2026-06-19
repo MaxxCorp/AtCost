@@ -19,6 +19,9 @@
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
     import { createContactSchema, updateContactSchema } from "@ac/validations";
+
+    const locationId = $derived(page.params.id || "");
+    const query = $derived(readLocation(locationId));
 </script>
 
 {#snippet contactLabel(item: any)}
@@ -50,11 +53,12 @@
 {/snippet}
 
 <div class="container mx-auto px-4 py-8">
-    {#await readLocation(page.params.id || "")}
+    {#if query.loading && !query.current}
         <LoadingSection
             message={m.loading_item({ item: m.feature_locations_title() })}
         />
-    {:then location}
+    {:else if query.current}
+        {@const location = query.current}
         {#if location}
             <div class="max-w-2xl mx-auto">
                 <Breadcrumb feature="locations" current={location.name} />
@@ -97,6 +101,7 @@
                     <h2 class="text-xl font-semibold mb-4">
                         {m.edit_item({ item: m.feature_locations_title() })}
                     </h2>
+                    {#key locationId}
                     <LocationForm
                         remoteFunction={updateLocation}
                         validationSchema={updateLocationSchema}
@@ -148,7 +153,7 @@
                                 <EntityManager
                                     title={m.feature_contacts_title()}
                                     icon={User}
-                                    mode="embedded"
+
                                     type="location"
                                     entityId={location.id}
                                     listItemsRemote={listContacts as any}
@@ -215,6 +220,7 @@
                             </div>
                         {/snippet}
                     </LocationForm>
+                    {/key}
                 </div>
             </div>
         {:else}
@@ -227,7 +233,8 @@
                 button={m.back_to_list()}
             />
         {/if}
-    {:catch error}
+    {:else if query.error}
+        {@const error = query.error}
         <ErrorSection
             headline={m.something_went_wrong()}
             message={error instanceof Error
@@ -236,5 +243,5 @@
             href="/locations"
             button={m.back_to_list()}
         />
-    {/await}
+    {/if}
 </div>

@@ -27,6 +27,7 @@ export const createTag = form(createTagSchema, async (input) => {
         userId: user.id
     }).returning();
 
-    void listTags().refresh();
+    await listTags({ limit: 50 }).refresh();
     return { success: true, tag: newTag };
 });
+

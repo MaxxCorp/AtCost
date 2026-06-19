@@ -47,7 +47,7 @@ export const createLocation = form(createLocationSchema, async (data) => {
         }
 
         const newLocation = result[0];
-        void listLocations().refresh();
+        await listLocations().refresh();
 
         console.log('--- createLocation SUCCESS ---');
         return { success: true, location: newLocation };
@@ -57,3 +57,4 @@ export const createLocation = form(createLocationSchema, async (data) => {
         return { success: false, error: { message: err.message || 'Creation failed' } };
     }
 });
+

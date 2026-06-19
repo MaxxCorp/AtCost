@@ -22,8 +22,7 @@ export const deleteUser = command(v.array(v.string()), async (userIds: string[])
 
     const result = await db.delete(user).where(inArray(user.id, userIds)).returning();
 
-    void listUsers().refresh();
-
+    await listUsers().refresh();
     return result;
 });
 

@@ -65,8 +65,7 @@
 
     const type = "announcement";
 
-    // svelte-ignore state_referenced_locally
-    let contentValue = $state(untrack(() => initialData?.content ?? ""));
+
     // svelte-ignore state_referenced_locally
     let tagsString = $state(
         untrack(() => isUpdating && initialData?.tags
@@ -202,10 +201,13 @@
                     {m.content()} <span class="text-red-500">*</span>
                 </label>
                 <div class="prose max-w-none">
-                    <RichTextEditor bind:value={contentValue} />
-                    {#if contentValue}
+                    <RichTextEditor 
+                        value={rf.fields.content.value() ?? initialData?.content ?? ""}
+                        onchange={(v) => rf.fields.content.set(v)}
+                    />
+                    {#if (rf.fields.content.value() ?? initialData?.content) !== undefined && (rf.fields.content.value() ?? initialData?.content) !== null}
                         <input
-                            {...rf.fields.content.as("text", contentValue)}
+                            {...rf.fields.content.as("text", initialData?.content ?? "")}
                             class="hidden"
                         />
                     {/if}

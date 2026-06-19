@@ -39,17 +39,18 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
-    const orderClause = sortOrder === 'desc' ? desc : asc;
     let orderField: any = kiosk.updatedAt;
     if (sortField === 'createdAt') orderField = kiosk.createdAt;
     else if (sortField === 'name') orderField = kiosk.name;
 
+    const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
     const paginatedIdsResult = await baseQuery
-        .orderBy(orderClause(orderField))
+        .orderBy(orderExpression)
         .limit(limit)
         .offset(offset);
 
-    const ids = paginatedIdsResult.map(r => r.id);
+    const ids = paginatedIdsResult.map((r: any) => r.id);
 
     if (ids.length === 0) {
         return { data: [], total };
@@ -57,8 +58,9 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
 
     const rawResults = await db.query.kiosk.findMany({
         where: inArray(kiosk.id, ids),
-        orderBy: [orderClause(orderField)],
+        orderBy: [orderExpression],
         with: {
+            user: true,
             locations: {
                 with: {
                     location: {

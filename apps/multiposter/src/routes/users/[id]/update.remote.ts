@@ -54,8 +54,7 @@ export const updateUser = form(updateUserSchema, async (data) => {
 
         // Refresh lists/reads
         readUser(data.id).set(updated);
-        void listUsers().refresh();
-
+        await listUsers().refresh();
         console.log('--- updateUser SUCCESS ---');
         return { success: true, user: updated };
     } catch (err: any) {

@@ -57,23 +57,34 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
 	const total = Number(countResult[0]?.count || 0);
 
+    if (total === 0) {
+        return { data: [], total: 0 };
+    }
+
+    const { sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
+    let orderField: any = contact.updatedAt;
+    if (sortField === 'displayName') orderField = contact.displayName;
+    else if (sortField === 'createdAt') orderField = contact.createdAt;
+
+    const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
 	const paginatedIdsResult = await baseQuery
-		.orderBy(desc(contact.createdAt))
+		.orderBy(orderExpression)
 		.limit(limit)
 		.offset(offset);
         
-	const ids = paginatedIdsResult.map(r => r.id);
+	const ids = paginatedIdsResult.map((r: any) => r.id);
 
 	if (ids.length === 0) {
 		console.log("[listContacts] No IDs found for query");
 		return { data: [], total };
 	}
 
-	const rawResults = await db
-		.select()
-		.from(contact)
-		.where(inArray(contact.id, ids))
-		.orderBy(desc(contact.createdAt));
+    const rawResults = await db.query.contact.findMany({
+        where: inArray(contact.id, ids),
+        with: { user: true },
+        orderBy: [orderExpression]
+    });
 
 	const data = rawResults.map((row) => ({
 		...row,

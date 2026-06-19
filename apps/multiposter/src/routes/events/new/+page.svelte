@@ -22,6 +22,7 @@
         </h1>
     </div>
 
+    {#key "new"}
     <form
         {...createEvent.preflight(createEventSchema).enhance(async ({ submit }: any) => {
                 try {
@@ -59,4 +60,5 @@
             </Button>
         </div>
     </form>
+    {/key}
 </div>

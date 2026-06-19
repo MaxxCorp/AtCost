@@ -50,7 +50,7 @@
                                     type="location"
                                     entityId={""}
                                     initialItems={[]}
-                                    mode="embedded"
+                                    
                             onchange={onLocationsChange}
                             listItemsRemote={listLocations}
                             addAssociationRemote={async (p: any) => {

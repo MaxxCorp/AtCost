@@ -211,7 +211,7 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
             readAnnouncement(announcementId).set(transformed);
         }
 
-        void listAnnouncements().refresh();
+        await 
 
         // Trigger background sync to external providers
         await syncService.triggerPushSync(user.id, announcementId, 'announcement');

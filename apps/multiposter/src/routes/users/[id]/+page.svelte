@@ -33,16 +33,21 @@
         }
     ];
 
-    let dataPromise = $derived(Promise.all([readUser(userId), authClient.getSession()]));
+    const userQuery = $derived(readUser(userId));
+    let sessionPromise = $state(authClient.getSession());
 </script>
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
         {#key userId}
             {#if browser}
-                {#await dataPromise}
+                {#await sessionPromise}
                     <LoadingSection message={m.loading_user()} />
-                {:then [user, session]}
+                {:then session}
+                {#if userQuery.loading && !userQuery.current}
+                    <LoadingSection message={m.loading_user()} />
+                {:else if userQuery.current}
+                    {@const user = userQuery.current}
                 {#if user}
                     <Breadcrumb feature="users" current={user.name} />
                     <div class="bg-white shadow rounded-lg p-6 space-y-4">
@@ -91,7 +96,7 @@
                             <EntityManager
                                 title={m.feature_contacts_title()}
                                 icon={UserIcon}
-                                mode="embedded"
+
                                 type="user"
                                 entityId={data.id}
                                 listItemsRemote={listContacts as any}
@@ -165,6 +170,17 @@
                 <ErrorSection
                     headline={m.user_not_found()}
                     message={m.user_not_found_message()}
+                    href="/users"
+                    button={m.back_to_users()}
+                />
+            {/if}
+            {:else if userQuery.error}
+                {@const error = userQuery.error}
+                <ErrorSection
+                    headline="Error"
+                    message={error instanceof Error
+                        ? error.message
+                        : m.failed_to_load_user()}
                     href="/users"
                     button={m.back_to_users()}
                 />

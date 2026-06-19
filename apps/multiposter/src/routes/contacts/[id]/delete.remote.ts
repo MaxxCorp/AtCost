@@ -35,6 +35,6 @@ export const deleteContact = command(deleteContactsSchema, async (ids) => {
         }
     }
 
-    void listContacts().refresh();
+    await listContacts().refresh();
     return { count: result.length, ids: deletedIds };
 });

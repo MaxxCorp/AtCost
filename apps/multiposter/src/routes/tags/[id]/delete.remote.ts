@@ -13,6 +13,6 @@ export const deleteTag = command(deleteTagSchema, async (ids) => {
     await db.delete(tag)
         .where(inArray(tag.id, ids));
 
-    void listTags().refresh();
+    await listTags({ limit: 50 }).refresh();
     return { success: true };
 });

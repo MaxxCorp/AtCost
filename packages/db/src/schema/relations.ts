@@ -27,7 +27,8 @@ export const userRelations = relations(user, ({ many }) => ({
     userTalents: many(userTalent),
 }));
 
-export const contactRelations = relations(contact, ({ many }) => ({
+export const contactRelations = relations(contact, ({ many, one }) => ({
+    user: one(user, { fields: [contact.userId], references: [user.id] }),
     emails: many(contactEmail),
     phones: many(contactPhone),
     addresses: many(contactAddress),
@@ -59,7 +60,8 @@ export const contactRelationRelations = relations(contactRelation, ({ one }) => 
     targetContact: one(contact, { fields: [contactRelation.targetContactId], references: [contact.id], relationName: 'toRelations' }),
 }));
 
-export const tagRelations = relations(tag, ({ many }) => ({
+export const tagRelations = relations(tag, ({ many, one }) => ({
+    user: one(user, { fields: [tag.userId], references: [user.id] }),
     contactAssociations: many(contactTag),
     announcementAssociations: many(announcementTag),
     eventAssociations: many(eventTag),

@@ -51,7 +51,7 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 		}
 
 		viewSynchronization(id).set(updated);
-		void listSynchronizations().refresh();
+		await 
 
 		console.log('--- updateSynchronization SUCCESS ---');
 		return { success: true, synchronization: updated };

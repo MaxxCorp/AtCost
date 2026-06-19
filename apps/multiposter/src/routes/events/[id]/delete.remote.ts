@@ -27,6 +27,6 @@ export const deleteEvents = command(
 		// We assume all were deleted for notification purposes, or we could fetch existing before delete
 		await publishEventChange('delete', ids);
 
-		void listEvents().refresh();
+		await listEvents().refresh();
 		return { success: true };
 	});

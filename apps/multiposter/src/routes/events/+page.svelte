@@ -115,8 +115,7 @@
 	const tagsQuery = listTags({ limit: 100 });
 	const locationsQuery = listLocations({ limit: 100 });
 
-	const tags = $derived(tagsQuery.current || []);
-	const locations = $derived(locationsQuery.current?.data || []);
+	const activeFiltersCount = $derived(selectedTags.length + selectedLocations.length);
 
 	function toggleSeries(id: string) {
 		expandedSeries[id] = !expandedSeries[id];
@@ -211,9 +210,6 @@
 				/>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
-				{#if tags.length > 0 || locations.length > 0}
-					{@const activeFiltersCount =
-						selectedTags.length + selectedLocations.length}
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
 							<Button
@@ -241,7 +237,8 @@
 							>
 							<DropdownMenu.Separator class="bg-gray-50" />
 
-							{#if tags.length > 0}
+							{#await tagsQuery then tagsRes}
+							{#if tagsRes.data && tagsRes.data.length > 0}
 								<DropdownMenu.Sub>
 									<DropdownMenu.SubTrigger
 										class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
@@ -257,7 +254,7 @@
 									<DropdownMenu.SubContent
 										class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
 									>
-										{#each tags as tag}
+										{#each tagsRes.data as tag}
 											<DropdownMenu.CheckboxItem
 												checked={selectedTags.includes(
 													tag.id,
@@ -275,8 +272,10 @@
 									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
 							{/if}
+							{/await}
 
-							{#if locations.length > 0}
+							{#await locationsQuery then locationsRes}
+							{#if locationsRes.data && locationsRes.data.length > 0}
 								<DropdownMenu.Sub>
 									<DropdownMenu.SubTrigger
 										class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
@@ -292,7 +291,7 @@
 									<DropdownMenu.SubContent
 										class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
 									>
-										{#each locations as location}
+										{#each locationsRes.data as location}
 											<DropdownMenu.CheckboxItem
 												checked={selectedLocations.includes(
 													location.id,
@@ -310,6 +309,7 @@
 									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
 							{/if}
+							{/await}
 
 							{#if activeFiltersCount > 0}
 								<DropdownMenu.Separator class="bg-gray-50" />
@@ -327,7 +327,6 @@
 							{/if}
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
-				{/if}
 
 				<div
 					class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1"

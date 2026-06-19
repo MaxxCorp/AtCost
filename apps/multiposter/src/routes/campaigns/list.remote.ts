@@ -20,10 +20,10 @@ export const listCampaigns = query(PaginationSchema, async (input): Promise<Pagi
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'campaigns');
 
-	const { page = 1, limit = 50, search = '' } = input || {};
+	const { page = 1, limit = 50, search = '', sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
 	const offset = (page - 1) * limit;
 
-	let baseQuery = db.select().from(campaign).$dynamic();
+	let baseQuery = db.select({ id: campaign.id }).from(campaign).$dynamic();
 	
 	const conditions = [];
 	if (search) {
@@ -40,10 +40,29 @@ export const listCampaigns = query(PaginationSchema, async (input): Promise<Pagi
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
 	const total = Number(countResult[0]?.count || 0);
 
-	const rawResults = await baseQuery
-		.orderBy(desc(campaign.createdAt))
-		.limit(limit)
-		.offset(offset);
+    if (total === 0) {
+        return { data: [], total: 0 };
+    }
+
+    let orderField: any = campaign.updatedAt;
+	if (sortField === 'name') orderField = campaign.name;
+	else if (sortField === 'createdAt') orderField = campaign.createdAt;
+
+	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
+	const paginatedIdsQuery = baseQuery.orderBy(orderExpression).limit(limit).offset(offset);
+    const ids = (await paginatedIdsQuery).map((r: any) => r.id);
+
+    if (ids.length === 0) {
+        return { data: [], total };
+    }
+
+	const { inArray } = await import('@ac/db');
+    const rawResults = await db.query.campaign.findMany({
+        where: inArray(campaign.id, ids),
+        with: { user: true },
+        orderBy: [orderExpression]
+    });
 
 	const data = rawResults.map((row) => ({
 		...row,

@@ -6,4 +6,9 @@ import type { Campaign as DbCampaign } from '@ac/db';
 export type Campaign = Omit<DbCampaign, 'createdAt' | 'updatedAt'> & {
 	createdAt: string;
 	updatedAt: string;
+	user?: {
+		id: string;
+		name: string | null;
+		email: string;
+	};
 };

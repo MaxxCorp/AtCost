@@ -11,24 +11,26 @@
     import { updateResource } from "./update.remote";
     import { updateResourceSchema } from "$lib/validations/resources";
 
-    const resourceId = page.params.id || "";
+    const resourceId = $derived(page.params.id || "");
 
-    const dataPromise = Promise.all([
-        readResource(resourceId),
-        listLocations(),
-        listResources(),
-    ]);
+    const query1 = $derived(readResource(resourceId));
+    const query2 = $derived(listLocations());
+    const query3 = $derived(listResources());
 </script>
 
 <div class="container mx-auto px-4 py-8">
-    {#await dataPromise}
+    {#if query1.loading || query2.loading || query3.loading && !(query1.current && query2.current && query3.current)}
         <LoadingSection message={m.loading_resource()} />
-    {:then [resource, locations, allResources]}
+    {:else if query1.current && query2.current && query3.current}
+        {@const resource = query1.current}
+        {@const locations = query2.current}
+        {@const allResources = query3.current}
         {#if resource}
             <div class="max-w-2xl mx-auto">
                 <Breadcrumb feature="resources" current={resource.name} />
                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
                     <h1 class="text-3xl font-bold mb-6">{m.edit_resource()}</h1>
+                    {#key resourceId}
                     <ResourceForm
                         remoteFunction={updateResource}
                         validationSchema={updateResourceSchema}
@@ -36,26 +38,18 @@
                         initialData={resource}
                         locations={locations.data}
                         allResources={allResources.data}
-
                     />
+                    {/key}
                 </div>
             </div>
-        {:else}
+        {/if}
+    {:else if query1.error || query2.error || query3.error}
+        {@const error = query1.error || query2.error || query3.error}
             <ErrorSection
                 headline={m.resource_not_found()}
                 message={m.resource_not_found_message()}
                 href="/resources"
                 button={m.back_to_resources()}
             />
-        {/if}
-    {:catch error}
-        <ErrorSection
-            headline="Error"
-            message={error instanceof Error
-                ? error.message
-                : m.failed_to_load_resource()}
-            href="/resources"
-            button={m.back_to_resources()}
-        />
-    {/await}
+    {/if}
 </div>

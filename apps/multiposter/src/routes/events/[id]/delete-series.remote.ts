@@ -118,7 +118,7 @@ export const deleteSeries = command(
             await publishEventChange('delete', deletedEventIds);
         }
 
-        void listEvents().refresh();
+        await 
 
         console.log('--- deleteSeries DONE ---');
         return { success: true, deletedCount: deletedEventIds.length };

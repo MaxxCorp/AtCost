@@ -73,6 +73,7 @@ export const contactSchema = v.intersect([
         relations: v.optional(v.array(contactRelationSchemaPure)),
         tags: v.optional(v.array(tagSchemaPure)),
         participationStatus: v.optional(v.string()),
+        user: v.optional(v.any()), // Can define specific user schema if needed
     })
 ]);
 
@@ -151,6 +152,8 @@ export const contactPaginationSchema = v.optional(v.object({
     associatedWith: v.optional(v.object({
         type: v.string(),
         id: v.string()
-    }))
+    })),
+    sortField: v.optional(v.string()),
+    sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});
 

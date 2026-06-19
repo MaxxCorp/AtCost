@@ -6,6 +6,11 @@ export type Resource = Omit<DbResource, 'createdAt' | 'updatedAt'> & {
     locationName: string | null;
     createdAt: string;
     updatedAt: string;
+    user?: {
+		id: string;
+		name: string | null;
+		email: string;
+	};
 };
 
 export const resourcePaginationSchema = v.optional(v.object({
@@ -16,7 +21,9 @@ export const resourcePaginationSchema = v.optional(v.object({
     associatedWith: v.optional(v.object({
         type: v.string(),
         id: v.string()
-    }))
+    })),
+    sortField: v.optional(v.union([v.literal('updatedAt'), v.literal('createdAt'), v.literal('name')])),
+	sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});
 export const resourceAssociationSchema = v.object({
     type: v.picklist(['event', 'user', 'location', 'announcement', 'kiosk']),

@@ -90,7 +90,8 @@ export const deleteEvents = command(
 			await publishEventChange('delete', eventIdsToDelete).catch(console.error);
 		}
 
-		void listEvents().refresh();
+		await listEvents().refresh();
 		return { success: true, deletedCount: eventIdsToDelete.length };
 	}
 );
+

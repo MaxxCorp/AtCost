@@ -9,6 +9,11 @@ export type Kiosk = Omit<DbKiosk, 'createdAt' | 'updatedAt' | 'startDate' | 'end
     endDate: string | null;
     publicContactQrCodePath?: string | null;
     locations?: { id: string, name: string, publicContactQrCodePath: string | null }[];
+    user?: {
+		id: string;
+		name: string | null;
+		email: string;
+	};
 };
 
 export const kioskPaginationSchema = v.optional(v.object({

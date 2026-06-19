@@ -14,7 +14,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     const user = getAuthenticatedUser();
     ensureAccess(user, 'announcements');
 
-    const { page = 1, limit = 50, search = '', locationId } = input || {};
+    const { page = 1, limit = 50, search = '', locationId, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select({ id: announcement.id }).from(announcement).$dynamic();
@@ -28,12 +28,12 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     if (locationId) {
         const ids = Array.isArray(locationId) ? locationId : [locationId];
         const { announcementLocation } = await import('@ac/db');
-        const announcementLocations = db
+        const announcementLocationsQuery = db
             .select({ announcementId: announcementLocation.announcementId })
             .from(announcementLocation)
             .where(inArray(announcementLocation.locationId, ids));
             
-        conditions.push(inArray(announcement.id, announcementLocations as any));
+        conditions.push(inArray(announcement.id, announcementLocationsQuery as any));
     }
 
     if (conditions.length > 0) {
@@ -45,52 +45,47 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
-    const rawResults = await baseQuery
-        .orderBy(desc(announcement.createdAt))
+    if (total === 0) {
+        return { data: [], total: 0 };
+    }
+
+    let orderField: any = announcement.updatedAt;
+    if (sortField === 'title') orderField = announcement.title;
+    else if (sortField === 'createdAt') orderField = announcement.createdAt;
+
+    const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
+    const paginatedIdsResult = await baseQuery
+        .orderBy(orderExpression)
         .limit(limit)
         .offset(offset);
 
-    const ids = rawResults.map((r) => r.id);
+    const ids = paginatedIdsResult.map((r) => r.id);
     if (ids.length === 0) {
         return { data: [], total };
     }
 
-    const finalResults = await db
-        .select()
-        .from(announcement)
-        .where(inArray(announcement.id, ids))
-        .orderBy(desc(announcement.createdAt));
-
-    // Fetch tags for these announcements
-    const { announcementTag, tag } = await import('@ac/db');
-    const tagsForAnnouncements = await db
-        .select({
-            announcementId: announcementTag.announcementId,
-            tagId: tag.id,
-            tagName: tag.name,
-        })
-        .from(announcementTag)
-        .innerJoin(tag, eq(announcementTag.tagId, tag.id))
-        .where(inArray(announcementTag.announcementId, ids));
-
-    const tagsMap = new Map<string, { id: string, name: string }[]>();
-    for (const { announcementId: aid, tagId, tagName } of tagsForAnnouncements) {
-        if (!tagsMap.has(aid)) {
-            tagsMap.set(aid, []);
+    const rawResults = await db.query.announcement.findMany({
+        where: inArray(announcement.id, ids),
+        orderBy: [orderExpression],
+        with: {
+            user: true,
+            tags: {
+                with: {
+                    tag: true
+                }
+            }
         }
-        if (tagName) {
-            tagsMap.get(aid)?.push({ id: tagId, name: tagName });
-        }
-    }
+    });
 
-    const data = finalResults.map((row) => ({
+    const data = rawResults.map((row) => ({
         ...row,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
-        tags: tagsMap.get(row.id) || [],
+        tags: row.tags?.map((t: any) => t.tag) || [],
     }));
 
-    return { data, total };
+    return { data: data as any, total };
 });
 
 export const listKioskAnnouncements = listAnnouncements;

@@ -9,7 +9,8 @@
     import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
     import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
 
-    const kioskId = page.params.id || "";
+    const kioskId = $derived(page.params.id || "");
+    const query = $derived(getKiosk(kioskId));
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -18,16 +19,19 @@
 
         <h1 class="text-3xl font-bold mb-8">{m.edit_kiosk()}</h1>
 
-        {#await getKiosk(kioskId)}
+        {#if query.loading && !query.current}
             <LoadingSection message={m.loading_kiosk()} />
-        {:then kiosk}
+        {:else if query.current}
+            {@const kiosk = query.current}
             {#if kiosk}
+                {#key kioskId}
                 <KioskForm
                     remoteFunction={updateKiosk}
                     validationSchema={updateKioskSchema}
                     initialData={kiosk}
                     isUpdating={true}
                 />
+                {/key}
             {:else}
                 <ErrorSection
                     headline={m.kiosk_not_found()}
@@ -36,13 +40,14 @@
                     button={m.back_to_list()}
                 />
             {/if}
-        {:catch err}
+        {:else if query.error}
+            {@const err = query.error}
             <ErrorSection
                 headline={m.error_loading_kiosk()}
                 message={err.message}
                 href="/kiosks"
                 button={m.back_to_list()}
             />
-        {/await}
+        {/if}
     </div>
 </div>

@@ -20,6 +20,6 @@ export const updateTag = form(updateTagSchema, async (input) => {
         .where(eq(tag.id, input.id))
         .returning();
 
-    void listTags().refresh();
+    await listTags({ limit: 50 }).refresh();
     return { success: true, ...updatedTag };
 });

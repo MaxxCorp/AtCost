@@ -21,16 +21,17 @@
         ChevronDown,
         RefreshCw,
     } from "@lucide/svelte";
-    import { RRule } from "rrule";
 
-	const eventId = page.params.id || "";
+	const eventId = $derived(page.params.id || "");
+    const query = $derived(readEvent(eventId));
+    const eventRf = $derived(updateEvent.for(eventId));
 </script>
 
 {#if browser}
-	{#await readEvent(eventId)}
-		<LoadingSection message={m.loading_event_data()} />
-	{:then event}
-	{#if event}
+    {#await query}
+        <LoadingSection message={m.loading_event_data()} />
+    {:then event}
+        {#if event}
         <div class="max-w-3xl mx-auto px-4 py-8 text-left">
             <Breadcrumb
                 feature="events"
@@ -43,7 +44,7 @@
                     {m.edit_item({ item: m.feature_events_title() })}
                 </h1>
                 
-                {#if event.recurrence && (event.recurrence as string[]).length > 0 || event.seriesId || event.recurringEventId}
+                {#if event.recurrence && (event.recurrence).length > 0 || event.seriesId || event.recurringEventId}
                     <DropdownMenu.Root>
                         <DropdownMenu.Trigger>
                             <Button
@@ -113,7 +114,7 @@
 
             {#key eventId}
                 <form
-                    {...updateEvent.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
+                    {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
                         try {
                             const result: any = await submit();
                             if (result?.error) {
@@ -131,7 +132,7 @@
                     class="space-y-6"
                 >
                     <EventForm
-                        remoteFunction={updateEvent}
+                        remoteFunction={eventRf}
                         validationSchema={updateEventSchema}
                         isUpdating={true}
                         initialData={event}
@@ -141,7 +142,7 @@
                         <AsyncButton
                             type="submit"
                             loadingLabel={m.saving()}
-                            loading={updateEvent.pending}
+                            loading={eventRf.pending}
                             class="px-8"
                         >
                             {m.save_changes()}
@@ -153,24 +154,15 @@
                 </form>
             {/key}
         </div>
-	{:else}
-		<ErrorSection
-			headline={m.event_not_found()}
-			message={m.event_not_found_message()}
-			href="/events"
-			button={m.back_to_events()}
-		/>
-	{/if}
-{:catch error}
-	<ErrorSection
-		headline={m.error()}
-		message={error instanceof Error
-			? error.message
-			: m.failed_to_load_event()}
-		href="/events"
-		button={m.back_to_events()}
-	/>
-	{/await}
+        {/if}
+    {:catch}
+        <ErrorSection
+            headline={m.event_not_found()}
+            message={m.event_not_found_message()}
+            href="/events"
+            button={m.back_to_events()}
+        />
+    {/await}
 {:else}
-	<LoadingSection message={m.loading_event_data()} />
+    <LoadingSection message={m.loading_event_data()} />
 {/if}

@@ -91,6 +91,8 @@
 		}
 		page = 1;
 	}
+	let query = $derived(listKiosks(filterState));
+	let res = $derived(query.current);
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -240,9 +242,15 @@
 			</div>
 		</div>
 
-		<!-- List using exactly the requested reactive pattern -->
+		<!-- List -->
 		<div class="grid grid-cols-1 gap-5">
-			{#each (await listKiosks(filterState)).data as kiosk (kiosk.id)}
+
+			{#if query.loading && !query.current}
+				<div class="col-span-full py-12 text-center text-gray-500">Loading...</div>
+			{:else if query.error}
+				<div class="col-span-full py-12 text-center text-red-500">{query.error.message}</div>
+			{:else}
+				{#each query.current?.data || [] as kiosk (kiosk.id)}
 				<div
 					class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
 				>
@@ -323,14 +331,25 @@
 						</button>
 					</div>
 					
-					<div
-						class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2"
-					>
+					<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
 						{m.updated_on({
-							date: new Date(
-								kiosk.updatedAt,
-							).toLocaleDateString(),
+							date: new Date(kiosk.updatedAt).toLocaleString([], {
+								year: "numeric",
+								month: "2-digit",
+								day: "2-digit",
+								hour: "2-digit",
+								minute: "2-digit",
+							}),
 						})}
+						{#if kiosk.user}
+							| <a
+								href="/users/{kiosk.user.id}"
+								class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+								>{kiosk.user.name ||
+									kiosk.user.email ||
+									"User"}</a
+							>
+						{/if}
 					</div>
 				</div>
 			{:else}
@@ -339,21 +358,22 @@
 					<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{m.no_kiosks()}</h3>
 					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Try adjusting your search or filters.</p>
 				</div>
-			{/each}
+				{/each}
+			{/if}
 		</div>
 
 		<!-- Pagination -->
-		{#await listKiosks(filterState) then res}
-			{#if res && res.total > limit}
-				{@const totalPages = Math.ceil(res.total / limit)}
+
+		{#if query.current && query.current.total > limit}
+				{@const totalPages = Math.ceil(query.current.total / limit)}
 				<div
 					class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
 				>
 					<div class="text-sm text-gray-500 dark:text-gray-400">
 						Showing {(page - 1) * limit + 1} to {Math.min(
 							page * limit,
-							res.total,
-						)} of {res.total}
+							query.current.total,
+						)} of {query.current.total}
 					</div>
 					<div class="flex items-center gap-2">
 						<Button
@@ -384,6 +404,7 @@
 					</div>
 				</div>
 			{/if}
-		{/await}
 	</div>
 </div>
+
+

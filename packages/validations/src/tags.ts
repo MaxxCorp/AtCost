@@ -6,6 +6,7 @@ export const TagSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
     userId: v.optional(v.string()),
     createdAt: v.optional(v.string()),
+    user: v.optional(v.any()),
 });
 
 export type Tag = v.InferOutput<typeof TagSchema>;

@@ -13,12 +13,21 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
     const user = getAuthenticatedUser();
     ensureAccess(user, 'resources');
 
-    const { page = 1, limit = 50, search = '', locationId } = input || {};
+    const { page = 1, limit = 50, search = '', locationId, associatedWith, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select({ id: resource.id }).from(resource).$dynamic();
     
     const conditions = [];
+
+    if (associatedWith) {
+        if (associatedWith.type === 'event') {
+            const { eventResource } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(eventResource, eq(resource.id, eventResource.resourceId)) as any;
+            conditions.push(eq(eventResource.eventId, associatedWith.id));
+        }
+    }
+
     if (search) {
         const { ilike } = await import('@ac/db');
         conditions.push(ilike(resource.name, `%${search}%`));
@@ -38,23 +47,29 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 
+    let orderField: any = resource.updatedAt;
+	if (sortField === 'name') orderField = resource.name;
+	else if (sortField === 'createdAt') orderField = resource.createdAt;
+
+	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
+
     const paginatedIdsResult = await baseQuery
-        .orderBy(desc(resource.createdAt))
+        .orderBy(orderExpression)
         .limit(limit)
         .offset(offset);
         
-    const ids = paginatedIdsResult.map(r => r.id);
+    const ids = paginatedIdsResult.map((r: any) => r.id);
 
     if (ids.length === 0) {
         return { data: [], total };
     }
 
-    const resources = await db.select({
-        ...getTableColumns(resource),
-    })
-    .from(resource)
-    .where(inArray(resource.id, ids))
-    .orderBy(desc(resource.createdAt));
+    const resources = await db.query.resource.findMany({
+        where: inArray(resource.id, ids),
+        with: { user: true },
+        orderBy: [orderExpression]
+    });
 
     // Fetch all location associations for these resource IDs to group them in memory
     const locationMap = new Map<string, string[]>();

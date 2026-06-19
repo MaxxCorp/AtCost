@@ -19,7 +19,7 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'locations');
 
-	const { page = 1, limit = 50, search = '', city, associatedWith } = input || {};
+	const { page = 1, limit = 50, search = '', city, associatedWith, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: location.id }).from(location).$dynamic();
@@ -64,19 +64,25 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 		return { data: [], total: 0 };
 	}
 
+    let orderField: any = location.updatedAt;
+	if (sortField === 'name') orderField = location.name;
+	else if (sortField === 'createdAt') orderField = location.createdAt;
+
+	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
 	const { inArray } = await import('@ac/db');
-	const paginatedIdsQuery = baseQuery.orderBy(desc(location.createdAt)).limit(limit).offset(offset);
+	const paginatedIdsQuery = baseQuery.orderBy(orderExpression).limit(limit).offset(offset);
 	const paginatedIds = (await paginatedIdsQuery).map((r) => r.id);
 
 	if (paginatedIds.length === 0) {
 		return { data: [], total };
 	}
 
-	const rawResults = await db
-		.select()
-		.from(location)
-		.where(inArray(location.id, paginatedIds))
-		.orderBy(desc(location.createdAt));
+	const rawResults = await db.query.location.findMany({
+		where: inArray(location.id, paginatedIds),
+		with: { user: true },
+		orderBy: [orderExpression]
+	});
 
 	const data = rawResults.map((row) => ({
 		...row,
