@@ -1,0 +1,5 @@
+{
+    "installCommand": "npm i -g pnpm@latest && npx pnpm install",
+    "buildCommand": "pnpm build",
+    "outputDirectory": ".vercel/output"
+}
