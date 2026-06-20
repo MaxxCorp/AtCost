@@ -133,6 +133,9 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		const msEvent = this.mapToMicrosoftEvent(event);
 		const url = `${this.getBaseUrl()}/events`;
 
+		console.log('[Microsoft Calendar] URL:', url);
+		console.log('[Microsoft Calendar] Payload:', JSON.stringify(msEvent, null, 2));
+
 		const response = await this.makeRequest<any>(url, {
 			method: 'POST',
 			body: JSON.stringify(msEvent)
@@ -338,7 +341,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	}
 
 	private mapToExternalEvent(msEvent: any): ExternalEvent {
-		const isCancelled = msEvent.isCancelled;
+		const isCancelled = msEvent.isCancelled || msEvent['@removed']?.reason === 'deleted';
 
 		const startDateTime = msEvent.start?.dateTime ? new Date(msEvent.start.dateTime + 'Z') : undefined;
 		const endDateTime = msEvent.end?.dateTime ? new Date(msEvent.end.dateTime + 'Z') : undefined;
@@ -368,6 +371,26 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		};
 	}
 
+	private formatLocal(date: Date, timeZone: string): string {
+		try {
+			const parts = new Intl.DateTimeFormat('en-US', {
+				timeZone,
+				year: 'numeric', month: '2-digit', day: '2-digit',
+				hour: '2-digit', minute: '2-digit', second: '2-digit',
+				hour12: false
+			}).formatToParts(date);
+			
+			const p: Record<string, string> = {};
+			for (const part of parts) p[part.type] = part.value;
+			
+			if (p.hour === '24') p.hour = '00';
+			
+			return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}`;
+		} catch (e) {
+			return date.toISOString().split('.')[0];
+		}
+	}
+
 	private mapToMicrosoftEvent(event: ExternalEvent): any {
 		const msEvent: any = {
 			subject: event.summary,
@@ -377,19 +400,19 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			transactionId: event.metadata?.app_event_id // Use transactionId for tracking our own ID
 		};
 
+		const startTimeZone = event.startTimeZone || 'UTC';
 		if (event.startDateTime) {
-			// MS Graph expects format like "2023-10-01T14:00:00" WITHOUT the Z if timezone is provided.
-			// But if we just provide UTC it's fine.
 			msEvent.start = {
-				dateTime: event.startDateTime.toISOString().split('.')[0],
-				timeZone: 'UTC'
+				dateTime: this.formatLocal(event.startDateTime, startTimeZone),
+				timeZone: startTimeZone
 			};
 		}
 
+		const endTimeZone = event.endTimeZone || startTimeZone;
 		if (event.endDateTime) {
 			msEvent.end = {
-				dateTime: event.endDateTime.toISOString().split('.')[0],
-				timeZone: 'UTC'
+				dateTime: this.formatLocal(event.endDateTime, endTimeZone),
+				timeZone: endTimeZone
 			};
 		}
 
