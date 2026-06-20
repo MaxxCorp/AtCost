@@ -20,13 +20,23 @@
 		UserX,
 		Pencil,
 		Trash2,
+		Plus,
+		Search,
+		Filter as FilterIcon,
+		X,
+		ArrowLeft,
+		ArrowRight,
+		ChevronsLeft,
+		ChevronsRight
 	} from "@lucide/svelte";
 
-	import { EntityManager } from "@ac/ui";
-	import { handleDelete } from "@ac/ui";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import WebhookToggleButton from "$lib/components/synchronizations/WebhookToggleButton.svelte";
 	import { authClient } from "$lib/auth";
 	import { hasAccess } from "$lib/authorization";
+	import { toast } from "svelte-sonner";
+	import { onMount } from "svelte";
+	import { getPreference, setPreference } from "$lib/utils/idb";
 
 	const session = authClient.useSession();
 	const user = $derived($session.data?.user);
@@ -212,86 +222,250 @@
 				return eventType;
 		}
 	}
+
+	let sortField = $state<"updatedAt" | "createdAt" | "name">("createdAt");
+	let sortOrder = $state<"asc" | "desc">("desc");
+	let searchQuery = $state("");
+	let selectedProviders = $state<string[]>([]);
+	let page = $state(1);
+	let limit = $state(50);
+
+	onMount(async () => {
+		try {
+			const savedPrefs = await getPreference("syncsFilters", null);
+			if (savedPrefs) {
+				const prefs = JSON.parse(savedPrefs as string);
+				if (prefs.sortField) sortField = prefs.sortField;
+				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
+				if (prefs.selectedProviders) selectedProviders = prefs.selectedProviders;
+			}
+		} catch (e) {
+			console.error("Failed to load preferences", e);
+		}
+	});
+
+	$effect(() => {
+		const prefsToSave = {
+			sortField,
+			sortOrder,
+			selectedProviders,
+		};
+		setPreference("syncsFilters", JSON.stringify(prefsToSave)).catch(
+			console.error,
+		);
+	});
+
+	const filterState = $derived({
+		page,
+		limit,
+		search: searchQuery,
+		providerType: selectedProviders.length > 0 ? selectedProviders : undefined,
+		sortField,
+		sortOrder,
+	});
+
+	const activeFiltersCount = $derived(selectedProviders.length);
+
+	const PROVIDER_OPTIONS = [
+		{ value: "google-calendar", label: "Google Calendar" },
+		{ value: "microsoft-calendar", label: "Microsoft Calendar" },
+		{ value: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
+		{ value: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
+		{ value: "wp-the-events-calendar", label: "WP The Events Calendar" },
+		{ value: "email", label: "E-Mail (Brevo)" },
+	];
+
+	function toggleProvider(value: string) {
+		if (selectedProviders.includes(value)) {
+			selectedProviders = selectedProviders.filter((t) => t !== value);
+		} else {
+			selectedProviders = [...selectedProviders, value];
+		}
+		page = 1;
+	}
+
+	async function deleteItem(config: Synchronization) {
+		if (!window.confirm(m.delete_confirm({ item: m.feature_synchronizations_title() }))) return;
+		try {
+			await removeBulk([config.id]);
+			toast.success(m.delete_successful());
+			list(filterState).refresh();
+		} catch (error: any) {
+			toast.error(error?.message || m.something_went_wrong());
+		}
+	}
 </script>
 
 <svelte:head>
 	<title>{m.feature_synchronizations_title()}</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto">
-	<Breadcrumb feature="synchronizations" />
-	<div class="bg-white shadow rounded-lg p-6">
-		<h1 class="text-2xl font-black mb-6 text-gray-900">{m.feature_synchronizations_title()}</h1>
-		<EntityManager
-			title={m.feature_synchronizations_title()}
-			icon={Calendar}
-			mode="standalone"
-			listItemsRemote={list as any}
-			deleteItemRemote={async (ids: string[]) => {
-				return await handleDelete({
-					ids,
-					deleteFn: removeBulk,
-					itemName: m.feature_synchronizations_title().toLowerCase(),
-				});
-			}}
-			loadingLabel="Loading synchronizations..."
-			noItemsFoundLabel={m.no_items({ items: m.feature_synchronizations_title() })}
-			searchPredicate={(config: Synchronization, q: string) => 
-				(config.name || '').toLowerCase().includes(q.toLowerCase()) || 
-				config.providerType.toLowerCase().includes(q.toLowerCase())
-			}
-			createHref={isAdmin ? "/synchronizations/new" : undefined}
-			showCreateButton={isAdmin}
-			createLabel={m.create_item({ item: "Synchronization" })}
-			filters={[
-				{
-					id: "providerType",
-					label: m.type_label(),
-					type: "select",
-					options: [
-						{ value: "google-calendar", label: "Google Calendar" },
-						{ value: "microsoft-calendar", label: "Microsoft Calendar" },
-						{ value: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
-						{ value: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
-						{ value: "wp-the-events-calendar", label: "WP The Events Calendar" },
-						{ value: "email", label: "E-Mail (Brevo)" },
-					],
-					optionsRemote: async () => [], // Dummy since we have hardcoded options
-				}
-			]}
+<div class="container mx-auto px-4 py-8">
+	<div class="max-w-5xl mx-auto space-y-6">
+		<Breadcrumb feature="synchronizations" />
+
+		<!-- Header -->
+		<div
+			class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800"
 		>
-			{#snippet renderListItem(config: Synchronization, { isSelected, toggleSelection, deleteItem }: any)}
+			<div>
+				<h1
+					class="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tight"
+				>
+					{m.feature_synchronizations_title()}
+				</h1>
+				<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+					{m.feature_synchronizations_description ? m.feature_synchronizations_description() : "Manage calendar and email synchronizations"}
+				</p>
+			</div>
+			{#if isAdmin}
+				<Button href="/synchronizations/new" class="w-full md:w-auto shadow-sm">
+					<Plus class="w-4 h-4 mr-2" />
+					{m.new_item({ item: "Synchronization" })}
+				</Button>
+			{/if}
+		</div>
+
+		<!-- Action Bar -->
+		<div class="flex flex-col md:flex-row gap-3 mb-6">
+			<div class="relative flex-1">
+				<Search
+					size={16}
+					class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+				/>
+				<input
+					type="text"
+					placeholder="Search synchronizations..."
+					bind:value={searchQuery}
+					oninput={() => (page = 1)}
+					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+				/>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						<Button
+							variant="outline"
+							class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+						>
+							<FilterIcon size={16} class="mr-2" />
+							Filters
+							{#if activeFiltersCount > 0}
+								<span
+									class="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm"
+								>
+									{activeFiltersCount}
+								</span>
+							{/if}
+						</Button>
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content
+						align="end"
+						class="min-w-[200px] rounded-2xl shadow-xl border-gray-100 p-1"
+					>
+						<DropdownMenu.Label
+							class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2"
+						>System Filters</DropdownMenu.Label>
+						<DropdownMenu.Separator class="bg-gray-50" />
+
+						<DropdownMenu.Sub>
+							<DropdownMenu.SubTrigger
+								class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
+							>
+								<span>Providers</span>
+								{#if selectedProviders.length > 0}
+									<span
+										class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold"
+										>{selectedProviders.length}</span
+									>
+								{/if}
+							</DropdownMenu.SubTrigger>
+							<DropdownMenu.SubContent
+								class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
+							>
+								{#each PROVIDER_OPTIONS as provider}
+									<DropdownMenu.CheckboxItem
+										checked={selectedProviders.includes(provider.value)}
+										onCheckedChange={() => toggleProvider(provider.value)}
+										class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
+									>
+										<span class="truncate block w-full">{provider.label}</span>
+									</DropdownMenu.CheckboxItem>
+								{/each}
+							</DropdownMenu.SubContent>
+						</DropdownMenu.Sub>
+
+						{#if activeFiltersCount > 0}
+							<DropdownMenu.Separator class="bg-gray-50" />
+							<DropdownMenu.Item
+								class="text-red-600 font-medium py-2 rounded-lg cursor-pointer hover:bg-red-50 hover:text-red-700"
+								onclick={() => {
+									selectedProviders = [];
+									page = 1;
+								}}
+							>
+								<X size={14} class="mr-2" />
+								Clear Filters
+							</DropdownMenu.Item>
+						{/if}
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+
+				<div
+					class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1"
+				>
+					<select
+						bind:value={sortField}
+						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
+					>
+						<option value="createdAt">Created Date</option>
+						<option value="updatedAt">Last Updated</option>
+						<option value="name">Name</option>
+					</select>
+					<button
+						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+						onclick={() =>
+							(sortOrder = sortOrder === "desc" ? "asc" : "desc")}
+						title={sortOrder === "desc" ? "Descending" : "Ascending"}
+					>
+						<ChevronDown
+							size={14}
+							class="transition-transform duration-200 {sortOrder ===
+							'asc'
+								? 'rotate-180'
+								: ''}"
+						/>
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- List -->
+		<div class="grid grid-cols-1 gap-5">
+			{#each (await list(filterState)).data || [] as config (config.id)}
 				{@const Icon = getProviderIcon(config.providerType)}
 				{@const statusColor = getStatusColor(
 					config.enabled,
 					config.lastSyncAt,
 				)}
-				<div class="bg-white shadow border rounded-lg p-6 flex flex-col sm:flex-row items-start gap-4 transition-shadow hover:shadow-md">
-					<input
-						type="checkbox"
-						checked={isSelected}
-						onchange={() => toggleSelection(config.id)}
-						class="mt-1 w-4 h-4 text-blue-600 rounded shrink-0"
-					/>
-					<div class="flex-1 w-full min-w-0">
-						<div class="flex items-start gap-3 mb-2">
+				<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+					<div class="flex-1 mb-5">
+						<div class="flex items-start justify-between gap-4 mb-2">
 							<div class="flex-1 min-w-0">
-								<h2 class="text-xl font-semibold">
+								<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
 									<a
 										href={`/synchronizations/${config.id}`}
 										class="hover:underline text-blue-600 flex items-center gap-2"
 									>
-										<Icon
-											class="h-5 w-5 flex-shrink-0"
-										/>
-										{getProviderLabel(
-											config.providerType,
-										)}
+										<Icon class="h-5 w-5 flex-shrink-0" />
+										{#if config.name}
+											{config.name}
+										{:else}
+											{getProviderLabel(config.providerType)}
+										{/if}
 									</a>
-								</h2>
-								<p
-									class="text-sm text-gray-500 break-all"
-								>
+								</h3>
+								<p class="text-sm text-gray-500 break-all mt-1">
 									{config.providerId}
 								</p>
 							</div>
@@ -304,7 +478,7 @@
 							</div>
 						</div>
 
-						<div class="space-y-1 text-sm mt-2">
+						<div class="space-y-1 text-sm mt-4">
 							<div class="flex gap-2">
 								<span class="text-gray-600">{m.direction()}:</span>
 								<span class="font-medium">{getDirectionLabel(config.direction)}</span>
@@ -387,45 +561,142 @@
 							</div>
 						{/if}
 					</div>
-					<div class="flex flex-col gap-2 shrink-0">
-						<WebhookToggleButton
-							configId={config.id}
-							providerType={config.providerType}
-							direction={config.direction}
-							disabled={!isAdmin}
-						/>
+
+					<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end items-center gap-2 w-full sm:w-auto">
+						<div class="flex-1">
+							<WebhookToggleButton
+								configId={config.id}
+								providerType={config.providerType}
+								direction={config.direction}
+								disabled={!isAdmin}
+							/>
+						</div>
+						
 						{#if isAdmin}
 							<Button
 								href={`/synchronizations/${config.id}`}
-								variant="default"
-								size="default"
-								class="flex items-center gap-2 w-[120px] justify-center"
+								variant="outline"
+								size="sm"
+								class="flex-1 sm:flex-none"
 							>
-								<Pencil size={16} /> {m.edit()}
+								<Pencil class="w-4 h-4 mr-2" /> {m.edit()}
 							</Button>
-							<AsyncButton
-								variant="destructive"
-								size="default"
-								loading={false}
-								loadingLabel={m.deleting()}
-								class="flex items-center gap-2 w-[120px] justify-center"
+							<button
+								class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
 								onclick={() => deleteItem(config)}
 							>
-								<Trash2 size={16} /> {m.delete()}
-							</AsyncButton>
+								<Trash2 class="w-4 h-4 mr-2" /> {m.delete()}
+							</button>
 						{:else}
 							<Button
 								href={`/synchronizations/${config.id}`}
 								variant="outline"
-								size="default"
-								class="flex items-center gap-2 w-[120px] justify-center"
+								size="sm"
+								class="flex-1 sm:flex-none"
 							>
-								<Eye size={16} /> {m.view()}
+								<Eye class="w-4 h-4 mr-2" /> {m.view()}
 							</Button>
 						{/if}
 					</div>
 				</div>
-			{/snippet}
-		</EntityManager>
+			{:else}
+				<div
+					class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
+				>
+					<Calendar
+						class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3"
+					/>
+					<h3
+						class="text-lg font-medium text-gray-900 dark:text-gray-100"
+					>
+						{m.no_items({ items: m.feature_synchronizations_title() })}
+					</h3>
+					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+						Try adjusting your search or filters.
+					</p>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Pagination -->
+		{#await list(filterState) then res}
+			{#if res && res.total > limit}
+				{@const totalPages = Math.ceil(res.total / limit)}
+				<div
+					class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
+				>
+					<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, res.total)} of {res.total}</span>
+						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+							<select
+								bind:value={limit}
+								onchange={() => (page = 1)}
+								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
+							>
+								<option value={10}>10 per page</option>
+								<option value={20}>20 per page</option>
+								<option value={50}>50 per page</option>
+								<option value={100}>100 per page</option>
+							</select>
+						</div>
+					</div>
+					<div class="flex items-center gap-1 sm:gap-2">
+						<Button
+							variant="outline"
+							size="icon"
+							disabled={page === 1}
+							onclick={() => page = 1}
+							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+							title="First page"
+						>
+							<ChevronsLeft size={16} />
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={page === 1}
+							onclick={() => page > 1 && page--}
+							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+						>
+							<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+							Previous
+						</Button>
+						<div
+							class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
+						>
+							<select
+								bind:value={page}
+								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
+							>
+								{#each Array(totalPages) as _, i}
+									<option value={i + 1}>{i + 1}</option>
+								{/each}
+							</select>
+							<span class="text-gray-400">/ {totalPages}</span>
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={page === totalPages}
+							onclick={() => page < totalPages && page++}
+							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+						>
+							Next
+							<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+						</Button>
+						<Button
+							variant="outline"
+							size="icon"
+							disabled={page === totalPages}
+							onclick={() => page = totalPages}
+							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+							title="Last page"
+						>
+							<ChevronsRight size={16} />
+						</Button>
+					</div>
+				</div>
+			{/if}
+		{/await}
 	</div>
 </div>

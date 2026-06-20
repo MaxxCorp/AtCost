@@ -6,10 +6,7 @@ import { db } from '@ac/db';
 import { desc, and, or, ilike, sql, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
-
-
 import { synchronizationPaginationSchema as PaginationSchema, type Synchronization, type PaginatedResult } from '@ac/validations';
-
 
 /**
  * Query: List all synchronizations
@@ -18,7 +15,7 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'synchronizations', 'use');
 
-	const { page = 1, limit = 50, search = '', providerType } = input || {};
+	const { page = 1, limit = 50, search = '', providerType, sortField = 'createdAt', sortOrder = 'desc' } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select().from(syncConfig).$dynamic();
@@ -34,7 +31,9 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 
 	if (providerType) {
 		const ids = Array.isArray(providerType) ? providerType : [providerType];
-		conditions.push(inArray(syncConfig.providerType, ids));
+		if (ids.length > 0) {
+			conditions.push(inArray(syncConfig.providerType, ids));
+		}
 	}
 
 	if (conditions.length > 0) {
@@ -44,8 +43,14 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
 	const total = Number(countResult[0]?.count || 0);
 
+	let orderField: any = syncConfig.createdAt;
+	if (sortField === 'updatedAt') orderField = syncConfig.updatedAt;
+	else if (sortField === 'name') orderField = syncConfig.name;
+
+	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+
 	const rawResults = await baseQuery
-		.orderBy(desc(syncConfig.createdAt))
+		.orderBy(orderExpression)
 		.limit(limit)
 		.offset(offset);
 
