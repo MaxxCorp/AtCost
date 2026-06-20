@@ -102,47 +102,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		const wpEventData = this.mapEventToWpFormat(event);
 
 		try {
-			// Check for existing event to prevent duplication
-			// Search by title
-			const searchParams = new URLSearchParams();
-			searchParams.set('search', event.summary);
-			// Also filter by start date if possible to narrow down results
-			if (wpEventData.start_date) {
-				searchParams.set('start_date', wpEventData.start_date);
-			}
-
-			const searchUrl = this.getApiUrl('/tribe/events/v1/events', searchParams);
-			const searchResponse = await fetch(searchUrl, {
-				method: 'GET',
-				headers: {
-					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
-					'Content-Type': 'application/json',
-				},
-			});
-
-			if (searchResponse.ok) {
-				const searchResult = await searchResponse.json();
-				console.log(`[WP-Sync] Search returned ${searchResult.events?.length || 0} results.`);
-				if (searchResult.events && searchResult.events.length > 0) {
-					// We intentionally only check for title match here because the search param already filtered by title
-					// We additionally check date match if multiple results came back or to be sure
-					const match = searchResult.events.find((e: any) => {
-						// Double check title similarity or exactness if needed
-						// API search is fuzzy, so we should check exact title match
-						return e.title === event.summary;
-					});
-
-					if (match) {
-						console.log(`Found existing WordPress event for "${event.summary}", linking instead of creating.`);
-						const updateResult = await this.updateEvent(match.id.toString(), event);
-						return {
-							externalId: match.id.toString(),
-							etag: updateResult.etag
-						};
-					}
-				}
-			}
-
+			// We rely on the generic sync layer to handle mappings.
+			// No fuzzy deduplication here, as it conflicts with recurring event series.
 
 			// Ensure venues exist
 			const venueIds: number[] = [];
