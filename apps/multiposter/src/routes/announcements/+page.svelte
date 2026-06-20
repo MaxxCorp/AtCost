@@ -195,7 +195,7 @@
 
 				<div class={["transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
 					<div class="grid grid-cols-1 gap-5">
-						{#each (await listAnnouncements(filterState))?.data || [] as announcement (announcement.id)}
+						{#each (await listAnnouncements(filterState)).data || [] as announcement (announcement.id)}
 						<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
 							<div class="flex-1 mb-5">
 								<div class="flex items-start gap-4">
@@ -274,8 +274,8 @@
 					</div>
 
 					<!-- Pagination -->
-					{#if ((await listAnnouncements(filterState))?.total || 0) > limit}
-						{@const totalCount = ((await listAnnouncements(filterState))?.total || 0)}
+					{#if ((await listAnnouncements(filterState)).total || 0) > limit}
+						{@const totalCount = ((await listAnnouncements(filterState)).total || 0)}
 						{@const totalPages = Math.ceil(totalCount / limit)}
 						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
 							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">

@@ -135,7 +135,6 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
         await syncService.triggerPushSync(user.id, announcementId, 'announcement');
 
         return {
-
             success: true,
             id: announcementId
         };

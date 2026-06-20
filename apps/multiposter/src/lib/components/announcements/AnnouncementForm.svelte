@@ -138,8 +138,7 @@
 
     <form {...rf.enhance(async ({ submit }: { submit: any }) => {
         try {
-            await submit();
-            const result = (rf as any).result;
+            const result = await submit();
             if (result?.error) {
                 toast.error(
                     result.error.message || m.something_went_wrong(),

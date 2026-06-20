@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { listKioskEvents } from '../../../events/list-public.remote';
-import { listKioskAnnouncements } from '../../../announcements/list.remote';
+import { listAnnouncements } from '../../../announcements/list.remote';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq } from '@ac/db';
@@ -65,7 +65,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
     const locationIds = locations.map(l => l.id);
     
     const eventsResult = await listKioskEvents(kioskId);
-    const announcementsResult = await listKioskAnnouncements({
+    const announcementsResult = await listAnnouncements({
         limit: 100,
         locationId: locationIds.length > 0 ? locationIds : undefined
     });
