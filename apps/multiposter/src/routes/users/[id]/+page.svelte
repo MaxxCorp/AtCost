@@ -33,171 +33,160 @@
         }
     ];
 
-    const userQuery = $derived(readUser(userId));
+
     let sessionPromise = $state(authClient.getSession());
 </script>
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
-        {#key userId}
-            {#if browser}
-                {#await sessionPromise}
+                    {#if browser}
+            <svelte:boundary>
+                {#if $effect.pending()}
                     <LoadingSection message={m.loading_user()} />
-                {:then session}
-                {#if userQuery.loading && !userQuery.current}
-                    <LoadingSection message={m.loading_user()} />
-                {:else if userQuery.current}
-                    {@const user = userQuery.current}
-                {#if user}
-                    <Breadcrumb feature="users" current={user.name} />
-                    <div class="bg-white shadow rounded-lg p-6 space-y-4">
-                        <div class="flex justify-between items-start mb-6">
-                            <div>
-                                <h1 class="text-3xl font-bold mb-2">
-                                    {user.name}
-                                </h1>
-                                <p class="text-gray-500">{user.email}</p>
-                            </div>
-                            <div class="flex gap-2">
-                                <AsyncButton
-                                    type="button"
-                                    loadingLabel={m.deleting()}
-                                    loading={deleteUser.pending}
-                                    variant="destructive"
-                                    onclick={async () => {
-                                        const confirmed = await handleDelete({
-                                            ids: [user.id],
-                                            deleteFn: async (ids: string[]) => deleteUser(ids),
-                                            itemName: m.users(),
-                                        });
-                                        if (confirmed) {
-                                            goto("/users");
-                                        }
-                                    }}
-                                >
-                                    {m.delete()}
-                                </AsyncButton>
-                            </div>
-                        </div>
+                {/if}
+                <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+                    {#await Promise.all([sessionPromise, readUser(userId)]) then [session, user]}
+                        {#if user}
+                            <Breadcrumb feature="users" current={user.name} />
+                            <div class="bg-white shadow rounded-lg p-6 space-y-4">
+                                <div class="flex justify-between items-start mb-6">
+                                    <div>
+                                        <h1 class="text-3xl font-bold mb-2">
+                                            {user.name}
+                                        </h1>
+                                        <p class="text-gray-500">{user.email}</p>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <AsyncButton
+                                            type="button"
+                                            loadingLabel={m.deleting()}
+                                            loading={deleteUser.pending}
+                                            variant="destructive"
+                                            onclick={async () => {
+                                                const confirmed = await handleDelete({
+                                                    ids: [user.id],
+                                                    deleteFn: async (ids: string[]) => deleteUser(ids),
+                                                    itemName: m.users(),
+                                                });
+                                                if (confirmed) {
+                                                    goto("/users");
+                                                }
+                                            }}
+                                        >
+                                            {m.delete()}
+                                        </AsyncButton>
+                                    </div>
+                                </div>
 
-                        <h2 class="text-xl font-semibold mb-4">{m.edit_user()}</h2>
-                        <UserForm
-                            remoteFunction={updateUser}
-                            validationSchema={updateUserSchema}
-                            isUpdating={true}
-                            initialData={user}
-                            {m}
-                            {appConfigList}
-                            canEditRoles={session?.data?.user ? parseRoles(session.data.user).includes("admin") : false}
-                            onSuccess={() => goto("/users")}
-                            onCancel={() => goto("/users")}
-                        >
-                        {#snippet extraEntities(data: any)}
-                            <EntityManager
-                                title={m.feature_contacts_title()}
-                                icon={UserIcon}
-
-                                type="user"
-                                entityId={data.id}
-                                listItemsRemote={listContacts as any}
-                                fetchAssociationsRemote={fetchEntityContacts as any}
-                                addAssociationRemote={async (p: any) =>
-                                    addAssociation({ ...p, contactId: p.itemId } as any)}
-                                removeAssociationRemote={async (p: any) =>
-                                    removeAssociation({ ...p, contactId: p.itemId } as any)}
-                                deleteItemRemote={async (ids: string[]) => {
-                                    return await handleDelete({
-                                        ids: ids,
-                                        deleteFn: async (ids: string[]) => deleteContact(ids),
-                                        itemName: m.feature_contacts_title(),
-                                    });
-                                }}
-                                createRemote={createContact}
-                                createSchema={createContactSchema}
-                                updateRemote={updateContact}
-                                updateSchema={updateContactSchema}
-                                getFormData={(c: any) => ({
-                                    contact: c,
-                                    emails: c.emails,
-                                    phones: c.phones,
-                                    addresses: c.addresses,
-                                    relations: c.relations,
-                                    tags: c.tags,
-                                })}
-                                searchPredicate={(c: any, q: string) => {
-                                    const name = (
-                                        c.displayName ||
-                                        `${c.givenName || ""} ${c.familyName || ""}`
-                                    ).toLowerCase();
-                                    return name.includes(q.toLowerCase());
-                                }}
-                                    loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
-                                    noItemsFoundLabel={m.no_items_found({ item: m.feature_contacts_title() })}
-                                    searchPlaceholder={m.search_placeholder({ item: m.feature_contacts_title() })}
-                                    linkItemLabel={m.link_item_label({ item: m.feature_contacts_title() })}
-                                    associatedItemLabel={m.associated_item_label({ item: m.feature_contacts_title() })}
-                                    quickCreateLabel={m.quick_create()}
-                                    closeSearchLabel={m.close_search()}
-                                    editLabel={m.edit()}
-                                    deleteLabel={m.delete()}
-                                    unlinkLabel={m.unlink()}
-                                    deleteForeverLabel={m.delete_forever({ item: m.contact() })}
-                                    bulkDeleteLabel={m.delete_selected({ count: 0 })}
-                                    selectAllLabel={m.select_all()}
-                                    deselectAllLabel={m.deselect_all()}
-                                    confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
-                                    noItemsLabel={m.no_items_associated_label({ item: m.feature_contacts_title() })}
+                                <h2 class="text-xl font-semibold mb-4">{m.edit_user()}</h2>
+                                <UserForm
+                                    remoteFunction={updateUser.for(userId)}
+                                    validationSchema={updateUserSchema}
+                                    isUpdating={true}
+                                    initialData={user}
+                                    {m}
+                                    {appConfigList}
+                                    canEditRoles={session?.data?.user ? parseRoles(session.data.user).includes("admin") : false}
+                                    onSuccess={() => goto("/users")}
+                                    onCancel={() => goto("/users")}
                                 >
-                                {#snippet renderItemLabel(contact: any)}
-                                    {contact.displayName ||
-                                        `${contact.givenName || ""} ${contact.familyName || ""}`}
-                                {/snippet}
-                                {#snippet renderForm(props: any)}
-                                    <ContactForm
-                                        remoteFunction={props.remoteFunction}
-                                        schema={props.schema}
-                                        initialData={props.initialData}
-                                        onSuccess={props.onSuccess}
-                                        onCancel={props.onCancel}
-                                        contactId={props.id}
-                                    />
-                                {/snippet}
-                            </EntityManager>
-                        {/snippet}
-                    </UserForm>
+                                    {#snippet extraEntities(data: any)}
+                                        <EntityManager
+                                            title={m.feature_contacts_title()}
+                                            icon={UserIcon}
+
+                                            type="user"
+                                            entityId={data.id}
+                                            listItemsRemote={listContacts as any}
+                                            fetchAssociationsRemote={fetchEntityContacts as any}
+                                            addAssociationRemote={async (p: any) =>
+                                                addAssociation({ ...p, contactId: p.itemId } as any)}
+                                            removeAssociationRemote={async (p: any) =>
+                                                removeAssociation({ ...p, contactId: p.itemId } as any)}
+                                            deleteItemRemote={async (ids: string[]) => {
+                                                return await handleDelete({
+                                                    ids: ids,
+                                                    deleteFn: async (ids: string[]) => deleteContact(ids),
+                                                    itemName: m.feature_contacts_title(),
+                                                });
+                                            }}
+                                            createRemote={createContact}
+                                            createSchema={createContactSchema}
+                                            updateRemote={updateContact}
+                                            updateSchema={updateContactSchema}
+                                            getFormData={(c: any) => ({
+                                                contact: c,
+                                                emails: c.emails,
+                                                phones: c.phones,
+                                                addresses: c.addresses,
+                                                relations: c.relations,
+                                                tags: c.tags,
+                                            })}
+                                            searchPredicate={(c: any, q: string) => {
+                                                const name = (
+                                                    c.displayName ||
+                                                    `${c.givenName || ""} ${c.familyName || ""}`
+                                                ).toLowerCase();
+                                                return name.includes(q.toLowerCase());
+                                            }}
+                                            loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
+                                            noItemsFoundLabel={m.no_items_found({ item: m.feature_contacts_title() })}
+                                            searchPlaceholder={m.search_placeholder({ item: m.feature_contacts_title() })}
+                                            linkItemLabel={m.link_item_label({ item: m.feature_contacts_title() })}
+                                            associatedItemLabel={m.associated_item_label({ item: m.feature_contacts_title() })}
+                                            quickCreateLabel={m.quick_create()}
+                                            closeSearchLabel={m.close_search()}
+                                            editLabel={m.edit()}
+                                            deleteLabel={m.delete()}
+                                            unlinkLabel={m.unlink()}
+                                            deleteForeverLabel={m.delete_forever({ item: m.contact() })}
+                                            bulkDeleteLabel={m.delete_selected({ count: 0 })}
+                                            selectAllLabel={m.select_all()}
+                                            deselectAllLabel={m.deselect_all()}
+                                            confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
+                                            noItemsLabel={m.no_items_associated_label({ item: m.feature_contacts_title() })}
+                                        >
+                                            {#snippet renderItemLabel(contact: any)}
+                                                {contact.displayName ||
+                                                    `${contact.givenName || ""} ${contact.familyName || ""}`}
+                                            {/snippet}
+                                            {#snippet renderForm(props: any)}
+                                                <ContactForm
+                                                    remoteFunction={props.remoteFunction}
+                                                    schema={props.schema}
+                                                    initialData={props.initialData}
+                                                    onSuccess={props.onSuccess}
+                                                    onCancel={props.onCancel}
+                                                    contactId={props.id}
+                                                />
+                                            {/snippet}
+                                        </EntityManager>
+                                    {/snippet}
+                                </UserForm>
+                            </div>
+                        {:else}
+                            <ErrorSection
+                                headline={m.user_not_found()}
+                                message={m.user_not_found_message()}
+                                href="/users"
+                                button={m.back_to_users()}
+                            />
+                        {/if}
+                    {/await}
                 </div>
-            {:else}
-                <ErrorSection
-                    headline={m.user_not_found()}
-                    message={m.user_not_found_message()}
-                    href="/users"
-                    button={m.back_to_users()}
-                />
-            {/if}
-            {:else if userQuery.error}
-                {@const error = userQuery.error}
-                <ErrorSection
-                    headline="Error"
-                    message={error instanceof Error
-                        ? error.message
-                        : m.failed_to_load_user()}
-                    href="/users"
-                    button={m.back_to_users()}
-                />
-            {/if}
-            {:catch error}
-                <ErrorSection
-                    headline="Error"
-                    message={error instanceof Error
-                        ? error.message
-                        : m.failed_to_load_user()}
-                    href="/users"
-                    button={m.back_to_users()}
-                />
-            {/await}
-            {:else}
-                <LoadingSection message={m.loading_user()} />
-            {/if}
-        {/key}
+                {#snippet failed(error: unknown)}
+                    <ErrorSection
+                        headline="Error"
+                        message={error instanceof Error
+                            ? error.message
+                            : m.failed_to_load_user()}
+                        href="/users"
+                        button={m.back_to_users()}
+                    />
+                {/snippet}
+            </svelte:boundary>
+        {:else}
+            <LoadingSection message={m.loading_user()} />
+        {/if}
     </div>
 </div>

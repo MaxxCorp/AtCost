@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { LoadingSection, ErrorSection } from "@ac/ui";
 	import * as m from "$lib/paraglide/messages.js";
 	import { page } from "$app/state";
 	import { browser } from "$app/environment";
@@ -9,9 +10,7 @@
     import { deleteEvents as deleteEventAction } from "../delete.remote";
 	import { updateEventSchema } from "$lib/validations/events";
 	import EventForm from "$lib/components/events/EventForm.svelte";
-	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+		    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { Button } from "$lib/components/ui/button";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -23,17 +22,20 @@
     } from "@lucide/svelte";
 
 	const eventId = $derived(page.params.id || "");
-    const query = $derived(readEvent(eventId));
     const eventRf = $derived(updateEvent.for(eventId));
 </script>
 
 {#if browser}
-    {#await query}
-        <LoadingSection message={m.loading_event_data()} />
-    {:then event}
-        {#if event}
-        <div class="max-w-3xl mx-auto px-4 py-8 text-left">
-            <Breadcrumb
+    <svelte:boundary>
+        {#if $effect.pending()}
+            <LoadingSection message={m.loading_event_data()} />
+        {/if}
+
+        <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+            {#await readEvent(eventId) then event}
+                {#if event}
+                <div class="max-w-3xl mx-auto px-4 py-8 text-left">
+                    <Breadcrumb
                 feature="events"
                 current={event.summary ??
                     m.create_new({ item: m.feature_events_title() })}
@@ -112,8 +114,7 @@
                 {/if}
             </div>
 
-            {#key eventId}
-                <form
+                            <form
                     {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
                         try {
                             const result: any = await submit();
@@ -152,17 +153,19 @@
                         </Button>
                     </div>
                 </form>
-            {/key}
-        </div>
+                    </div>
         {/if}
-    {:catch}
-        <ErrorSection
-            headline={m.event_not_found()}
-            message={m.event_not_found_message()}
-            href="/events"
-            button={m.back_to_events()}
-        />
-    {/await}
+            {/await}
+        </div>
+        {#snippet failed(error: unknown)}
+            <ErrorSection
+                headline={m.event_not_found()}
+                message={m.event_not_found_message()}
+                href="/events"
+                button={m.back_to_events()}
+            />
+        {/snippet}
+    </svelte:boundary>
 {:else}
     <LoadingSection message={m.loading_event_data()} />
 {/if}

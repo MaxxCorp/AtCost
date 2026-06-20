@@ -40,8 +40,7 @@
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
-        {#key userId}
-            {#if browser}
+                    {#if browser}
                 {#await dataPromise}
                     <LoadingSection message="Loading user and session data..." />
                 {:then [user, session]}
@@ -78,7 +77,7 @@
 
                             <h2 class="text-xl font-semibold mb-4">Edit User</h2>
                             <UserForm
-                                remoteFunction={updateUser}
+                                remoteFunction={updateUser.for(userId)}
                                 validationSchema={updateUserSchema}
                                 isUpdating={true}
                                 initialData={user}
@@ -207,6 +206,5 @@
             {:else}
                 <LoadingSection message="Loading user..." />
             {/if}
-        {/key}
-    </div>
+            </div>
 </div>

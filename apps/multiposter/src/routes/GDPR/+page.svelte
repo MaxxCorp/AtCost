@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { LoadingSection, ErrorSection } from "@ac/ui";
     import ContentBlockEditor from "$lib/components/cms/ContentBlockEditor.svelte";
     import { readContent } from "./read.remote";
     import { updateContent } from "./update.remote";
@@ -7,9 +8,7 @@
     import { deleteBlockFunction } from "./delete.remote";
     import { listBlocksFunction } from "./list.remote";
     import { renameBlockFunction } from "./rename.remote";
-    import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-    import * as m from "$lib/paraglide/messages.js";
+            import * as m from "$lib/paraglide/messages.js";
 
     let contentPromise = $state(readContent({}));
 </script>

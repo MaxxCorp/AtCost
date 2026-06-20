@@ -26,6 +26,9 @@
             goto("/contacts");
         }
     }
+
+    const formId = crypto.randomUUID();
+    const rf = createContact.for(formId);
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -34,7 +37,7 @@
         <div class="bg-white shadow rounded-lg p-6">
             <h1 class="text-2xl font-bold mb-6">Create New Contact</h1>
             <ContactForm
-                remoteFunction={createContact}
+                remoteFunction={rf}
                 schema={createContactSchema}
                 onSuccess={handleSuccess}
             >

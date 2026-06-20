@@ -8,6 +8,9 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { Button } from "$lib/components/ui/button";
+
+    const formId = crypto.randomUUID();
+    const rf = createEvent.for(formId);
 </script>
 
 <div class="max-w-3xl mx-auto px-4 py-8 text-left">
@@ -22,9 +25,8 @@
         </h1>
     </div>
 
-    {#key "new"}
-    <form
-        {...createEvent.preflight(createEventSchema).enhance(async ({ submit }: any) => {
+        <form
+        {...rf.preflight(createEventSchema).enhance(async ({ submit }: any) => {
                 try {
                     const result: any = await submit();
                     if (result?.error) {
@@ -42,7 +44,7 @@
         class="space-y-6"
     >
         <EventForm
-            remoteFunction={createEvent}
+            remoteFunction={rf}
             validationSchema={createEventSchema}
         />
 
@@ -50,7 +52,7 @@
             <AsyncButton
                 type="submit"
                 loadingLabel={m.saving()}
-                loading={createEvent.pending}
+                loading={rf.pending}
                 class="px-8"
             >
                 {m.create_item({ item: m.feature_events_title() })}
@@ -60,5 +62,4 @@
             </Button>
         </div>
     </form>
-    {/key}
-</div>
+    </div>

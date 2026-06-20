@@ -31,13 +31,11 @@
             button="Back to List"
         />
     {:else if query.current}
-        {#key query.current.id}
-            <ShiftplanTemplateForm 
+                    <ShiftplanTemplateForm 
                 isUpdating={true}
                 initialData={query.current}
                 remoteFunction={updateShiftplan}
                 validationSchema={updateShiftplanSchema}
             />
-        {/key}
-    {/if}
+            {/if}
 </div>

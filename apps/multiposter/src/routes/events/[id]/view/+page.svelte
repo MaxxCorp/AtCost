@@ -1,13 +1,12 @@
 <script lang="ts">
+	import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "$lib/paraglide/messages";
     import { page } from "$app/state";
     import { readEvent } from "../read.remote";
     import { authClient } from "$lib/auth";
     import { deleteEvents } from "../../delete.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-    import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import { goto } from "$app/navigation";
+            import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import {
         Calendar,

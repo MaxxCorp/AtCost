@@ -68,7 +68,6 @@
 		}
 	}
 
-	const query = $derived(listCampaigns(filterState));
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -121,151 +120,157 @@
 			</div>
 		</div>
 
-		<!-- List -->
-		<div class="grid grid-cols-1 gap-5">
-			{#if query.loading && !query.current}
-				<div class="col-span-full py-12 text-center text-gray-500">Loading...</div>
-			{:else if query.error}
-				<div class="col-span-full py-12 text-center text-red-500">{query.error.message}</div>
-			{:else}
-				{#each query.current?.data || [] as campaign (campaign.id)}
-				<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
-					<div class="flex-1 mb-5">
-						<div class="flex items-start gap-4">
-							<div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
-								<Megaphone size={24} />
+		<svelte:boundary>
+			{#if $effect.pending()}
+				<div class="py-12 text-center text-gray-500">Loading...</div>
+			{/if}
+			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+				<!-- List -->
+				<div class="grid grid-cols-1 gap-5">
+					{#each (await listCampaigns(filterState)).data || [] as campaign (campaign.id)}
+						<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+							<div class="flex-1 mb-5">
+								<div class="flex items-start gap-4">
+									<div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
+										<Megaphone size={24} />
+									</div>
+									<div class="flex-1 min-w-0">
+										<a href={`/campaigns/${campaign.id}`} class="block group mb-1">
+											<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug truncate transition-colors">
+												{campaign.name}
+											</h3>
+										</a>
+									</div>
+								</div>
 							</div>
-							<div class="flex-1 min-w-0">
-								<a href={`/campaigns/${campaign.id}`} class="block group mb-1">
-									<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug truncate transition-colors">
-										{campaign.name}
-									</h3>
-								</a>
+
+							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
+								<Button variant="outline" size="sm" href={`/campaigns/${campaign.id}`} class="flex-1 sm:flex-none">
+									<Pencil class="w-4 h-4 mr-2" />
+									{m.edit()}
+								</Button>
+								<button
+									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
+									onclick={() => handleDelete(campaign)}
+								>
+									<Trash2 class="w-4 h-4 mr-2" />
+									{m.delete()}
+								</button>
+							</div>
+							<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
+								{m.updated_on({
+									date: new Date(campaign.updatedAt).toLocaleString([], {
+										year: "numeric",
+										month: "2-digit",
+										day: "2-digit",
+										hour: "2-digit",
+										minute: "2-digit",
+									}),
+								})}
+								{#if campaign.user}
+									| <a
+										href="/users/{campaign.user.id}"
+										class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+										>{campaign.user.name ||
+											campaign.user.email ||
+											"User"}</a
+									>
+								{/if}
 							</div>
 						</div>
+						{:else}
+						<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+							<Megaphone class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+							<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+								{m.no_items({ items: m.feature_campaigns_title() })}
+							</h3>
+							<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+								Try adjusting your search or filters.
+							</p>
+						</div>
+						{/each}
 					</div>
 
-					<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
-						<Button variant="outline" size="sm" href={`/campaigns/${campaign.id}`} class="flex-1 sm:flex-none">
-							<Pencil class="w-4 h-4 mr-2" />
-							{m.edit()}
-						</Button>
-						<button
-							class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-							onclick={() => handleDelete(campaign)}
-						>
-							<Trash2 class="w-4 h-4 mr-2" />
-							{m.delete()}
-						</button>
-					</div>
-					<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
-						{m.updated_on({
-							date: new Date(campaign.updatedAt).toLocaleString([], {
-								year: "numeric",
-								month: "2-digit",
-								day: "2-digit",
-								hour: "2-digit",
-								minute: "2-digit",
-							}),
-						})}
-						{#if campaign.user}
-							| <a
-								href="/users/{campaign.user.id}"
-								class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-								>{campaign.user.name ||
-									campaign.user.email ||
-									"User"}</a
-							>
-						{/if}
-					</div>
-				</div>
-			{:else}
-				<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-					<Megaphone class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-					<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-						{m.no_items({ items: m.feature_campaigns_title() })}
-					</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						Try adjusting your search or filters.
-					</p>
-				</div>
-				{/each}
-			{/if}
-		</div>
-
-		<!-- Pagination -->
-		{#if query.current && query.current.total > limit}
-				{@const totalPages = Math.ceil(query.current.total / limit)}
-				<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-					<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, query.current.total)} of {query.current.total}</span>
-						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-							<select
-								bind:value={limit}
-								onchange={() => (page = 1)}
-								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
-							>
-								<option value={10}>10 per page</option>
-								<option value={20}>20 per page</option>
-								<option value={50}>50 per page</option>
-								<option value={100}>100 per page</option>
-							</select>
+					<!-- Pagination -->
+					{#await listCampaigns(filterState) then result}
+					{#if result && result.total > limit}
+						{@const totalPages = Math.ceil(result.total / limit)}
+						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
+								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+									<select
+										bind:value={limit}
+										onchange={() => (page = 1)}
+										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
+									>
+										<option value={10}>10 per page</option>
+										<option value={20}>20 per page</option>
+										<option value={50}>50 per page</option>
+										<option value={100}>100 per page</option>
+									</select>
+								</div>
+							</div>
+							<div class="flex items-center gap-1 sm:gap-2">
+								<Button
+									variant="outline"
+									size="icon"
+									disabled={page === 1}
+									onclick={() => page = 1}
+									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+									title="First page"
+								>
+									<ChevronsLeft size={16} />
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page === 1}
+									onclick={() => page > 1 && page--}
+									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+								>
+									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+									Previous
+								</Button>
+								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
+									<select
+										bind:value={page}
+										class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
+									>
+										{#each Array(totalPages) as _, i}
+											<option value={i + 1}>{i + 1}</option>
+										{/each}
+									</select>
+									<span class="text-gray-400">/ {totalPages}</span>
+								</div>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page === totalPages}
+									onclick={() => page < totalPages && page++}
+									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+								>
+									Next
+									<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									disabled={page === totalPages}
+									onclick={() => page = totalPages}
+									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+									title="Last page"
+								>
+									<ChevronsRight size={16} />
+								</Button>
+							</div>
 						</div>
-					</div>
-					<div class="flex items-center gap-1 sm:gap-2">
-						<Button
-							variant="outline"
-							size="icon"
-							disabled={page === 1}
-							onclick={() => page = 1}
-							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-							title="First page"
-						>
-							<ChevronsLeft size={16} />
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === 1}
-							onclick={() => page > 1 && page--}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-						>
-							<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-							Previous
-						</Button>
-						<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
-							<select
-								bind:value={page}
-								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
-							>
-								{#each Array(totalPages) as _, i}
-									<option value={i + 1}>{i + 1}</option>
-								{/each}
-							</select>
-							<span class="text-gray-400">/ {totalPages}</span>
-						</div>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === totalPages}
-							onclick={() => page < totalPages && page++}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-						>
-							Next
-							<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
-						</Button>
-						<Button
-							variant="outline"
-							size="icon"
-							disabled={page === totalPages}
-							onclick={() => page = totalPages}
-							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-							title="Last page"
-						>
-							<ChevronsRight size={16} />
-						</Button>
-					</div>
+					{/if}
+					{/await}
 				</div>
-			{/if}
+			{#snippet failed(error: unknown)}
+				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
+			{/snippet}
+		</svelte:boundary>
 	</div>
 </div>

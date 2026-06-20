@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "$lib/paraglide/messages";
     import { type Event, type Tag } from "@ac/validations";
 
@@ -22,9 +23,7 @@
     import { onMount, type Snippet, untrack } from "svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
-    import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-
+        
     import {
         addAssociation,
         removeAssociation,

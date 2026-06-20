@@ -388,8 +388,7 @@
     {:else if kiosk?.uiMode === "table"}
         <KioskTableView {items} {kiosk} />
     {:else}
-        {#key currentIndex}
-            <div
+                    <div
                 class="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 overflow-y-auto"
                 in:fly={{
                     x: direction * 500,
@@ -444,6 +443,5 @@
                     {/if}
                 </div>
             </div>
-        {/key}
-    {/if}
+            {/if}
 </div>

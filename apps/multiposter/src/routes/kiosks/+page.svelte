@@ -242,15 +242,13 @@
 			</div>
 		</div>
 
-		<!-- List -->
-		<div class="grid grid-cols-1 gap-5">
-
-			{#if query.loading && !query.current}
-				<div class="col-span-full py-12 text-center text-gray-500">Loading...</div>
-			{:else if query.error}
-				<div class="col-span-full py-12 text-center text-red-500">{query.error.message}</div>
-			{:else}
-				{#each query.current?.data || [] as kiosk (kiosk.id)}
+		<svelte:boundary>
+			{#if $effect.pending()}
+				<div class="py-12 text-center text-gray-500">Loading...</div>
+			{/if}
+			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+				<div class="grid grid-cols-1 gap-5">
+					{#each (await listKiosks(filterState)).data || [] as kiosk (kiosk.id)}
 				<div
 					class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
 				>
@@ -352,28 +350,21 @@
 						{/if}
 					</div>
 				</div>
-			{:else}
-				<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-					<Monitor class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-					<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{m.no_kiosks()}</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Try adjusting your search or filters.</p>
+					{/each}
 				</div>
-				{/each}
-			{/if}
-		</div>
 
-		<!-- Pagination -->
-
-		{#if query.current && query.current.total > limit}
-				{@const totalPages = Math.ceil(query.current.total / limit)}
+				<!-- Pagination -->
+				{#await listKiosks(filterState) then result}
+				{#if result && result.total > limit}
+					{@const totalPages = Math.ceil(result.total / limit)}
 				<div
 					class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
 				>
 					<div class="text-sm text-gray-500 dark:text-gray-400">
 						Showing {(page - 1) * limit + 1} to {Math.min(
 							page * limit,
-							query.current.total,
-						)} of {query.current.total}
+							result.total,
+						)} of {result.total}
 					</div>
 					<div class="flex items-center gap-2">
 						<Button
@@ -403,7 +394,14 @@
 						</Button>
 					</div>
 				</div>
-			{/if}
+				{/if}
+				{/await}
+			</div>
+
+			{#snippet failed(error: unknown)}
+				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
+			{/snippet}
+		</svelte:boundary>
 	</div>
 </div>
 

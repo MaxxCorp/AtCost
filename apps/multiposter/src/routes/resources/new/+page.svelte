@@ -8,6 +8,9 @@
 
     let locationsPromise = listLocations();
     let resourcesPromise = listResources();
+
+    const formId = crypto.randomUUID();
+    const rf = createResource.for(formId);
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -21,7 +24,7 @@
                 <p>Loading...</p>
             {:then [locations, allResources]}
                 <ResourceForm
-                    remoteFunction={createResource}
+                    remoteFunction={rf}
                     validationSchema={createResourceSchema}
                     locations={locations.data}
                     allResources={allResources.data}

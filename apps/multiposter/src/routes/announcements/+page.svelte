@@ -5,7 +5,8 @@
 	import { deleteAnnouncements } from "./[id]/delete.remote";
 
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import { Button } from "@ac/ui/components/button";
+	import { LoadingSection, ErrorSection, EmptyState } from "@ac/ui";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import {
 		Megaphone,
@@ -184,164 +185,179 @@
 		</div>
 
 		<!-- List -->
-		{#if await listAnnouncements(filterState)}
-		{@const res = await listAnnouncements(filterState)}
-		<div class="grid grid-cols-1 gap-5">
-				{#each res.data || [] as announcement (announcement.id)}
-				<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
-					<div class="flex-1 mb-5">
-						<div class="flex items-start gap-4">
-							<div class="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-								<Megaphone size={24} />
-							</div>
-							<div class="flex-1 min-w-0">
-								<a href={`/announcements/${announcement.id}/view`} class="block group mb-2">
-									<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-snug truncate transition-colors">
-										{announcement.title}
-									</h3>
-								</a>
-								
-								<div class="flex flex-col gap-1 mt-1">
-									{#if announcement.isPublic}
-										<div class="flex items-center gap-2">
-											<Earth size={14} class="text-green-500" />
-											<span class="text-xs text-green-600 font-medium">{m.public()}</span>
+		<div class="relative min-h-[200px]">
+			<svelte:boundary>
+				{#if $effect.pending()}
+					<div class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] rounded-xl">
+						<LoadingSection />
+					</div>
+				{/if}
+
+				<div class={["transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
+					<div class="grid grid-cols-1 gap-5">
+						{#each (await listAnnouncements(filterState))?.data || [] as announcement (announcement.id)}
+						<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+							<div class="flex-1 mb-5">
+								<div class="flex items-start gap-4">
+									<div class="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+										<Megaphone size={24} />
+									</div>
+									<div class="flex-1 min-w-0">
+										<a href={`/announcements/${announcement.id}/view`} class="block group mb-2">
+											<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-snug truncate transition-colors">
+												{announcement.title}
+											</h3>
+										</a>
+										
+										<div class="flex flex-col gap-1 mt-1">
+											{#if announcement.isPublic}
+												<div class="flex items-center gap-2">
+													<Earth size={14} class="text-green-500" />
+													<span class="text-xs text-green-600 font-medium">{m.public()}</span>
+												</div>
+											{:else}
+												<div class="flex items-center gap-2">
+													<span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{m.draft()}</span>
+												</div>
+											{/if}
 										</div>
-									{:else}
-										<div class="flex items-center gap-2">
-											<span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{m.draft()}</span>
-										</div>
-									{/if}
+									</div>
 								</div>
 							</div>
+
+							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
+								<Button variant="outline" size="sm" href={`/announcements/${announcement.id}/view`} class="flex-1 sm:flex-none">
+									<Eye class="w-4 h-4 mr-2" />
+									{m.view()}
+								</Button>
+								<Button variant="outline" size="sm" href={`/announcements/${announcement.id}`} class="flex-1 sm:flex-none">
+									<Pencil class="w-4 h-4 mr-2" />
+									{m.edit()}
+								</Button>
+								<button
+									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
+									onclick={() => handleDelete(announcement)}
+								>
+									<Trash2 class="w-4 h-4 mr-2" />
+									{m.delete()}
+								</button>
+							</div>
+							<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
+								{m.updated_on({
+									date: new Date(announcement.updatedAt).toLocaleString([], {
+										year: "numeric",
+										month: "2-digit",
+										day: "2-digit",
+										hour: "2-digit",
+										minute: "2-digit",
+									}),
+								})}
+								{#if announcement.user}
+									| <a
+										href="/users/{announcement.user.id}"
+										class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+									>{announcement.user.name || announcement.user.email || "User"}</a>
+								{/if}
+							</div>
 						</div>
+						{:else}
+							<div class="col-span-full">
+								<EmptyState 
+									icon={Megaphone}
+									title="No announcements found"
+									description="Get started by creating a new announcement"
+									actionLabel="Create Announcement"
+									actionHref="/announcements/new"
+								/>
+							</div>
+						{/each}
 					</div>
 
-					<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
-						<Button variant="outline" size="sm" href={`/announcements/${announcement.id}/view`} class="flex-1 sm:flex-none">
-							<Eye class="w-4 h-4 mr-2" />
-							{m.view()}
-						</Button>
-						<Button variant="outline" size="sm" href={`/announcements/${announcement.id}`} class="flex-1 sm:flex-none">
-							<Pencil class="w-4 h-4 mr-2" />
-							{m.edit()}
-						</Button>
-						<button
-							class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-							onclick={() => handleDelete(announcement)}
-						>
-							<Trash2 class="w-4 h-4 mr-2" />
-							{m.delete()}
-						</button>
-					</div>
-					<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
-						{m.updated_on({
-							date: new Date(announcement.updatedAt).toLocaleString([], {
-								year: "numeric",
-								month: "2-digit",
-								day: "2-digit",
-								hour: "2-digit",
-								minute: "2-digit",
-							}),
-						})}
-						{#if announcement.user}
-							| <a
-								href="/users/{announcement.user.id}"
-								class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-								>{announcement.user.name ||
-									announcement.user.email ||
-									"User"}</a
-							>
-						{/if}
-					</div>
+					<!-- Pagination -->
+					{#if ((await listAnnouncements(filterState))?.total || 0) > limit}
+						{@const totalCount = ((await listAnnouncements(filterState))?.total || 0)}
+						{@const totalPages = Math.ceil(totalCount / limit)}
+						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalCount)} of {totalCount}</span>
+								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+									<select
+										bind:value={limit}
+										onchange={() => (page = 1)}
+										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
+									>
+										<option value={10}>10 per page</option>
+										<option value={20}>20 per page</option>
+										<option value={50}>50 per page</option>
+										<option value={100}>100 per page</option>
+									</select>
+								</div>
+							</div>
+							<div class="flex items-center gap-1 sm:gap-2">
+								<Button
+									variant="outline"
+									size="icon"
+									disabled={page === 1}
+									onclick={() => page = 1}
+									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+									title="First page"
+								>
+									<ChevronsLeft size={16} />
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page === 1}
+									onclick={() => page > 1 && page--}
+									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+								>
+									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+									Previous
+								</Button>
+								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
+									<select
+										bind:value={page}
+										class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
+									>
+										{#each Array(totalPages) as _, i}
+											<option value={i + 1}>{i + 1}</option>
+										{/each}
+									</select>
+									<span class="text-gray-400">/ {totalPages}</span>
+								</div>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page === totalPages}
+									onclick={() => page < totalPages && page++}
+									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+								>
+									Next
+									<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									disabled={page === totalPages}
+									onclick={() => page = totalPages}
+									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+									title="Last page"
+								>
+									<ChevronsRight size={16} />
+								</Button>
+							</div>
+						</div>
+					{/if}
 				</div>
-			{:else}
-				<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-					<Megaphone class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-					<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-						{m.no_items({ items: m.announcements() })}
-					</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						Try adjusting your search or filters.
-					</p>
-				</div>
-				{/each}
+
+				{#snippet pending()}
+					<LoadingSection />
+				{/snippet}
+
+				{#snippet failed(error, reset)}
+					<ErrorSection {error} onRetry={reset} />
+				{/snippet}
+			</svelte:boundary>
 		</div>
-
-		<!-- Pagination -->
-			{#if res.total > limit}
-				{@const totalPages = Math.ceil(res.total / limit)}
-				<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-					<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, res.total)} of {res.total}</span>
-						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-							<select
-								bind:value={limit}
-								onchange={() => (page = 1)}
-								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
-							>
-								<option value={10}>10 per page</option>
-								<option value={20}>20 per page</option>
-								<option value={50}>50 per page</option>
-								<option value={100}>100 per page</option>
-							</select>
-						</div>
-					</div>
-					<div class="flex items-center gap-1 sm:gap-2">
-						<Button
-							variant="outline"
-							size="icon"
-							disabled={page === 1}
-							onclick={() => page = 1}
-							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-							title="First page"
-						>
-							<ChevronsLeft size={16} />
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === 1}
-							onclick={() => page > 1 && page--}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-						>
-							<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-							Previous
-						</Button>
-						<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
-							<select
-								bind:value={page}
-								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
-							>
-								{#each Array(totalPages) as _, i}
-									<option value={i + 1}>{i + 1}</option>
-								{/each}
-							</select>
-							<span class="text-gray-400">/ {totalPages}</span>
-						</div>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === totalPages}
-							onclick={() => page < totalPages && page++}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-						>
-							Next
-							<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
-						</Button>
-						<Button
-							variant="outline"
-							size="icon"
-							disabled={page === totalPages}
-							onclick={() => page = totalPages}
-							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-							title="Last page"
-						>
-							<ChevronsRight size={16} />
-						</Button>
-					</div>
-				</div>
-			{/if}
-		{/if}
 	</div>
 </div>

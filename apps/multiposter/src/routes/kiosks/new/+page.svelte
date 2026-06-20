@@ -3,6 +3,9 @@
     import KioskForm from "$lib/components/kiosks/KioskForm.svelte";
     import { createKiosk } from "./create.remote";
     import { createKioskSchema } from "$lib/validations/kiosks";
+
+    const formId = crypto.randomUUID();
+    const rf = createKiosk.for(formId);
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -12,7 +15,7 @@
         <h1 class="text-3xl font-bold mb-8">Create New Kiosk</h1>
 
         <KioskForm
-            remoteFunction={createKiosk}
+            remoteFunction={rf}
             validationSchema={createKioskSchema}
         />
     </div>

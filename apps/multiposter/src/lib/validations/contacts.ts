@@ -19,14 +19,14 @@ const emailSchemaPure = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),
     value: v.union([v.pipe(v.string(), v.email()), v.pipe(v.string(), v.length(0))]),
     type: v.fallback(v.string(), 'work'),
-    primary: v.fallback(v.boolean(), false),
+    primary: v.optional(v.boolean(), false),
 });
 
 const phoneSchemaPure = v.object({
     id: v.optional(v.pipe(v.string(), v.uuid())),
     value: v.string(),
     type: v.fallback(v.string(), 'mobile'),
-    primary: v.fallback(v.boolean(), false),
+    primary: v.optional(v.boolean(), false),
 });
 
 const addressSchemaPure = v.object({
@@ -38,7 +38,7 @@ const addressSchemaPure = v.object({
     state: v.optional(v.string()),
     country: v.optional(v.string()),
     type: v.fallback(v.string(), 'home'),
-    primary: v.fallback(v.boolean(), false),
+    primary: v.optional(v.boolean(), false),
 });
 
 const contactRelationSchemaPure = v.object({

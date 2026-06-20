@@ -8,11 +8,14 @@
         feature: "shiftplans",
         current: "New Template"
     });
+
+    const formId = crypto.randomUUID();
+    const rf = createShiftplan.for(formId);
 </script>
 
 <div class="py-10">
     <ShiftplanTemplateForm 
-        remoteFunction={createShiftplan}
+        remoteFunction={rf}
         validationSchema={createShiftplanSchema}
     />
 </div>

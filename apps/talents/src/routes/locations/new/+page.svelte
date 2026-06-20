@@ -5,6 +5,9 @@
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
 
     breadcrumbState.set({ feature: "locations", current: "New Location" });
+
+    const formId = crypto.randomUUID();
+    const rf = createLocation.for(formId);
 </script>
 
 <div class="max-w-4xl mx-auto px-4 py-8">
@@ -19,7 +22,7 @@
         class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8"
     >
         <LocationForm
-            remoteFunction={createLocation}
+            remoteFunction={rf}
             validationSchema={createLocationSchema}
             cancelHref="/locations"
         />

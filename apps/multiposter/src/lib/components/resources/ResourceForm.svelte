@@ -49,7 +49,7 @@
         onSuccess,
         onCancel,
     }: {
-        remoteFunction: typeof updateResource | typeof createResource;
+        remoteFunction: any;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: any;

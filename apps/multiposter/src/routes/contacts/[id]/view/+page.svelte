@@ -1,12 +1,11 @@
 <script lang="ts">
+	import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "$lib/paraglide/messages";
     import { page } from "$app/state";
     import { authClient } from "$lib/auth";
     import { readContact } from "../read.remote";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-    import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-    import { goto } from "$app/navigation";
+            import { goto } from "$app/navigation";
     import {
         Mail,
         Phone,

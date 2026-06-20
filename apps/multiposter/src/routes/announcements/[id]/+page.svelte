@@ -11,14 +11,12 @@
 {#await readAnnouncement(id)}
     <div class="p-8 text-center text-gray-500">Loading...</div>
 {:then announcement}
-    {#key id}
-    <AnnouncementForm
+        <AnnouncementForm
         remoteFunction={updateAnnouncement.for(id)}
         validationSchema={updateAnnouncementSchema}
         isUpdating={true}
         initialData={announcement}
     />
-    {/key}
-{:catch}
+    {:catch}
     <div class="p-8 text-center text-red-500">Error loading announcement</div>
 {/await}

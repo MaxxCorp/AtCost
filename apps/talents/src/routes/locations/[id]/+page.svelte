@@ -1,12 +1,12 @@
 <script lang="ts">
+	import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "$lib/paraglide/messages";
     import { Users } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";
     import { page } from "$app/state";
     import LocationForm from "@ac/ui/components/forms/LocationForm.svelte";
-    import LoadingSection from "@ac/ui/components/LoadingSection.svelte";
-    import { readLocation } from "./read.remote";
+        import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { updateLocationSchema } from "@ac/validations/locations";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
@@ -58,7 +58,7 @@
             class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8"
         >
             <LocationForm
-                remoteFunction={updateLocation}
+                remoteFunction={updateLocation.for(id)}
                 validationSchema={updateLocationSchema}
                 initialData={locationQuery.data}
                 isUpdating={true}

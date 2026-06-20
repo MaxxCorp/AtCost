@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { LoadingSection, ErrorSection } from "@ac/ui";
 	import * as m from "$lib/paraglide/messages.js";
 	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
@@ -13,9 +14,7 @@
 	import DashboardCard from "$lib/components/ui/DashboardCard.svelte";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-	import LoadingSection from "$lib/components/ui/LoadingSection.svelte";
-	import ErrorSection from "$lib/components/ui/ErrorSection.svelte";
-	import { handleDelete } from "@ac/ui";
+			import { handleDelete } from "@ac/ui";
 	import { toast } from "svelte-sonner";
 	import {
 		Calendar,

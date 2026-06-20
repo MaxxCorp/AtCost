@@ -76,8 +76,7 @@
 		if (roles.length === 0) return m.role_user();
 		return roles.join(", ");
 	}
-	let query = $derived(listUsers(filterState));
-	let res = $derived(query.current);
+
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -127,165 +126,169 @@
 			</div>
 		</div>
 
-		<!-- List -->
-		<div class="grid grid-cols-1 gap-5">
+		<svelte:boundary>
+			{#if $effect.pending()}
+				<div class="py-12 text-center text-gray-500">Loading...</div>
+			{/if}
+			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+					<!-- List -->
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+						{#each (await listUsers(filterState)).data || [] as user (user.id)}
+						<div class="group relative bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 hover:shadow-xl hover:border-blue-200 transition-all duration-300">
+							<div class="flex flex-col sm:flex-row items-start gap-6">
+								<div class="flex items-center gap-4 shrink-0">
+									<a href={`/users/${user.id}`} class="shrink-0">
+										{#if user.image}
+											<img
+												src={user.image}
+												alt={user.name}
+												class="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md group-hover:scale-105 transition-transform"
+											/>
+										{:else}
+											<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border border-blue-200 shadow-sm group-hover:scale-105 transition-transform">
+												<UserIcon size={28} class="text-blue-600" />
+											</div>
+										{/if}
+									</a>
+								</div>
 
-			{#if query.loading && !query.current}
-				<div class="col-span-full py-12 text-center text-gray-500">Loading...</div>
-			{:else if query.error}
-				<div class="col-span-full py-12 text-center text-red-500">{query.error.message}</div>
-			{:else}
-				{#each query.current?.data || [] as user (user.id)}
-				<div class="group relative bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 hover:shadow-xl hover:border-blue-200 transition-all duration-300">
-					<div class="flex flex-col sm:flex-row items-start gap-6">
-						<div class="flex items-center gap-4 shrink-0">
-							<a href={`/users/${user.id}`} class="shrink-0">
-								{#if user.image}
-									<img
-										src={user.image}
-										alt={user.name}
-										class="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md group-hover:scale-105 transition-transform"
-									/>
-								{:else}
-									<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center border border-blue-200 shadow-sm group-hover:scale-105 transition-transform">
-										<UserIcon size={28} class="text-blue-600" />
+								<div class="flex-1 min-w-0 space-y-3">
+									<div>
+										<a href={`/users/${user.id}`} class="text-xl font-black text-gray-900 dark:text-gray-100 hover:underline group-hover:text-blue-600 transition-colors truncate block">
+											{user.name}
+										</a>
+										<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 mt-1">
+											<Mail size={14} class="text-blue-400" />
+											<span class="text-sm font-medium truncate">{user.email}</span>
+										</div>
 									</div>
-								{/if}
-							</a>
-						</div>
 
-						<div class="flex-1 min-w-0 space-y-3">
-							<div>
-								<a href={`/users/${user.id}`} class="text-xl font-black text-gray-900 dark:text-gray-100 hover:underline group-hover:text-blue-600 transition-colors truncate block">
-									{user.name}
-								</a>
-								<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 mt-1">
-									<Mail size={14} class="text-blue-400" />
-									<span class="text-sm font-medium truncate">{user.email}</span>
+									<div class="flex flex-wrap gap-2">
+										<div class="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-black uppercase tracking-wider border border-blue-100 dark:border-blue-800">
+											<Shield size={12} />
+											{formatRoles(user)}
+										</div>
+									</div>
+
+									<div class="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest pt-2">
+										<CalendarIcon size={12} />
+										{m.joined_label()} {new Date(user.createdAt).toLocaleDateString()}
+									</div>
+								</div>
+
+								<div class="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-4 sm:mt-0 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+									<Button
+										href={`/users/${user.id}`}
+										variant="ghost"
+										class="flex-1 sm:flex-none justify-start px-4 h-10 hover:bg-blue-50 hover:text-blue-600 rounded-xl"
+									>
+										<Pencil size={16} class="mr-2" />
+										{m.edit()}
+									</Button>
+									<button
+										onclick={() => handleDelete(user)}
+										class="flex-1 sm:flex-none inline-flex items-center justify-start whitespace-nowrap text-sm font-medium transition-colors hover:bg-red-50 hover:text-red-600 rounded-xl px-4 h-10 text-red-500"
+									>
+										<Trash2 size={16} class="mr-2" />
+										{m.delete()}
+									</button>
 								</div>
 							</div>
+						</div>
+						{:else}
+						<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+							<UserIcon class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+							<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+								{m.no_users_found()}
+							</h3>
+							<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+								Try adjusting your search or filters.
+							</p>
+						</div>
+						{/each}
+					</div>
 
-							<div class="flex flex-wrap gap-2">
-								<div class="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-black uppercase tracking-wider border border-blue-100 dark:border-blue-800">
-									<Shield size={12} />
-									{formatRoles(user)}
+					<!-- Pagination -->
+					{#await listUsers(filterState) then result}
+					{#if result && result.total > limit}
+						{@const totalPages = Math.ceil(result.total / limit)}
+						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
+								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+									<select
+										bind:value={limit}
+										onchange={() => (page = 1)}
+										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
+									>
+										<option value={10}>10 per page</option>
+										<option value={20}>20 per page</option>
+										<option value={50}>50 per page</option>
+										<option value={100}>100 per page</option>
+									</select>
 								</div>
 							</div>
-
-							<div class="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest pt-2">
-								<CalendarIcon size={12} />
-								{m.joined_label()} {new Date(user.createdAt).toLocaleDateString()}
+							<div class="flex items-center gap-1 sm:gap-2">
+								<Button
+									variant="outline"
+									size="icon"
+									disabled={page === 1}
+									onclick={() => page = 1}
+									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+									title="First page"
+								>
+									<ChevronsLeft size={16} />
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page === 1}
+									onclick={() => page > 1 && page--}
+									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+								>
+									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+									Previous
+								</Button>
+								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
+									<select
+										bind:value={page}
+										class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
+									>
+										{#each Array(totalPages) as _, i}
+											<option value={i + 1}>{i + 1}</option>
+										{/each}
+									</select>
+									<span class="text-gray-400">/ {totalPages}</span>
+								</div>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={page === totalPages}
+									onclick={() => page < totalPages && page++}
+									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+								>
+									Next
+									<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									disabled={page === totalPages}
+									onclick={() => page = totalPages}
+									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+									title="Last page"
+								>
+									<ChevronsRight size={16} />
+								</Button>
 							</div>
 						</div>
-
-						<div class="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-4 sm:mt-0 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-							<Button
-								href={`/users/${user.id}`}
-								variant="ghost"
-								class="flex-1 sm:flex-none justify-start px-4 h-10 hover:bg-blue-50 hover:text-blue-600 rounded-xl"
-							>
-								<Pencil size={16} class="mr-2" />
-								{m.edit()}
-							</Button>
-							<button
-								onclick={() => handleDelete(user)}
-								class="flex-1 sm:flex-none inline-flex items-center justify-start whitespace-nowrap text-sm font-medium transition-colors hover:bg-red-50 hover:text-red-600 rounded-xl px-4 h-10 text-red-500"
-							>
-								<Trash2 size={16} class="mr-2" />
-								{m.delete()}
-							</button>
-						</div>
-					</div>
-				</div>
-			{:else}
-				<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-					<UserIcon class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-					<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-						{m.no_users_found()}
-					</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						Try adjusting your search or filters.
-					</p>
-				</div>
-				{/each}
-			{/if}
-		</div>
-
-		<!-- Pagination -->
-
-		{#if query.current && query.current.total > limit}
-				{@const totalPages = Math.ceil(query.current.total / limit)}
-				<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-					<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, query.current.total)} of {query.current.total}</span>
-						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-							<select
-								bind:value={limit}
-								onchange={() => (page = 1)}
-								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
-							>
-								<option value={10}>10 per page</option>
-								<option value={20}>20 per page</option>
-								<option value={50}>50 per page</option>
-								<option value={100}>100 per page</option>
-							</select>
-						</div>
-					</div>
-					<div class="flex items-center gap-1 sm:gap-2">
-						<Button
-							variant="outline"
-							size="icon"
-							disabled={page === 1}
-							onclick={() => page = 1}
-							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-							title="First page"
-						>
-							<ChevronsLeft size={16} />
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === 1}
-							onclick={() => page > 1 && page--}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-						>
-							<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-							Previous
-						</Button>
-						<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
-							<select
-								bind:value={page}
-								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
-							>
-								{#each Array(totalPages) as _, i}
-									<option value={i + 1}>{i + 1}</option>
-								{/each}
-							</select>
-							<span class="text-gray-400">/ {totalPages}</span>
-						</div>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === totalPages}
-							onclick={() => page < totalPages && page++}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-						>
-							Next
-							<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
-						</Button>
-						<Button
-							variant="outline"
-							size="icon"
-							disabled={page === totalPages}
-							onclick={() => page = totalPages}
-							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-							title="Last page"
-						>
-							<ChevronsRight size={16} />
-						</Button>
-					</div>
-				</div>
-			{/if}
+					{/if}
+					{/await}
+			</div>
+			{#snippet failed(error: unknown)}
+				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
+			{/snippet}
+		</svelte:boundary>
 	</div>
 </div>
 

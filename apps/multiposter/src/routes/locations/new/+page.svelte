@@ -11,6 +11,9 @@
     import { updateLocation } from "../[id]/update.remote";
     import { deleteLocation } from "../[id]/delete.remote";
     import { handleDelete } from "@ac/ui";
+
+    const formId = crypto.randomUUID();
+    const rf = createLocation.for(formId);
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -21,7 +24,7 @@
             <h1 class="text-3xl font-bold mb-6">{m.create_new_item({ item: m.location_label() })}</h1>
 
             <LocationForm
-                remoteFunction={createLocation}
+                remoteFunction={rf}
                 validationSchema={createLocationSchema}
                 isUpdating={false}
                 labels={{
