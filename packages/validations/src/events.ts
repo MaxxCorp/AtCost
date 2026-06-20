@@ -40,7 +40,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	instances?: Event[];
 };
 
-export type PublicEvent = Omit<Event, 'resolvedContact'> & {
+export type PublicEvent = Omit<Event, 'resolvedContact' | 'internalNotes'> & {
     resolvedContact: {
         name: string;
         company?: string | null;
@@ -59,6 +59,7 @@ export type PublicEvent = Omit<Event, 'resolvedContact'> & {
         qrCodePath?: string;
     } | null;
     ticketPrice?: string | null;
+    ticketPriceUnknown?: boolean;
     categoryBerlinDotDe?: string | null;
     qrCodeDataUrl?: string;
     confirmedParticipants?: number;

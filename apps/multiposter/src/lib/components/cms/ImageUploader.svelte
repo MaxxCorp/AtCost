@@ -50,7 +50,7 @@
 
     async function handleFile(file: File) {
         if (!file.type.startsWith("image/")) {
-            toast.error("Invalid file type. Please upload an image.");
+            toast.error(m.invalid_file_type_image());
             return;
         }
 
@@ -107,7 +107,7 @@
             }
         } catch (err) {
             console.error("Camera access error:", err);
-            toast.error("Camera access denied or unavailable");
+            toast.error(m.camera_access_denied());
             showCamera = false;
         }
     }
@@ -170,7 +170,7 @@
     <div
         role="button"
         tabindex="0"
-        aria-label="Upload image"
+        aria-label={m.upload_image()}
         class="relative border-2 border-dashed rounded-lg transition-all duration-200 overflow-hidden bg-gray-50 min-h-[200px] flex items-center justify-center
         {isDragging
             ? 'border-blue-500 bg-blue-50'
@@ -190,7 +190,7 @@
         {#if isUploading}
             <div class="flex flex-col items-center space-y-2">
                 <Loader2 class="w-8 h-8 animate-spin text-blue-600" />
-                <p class="text-sm text-gray-500">Uploading...</p>
+                <p class="text-sm text-gray-500">{m.uploading_image()}</p>
             </div>
         {:else if showCamera}
             <div
@@ -207,14 +207,14 @@
                     <Button
                         variant="outline"
                         size="icon"
-                        aria-label="Close camera"
+                        aria-label={m.close_camera()}
                         onclick={stopCamera}
                         class="bg-white/20 hover:bg-white/40 border-none text-white rounded-full"
                     >
                         <X class="w-6 h-6" />
                     </Button>
                     <button
-                        aria-label="Take photo"
+                        aria-label={m.take_photo()}
                         onclick={takePhoto}
                         class="w-12 h-12 bg-white rounded-full border-4 border-gray-300 hover:scale-105 transition-transform shadow-lg"
                     ></button>
@@ -233,7 +233,7 @@
                     <Button
                         variant="destructive"
                         size="icon"
-                        aria-label="Clear image"
+                        aria-label={m.clear_image()}
                         onclick={clear}
                         class="rounded-full shadow-lg"
                     >
@@ -249,7 +249,7 @@
                             class="bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg text-sm font-medium hover:bg-white transition-colors flex items-center gap-2"
                         >
                             <Upload class="w-4 h-4" />
-                            Change
+                            {m.change_image()}
                         </div>
                         <input
                             type="file"
@@ -263,7 +263,7 @@
                         class="bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg text-sm font-medium hover:bg-white transition-colors flex items-center gap-2"
                     >
                         <Camera class="w-4 h-4" />
-                        Retake
+                        {m.retake_image()}
                     </button>
                 </div>
             </div>
@@ -274,9 +274,9 @@
                 </div>
                 <div class="space-y-1">
                     <p class="text-base font-semibold text-gray-900">
-                        Drag & drop or browse
+                        {m.drag_drop_browse()}
                     </p>
-                    <p class="text-sm text-gray-500">Supports PNG, JPG, WebP</p>
+                    <p class="text-sm text-gray-500">{m.supports_image_formats()}</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <label class="cursor-pointer">
@@ -284,7 +284,7 @@
                             class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 font-medium text-sm transition-colors"
                         >
                             <Upload class="w-4 h-4 mr-2" />
-                            Select File
+                            {m.select_file()}
                         </div>
                         <input
                             type="file"
@@ -294,7 +294,7 @@
                         />
                     </label>
                     <span class="text-xs text-gray-400 font-medium uppercase"
-                        >Or</span
+                        >{m.or()}</span
                     >
                     <button
                         type="button"
@@ -302,7 +302,7 @@
                         class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md shadow-sm hover:bg-gray-50 font-medium text-sm transition-colors"
                     >
                         <Camera class="w-4 h-4 mr-2 text-gray-500" />
-                        Take Photo
+                        {m.take_photo()}
                     </button>
                 </div>
             </div>

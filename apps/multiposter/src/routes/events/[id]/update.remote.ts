@@ -33,9 +33,15 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		if (data.summary !== undefined) updateData.summary = data.summary;
 		if (data.description !== undefined) updateData.description = data.description;
+		if (data.internalNotes !== undefined) updateData.internalNotes = data.internalNotes;
 		if (data.status !== undefined) updateData.status = data.status;
 		if (data.categoryBerlinDotDe !== undefined) updateData.categoryBerlinDotDe = data.categoryBerlinDotDe;
-		if (data.ticketPrice !== undefined) updateData.ticketPrice = data.ticketPrice;
+		if (data.ticketPriceUnknown !== undefined) {
+			updateData.ticketPriceUnknown = data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on';
+		}
+		if (data.ticketPrice !== undefined) {
+			updateData.ticketPrice = updateData.ticketPriceUnknown ? "0" : data.ticketPrice;
+		}
 
 		if (data.startDate !== undefined) {
 			const startTimeZone = data.startTimeZone || 'UTC';
@@ -64,7 +70,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			const endTimeZone = data.endTimeZone || data.startTimeZone || 'UTC';
 			updateData.endTimeZone = data.endTimeZone || null;
 			if (!data.endDate) {
-				updateData.endDateTime = null;
+				error(400, 'End date is required');
 			} else {
 				try {
 					if (data.endTime) {
@@ -73,15 +79,16 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						const zonedDate = toZoned(calendarDate, endTimeZone);
 						updateData.endDateTime = zonedDate.toDate();
 					} else {
-						const dString = `${data.endDate}T00:00:00`;
+						// Use 23:59:59 for end time if not provided (e.g., all day event)
+						const dString = `${data.endDate}T23:59:59`;
 						const calendarDate = parseDateTime(dString);
 						const zonedDate = toZoned(calendarDate, endTimeZone);
 						updateData.endDateTime = zonedDate.toDate();
 					}
 					console.log('Parsed End Date:', updateData.endDateTime);
 				} catch (e: any) {
-					console.warn(`Invalid end date/time provided, setting to null: ${e.message}`);
-					updateData.endDateTime = null;
+					console.error(`Invalid end date/time provided: ${e.message}`);
+					error(400, `Invalid end date/time format: ${e.message}`);
 				}
 			}
 		}
@@ -282,13 +289,14 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							campaignId: updatedEvent.campaignId,
 							summary: updatedEvent.summary,
 							description: updatedEvent.description,
+							internalNotes: updatedEvent.internalNotes,
 							categoryBerlinDotDe: updatedEvent.categoryBerlinDotDe,
 							ticketPrice: updatedEvent.ticketPrice,
 							isAllDay: updatedEvent.isAllDay,
 							status: updatedEvent.status,
 							startDateTime: date,
 							startTimeZone: updatedEvent.startTimeZone,
-							endDateTime: updatedEvent.endDateTime && instanceEnd ? instanceEnd : null,
+							endDateTime: instanceEnd || new Date(date.getTime() + 60*60*1000),
 							endTimeZone: updatedEvent.endTimeZone,
 							seriesId: seriesId,
 							isException: false,
@@ -335,9 +343,11 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						};
 						if (updateData.summary !== undefined) instanceUpdatePayload.summary = updateData.summary;
 						if (updateData.description !== undefined) instanceUpdatePayload.description = updateData.description;
+						if (updateData.internalNotes !== undefined) instanceUpdatePayload.internalNotes = updateData.internalNotes;
 						if (updateData.status !== undefined) instanceUpdatePayload.status = updateData.status;
 						if (updateData.categoryBerlinDotDe !== undefined) instanceUpdatePayload.categoryBerlinDotDe = updateData.categoryBerlinDotDe;
-						if (updateData.ticketPrice !== undefined) instanceUpdatePayload.ticketPrice = updateData.ticketPrice;
+						if (updateData.ticketPriceUnknown !== undefined) instanceUpdatePayload.ticketPriceUnknown = updateData.ticketPriceUnknown;
+						if (updateData.ticketPrice !== undefined) instanceUpdatePayload.ticketPrice = updateData.ticketPriceUnknown ? "0" : updateData.ticketPrice;
 						if (updateData.isAllDay !== undefined) instanceUpdatePayload.isAllDay = updateData.isAllDay;
 						if (updateData.startTimeZone !== undefined) instanceUpdatePayload.startTimeZone = updateData.startTimeZone;
 						if (updateData.endTimeZone !== undefined) instanceUpdatePayload.endTimeZone = updateData.endTimeZone;

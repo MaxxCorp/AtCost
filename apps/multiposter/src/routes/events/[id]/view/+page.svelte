@@ -423,7 +423,7 @@
                                         </li>
                                     {/if}
 
-                                    {#if event.ticketPrice}
+                                    {#if event.ticketPrice && !event.ticketPriceUnknown}
                                         <li
                                             class="flex items-center gap-3 text-gray-700"
                                         >

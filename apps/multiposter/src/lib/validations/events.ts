@@ -29,14 +29,15 @@ const remindersSchema = v.object({
 export const eventBaseSchema = v.object({
 	summary: v.pipe(v.string(), v.minLength(1, 'Event title is required')),
 	description: v.optional(v.string()),
+	internalNotes: v.optional(v.string()),
 	locationIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	// RemoteFormInput only allows string | number | boolean | File | ...
 	// So we use string and parse to Date manually where needed.
 	isAllDay: v.optional(v.union([v.boolean(), v.string()])),
-	startDate: v.optional(v.string()),
+	startDate: v.pipe(v.string(), v.minLength(1, 'Start date is required')),
 	startTime: v.optional(v.string()),
 	startTimeZone: v.optional(v.string()),
-	endDate: v.optional(v.string()),
+	endDate: v.pipe(v.string(), v.minLength(1, 'End date is required')),
 	endTime: v.optional(v.string()),
 	endTimeZone: v.optional(v.string()),
 	recurrence: v.optional(recurrenceSchema),
@@ -51,6 +52,7 @@ export const eventBaseSchema = v.object({
 	contactIds: v.optional(v.string()),
 	categoryBerlinDotDe: v.optional(v.string()),
 	ticketPrice: v.pipe(v.string(), v.minLength(1, m.ticket_price_required?.() ?? 'Ticket price is required')),
+	ticketPriceUnknown: v.optional(v.union([v.boolean(), v.string()])),
 	tags: v.optional(v.string()),
 	syncIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	status: v.optional(v.string()),

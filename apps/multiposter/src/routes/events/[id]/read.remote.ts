@@ -115,6 +115,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			isPublic: result.isPublic,
 			heroImage: result.heroImage,
 			ticketPrice: result.ticketPrice,
+			ticketPriceUnknown: result.ticketPriceUnknown,
 			categoryBerlinDotDe: result.categoryBerlinDotDe,
 			createdAt: result.createdAt.toISOString(),
 			updatedAt: result.updatedAt.toISOString(),

@@ -53,26 +53,30 @@ export const createEvent = form(createEventSchema, async (data) => {
 		}
 
 		// End date
-		let end: Date | null = null;
-		if (data.endDate) {
-			const endTimeZone = data.endTimeZone || startTimeZone;
-			try {
-				if (data.endTime) {
-					const dString = `${data.endDate}T${data.endTime}`;
-					const calendarDate = parseDateTime(dString);
-					const zonedDate = toZoned(calendarDate, endTimeZone);
-					end = zonedDate.toDate();
-				} else {
-					const dString = `${data.endDate}T00:00:00`;
-					const calendarDate = parseDateTime(dString);
-					const zonedDate = toZoned(calendarDate, endTimeZone);
-					end = zonedDate.toDate();
-				}
-				console.log('Parsed End Date:', end);
-			} catch (e: any) {
-				console.warn(`Invalid end date/time provided, setting to null: ${e.message}`);
-				end = null;
+		let end: Date;
+		if (!data.endDate) {
+			console.error('Missing end date');
+			error(400, 'End date is required');
+		}
+
+		const endTimeZone = data.endTimeZone || startTimeZone;
+		try {
+			if (data.endTime) {
+				const dString = `${data.endDate}T${data.endTime}`;
+				const calendarDate = parseDateTime(dString);
+				const zonedDate = toZoned(calendarDate, endTimeZone);
+				end = zonedDate.toDate();
+			} else {
+				// Use 23:59:59 for end time if not provided (e.g., all day event)
+				const dString = `${data.endDate}T23:59:59`;
+				const calendarDate = parseDateTime(dString);
+				const zonedDate = toZoned(calendarDate, endTimeZone);
+				end = zonedDate.toDate();
 			}
+			console.log('Parsed End Date:', end);
+		} catch (e: any) {
+			console.error(`Invalid end date/time provided: ${e.message}`);
+			error(400, `Invalid end date/time format: ${e.message}`);
 		}
 
 		// Handle Recurrence
@@ -135,8 +139,10 @@ export const createEvent = form(createEventSchema, async (data) => {
             campaignId: newCampaign?.id,
 			summary: data.summary,
 			description: data.description || null,
+			internalNotes: data.internalNotes || null,
 			categoryBerlinDotDe: data.categoryBerlinDotDe || null,
-			ticketPrice: data.ticketPrice || null,
+			ticketPriceUnknown: data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on',
+			ticketPrice: (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on') ? "0" : (data.ticketPrice || null),
 			isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
 			status: data.status || 'confirmed',
 			startDateTime: start,
@@ -236,13 +242,15 @@ export const createEvent = form(createEventSchema, async (data) => {
                         campaignId: newCampaign?.id,
 						summary: data.summary,
 						description: data.description || null,
+						internalNotes: data.internalNotes || null,
 						categoryBerlinDotDe: data.categoryBerlinDotDe || null,
-                        ticketPrice: data.ticketPrice || null,
+                        ticketPriceUnknown: data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on',
+                        ticketPrice: (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on') ? "0" : (data.ticketPrice || null),
                         isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
                         status: data.status || 'confirmed',
                         startDateTime: date,
 						startTimeZone: data.startTimeZone || null,
-						endDateTime: data.endTime && instanceEnd ? instanceEnd : null,
+						endDateTime: instanceEnd || end,
 						endTimeZone: data.endTimeZone || null,
 						// New series-based recurrence
 						seriesId: seriesId,

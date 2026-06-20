@@ -225,7 +225,7 @@
                     </h3>
 
                     <div class="space-y-4">
-                        {#if event.ticketPrice}
+                        {#if event.ticketPrice && !event.ticketPriceUnknown}
                             <div
                                 class="flex items-center gap-3 text-indigo-800"
                             >

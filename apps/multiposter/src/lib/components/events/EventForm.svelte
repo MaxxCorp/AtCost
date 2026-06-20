@@ -233,13 +233,7 @@
                rf.fields.isAllDay.value() === "on")
             : (initialData?.isAllDay ?? false),
     );
-    let hasEndTime = $derived(
-        rf.fields.hasEndTime.value() !== undefined
-            ? (rf.fields.hasEndTime.value() === true ||
-               rf.fields.hasEndTime.value() === "true" ||
-               rf.fields.hasEndTime.value() === "on")
-            : (initialData ? !!initialData.endDateTime : true),
-    );
+
     let useDefaultReminders = $derived(
         rf.fields.reminders.useDefault.value() !== undefined
             ? (rf.fields.reminders.useDefault.value() === true ||
@@ -249,6 +243,14 @@
     );
     let reminders = $derived(
         rf.fields.reminders.overrides.value() ?? [],
+    );
+
+    let isTicketPriceUnknown = $derived(
+        rf.fields.ticketPriceUnknown.value() !== undefined
+            ? (rf.fields.ticketPriceUnknown.value() === true ||
+               rf.fields.ticketPriceUnknown.value() === "true" ||
+               rf.fields.ticketPriceUnknown.value() === "on")
+            : (initialData?.id ? !!initialData.ticketPriceUnknown : true),
     );
 </script>
 
@@ -341,6 +343,26 @@
             {#if (rf.fields.description.value() ?? initialData?.description) !== undefined && (rf.fields.description.value() ?? initialData?.description) !== null}
                 <input
                     {...rf.fields.description.as("text", initialData?.description ?? "")}
+                    class="hidden"
+                />
+            {/if}
+        </div>
+    </div>
+
+    <div>
+        <label
+            for="internalNotes"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >{m.internal_notes()}</label
+        >
+        <div class="prose max-w-none">
+            <RichTextEditor 
+                value={rf.fields.internalNotes.value() ?? initialData?.internalNotes ?? ""} 
+                onchange={(v) => rf.fields.internalNotes.set(v)}
+            />
+            {#if (rf.fields.internalNotes.value() ?? initialData?.internalNotes) !== undefined && (rf.fields.internalNotes.value() ?? initialData?.internalNotes) !== null}
+                <input
+                    {...rf.fields.internalNotes.as("text", initialData?.internalNotes ?? "")}
                     class="hidden"
                 />
             {/if}
@@ -608,17 +630,31 @@
             >
                 {m.ticket_price()} <span class="text-red-500">*</span>
             </label>
-            <input
-                {...rf.fields.ticketPrice.as(
-                    "text",
-                    initialData?.ticketPrice?.toString() ?? "",
-                )}
-                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
-                    ? 'border-red-500'
-                    : 'border-gray-300'}"
-                placeholder="e.g. 15.50"
-                onblur={() => rf.validate()}
-            />
+            <div class="flex items-center gap-4 min-h-[42px]">
+                {#if !isTicketPriceUnknown}
+                    <input
+                        {...rf.fields.ticketPrice.as(
+                            "text",
+                            initialData?.ticketPrice?.toString() ?? "",
+                        )}
+                        class="flex-1 w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
+                            ? 'border-red-500'
+                            : 'border-gray-300'}"
+                        placeholder="e.g. 15.50"
+                        onblur={() => rf.validate()}
+                    />
+                {:else}
+                    <input {...rf.fields.ticketPrice.as("hidden", "0")} />
+                {/if}
+                <div class="flex items-center gap-2 whitespace-nowrap">
+                    <input
+                        {...rf.fields.ticketPriceUnknown.as("checkbox", initialData?.id ? !!initialData.ticketPriceUnknown : true)}
+                        id="ticketPriceUnknown"
+                        class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label for="ticketPriceUnknown" class="text-sm text-gray-700 cursor-pointer">{m.ticket_price_unknown()}</label>
+                </div>
+            </div>
             {#each rf.fields.ticketPrice.issues() ?? [] as issue}
                 <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
@@ -851,68 +887,54 @@
 
         <!-- End Block -->
         <div class="space-y-4">
-            <div class="flex items-center gap-2 h-6 md:mb-1">
-                <input
-                    {...rf.fields.hasEndTime.as(
-                        "checkbox",
-                        initialData ? !!initialData.endDateTime : true,
-                    )}
-                    id="hasEndTime"
-                    class="w-4 h-4 text-blue-600"
-                />
+            <div>
                 <label
-                    for="hasEndTime"
-                    class="text-sm font-medium text-gray-700"
-                    >{m.add_item({ item: m.end_time() })}</label
+                    for="endDate"
+                    class="block text-sm font-medium text-gray-700 mb-1"
+                    >{m.end_date()}
+                    <span class="text-red-500">*</span></label
                 >
+                <input
+                    {...rf.fields.endDate.as("date", initialEnd.date)}
+                    placeholder={rf.fields.startDate.value()}
+                    required
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                />
             </div>
-
-            {#if hasEndTime}
+            {#if !isAllDay}
                 <div>
                     <label
-                        for="endDate"
+                        for="endTime"
                         class="block text-sm font-medium text-gray-700 mb-1"
-                        >{m.end_date()}</label
+                        >{m.end_time()}
+                        <span class="text-red-500">*</span></label
                     >
                     <input
-                        {...rf.fields.endDate.as("date", initialEnd.date)}
-                        placeholder={rf.fields.startDate.value()}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    />
-                </div>
-                {#if !isAllDay}
-                    <div>
-                        <label
-                            for="endTime"
-                            class="block text-sm font-medium text-gray-700 mb-1"
-                            >{m.end_time()}</label
-                        >
-                        <input
-                            {...rf.fields.endTime.as("time", initialEnd.time)}
-                            placeholder={getDefaultEndTime(rf)}
-                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                        />
-                    </div>
-                {/if}
-                <div>
-                    <label
-                        for="endTimeZone"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >{m.end_time()} {m.timezone()}</label
-                    >
-                    <input
-                        {...rf.fields.endTimeZone.as(
-                            "text",
-                            initialData?.endTimeZone ||
-                                initialData?.startTimeZone ||
-                                browserTimezone,
-                        )}
-                        list="timezones"
-                        placeholder={rf.fields.startTimeZone.value()}
+                        {...rf.fields.endTime.as("time", initialEnd.time)}
+                        placeholder={getDefaultEndTime(rf)}
+                        required
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     />
                 </div>
             {/if}
+            <div>
+                <label
+                    for="endTimeZone"
+                    class="block text-sm font-medium text-gray-700 mb-1"
+                    >{m.end_time()} {m.timezone()}</label
+                >
+                <input
+                    {...rf.fields.endTimeZone.as(
+                        "text",
+                        initialData?.endTimeZone ||
+                            initialData?.startTimeZone ||
+                            browserTimezone,
+                    )}
+                    list="timezones"
+                    placeholder={rf.fields.startTimeZone.value()}
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                />
+            </div>
         </div>
     </div>
 

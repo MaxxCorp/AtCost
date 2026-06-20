@@ -210,6 +210,7 @@
 	"department": "Department",
 	"role": "Role",
 	"notes": "Notes",
+	"internal_notes": "Internal Notes",
 	"public_profile": "Public Profile",
 	"public_profile_description": "Allow unauthenticated viewing",
 	"tag_placeholder": "e.g. Customer, Lead, Priority",
@@ -574,5 +575,19 @@
 	"view_series": "View Series",
 	"for": "for",
 	"series": "Series",
-	"instances": "Instances"
+	"instances": "Instances",
+	"ticket_price_unknown": "Unknown",
+	"uploading_image": "Uploading...",
+	"change_image": "Change",
+	"retake_image": "Retake",
+	"drag_drop_browse": "Drag & drop or browse",
+	"supports_image_formats": "Supports PNG, JPG, WebP",
+	"select_file": "Select File",
+	"or": "Or",
+	"take_photo": "Take Photo",
+	"invalid_file_type_image": "Invalid file type. Please upload an image.",
+	"camera_access_denied": "Camera access denied or unavailable",
+	"upload_image": "Upload image",
+	"close_camera": "Close camera",
+	"clear_image": "Clear image"
 }

@@ -274,6 +274,7 @@ async function hydrateEvents(events: any[]): Promise<PublicEvent[]> {
             participationStatuses: {},
             resolvedContact: null,
             ticketPrice: row.ticketPrice ?? null,
+            ticketPriceUnknown: row.ticketPriceUnknown ?? false,
             categoryBerlinDotDe: row.categoryBerlinDotDe ?? null,
             qrCodeDataUrl: undefined,
             confirmedParticipants: 0,
