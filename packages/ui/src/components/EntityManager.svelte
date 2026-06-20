@@ -137,19 +137,12 @@
 
     let searchQuery = $state("");
 
-    const getParams = () => {
-        const params = {
-            search: searchQuery || undefined,
-            limit: 100,
-            sortField: "name",
-            sortOrder: "asc",
-        };
-        try {
-            return JSON.parse(JSON.stringify(params));
-        } catch (e) {
-            return params;
-        }
-    };
+    const filterState = $derived({
+        search: searchQuery || undefined,
+        limit: 100,
+        sortField: "name",
+        sortOrder: "asc",
+    });
 
     function normalize(res: any) {
         if (!res) return { data: [], total: 0 };
@@ -168,39 +161,22 @@
         return fn(params);
     }
 
-    // --- DATA STATE ---
-    let refreshCounter = $state(0);
+    // --- STATE ---
+    let localAssociatedItems = $state<T[]>(untrack(() => initialItems ?? []));
 
-    export function refresh() {
-        refreshCounter++;
-        if (typeof (listItemsRemote as any)?.refresh === "function") {
-            void (listItemsRemote as any).refresh();
-        }
-        if (typeof (fetchAssociationsRemote as any)?.refresh === "function") {
-            void (fetchAssociationsRemote as any).refresh();
-        }
-    }
-
-    const associationsPromise = $derived.by(() => {
-        const _ = { refreshCounter, entityId, type };
-        if (entityId && type) {
-            return fetchAssociationsRemote
+    const associationsPromise = $derived(
+        entityId && type
+            ? fetchAssociationsRemote
                 ? invokeRemote(fetchAssociationsRemote, { type, entityId })
                 : invokeRemote(listItemsRemote, {
                       associatedWith: { type, id: entityId },
-                  });
-        }
-        return Promise.resolve(localAssociatedItems);
-    });
+                  })
+            : Promise.resolve(localAssociatedItems)
+    );
 
-    const selectorListPromise = $derived.by(() => {
-        const _ = { refreshCounter, showSelector };
-        if (!showSelector) return Promise.resolve({ data: [], total: 0 });
-        return invokeRemote(listItemsRemote, getParams());
-    });
+    const selectorListPromise = $derived(invokeRemote(listItemsRemote, filterState));
 
-    // --- STATE ---
-    let localAssociatedItems = $state<T[]>(untrack(() => initialItems ?? []));
+
     $effect(() => {
         if (initialItems) {
             untrack(() => {
@@ -238,14 +214,18 @@
                         entityId,
                         itemId: item.id!,
                     });
+                    if (typeof associationsPromise?.refresh === 'function') {
+                        await associationsPromise.refresh();
+                    }
+                } else {
+                    const newList = currentList.filter((ai) => {
+                        if (item.id && ai.id) return ai.id !== item.id;
+                        if (item.name && ai.name) return ai.name !== item.name;
+                        return true;
+                    });
+                    localAssociatedItems = newList;
+                    onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
                 }
-                const newList = currentList.filter((ai) => {
-                    if (item.id && ai.id) return ai.id !== item.id;
-                    if (item.name && ai.name) return ai.name !== item.name;
-                    return true;
-                });
-                localAssociatedItems = newList;
-                onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
             } else {
                 if (singleSelect) {
                     if (entityId && removeAssociationRemote) {
@@ -265,13 +245,20 @@
                             entityId,
                             itemId: item.id!,
                         });
+                        if (typeof associationsPromise?.refresh === 'function') {
+                            await associationsPromise.refresh();
+                        }
                     }
-                    const newList = [item];
-                    localAssociatedItems = newList;
-                    onchange?.(
-                        newList.map((i) => i.id!).filter(Boolean),
-                        newList,
-                    );
+                    if (entityId && addAssociationRemote) {
+                        // Already handled
+                    } else {
+                        const newList = [item];
+                        localAssociatedItems = newList;
+                        onchange?.(
+                            newList.map((i) => i.id!).filter(Boolean),
+                            newList,
+                        );
+                    }
                     showSelector = false;
                 } else {
                     if (entityId && addAssociationRemote) {
@@ -280,14 +267,18 @@
                             entityId,
                             itemId: item.id!,
                         });
+                        if (typeof associationsPromise?.refresh === 'function') {
+                            await associationsPromise.refresh();
+                        }
+                    } else {
+                        if (!mounted) return;
+                        const newList = [...currentList, item];
+                        localAssociatedItems = newList;
+                        onchange?.(
+                            newList.map((i) => i.id!).filter(Boolean),
+                            newList,
+                        );
                     }
-                    if (!mounted) return;
-                    const newList = [...currentList, item];
-                    localAssociatedItems = newList;
-                    onchange?.(
-                        newList.map((i) => i.id!).filter(Boolean),
-                        newList,
-                    );
                 }
             }
         } catch (e: any) {
@@ -296,7 +287,6 @@
         } finally {
             if (mounted) {
                 linkingItemId = null;
-                refresh();
             }
         }
     }
@@ -310,13 +300,20 @@
                 result === true || (result && result.success !== false);
             if (!success) return;
 
-            const newList = currentList.filter((i) => i.id !== item.id);
-            localAssociatedItems = newList;
-            onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
+            if (typeof selectorListPromise?.refresh === 'function') {
+                await selectorListPromise.refresh();
+            }
+
+            if (typeof associationsPromise?.refresh === 'function') {
+                await associationsPromise.refresh();
+            } else {
+                const newList = currentList.filter((i) => i.id !== item.id);
+                localAssociatedItems = newList;
+                onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
+            }
 
             if (success && mounted) {
                 toast.success("Deleted successfully");
-                refresh();
             }
         } catch (e: any) {
             if (mounted) toast.error(e.message || "Failed to delete item");
@@ -327,29 +324,43 @@
 
     async function handleQuickCreateSuccess(result: any, currentList: T[]) {
         showQuickCreate = false;
-        const newId = result?.id || result?.tag?.id || result?.data?.id;
+        let newId = result?.id || result?.data?.id;
+        if (!newId && result && typeof result === 'object') {
+            for (const key of Object.keys(result)) {
+                if (result[key] && typeof result[key] === 'object' && 'id' in result[key]) {
+                    newId = result[key].id;
+                    break;
+                }
+            }
+        }
 
         if (newId) {
-            const params = untrack(() => getParams());
-            const res = await invokeRemote(listItemsRemote, params);
-            const { data: items } = normalize(res);
-            const newItem = items.find((i: any) => i.id === newId);
-
-            if (newItem) {
-                if (entityId && addAssociationRemote) {
-                    await addAssociationRemote({
-                        type,
-                        entityId,
-                        itemId: newItem.id!,
-                    });
-                }
-                if (!mounted) return;
-                const newList = [newItem, ...currentList];
-                localAssociatedItems = newList;
-                onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
-                toast.success(`${title} created and associated`);
-                refresh();
+            if (typeof selectorListPromise?.refresh === 'function') {
+                await selectorListPromise.refresh();
             }
+
+            if (entityId && addAssociationRemote) {
+                await addAssociationRemote({
+                    type,
+                    entityId,
+                    itemId: newId,
+                });
+                
+                if (typeof associationsPromise?.refresh === 'function') {
+                    await associationsPromise.refresh();
+                }
+            } else {
+                const res = await selectorListPromise;
+                const { data: items } = normalize(res);
+                const newItem = items.find((i: any) => i.id === newId);
+
+                if (newItem && mounted) {
+                    const newList = [newItem, ...currentList];
+                    localAssociatedItems = newList;
+                    onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
+                }
+            }
+            if (mounted) toast.success(`${title} created and associated`);
         }
     }
 
@@ -358,21 +369,26 @@
         editingItem = null;
         if (!targetId) return;
 
-        const params = untrack(() => getParams());
-        const res = await invokeRemote(listItemsRemote, params);
-        const { data: items } = normalize(res);
-        const updatedItem = items.find((i: any) => i.id === targetId);
-
-        if (updatedItem) {
-            if (!mounted) return;
-            const newList = currentList.map((i) =>
-                i.id === targetId ? updatedItem : i,
-            );
-            localAssociatedItems = newList;
-            onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
-            toast.success(`${title} updated`);
-            refresh();
+        if (typeof selectorListPromise?.refresh === 'function') {
+            await selectorListPromise.refresh();
         }
+
+        if (typeof associationsPromise?.refresh === 'function') {
+            await associationsPromise.refresh();
+        } else {
+            const res = await selectorListPromise;
+            const { data: items } = normalize(res);
+            const updatedItem = items.find((i: any) => i.id === targetId);
+
+            if (updatedItem && mounted) {
+                const newList = currentList.map((i) =>
+                    i.id === targetId ? updatedItem : i,
+                );
+                localAssociatedItems = newList;
+                onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
+            }
+        }
+        if (mounted) toast.success(`${title} updated`);
     }
 </script>
 
@@ -442,20 +458,146 @@
 
 {#if showSelector}
     <div
-        class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
+        class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 relative min-h-[100px]"
     >
-        <div class="max-h-64 overflow-y-auto space-y-1 p-1">
-            {#await selectorListPromise}
+        <svelte:boundary>
+            {#if $effect.pending()}
+                <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px] rounded-xl">
+                    <div class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                </div>
+            {/if}
+
+            <div class={["max-h-64 overflow-y-auto space-y-1 p-1 transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
+                {#await selectorListPromise then res}
+                    {@const allItems = normalize(res).data}
+                    {@const filteredItems = searchQuery
+                        ? allItems.filter(
+                              (i: any) =>
+                                  i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                  i.title?.toLowerCase().includes(searchQuery.toLowerCase()),
+                          )
+                        : allItems}
+                    
+                    {#if filteredItems.length === 0}
+                        <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
+                            {searchQuery ? noItemsFoundLabel : noItemsLabel}
+                        </div>
+                    {:else}
+                        {#await associationsPromise then ares}
+                            {@const currentAssociations = normalize(ares).data}
+                            {#each filteredItems as item (item.id)}
+                                {@const isLinked = isAssociated(item, currentAssociations)}
+                                <div
+                                    class="flex items-center gap-3 transition-all rounded-xl p-2 {isLinked
+                                        ? 'bg-blue-50/50'
+                                        : 'hover:bg-gray-50'}"
+                                >
+                                    <div class="flex-1 min-w-0">
+                                        <div
+                                            class="text-sm font-bold {isLinked
+                                                ? 'text-blue-700'
+                                                : 'text-gray-900'} truncate"
+                                        >
+                                            {#if renderItemLabel}
+                                                {@render renderItemLabel(item)}
+                                            {:else}
+                                                {item.name ||
+                                                    item.id ||
+                                                    "Unnamed Item"}
+                                            {/if}
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-1">
+                                        {#if updateRemote && renderForm && getFormData}
+                                            <button
+                                                type="button"
+                                                class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                onclick={() => {
+                                                    editingItem = item;
+                                                }}
+                                                title={editLabel}
+                                            >
+                                                <Pencil size={15} />
+                                            </button>
+                                        {/if}
+                                        <AsyncButton
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-8 w-8 p-0 rounded-lg {isLinked
+                                                ? 'text-blue-600 bg-blue-100/50'
+                                                : 'text-gray-400 hover:text-blue-500'}"
+                                            loading={linkingItemId === item.id}
+                                            loadingLabel=""
+                                            onclick={() => {
+                                                void toggleAssociation(
+                                                    item,
+                                                    currentAssociations,
+                                                );
+                                            }}
+                                            title={isLinked
+                                                ? confirmUnlinkLabel
+                                                : linkItemLabel}
+                                        >
+                                            {#if isLinked}
+                                                <Unlink size={16} />
+                                            {:else}
+                                                <Link size={16} />
+                                            {/if}
+                                        </AsyncButton>
+                                        {#if deleteItemRemote}
+                                            <AsyncButton
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                                loading={deletingItemId === item.id}
+                                                loadingLabel=""
+                                                onclick={() =>
+                                                    deleteItem(item, currentAssociations)}
+                                                title={deleteForeverLabel}
+                                            >
+                                                <Trash2 size={15} />
+                                            </AsyncButton>
+                                        {/if}
+                                    </div>
+                                </div>
+                            {/each}
+                        {/await}
+                    {/if}
+                {/await}
+            </div>
+
+            {#snippet pending()}
                 <div class="text-xs text-center py-8 text-gray-400 font-medium">
-                    <div
-                        class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"
-                    ></div>
+                    <div class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
                     {loadingLabel}
                 </div>
-            {:then res}
-                {@const { data: allItems } = normalize(res)}
-                {@const filteredItems = searchQuery
-                    ? allItems.filter(
+            {/snippet}
+
+            {#snippet failed(error: any, reset)}
+                <div class="text-xs text-center py-8 text-red-500 font-medium">
+                    {error?.message || "Failed to load items"}
+                </div>
+            {/snippet}
+        </svelte:boundary>
+    </div>
+{/if}
+
+<!-- Embedded Content -->
+<div class="space-y-2 relative">
+    <svelte:boundary>
+        {#if $effect.pending()}
+            <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px] rounded-2xl">
+                <div class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+            </div>
+        {/if}
+        <div class={$effect.pending() ? 'opacity-50 pointer-events-none transition-opacity duration-200' : 'transition-opacity duration-200'}>
+            {#await associationsPromise then res}
+                {@const { data: currentAssociations } = normalize(res)}
+                {@const items = searchQuery
+                    ? currentAssociations.filter(
                           (i: any) =>
                               i.name
                                   ?.toLowerCase()
@@ -464,147 +606,17 @@
                                   ?.toLowerCase()
                                   .includes(searchQuery.toLowerCase()),
                       )
-                    : allItems}
-                {#if filteredItems.length === 0}
-                    <div
-                        class="text-xs text-center py-8 text-gray-400 font-medium italic"
-                    >
-                        {searchQuery ? noItemsFoundLabel : noItemsLabel}
-                    </div>
-                {:else}
-                    {#await associationsPromise}
-                        <div class="p-4 flex justify-center">
+                    : currentAssociations}
+                {#if items.length > 0}
+                    <div class="grid gap-2">
+                        {#each items as item (item.id)}
                             <div
-                                class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"
-                            ></div>
-                        </div>
-                    {:then ares}
-                        {@const { data: currentAssociations } = normalize(ares)}
-                        {#each filteredItems as item (item.id)}
-                            {@const isLinked = isAssociated(
-                                item,
-                                currentAssociations,
-                            )}
-                            <div
-                                class="flex items-center gap-3 transition-all rounded-xl p-2 {isLinked
-                                    ? 'bg-blue-50/50'
-                                    : 'hover:bg-gray-50'}"
+                                class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
                             >
                                 <div class="flex-1 min-w-0">
                                     <div
-                                        class="text-sm font-bold {isLinked
-                                            ? 'text-blue-700'
-                                            : 'text-gray-900'} truncate"
+                                        class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
                                     >
-                                        {#if renderItemLabel}
-                                            {@render renderItemLabel(item)}
-                                        {:else}
-                                            {item.name ||
-                                                item.id ||
-                                                "Unnamed Item"}
-                                        {/if}
-                                    </div>
-                                </div>
-
-                                <div class="flex items-center gap-1">
-                                    {#if updateRemote && renderForm && getFormData}
-                                        <button
-                                            type="button"
-                                            class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                            onclick={() => {
-                                                editingItem = item;
-                                            }}
-                                            title={editLabel}
-                                        >
-                                            <Pencil size={15} />
-                                        </button>
-                                    {/if}
-                                    <AsyncButton
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        class="h-8 w-8 p-0 rounded-lg {isLinked
-                                            ? 'text-blue-600 bg-blue-100/50'
-                                            : 'text-gray-400 hover:text-blue-500'}"
-                                        loading={linkingItemId === item.id}
-                                        loadingLabel=""
-                                        onclick={() => {
-                                            void toggleAssociation(
-                                                item,
-                                                currentAssociations,
-                                            );
-                                        }}
-                                        title={isLinked
-                                            ? confirmUnlinkLabel
-                                            : linkItemLabel}
-                                    >
-                                        {#if isLinked}
-                                            <Unlink size={16} />
-                                        {:else}
-                                            <Link size={16} />
-                                        {/if}
-                                    </AsyncButton>
-                                    {#if deleteItemRemote}
-                                        <AsyncButton
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                            loading={deletingItemId === item.id}
-                                            loadingLabel=""
-                                            onclick={() =>
-                                                deleteItem(item, currentAssociations)}
-                                            title={deleteForeverLabel}
-                                        >
-                                            <Trash2 size={15} />
-                                        </AsyncButton>
-                                    {/if}
-                                </div>
-                            </div>
-                        {/each}
-                    {/await}
-                {/if}
-            {:catch error}
-                <div class="text-xs text-center py-8 text-red-500 font-medium">
-                    {error.message || "Failed to load items"}
-                </div>
-            {/await}
-        </div>
-    </div>
-{/if}
-
-<!-- Embedded Content -->
-<div class="space-y-2">
-    {#await associationsPromise}
-        <div class="text-center py-10 animate-pulse text-gray-400 font-medium">
-            <div
-                class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"
-            ></div>
-            {loadingLabel}
-        </div>
-    {:then res}
-        {@const { data: currentAssociations } = normalize(res)}
-        {@const items = searchQuery
-            ? currentAssociations.filter(
-                  (i: any) =>
-                      i.name
-                          ?.toLowerCase()
-                          .includes(searchQuery.toLowerCase()) ||
-                      i.title
-                          ?.toLowerCase()
-                          .includes(searchQuery.toLowerCase()),
-              )
-            : currentAssociations}
-        {#if items.length > 0}
-            <div class="grid gap-2">
-                {#each items as item (item.id)}
-                    <div
-                        class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
-                    >
-                        <div class="flex-1 min-w-0">
-                            <div
-                                class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
-                            >
                                 {#if renderItemLabel}
                                     {@render renderItemLabel(item)}
                                 {:else}
@@ -675,26 +687,35 @@
                             {/if}
                         </div>
                     </div>
-                {/each}
+                        {/each}
+                    </div>
+                {:else}
+                    <div
+                        class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
+                    >
+                        <p class="text-sm font-medium text-gray-400 italic">
+                            {noItemsLabel}
+                        </p>
+                    </div>
+                {/if}
+            {/await}
+        </div>
+
+        {#snippet pending()}
+            <div class="text-center py-10 animate-pulse text-gray-400 font-medium">
+                <div class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                {loadingLabel}
             </div>
-        {:else}
-            <div
-                class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
-            >
-                <p class="text-sm font-medium text-gray-400 italic">
-                    {noItemsLabel}
+        {/snippet}
+
+        {#snippet failed(error: any, reset)}
+            <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+                <p class="text-sm font-medium text-red-600">
+                    {error?.message || "Failed to load associations"}
                 </p>
             </div>
-        {/if}
-    {:catch error}
-        <div
-            class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center"
-        >
-            <p class="text-sm font-medium text-red-600">
-                {error.message || "Failed to load associations"}
-            </p>
-        </div>
-    {/await}
+        {/snippet}
+    </svelte:boundary>
 </div>
 
 <!-- Dialog for Create/Edit -->
@@ -720,43 +741,49 @@
             <div style="overflow-y: auto; flex: 1; min-height: 0;">
                 {#await associationsPromise}
                     <div class="p-8 flex justify-center">
-                        <div
-                            class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"
-                        ></div>
+                        <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                     </div>
                 {:then res}
-                    {@const { data: currentList } = normalize(res)}
-                    {#if editingItem && getFormData}
-                        {@render renderForm({
-                            remoteFunction: updateRemote,
-                            schema: updateSchema,
-                            initialData: getFormData(editingItem),
-                            onSuccess: (result) => {
-                                void handleInPlaceUpdateSuccess(
-                                    result,
-                                    currentList,
-                                );
-                            },
-                            onCancel: () => {
-                                editingItem = null;
-                            },
-                            id: editingItem.id,
-                        })}
-                    {:else if showQuickCreate}
-                        {@render renderForm({
-                            remoteFunction: createRemote,
-                            schema: createSchema,
-                            onSuccess: (result) => {
-                                void handleQuickCreateSuccess(
-                                    result,
-                                    currentList,
-                                );
-                            },
-                            onCancel: () => {
-                                showQuickCreate = false;
-                            },
-                        })}
-                    {/if}
+                    {@const currentAssociations = normalize(res).data}
+                    <svelte:boundary>
+                        {#if editingItem && getFormData}
+                            {@render renderForm({
+                                remoteFunction: updateRemote,
+                                schema: updateSchema,
+                                initialData: getFormData(editingItem),
+                                onSuccess: (result) => {
+                                    void handleInPlaceUpdateSuccess(
+                                        result,
+                                        currentAssociations,
+                                    );
+                                },
+                                onCancel: () => {
+                                    editingItem = null;
+                                },
+                                id: editingItem.id,
+                            })}
+                        {:else if showQuickCreate}
+                            {@render renderForm({
+                                remoteFunction: createRemote,
+                                schema: createSchema,
+                                onSuccess: (result) => {
+                                    void handleQuickCreateSuccess(
+                                        result,
+                                        currentAssociations,
+                                    );
+                                },
+                                onCancel: () => {
+                                    showQuickCreate = false;
+                                },
+                            })}
+                        {/if}
+                        
+                        {#snippet pending()}
+                            <div class="p-8 flex justify-center">
+                                <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                            </div>
+                        {/snippet}
+                    </svelte:boundary>
                 {/await}
             </div>
         </Dialog.Content>

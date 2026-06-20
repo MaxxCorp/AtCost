@@ -6,13 +6,9 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createLocationSchema } from '@ac/validations';
 
 export const createLocation = form(createLocationSchema, async (data) => {
-    console.log('--- createLocation START ---');
-    console.log('Data received:', JSON.stringify(data, null, 2));
-
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'locations');
-        console.log('User authenticated:', user.id);
 
         const insertData: any = {
             userId: user.id,
@@ -38,8 +34,6 @@ export const createLocation = form(createLocationSchema, async (data) => {
         if (insertData.latitude && isNaN(insertData.latitude)) insertData.latitude = null;
         if (insertData.longitude && isNaN(insertData.longitude)) insertData.longitude = null;
 
-        console.log('Insert payload:', insertData);
-
         const result = await db.insert(location as any).values(insertData).returning();
 
         if (result.length === 0) {
@@ -49,11 +43,9 @@ export const createLocation = form(createLocationSchema, async (data) => {
         const newLocation = result[0];
         await listLocations().refresh();
 
-        console.log('--- createLocation SUCCESS ---');
         return { success: true, location: newLocation };
 
     } catch (err: any) {
-        console.error('--- createLocation ERROR ---', err);
         return { success: false, error: { message: err.message || 'Creation failed' } };
     }
 });

@@ -10,11 +10,9 @@ import { generateContactAssets } from '$lib/server/contacts';
 import { listContacts } from '../list.remote';
 
 export const createContact = form(createContactSchema, async (input) => {
-    console.log('--- createContact START ---');
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'contacts');
-        console.log('User authenticated:', user.id);
 
         const data = input as any;
 
@@ -34,7 +32,7 @@ export const createContact = form(createContactSchema, async (input) => {
             if (data.tagsJson) tagNames = JSON.parse(data.tagsJson);
             if (data.locationIdsJson) locationIds = JSON.parse(data.locationIdsJson);
         } catch (e) {
-            console.error('JSON parsing error:', e);
+            // Ignore parse errors as it falls back to defaults
         }
 
         // Sanitize contact data
@@ -193,12 +191,10 @@ export const createContact = form(createContactSchema, async (input) => {
             }))
         } as Contact;
 
-        console.log('--- createContact SUCCESS --- returning contact:', transformed.id);
         await listContacts().refresh();
         return { success: true, id: contactId, contact: transformed };
 
     } catch (err: any) {
-        console.error('--- createContact ERROR ---', err);
         return { success: false, error: { message: err.message || 'Failed to create contact' } };
     }
 });
