@@ -507,6 +507,18 @@
                                 </div>
 
                                 <div class="flex items-center gap-1">
+                                    {#if updateRemote && renderForm && getFormData}
+                                        <button
+                                            type="button"
+                                            class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                            onclick={() => {
+                                                editingItem = item;
+                                            }}
+                                            title={editLabel}
+                                        >
+                                            <Pencil size={15} />
+                                        </button>
+                                    {/if}
                                     <AsyncButton
                                         type="button"
                                         variant="ghost"
@@ -523,7 +535,7 @@
                                             );
                                         }}
                                         title={isLinked
-                                            ? "Unlink"
+                                            ? confirmUnlinkLabel
                                             : linkItemLabel}
                                     >
                                         {#if isLinked}
@@ -532,6 +544,21 @@
                                             <Link size={16} />
                                         {/if}
                                     </AsyncButton>
+                                    {#if deleteItemRemote}
+                                        <AsyncButton
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                            loading={deletingItemId === item.id}
+                                            loadingLabel=""
+                                            onclick={() =>
+                                                deleteItem(item, currentAssociations)}
+                                            title={deleteForeverLabel}
+                                        >
+                                            <Trash2 size={15} />
+                                        </AsyncButton>
+                                    {/if}
                                 </div>
                             </div>
                         {/each}
