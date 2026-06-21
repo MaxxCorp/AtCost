@@ -616,13 +616,46 @@ export class SyncService {
 		}
 	}
 
-	/**
-	 * Handle incoming webhook notification
-	 */
 	public async handleWebhook(
 		providerId: ProviderType,
 		payload: any
 	): Promise<{ configId: string; processed: boolean }> {
+		const configIdsToSync = new Set<string>();
+
+		if (providerId === 'google-calendar' && payload?.channelToken) {
+			configIdsToSync.add(payload.channelToken);
+		} else if (providerId === 'microsoft-calendar' && payload?.value && Array.isArray(payload.value)) {
+			// Extract clientState from each notification
+			for (const notification of payload.value) {
+				if (notification.clientState) {
+					configIdsToSync.add(notification.clientState);
+				}
+			}
+		}
+
+		if (configIdsToSync.size > 0) {
+			const configs = await db
+				.select()
+				.from(syncConfigTable)
+				.where(and(
+					eq(syncConfigTable.providerType, providerId),
+					eq(syncConfigTable.enabled, true),
+					inArray(syncConfigTable.id, Array.from(configIdsToSync))
+				));
+
+			for (const configRow of configs) {
+				this.syncEvents(configRow.id).catch((error) => {
+					console.error(`Webhook-triggered sync failed for config ${configRow.id}:`, error);
+				});
+			}
+
+			return {
+				configId: configs[0]?.id || '',
+				processed: true
+			};
+		}
+
+		// Fallback: If payload lacks specific config info, sync all configs for the provider
 		const configs = await db
 			.select()
 			.from(syncConfigTable)
@@ -663,8 +696,16 @@ export class SyncService {
 		await this.removeWebhook(configId);
 
 		// Construct callback URL
-		const baseUrl = env.BETTER_AUTH_URL || 'https://localhost:5173';
-		const callbackUrl = `${baseUrl}/api/sync/webhook/${config.providerType}`;
+		// Microsoft Graph requires a publicly accessible HTTPS URL.
+		const baseUrl = env.SYNC_WEBHOOK_URL || env.BETTER_AUTH_URL || 'https://localhost:5173';
+		let callbackUrl = `${baseUrl}/api/sync/webhook/${config.providerType}`;
+		
+		// Ensure it uses https if it's the default localhost fallback
+		if (callbackUrl.startsWith('http://localhost') && provider.type === 'microsoft-calendar') {
+			// Note: This will still fail actual delivery because localhost isn't public, 
+			// but we keep it here as a fallback or if they are testing behind a proxy that accepts https.
+			// The proper fix is using SYNC_WEBHOOK_URL with ngrok.
+		}
 
 		// Setup new webhook
 		if (provider.setupWebhook) {

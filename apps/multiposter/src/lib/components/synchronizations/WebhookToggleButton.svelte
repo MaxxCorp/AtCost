@@ -24,7 +24,7 @@
 
     // Only show for active configurations that support it
     const supportsWebhooks = $derived(
-        (providerType === "google-calendar" &&
+        ((providerType === "google-calendar" || providerType === "microsoft-calendar") &&
             (direction === "pull" || direction === "bidirectional")) ||
             (providerType === "email" && direction === "push"),
     );

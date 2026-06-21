@@ -333,7 +333,7 @@ export class GoogleCalendarProvider implements SyncProvider {
 		await this.cancelWebhook(subscription);
 
 		// Reconstruct callback URL from environment
-		const baseUrl = env.BETTER_AUTH_URL || 'https://localhost:5173';
+		const baseUrl = env.SYNC_WEBHOOK_URL || env.BETTER_AUTH_URL || 'https://localhost:5173';
 		const callbackUrl = `${baseUrl}/api/sync/webhook/google-calendar`;
 
 		return this.setupWebhook(callbackUrl);

@@ -91,10 +91,9 @@ Since Microsoft Graph cannot send notifications to `localhost`, you must use a t
 3. Copy the ngrok HTTPS URL (e.g., `https://abc-123.ngrok-free.app`)
 4. Update your `.env.local`:
    ```env
-   BETTER_AUTH_URL=https://abc-123.ngrok-free.app
+   SYNC_WEBHOOK_URL=https://abc-123.ngrok-free.app
    ```
-5. Update your Microsoft App Registration Redirect URI to:
-   `https://abc-123.ngrok-free.app/api/auth/callback/microsoft`
+5. You DO NOT need to update your Microsoft App Registration Redirect URI if you only set `SYNC_WEBHOOK_URL`. `BETTER_AUTH_URL` can remain as `http://localhost:5173`.
 6. Create a new synchronization in the app. The webhook will now be registered using the ngrok URL.
 
 ---
