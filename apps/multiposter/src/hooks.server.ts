@@ -49,4 +49,35 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle: Handle = sequence(handleBetterAuth, handleRouteGuard);
+const handleCSRF: Handle = async ({ event, resolve }) => {
+	// Bypass CSRF for webhook routes
+	if (event.url.pathname.startsWith('/api/sync/webhook/')) {
+		return resolve(event);
+	}
+
+	// Apply SvelteKit's default CSRF logic for form submissions
+	if (
+		event.request.method === 'POST' ||
+		event.request.method === 'PUT' ||
+		event.request.method === 'PATCH' ||
+		event.request.method === 'DELETE'
+	) {
+		const origin = event.request.headers.get('origin');
+		const contentType = event.request.headers.get('content-type') || '';
+
+		if (
+			event.request.body &&
+			(contentType.includes('application/x-www-form-urlencoded') ||
+				contentType.includes('multipart/form-data') ||
+				contentType.includes('text/plain'))
+		) {
+			if (!origin || new URL(origin).origin !== event.url.origin) {
+				return new Response('Cross-site POST form submissions are forbidden', { status: 403 });
+			}
+		}
+	}
+
+	return resolve(event);
+};
+
+export const handle: Handle = sequence(handleBetterAuth, handleRouteGuard, handleCSRF);

@@ -6,7 +6,7 @@ import { eq, and } from '@ac/db';
 import { updateSynchronizationSchema, type UpdateSynchronizationInput } from '$lib/validations/synchronizations';
 export type { UpdateSynchronizationInput };
 import { list as listSynchronizations } from '../list.remote';
-import { view as viewSynchronization } from './view.remote';
+import { readSynchronization as read } from './read.remote';
 
 /**
  * Update a sync configuration
@@ -50,8 +50,7 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 			throw new Error('Update failed');
 		}
 
-		viewSynchronization(id).set(updated);
-		await 
+		read(id).set(updated);
 
 		console.log('--- updateSynchronization SUCCESS ---');
 		return { success: true, synchronization: updated };

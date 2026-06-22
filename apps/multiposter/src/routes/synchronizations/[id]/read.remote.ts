@@ -6,7 +6,7 @@ import { db, syncConfig, syncOperation, eq, and, desc, type SyncConfig, type Syn
 /**
  * Query: Get a sync configuration and its recent logs
  */
-export const view = query(v.string(), async (id: string): Promise<SyncConfig> => {
+export const readSynchronization = query(v.string(), async (id: string): Promise<SyncConfig> => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'synchronizations', 'use');
 

@@ -23,6 +23,9 @@ const config = {
 		experimental: {
 			remoteFunctions: true
 		},
+		csrf: {
+			checkOrigin: false
+		},
 		alias: {
 			"@": "./src/lib",
 			"@ac/validations": "../../packages/validations/src",
