@@ -5,3 +5,5 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+  '@google/genai': true
+  protobufjs: true

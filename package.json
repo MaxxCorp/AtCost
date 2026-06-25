@@ -24,13 +24,7 @@
 		"svelte": "^5.55.1",
 		"drizzle-orm": "0.45.2",
 		"drizzle-kit": "0.31.10"
-	},
-	"pnpm": {
-		"overrides": {
-			"svelte": "^5.55.1",
-			"drizzle-orm": "0.45.2",
-			"drizzle-kit": "0.31.10"
-		}
+
 	},
 	"dependencies": {
 		"@rolldown/binding-win32-x64-msvc": "1.1.3",
