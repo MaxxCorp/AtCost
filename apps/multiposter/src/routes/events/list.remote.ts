@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, eventContact, eventLocation, eventTag, contact, location, tag, eq, inArray, and, or, ilike, sql, desc, asc, exists } from '@ac/db';
+import { db, event, eventContact, eventLocation, eventTag, contact, location, tag, eq, inArray, and, or, ilike, sql, desc, asc, exists, isNull } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { eventPaginationSchema as PaginationSchema, type PaginatedResult, type Event } from '@ac/validations';
 
@@ -12,7 +12,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: event.id }).from(event).$dynamic();
-	const conditions = [];
+	const conditions: any[] = [isNull(event.recurringEventId)];
 
 	// Search filter: Summary, Description, Location Names, Contact Names
 	if (search) {
@@ -104,7 +104,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	// Fetch full data for the paginated IDs
 	const rawResults = await db.query.event.findMany({
-		where: inArray(event.id, ids),
+		where: or(inArray(event.id, ids), inArray(event.recurringEventId, ids)),
 		with: {
 			contacts: true,
 			locations: {
