@@ -223,9 +223,9 @@
     }
 
     function clear() {
-        value = null;
+        value = "";
         open = false;
-        onchange?.(null);
+        onchange?.("");
     }
 
     const frequencies = [

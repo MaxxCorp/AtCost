@@ -23,12 +23,14 @@ export const updateUser = form(updateUserSchema, async (data) => {
         const updateData: any = {
             name: data.name,
             email: data.email,
-            claims: data.claims,
         };
 
-        // Only admins can update roles.
+        // Only admins can update roles and claims.
         if (isAdmin) {
             updateData.roles = data.roles ?? [];
+            if (data.claims !== undefined) {
+                updateData.claims = data.claims;
+            }
         }
 
         const result = await db.update(user)

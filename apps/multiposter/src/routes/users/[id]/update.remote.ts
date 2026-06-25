@@ -29,13 +29,15 @@ export const updateUser = form(updateUserSchema, async (data) => {
         const updateData: any = {
             name: data.name,
             email: data.email,
-            claims: data.claims as any,
         };
 
-        // Only admins can update roles.
+        // Only admins can update roles and claims.
         // If the user is an admin, we treat missing roles as an empty array (clearing roles).
         if (isAdmin) {
             updateData.roles = data.roles ?? [];
+            if (data.claims !== undefined) {
+                updateData.claims = data.claims as any;
+            }
         }
 
         console.log('Update payload:', updateData);

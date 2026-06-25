@@ -22,6 +22,11 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		ensureAccess(user, 'events');
 		console.log('User authenticated:', user.id);
 
+		const [oldEvent] = await db.select().from(event).where(eq(event.id, data.id));
+		if (!oldEvent) {
+			error(404, 'Event not found');
+		}
+
 		// Handle reminders
 		const reminders = data.reminders;
 
@@ -96,12 +101,20 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		if (data.isAllDay !== undefined) updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on';
 
 		if (data.recurrence !== undefined) {
-			// If empty string, treat as null (clearing recurrence)
-			updateData.recurrence = data.recurrence ? [data.recurrence] : null;
+			const oldRec = oldEvent.recurrence ? (Array.isArray(oldEvent.recurrence) ? oldEvent.recurrence[0] : oldEvent.recurrence) : null;
+			const newRec = data.recurrence || null;
 
-			// If we are setting recurrence, this event becomes a Master (or is already).
-			// ensure it doesn't point to another event as parent
-			updateData.recurringEventId = null;
+			if (oldRec !== newRec) {
+				// If empty string, treat as null (clearing recurrence)
+				updateData.recurrence = data.recurrence ? [data.recurrence] : null;
+
+				// If we are setting recurrence, this event becomes a Master (or is already).
+				// ensure it doesn't point to another event as parent
+				updateData.recurringEventId = null;
+			} else {
+				// Recurrence has not actually changed, ignore it so downstream logic doesn't trigger
+				data.recurrence = undefined;
+			}
 		}
 
 		if (data.attendees !== undefined) updateData.attendees = data.attendees || null;
