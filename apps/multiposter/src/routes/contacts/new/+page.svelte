@@ -2,6 +2,7 @@
     import { goto } from "$app/navigation";
     import { createContact } from "./create.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import ScanNamecardButton from "$lib/components/contacts/ScanNamecardButton.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 
     import { createContactSchema } from "$lib/validations/contacts";
@@ -29,14 +30,20 @@
 
     const formId = crypto.randomUUID();
     const rf = createContact.for(formId);
+    
+    let formComponent: ReturnType<typeof ContactForm> | undefined = $state();
 </script>
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
         <Breadcrumb feature="contacts" />
         <div class="bg-white shadow rounded-lg p-6">
-            <h1 class="text-2xl font-bold mb-6">Create New Contact</h1>
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">Create New Contact</h1>
+                <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
+            </div>
             <ContactForm
+                bind:this={formComponent}
                 remoteFunction={rf}
                 schema={createContactSchema}
                 onSuccess={handleSuccess}

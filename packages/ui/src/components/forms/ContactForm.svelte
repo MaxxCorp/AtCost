@@ -196,6 +196,57 @@
 
 
     const prefix = $derived(contactId ? "data.contact" : "contact");
+
+    export function fillData(data: any) {
+        if (!data) return;
+        
+        // Fill contact data only if empty
+        if (data.displayName && !contactData.displayName) contactData.displayName = data.displayName;
+        if (data.givenName && !contactData.givenName) contactData.givenName = data.givenName;
+        if (data.familyName && !contactData.familyName) contactData.familyName = data.familyName;
+        if (data.company && !contactData.company) contactData.company = data.company;
+        if (data.role && !contactData.role) contactData.role = data.role;
+        
+        // Emails
+        if (data.emails && data.emails.length > 0) {
+            const newEmails = data.emails.filter((e: any) => !emails.some(existing => existing.value === e.value));
+            if (newEmails.length > 0) {
+                // If there's an empty email field, use it first
+                const emptyIdx = emails.findIndex(e => !e.value);
+                if (emptyIdx !== -1) {
+                    emails[emptyIdx] = { ...emails[emptyIdx], ...newEmails[0] };
+                    newEmails.shift();
+                }
+                emails = [...emails, ...newEmails];
+            }
+        }
+        
+        // Phones
+        if (data.phones && data.phones.length > 0) {
+            const newPhones = data.phones.filter((p: any) => !phones.some(existing => existing.value === p.value));
+            if (newPhones.length > 0) {
+                const emptyIdx = phones.findIndex(p => !p.value);
+                if (emptyIdx !== -1) {
+                    phones[emptyIdx] = { ...phones[emptyIdx], ...newPhones[0] };
+                    newPhones.shift();
+                }
+                phones = [...phones, ...newPhones];
+            }
+        }
+
+        // Addresses
+        if (data.addresses && data.addresses.length > 0) {
+            const newAddresses = data.addresses.filter((a: any) => !addresses.some(existing => existing.street === a.street && existing.city === a.city));
+            if (newAddresses.length > 0) {
+                const emptyIdx = addresses.findIndex(a => !a.street && !a.city);
+                if (emptyIdx !== -1) {
+                    addresses[emptyIdx] = { ...addresses[emptyIdx], ...newAddresses[0] };
+                    newAddresses.shift();
+                }
+                addresses = [...addresses, ...newAddresses];
+            }
+        }
+    }
 </script>
 
 <form

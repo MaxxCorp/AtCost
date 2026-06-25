@@ -49,35 +49,16 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-const handleCSRF: Handle = async ({ event, resolve }) => {
-	// Bypass CSRF for webhook routes
-	if (event.url.pathname.startsWith('/api/sync/webhook/')) {
-		return resolve(event);
-	}
-
-	// Apply SvelteKit's default CSRF logic for form submissions
-	if (
-		event.request.method === 'POST' ||
-		event.request.method === 'PUT' ||
-		event.request.method === 'PATCH' ||
-		event.request.method === 'DELETE'
-	) {
-		const origin = event.request.headers.get('origin');
-		const contentType = event.request.headers.get('content-type') || '';
-
-		if (
-			event.request.body &&
-			(contentType.includes('application/x-www-form-urlencoded') ||
-				contentType.includes('multipart/form-data') ||
-				contentType.includes('text/plain'))
-		) {
-			if (!origin || new URL(origin).origin !== event.url.origin) {
-				return new Response('Cross-site POST form submissions are forbidden', { status: 403 });
-			}
-		}
+const handleWebhook: Handle = async ({ event, resolve }) => {
+	// Microsoft Graph webhooks send POST requests with Content-Type: text/plain during validation challenge.
+	// Since they don't include an Origin header, SvelteKit's built-in CSRF protection blocks them.
+	// The modern way to bypass CSRF for a specific route is to intercept it before resolve()
+	if (event.url.pathname === '/api/sync/webhook/microsoft-calendar' && event.request.method === 'POST') {
+		const { POST } = await import('./routes/api/sync/webhook/microsoft-calendar/+server.ts');
+		return await POST(event as any);
 	}
 
 	return resolve(event);
 };
 
-export const handle: Handle = sequence(handleBetterAuth, handleRouteGuard, handleCSRF);
+export const handle: Handle = sequence(handleBetterAuth, handleRouteGuard, handleWebhook);

@@ -46,9 +46,18 @@
         deleteTagRemote = deleteTagHandle,
         children,
     }: Props = $props();
+
+    let sharedFormRef: ReturnType<typeof SharedContactForm> | undefined = $state();
+
+    export function fillData(data: any) {
+        if (sharedFormRef && (sharedFormRef as any).fillData) {
+            (sharedFormRef as any).fillData(data);
+        }
+    }
 </script>
 
 <SharedContactForm
+    bind:this={sharedFormRef}
     {initialData}
     {remoteFunction}
     {schema}

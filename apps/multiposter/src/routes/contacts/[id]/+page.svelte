@@ -6,6 +6,7 @@
     import { updateContact } from "./update.remote";
     import { deleteContact } from "./delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import ScanNamecardButton from "$lib/components/contacts/ScanNamecardButton.svelte";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
             import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { goto } from "$app/navigation";
@@ -34,6 +35,8 @@
         // Redirect to list page on success
         goto(`/contacts`);
     }
+
+    let formComponent: ReturnType<typeof ContactForm> | undefined = $state();
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -72,24 +75,28 @@
                         >
                             <div class="flex justify-between items-center mb-4">
                                 <h1 class="text-2xl font-bold">Edit Contact</h1>
-                                <AsyncButton
-                                    type="button"
-                                    loadingLabel={m.deleting()}
-                                    loading={deleteContact.pending}
-                                    variant="destructive"
-                                    onclick={async () => {
-                                        await handleDelete({
-                                            ids: [contact.id],
-                                            deleteFn: deleteContact,
-                                            itemName: m.contacts().toLowerCase(),
-                                        });
-                                        goto("/contacts");
-                                    }}
-                                >
-                                    {m.delete()}
-                                </AsyncButton>
+                                <div class="flex items-center gap-2">
+                                    <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
+                                    <AsyncButton
+                                        type="button"
+                                        loadingLabel={m.deleting()}
+                                        loading={deleteContact.pending}
+                                        variant="destructive"
+                                        onclick={async () => {
+                                            await handleDelete({
+                                                ids: [contact.id],
+                                                deleteFn: deleteContact,
+                                                itemName: m.contacts().toLowerCase(),
+                                            });
+                                            goto("/contacts");
+                                        }}
+                                    >
+                                        {m.delete()}
+                                    </AsyncButton>
+                                </div>
                             </div>
                                                 <ContactForm
+                                bind:this={formComponent}
                                 remoteFunction={updateContact.for(contactId)}
                                 schema={updateContactSchema}
                                 onSuccess={handleSuccess}
