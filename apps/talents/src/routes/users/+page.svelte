@@ -82,7 +82,7 @@
                     <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Search users..."
+                        placeholder={m.search_users()}
                         bind:value={searchQuery}
                         oninput={() => (page = 1)}
                         class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all bg-gray-50/50"
@@ -96,10 +96,10 @@
             onchange={() => page = 1}
             class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white capitalize"
         >
-            <option value={null}>All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-            <option value="user">User</option>
+            <option value={null}>{m.all_roles()}</option>
+            <option value="admin">{m.admin()}</option>
+            <option value="manager">{m.manager()}</option>
+            <option value="user">{m.role_user()}</option>
         </select>
     </div>
     
@@ -199,10 +199,10 @@
                                             onchange={() => (page = 1)}
                                             class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
                                         >
-                                            <option value={10}>10 per page</option>
-                                            <option value={20}>20 per page</option>
-                                            <option value={50}>50 per page</option>
-                                            <option value={100}>100 per page</option>
+                                            <option value={10}>{m.items_per_page({ count: 10 })}</option>
+                                            <option value={20}>{m.items_per_page({ count: 20 })}</option>
+                                            <option value={50}>{m.items_per_page({ count: 50 })}</option>
+                                            <option value={100}>{m.items_per_page({ count: 100 })}</option>
                                         </select>
                                     </div>
                                 </div>

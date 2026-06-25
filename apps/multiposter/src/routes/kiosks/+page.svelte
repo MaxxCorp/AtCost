@@ -125,7 +125,7 @@
 				/>
 				<input
 					type="text"
-					placeholder="Search kiosks..."
+					placeholder={m.search_kiosks()}
 					bind:value={searchQuery}
 					oninput={() => (page = 1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
@@ -218,9 +218,9 @@
 						bind:value={sortField}
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
-						<option value="updatedAt">Last Updated</option>
-						<option value="createdAt">Created Date</option>
-						<option value="name">Name</option>
+						<option value="updatedAt">{m.sort_last_updated()}</option>
+						<option value="createdAt">{m.sort_created_date()}</option>
+						<option value="name">{m.sort_name()}</option>
 					</select>
 					<button
 						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

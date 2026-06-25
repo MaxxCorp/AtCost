@@ -1,4 +1,5 @@
 <script lang="ts">
+    import * as m from "$lib/paraglide/messages.js";
     import { listShiftplans } from "./list.remote";
     import { deleteShiftplans } from "./[id]/delete.remote";
     import { Button, AsyncButton } from "@ac/ui";
@@ -84,7 +85,7 @@
                     <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Search shift plans..."
+                        placeholder={m.search_shift_plans()}
                         bind:value={searchQuery}
                         oninput={() => (page = 1)}
                         class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all bg-gray-50/50"
@@ -99,7 +100,7 @@
             onchange={() => page = 1}
             class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
         >
-            <option value={null}>All Locations</option>
+            <option value={null}>{m.all_locations()}</option>
             {#await allLocationsQuery then locations}
                 {#each locations.data as loc}
                     <option value={loc.id}>{loc.name}</option>
@@ -200,9 +201,9 @@
                                             onchange={() => (page = 1)}
                                             class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
                                         >
-                                            <option value={10}>10 per page</option>
-                                            <option value={20}>20 per page</option>
-                                            <option value={50}>50 per page</option>
+                                            <option value={10}>{m.items_per_page({ count: 10 })}</option>
+                                            <option value={20}>{m.items_per_page({ count: 20 })}</option>
+                                            <option value={50}>{m.items_per_page({ count: 50 })}</option>
                                         </select>
                                     </div>
                                 </div>

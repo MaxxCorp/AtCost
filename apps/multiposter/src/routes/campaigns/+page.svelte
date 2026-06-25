@@ -93,7 +93,7 @@
 				<Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
 				<input
 					type="text"
-					placeholder="Search campaigns..."
+					placeholder={m.search_campaigns()}
 					bind:value={searchQuery}
 					oninput={() => (page = 1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
@@ -105,14 +105,14 @@
 						bind:value={sortField}
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
-						<option value="updatedAt">Last Updated</option>
-						<option value="createdAt">Created Date</option>
-						<option value="name">Name</option>
+						<option value="updatedAt">{m.sort_last_updated()}</option>
+						<option value="createdAt">{m.sort_created_date()}</option>
+						<option value="name">{m.sort_name()}</option>
 					</select>
 					<button
 						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
 						onclick={() => (sortOrder = sortOrder === "desc" ? "asc" : "desc")}
-						title={sortOrder === "desc" ? "Descending" : "Ascending"}
+						title={sortOrder === "desc" ? m.descending() : m.ascending()}
 					>
 						<ChevronDown size={14} class="transition-transform duration-200 {sortOrder === 'asc' ? 'rotate-180' : ''}" />
 					</button>
@@ -204,10 +204,10 @@
 										onchange={() => (page = 1)}
 										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
 									>
-										<option value={10}>10 per page</option>
-										<option value={20}>20 per page</option>
-										<option value={50}>50 per page</option>
-										<option value={100}>100 per page</option>
+										<option value={10}>{m.items_per_page({ count: 10 })}</option>
+										<option value={20}>{m.items_per_page({ count: 20 })}</option>
+										<option value={50}>{m.items_per_page({ count: 50 })}</option>
+										<option value={100}>{m.items_per_page({ count: 100 })}</option>
 									</select>
 								</div>
 							</div>
