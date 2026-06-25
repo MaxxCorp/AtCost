@@ -19,6 +19,9 @@ const config = {
 			// Set maxDuration for all functions (free tier: 60s)
 			maxDuration: 60
 		}),
+		csrf: {
+			checkOrigin: false
+		},
 		experimental: {
 			remoteFunctions: true
 		},
