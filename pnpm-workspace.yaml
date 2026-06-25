@@ -7,3 +7,5 @@ allowBuilds:
   workerd: true
   '@google/genai': true
   protobufjs: true
+patchedDependencies:
+  '@sveltejs/adapter-vercel': patches/@sveltejs__adapter-vercel.patch

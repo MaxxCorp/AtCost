@@ -52,10 +52,14 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 const handleWebhook: Handle = async ({ event, resolve }) => {
 	// Microsoft Graph webhooks send POST requests with Content-Type: text/plain during validation challenge.
 	// Since they don't include an Origin header, SvelteKit's built-in CSRF protection blocks them.
-	// The modern way to bypass CSRF for a specific route is to intercept it before resolve()
+	// We handle the validation challenge directly here to bypass CSRF, and to avoid a static import
+	// of the actual route, which would cause Vercel's NFT to bundle `syncService` and heavy dependencies
+	// like `sharp` into every single Vercel Serverless Function.
 	if (event.url.pathname === '/api/sync/webhook/microsoft-calendar' && event.request.method === 'POST') {
-		const { POST } = await import('./routes/api/sync/webhook/microsoft-calendar/+server.ts');
-		return await POST(event as any);
+		const validationToken = event.url.searchParams.get('validationToken');
+		if (validationToken) {
+			return new Response(validationToken, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+		}
 	}
 
 	return resolve(event);

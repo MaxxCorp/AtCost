@@ -1,0 +1,13 @@
+diff --git a/index.js b/index.js
+index 9369f8cbb026ed7c0da7863406ddd3ff589ff6ca..e6282fc27f51fb43ed4eeb980c413a1e29aa7e46 100644
+--- a/index.js
++++ b/index.js
+@@ -321,7 +321,7 @@ const plugin = function (defaults = {}) {
+ 				}
+ 
+ 				// then, create a group for each config
+-				const id = config.split ? `${hash}-${groups.size}` : hash;
++				const id = false ? `${hash}-${groups.size}` : hash;
+ 				let group = groups.get(id);
+ 				if (!group) {
+ 					group = { i: groups.size, config, routes: [] };
