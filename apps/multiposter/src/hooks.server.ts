@@ -8,20 +8,33 @@ import { building } from '$app/environment';
 
 const handleWebhook: Handle = async ({ event, resolve }) => {
 	// Microsoft Graph webhooks send POST requests with Content-Type: text/plain during validation challenge.
-	// Since they don't include an Origin header, SvelteKit's built-in CSRF protection blocks them.
-	// We handle the validation challenge directly here to bypass CSRF, and to avoid a static import
-	// of the actual route, which would cause Vercel's NFT to bundle `syncService` and heavy dependencies
-	// like `sharp` into every single Vercel Serverless Function.
-	const pathname = event.url.pathname.replace(/\/$/, '').toLowerCase();
-	if (pathname === '/api/sync/webhook/microsoft-calendar' && event.request.method === 'POST') {
-		const validationToken = event.url.searchParams.get('validationToken') || event.url.searchParams.get('ValidationToken');
-		if (validationToken) {
-			return new Response(validationToken, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+	// We handle the validation challenge directly here to bypass SvelteKit's CSRF protection completely.
+	
+	let validationToken = event.url.searchParams.get('validationToken') || event.url.searchParams.get('ValidationToken');
+	if (!validationToken) {
+		// Fallback: search all params case-insensitively
+		for (const [key, value] of event.url.searchParams.entries()) {
+			if (key.toLowerCase() === 'validationtoken') {
+				validationToken = value;
+				break;
+			}
 		}
-		
-		// If it's a POST to this endpoint but no validation token, it might be a normal webhook event.
-		// Normal webhook events are application/json, so SvelteKit CSRF won't block them.
-		// We can just let it fall through to resolve(event).
+	}
+
+	// If we see a validation token, we MUST return it as plain text immediately.
+	// This makes it bulletproof regardless of the exact path, trailing slashes, or proxies.
+	if (validationToken) {
+		return new Response(validationToken, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+	}
+
+	const pathname = event.url.pathname.replace(/\/$/, '').toLowerCase();
+	if (pathname.includes('microsoft-calendar') && event.request.method === 'POST') {
+		// If no validationToken is found, but it is a text/plain POST to this endpoint, SvelteKit CSRF will block it.
+		// Microsoft Graph might be sending an empty validation challenge? Return 200 just in case it's a ping.
+		const contentType = event.request.headers.get('content-type') || '';
+		if (contentType.includes('text/plain')) {
+			return new Response('OK', { status: 200 });
+		}
 	}
 
 	return resolve(event);
