@@ -697,7 +697,7 @@ export class SyncService {
 
 		// Construct callback URL
 		// Microsoft Graph requires a publicly accessible HTTPS URL.
-		const baseUrl = env.SYNC_WEBHOOK_URL || env.BETTER_AUTH_URL || 'https://localhost:5173';
+		const baseUrl = (env.SYNC_WEBHOOK_URL || env.BETTER_AUTH_URL || 'https://localhost:5173').replace(/\/$/, '');
 		let callbackUrl = `${baseUrl}/api/sync/webhook/${config.providerType}`;
 		
 		// Ensure it uses https if it's the default localhost fallback
