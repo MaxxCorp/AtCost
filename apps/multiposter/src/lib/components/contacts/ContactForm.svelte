@@ -68,12 +68,17 @@
     {loading}
     {children}
     listContactsRemote={listContacts as any}
+    m={m}
     labels={{
         basicInformation: m.basic_information(),
         displayName: m.display_name(),
         givenName: m.given_name(),
+        middleName: m.middle_name(),
         familyName: m.family_name(),
+        honorificPrefix: m.honorific_prefix(),
+        honorificSuffix: m.honorific_suffix(),
         birthday: m.birthday(),
+        gender: m.gender(),
         company: m.company(),
         department: m.department(),
         role: m.role(),
@@ -108,7 +113,7 @@
         searchTags: m.search_placeholder({ item: m.tags() }),
         noTags: m.no_items_associated_label({ item: m.tags() }),
         quickCreateTag: m.quick_create(),
-        tag: "tag",
+        tag: m.tag(),
     }}
     {listTagsRemote}
     {createTagRemote}

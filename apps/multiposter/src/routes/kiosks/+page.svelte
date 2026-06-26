@@ -141,7 +141,7 @@
 								class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
 							>
 								<FilterIcon size={16} class="mr-2" />
-								Filters
+								{m.filters()}
 								{#if activeFiltersCount > 0}
 									<span
 										class="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm"
@@ -157,7 +157,7 @@
 						>
 							<DropdownMenu.Label
 								class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2"
-								>System Filters</DropdownMenu.Label
+								>{m.system_filters()}</DropdownMenu.Label
 							>
 							<DropdownMenu.Separator class="bg-gray-50" />
 
@@ -165,7 +165,7 @@
 								<DropdownMenu.SubTrigger
 									class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
 								>
-									<span>Locations</span>
+									<span>{m.locations()}</span>
 									{#if selectedLocations.length > 0}
 										<span
 											class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold"
@@ -183,6 +183,7 @@
 											)}
 											onCheckedChange={() =>
 												toggleLocation(location.id)}
+											closeOnSelect={false}
 											class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
 										>
 											<span
@@ -204,7 +205,7 @@
 									}}
 								>
 									<X size={14} class="mr-2" />
-									Clear Filters
+									{m.clear_filters()}
 								</DropdownMenu.Item>
 							{/if}
 						</DropdownMenu.Content>

@@ -3,6 +3,7 @@
     import { Camera } from "@lucide/svelte";
     import { AsyncButton } from "@ac/ui";
     import { toast } from "svelte-sonner";
+    import * as m from "$lib/paraglide/messages";
 
     interface Props {
         onScanned: (data: any) => void;
@@ -35,12 +36,12 @@
                     const result = await scanNamecard({ imageBase64: base64, mimeType });
                     if (result.success) {
                         onScanned(result.data);
-                        toast.success("Namecard scanned successfully");
+                        toast.success(m.namecard_scan_success());
                     } else {
-                        toast.error(result.error || "Failed to scan namecard");
+                        toast.error(result.error || m.namecard_scan_failed());
                     }
                 } catch (err: any) {
-                    toast.error(err.message || "Failed to scan namecard");
+                    toast.error(err.message || m.namecard_scan_failed());
                 } finally {
                     scanning = false;
                     if (fileInput) fileInput.value = '';
@@ -48,7 +49,7 @@
             };
             reader.readAsDataURL(file);
         } catch (error: any) {
-            toast.error(error.message || "Failed to process image");
+            toast.error(error.message || m.image_process_failed());
             scanning = false;
             if (fileInput) fileInput.value = '';
         }
@@ -69,11 +70,11 @@
             type="button"
             variant="outline"
             loading={scanning}
-            loadingLabel="Scanning..."
+            loadingLabel={m.scanning()}
             onclick={() => fileInput?.click()}
         >
             <Camera size={16} class="mr-2" />
-            Scan Namecard
+            {m.scan_namecard()}
         </AsyncButton>
     {/if}
 {/await}

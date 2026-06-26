@@ -1,8 +1,9 @@
 import * as v from 'valibot';
+import * as m from '$lib/paraglide/messages';
 
 // Minimal pure Valibot schemas for contact sub-entities
 const contactBaseSchema = v.object({
-    displayName: v.pipe(v.string(), v.minLength(1, 'Display name is required')),
+    displayName: v.pipe(v.string(), v.minLength(1, m.display_name_required?.() ?? 'Display name is required')),
     givenName: v.optional(v.string()),
     familyName: v.optional(v.string()),
     honorificPrefix: v.optional(v.string()),

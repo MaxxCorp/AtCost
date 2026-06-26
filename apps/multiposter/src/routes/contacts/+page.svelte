@@ -36,8 +36,8 @@
 	let searchQuery = $state("");
 	let page = $state(1);
 	let limit = $state(50);
-	let selectedLocationId = $state<string | null>(null);
-	let selectedTagId = $state<string | null>(null);
+	let selectedLocations = $state<string[]>([]);
+	let selectedTags = $state<string[]>([]);
 
 	onMount(async () => {
 		try {
@@ -46,8 +46,11 @@
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.sortField) sortField = prefs.sortField;
 				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
-				if (prefs.locationId) selectedLocationId = prefs.locationId;
-				if (prefs.tagId) selectedTagId = prefs.tagId;
+				if (prefs.selectedLocations) selectedLocations = prefs.selectedLocations;
+				if (prefs.selectedTags) selectedTags = prefs.selectedTags;
+				// Backward compatibility for old singular prefs
+				if (prefs.locationId && selectedLocations.length === 0) selectedLocations = [prefs.locationId];
+				if (prefs.tagId && selectedTags.length === 0) selectedTags = [prefs.tagId];
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -58,8 +61,8 @@
 		const prefsToSave = {
 			sortField,
 			sortOrder,
-			locationId: selectedLocationId,
-			tagId: selectedTagId,
+			selectedLocations,
+			selectedTags,
 		};
 		setPreference("contactsFilters", JSON.stringify(prefsToSave)).catch(console.error);
 	});
@@ -68,19 +71,37 @@
 		page,
 		limit,
 		search: searchQuery,
-		locationId: selectedLocationId || undefined,
-		tagId: selectedTagId || undefined,
+		locationId: selectedLocations.length > 0 ? selectedLocations : undefined,
+		tagId: selectedTags.length > 0 ? selectedTags : undefined,
 		sortField,
 		sortOrder,
 	});
 
-	const activeFiltersCount = $derived((selectedLocationId ? 1 : 0) + (selectedTagId ? 1 : 0));
+	const activeFiltersCount = $derived(selectedLocations.length + selectedTags.length);
 
-	const allLocationsQuery = listLocations({ limit: 1000, sortField: 'name', sortOrder: 'asc' });
-	const allTagsQuery = listTags({ limit: 1000, sortField: 'name', sortOrder: 'asc' });
+	const locationsQuery = listLocations({ limit: 1000, sortField: 'name', sortOrder: 'asc' });
+	const tagsQuery = listTags({ limit: 1000, sortField: 'name', sortOrder: 'asc' });
+
+	function toggleLocation(id: string) {
+		if (selectedLocations.includes(id)) {
+			selectedLocations = selectedLocations.filter((l) => l !== id);
+		} else {
+			selectedLocations = [...selectedLocations, id];
+		}
+		page = 1;
+	}
+
+	function toggleTag(id: string) {
+		if (selectedTags.includes(id)) {
+			selectedTags = selectedTags.filter((t) => t !== id);
+		} else {
+			selectedTags = [...selectedTags, id];
+		}
+		page = 1;
+	}
 
 	async function handleDelete(contact: any) {
-		if (!window.confirm(m.delete_confirm({ item: "Contact" }))) return;
+		if (!window.confirm(m.delete_confirm({ item: m.contact() }))) return;
 		try {
 			await deleteContact([contact.id]);
 			toast.success(m.delete_successful());
@@ -105,7 +126,7 @@
 			</div>
 			<Button href="/contacts/new" class="w-full md:w-auto shadow-sm">
 				<Plus class="w-4 h-4 mr-2" />
-				{m.new_item({ item: "Contact" })}
+				{m.new_item({ item: m.contact() })}
 			</Button>
 		</div>
 
@@ -126,70 +147,89 @@
 					<DropdownMenu.Trigger>
 						<Button variant="outline" class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
 							<FilterIcon size={16} class="mr-2" />
-							Filters
+							{m.filters()}
 							{#if activeFiltersCount > 0}
-								<span class="absolute -top-2 -right-2 bg-primary-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm">
+								<span
+									class="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm"
+								>
 									{activeFiltersCount}
 								</span>
 							{/if}
 						</Button>
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-64 p-2 rounded-xl">
-						<div class="px-2 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-							Location
-						</div>
-						<div class="max-h-48 overflow-y-auto p-1 space-y-0.5">
-							<button
-								class="w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors {selectedLocationId === null ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}"
-								onclick={() => { selectedLocationId = null; page = 1; }}
-							>
-								All Locations
-							</button>
-							{#await allLocationsQuery then locations}
-								{#each locations.data as loc}
-									<button
-										class="w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors {selectedLocationId === loc.id ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}"
-										onclick={() => { selectedLocationId = loc.id; page = 1; }}
-									>
-										{loc.name}
-									</button>
-								{/each}
-							{/await}
-						</div>
-						
-						<DropdownMenu.Separator />
+					<DropdownMenu.Content align="end" class="min-w-[200px] rounded-2xl shadow-xl border-gray-100 p-1">
+						<DropdownMenu.Label class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2">
+							{m.system_filters()}
+						</DropdownMenu.Label>
+						<DropdownMenu.Separator class="bg-gray-50" />
 
-						<div class="px-2 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-							Tag
-						</div>
-						<div class="max-h-48 overflow-y-auto p-1 space-y-0.5">
-							<button
-								class="w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors {selectedTagId === null ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}"
-								onclick={() => { selectedTagId = null; page = 1; }}
-							>
-								All Tags
-							</button>
-							{#await allTagsQuery then tags}
-								{#each tags.data as tag}
-									<button
-										class="w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors {selectedTagId === tag.id ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}"
-										onclick={() => { selectedTagId = tag.id; page = 1; }}
-									>
-										{tag.name}
-									</button>
-								{/each}
-							{/await}
-						</div>
+						{#await locationsQuery then locationsRes}
+						{#if locationsRes.data && locationsRes.data.length > 0}
+							<DropdownMenu.Sub>
+								<DropdownMenu.SubTrigger class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg">
+									<span>{m.locations()}</span>
+									{#if selectedLocations.length > 0}
+										<span class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold">
+											{selectedLocations.length}
+										</span>
+									{/if}
+								</DropdownMenu.SubTrigger>
+								<DropdownMenu.SubContent class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100">
+									{#each locationsRes.data as location}
+										<DropdownMenu.CheckboxItem
+											checked={selectedLocations.includes(location.id)}
+											onCheckedChange={() => toggleLocation(location.id)}
+											closeOnSelect={false}
+											class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
+										>
+											<span class="truncate block w-full">{location.name}</span>
+										</DropdownMenu.CheckboxItem>
+									{/each}
+								</DropdownMenu.SubContent>
+							</DropdownMenu.Sub>
+						{/if}
+						{/await}
+
+						{#await tagsQuery then tagsRes}
+						{#if tagsRes.data && tagsRes.data.length > 0}
+							<DropdownMenu.Sub>
+								<DropdownMenu.SubTrigger class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg">
+									<span>{m.tags()}</span>
+									{#if selectedTags.length > 0}
+										<span class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold">
+											{selectedTags.length}
+										</span>
+									{/if}
+								</DropdownMenu.SubTrigger>
+								<DropdownMenu.SubContent class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100">
+									{#each tagsRes.data as tag}
+										<DropdownMenu.CheckboxItem
+											checked={selectedTags.includes(tag.id)}
+											onCheckedChange={() => toggleTag(tag.id)}
+											closeOnSelect={false}
+											class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
+										>
+											<span class="truncate block w-full">{tag.name}</span>
+										</DropdownMenu.CheckboxItem>
+									{/each}
+								</DropdownMenu.SubContent>
+							</DropdownMenu.Sub>
+						{/if}
+						{/await}
 
 						{#if activeFiltersCount > 0}
-							<div class="p-1 mt-2 border-t border-gray-100 dark:border-gray-800">
-								<button
-									class="w-full flex items-center justify-center gap-2 px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-md transition-colors"
-									onclick={() => { selectedLocationId = null; selectedTagId = null; page = 1; }}
-								>
-									<X size={14} /> Clear all
-								</button>
-							</div>
+							<DropdownMenu.Separator class="bg-gray-50" />
+							<DropdownMenu.Item
+								class="text-red-600 font-medium py-2 rounded-lg cursor-pointer hover:bg-red-50 hover:text-red-700"
+								onclick={() => {
+									selectedLocations = [];
+									selectedTags = [];
+									page = 1;
+								}}
+							>
+								<X size={14} class="mr-2" />
+								{m.clear_filters()}
+							</DropdownMenu.Item>
 						{/if}
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
@@ -201,7 +241,7 @@
 					>
 						<option value="updatedAt">{m.sort_last_updated()}</option>
 						<option value="createdAt">{m.sort_created_date()}</option>
-						<option value="displayName">Name</option>
+						<option value="displayName">{m.display_name()}</option>
 					</select>
 					<button
 						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -322,7 +362,7 @@
 								{m.no_items({ items: m.feature_contacts_title() })}
 							</h3>
 							<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-								Try adjusting your search or filters.
+								{m.try_adjusting_filters()}
 							</p>
 						</div>
 					{/each}
@@ -333,7 +373,7 @@
 						{@const totalPages = Math.ceil(res.total / limit)}
 						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
 							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, res.total)} of {res.total}</span>
+								<span>{m.showing_range({ from: (page - 1) * limit + 1, to: Math.min(page * limit, res.total), total: res.total })}</span>
 								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 									<select
 										bind:value={limit}
@@ -354,7 +394,7 @@
 									disabled={page === 1}
 									onclick={() => page = 1}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-									title="First page"
+									title={m.first_page()}
 								>
 									<ChevronsLeft size={16} />
 								</Button>
@@ -366,7 +406,7 @@
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
 									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-									Previous
+									{m.previous()}
 								</Button>
 								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
 									<select
@@ -386,7 +426,7 @@
 									onclick={() => page < totalPages && page++}
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
-									Next
+									{m.next()}
 									<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
 								</Button>
 								<Button
@@ -395,7 +435,7 @@
 									disabled={page === totalPages}
 									onclick={() => page = totalPages}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-									title="Last page"
+									title={m.last_page()}
 								>
 									<ChevronsRight size={16} />
 								</Button>

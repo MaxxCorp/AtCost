@@ -47,7 +47,7 @@
                 <div
                     class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
                 >
-                    <LoadingSection message="Loading contact profile..." />
+                    <LoadingSection message={m.loading_contact_profile()} />
                 </div>
             {/if}
             <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
@@ -58,23 +58,23 @@
                             class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
                         >
                             <ErrorSection
-                                headline="Contact not found"
-                                message="The contact you are looking for does not exist or you don't have access."
+                                headline={m.contact_not_found()}
+                                message={m.contact_not_found_message()}
                                 href="/contacts"
-                                button="Back to Contacts"
+                                button={m.back_to_contacts()}
                             />
                         </div>
                     {:else}
                         <Breadcrumb
                             feature="contacts"
-                            current={contact.displayName || undefined}
+                            current={contact.displayName || m.unnamed_contact()}
                         />
 
                         <div
                             class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
                         >
                             <div class="flex justify-between items-center mb-4">
-                                <h1 class="text-2xl font-bold">Edit Contact</h1>
+                                <h1 class="text-2xl font-bold">{m.edit_contact()}</h1>
                                 <div class="flex items-center gap-2">
                                     <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
                                     <AsyncButton
@@ -254,10 +254,10 @@
                     class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
                 >
                     <ErrorSection
-                        headline="Error loading contact"
-                        message={error instanceof Error ? error.message : "An error occurred"}
+                        headline={m.error_loading_contact()}
+                        message={error instanceof Error ? error.message : m.something_went_wrong()}
                         href="/contacts"
-                        button="Back to Contacts"
+                        button={m.back_to_contacts()}
                     />
                 </div>
             {/snippet}

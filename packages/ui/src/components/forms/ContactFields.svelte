@@ -345,12 +345,12 @@
                     bind:value={contactData.gender}
                     class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.gender?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 >
-                    <option value="">Select...</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="non-binary">Non-binary</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                    <option value="other">Other</option>
+                    <option value="">{m?.select_placeholder?.() ?? "Select..."}</option>
+                    <option value="male">{m?.gender_male?.() ?? "Male"}</option>
+                    <option value="female">{m?.gender_female?.() ?? "Female"}</option>
+                    <option value="non-binary">{m?.gender_non_binary?.() ?? "Non-binary"}</option>
+                    <option value="prefer-not-to-say">{m?.gender_prefer_not_to_say?.() ?? "Prefer not to say"}</option>
+                    <option value="other">{labels?.other ?? "Other"}</option>
                 </select>
                 {#each (contactFields?.fields?.gender?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
@@ -516,12 +516,12 @@
                                 {/each}
                             </div>
                             <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" type="button" onclick={onCancel}>Cancel</Button>
+                                <Button variant="outline" type="button" onclick={onCancel}>{m?.cancel?.() ?? "Cancel"}</Button>
                                 <AsyncButton 
                                     type="submit" 
                                     loading={state.pending}
                                 >
-                                    {id ? "Update" : "Create"}
+                                    {id ? (m?.update?.() ?? "Update") : (m?.create?.() ?? "Create")}
                                 </AsyncButton>
                             </div>
                         </form>

@@ -85,7 +85,7 @@
                     m.unnamed_contact()}
                 <Breadcrumb
                     feature="contacts"
-                    current={contact.displayName || undefined}
+                    current={contact.displayName || m.unnamed_contact()}
                 />
 
                 <div

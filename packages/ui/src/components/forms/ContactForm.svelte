@@ -31,8 +31,12 @@
             basicInformation?: string;
             displayName?: string;
             givenName?: string;
+            middleName?: string;
             familyName?: string;
+            honorificPrefix?: string;
+            honorificSuffix?: string;
             birthday?: string;
+            gender?: string;
             company?: string;
             department?: string;
             role?: string;
@@ -78,6 +82,7 @@
         updateTagRemote?: any;
         createTagSchema?: any;
         updateTagSchema?: any;
+        m?: any;
     }
 
     let {
@@ -93,6 +98,7 @@
         children,
         tags = $bindable(),
         labels,
+        m,
 
         listTagsRemote,
         createTagRemote,
@@ -306,6 +312,7 @@
         {contactId}
         {listContactsRemote}
         {labels}
+        {m}
         rf={remoteFunction}
         {listTagsRemote}
         {createTagRemote}
