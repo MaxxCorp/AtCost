@@ -58,4 +58,7 @@ const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(even
     });
 });
 
-export const handle: Handle = sequence(handleBetterAuth, handleMockAuth, handleParaglide);
+export const handle: Handle = dev
+    ? sequence(handleBetterAuth, handleMockAuth, handleParaglide)
+    : sequence(handleBetterAuth, handleParaglide);
+
