@@ -653,6 +653,12 @@
 	"gender_male": "Male",
 	"gender_female": "Female",
 	"gender_non_binary": "Non-binary",
-	"gender_prefer_not_to_say": "Prefer not to say"
+	"gender_prefer_not_to_say": "Prefer not to say",
+	"deleted_successfully": "Deleted successfully",
+	"failed_to_delete_item": "Failed to delete item",
+	"item_created_and_associated": "{item} created and associated",
+	"item_updated": "{item} updated",
+	"failed_to_update_association": "Failed to update association",
+	"failed_to_load_associations": "Failed to load associations"
 }
 

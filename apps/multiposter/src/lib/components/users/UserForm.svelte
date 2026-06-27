@@ -211,7 +211,7 @@
             <User size={18} class="text-blue-600" />
             {m.feature_contacts_title()}
         </h3>
-        <EntityManager
+        <EntityManager {m}
             title={m.feature_contacts_title()}
             icon={User}
             mode="embedded"

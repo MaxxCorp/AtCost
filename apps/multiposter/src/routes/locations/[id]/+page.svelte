@@ -149,7 +149,7 @@
                             >
                                 {#snippet children()}
                                     <div class="mt-8 pt-8 border-t">
-                                        <EntityManager
+                                        <EntityManager {m}
                                             title={m.feature_contacts_title()}
                                             icon={User}
 

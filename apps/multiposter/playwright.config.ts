@@ -9,7 +9,10 @@ export default defineConfig({
 		port: PORT,
 		reuseExistingServer: !process.env.CI,
 		stdout: 'pipe',
-		stderr: 'pipe'
+		stderr: 'pipe',
+		env: {
+			PLAYWRIGHT_TEST: 'true'
+		}
 	},
 	use: {
 		baseURL: `http://${HOST}:${PORT}`

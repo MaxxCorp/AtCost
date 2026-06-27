@@ -23,6 +23,7 @@
     import { onMount, type Snippet, untrack } from "svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
+    import TagForm from "@ac/ui/components/forms/TagForm.svelte";
         
     import {
         addAssociation,
@@ -86,7 +87,7 @@
     const type = "event";
     const BERLIN_DE_CATEGORIES = [
         "Ausstellung",
-        "Berliner Bühnen",
+        "Berliner BÃ¼hnen",
         "Bildung",
         "Feste",
         "Freizeit",
@@ -377,7 +378,7 @@
             {m.tags()}
         </h3>
         {#key initialData?.id || "new"}
-            <EntityManager
+            <EntityManager {m}
             title={m.tags()}
             icon={TagIcon}
             mode="embedded"
@@ -417,6 +418,8 @@
             editLabel={m.edit()}
             deleteLabel={m.delete()}
             unlinkLabel={m.unlink()}
+            deleteForeverLabel={m.delete_forever({ item: m.tag() })}
+            confirmUnlinkLabel={m.confirm_unlink_label({ item: m.tag() })}
             selectAllLabel={m.select_all()}
             deselectAllLabel={m.deselect_all()}
         >
@@ -431,64 +434,15 @@
                 onCancel,
                 id,
             }: any)}
-                <form
-                    {...rfState
-                        .preflight(schema)
-                        .enhance(async ({ submit }: { submit: any }) => {
-                            try {
-                                const res = await submit();
-                                if (res && res.success !== false) {
-                                    onSuccess(res);
-                                }
-                            } catch (err) {
-                                console.error(
-                                    "[EventForm] Quick Create Error:",
-                                    err,
-                                );
-                            }
-                        })}
-                    class="space-y-4 p-4"
-                >
-                    {#if id && rfState.fields?.id}
-                        <input
-                            {...rfState.fields.id.as("text", id)}
-                            class="hidden"
-                        />
-                    {/if}
-                    <div>
-                        <label
-                            for="tag-name"
-                            class="block text-sm font-medium text-gray-700"
-                            >{m.summary()}</label
-                        >
-                        <input
-                            {...rfState.fields.name.as("text")}
-                            id="name"
-                            type="text"
-                            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            value={formData?.name ?? ""}
-                        />
-                        <div class="px-2">
-                            {#each (rf.fields.name.issues() ?? []) as issue}
-                                <p class="text-sm text-red-600">
-                                    {translateIssue(issue.message, m)}
-                                </p>
-                            {/each}
-                        </div>
-                    </div>
-                    <div class="flex justify-end gap-2 pt-4 border-t">
-                        <Button
-                            variant="outline"
-                            type="button"
-                            onclick={onCancel}>{m.cancel()}</Button
-                        >
-                        <AsyncButton type="submit" loading={rfState.pending}>
-                            {id
-                                ? m.save_changes()
-                                : m.create_item({ item: "Tag" })}
-                        </AsyncButton>
-                    </div>
-                </form>
+                <TagForm
+                    remoteFunction={rfState}
+                    validationSchema={schema}
+                    initialData={formData}
+                    isUpdating={!!id}
+                    {onSuccess}
+                    {onCancel}
+                    {m}
+                />
             {/snippet}
         </EntityManager>
         {/key}
@@ -499,7 +453,7 @@
             >{m.feature_resources_title()} ({m.optional()})</span
         >
         {#key initialData?.id || "new"}
-            <EntityManager
+            <EntityManager {m}
                 title={m.feature_resources_title()}
                 icon={Database}
                 mode="embedded"
@@ -533,6 +487,9 @@
                 noItemsLabel={m.no_items_associated_label({
                     item: m.feature_resources_title().toLowerCase(),
                 })}
+                noItemsFoundLabel={m.no_items_found({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
                 searchPlaceholder={m.search_placeholder({
                     item: m.feature_resources_title().toLowerCase(),
                 })}
@@ -547,6 +504,12 @@
                 editLabel={m.edit()}
                 deleteLabel={m.delete()}
                 unlinkLabel={m.unlink()}
+                deleteForeverLabel={m.delete_forever({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
+                confirmUnlinkLabel={m.confirm_unlink_label({
+                    item: m.feature_resources_title().toLowerCase(),
+                })}
                 selectAllLabel={m.select_all()}
                 deselectAllLabel={m.deselect_all()}
             >
@@ -671,7 +634,7 @@
             {m.feature_locations_title()}
         </h3>
         {#key initialData?.id || "new"}
-            <EntityManager
+            <EntityManager {m}
                 title={m.feature_locations_title()}
                 icon={MapPin}
                 mode="embedded"
@@ -1085,7 +1048,7 @@
         {m.feature_contacts_title()}
     </h3>
     {#key initialData?.id || "new"}
-    <EntityManager
+    <EntityManager {m}
         title={m.feature_contacts_title()}
         icon={User}
         mode="embedded"
@@ -1210,7 +1173,7 @@
                             {m.feature_locations_title()}
                         </h3>
                         {#key id || "new"}
-                            <EntityManager
+                            <EntityManager {m}
                             title={m.feature_locations_title()}
                             icon={MapPin}
                             mode="embedded"

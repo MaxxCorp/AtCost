@@ -91,7 +91,7 @@
                                     onCancel={() => goto("/users")}
                                 >
                                     {#snippet extraEntities(data: any)}
-                                        <EntityManager
+                                        <EntityManager {m}
                                             title={m.feature_contacts_title()}
                                             icon={UserIcon}
 

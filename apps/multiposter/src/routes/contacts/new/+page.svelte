@@ -54,7 +54,7 @@
                                     <MapPin size={18} class="text-blue-600" />
                                     {m.feature_locations_title()}
                                 </h3>
-                                <EntityManager
+                                <EntityManager {m}
                                     title={m.feature_locations_title()}
                                     icon={MapPin}
                                     type="location"

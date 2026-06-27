@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { untrack } from "svelte";
     import { goto } from "$app/navigation";
 
     import { toast } from "svelte-sonner";
@@ -108,7 +107,6 @@
         updateTagSchema,
     }: Props = $props();
 
-
     const i18n = $derived({
         saveContact: labels?.saveContact ?? "Save Contact",
         cancel: labels?.cancel ?? "Cancel",
@@ -116,7 +114,9 @@
         errorSomethingWentWrong:
             labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong",
         successfullySaved: labels?.successfullySaved ?? "Successfully Saved!",
-        pleaseFixValidation: labels?.pleaseFixValidation ?? "Please fix the validation errors in the form.",
+        pleaseFixValidation:
+            labels?.pleaseFixValidation ??
+            "Please fix the validation errors in the form.",
     });
 
     let prevIssuesLength = $state(0);
@@ -180,7 +180,9 @@
 
     $effect(() => {
         if (initialData.tags) {
-            tagsInput = initialData.tags.map((t: any) => t.name || t).join(", ");
+            tagsInput = initialData.tags
+                .map((t: any) => t.name || t)
+                .join(", ");
         }
     });
 
@@ -199,26 +201,31 @@
         ),
     );
 
-
-
     const prefix = $derived(contactId ? "data.contact" : "contact");
 
     export function fillData(data: any) {
         if (!data) return;
-        
+
         // Fill contact data only if empty
-        if (data.displayName && !contactData.displayName) contactData.displayName = data.displayName;
-        if (data.givenName && !contactData.givenName) contactData.givenName = data.givenName;
-        if (data.familyName && !contactData.familyName) contactData.familyName = data.familyName;
-        if (data.company && !contactData.company) contactData.company = data.company;
+        if (data.displayName && !contactData.displayName)
+            contactData.displayName = data.displayName;
+        if (data.givenName && !contactData.givenName)
+            contactData.givenName = data.givenName;
+        if (data.familyName && !contactData.familyName)
+            contactData.familyName = data.familyName;
+        if (data.company && !contactData.company)
+            contactData.company = data.company;
         if (data.role && !contactData.role) contactData.role = data.role;
-        
+
         // Emails
         if (data.emails && data.emails.length > 0) {
-            const newEmails = data.emails.filter((e: any) => !emails.some(existing => existing.value === e.value));
+            const newEmails = data.emails.filter(
+                (e: any) =>
+                    !emails.some((existing) => existing.value === e.value),
+            );
             if (newEmails.length > 0) {
                 // If there's an empty email field, use it first
-                const emptyIdx = emails.findIndex(e => !e.value);
+                const emptyIdx = emails.findIndex((e) => !e.value);
                 if (emptyIdx !== -1) {
                     emails[emptyIdx] = { ...emails[emptyIdx], ...newEmails[0] };
                     newEmails.shift();
@@ -226,12 +233,15 @@
                 emails = [...emails, ...newEmails];
             }
         }
-        
+
         // Phones
         if (data.phones && data.phones.length > 0) {
-            const newPhones = data.phones.filter((p: any) => !phones.some(existing => existing.value === p.value));
+            const newPhones = data.phones.filter(
+                (p: any) =>
+                    !phones.some((existing) => existing.value === p.value),
+            );
             if (newPhones.length > 0) {
-                const emptyIdx = phones.findIndex(p => !p.value);
+                const emptyIdx = phones.findIndex((p) => !p.value);
                 if (emptyIdx !== -1) {
                     phones[emptyIdx] = { ...phones[emptyIdx], ...newPhones[0] };
                     newPhones.shift();
@@ -242,11 +252,23 @@
 
         // Addresses
         if (data.addresses && data.addresses.length > 0) {
-            const newAddresses = data.addresses.filter((a: any) => !addresses.some(existing => existing.street === a.street && existing.city === a.city));
+            const newAddresses = data.addresses.filter(
+                (a: any) =>
+                    !addresses.some(
+                        (existing) =>
+                            existing.street === a.street &&
+                            existing.city === a.city,
+                    ),
+            );
             if (newAddresses.length > 0) {
-                const emptyIdx = addresses.findIndex(a => !a.street && !a.city);
+                const emptyIdx = addresses.findIndex(
+                    (a) => !a.street && !a.city,
+                );
                 if (emptyIdx !== -1) {
-                    addresses[emptyIdx] = { ...addresses[emptyIdx], ...newAddresses[0] };
+                    addresses[emptyIdx] = {
+                        ...addresses[emptyIdx],
+                        ...newAddresses[0],
+                    };
                     newAddresses.shift();
                 }
                 addresses = [...addresses, ...newAddresses];
@@ -256,47 +278,82 @@
 </script>
 
 <form
-    {...(remoteFunction as any).preflight(schema).enhance(async ({ submit }: { submit: any }) => {
-        try {
-            const result = await submit();
+    {...(remoteFunction as any)
+        .preflight(schema)
+        .enhance(async ({ submit }: { submit: any }) => {
+            try {
+                await submit();
+                const result = (remoteFunction as any).result;
+                const error = (remoteFunction as any).error;
 
-            if (result?.success === false || result?.error) {
-                const msg =
-                    result?.error?.message ||
-                    result?.error ||
-                    i18n.errorSomethingWentWrong;
-                toast.error(msg);
-                return;
+                if (error || (result && result.success === false)) {
+                    const msg =
+                        error?.message ||
+                        result?.error?.message ||
+                        result?.error ||
+                        i18n.errorSomethingWentWrong;
+                    toast.error(msg);
+                    return;
+                }
+
+                toast.success(i18n.successfullySaved);
+                if (onSuccess) onSuccess(result);
+                else goto(cancelHref);
+            } catch (error: any) {
+                toast.error(error.message || i18n.errorSomethingWentWrong);
             }
-
-            toast.success(i18n.successfullySaved);
-            if (onSuccess) onSuccess(result);
-            else goto(cancelHref);
-        } catch (error: any) {
-            toast.error(error.message || i18n.errorSomethingWentWrong);
-        }
-    })}
+        })}
     class="space-y-8"
 >
     {#if remoteFunction?.fields}
         {#if contactId && remoteFunction.fields.id}
-            <input {...remoteFunction.fields.id.as("text", contactId)} class="hidden" />
+            <input
+                {...remoteFunction.fields.id.as("text", contactId)}
+                class="hidden"
+            />
         {/if}
 
         {#if remoteFunction.fields.emailsJson}
-            <input {...remoteFunction.fields.emailsJson.as("text", emailsJson ?? "[]")} class="hidden" />
+            <input
+                {...remoteFunction.fields.emailsJson.as(
+                    "text",
+                    emailsJson ?? "[]",
+                )}
+                class="hidden"
+            />
         {/if}
         {#if remoteFunction.fields.phonesJson}
-            <input {...remoteFunction.fields.phonesJson.as("text", phonesJson ?? "[]")} class="hidden" />
+            <input
+                {...remoteFunction.fields.phonesJson.as(
+                    "text",
+                    phonesJson ?? "[]",
+                )}
+                class="hidden"
+            />
         {/if}
         {#if remoteFunction.fields.relationsJson}
-            <input {...remoteFunction.fields.relationsJson.as("text", relationsJson ?? "[]")} class="hidden" />
+            <input
+                {...remoteFunction.fields.relationsJson.as(
+                    "text",
+                    relationsJson ?? "[]",
+                )}
+                class="hidden"
+            />
         {/if}
         {#if remoteFunction.fields.addressesJson}
-            <input {...remoteFunction.fields.addressesJson.as("text", addressesJson ?? "[]")} class="hidden" />
+            <input
+                {...remoteFunction.fields.addressesJson.as(
+                    "text",
+                    addressesJson ?? "[]",
+                )}
+                class="hidden"
+            />
         {/if}
         {#if remoteFunction.fields.tagsJson}
-            <input {...remoteFunction.fields.tagsJson.as("text", tagsJson ?? "[]")} class="hidden" />
+            <input
+                {...remoteFunction.fields.tagsJson.as("text", tagsJson ?? "[]")}
+                class="hidden"
+            />
         {/if}
     {/if}
 
@@ -330,7 +387,13 @@
     {/if}
 
     {#if remoteFunction?.fields?.locationIdsJson}
-        <input {...remoteFunction.fields.locationIdsJson.as("text", locationIdsJson)} class="hidden" />
+        <input
+            {...remoteFunction.fields.locationIdsJson.as(
+                "text",
+                locationIdsJson,
+            )}
+            class="hidden"
+        />
     {/if}
 
     <div class="flex justify-end gap-3 pt-6 border-t">

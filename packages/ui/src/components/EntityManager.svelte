@@ -76,6 +76,9 @@
         // Initial state
         initialItems?: T[];
 
+        // Search predicate
+        searchPredicate?: (item: T, query: string) => boolean;
+
         // Localization props
         loadingLabel?: string;
         noItemsLabel?: string;
@@ -88,6 +91,7 @@
         editLabel?: string;
         deleteForeverLabel?: string;
         confirmUnlinkLabel?: string;
+        m?: any;
     }
 
     let {
@@ -113,6 +117,7 @@
         renderItemDetail,
         participationSnippet,
         initialItems = [],
+        searchPredicate = undefined,
 
         // Localization defaults
         loadingLabel = `Loading ${title.toLowerCase()}...`,
@@ -124,9 +129,67 @@
         showQuickCreateButton = true,
         closeSearchLabel = "Close Search",
         editLabel = "Edit",
-        deleteForeverLabel = `Delete ${title.toLowerCase()} forever`,
+        deleteForeverLabel = undefined,
         confirmUnlinkLabel = "Remove link",
+        m = undefined,
     }: Props<T> = $props();
+
+    const i18n = {
+        get loadingLabel() {
+            return m?.loading_item?.({ item: title.toLowerCase() }) ?? `Loading ${title.toLowerCase()}...`;
+        },
+        get noItemsLabel() {
+            return m?.no_items?.({ items: title.toLowerCase() }) ?? `No ${title.toLowerCase()} associated yet.`;
+        },
+        get noItemsFoundLabel() {
+            return m?.not_found?.({ item: title.toLowerCase() }) ?? `No ${title.toLowerCase()} found.`;
+        },
+        get searchPlaceholder() {
+            return m?.search_placeholder?.({ item: title.toLowerCase() }) ?? `Search ${title.toLowerCase()}...`;
+        },
+        get linkItemLabel() {
+            return m?.link_item_label?.({ item: title.toLowerCase() }) ?? `Link ${title}`;
+        },
+        get quickCreateLabel() {
+            return m?.quick_create?.() ?? "Quick Create";
+        },
+        get closeSearchLabel() {
+            return m?.close_search?.() ?? "Close Search";
+        },
+        get editLabel() {
+            return m?.edit?.() ?? "Edit";
+        },
+        get deleteForeverLabel() {
+            return deleteForeverLabel ?? m?.delete_forever?.({ item: title.toLowerCase() }) ?? `Delete ${title.toLowerCase()} forever`;
+        },
+        get confirmUnlinkLabel() {
+            return m?.confirm_unlink_label?.({ item: title.toLowerCase() }) ?? "Remove link";
+        },
+        get deleteConfirmLabel() {
+            return m?.delete_confirm?.({ item: title.toLowerCase() }) ?? `Delete this ${title.toLowerCase()}?`;
+        },
+        get deleteSuccessLabel() {
+            return m?.deleted_successfully?.() ?? "Deleted successfully";
+        },
+        get deleteFailedLabel() {
+            return m?.failed_to_delete_item?.() ?? "Failed to delete item";
+        },
+        get updateAssociationFailedLabel() {
+            return m?.failed_to_update_association?.() ?? "Failed to update association";
+        },
+        get createSuccessLabel() {
+            return m?.item_created_and_associated?.({ item: title }) ?? `${title} created and associated`;
+        },
+        get updateSuccessLabel() {
+            return m?.item_updated?.({ item: title }) ?? `${title} updated`;
+        },
+        get failedToLoadLabel() {
+            return m?.failed_to_load?.({ item: title.toLowerCase() }) ?? `Failed to load ${title.toLowerCase()}`;
+        },
+        get failedToLoadAssociations() {
+            return m?.failed_to_load_associations?.() ?? "Failed to load associations";
+        }
+    };
 
     let mounted = true;
     onMount(() => {
@@ -208,6 +271,11 @@
 
         try {
             if (associated) {
+                const newList = currentList.filter((ai) => {
+                    if (item.id && ai.id) return ai.id !== item.id;
+                    if (item.name && ai.name) return ai.name !== item.name;
+                    return true;
+                });
                 if (entityId && removeAssociationRemote) {
                     await removeAssociationRemote({
                         type,
@@ -218,16 +286,12 @@
                         await associationsPromise.refresh();
                     }
                 } else {
-                    const newList = currentList.filter((ai) => {
-                        if (item.id && ai.id) return ai.id !== item.id;
-                        if (item.name && ai.name) return ai.name !== item.name;
-                        return true;
-                    });
                     localAssociatedItems = newList;
-                    onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
                 }
+                onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
             } else {
                 if (singleSelect) {
+                    const newList = [item];
                     if (entityId && removeAssociationRemote) {
                         for (const existing of currentList) {
                             if (existing.id) {
@@ -248,19 +312,13 @@
                         if (typeof associationsPromise?.refresh === 'function') {
                             await associationsPromise.refresh();
                         }
-                    }
-                    if (entityId && addAssociationRemote) {
-                        // Already handled
                     } else {
-                        const newList = [item];
                         localAssociatedItems = newList;
-                        onchange?.(
-                            newList.map((i) => i.id!).filter(Boolean),
-                            newList,
-                        );
                     }
+                    onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
                     showSelector = false;
                 } else {
+                    const newList = [...currentList, item];
                     if (entityId && addAssociationRemote) {
                         await addAssociationRemote({
                             type,
@@ -272,18 +330,17 @@
                         }
                     } else {
                         if (!mounted) return;
-                        const newList = [...currentList, item];
                         localAssociatedItems = newList;
-                        onchange?.(
-                            newList.map((i) => i.id!).filter(Boolean),
-                            newList,
-                        );
                     }
+                    onchange?.(
+                        newList.map((i) => i.id!).filter(Boolean),
+                        newList,
+                    );
                 }
             }
         } catch (e: any) {
             if (!mounted) return;
-            toast.error(e.message || "Failed to update association");
+            toast.error(e.message || i18n.updateAssociationFailedLabel);
         } finally {
             if (mounted) {
                 linkingItemId = null;
@@ -300,6 +357,8 @@
                 result === true || (result && result.success !== false);
             if (!success) return;
 
+            const newList = currentList.filter((i) => i.id !== item.id);
+
             if (typeof selectorListPromise?.refresh === 'function') {
                 await selectorListPromise.refresh();
             }
@@ -307,16 +366,15 @@
             if (typeof associationsPromise?.refresh === 'function') {
                 await associationsPromise.refresh();
             } else {
-                const newList = currentList.filter((i) => i.id !== item.id);
                 localAssociatedItems = newList;
-                onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
             }
+            onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
 
             if (success && mounted) {
-                toast.success("Deleted successfully");
+                toast.success(i18n.deleteSuccessLabel);
             }
         } catch (e: any) {
-            if (mounted) toast.error(e.message || "Failed to delete item");
+            if (mounted) toast.error(e.message || i18n.deleteFailedLabel);
         } finally {
             if (mounted) deletingItemId = null;
         }
@@ -334,10 +392,23 @@
             }
         }
 
+        let newItem = result?.data || result?.contact || result?.resource || result?.tag;
+        if (!newItem && result && typeof result === 'object' && 'id' in result) {
+            newItem = result;
+        }
+
         if (newId) {
             if (typeof selectorListPromise?.refresh === 'function') {
                 await selectorListPromise.refresh();
             }
+
+            if (!newItem) {
+                const res = await selectorListPromise;
+                const { data: items } = normalize(res);
+                newItem = items.find((i: any) => i.id === newId);
+            }
+
+            const newList = newItem ? [...currentList, newItem] : currentList;
 
             if (entityId && addAssociationRemote) {
                 await addAssociationRemote({
@@ -350,17 +421,12 @@
                     await associationsPromise.refresh();
                 }
             } else {
-                const res = await selectorListPromise;
-                const { data: items } = normalize(res);
-                const newItem = items.find((i: any) => i.id === newId);
-
                 if (newItem && mounted) {
-                    const newList = [newItem, ...currentList];
                     localAssociatedItems = newList;
-                    onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
                 }
             }
-            if (mounted) toast.success(`${title} created and associated`);
+            onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
+            if (mounted) toast.success(i18n.createSuccessLabel);
         }
     }
 
@@ -369,26 +435,32 @@
         editingItem = null;
         if (!targetId) return;
 
+        let updatedItem = result?.data || result?.contact || result?.resource || result?.tag;
+        if (!updatedItem && result && typeof result === 'object' && 'id' in result) {
+            updatedItem = result;
+        }
+
         if (typeof selectorListPromise?.refresh === 'function') {
             await selectorListPromise.refresh();
         }
 
+        if (!updatedItem) {
+            const res = await selectorListPromise;
+            const { data: items } = normalize(res);
+            updatedItem = items.find((i: any) => i.id === targetId);
+        }
+
+        const newList = updatedItem
+            ? currentList.map((i) => (i.id === targetId ? updatedItem : i))
+            : currentList;
+
         if (typeof associationsPromise?.refresh === 'function') {
             await associationsPromise.refresh();
         } else {
-            const res = await selectorListPromise;
-            const { data: items } = normalize(res);
-            const updatedItem = items.find((i: any) => i.id === targetId);
-
-            if (updatedItem && mounted) {
-                const newList = currentList.map((i) =>
-                    i.id === targetId ? updatedItem : i,
-                );
-                localAssociatedItems = newList;
-                onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
-            }
+            localAssociatedItems = newList;
         }
-        if (mounted) toast.success(`${title} updated`);
+        onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
+        if (mounted) toast.success(i18n.updateSuccessLabel);
     }
 </script>
 
@@ -402,7 +474,7 @@
             />
             <input
                 type="text"
-                placeholder={searchPlaceholder}
+                placeholder={i18n.searchPlaceholder}
                 bind:value={searchQuery}
                 class="pl-9 w-full px-2 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all bg-gray-50/50"
             />
@@ -428,12 +500,12 @@
                         {#if showSelector}
                             <X size={16} class="mr-1.5" />
                             <span class="text-sm font-semibold"
-                                >{closeSearchLabel}</span
+                                >{i18n.closeSearchLabel}</span
                             >
                         {:else}
                             <Link size={16} class="mr-1.5" />
                             <span class="text-sm font-semibold"
-                                >{linkItemLabel}</span
+                                >{i18n.linkItemLabel}</span
                             >
                         {/if}
                     </Button>
@@ -448,7 +520,7 @@
                     class="h-9 px-3 text-gray-500 hover:bg-gray-100 rounded-xl"
                 >
                     <Plus size={16} class="mr-1.5" />
-                    <span class="text-sm font-semibold">{quickCreateLabel}</span
+                    <span class="text-sm font-semibold">{i18n.quickCreateLabel}</span
                     >
                 </Button>
             {/if}
@@ -473,14 +545,16 @@
                     {@const filteredItems = searchQuery
                         ? allItems.filter(
                               (i: any) =>
-                                  i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                  i.title?.toLowerCase().includes(searchQuery.toLowerCase()),
+                                  searchPredicate
+                                      ? searchPredicate(i, searchQuery)
+                                      : (i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                         i.title?.toLowerCase().includes(searchQuery.toLowerCase())),
                           )
                         : allItems}
                     
                     {#if filteredItems.length === 0}
                         <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
-                            {searchQuery ? noItemsFoundLabel : noItemsLabel}
+                            {searchQuery ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
                         </div>
                     {:else}
                         {#await associationsPromise then ares}
@@ -516,7 +590,7 @@
                                                 onclick={() => {
                                                     editingItem = item;
                                                 }}
-                                                title={editLabel}
+                                                title={i18n.editLabel}
                                             >
                                                 <Pencil size={15} />
                                             </button>
@@ -537,8 +611,8 @@
                                                 );
                                             }}
                                             title={isLinked
-                                                ? confirmUnlinkLabel
-                                                : linkItemLabel}
+                                                ? i18n.confirmUnlinkLabel
+                                                : i18n.linkItemLabel}
                                         >
                                             {#if isLinked}
                                                 <Unlink size={16} />
@@ -554,9 +628,13 @@
                                                 class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
                                                 loading={deletingItemId === item.id}
                                                 loadingLabel=""
-                                                onclick={() =>
-                                                    deleteItem(item, currentAssociations)}
-                                                title={deleteForeverLabel}
+                                                onclick={async () => {
+                                                    const confirmed = window.confirm(i18n.deleteConfirmLabel);
+                                                    if (confirmed) {
+                                                        await deleteItem(item, currentAssociations);
+                                                    }
+                                                }}
+                                                title={i18n.deleteForeverLabel}
                                             >
                                                 <Trash2 size={15} />
                                             </AsyncButton>
@@ -572,13 +650,13 @@
             {#snippet pending()}
                 <div class="text-xs text-center py-8 text-gray-400 font-medium">
                     <div class="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                    {loadingLabel}
+                    {i18n.loadingLabel}
                 </div>
             {/snippet}
 
             {#snippet failed(error: any, reset)}
                 <div class="text-xs text-center py-8 text-red-500 font-medium">
-                    {error?.message || "Failed to load items"}
+                    {error?.message || i18n.failedToLoadLabel}
                 </div>
             {/snippet}
         </svelte:boundary>
@@ -599,12 +677,14 @@
                 {@const items = searchQuery
                     ? currentAssociations.filter(
                           (i: any) =>
-                              i.name
-                                  ?.toLowerCase()
-                                  .includes(searchQuery.toLowerCase()) ||
-                              i.title
-                                  ?.toLowerCase()
-                                  .includes(searchQuery.toLowerCase()),
+                              searchPredicate
+                                  ? searchPredicate(i, searchQuery)
+                                  : (i.name
+                                        ?.toLowerCase()
+                                        .includes(searchQuery.toLowerCase()) ||
+                                    i.title
+                                        ?.toLowerCase()
+                                        .includes(searchQuery.toLowerCase())),
                       )
                     : currentAssociations}
                 {#if items.length > 0}
@@ -649,7 +729,7 @@
                                     onclick={() => {
                                         editingItem = item;
                                     }}
-                                    title={editLabel}
+                                    title={i18n.editLabel}
                                 >
                                     <Pencil size={15} />
                                 </button>
@@ -666,7 +746,7 @@
                                         item,
                                         currentAssociations,
                                     )}
-                                title={confirmUnlinkLabel}
+                                title={i18n.confirmUnlinkLabel}
                             >
                                 <Unlink size={15} />
                             </AsyncButton>
@@ -678,9 +758,13 @@
                                     class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
                                     loading={deletingItemId === item.id}
                                     loadingLabel=""
-                                    onclick={() =>
-                                        deleteItem(item, currentAssociations)}
-                                    title={deleteForeverLabel}
+                                    onclick={async () => {
+                                        const confirmed = window.confirm(i18n.deleteConfirmLabel);
+                                        if (confirmed) {
+                                            await deleteItem(item, currentAssociations);
+                                        }
+                                    }}
+                                    title={i18n.deleteForeverLabel}
                                 >
                                     <Trash2 size={15} />
                                 </AsyncButton>
@@ -694,7 +778,7 @@
                         class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
                     >
                         <p class="text-sm font-medium text-gray-400 italic">
-                            {noItemsLabel}
+                            {i18n.noItemsLabel}
                         </p>
                     </div>
                 {/if}
@@ -704,14 +788,14 @@
         {#snippet pending()}
             <div class="text-center py-10 animate-pulse text-gray-400 font-medium">
                 <div class="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-                {loadingLabel}
+                {i18n.loadingLabel}
             </div>
         {/snippet}
 
         {#snippet failed(error: any, reset)}
             <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
                 <p class="text-sm font-medium text-red-600">
-                    {error?.message || "Failed to load associations"}
+                    {error?.message || i18n.failedToLoadAssociations}
                 </p>
             </div>
         {/snippet}
@@ -734,7 +818,7 @@
         >
             <Dialog.Header class="mb-4" style="flex-shrink: 0;">
                 <Dialog.Title class="text-xl font-bold">
-                    {editingItem ? editLabel : quickCreateLabel}
+                    {editingItem ? i18n.editLabel : i18n.quickCreateLabel}
                 </Dialog.Title>
             </Dialog.Header>
 

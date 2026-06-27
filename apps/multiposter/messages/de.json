@@ -653,6 +653,12 @@
 	"gender_male": "Männlich",
 	"gender_female": "Weiblich",
 	"gender_non_binary": "Nicht-binär",
-	"gender_prefer_not_to_say": "Keine Angabe"
+	"gender_prefer_not_to_say": "Keine Angabe",
+	"deleted_successfully": "Erfolgreich gelöscht",
+	"failed_to_delete_item": "Fehler beim Löschen des Elements",
+	"item_created_and_associated": "{item} erstellt und verknüpft",
+	"item_updated": "{item} aktualisiert",
+	"failed_to_update_association": "Fehler beim Aktualisieren der Verknüpfung",
+	"failed_to_load_associations": "Fehler beim Laden der Verknüpfungen"
 }
 

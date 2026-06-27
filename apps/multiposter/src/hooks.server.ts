@@ -5,6 +5,8 @@ import { redirect } from '@sveltejs/kit';
 import { auth } from "$lib/server/auth";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building } from '$app/environment';
+import { env } from '$env/dynamic/private';
+import { db, user, eq } from '@ac/db';
 
 const handleWebhook: Handle = async ({ event, resolve }) => {
 	// Microsoft Graph webhooks send POST requests with Content-Type: text/plain during validation challenge.
@@ -83,4 +85,36 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle: Handle = sequence(handleWebhook, handleBetterAuth, handleRouteGuard);
+const handleE2EAuth: Handle = async ({ event, resolve }) => {
+	if (env.PLAYWRIGHT_TEST === 'true' && !event.locals.user) {
+		const mockUserId = 'playwright-test-user';
+		
+		// Ensure user exists in the database using onConflictDoNothing to handle concurrent requests gracefully
+		console.log('[E2E Auth] Attempting to insert mock user:', mockUserId);
+		await db.insert(user).values({
+			id: mockUserId,
+			email: `${mockUserId}@example.com`,
+			name: 'Playwright Test',
+			emailVerified: true,
+			createdAt: new Date(),
+			updatedAt: new Date()
+		}).onConflictDoNothing({ target: user.id }).then(() => {
+			console.log('[E2E Auth] Successfully inserted mock user:', mockUserId);
+		}).catch(err => {
+			console.error('[E2E Auth] Failed to insert mock user:', err);
+		});
+
+		event.locals.user = {
+			id: mockUserId,
+			email: 'test@example.com',
+			emailVerified: true,
+			name: 'Playwright Test',
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			roles: ['admin'] // Ensure 'admin' role is present based on ensureAccess
+		} as any;
+	}
+	return resolve(event);
+};
+
+export const handle: Handle = sequence(handleWebhook, handleBetterAuth, handleE2EAuth, handleRouteGuard);

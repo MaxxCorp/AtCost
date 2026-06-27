@@ -175,7 +175,7 @@
                     {m.feature_locations_title()}
                 </h3>
                 {#key initialData?.id || "new"}
-                    <EntityManager
+                    <EntityManager {m}
                         title={m.feature_locations_title()}
                         icon={MapPin}
                         mode="embedded"

@@ -222,7 +222,7 @@
                     {m.tags()}
                 </h3>
                 {#key initialData?.id || "new"}
-                    <EntityManager
+                    <EntityManager {m}
                         title={m.tags()}
                         icon={TagIcon}
                         mode="embedded"
@@ -355,7 +355,7 @@
                         {m.locations()}
                     </h3>
                     {#key initialData?.id || "new"}
-                        <EntityManager
+                        <EntityManager {m}
                             title={m.locations()}
                             icon={MapPin}
                             mode="embedded"
@@ -544,7 +544,7 @@
                 {m.contacts()}
             </h3>
             {#key initialData?.id || "new"}
-                <EntityManager
+                <EntityManager {m}
                     title={m.contacts()}
                     icon={User}
                     mode="embedded"

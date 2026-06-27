@@ -100,10 +100,15 @@
     class="space-y-4"
     {...rf.enhance(async ({ submit }: { submit: any }) => {
             try {
-                const result: any = await submit();
-                if (result?.error) {
+                await submit();
+                const result = (rf as any).result;
+                const error = (rf as any).error;
+
+                if (error || (result && result.success === false)) {
                     toast.error(
-                        result.error.message || m.something_went_wrong(),
+                        error?.message ||
+                            result?.error?.message ||
+                            m.something_went_wrong(),
                     );
                     return;
                 }
@@ -194,7 +199,7 @@
             {m.feature_locations_title()}
         </h3>
         {#key initialData?.id || "new"}
-            <EntityManager
+            <EntityManager {m}
                 title={m.feature_locations_title()}
                 icon={MapPin}
                 mode="embedded"
@@ -432,7 +437,7 @@
         </h3>
 
         {#key initialData?.id || "new"}
-            <EntityManager
+            <EntityManager {m}
                 title={m.feature_contacts_title()}
                 icon={User}
                 type="resource"
