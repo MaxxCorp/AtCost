@@ -39,8 +39,7 @@
     let formComponent: ReturnType<typeof ContactForm> | undefined = $state();
 </script>
 
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-3xl mx-auto">
+<div class="max-w-3xl mx-auto px-4 py-8 text-left">
         <svelte:boundary>
             {#if $effect.pending()}
                 <Breadcrumb feature="contacts" />
@@ -70,31 +69,30 @@
                             current={contact.displayName || m.unnamed_contact()}
                         />
 
-                        <div
-                            class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100"
-                        >
-                            <div class="flex justify-between items-center mb-4">
-                                <h1 class="text-2xl font-bold">{m.edit_contact()}</h1>
-                                <div class="flex items-center gap-2">
-                                    <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
-                                    <AsyncButton
-                                        type="button"
-                                        loadingLabel={m.deleting()}
-                                        loading={deleteContact.pending}
-                                        variant="destructive"
-                                        onclick={async () => {
-                                            await handleDelete({
-                                                ids: [contact.id],
-                                                deleteFn: deleteContact,
-                                                itemName: m.contacts().toLowerCase(),
-                                            });
-                                            goto("/contacts");
-                                        }}
-                                    >
-                                        {m.delete()}
-                                    </AsyncButton>
-                                </div>
+                        <div class="flex justify-between items-center mb-6 mt-2">
+                            <h1 class="text-3xl font-bold">{m.edit_contact()}</h1>
+                            <div class="flex items-center gap-2">
+                                <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
+                                <AsyncButton
+                                    type="button"
+                                    loadingLabel={m.deleting()}
+                                    loading={deleteContact.pending}
+                                    variant="destructive"
+                                    onclick={async () => {
+                                        await handleDelete({
+                                            ids: [contact.id],
+                                            deleteFn: deleteContact,
+                                            itemName: m.contacts().toLowerCase(),
+                                        });
+                                        goto("/contacts");
+                                    }}
+                                >
+                                    {m.delete()}
+                                </AsyncButton>
                             </div>
+                        </div>
+
+                        <div class="bg-white shadow-xl rounded-2xl p-8 border border-gray-100">
                                                 <ContactForm
                                 bind:this={formComponent}
                                 remoteFunction={updateContact.for(contactId)}
@@ -262,5 +260,4 @@
                 </div>
             {/snippet}
         </svelte:boundary>
-    </div>
 </div>

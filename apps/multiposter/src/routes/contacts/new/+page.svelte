@@ -34,14 +34,15 @@
     let formComponent: ReturnType<typeof ContactForm> | undefined = $state();
 </script>
 
-<div class="container mx-auto px-4 py-8">
-    <div class="max-w-2xl mx-auto">
-        <Breadcrumb feature="contacts" current={m.new_contact()} />
-        <div class="bg-white shadow rounded-lg p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold">{m.create_new_contact()}</h1>
-                <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
-            </div>
+<div class="max-w-3xl mx-auto px-4 py-8 text-left">
+    <Breadcrumb feature="contacts" current={m.new_contact()} />
+
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">{m.create_new_contact()}</h1>
+        <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-6">
             <ContactForm
                 bind:this={formComponent}
                 remoteFunction={rf}
@@ -187,5 +188,4 @@
                 {/snippet}
             </ContactForm>
         </div>
-    </div>
 </div>
