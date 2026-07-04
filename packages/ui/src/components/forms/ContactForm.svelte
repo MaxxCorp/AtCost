@@ -22,7 +22,7 @@
         tags?: string[];
 
         // Injected dependencies to keep it shared
-        listContactsRemote: () => Promise<any[]>;
+        listContactsRemote: (input?: any) => Promise<any>;
         // Optional snippet for additional sections
         children?: Snippet<[{ onLocationsChange: (ids: string[]) => void }]>;
 

@@ -47,7 +47,8 @@
         // Configuration
         prefix?: string;
         contactId?: string;
-        listContactsRemote: () => Promise<any[]>;
+        listContactsRemote: (input?: any) => Promise<any>;
+
         
         // Tags Configuration
         listTagsRemote?: any;
@@ -146,37 +147,26 @@
     });
 
     let contactSearch = $state("");
-    let allContacts = $state<any[]>([]);
+    let filteredContacts = $state<any[]>([]);
 
-    let filteredContacts = $derived(
-        contactSearch.length > 1
-            ? allContacts.filter(
-                  (c) =>
-                      c.id !== contactId &&
-                      (c.displayName
-                          ?.toLowerCase()
-                          .includes(contactSearch.toLowerCase()) ||
-                          c.givenName
-                              ?.toLowerCase()
-                              .includes(contactSearch.toLowerCase()) ||
-                          c.familyName
-                              ?.toLowerCase()
-                              .includes(contactSearch.toLowerCase()) ||
-                          (c.email &&
-                              c.email
-                                  .toLowerCase()
-                                  .includes(contactSearch.toLowerCase()))),
-              )
-            : [],
-    );
+    let searchTimeout: any;
 
-    onMount(async () => {
-        try {
-            const res: any = await listContactsRemote();
-            allContacts = res?.data ?? res ?? [];
-        } catch (e) {
-            console.error("Failed to load contacts for relations", e);
+    $effect(() => {
+        if (contactSearch.length > 1) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                listContactsRemote({ search: contactSearch, limit: 10 })
+                    .then((res: any) => {
+                        const contacts = res?.data ?? res ?? [];
+                        filteredContacts = contacts.filter((c: any) => c.id !== contactId);
+                    })
+                    .catch(console.error);
+            }, 300);
+        } else {
+            filteredContacts = [];
         }
+
+        return () => clearTimeout(searchTimeout);
     });
 
     function addEmail() {
@@ -593,39 +583,41 @@
                 <div class="space-y-2">
                     {#each relations as rel, i}
                         <div
-                            class="flex items-center gap-2 bg-gray-50 p-2 rounded-md border border-gray-100"
+                            class="flex flex-col sm:flex-row sm:items-center gap-2 bg-gray-50 p-3 sm:p-2 rounded-md border border-gray-100"
                         >
-                            <div class="flex-1 text-sm">
+                            <div class="flex-1 text-sm mb-1 sm:mb-0">
                                 <span class="font-medium">
                                     {rel.targetContact?.displayName ||
                                         `${rel.targetContact?.givenName || ""} ${rel.targetContact?.familyName || ""}`.trim() ||
                                         rel.targetContactId}
                                 </span>
                             </div>
-                            <div class="w-48">
-                                <select
-                                    bind:value={rel.relationType}
-                                    class="block w-full text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <div class="flex-1 sm:w-48">
+                                    <select
+                                        bind:value={rel.relationType}
+                                        class="block w-full text-xs px-2 py-1.5 sm:py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    >
+                                        <option value="reports to"
+                                            >{i18n.reportsTo}</option
+                                        >
+                                        <option value="cooperates with"
+                                            >{i18n.cooperatesWith}</option
+                                        >
+                                        <option value="manager of"
+                                            >{i18n.managerOf}</option
+                                        >
+                                        <option value="other">{i18n.other}</option>
+                                    </select>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="text-red-500 p-1.5 sm:p-1 hover:bg-red-50 rounded flex-shrink-0"
+                                    onclick={() => removeRelation(i)}
                                 >
-                                    <option value="reports to"
-                                        >{i18n.reportsTo}</option
-                                    >
-                                    <option value="cooperates with"
-                                        >{i18n.cooperatesWith}</option
-                                    >
-                                    <option value="manager of"
-                                        >{i18n.managerOf}</option
-                                    >
-                                    <option value="other">{i18n.other}</option>
-                                </select>
+                                    <Trash2 size={16} />
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                class="text-red-500 p-1 hover:bg-red-50 rounded"
-                                onclick={() => removeRelation(i)}
-                            >
-                                <Trash2 size={16} />
-                            </button>
                         </div>
                     {/each}
                 </div>
@@ -649,8 +641,8 @@
             </Button>
         </div>
         {#each emails as email, i}
-            <div class="flex gap-2 items-end">
-                <div class="flex-1">
+            <div class="flex flex-col sm:flex-row gap-2 sm:items-center bg-gray-50/50 sm:bg-transparent p-3 sm:p-0 rounded-lg sm:rounded-none border border-gray-100 sm:border-transparent">
+                <div class="flex-1 w-full">
                     <input
                         type="email"
                         placeholder={i18n.emailPlaceholder}
@@ -659,31 +651,35 @@
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                 </div>
-                <div class="w-32">
-                    <select
-                        bind:value={email.type}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                        <option value="home">{i18n.home}</option>
-                        <option value="work">{i18n.work}</option>
-                        <option value="other">{i18n.other}</option>
-                    </select>
+                <div class="flex items-center gap-3 w-full sm:w-auto mt-1 sm:mt-0 justify-between sm:justify-start">
+                    <div class="flex-1 sm:w-32">
+                        <select
+                            bind:value={email.type}
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                            <option value="home">{i18n.home}</option>
+                            <option value="work">{i18n.work}</option>
+                            <option value="other">{i18n.other}</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="flex items-center gap-1">
+                            <input
+                                type="checkbox"
+                                bind:checked={email.primary}
+                                class="rounded text-blue-600"
+                            />
+                            <span class="text-sm text-gray-500">{i18n.primary}</span>
+                        </label>
+                        <button
+                            type="button"
+                            class="text-red-500 p-2 hover:bg-red-50 rounded flex-shrink-0"
+                            onclick={() => removeEmail(i)}
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
                 </div>
-                <label class="flex items-center gap-1 mb-2">
-                    <input
-                        type="checkbox"
-                        bind:checked={email.primary}
-                        class="rounded text-blue-600"
-                    />
-                    <span class="text-sm text-gray-500">{i18n.primary}</span>
-                </label>
-                <button
-                    type="button"
-                    class="text-red-500 p-2 hover:bg-red-50 rounded mb-1"
-                    onclick={() => removeEmail(i)}
-                >
-                    <Trash2 size={16} />
-                </button>
             </div>
         {/each}
     </div>
@@ -704,8 +700,8 @@
             </Button>
         </div>
         {#each phones as phone, i}
-            <div class="flex gap-2 items-end">
-                <div class="flex-1">
+            <div class="flex flex-col sm:flex-row gap-2 sm:items-center bg-gray-50/50 sm:bg-transparent p-3 sm:p-0 rounded-lg sm:rounded-none border border-gray-100 sm:border-transparent">
+                <div class="flex-1 w-full">
                     <input
                         type="text"
                         placeholder={i18n.phonePlaceholder}
@@ -713,32 +709,36 @@
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                 </div>
-                <div class="w-32">
-                    <select
-                        bind:value={phone.type}
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                        <option value="mobile">{i18n.mobile}</option>
-                        <option value="home">{i18n.home}</option>
-                        <option value="work">{i18n.work}</option>
-                        <option value="other">{i18n.other}</option>
-                    </select>
+                <div class="flex items-center gap-3 w-full sm:w-auto mt-1 sm:mt-0 justify-between sm:justify-start">
+                    <div class="flex-1 sm:w-32">
+                        <select
+                            bind:value={phone.type}
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                            <option value="mobile">{i18n.mobile}</option>
+                            <option value="home">{i18n.home}</option>
+                            <option value="work">{i18n.work}</option>
+                            <option value="other">{i18n.other}</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="flex items-center gap-1">
+                            <input
+                                type="checkbox"
+                                bind:checked={phone.primary}
+                                class="rounded text-blue-600"
+                            />
+                            <span class="text-sm text-gray-500">{i18n.primary}</span>
+                        </label>
+                        <button
+                            type="button"
+                            class="text-red-500 p-2 hover:bg-red-50 rounded flex-shrink-0"
+                            onclick={() => removePhone(i)}
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
                 </div>
-                <label class="flex items-center gap-1 mb-2">
-                    <input
-                        type="checkbox"
-                        bind:checked={phone.primary}
-                        class="rounded text-blue-600"
-                    />
-                    <span class="text-sm text-gray-500">{i18n.primary}</span>
-                </label>
-                <button
-                    type="button"
-                    class="text-red-500 p-2 hover:bg-red-50 rounded mb-1"
-                    onclick={() => removePhone(i)}
-                >
-                    <Trash2 size={16} />
-                </button>
             </div>
         {/each}
     </div>
@@ -835,8 +835,8 @@
                             <option value="other">{i18n.other}</option>
                         </select>
                     </div>
-                    <div class="flex items-end justify-between">
-                         <label class="flex items-center gap-1 mb-2">
+                    <div class="flex items-center justify-between sm:items-end sm:justify-start sm:gap-4 mt-2 sm:mt-0">
+                         <label class="flex items-center gap-1 sm:mb-2">
                             <input
                                 type="checkbox"
                                 bind:checked={address.primary}
@@ -846,7 +846,7 @@
                         </label>
                         <button
                             type="button"
-                            class="text-red-500 p-2 hover:bg-red-50 rounded mb-1"
+                            class="text-red-500 p-2 hover:bg-red-50 rounded sm:mb-1 flex-shrink-0"
                             onclick={() => removeAddress(i)}
                         >
                             <Trash2 size={16} />
