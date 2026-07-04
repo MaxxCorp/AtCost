@@ -75,7 +75,7 @@ export const updateContact = form(updateContactSchema, async (input) => {
                 if (c.birthday !== undefined) updateSet.birthday = c.birthday;
                 if (c.gender !== undefined) updateSet.gender = c.gender;
                 if (c.notes !== undefined) updateSet.notes = c.notes;
-                if (c.isPublic !== undefined) updateSet.isPublic = !!c.isPublic;
+                updateSet.isPublic = !!c.isPublic;
 
                 await tx.update(contact).set(updateSet).where(eq(contact.id, id));
             }

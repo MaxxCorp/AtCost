@@ -41,9 +41,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		if (data.internalNotes !== undefined) updateData.internalNotes = data.internalNotes;
 		if (data.status !== undefined) updateData.status = data.status;
 		if (data.categoryBerlinDotDe !== undefined) updateData.categoryBerlinDotDe = data.categoryBerlinDotDe;
-		if (data.ticketPriceUnknown !== undefined) {
-			updateData.ticketPriceUnknown = data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on';
-		}
+		updateData.ticketPriceUnknown = data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on';
 		if (data.ticketPrice !== undefined) {
 			updateData.ticketPrice = updateData.ticketPriceUnknown ? "0" : data.ticketPrice;
 		}
@@ -98,7 +96,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			}
 		}
 
-		if (data.isAllDay !== undefined) updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on';
+		updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on';
 
 		if (data.recurrence !== undefined) {
 			const oldRec = oldEvent.recurrence ? (Array.isArray(oldEvent.recurrence) ? oldEvent.recurrence[0] : oldEvent.recurrence) : null;
@@ -120,10 +118,10 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		if (data.attendees !== undefined) updateData.attendees = data.attendees || null;
 		if (reminders !== undefined) updateData.reminders = reminders || null;
 
-		if (data.isPublic !== undefined) updateData.isPublic = data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on';
-		if (data.guestsCanInviteOthers !== undefined) updateData.guestsCanInviteOthers = data.guestsCanInviteOthers === 'true' || data.guestsCanInviteOthers === true || data.guestsCanInviteOthers === 'on';
-		if (data.guestsCanModify !== undefined) updateData.guestsCanModify = data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on';
-		if (data.guestsCanSeeOtherGuests !== undefined) updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
+		updateData.isPublic = data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on';
+		updateData.guestsCanInviteOthers = data.guestsCanInviteOthers === 'true' || data.guestsCanInviteOthers === true || data.guestsCanInviteOthers === 'on';
+		updateData.guestsCanModify = data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on';
+		updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
 		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
@@ -359,17 +357,17 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						if (updateData.internalNotes !== undefined) instanceUpdatePayload.internalNotes = updateData.internalNotes;
 						if (updateData.status !== undefined) instanceUpdatePayload.status = updateData.status;
 						if (updateData.categoryBerlinDotDe !== undefined) instanceUpdatePayload.categoryBerlinDotDe = updateData.categoryBerlinDotDe;
-						if (updateData.ticketPriceUnknown !== undefined) instanceUpdatePayload.ticketPriceUnknown = updateData.ticketPriceUnknown;
+						instanceUpdatePayload.ticketPriceUnknown = updateData.ticketPriceUnknown;
 						if (updateData.ticketPrice !== undefined) instanceUpdatePayload.ticketPrice = updateData.ticketPriceUnknown ? "0" : updateData.ticketPrice;
-						if (updateData.isAllDay !== undefined) instanceUpdatePayload.isAllDay = updateData.isAllDay;
+						instanceUpdatePayload.isAllDay = updateData.isAllDay;
 						if (updateData.startTimeZone !== undefined) instanceUpdatePayload.startTimeZone = updateData.startTimeZone;
 						if (updateData.endTimeZone !== undefined) instanceUpdatePayload.endTimeZone = updateData.endTimeZone;
 						if (updateData.attendees !== undefined) instanceUpdatePayload.attendees = updateData.attendees;
 						if (updateData.reminders !== undefined) instanceUpdatePayload.reminders = updateData.reminders;
-						if (updateData.isPublic !== undefined) instanceUpdatePayload.isPublic = updateData.isPublic;
-						if (updateData.guestsCanInviteOthers !== undefined) instanceUpdatePayload.guestsCanInviteOthers = updateData.guestsCanInviteOthers;
-						if (updateData.guestsCanModify !== undefined) instanceUpdatePayload.guestsCanModify = updateData.guestsCanModify;
-						if (updateData.guestsCanSeeOtherGuests !== undefined) instanceUpdatePayload.guestsCanSeeOtherGuests = updateData.guestsCanSeeOtherGuests;
+						instanceUpdatePayload.isPublic = updateData.isPublic;
+						instanceUpdatePayload.guestsCanInviteOthers = updateData.guestsCanInviteOthers;
+						instanceUpdatePayload.guestsCanModify = updateData.guestsCanModify;
+						instanceUpdatePayload.guestsCanSeeOtherGuests = updateData.guestsCanSeeOtherGuests;
 						if (updateData.heroImage !== undefined) instanceUpdatePayload.heroImage = updateData.heroImage;
 						if (updatedEvent.campaignId !== undefined) instanceUpdatePayload.campaignId = updatedEvent.campaignId;
 

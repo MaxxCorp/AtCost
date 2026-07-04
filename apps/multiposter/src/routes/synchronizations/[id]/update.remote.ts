@@ -38,7 +38,7 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 			.update(syncConfig)
 			.set({
 				name: input.name !== undefined ? input.name : existing.name,
-				enabled: input.enabled !== undefined ? (typeof input.enabled === 'string' ? input.enabled === 'true' : !!input.enabled) : existing.enabled,
+				enabled: typeof input.enabled === 'string' ? input.enabled === 'true' : !!input.enabled,
 				direction: input.direction !== undefined ? input.direction : existing.direction,
 				settings: input.settings !== undefined ? input.settings : existing.settings,
 				updatedAt: new Date()
