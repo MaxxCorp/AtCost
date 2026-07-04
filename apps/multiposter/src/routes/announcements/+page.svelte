@@ -226,10 +226,7 @@
 							</div>
 
 							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
-								<Button variant="outline" size="sm" href={`/announcements/${announcement.id}/view`} class="flex-1 sm:flex-none">
-									<Eye class="w-4 h-4 mr-2" />
-									{m.view()}
-								</Button>
+
 								<Button variant="outline" size="sm" href={`/announcements/${announcement.id}`} class="flex-1 sm:flex-none">
 									<Pencil class="w-4 h-4 mr-2" />
 									{m.edit()}

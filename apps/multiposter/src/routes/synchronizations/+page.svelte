@@ -588,15 +588,6 @@
 							>
 								<Trash2 class="w-4 h-4 mr-2" /> {m.delete()}
 							</button>
-						{:else}
-							<Button
-								href={`/synchronizations/${config.id}`}
-								variant="outline"
-								size="sm"
-								class="flex-1 sm:flex-none"
-							>
-								<Eye class="w-4 h-4 mr-2" /> {m.view()}
-							</Button>
 						{/if}
 					</div>
 				</div>

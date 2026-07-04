@@ -480,7 +480,7 @@
             />
         </div>
 
-        <div class="flex items-center gap-1.5 ml-auto shrink-0">
+        <div class="flex flex-wrap items-center gap-1.5 md:ml-auto shrink-0 w-full md:w-auto">
             {#await associationsPromise}
                 <div class="flex items-center justify-center p-1">
                     <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
@@ -562,7 +562,7 @@
                             {#each filteredItems as item (item.id)}
                                 {@const isLinked = isAssociated(item, currentAssociations)}
                                 <div
-                                    class="flex items-center gap-3 transition-all rounded-xl p-2 {isLinked
+                                    class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 transition-all rounded-xl p-2 {isLinked
                                         ? 'bg-blue-50/50'
                                         : 'hover:bg-gray-50'}"
                                 >
@@ -582,7 +582,7 @@
                                         </div>
                                     </div>
 
-                                    <div class="flex items-center gap-1">
+                                    <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start">
                                         {#if updateRemote && renderForm && getFormData}
                                             <button
                                                 type="button"
@@ -691,7 +691,7 @@
                     <div class="grid gap-2">
                         {#each items as item (item.id)}
                             <div
-                                class="flex items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
+                                class="flex flex-col sm:flex-row sm:items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
                             >
                                 <div class="flex-1 min-w-0">
                                     <div
@@ -721,7 +721,7 @@
                             {@render participationSnippet(item)}
                         {/if}
 
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start mt-1 sm:mt-0">
                             {#if updateRemote && renderForm && getFormData}
                                 <button
                                     type="button"
