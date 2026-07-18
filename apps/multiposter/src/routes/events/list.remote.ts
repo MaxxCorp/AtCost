@@ -1,18 +1,28 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, eventContact, eventLocation, eventTag, contact, location, tag, eq, inArray, and, or, ilike, sql, desc, asc, exists, isNull } from '@ac/db';
+import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, eq, ne, notInArray, inArray, and, or, ilike, sql, desc, asc, exists, isNull, gte, lte } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { eventPaginationSchema as PaginationSchema, type PaginatedResult, type Event } from '@ac/validations';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
-	const user = getAuthenticatedUser();
-	ensureAccess(user, 'events');
+	let hasAccess = false;
+	try {
+		const user = getAuthenticatedUser();
+		ensureAccess(user, 'events');
+		hasAccess = true;
+	} catch (e) {
+		// unauthorized can only see public events
+	}
 
-	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
+	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: event.id }).from(event).$dynamic();
 	const conditions: any[] = [isNull(event.recurringEventId)];
+
+	if (!hasAccess) {
+		conditions.push(eq(event.isPublic, true));
+	}
 
 	// Search filter: Summary, Description, Location Names, Contact Names
 	if (search) {
@@ -38,10 +48,18 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const ids = Array.isArray(locationId) ? locationId : [locationId];
 		if (ids.length > 0) {
 			conditions.push(
-				exists(
-					db.select({ id: sql`1` })
-					  .from(eventLocation)
-					  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, ids)))
+				or(
+					exists(
+						db.select({ id: sql`1` })
+						  .from(eventLocation)
+						  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, ids)))
+					),
+					exists(
+						db.select({ id: sql`1` })
+						  .from(eventResource)
+						  .innerJoin(resource, eq(eventResource.resourceId, resource.id))
+						  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, ids)))
+					)
 				)
 			);
 		}
@@ -73,6 +91,82 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				)
 			);
 		}
+	}
+
+	// Advanced Kiosk filters
+	const conditionalFilters = [];
+	
+	if (excludeTentative) {
+		conditionalFilters.push(ne(event.status, 'tentative'));
+	}
+	
+	if (excludeCancelled) {
+		conditionalFilters.push(ne(event.status, 'cancelled'));
+	}
+	
+	if (excludeNonPublic) {
+		conditionalFilters.push(eq(event.isPublic, true));
+	}
+	
+	if (startDate) {
+		conditionalFilters.push(or(
+            gte(event.endDateTime, new Date(startDate)),
+            and(isNull(event.endDateTime), gte(event.startDateTime, new Date(startDate)))
+        ));
+	}
+	
+	if (endDate) {
+		conditionalFilters.push(lte(event.startDateTime, new Date(endDate)));
+	}
+	
+	if (excludedTags && excludedTags.length > 0) {
+		// exclude events that have any of these tag names
+		conditionalFilters.push(
+			sql`NOT EXISTS (
+				SELECT 1 FROM ${eventTag} et
+				JOIN ${tag} t ON et.tag_id = t.id
+				WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+			)`
+		);
+	}
+	
+	if (includedTags && includedTags.length > 0) {
+		// include events that have these tag names
+		conditionalFilters.push(
+			sql`EXISTS (
+				SELECT 1 FROM ${eventTag} et
+				JOIN ${tag} t ON et.tag_id = t.id
+				WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+			)`
+		);
+	}
+
+	if (excludedEventIds && excludedEventIds.length > 0) {
+		conditionalFilters.push(notInArray(event.id, excludedEventIds));
+	}
+
+	if (includedEventIds && includedEventIds.length > 0) {
+		// If explicit inclusion is present, it ORs with the conditions, but we still respect isPublic if unauth
+		const explicitInclusion = inArray(event.id, includedEventIds);
+		if (conditionalFilters.length > 0 || conditions.length > (hasAccess ? 1 : 2)) {
+			// Combine the standard filters, then OR with explicit inclusion
+			const standardFilters = and(...conditions, ...conditionalFilters);
+			// Overwrite conditions so we just apply this top level OR
+			conditions.length = 0;
+			conditions.push(or(standardFilters, explicitInclusion));
+			
+			// Re-apply access restriction if needed so included events must still be public
+			if (!hasAccess) {
+				conditions.push(eq(event.isPublic, true));
+			}
+			// And keep the recurringEventId restriction
+			conditions.push(isNull(event.recurringEventId));
+		} else {
+			// Just normal pushing
+			conditions.push(explicitInclusion);
+		}
+	} else {
+		conditions.push(...conditionalFilters);
 	}
 
 	if (conditions.length > 0) {

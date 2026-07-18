@@ -182,17 +182,30 @@
         ? Intl.supportedValuesOf("timeZone")
         : [];
 
-    function updateEndDateTime(rf: any) {
-        const startDate = rf.fields.startDate.value();
-        const startTime = rf.fields.startTime.value();
+    function updateEndDateTime(e: Event, isDate: boolean) {
+        const target = e.target as HTMLInputElement;
+        const newVal = target.value;
+        const currentStartDate = rf.fields.startDate.value() || startParsed.date || localNow.date;
+        const currentStartTime = rf.fields.startTime.value() || startParsed.time || localNow.time;
+        
+        const startDate = isDate ? newVal : currentStartDate;
+        const startTime = !isDate ? newVal : currentStartTime;
+        
         if (!startDate || !startTime) return;
 
         const start = new Date(`${startDate}T${startTime}:00`);
         if (isNaN(start.getTime())) return;
 
         const end = new Date(start.getTime() + 60 * 60000);
-        rf.fields.endDate.set(end.toISOString().split("T")[0]);
-        rf.fields.endTime.set(end.toTimeString().slice(0, 5));
+        
+        const year = end.getFullYear();
+        const month = String(end.getMonth() + 1).padStart(2, "0");
+        const day = String(end.getDate()).padStart(2, "0");
+        const hours = String(end.getHours()).padStart(2, "0");
+        const minutes = String(end.getMinutes()).padStart(2, "0");
+
+        rf.fields.endDate.set(`${year}-${month}-${day}`);
+        rf.fields.endTime.set(`${hours}:${minutes}`);
     }
 
     function getDefaultEndTime(rf: any) {
@@ -807,7 +820,7 @@
                         startParsed.date || localNow.date,
                     )}
                     required
-                    onchange={() => updateEndDateTime(rf)}
+                    oninput={(e) => updateEndDateTime(e, true)}
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                 />
             </div>
@@ -825,7 +838,7 @@
                             startParsed.time || localNow.time,
                         )}
                         required
-                        onchange={() => updateEndDateTime(rf)}
+                        oninput={(e) => updateEndDateTime(e, false)}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     />
                 </div>

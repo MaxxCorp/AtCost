@@ -4,7 +4,7 @@ export * from "./reporting-line.js";
 
 // Re-export all common Drizzle helpers and types for convenience
 export { 
-    sql, eq, ne, inArray, isNull, isNotNull, 
+    sql, eq, ne, inArray, notInArray, not, isNull, isNotNull, 
     and, or, asc, desc, ilike, like, exists,
     getTableColumns, count, gt, gte, lt, lte,
     type InferSelectModel, type InferInsertModel

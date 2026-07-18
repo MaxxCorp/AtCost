@@ -16,6 +16,15 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
         const { id, lookAheadDays, lookPastDays, startDate, endDate, locationIds: _, ...updates } = data;
 
         const dbUpdates: any = { ...updates };
+        const parseJsonArray = (val: any) => typeof val === 'string' ? JSON.parse(val) : val;
+        
+        if (updates.excludedEventIds !== undefined) dbUpdates.excludedEventIds = parseJsonArray(updates.excludedEventIds);
+        if (updates.includedEventIds !== undefined) dbUpdates.includedEventIds = parseJsonArray(updates.includedEventIds);
+        if (updates.excludedAnnouncementIds !== undefined) dbUpdates.excludedAnnouncementIds = parseJsonArray(updates.excludedAnnouncementIds);
+        if (updates.includedAnnouncementIds !== undefined) dbUpdates.includedAnnouncementIds = parseJsonArray(updates.includedAnnouncementIds);
+        if (updates.excludedTags !== undefined) dbUpdates.excludedTags = parseJsonArray(updates.excludedTags);
+        if (updates.includedTags !== undefined) dbUpdates.includedTags = parseJsonArray(updates.includedTags);
+
         if (lookAheadDays !== undefined) dbUpdates.lookAhead = Math.round(lookAheadDays * 86400);
         if (lookPastDays !== undefined) dbUpdates.lookPast = Math.round(lookPastDays * 86400);
         if (startDate !== undefined) dbUpdates.startDate = startDate ? new Date(startDate) : null;

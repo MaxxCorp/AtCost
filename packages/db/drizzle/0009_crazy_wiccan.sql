@@ -1,0 +1,1 @@
+ALTER TABLE "kiosk" ADD COLUMN "exclude_cancelled" boolean DEFAULT false NOT NULL;

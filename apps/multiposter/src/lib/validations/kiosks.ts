@@ -7,6 +7,12 @@ const numberCoerce = v.pipe(
     v.number('Must be a number')
 );
 
+const booleanCoerce = v.pipe(
+    v.union([v.string(), v.boolean()]),
+    v.transform((input) => input === 'true' || input === true),
+    v.boolean()
+);
+
 export const createKioskSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
     description: v.optional(v.string()),
@@ -26,7 +32,16 @@ export const createKioskSchema = v.object({
     uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table')])),
     rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
     startDate: v.optional(v.string()),
-    endDate: v.optional(v.string())
+    endDate: v.optional(v.string()),
+    excludeNonPublic: v.optional(booleanCoerce),
+    excludeTentative: v.optional(booleanCoerce),
+    excludeCancelled: v.optional(booleanCoerce),
+    excludedEventIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    includedEventIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    excludedAnnouncementIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    includedAnnouncementIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    excludedTags: v.optional(v.union([v.array(v.string()), v.string()])),
+    includedTags: v.optional(v.union([v.array(v.string()), v.string()]))
 });
 
 export const updateKioskSchema = v.object({
@@ -40,7 +55,16 @@ export const updateKioskSchema = v.object({
     uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table')])),
     rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
     startDate: v.optional(v.string()),
-    endDate: v.optional(v.string())
+    endDate: v.optional(v.string()),
+    excludeNonPublic: v.optional(booleanCoerce),
+    excludeTentative: v.optional(booleanCoerce),
+    excludeCancelled: v.optional(booleanCoerce),
+    excludedEventIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    includedEventIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    excludedAnnouncementIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    includedAnnouncementIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    excludedTags: v.optional(v.union([v.array(v.string()), v.string()])),
+    includedTags: v.optional(v.union([v.array(v.string()), v.string()]))
 });
 
 export type CreateKioskSchema = v.InferInput<typeof createKioskSchema>;

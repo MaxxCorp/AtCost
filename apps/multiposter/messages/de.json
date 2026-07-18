@@ -659,6 +659,22 @@
 	"item_created_and_associated": "{item} erstellt und verknüpft",
 	"item_updated": "{item} aktualisiert",
 	"failed_to_update_association": "Fehler beim Aktualisieren der Verknüpfung",
-	"failed_to_load_associations": "Fehler beim Laden der Verknüpfungen"
+	"failed_to_load_associations": "Fehler beim Laden der Verknüpfungen",
+	"fine_grained_display_selection": "Detaillierte Anzeigeeinstellungen",
+	"exclude_non_public_items": "Nicht öffentliche Elemente ausschließen",
+	"exclude_tentative_items": "Vorläufige Elemente ausschließen",
+	"exclude_cancelled_items": "Abgesagte Elemente ausschließen",
+	"included_tags": "Eingeschlossene Tags",
+	"excluded_tags": "Ausgeschlossene Tags",
+	"included_events": "Eingeschlossene Events",
+	"excluded_events": "Ausgeschlossene Events",
+	"included_announcements": "Eingeschlossene Ankündigungen",
+	"excluded_announcements": "Ausgeschlossene Ankündigungen",
+	"page_uppercase": "SEITE",
+	"date": "Datum",
+	"time": "Zeit",
+	"event_detail": "Event-Details",
+	"qr": "QR",
+	"no_scheduled_events": "Keine geplanten Events"
 }
 

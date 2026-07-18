@@ -6,7 +6,7 @@
     import EventView from "$lib/components/events/EventView.svelte";
     import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
     import KioskTableView from "$lib/components/kiosks/KioskTableView.svelte";
-    import { type PublicEvent, type Announcement } from "@ac/validations";
+    import { type Event, type Announcement } from "@ac/validations";
 
     import { browser } from "$app/environment";
     // import * as Ably from "ably";
@@ -18,7 +18,7 @@
 
     let kioskId = $derived(page.params.id);
     let kiosk = $state<any>(null);
-    let items = $state<(PublicEvent | Announcement)[]>([]);
+    let items = $state<(Event | Announcement)[]>([]);
 
     let currentIndex = $state(0);
     let direction = $state(1); // 1 for forward (next), -1 for backward (prev)
@@ -215,7 +215,7 @@
                 );
                 if (storedKiosk) kiosk = JSON.parse(storedKiosk);
             }
-            let cachedItems: (PublicEvent | Announcement)[] = stored
+            let cachedItems: (Event | Announcement)[] = stored
                 ? JSON.parse(stored)
                 : [];
 
@@ -242,7 +242,7 @@
                 const validItems = cachedItems.filter((item) => {
                     // Check validity for Events
                     if ("startDateTime" in item) {
-                        const e = item as PublicEvent;
+                        const e = item as Event;
                         // Simple check: is endDateTime in future?
                         if (e.endDateTime) return new Date(e.endDateTime) > now;
                         if (e.startDateTime && e.isAllDay) {
@@ -407,7 +407,7 @@
                     class="w-full max-w-7xl relative flex flex-col items-center"
                 >
                     {#if "startDateTime" in items[currentIndex]}
-                        <EventView event={items[currentIndex] as PublicEvent} />
+                        <EventView event={items[currentIndex] as Event} />
                     {:else}
                         <!-- Wrapper for Announcement to match EventView styling/sizing if needed, or specific component -->
                         <!-- AnnouncementView is usually just the content, we might need a container -->

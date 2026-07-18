@@ -13,8 +13,16 @@ export const createKiosk = form(createKioskSchema, async (data) => {
 
         const { lookAheadDays, lookPastDays, startDate, endDate, locationIds: _, ...rest } = data;
 
+        const parseJsonArray = (val: any) => typeof val === 'string' ? JSON.parse(val) : val;
+
         const [newKiosk] = await db.insert(kiosk).values({
             ...rest,
+            excludedEventIds: parseJsonArray(rest.excludedEventIds),
+            includedEventIds: parseJsonArray(rest.includedEventIds),
+            excludedAnnouncementIds: parseJsonArray(rest.excludedAnnouncementIds),
+            includedAnnouncementIds: parseJsonArray(rest.includedAnnouncementIds),
+            excludedTags: parseJsonArray(rest.excludedTags),
+            includedTags: parseJsonArray(rest.includedTags),
             lookAhead: Math.round(lookAheadDays * 86400),
             lookPast: Math.round(lookPastDays * 86400),
             startDate: startDate ? new Date(startDate) : null,

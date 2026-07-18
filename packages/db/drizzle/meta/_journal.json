@@ -57,6 +57,20 @@
       "when": 1781969763712,
       "tag": "0007_silky_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784362618873,
+      "tag": "0008_tense_microbe",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784367793595,
+      "tag": "0009_crazy_wiccan",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,10 @@
 <script lang="ts">
     import { listLocations } from "../../../routes/locations/list.remote";
     import { type Location } from "@ac/validations";
+    import KioskMultiSelect from "./KioskMultiSelect.svelte";
+    import { listEvents } from "../../../routes/events/list.remote";
+    import { listAnnouncements } from "../../../routes/announcements/list.remote";
+    import { listTags } from "../../../routes/tags/list.remote";
 
     import * as m from "$lib/paraglide/messages";
     import Button from "$lib/components/ui/button/button.svelte";
@@ -41,6 +45,17 @@
     let rangeMode = $state(untrack(() => initialData?.rangeMode || "rolling"));
     let startDate = $state(untrack(() => initialData?.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : ""));
     let endDate = $state(untrack(() => initialData?.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : ""));
+ 
+    let excludeNonPublic = $state(untrack(() => initialData?.excludeNonPublic ?? true));
+    let excludeTentative = $state(untrack(() => initialData?.excludeTentative ?? true));
+    let excludeCancelled = $state(untrack(() => initialData?.excludeCancelled ?? false));
+    
+    let excludedEventIds = $state<string[]>(untrack(() => initialData?.excludedEventIds || []));
+    let includedEventIds = $state<string[]>(untrack(() => initialData?.includedEventIds || []));
+    let excludedAnnouncementIds = $state<string[]>(untrack(() => initialData?.excludedAnnouncementIds || []));
+    let includedAnnouncementIds = $state<string[]>(untrack(() => initialData?.includedAnnouncementIds || []));
+    let excludedTags = $state<string[]>(untrack(() => initialData?.excludedTags || ['Series']));
+    let includedTags = $state<string[]>(untrack(() => initialData?.includedTags || []));
  
 
 
@@ -503,6 +518,77 @@
                 </div>
             {/if}
         </div>
+
+        <details class="space-y-4 border-t pt-6">
+            <summary class="text-lg font-medium text-gray-900 cursor-pointer select-none">
+                {m.fine_grained_display_selection()}
+            </summary>
+            
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg space-y-6">
+                <div class="flex flex-col gap-3">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 font-medium">
+                        <input type="checkbox" bind:checked={excludeNonPublic} class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" />
+                        {m.exclude_non_public_items()}
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 font-medium">
+                        <input type="checkbox" bind:checked={excludeTentative} class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" />
+                        {m.exclude_tentative_items()}
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 font-medium">
+                        <input type="checkbox" bind:checked={excludeCancelled} class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" />
+                        {m.exclude_cancelled_items()}
+                    </label>
+                </div>
+                
+                <input {...rf.fields.excludeNonPublic.as("text", String(excludeNonPublic))} class="hidden" />
+                <input {...rf.fields.excludeTentative.as("text", String(excludeTentative))} class="hidden" />
+                <input {...rf.fields.excludeCancelled.as("text", String(excludeCancelled))} class="hidden" />
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {#await listTags({ limit: 1000 })}
+                        <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
+                        <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
+                    {:then tagsResult}
+                        <div class="space-y-2">
+                            <KioskMultiSelect title={m.included_tags()} items={tagsResult.data} bind:selectedIds={includedTags} />
+                            <input {...rf.fields.includedTags.as("text", JSON.stringify(includedTags))} class="hidden" />
+                        </div>
+                        <div class="space-y-2">
+                            <KioskMultiSelect title={m.excluded_tags()} items={tagsResult.data} bind:selectedIds={excludedTags} />
+                            <input {...rf.fields.excludedTags.as("text", JSON.stringify(excludedTags))} class="hidden" />
+                        </div>
+                    {/await}
+                    
+                    {#await listEvents({ limit: 1000 })}
+                        <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
+                        <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
+                    {:then eventsResult}
+                        <div class="space-y-2">
+                            <KioskMultiSelect title={m.included_events()} items={eventsResult.data} labelKey="summary" bind:selectedIds={includedEventIds} />
+                            <input {...rf.fields.includedEventIds.as("text", JSON.stringify(includedEventIds))} class="hidden" />
+                        </div>
+                        <div class="space-y-2">
+                            <KioskMultiSelect title={m.excluded_events()} items={eventsResult.data} labelKey="summary" bind:selectedIds={excludedEventIds} />
+                            <input {...rf.fields.excludedEventIds.as("text", JSON.stringify(excludedEventIds))} class="hidden" />
+                        </div>
+                    {/await}
+                    
+                    {#await listAnnouncements({ limit: 1000 })}
+                        <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
+                        <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
+                    {:then announcementsResult}
+                        <div class="space-y-2">
+                            <KioskMultiSelect title={m.included_announcements()} items={announcementsResult.data} labelKey="title" bind:selectedIds={includedAnnouncementIds} />
+                            <input {...rf.fields.includedAnnouncementIds.as("text", JSON.stringify(includedAnnouncementIds))} class="hidden" />
+                        </div>
+                        <div class="space-y-2">
+                            <KioskMultiSelect title={m.excluded_announcements()} items={announcementsResult.data} labelKey="title" bind:selectedIds={excludedAnnouncementIds} />
+                            <input {...rf.fields.excludedAnnouncementIds.as("text", JSON.stringify(excludedAnnouncementIds))} class="hidden" />
+                        </div>
+                    {/await}
+                </div>
+            </div>
+        </details>
 
         <div class="pt-4 flex justify-end gap-3">
             <Button href="/kiosks" variant="outline" type="button"

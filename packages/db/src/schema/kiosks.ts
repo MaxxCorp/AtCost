@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, primaryKey, jsonb, boolean } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { location } from "./resources";
 
@@ -17,6 +17,15 @@ export const kiosk = pgTable("kiosk", {
     lookPast: integer("look_past").default(86400).notNull(), // 1 day in seconds
     loopDuration: integer("loop_duration").default(30).notNull(),
     uiMode: text("ui_mode", { enum: ["carousel", "table"] }).default("carousel").notNull(),
+    excludeNonPublic: boolean("exclude_non_public").default(true).notNull(),
+    excludeTentative: boolean("exclude_tentative").default(true).notNull(),
+    excludeCancelled: boolean("exclude_cancelled").default(false).notNull(),
+    excludedEventIds: jsonb("excluded_event_ids").$type<string[]>().default([]).notNull(),
+    includedEventIds: jsonb("included_event_ids").$type<string[]>().default([]).notNull(),
+    excludedAnnouncementIds: jsonb("excluded_announcement_ids").$type<string[]>().default([]).notNull(),
+    includedAnnouncementIds: jsonb("included_announcement_ids").$type<string[]>().default([]).notNull(),
+    excludedTags: jsonb("excluded_tags").$type<string[]>().default(['Series']).notNull(),
+    includedTags: jsonb("included_tags").$type<string[]>().default([]).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

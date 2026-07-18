@@ -659,6 +659,22 @@
 	"item_created_and_associated": "{item} created and associated",
 	"item_updated": "{item} updated",
 	"failed_to_update_association": "Failed to update association",
-	"failed_to_load_associations": "Failed to load associations"
+	"failed_to_load_associations": "Failed to load associations",
+	"fine_grained_display_selection": "Fine-grained Display Selection",
+	"exclude_non_public_items": "Exclude non-public items",
+	"exclude_tentative_items": "Exclude tentative items",
+	"exclude_cancelled_items": "Exclude cancelled items",
+	"included_tags": "Included Tags",
+	"excluded_tags": "Excluded Tags",
+	"included_events": "Included Events",
+	"excluded_events": "Excluded Events",
+	"included_announcements": "Included Announcements",
+	"excluded_announcements": "Excluded Announcements",
+	"page_uppercase": "PAGE",
+	"date": "Date",
+	"time": "Time",
+	"event_detail": "Event Detail",
+	"qr": "QR",
+	"no_scheduled_events": "No Scheduled Events"
 }
 

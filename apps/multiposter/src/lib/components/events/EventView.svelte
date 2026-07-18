@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { type PublicEvent } from "@ac/validations";
+    import { type Event } from "@ac/validations";
 
     import { m } from "$lib/paraglide/messages";
     import { getLocale } from "$lib/paraglide/runtime";
@@ -15,7 +15,7 @@
         Euro,
     } from "@lucide/svelte";
 
-    let { event }: { event: PublicEvent } = $props();
+    let { event }: { event: Event } = $props();
 
     function formatDateTime(dateStr: string | null) {
         if (!dateStr) return "";
@@ -56,9 +56,16 @@
 >
     <!-- Header / Banner -->
     <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 text-white flex flex-col md:flex-row md:items-center justify-between gap-2">
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
-            {event.summary}
-        </h1>
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
+                {event.summary}
+            </h1>
+            {#if event.status === 'cancelled'}
+                <span class="bg-red-600 text-white text-xs sm:text-sm font-bold px-3 py-1 rounded-full border-2 border-white/20 uppercase tracking-widest shadow-sm">
+                    {m.cancelled?.() || 'Cancelled'}
+                </span>
+            {/if}
+        </div>
         <div class="flex items-center gap-2 text-blue-100 text-sm sm:text-base font-medium">
             <Calendar class="w-4 h-4" />
             <span>{displayDate}</span>
@@ -95,60 +102,26 @@
                                 {event.resolvedContact.name}
                             </p>
 
-                            {#if event.resolvedContact.company}
-                                <p class="text-sm text-gray-800 font-medium mt-1">
-                                    {event.resolvedContact.company}
-                                </p>
-                            {/if}
-                            {#if event.resolvedContact.role || event.resolvedContact.department}
-                                <p class="text-sm text-gray-600 {event.resolvedContact.company ? '' : 'mt-1'}">
-                                    {event.resolvedContact.role || ""}
-                                    {#if event.resolvedContact.role && event.resolvedContact.department} - {/if}
-                                    {event.resolvedContact.department || ""}
-                                </p>
-                            {/if}
-
-                            {#if event.resolvedContact}
-                                {@const resolvedContactAny = event.resolvedContact as any}
-                                {@const mainAddress = resolvedContactAny.address || resolvedContactAny.addresses?.find((a: any) => a.primary) || resolvedContactAny.addresses?.[0]}
-                            {#if mainAddress}
+                            {#if event.resolvedContact.email}
                                 <p class="text-sm text-gray-600 mt-1">
-                                    {mainAddress.street || ""} {mainAddress.houseNumber || ""}<br />
-                                    {#if mainAddress.zip || mainAddress.city}
-                                        {mainAddress.zip || ""} {mainAddress.city || ""}
-                                    {/if}
+                                    <a
+                                        href="mailto:{event.resolvedContact.email}"
+                                        class="hover:text-blue-600 break-all"
+                                        >{event.resolvedContact.email}</a
+                                    >
                                 </p>
                             {/if}
+                            {#if event.resolvedContact.phone}
+                                <p class="text-sm text-gray-600">
+                                    <a
+                                        href="tel:{event.resolvedContact.phone}"
+                                        class="hover:text-blue-600"
+                                        >{event.resolvedContact.phone}</a
+                                    >
+                                </p>
                             {/if}
 
-                            <div class="mt-2 space-y-1">
-                                {#each event.resolvedContact.emails as email}
-                                    <p class="text-sm text-gray-600">
-                                        <a
-                                            href="mailto:{email.value}"
-                                            class="hover:text-blue-600 break-all"
-                                            >{email.value}</a
-                                        >
-                                        {#if email.type}<span
-                                                class="text-xs text-gray-400 ml-1"
-                                                >({email.type})</span
-                                            >{/if}
-                                    </p>
-                                {/each}
-                                {#each event.resolvedContact.phones as phone}
-                                    <p class="text-sm text-gray-600">
-                                        <a
-                                            href="tel:{phone.value}"
-                                            class="hover:text-blue-600"
-                                            >{phone.value}</a
-                                        >
-                                        {#if phone.type}<span
-                                                class="text-xs text-gray-400 ml-1"
-                                                >({phone.type})</span
-                                            >{/if}
-                                    </p>
-                                {/each}
-                            </div>
+
 
                             <!-- Contact QR Code -->
                             {#if event.resolvedContact.qrCodeDataUrl}
@@ -181,14 +154,14 @@
         <!-- Sidebar / Visuals -->
         <div class="space-y-3 md:space-y-4">
             <!-- QR Code Card -->
-            {#if event.qrCodeDataUrl || event.qrCodePath}
+            {#if (event as any).qrCodeDataUrl || (event as any).qrCodePath}
                 <div
                     class="bg-white border border-gray-200 rounded-xl p-4 md:p-6 shadow-sm flex flex-col items-center text-center"
                 >
                     <div class="bg-gray-100 p-4 rounded-lg mb-4">
-                        {#if event.qrCodeDataUrl}
+                        {#if (event as any).qrCodeDataUrl}
                             <img
-                                src={event.qrCodeDataUrl}
+                                src={(event as any).qrCodeDataUrl}
                                 alt="QR Code"
                                 class="w-32 h-32 object-contain"
                             />
@@ -213,7 +186,7 @@
             {/if}
 
             <!-- Event Details Sidebar -->
-            {#if event.ticketPrice || event.categoryBerlinDotDe || (event.confirmedParticipants !== undefined && event.confirmedParticipants > 0) || (event.inclusivityInformation && event.inclusivityInformation.length > 0)}
+            {#if (event as any).ticketPrice || (event as any).categoryBerlinDotDe || ((event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0) || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
                 <div
                     class="bg-indigo-50 rounded-xl p-4 md:p-6 border border-indigo-100"
                 >
@@ -225,18 +198,18 @@
                     </h3>
 
                     <div class="space-y-4">
-                        {#if event.ticketPrice && !event.ticketPriceUnknown}
+                        {#if (event as any).ticketPrice && !(event as any).ticketPriceUnknown}
                             <div
                                 class="flex items-center gap-3 text-indigo-800"
                             >
                                 <Euro class="w-5 h-5 opacity-75" />
                                 <span class="text-sm font-medium"
-                                    >{event.ticketPrice}</span
+                                    >{(event as any).ticketPrice}</span
                                 >
                             </div>
                         {/if}
 
-                        {#if event.categoryBerlinDotDe}
+                        {#if (event as any).categoryBerlinDotDe}
                             <div class="flex items-start gap-3 text-indigo-800">
                                 <div class="mt-1">
                                     <Tag class="w-5 h-5 opacity-75" />
@@ -244,19 +217,19 @@
                                 <span
                                     class="bg-white/50 px-2 py-1 rounded text-sm font-medium"
                                 >
-                                    {event.categoryBerlinDotDe}
+                                    {(event as any).categoryBerlinDotDe}
                                 </span>
                             </div>
                         {/if}
 
-                        {#if event.confirmedParticipants !== undefined && event.confirmedParticipants > 0}
+                        {#if (event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0}
                             <div class="flex items-start gap-3 text-indigo-800">
                                 <div class="mt-1">
                                     <Users class="w-5 h-5 opacity-75" />
                                 </div>
                                 <span class="text-sm">
                                     <strong
-                                        >{event.confirmedParticipants}</strong
+                                        >{(event as any).confirmedParticipants}</strong
                                     >
                                     {m.confirmed_participants()}
                                     {#if event.maxOccupancy}
@@ -268,13 +241,13 @@
                             </div>
                         {/if}
 
-                        {#if event.inclusivityInformation && event.inclusivityInformation.length > 0}
+                        {#if (event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0}
                             <div class="flex items-start gap-3 text-indigo-800">
                                 <div class="mt-1">
                                     <Accessibility class="w-5 h-5 opacity-75" />
                                 </div>
                                 <div class="flex flex-wrap gap-1.5">
-                                    {#each event.inclusivityInformation as info}
+                                    {#each (event as any).inclusivityInformation as info}
                                         <span
                                             class="bg-white/50 text-indigo-900 px-2 py-0.5 rounded text-sm border border-indigo-100/50"
                                         >

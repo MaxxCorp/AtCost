@@ -1,10 +1,11 @@
 <script lang="ts">
-    import { type PublicEvent } from "@ac/validations";
+    import { type Event } from "@ac/validations";
 
     import { type Announcement } from "@ac/validations";
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
+    import * as m from "$lib/paraglide/messages";
 
     interface LocationInfo {
         id: string;
@@ -24,7 +25,7 @@
     }
 
     let { items, kiosk }: { 
-        items: (PublicEvent | Announcement)[], 
+        items: (Event | Announcement)[], 
         kiosk: {
             name?: string;
             loopDuration?: number;
@@ -33,11 +34,11 @@
     } = $props();
 
     // Filter only events
-    let events = $derived(items.filter(item => "startDateTime" in item) as PublicEvent[]);
+    let events = $derived(items.filter(item => "startDateTime" in item) as Event[]);
 
     // Flatten into pages grouped by kiosk locations
     let pages = $derived.by(() => {
-        const result: { location: LocationInfo, items: PublicEvent[] }[] = [];
+        const result: { location: LocationInfo, items: Event[] }[] = [];
         const ITEMS_PER_PAGE = 5; // Reduced as requested to ensure it fits vertically
 
         if (!kiosk?.locations || kiosk.locations.length === 0) {
@@ -52,7 +53,10 @@
 
         for (const loc of kiosk.locations) {
             // Find events that belong to this location ID
-            const locEvents = events.filter(e => e.locationIds?.includes(loc.id));
+            const locEvents = events.filter(e => 
+                e.locationIds?.includes(loc.id) || 
+                e.locations?.some((l: any) => l.locationId === loc.id || l.location?.id === loc.id || l.id === loc.id)
+            );
             if (locEvents.length === 0) continue;
 
             for (let i = 0; i < locEvents.length; i += ITEMS_PER_PAGE) {
@@ -126,7 +130,7 @@
                     
                     {#if currentPageData.location.contact}
                         <div class="border-l border-gray-800 pl-8 space-y-1">
-                            <span class="text-blue-400 uppercase text-xs font-bold tracking-widest block mb-1">Contact</span>
+                            <span class="text-blue-400 uppercase text-xs font-bold tracking-widest block mb-1">{m.contact()}</span>
                             <div class="flex items-start gap-4">
                                 <div class="space-y-0.5">
                                     <div class="text-white text-2xl font-bold leading-tight">{currentPageData.location.contact.name}</div>
@@ -153,7 +157,7 @@
 
             <div class="flex items-center gap-6 shrink-0">
                 <div class="text-right">
-                    <div class="text-3xl font-black text-blue-500/50">PAGE</div>
+                    <div class="text-3xl font-black text-blue-500/50">{m.page_uppercase()}</div>
                     <div class="text-6xl font-black">{currentPage + 1} <span class="text-gray-800">/</span> {totalPages}</div>
                 </div>
             </div>
@@ -164,11 +168,11 @@
             <table class="w-full text-left border-collapse table-fixed">
                 <thead>
                     <tr class="text-gray-500 text-lg uppercase tracking-[0.2em] font-black border-b border-gray-800/50">
-                        <th class="py-3 px-6 w-[12%]">Date</th>
-                        <th class="py-3 px-6 w-[10%]">Time</th>
-                        <th class="py-3 px-6 w-[45%]">Event Detail</th>
-                        <th class="py-3 px-6 w-[20%]">Tags</th>
-                        <th class="py-3 px-6 w-[13%] text-right">QR</th>
+                        <th class="py-3 px-6 w-[12%]">{m.date()}</th>
+                        <th class="py-3 px-6 w-[10%]">{m.time()}</th>
+                        <th class="py-3 px-6 w-[45%]">{m.event_detail()}</th>
+                        <th class="py-3 px-6 w-[20%]">{m.tags()}</th>
+                        <th class="py-3 px-6 w-[13%] text-right">{m.qr()}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -186,11 +190,16 @@
                                 </td>
                                 <td class="py-4 px-6 align-middle">
                                     <div class="space-y-1.5 overflow-hidden">
-                                        <div class="text-3xl font-black leading-tight line-clamp-2">{item.summary || "UNTITLED EVENT"}</div>
-                                        {#if item.roomTitle}
+                                        <div class="text-3xl font-black leading-tight line-clamp-2 flex items-center gap-3">
+                                            {#if (item as any).status === 'cancelled'}
+                                                <span class="inline-block bg-red-600/80 text-white text-sm font-black px-3 py-1 rounded-full uppercase tracking-widest self-center shrink-0">{m.cancelled()}</span>
+                                            {/if}
+                                            <span class={(item as any).status === 'cancelled' ? 'line-through opacity-50 text-gray-500' : ''}>{item.summary || m.untitled_event().toUpperCase()}</span>
+                                        </div>
+                                        {#if (item as any).roomTitle}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-800 rounded-md text-blue-300 text-base font-bold">
                                                 <div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                                                {item.roomTitle}
+                                                {(item as any).roomTitle}
                                             </div>
                                         {/if}
                                     </div>
@@ -205,9 +214,9 @@
                                     </div>
                                 </td>
                                 <td class="py-3 px-6 align-middle text-right shrink-0">
-                                    {#if item.qrCodeDataUrl || (item as any).qrCodePath}
+                                    {#if (item as any).qrCodeDataUrl || (item as any).qrCodePath}
                                         <div class="inline-block bg-white p-1 rounded-lg shadow-lg transform hover:scale-105 transition-transform shadow-blue-500/10">
-                                            <img src={item.qrCodeDataUrl || (item as any).qrCodePath} alt="QR" class="w-16 h-16 md:w-20 md:h-20" />
+                                            <img src={(item as any).qrCodeDataUrl || (item as any).qrCodePath} alt="QR" class="w-16 h-16 md:w-20 md:h-20" />
                                         </div>
                                     {/if}
                                 </td>
@@ -222,7 +231,7 @@
             <div class="w-48 h-48 rounded-full border-8 border-gray-900 border-t-blue-500/20 animate-spin flex items-center justify-center">
                 <div class="text-6xl text-gray-800">!</div>
             </div>
-            <p class="text-5xl font-black italic uppercase tracking-tighter">No Scheduled Events</p>
+            <p class="text-5xl font-black italic uppercase tracking-tighter">{m.no_scheduled_events()}</p>
         </div>
     {/if}
 

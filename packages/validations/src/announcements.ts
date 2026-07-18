@@ -45,4 +45,8 @@ export const announcementPaginationSchema = v.optional(v.object({
 	locationId: FilterableIdSchema,
     sortField: v.optional(v.string()),
     sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
+    excludedAnnouncementIds: v.optional(v.array(v.string())),
+    includedAnnouncementIds: v.optional(v.array(v.string())),
+    excludedTags: v.optional(v.array(v.string())),
+    includedTags: v.optional(v.array(v.string())),
 }), {});

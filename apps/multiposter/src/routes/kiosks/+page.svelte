@@ -245,7 +245,7 @@
 
 		<svelte:boundary>
 			{#if $effect.pending()}
-				<div class="py-12 text-center text-gray-500">Loading...</div>
+				<div class="py-12 text-center text-gray-500">{m.loading()}</div>
 			{/if}
 			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
 				<div class="grid grid-cols-1 gap-5">
@@ -362,10 +362,11 @@
 					class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
 				>
 					<div class="text-sm text-gray-500 dark:text-gray-400">
-						Showing {(page - 1) * limit + 1} to {Math.min(
-							page * limit,
-							result.total,
-						)} of {result.total}
+						{m.showing_range({
+							from: (page - 1) * limit + 1,
+							to: Math.min(page * limit, result.total),
+							total: result.total
+						})}
 					</div>
 					<div class="flex items-center gap-2">
 						<Button
@@ -376,7 +377,7 @@
 							class="h-9 px-3 border-gray-200 dark:border-gray-700"
 						>
 							<ArrowLeft size={16} class="mr-1.5" />
-							Previous
+							{m.previous()}
 						</Button>
 						<div
 							class="flex items-center gap-1 px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
@@ -390,7 +391,7 @@
 							onclick={() => page < totalPages && page++}
 							class="h-9 px-3 border-gray-200 dark:border-gray-700"
 						>
-							Next
+							{m.next()}
 							<ArrowRight size={16} class="ml-1.5" />
 						</Button>
 					</div>
@@ -400,7 +401,7 @@
 			</div>
 
 			{#snippet failed(error: unknown)}
-				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
+				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : m.load_error()}</div>
 			{/snippet}
 		</svelte:boundary>
 	</div>

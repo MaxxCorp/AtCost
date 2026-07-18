@@ -40,46 +40,6 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	instances?: Event[];
 };
 
-export type PublicEvent = Omit<Event, 'resolvedContact' | 'internalNotes'> & {
-    resolvedContact: {
-        name: string;
-        company?: string | null;
-        role?: string | null;
-        department?: string | null;
-        emails: { value: string; type: string | null; primary: boolean }[];
-        phones: { value: string; type: string | null; primary: boolean }[];
-        address: {
-            street: string | null;
-            houseNumber: string | null;
-            zip: string | null;
-            city: string | null;
-            country: string | null;
-        } | null;
-        qrCodeDataUrl?: string;
-        qrCodePath?: string;
-    } | null;
-    ticketPrice?: string | null;
-    ticketPriceUnknown?: boolean;
-    categoryBerlinDotDe?: string | null;
-    qrCodeDataUrl?: string;
-    confirmedParticipants?: number;
-    maxOccupancy?: number | null;
-    inclusivityInformation?: string[];
-    roomTitle?: string | null;
-    tags?: Tag[];
-    locationIds?: string[];
-    locations?: {
-        id: string;
-        name: string;
-        street: string | null;
-        houseNumber: string | null;
-        zip: string | null;
-        city: string | null;
-        country: string | null;
-        isPublic: boolean;
-    }[];
-};
-
 
 import { FilterableIdSchema } from './pagination.js';
 
@@ -94,4 +54,13 @@ export const eventPaginationSchema = v.optional(v.object({
 	sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 	grouped: v.optional(v.boolean(), false),
 	seriesId: v.optional(v.string()),
+    excludeTentative: v.optional(v.boolean()),
+    excludeCancelled: v.optional(v.boolean()),
+    excludeNonPublic: v.optional(v.boolean()),
+    excludedEventIds: v.optional(v.array(v.string())),
+    includedEventIds: v.optional(v.array(v.string())),
+    excludedTags: v.optional(v.array(v.string())),
+    includedTags: v.optional(v.array(v.string())),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
 }), {});
