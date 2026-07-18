@@ -18,7 +18,7 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	console.log("[listContacts] input:", { page, limit, search, locationId, tagId, associatedWith });
 	const offset = (page - 1) * limit;
 
-	let baseQuery = db.select({ id: contact.id }).from(contact).$dynamic();
+	let baseQuery = db.select({ id: contact.id }).from(contact).groupBy(contact.id).$dynamic();
 	
 	const conditions = [];
 
@@ -62,11 +62,16 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
     }
 
     const { sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
-    let orderField: any = contact.updatedAt;
-    if (sortField === 'displayName') orderField = contact.displayName;
-    else if (sortField === 'createdAt') orderField = contact.createdAt;
-
-    const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+    
+    let orderExpression: any;
+    if (sortField === 'displayName') {
+        orderExpression = sortOrder === 'desc' 
+            ? sql`lower(${contact.displayName}) desc nulls last` 
+            : sql`lower(${contact.displayName}) asc nulls last`;
+    } else {
+        const orderField = sortField === 'createdAt' ? contact.createdAt : contact.updatedAt;
+        orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
+    }
 
 	const paginatedIdsResult = await baseQuery
 		.orderBy(orderExpression)
