@@ -27,6 +27,12 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     readonly supportedDirections: SyncDirection[] = ['push'];
     readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 
+    shouldSyncEvent(event: any): boolean {
+        if (event.status === 'cancelled') return false;
+        if (event.status === 'tentative' || !event.isPublic) return false;
+        return true;
+    }
+
     private config?: SyncConfig;
     private sessionCookie?: string;
 
@@ -51,23 +57,38 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
      * while keeping logical consistency).
      */
     private static readonly CATEGORY_MAPPING: Record<string, string[]> = {
-        'Ausstellungen': ['1'],                // Ausstellungen
-        'Bälle & Galas': ['2'],                // Feste, Events
-        'Bildung & Vorträge': ['118', '4'],         // Bildung, Schule + Lesungen, Vorträge
-        'Festivals': ['2', '5'],           // Feste, Events + Musik, Konzerte
-        'Jazz & Blues': ['5'],                 // Musik, Konzerte
-        'Kabarett & Comedy': ['10', '116'],        // Bühnen, Filme + Kunst, Kultur
-        'Kinderveranstaltungen': ['3'],                 // Kinder, Jugendliche
-        'Klassische Konzerte': ['5', '116'],          // Musik, Konzerte + Kunst, Kultur
-        'Literatur': ['4', '116'],          // Lesungen, Vorträge + Kunst, Kultur
-        'Musical': ['10', '5'],           // Bühnen, Filme + Musik, Konzerte
-        'Oper & Tanz': ['10', '116', '5'],   // Bühnen, Filme + Kunst, Kultur + Musik, Konzerte
-        'Pop, Rock & HipHop': ['5'],                 // Musik, Konzerte
-        'Schlager & Volksmusik': ['5'],                 // Musik, Konzerte
-        'Show': ['10', '2'],           // Bühnen, Filme + Feste, Events
-        'Sport': ['9'],                 // Freizeit, Sport
-        'Theater': ['10', '116'],         // Bühnen, Filme + Kunst, Kultur
-        'Vermischtes': ['116'],               // Kunst, Kultur
+        'Ausstellung': ['1'],
+        'Berliner Bühnen': ['10', '116', '42'],
+        'Berliner BÃ¼hnen': ['10', '116', '42'],
+        'Bildung': ['118'],
+        'Feste': ['2'],
+        'Freizeit': ['9'],
+        'Kinder': ['3'],
+        'Kino': ['10'],
+        'Klassik': ['5', '116'],
+        'Konzerte': ['5'],
+        'Literatur': ['4', '116'],
+        'Messen': ['120'],
+        'Party': ['2'],
+        'Rund ums Haus': ['116'],
+        'Sport': ['9'],
+        'Sonstiges': ['116'],
+        // Fallback for any legacy entries
+        'Ausstellungen': ['1'],
+        'Bälle & Galas': ['2'],
+        'Bildung & Vorträge': ['118', '4'],
+        'Festivals': ['2', '5'],
+        'Jazz & Blues': ['5'],
+        'Kabarett & Comedy': ['10', '116'],
+        'Kinderveranstaltungen': ['3'],
+        'Klassische Konzerte': ['5', '116'],
+        'Musical': ['10', '5'],
+        'Oper & Tanz': ['10', '116', '5'],
+        'Pop, Rock & HipHop': ['5'],
+        'Schlager & Volksmusik': ['5'],
+        'Show': ['10', '2'],
+        'Theater': ['10', '116'],
+        'Vermischtes': ['116'],
     };
 
     async initialize(config: SyncConfig): Promise<void> {
@@ -96,29 +117,39 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         // Step 2: Create a new event
         const editId = await this.createEvent();
 
-        // Step 3: Fill out each page in sequence with short delays to avoid server race conditions
-        await this.submitStatus(editId, event);
-        await this.delay(500);
-        await this.submitText(editId, event);
-        await this.delay(500);
-        await this.submitDetailsDistrict(editId);
-        await this.delay(500);
-        await this.submitDetailsCategories(editId, event);
-        await this.delay(500);
-        await this.submitDetailsOrganizer(editId, event);
-        await this.delay(500);
-        await this.submitDetailsVenue(editId, event);
-        await this.delay(500);
-        await this.submitDate(editId, event);
-        await this.delay(500);
-        await this.submitWeb(editId, event);
-        await this.delay(500);
-        await this.submitImage(editId, event);
+        try {
+            // Step 3: Fill out each page in sequence with short delays to avoid server race conditions
+            await this.submitStatus(editId, event);
+            await this.delay(500);
+            await this.submitText(editId, event);
+            await this.delay(500);
+            await this.submitDetailsDistrict(editId);
+            await this.delay(500);
+            await this.submitDetailsCategories(editId, event);
+            await this.delay(500);
+            await this.submitDetailsOrganizer(editId, event);
+            await this.delay(500);
+            await this.submitDetailsVenue(editId, event);
+            await this.delay(500);
+            await this.submitDate(editId, event);
+            await this.delay(500);
+            await this.submitWeb(editId, event);
+            await this.delay(500);
+            await this.submitImage(editId, event);
 
-        return {
-            externalId: editId,
-            etag: new Date().toISOString()
-        };
+            return {
+                externalId: editId,
+                etag: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error(`[Berlin.de MH Calendar] Error pushing event, deleting draft ${editId}:`, error);
+            try {
+                await this.deleteEvent(editId);
+            } catch (cleanupError) {
+                console.error(`[Berlin.de MH Calendar] Failed to delete draft ${editId} during error cleanup:`, cleanupError);
+            }
+            throw error;
+        }
     }
 
     async updateEvent(externalId: string, event: ExternalEvent): Promise<{ etag?: string }> {
@@ -392,7 +423,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         }
 
         // Parse editid from the success banner in the response body
-        const bannerMatch = html.match(/OK:\s*Neue\s+Veranstaltung\s+Nr\.\s*(\d+)\s+wurde\s+angelegt/i);
+        const bannerMatch = html.match(/OK:.*?Neue\s+Veranstaltung\s+Nr\.\s*(\d+)\s+wurde\s+angelegt/i);
         if (bannerMatch) {
             return bannerMatch[1];
         }
@@ -468,12 +499,28 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const remoteIds = BerlinDeMhCalendarProvider.CATEGORY_MAPPING[ourCategory];
         if (!remoteIds || remoteIds.length === 0) return;
 
+        const editUrl = this.editUrl(editId, 'details');
+
+        // Clear existing categories on the event first
+        try {
+            const detailsRes = await this.authedFetch(editUrl);
+            const detailsHtml = await detailsRes.text();
+            const existingKats = [...detailsHtml.matchAll(/remkat=(\d+)/gi)].map(m => m[1]);
+            for (const katId of existingKats) {
+                await this.authedFetch(`${editUrl}&remkat=${katId}`);
+                await this.delay(200);
+            }
+        } catch (err) {
+            console.warn('[Berlin.de MH Calendar] Failed to clear existing categories:', err);
+        }
+
         // Add each category ID (up to 3) one at a time
         const categoriesToAdd = remoteIds.slice(0, 3);
         for (const categoryId of categoriesToAdd) {
-            await this.postForm(this.editUrl(editId, 'details'), {
+            await this.postForm(editUrl, {
                 update_kategorie: categoryId
             });
+            await this.delay(300);
         }
     }
 
@@ -516,12 +563,34 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const veranstalterLinks = [...searchHtml.matchAll(/set_veranstalter=(\d+)[^>]*>([^<]+)<\/a>/g)];
         let selectedId: string | undefined;
 
-        // Find the one matching our search string (exact or inclusion)
+        // 1. Check for exact match with searchString
         for (const match of veranstalterLinks) {
             const linkText = match[2].trim();
-            if (linkText === searchString || linkText.includes(searchString) || linkText.includes(orgName)) {
+            if (linkText === searchString) {
                 selectedId = match[1];
                 break;
+            }
+        }
+
+        // 2. Check for exact match with orgName
+        if (!selectedId) {
+            for (const match of veranstalterLinks) {
+                const linkText = match[2].trim();
+                if (linkText === orgName) {
+                    selectedId = match[1];
+                    break;
+                }
+            }
+        }
+
+        // 3. Check for inclusion match
+        if (!selectedId) {
+            for (const match of veranstalterLinks) {
+                const linkText = match[2].trim();
+                if (linkText.includes(searchString) || linkText.includes(orgName)) {
+                    selectedId = match[1];
+                    break;
+                }
             }
         }
 
@@ -594,12 +663,34 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const venueLinks = [...searchHtml.matchAll(/set_veranstaltungsort=(\d+)[^>]*>([^<]+)<\/a>/g)];
         let selectedId: string | undefined;
 
-        // Find the one matching our search string (exact or inclusion)
+        // 1. Check for exact match with searchString
         for (const match of venueLinks) {
             const linkText = match[2].trim();
-            if (linkText === searchString || linkText.includes(searchString) || linkText.includes(orgName)) {
+            if (linkText === searchString) {
                 selectedId = match[1];
                 break;
+            }
+        }
+
+        // 2. Check for exact match with orgName
+        if (!selectedId) {
+            for (const match of venueLinks) {
+                const linkText = match[2].trim();
+                if (linkText === orgName) {
+                    selectedId = match[1];
+                    break;
+                }
+            }
+        }
+
+        // 3. Check for inclusion match
+        if (!selectedId) {
+            for (const match of venueLinks) {
+                const linkText = match[2].trim();
+                if (linkText.includes(searchString) || linkText.includes(orgName)) {
+                    selectedId = match[1];
+                    break;
+                }
             }
         }
 
@@ -641,6 +732,10 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
 
         const dateUrl = this.editUrl(editId, 'date');
 
+        // Clear any existing dates to prevent duplicate schedules on updates
+        await this.authedFetch(`${dateUrl}&remove_termin_all=1`);
+        await this.delay(300);
+
         // Step 1: set terminmodus to single date
         await this.postForm(dateUrl, {
             update_terminmodus: '1'
@@ -661,7 +756,15 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             dateData.uhrzeit_bis = this.formatTime(endBerlin);
         }
 
-        await this.postForm(dateUrl, dateData);
+        const response = await this.postForm(dateUrl, dateData);
+        const html = await response.text();
+
+        // Check for the system restriction message in the HTML
+        if (html.includes('Es wurden keine gültigen Termine ausgewählt') ||
+            (html.includes('Vergangenheit') && html.includes('gelöscht')) ||
+            (html.includes('365 Tage') && html.includes('Zukunft'))) {
+            throw new Error('Berlin.de restriction: Es wurden keine gültigen Termine ausgewählt. Termine in der Vergangenheit oder mehr als 365 Tage in der Zukunft sind nicht zulässig.');
+        }
     }
 
     /**
