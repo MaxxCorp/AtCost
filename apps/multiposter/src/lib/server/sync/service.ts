@@ -282,15 +282,22 @@ export class SyncService {
 					)
 				)
 				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-				.where(and(
-					isNull(syncMappingTable.id),
-					inArray(eventTable.status, ['confirmed', 'cancelled'])
-				));
+				.where(
+					isNull(syncMappingTable.id)
+				);
 
-			const unmappedEvents = unmappedEventsRaw.filter(({ campaign }) => {
+			const unmappedEvents = unmappedEventsRaw.filter(({ campaign, event }) => {
 				if (!campaign || !campaign.content) return false;
 				const syncIds = (campaign.content as any).syncIds || [];
-				return syncIds.includes(config.id);
+				if (!syncIds.includes(config.id)) return false;
+
+				if (provider.shouldSyncEvent) {
+					if (!provider.shouldSyncEvent(event)) return false;
+				} else {
+					if (event.status === 'tentative' || !event.isPublic) return false;
+				}
+
+				return true;
 			});
 
 			for (const { event } of unmappedEvents) {
@@ -331,9 +338,12 @@ export class SyncService {
 					const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
 					let shouldBeSynced = syncIds.includes(config.id);
 
-					// Only sync events that are confirmed or cancelled
-					if (shouldBeSynced && event.status !== 'confirmed' && event.status !== 'cancelled') {
-						shouldBeSynced = false;
+					if (shouldBeSynced) {
+						if (provider.shouldSyncEvent) {
+							if (!provider.shouldSyncEvent(event)) shouldBeSynced = false;
+						} else {
+							if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
+						}
 					}
 
 					if (!shouldBeSynced) {
@@ -1257,7 +1267,7 @@ export class SyncService {
 		const table = entityType === 'event' ? eventTable : announcementTable;
 		const [itemWithCampaign] = await db
 			.select({
-				status: (table as any).status,
+				item: table,
 				campaign: campaignTable
 			})
 			.from(table)
@@ -1272,11 +1282,19 @@ export class SyncService {
 		const syncIds = itemWithCampaign.campaign?.content ? ((itemWithCampaign.campaign.content as any).syncIds || []) : [];
 		let shouldBeSynced = syncIds.includes(config.id);
 
-		// Only sync events that are confirmed or cancelled
 		if (entityType === 'event' && shouldBeSynced) {
-			const status = itemWithCampaign.status;
-			if (status !== 'confirmed' && status !== 'cancelled') {
-				shouldBeSynced = false;
+			try {
+				const provider = await this.getProviderInstance(config);
+				const event = itemWithCampaign.item as any;
+				if (provider.shouldSyncEvent) {
+					if (!provider.shouldSyncEvent(event)) shouldBeSynced = false;
+				} else {
+					if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
+				}
+			} catch (e) {
+				// Fallback if provider cannot be instantiated
+				const event = itemWithCampaign.item as any;
+				if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
 			}
 		}
 
@@ -1326,11 +1344,12 @@ export class SyncService {
 			const syncIds = itemWithCampaign?.campaign?.content ? ((itemWithCampaign.campaign.content as any).syncIds || []) : [];
 			let shouldBeSynced = syncIds.includes(config.id);
 
-			// Only sync events that are confirmed or cancelled
 			if (entityType === 'event' && shouldBeSynced) {
-				const status = (itemRow as any).status;
-				if (status !== 'confirmed' && status !== 'cancelled') {
-					shouldBeSynced = false;
+				if (provider.shouldSyncEvent) {
+					if (!provider.shouldSyncEvent(itemRow)) shouldBeSynced = false;
+				} else {
+					const event = itemRow as any;
+					if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
 				}
 			}
 

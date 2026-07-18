@@ -175,6 +175,12 @@ export interface SyncProvider {
 	readonly supportedEntityTypes: ('event' | 'announcement')[];
 
 	/**
+	 * Determine if a specific event should be synced by this provider.
+	 * Can be used to filter by status, visibility, etc.
+	 */
+	shouldSyncEvent?(event: any): boolean;
+
+	/**
 	 * Initialize the provider with credentials
 	 */
 	initialize(config: SyncConfig): Promise<void>;

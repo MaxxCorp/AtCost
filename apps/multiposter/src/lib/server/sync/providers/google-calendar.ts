@@ -23,6 +23,11 @@ export class GoogleCalendarProvider implements SyncProvider {
 	readonly supportedDirections: SyncDirection[] = ['pull', 'push', 'bidirectional'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 
+	shouldSyncEvent(event: any): boolean {
+		// Google Calendar allows syncing of all events (including tentative and non-public)
+		return true;
+	}
+
 
 	private config?: SyncConfig;
 	private calendar?: calendar_v3.Calendar;
@@ -481,6 +486,7 @@ export class GoogleCalendarProvider implements SyncProvider {
 	private mapToGoogleEvent(event: ExternalEvent): calendar_v3.Schema$Event {
 		const gcalEvent: calendar_v3.Schema$Event = {
 			summary: event.summary,
+			status: event.status,
 			description: event.description,
 			location: event.location,
 			start: {},

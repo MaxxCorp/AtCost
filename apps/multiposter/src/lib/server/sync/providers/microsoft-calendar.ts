@@ -18,6 +18,11 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	readonly supportedDirections: SyncDirection[] = ['pull', 'push', 'bidirectional'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 
+	shouldSyncEvent(event: any): boolean {
+		// Microsoft Calendar allows syncing of all events (including tentative and non-public)
+		return true;
+	}
+
 	private config?: SyncConfig;
 	private accessToken?: string;
 	private refreshToken?: string;
@@ -350,7 +355,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			externalId: msEvent.id,
 			providerId: this.config!.providerId,
 			summary: msEvent.subject || 'Untitled Event',
-			status: isCancelled ? 'cancelled' : 'confirmed',
+			status: isCancelled ? 'cancelled' : (msEvent.showAs === 'tentative' ? 'tentative' : 'confirmed'),
 			description: msEvent.body?.content ?? undefined,
 			location: msEvent.location?.displayName ?? undefined,
 			isAllDay: msEvent.isAllDay ?? false,
@@ -394,6 +399,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	private mapToMicrosoftEvent(event: ExternalEvent): any {
 		const msEvent: any = {
 			subject: event.summary,
+			showAs: event.status === 'tentative' ? 'tentative' : 'busy',
 			body: event.description ? { contentType: 'HTML', content: event.description } : undefined,
 			location: event.location ? { displayName: event.location } : undefined,
 			isAllDay: event.isAllDay,
