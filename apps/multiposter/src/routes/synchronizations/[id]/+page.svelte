@@ -28,7 +28,6 @@
 	} from "@lucide/svelte";
 
 	const configId = $derived(page.params.id || "");
-    const toggleRf = $derived(update.for(configId));
     const mainRf = $derived(update.for(configId));
 
 	// Version tracker for re-fetching data after actions
@@ -154,9 +153,14 @@
                                             <RefreshCw class="h-4 w-4 mr-2 {isSyncing ? 'animate-spin' : ''}" />
                                             {m.sync_now()}
                                         </AsyncButton>
-                                        <form
-                                            {...toggleRf.preflight(updateSynchronizationSchema).enhance(async ({ submit }: any) => {
-                                                    const result: any = await submit();
+                                        <AsyncButton
+                                            variant={config.enabled ? "secondary" : "default"}
+                                            loading={update.pending}
+                                            loadingLabel={config.enabled ? m.disabling() : m.enabling()}
+                                            class={config.enabled ? "bg-gray-600 text-white hover:bg-gray-700" : "bg-green-600 text-white hover:bg-green-700"}
+                                            onclick={async () => {
+                                                try {
+                                                    const result = await update({ id: configId, enabled: !config.enabled });
                                                     if (result?.error) {
                                                         toast.error(
                                                             result.error.message ||
@@ -166,23 +170,13 @@
                                                     }
                                                     version++; // Trigger re-fetch
                                                     toast.success(m.status_updated());
-                                                })}
-                                            class="inline-block"
+                                                } catch (e: any) {
+                                                    toast.error(m.failed_to_update_status());
+                                                }
+                                            }}
                                         >
-                                            <input
-                                                {...toggleRf.fields.enabled.as("checkbox", config.enabled)}
-                                                class="hidden"
-                                            />
-                                            <AsyncButton
-                                                variant={config.enabled ? "secondary" : "default"}
-                                                loading={update.pending}
-                                                loadingLabel={config.enabled ? m.disabling() : m.enabling()}
-                                                type="submit"
-                                                class={config.enabled ? "bg-gray-600 text-white hover:bg-gray-700" : "bg-green-600 text-white hover:bg-green-700"}
-                                            >
-                                                {config.enabled ? m.disable() : m.enable()}
-                                            </AsyncButton>
-                                        </form>
+                                            {config.enabled ? m.disable() : m.enable()}
+                                        </AsyncButton>
                                         <AsyncButton
                                             variant="destructive"
                                             loading={false}
