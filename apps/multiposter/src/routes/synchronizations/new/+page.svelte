@@ -8,7 +8,8 @@
 	import { toast } from "svelte-sonner";
 	import SynchronizationForm from "$lib/components/synchronizations/SynchronizationForm.svelte";
 
-	const rf = create.preflight(createSynchronizationSchema);
+	const formId = crypto.randomUUID();
+	const rf = create.for(formId);
 </script>
 
 <svelte:head>
@@ -27,7 +28,7 @@
 
 	<form
 		class="space-y-4"
-		{...rf.enhance(async ({ submit }) => {
+		{...rf.preflight(createSynchronizationSchema).enhance(async ({ submit }) => {
 				const result: any = await submit();
 				if (result?.error) {
 					toast.error(

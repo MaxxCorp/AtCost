@@ -269,6 +269,9 @@
 </script>
 
 <!-- Hidden Inputs required for form submission -->
+{#if isUpdating && initialData?.id}
+	<input {...fields.id.as("hidden", initialData.id)} />
+{/if}
 {#if selectedProvider}
 	<input
 		{...fields.providerType.as("hidden", selectedProvider)}
@@ -338,13 +341,9 @@
 				Sync Name
 			</label>
 			<input
-				{...fields.name.as("text")}
-				value={providerId}
-				name="name"
+				{...fields.name.as("text", providerId)}
 				placeholder="e.g., my-work-calendar"
 				class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(fields.name.issues() ?? []).length > 0 ? 'border-red-500' : ''}"
-				oninput={(e) => (providerId = e.currentTarget.value)}
-				onblur={() => remoteFunction.validate()}
 			/>
 			{#each fields.name.issues() ?? [] as issue (issue.message)}
 				<p class="text-xs text-red-600 mt-1">

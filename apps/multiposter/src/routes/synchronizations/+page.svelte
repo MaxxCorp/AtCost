@@ -445,176 +445,176 @@
 		</div>
 
 		<!-- List -->
-		<div class="grid grid-cols-1 gap-5">
-			{#each (await list(filterState)).data || [] as config (config.id)}
-				{@const Icon = getProviderIcon(config.providerType)}
-				{@const statusColor = getStatusColor(
-					config.enabled,
-					config.lastSyncAt,
-				)}
-				<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
-					<div class="flex-1 mb-5">
-						<div class="flex items-start justify-between gap-4 mb-2">
-							<div class="flex-1 min-w-0">
-								<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
-									<a
-										href={`/synchronizations/${config.id}`}
-										class="hover:underline text-blue-600 flex items-center gap-2"
-									>
-										<Icon class="h-5 w-5 flex-shrink-0" />
-										{#if config.name}
-											{config.name}
-										{:else}
-											{getProviderLabel(config.providerType)}
-										{/if}
-									</a>
-								</h3>
-								<p class="text-sm text-gray-500 break-all mt-1">
-									{config.providerId}
-								</p>
-							</div>
-							<div class={statusColor}>
-								{#if config.enabled}
-									<CircleCheck class="h-5 w-5" />
-								{:else}
-									<CircleAlert class="h-5 w-5" />
-								{/if}
-							</div>
-						</div>
-
-						<div class="space-y-1 text-sm mt-4">
-							<div class="flex gap-2">
-								<span class="text-gray-600">{m.direction()}:</span>
-								<span class="font-medium">{getDirectionLabel(config.direction)}</span>
-							</div>
-							<div class="flex gap-2">
-								<span class="text-gray-600">{m.status()}:</span>
-								<span class={`font-medium ${config.enabled ? "text-green-600" : "text-gray-400"}`}>
-									{config.enabled ? m.enabled() : m.disabled()}
-								</span>
-							</div>
-							<div class="flex gap-2">
-								<span class="text-gray-600">{m.last_sync()}:</span>
-								<span class="font-medium">{formatDate(config.lastSyncAt)}</span>
-							</div>
-						</div>
-
-						{#if config.providerType === "email"}
-							<div class="mt-4 border-t pt-4">
-								<button
-									class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-									onclick={() => toggleCampaignsExpansion(config.id)}
-								>
-									{#if expandedCampaigns.has(config.id)}
-										<ChevronDown class="h-4 w-4" />
-									{:else}
-										<ChevronRight class="h-4 w-4" />
-									{/if}
-									{m.campaigns()}
-								</button>
-
-								{#if expandedCampaigns.has(config.id)}
-									{@const campaignData = campaignsData.get(config.id)}
-									<div class="mt-3 space-y-3">
-										{#if campaignData?.campaigns.length === 0 && !campaignData.loading}
-											<p class="text-sm text-gray-500">{m.no_campaigns_sent()}</p>
-										{:else}
-											{#each campaignData?.campaigns || [] as campaign}
-												<div class="border rounded-lg p-3 bg-gray-50">
-													<div class="flex items-center justify-between mb-2">
-														<h4 class="font-medium text-sm">{campaign.eventSummary}</h4>
-														<span class="text-xs text-gray-500">
-															{new Date(campaign.sentAt).toLocaleDateString()}
-															{new Date(campaign.sentAt).toLocaleTimeString()}
-														</span>
-													</div>
-													<div class="space-y-1">
-														{#each campaign.events as event}
-															{@const EventIcon = getEventIcon(event.eventType)}
-															<div class="flex items-center gap-2 text-xs">
-																<EventIcon class={`h-3 w-3 ${getEventColor(event.eventType)}`} />
-																<span class="text-gray-600">{event.recipientEmail}</span>
-																<span class={`font-medium ${getEventColor(event.eventType)}`}>
-																	{formatEventType(event.eventType)}
-																</span>
-																<span class="text-gray-400 ml-auto">{new Date(event.occurredAt).toLocaleString()}</span>
-															</div>
-														{/each}
-													</div>
-												</div>
-											{/each}
-
-											{#if campaignData?.loading}
-												<div class="text-center py-2">
-													<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
-												</div>
-											{:else if campaignData?.hasMore}
-												<div class="text-center pt-2">
-													<Button
-														variant="outline"
-														size="sm"
-														onclick={() => loadCampaigns(config.id, true)}
-													>
-														{m.load_more_items({ items: m.campaigns() })}
-													</Button>
-												</div>
-											{/if}
-										{/if}
-									</div>
-								{/if}
-							</div>
-						{/if}
-					</div>
-
-					<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end items-center gap-2 w-full sm:w-auto">
-						<div class="flex-1">
-							<WebhookToggleButton
-								configId={config.id}
-								providerType={config.providerType}
-								direction={config.direction}
-								disabled={!isAdmin}
-							/>
-						</div>
-						
-						{#if isAdmin}
-							<Button
-								href={`/synchronizations/${config.id}`}
-								variant="outline"
-								size="sm"
-								class="flex-1 sm:flex-none"
-							>
-								<Pencil class="w-4 h-4 mr-2" /> {m.edit()}
-							</Button>
-							<button
-								class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-								onclick={() => deleteItem(config)}
-							>
-								<Trash2 class="w-4 h-4 mr-2" /> {m.delete()}
-							</button>
-						{/if}
-					</div>
-				</div>
-			{:else}
-				<div
-					class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
-				>
-					<Calendar
-						class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3"
-					/>
-					<h3
-						class="text-lg font-medium text-gray-900 dark:text-gray-100"
-					>
-						{m.no_items({ items: m.feature_synchronizations_title() })}
-					</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						Try adjusting your search or filters.
-					</p>
-				</div>
-			{/each}
-		</div>
-
-		<!-- Pagination -->
 		{#await list(filterState) then res}
+			<div class="grid grid-cols-1 gap-5">
+				{#each res?.data || [] as config (config.id)}
+					{@const Icon = getProviderIcon(config.providerType)}
+					{@const statusColor = getStatusColor(
+						config.enabled,
+						config.lastSyncAt,
+					)}
+					<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+						<div class="flex-1 mb-5">
+							<div class="flex items-start justify-between gap-4 mb-2">
+								<div class="flex-1 min-w-0">
+									<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
+										<a
+											href={`/synchronizations/${config.id}`}
+											class="hover:underline text-blue-600 flex items-center gap-2"
+										>
+											<Icon class="h-5 w-5 flex-shrink-0" />
+											{#if config.name}
+												{config.name}
+											{:else}
+												{getProviderLabel(config.providerType)}
+											{/if}
+										</a>
+									</h3>
+									<p class="text-sm text-gray-500 break-all mt-1">
+										{config.providerId}
+									</p>
+								</div>
+								<div class={statusColor}>
+									{#if config.enabled}
+										<CircleCheck class="h-5 w-5" />
+									{:else}
+										<CircleAlert class="h-5 w-5" />
+									{/if}
+								</div>
+							</div>
+
+							<div class="space-y-1 text-sm mt-4">
+								<div class="flex gap-2">
+									<span class="text-gray-600">{m.direction()}:</span>
+									<span class="font-medium">{getDirectionLabel(config.direction)}</span>
+								</div>
+								<div class="flex gap-2">
+									<span class="text-gray-600">{m.status()}:</span>
+									<span class={`font-medium ${config.enabled ? "text-green-600" : "text-gray-400"}`}>
+										{config.enabled ? m.enabled() : m.disabled()}
+									</span>
+								</div>
+								<div class="flex gap-2">
+									<span class="text-gray-600">{m.last_sync()}:</span>
+									<span class="font-medium">{formatDate(config.lastSyncAt)}</span>
+								</div>
+							</div>
+
+							{#if config.providerType === "email"}
+								<div class="mt-4 border-t pt-4">
+									<button
+										class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+										onclick={() => toggleCampaignsExpansion(config.id)}
+									>
+										{#if expandedCampaigns.has(config.id)}
+											<ChevronDown class="h-4 w-4" />
+										{:else}
+											<ChevronRight class="h-4 w-4" />
+										{/if}
+										{m.campaigns()}
+									</button>
+
+									{#if expandedCampaigns.has(config.id)}
+										{@const campaignData = campaignsData.get(config.id)}
+										<div class="mt-3 space-y-3">
+											{#if campaignData?.campaigns.length === 0 && !campaignData.loading}
+												<p class="text-sm text-gray-500">{m.no_campaigns_sent()}</p>
+											{:else}
+												{#each campaignData?.campaigns || [] as campaign}
+													<div class="border rounded-lg p-3 bg-gray-50">
+														<div class="flex items-center justify-between mb-2">
+															<h4 class="font-medium text-sm">{campaign.eventSummary}</h4>
+															<span class="text-xs text-gray-500">
+																{new Date(campaign.sentAt).toLocaleDateString()}
+																{new Date(campaign.sentAt).toLocaleTimeString()}
+															</span>
+														</div>
+														<div class="space-y-1">
+															{#each campaign.events as event}
+																{@const EventIcon = getEventIcon(event.eventType)}
+																<div class="flex items-center gap-2 text-xs">
+																	<EventIcon class={`h-3 w-3 ${getEventColor(event.eventType)}`} />
+																	<span class="text-gray-600">{event.recipientEmail}</span>
+																	<span class={`font-medium ${getEventColor(event.eventType)}`}>
+																		{formatEventType(event.eventType)}
+																	</span>
+																	<span class="text-gray-400 ml-auto">{new Date(event.occurredAt).toLocaleString()}</span>
+																</div>
+															{/each}
+														</div>
+													</div>
+												{/each}
+
+												{#if campaignData?.loading}
+													<div class="text-center py-2">
+														<div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+													</div>
+												{:else if campaignData?.hasMore}
+													<div class="text-center pt-2">
+														<Button
+															variant="outline"
+															size="sm"
+															onclick={() => loadCampaigns(config.id, true)}
+														>
+															{m.load_more_items({ items: m.campaigns() })}
+														</Button>
+													</div>
+												{/if}
+											{/if}
+										</div>
+									{/if}
+								</div>
+							{/if}
+						</div>
+
+						<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end items-center gap-2 w-full sm:w-auto">
+							<div class="flex-1">
+								<WebhookToggleButton
+									configId={config.id}
+									providerType={config.providerType}
+									direction={config.direction}
+									disabled={!isAdmin}
+								/>
+							</div>
+							
+							{#if isAdmin}
+								<Button
+									href={`/synchronizations/${config.id}`}
+									variant="outline"
+									size="sm"
+									class="flex-1 sm:flex-none"
+								>
+									<Pencil class="w-4 h-4 mr-2" /> {m.edit()}
+								</Button>
+								<button
+									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
+									onclick={() => deleteItem(config)}
+								>
+									<Trash2 class="w-4 h-4 mr-2" /> {m.delete()}
+								</button>
+							{/if}
+						</div>
+					</div>
+				{:else}
+					<div
+						class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
+					>
+						<Calendar
+							class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3"
+						/>
+						<h3
+							class="text-lg font-medium text-gray-900 dark:text-gray-100"
+						>
+							{m.no_items({ items: m.feature_synchronizations_title() })}
+						</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+							Try adjusting your search or filters.
+						</p>
+					</div>
+				{/each}
+			</div>
+
+			<!-- Pagination -->
 			{#if res && res.total > limit}
 				{@const totalPages = Math.ceil(res.total / limit)}
 				<div

@@ -34,13 +34,22 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 		}
 
 		// Update config
+		const newSettings = input.settings !== undefined
+			? (typeof input.settings === 'string' ? JSON.parse(input.settings) : { ...(existing.settings as any || {}), ...input.settings })
+			: existing.settings;
+
+		const newCredentials = input.credentials !== undefined
+			? (typeof input.credentials === 'string' ? JSON.parse(input.credentials) : { ...(existing.credentials as any || {}), ...input.credentials })
+			: existing.credentials;
+
 		const [updated] = await db
 			.update(syncConfig)
 			.set({
 				name: input.name !== undefined ? input.name : existing.name,
-				enabled: typeof input.enabled === 'string' ? input.enabled === 'true' : !!input.enabled,
+				enabled: typeof input.enabled === 'string' ? input.enabled === 'true' : (input.enabled !== undefined ? !!input.enabled : existing.enabled),
 				direction: input.direction !== undefined ? input.direction : existing.direction,
-				settings: input.settings !== undefined ? input.settings : existing.settings,
+				credentials: newCredentials,
+				settings: newSettings,
 				updatedAt: new Date()
 			})
 			.where(eq(syncConfig.id, id))
@@ -51,6 +60,7 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 		}
 
 		read(id).set(updated);
+		await listSynchronizations().refresh();
 
 		console.log('--- updateSynchronization SUCCESS ---');
 		return { success: true, synchronization: updated };
