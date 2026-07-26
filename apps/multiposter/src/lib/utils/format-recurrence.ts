@@ -3,7 +3,7 @@ import ENGLISH from "rrule/dist/esm/nlp/i18n.js";
 import * as m from "$lib/paraglide/messages";
 import { getLocale } from "$lib/paraglide/runtime";
 
-export function formatRecurrenceText(ruleStr: string | string[] | null | undefined): string {
+export function formatRecurrenceText(ruleStr: string | string[] | null | undefined, localeOverride?: string): string {
     if (!ruleStr) return m.recurrence();
     
     // Extract string if it's an array
@@ -16,9 +16,30 @@ export function formatRecurrenceText(ruleStr: string | string[] | null | undefin
         }
 
         // Generate English string first
-        const textEn = RRule.fromString(cleanRule).toText();
+        let textEn = RRule.fromString(cleanRule).toText();
 
-        if (getLocale() === 'de') {
+        if (cleanRule.includes('BYSETPOS=')) {
+            const setposMatch = cleanRule.match(/BYSETPOS=(-?\d+)/);
+            if (setposMatch) {
+                const pos = parseInt(setposMatch[1], 10);
+                const posStr = pos === 1 ? '1st' : pos === 2 ? '2nd' : pos === 3 ? '3rd' : pos === 4 ? '4th' : pos === -1 ? 'last' : `${pos}th`;
+                
+                if (textEn.includes('Monday, Tuesday, Wednesday, Thursday, Friday')) {
+                    textEn = textEn.replace(/on Monday, Tuesday, Wednesday, Thursday, Friday/gi, `on the ${posStr} weekday`);
+                    textEn = textEn.replace(/Monday, Tuesday, Wednesday, Thursday, Friday/gi, `${posStr} weekday`);
+                } else if (textEn.includes('Saturday, Sunday')) {
+                    textEn = textEn.replace(/on Saturday, Sunday/gi, `on the ${posStr} weekend day`);
+                    textEn = textEn.replace(/Saturday, Sunday/gi, `${posStr} weekend day`);
+                } else if (textEn.includes('Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday')) {
+                    textEn = textEn.replace(/on Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday/gi, `on the ${posStr} day`);
+                } else if (!/1st|2nd|3rd|4th|last/i.test(textEn)) {
+                    textEn = textEn.replace(/on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/gi, `on the ${posStr} $1`);
+                }
+            }
+        }
+
+        const currentLocale = localeOverride || getLocale();
+        if (currentLocale === 'de') {
             let textDe = textEn;
             // Singular forms
             textDe = textDe.replace(/every day/g, 'jeden Tag');
@@ -62,9 +83,17 @@ export function formatRecurrenceText(ruleStr: string | string[] | null | undefin
                 textDe = textDe.replace(new RegExp(en, 'gi'), de);
             }
 
-            // "on the Xth"
+            // Ordinals and relative terms
             textDe = textDe.replace(/on the last/gi, 'am letzten');
             textDe = textDe.replace(/on the (\d+)(st|nd|rd|th)/gi, 'am $1.');
+
+            textDe = textDe.replace(/weekend days/gi, 'Wochenendtagen');
+            textDe = textDe.replace(/weekend day/gi, 'Wochenendtag');
+            textDe = textDe.replace(/on weekdays/gi, 'an Wochentagen');
+            textDe = textDe.replace(/on a weekday/gi, 'an einem Wochentag');
+            textDe = textDe.replace(/weekdays/gi, 'Wochentagen');
+            textDe = textDe.replace(/weekday/gi, 'Wochentag');
+            textDe = textDe.replace(/(am (?:letzten|\d+\.))\s+day\b/gi, '$1 Tag');
 
             // Structural words
             textDe = textDe.replace(/ until /gi, ' bis ');
@@ -72,8 +101,6 @@ export function formatRecurrenceText(ruleStr: string | string[] | null | undefin
             textDe = textDe.replace(/ for 1 time/gi, ' einmal');
             textDe = textDe.replace(/ and /gi, ' und ');
             textDe = textDe.replace(/ or /gi, ' oder ');
-            textDe = textDe.replace(/on weekdays/gi, 'an Wochentagen');
-            textDe = textDe.replace(/on a weekday/gi, 'an einem Wochentag');
             
             return textDe;
         }

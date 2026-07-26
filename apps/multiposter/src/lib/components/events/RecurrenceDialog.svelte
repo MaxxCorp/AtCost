@@ -2,6 +2,8 @@
     import * as Dialog from "$lib/components/ui/dialog";
     import { Button } from "$lib/components/ui/button";
     import { RRule, Frequency } from "$lib/utils/rrule-compat";
+    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { RefreshCw } from "@lucide/svelte";
     import { createEventDispatcher } from "svelte";
     import * as m from "$lib/paraglide/messages";
 
@@ -242,6 +244,46 @@
             byweekday = [...byweekday, day];
         }
     }
+
+    let previewRule = $derived.by(() => {
+        const options: any = { freq, interval };
+        if (endType === "count") {
+            options.count = Number(count);
+        } else if (endType === "until" && untilDate) {
+            options.until = new Date(untilDate);
+        }
+
+        if (freq === RRule.WEEKLY && byweekday.length > 0) {
+            options.byweekday = byweekday;
+        }
+
+        if (freq === RRule.MONTHLY) {
+            if (monthlyType === "day") {
+                options.bymonthday = bymonthday;
+            } else {
+                options.bysetpos = bysetpos;
+                options.byweekday = getRRuleWeekdays(relativeDay);
+            }
+        }
+
+        if (freq === RRule.YEARLY) {
+            options.bymonth = bymonth;
+            if (yearlyType === "day") {
+                options.bymonthday = bymonthday;
+            } else {
+                options.bysetpos = bysetpos;
+                options.byweekday = getRRuleWeekdays(relativeDay);
+            }
+        }
+
+        try {
+            return new RRule(options).toString();
+        } catch {
+            return null;
+        }
+    });
+
+    let previewText = $derived(previewRule ? formatRecurrenceText(previewRule) : "");
 </script>
 
 <Dialog.Root bind:open>
@@ -251,6 +293,12 @@
             <Dialog.Description>
                 {m.recurrence_description()}
             </Dialog.Description>
+            {#if previewText}
+                <div class="mt-2 text-sm font-medium text-blue-700 bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center gap-2">
+                    <RefreshCw size={14} class="text-blue-600 flex-shrink-0" />
+                    <span>{previewText}</span>
+                </div>
+            {/if}
         </Dialog.Header>
         <div class="grid gap-6 py-4">
             <div class="grid grid-cols-4 items-center gap-4">

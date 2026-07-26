@@ -5,6 +5,8 @@
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
+    import { RefreshCw } from "@lucide/svelte";
+    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import * as m from "$lib/paraglide/messages";
 
     interface LocationInfo {
@@ -200,6 +202,12 @@
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-800 rounded-md text-blue-300 text-base font-bold">
                                                 <div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
                                                 {(item as any).roomTitle}
+                                            </div>
+                                        {/if}
+                                        {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
+                                            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-300 text-sm font-semibold">
+                                                <RefreshCw class="w-3.5 h-3.5" />
+                                                <span>{formatRecurrenceText((item as any).recurrence)}</span>
                                             </div>
                                         {/if}
                                     </div>

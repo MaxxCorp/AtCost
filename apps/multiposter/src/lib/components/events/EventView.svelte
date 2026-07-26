@@ -13,7 +13,9 @@
         Accessibility,
         Tag,
         Euro,
+        RefreshCw,
     } from "@lucide/svelte";
+    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
 
     let { event }: { event: Event } = $props();
 
@@ -66,9 +68,17 @@
                 </span>
             {/if}
         </div>
-        <div class="flex items-center gap-2 text-blue-100 text-sm sm:text-base font-medium">
-            <Calendar class="w-4 h-4" />
-            <span>{displayDate}</span>
+        <div class="flex flex-col items-start md:items-end text-blue-100 text-sm sm:text-base font-medium">
+            <div class="flex items-center gap-2">
+                <Calendar class="w-4 h-4" />
+                <span>{displayDate}</span>
+            </div>
+            {#if (event.recurrence && (event.recurrence as string[]).length > 0) || event.recurringEventId || event.seriesId}
+                <div class="flex items-center gap-1.5 text-xs sm:text-sm text-blue-200 mt-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/20">
+                    <RefreshCw class="w-3.5 h-3.5" />
+                    <span>{formatRecurrenceText((event.recurrence as string[])?.[0])}</span>
+                </div>
+            {/if}
         </div>
     </div>
 
