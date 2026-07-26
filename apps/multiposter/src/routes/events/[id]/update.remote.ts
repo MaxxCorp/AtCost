@@ -1,7 +1,7 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
-import { eq, and, or, ne } from '@ac/db';
+import { eq, and, or, ne, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -313,7 +313,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					let start2: Date = updatedEvent.startDateTime ? new Date(updatedEvent.startDateTime) : new Date();
 					let end2: Date | null = updatedEvent.endDateTime ? new Date(updatedEvent.endDateTime) : null;
 
-					const instances = expandRecurrence(newRecurrenceRule, start2, end2);
+					const instances = expandRecurrence(newRecurrenceRule, start2, end2, 50, true, updatedEvent.startTimeZone || 'UTC');
 
 					for (const { date, end: instanceEnd } of instances) {
 						const instanceId = crypto.randomUUID();

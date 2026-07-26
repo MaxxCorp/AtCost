@@ -103,11 +103,41 @@
         "Sonstiges",
     ];
 
-    function parseDateTime(dt: string | null | undefined) {
+    function parseDateTime(dt: string | null | undefined, timeZone?: string | null) {
         if (!dt) return { date: "", time: "" };
         try {
             const d = new Date(dt);
             if (isNaN(d.getTime())) return { date: "", time: "" };
+            const tz = timeZone || browserTimezone;
+            if (tz) {
+                try {
+                    const formatter = new Intl.DateTimeFormat("en-CA", {
+                        timeZone: tz,
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                    });
+                    const parts = formatter.formatToParts(d);
+                    const getPart = (type: string) => parts.find((p) => p.type === type)?.value || "";
+                    const year = getPart("year");
+                    const month = getPart("month");
+                    const day = getPart("day");
+                    let hours = getPart("hour");
+                    if (hours === "24") hours = "00";
+                    const minutes = getPart("minute");
+                    if (year && month && day && hours && minutes) {
+                        return {
+                            date: `${year}-${month}-${day}`,
+                            time: `${hours}:${minutes}`,
+                        };
+                    }
+                } catch {
+                    // Fallback to local
+                }
+            }
             const year = d.getFullYear();
             const month = String(d.getMonth() + 1).padStart(2, "0");
             const day = String(d.getDate()).padStart(2, "0");
@@ -157,8 +187,8 @@
 
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    const startParsed = $derived(parseDateTime(initialData?.startDateTime));
-    const endParsed = $derived(parseDateTime(initialData?.endDateTime));
+    const startParsed = $derived(parseDateTime(initialData?.startDateTime, initialData?.startTimeZone));
+    const endParsed = $derived(parseDateTime(initialData?.endDateTime, initialData?.endTimeZone || initialData?.startTimeZone));
     const localNow = getLocalNow();
     const initialEnd = $derived(
         getInitialEndDateTime(startParsed, endParsed, localNow),

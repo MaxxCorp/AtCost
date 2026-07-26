@@ -231,7 +231,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 		if (recurrenceRule) {
 			try {
 				const { expandRecurrence } = await import('$lib/server/events/recurrence');
-				const instances = expandRecurrence(recurrenceRule, start, end);
+				const instances = expandRecurrence(recurrenceRule, start, end, 50, true, data.startTimeZone || 'UTC');
 
 				for (const { date, end: instanceEnd } of instances) {
 					const instanceId = crypto.randomUUID();

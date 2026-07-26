@@ -70,4 +70,38 @@ describe('Recurrence Expansion', () => {
         expect(instances[0].date.toISOString()).toBe('2024-03-02T10:00:00.000Z');
         expect(instances[1].date.toISOString()).toBe('2024-03-03T10:00:00.000Z');
     });
+
+    it('should preserve local wall-clock time across DST transitions when timezone is provided', () => {
+        // March 1, 2026 is CET (UTC+1). 16:00 Berlin = 15:00 UTC.
+        // DST switch in Europe/Berlin occurs on March 29, 2026 (switching to CEST UTC+2).
+        // April 5, 2026 is CEST (UTC+2). 16:00 Berlin = 14:00 UTC.
+        const berlinStart = new Date('2026-03-01T15:00:00.000Z');
+        const berlinEnd = new Date('2026-03-01T16:00:00.000Z');
+        const rrule = 'FREQ=WEEKLY;COUNT=7';
+
+        const instances = expandRecurrence(rrule, berlinStart, berlinEnd, 50, false, 'Europe/Berlin');
+
+        expect(instances.length).toBe(6); // Master skipped
+
+        // Instance 1 (March 8 - CET UTC+1): 16:00 CET = 15:00 UTC
+        expect(instances[0].date.toISOString()).toBe('2026-03-08T15:00:00.000Z');
+
+        // Instance 5 (April 5 - CEST UTC+2): 16:00 CEST = 14:00 UTC
+        const aprilInstance = instances.find(i => i.date.toISOString().startsWith('2026-04-05'));
+        expect(aprilInstance).toBeDefined();
+        expect(aprilInstance!.date.toISOString()).toBe('2026-04-05T14:00:00.000Z');
+
+        // Verify that formatting in Europe/Berlin produces 16:00 for both CET and CEST instances
+        const fmtOptions: Intl.DateTimeFormatOptions = {
+            timeZone: 'Europe/Berlin',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        };
+        const marchTime = new Intl.DateTimeFormat('en-US', fmtOptions).format(instances[0].date);
+        const aprilTime = new Intl.DateTimeFormat('en-US', fmtOptions).format(aprilInstance!.date);
+
+        expect(marchTime).toBe('16:00');
+        expect(aprilTime).toBe('16:00');
+    });
 });
