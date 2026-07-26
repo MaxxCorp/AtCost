@@ -64,7 +64,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		if (!this.accessToken) throw new Error('Provider not initialized');
 
 		try {
-			await this.makeRequest('https://graph.microsoft.com/v1.0/me/calendar', { method: 'GET' });
+			await this.makeRequest(this.getBaseUrl(), { method: 'GET' });
 			return true;
 		} catch (error) {
 			console.error('Microsoft Calendar connection validation failed:', error);
@@ -73,9 +73,13 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	}
 
 	private getBaseUrl(): string {
-		return this.calendarId === 'primary' 
-			? 'https://graph.microsoft.com/v1.0/me/calendar' 
-			: `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(this.calendarId)}`;
+		if (this.calendarId === 'primary') {
+			return 'https://graph.microsoft.com/v1.0/me/calendar';
+		}
+		if (this.calendarId.includes('@')) {
+			return `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(this.calendarId)}/calendar`;
+		}
+		return `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(this.calendarId)}`;
 	}
 
 	async pullEvents(syncToken?: string): Promise<{
@@ -188,9 +192,14 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 
 		const url = 'https://graph.microsoft.com/v1.0/subscriptions';
         
-		const resource = this.calendarId === 'primary' 
-			? 'me/events' 
-			: `me/calendars/${encodeURIComponent(this.calendarId)}/events`;
+		let resource = 'me/events';
+		if (this.calendarId !== 'primary') {
+			if (this.calendarId.includes('@')) {
+				resource = `users/${encodeURIComponent(this.calendarId)}/events`;
+			} else {
+				resource = `me/calendars/${encodeURIComponent(this.calendarId)}/events`;
+			}
+		}
 
 		const response = await this.makeRequest<any>(url, {
 			method: 'POST',
