@@ -1386,12 +1386,31 @@ export class SyncService {
 			if (mapping) {
 				// Update existing item
 				const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
-				const { etag } = await provider.updateEvent(mapping.externalId, externalItem);
+				try {
+					const { etag } = await provider.updateEvent(mapping.externalId, externalItem);
 
-				await db
-					.update(syncMappingTable)
-					.set({ etag: etag ?? null, lastSyncedAt: new Date() })
-					.where(eq(syncMappingTable.id, mapping.id));
+					await db
+						.update(syncMappingTable)
+						.set({ etag: etag ?? null, lastSyncedAt: new Date() })
+						.where(eq(syncMappingTable.id, mapping.id));
+				} catch (err: any) {
+					if (err?.message?.includes('404')) {
+						console.warn(`[SyncService] External item ${mapping.externalId} returned 404 on update. Deleting mapping and re-pushing.`);
+						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
+						const { externalId, etag } = await provider.pushEvent(externalItem);
+						await db.insert(syncMappingTable).values({
+							syncConfigId: config.id,
+							eventId: entityType === 'event' ? itemRow.id : null,
+							announcementId: entityType === 'announcement' ? itemRow.id : null,
+							externalId: externalId,
+							providerId: config.providerId,
+							etag: etag ?? null,
+							lastSyncedAt: new Date()
+						});
+					} else {
+						throw err;
+					}
+				}
 			} else {
 				// Create new item
 				const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);

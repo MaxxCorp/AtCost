@@ -98,11 +98,30 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on';
 
-		if (data.recurrence !== undefined) {
-			const oldRec = oldEvent.recurrence ? (Array.isArray(oldEvent.recurrence) ? oldEvent.recurrence[0] : oldEvent.recurrence) : null;
-			const newRec = data.recurrence || null;
+		// Resolve old recurrence rule (checking event.recurrence and recurringSeries)
+		let oldRec = oldEvent.recurrence ? (Array.isArray(oldEvent.recurrence) ? oldEvent.recurrence[0] : oldEvent.recurrence) : null;
+		if (!oldRec && oldEvent.seriesId) {
+			const [series] = await db.select().from(recurringSeries).where(eq(recurringSeries.id, oldEvent.seriesId));
+			if (series?.rrule) {
+				oldRec = series.rrule;
+			}
+		}
 
-			if (oldRec !== newRec) {
+		const newRec = data.recurrence || null;
+		const recurrenceChanged = oldRec !== newRec;
+
+		const oldStartMs = oldEvent.startDateTime ? new Date(oldEvent.startDateTime).getTime() : 0;
+		const newStartMs = updateData.startDateTime ? new Date(updateData.startDateTime).getTime() : oldStartMs;
+		const startChanged = oldStartMs !== newStartMs;
+
+		const oldEndMs = oldEvent.endDateTime ? new Date(oldEvent.endDateTime).getTime() : 0;
+		const newEndMs = updateData.endDateTime ? new Date(updateData.endDateTime).getTime() : oldEndMs;
+		const endChanged = oldEndMs !== newEndMs;
+
+		const shouldReexpand = data.recurrence !== undefined && (recurrenceChanged || startChanged || endChanged);
+
+		if (data.recurrence !== undefined) {
+			if (shouldReexpand) {
 				// If empty string, treat as null (clearing recurrence)
 				updateData.recurrence = data.recurrence ? [data.recurrence] : null;
 
@@ -110,7 +129,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				// ensure it doesn't point to another event as parent
 				updateData.recurringEventId = null;
 			} else {
-				// Recurrence has not actually changed, ignore it so downstream logic doesn't trigger
+				// Recurrence and dates have not changed, ignore it so downstream re-expansion doesn't trigger
 				data.recurrence = undefined;
 			}
 		}
@@ -135,6 +154,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		if (data.tags !== undefined) {
 			tagNames = data.tags ? data.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0) : [];
 		}
+
+		let oldInstanceIds: string[] = [];
 
 		const updatedEvent = await db.transaction(async (tx) => {
 			const [updatedEvent] = await tx
@@ -236,16 +257,19 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			if (data.recurrence !== undefined) {
 				console.log('Handling recurrence instances update...');
 
-				// 1. Delete existing instances
-				if (updatedEvent.seriesId) {
-					await tx.delete(event).where(
-						and(
-							eq(event.seriesId, updatedEvent.seriesId),
-							ne(event.id, data.id)
-						)
-					);
+				// 1. Find existing instances to clean up external mappings
+				const existingInstances = await tx.select({ id: event.id }).from(event).where(
+					or(
+						updatedEvent.seriesId ? and(eq(event.seriesId, updatedEvent.seriesId), ne(event.id, data.id)) : undefined,
+						eq(event.recurringEventId, data.id)
+					)
+				);
+				oldInstanceIds = existingInstances.map(i => i.id);
+
+				// Delete existing instances from DB
+				if (oldInstanceIds.length > 0) {
+					await tx.delete(event).where(inArray(event.id, oldInstanceIds));
 				}
-				await tx.delete(event).where(eq(event.recurringEventId, data.id));
 
 				// 2. Handle series record
 				let seriesId = updatedEvent.seriesId;
@@ -389,6 +413,11 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			}
 			return updatedEvent;
 		});
+
+		if (oldInstanceIds.length > 0) {
+			console.log(`[Update Remote] Cleaning up sync mappings for ${oldInstanceIds.length} replaced instance events...`);
+			await syncService.deleteEventMappings(user.id, oldInstanceIds).catch(console.error);
+		}
 
 		// Determine origin for asset generation
 		let origin: string | undefined;

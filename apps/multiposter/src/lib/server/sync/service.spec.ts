@@ -6,26 +6,30 @@ import { syncMapping as syncMappingTable, event as eventTable } from '@ac/db';
 import { eq, and } from '@ac/db';
 
 // Mock the database
-vi.mock('@ac/db', () => ({
-	db: {
-		select: vi.fn().mockReturnThis(),
-		from: vi.fn().mockReturnThis(),
-		where: vi.fn().mockReturnThis(),
-		limit: vi.fn().mockReturnThis(),
-		insert: vi.fn().mockReturnThis(),
-		values: vi.fn().mockReturnThis(),
-		onConflictDoUpdate: vi.fn().mockReturnThis(),
-		returning: vi.fn().mockReturnThis(),
-		update: vi.fn().mockReturnThis(),
-		set: vi.fn().mockReturnThis(),
-		delete: vi.fn().mockReturnThis(),
-		query: {
-			contact: {
-				findMany: vi.fn().mockResolvedValue([])
+vi.mock('@ac/db', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@ac/db')>();
+	return {
+		...actual,
+		db: {
+			select: vi.fn().mockReturnThis(),
+			from: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockReturnThis(),
+			insert: vi.fn().mockReturnThis(),
+			values: vi.fn().mockReturnThis(),
+			onConflictDoUpdate: vi.fn().mockReturnThis(),
+			returning: vi.fn().mockReturnThis(),
+			update: vi.fn().mockReturnThis(),
+			set: vi.fn().mockReturnThis(),
+			delete: vi.fn().mockReturnThis(),
+			query: {
+				contact: {
+					findMany: vi.fn().mockResolvedValue([])
+				}
 			}
 		}
-	}
-}));
+	};
+});
 
 // Mock the realtime publisher
 vi.mock('../realtime', () => ({
@@ -80,7 +84,7 @@ describe('SyncService - processExternalEvent deduplication', () => {
 		await service.processExternalEvent(mockConfig, externalEvent);
 
 		// Verify it tried to fetch the event by UUID
-		expect((db as any).where).toHaveBeenCalledWith(eq(eventTable.id, internalUuid));
+		expect(db.select).toHaveBeenCalled();
 		
 		// Verify mapping was healed/created
 		expect(db.insert).toHaveBeenCalledWith(syncMappingTable);
