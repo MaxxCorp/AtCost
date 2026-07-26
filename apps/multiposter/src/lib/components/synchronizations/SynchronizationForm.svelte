@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from "svelte";
+	import { untrack, onMount } from "svelte";
 	import {
 		Calendar,
 		ArrowLeft,
@@ -13,7 +13,13 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import * as m from "$lib/paraglide/messages";
-	import { translateIssue } from "@ac/ui";
+	import { translateIssue, EntityManager, handleDelete } from "@ac/ui";
+	import TemplateSelector from "./TemplateSelector.svelte";
+	import ContactForm from "../contacts/ContactForm.svelte";
+	import { listContacts } from "../../../routes/contacts/list.remote";
+	import { createContact, createContactSchema } from "../../../routes/contacts/new/create.remote";
+	import { updateContact, updateContactSchema } from "../../../routes/contacts/[id]/update.remote";
+	import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
 
 	interface Props {
 		remoteFunction: any;
@@ -90,7 +96,7 @@
 		{
 			id: "email" as const,
 			name: "E-Mail (Brevo)",
-			description: "Send email campaigns via Brevo",
+			description: "Send email campaigns via Brevo with Svelte templates & contacts",
 			icon: Mail,
 			available: true,
 		},
@@ -158,6 +164,43 @@
 	let instagramTemplate = $state(untrack(() => initialData?.settings?.selectedTemplate || "standard"));
 	let instagramHashtags = $state(untrack(() => initialData?.settings?.defaultHashtags || "#events #community"));
 
+	let emailTemplate = $state(untrack(() => initialData?.settings?.selectedTemplate || "standard"));
+	let recipientEmail = $state(untrack(() => initialData?.settings?.recipientEmail || ""));
+	let includeEventContacts = $state<boolean>(
+		untrack(() => {
+			const val = initialData?.settings?.includeEventContacts;
+			return val === true || val === "true" || val === "1";
+		})
+	);
+	let brevoApiKey = $state(untrack(() => initialData?.settings?.apiKey || initialData?.credentials?.apiKey || ""));
+
+	let recipientContactIds = $state<string[]>(
+		untrack(() => {
+			const raw = initialData?.settings?.recipientContactIds;
+			if (Array.isArray(raw)) return raw;
+			if (typeof raw === "string" && raw.trim()) {
+				try {
+					const parsed = JSON.parse(raw);
+					return Array.isArray(parsed) ? parsed : [raw];
+				} catch {
+					return [raw];
+				}
+			}
+			return [];
+		})
+	);
+
+	let initialContacts = $state<any[]>([]);
+
+	onMount(() => {
+		if (recipientContactIds.length > 0) {
+			listContacts({ limit: 100 }).then((res) => {
+				const all = res?.data || [];
+				initialContacts = all.filter((c: any) => recipientContactIds.includes(c.id));
+			}).catch(() => {});
+		}
+	});
+
 	const instagramTemplates = [
 		{
 			id: "standard",
@@ -173,6 +216,24 @@
 			id: "story-banner",
 			name: "Story Banner Layout",
 			description: "Vibrant highlight design layout suitable for Instagram Stories and highlights."
+		}
+	];
+
+	const emailTemplates = [
+		{
+			id: "standard",
+			name: "Standard Event Notification",
+			description: "Rich HTML notification with full event details, date/time, location, and contact info."
+		},
+		{
+			id: "minimal",
+			name: "Minimal & Direct",
+			description: "Clean layout focused on event title, date, location, and concise summary."
+		},
+		{
+			id: "newsletter",
+			name: "Newsletter Highlight",
+			description: "Modern card-based layout ideal for community announcements and bulletins."
 		}
 	];
 
@@ -231,7 +292,7 @@
 	</div>
 
 	<div class="grid gap-3 grid-cols-2 lg:grid-cols-3">
-		{#each filteredProviders as provider}
+		{#each filteredProviders as provider (provider.id)}
 			{@const Icon = provider.icon}
 			<button
 				type="button"
@@ -285,7 +346,7 @@
 				oninput={(e) => (providerId = e.currentTarget.value)}
 				onblur={() => remoteFunction.validate()}
 			/>
-			{#each fields.name.issues() ?? [] as issue}
+			{#each fields.name.issues() ?? [] as issue (issue.message)}
 				<p class="text-xs text-red-600 mt-1">
 					{translateIssue(issue.message, m)}
 				</p>
@@ -448,30 +509,144 @@
 			</div>
 		{/if}
 
-		{#if selectedProvider === "instagram"}
+		{#if selectedProvider === "email"}
+			<TemplateSelector
+				templates={emailTemplates}
+				selectedTemplate={emailTemplate}
+				onselect={(id) => (emailTemplate = id)}
+				label="Select Email Template (Svelte Templating)"
+				accent="blue"
+			/>
+			<input {...fields.settings.selectedTemplate.as("hidden", emailTemplate)} />
+
 			<div>
-				<span class="block text-sm font-medium text-gray-700 mb-2">
-					Select Template (Svelte Templating)
-				</span>
-				<div class="grid gap-3 grid-cols-1 sm:grid-cols-3">
-					{#each instagramTemplates as tmpl}
-						<button
-							type="button"
-							class="text-left p-3 rounded-lg border-2 transition-all flex flex-col justify-between {instagramTemplate === tmpl.id ? 'border-pink-600 bg-pink-50' : 'border-gray-200 hover:border-gray-300'}"
-							onclick={() => (instagramTemplate = tmpl.id)}
-						>
-							<div>
-								<div class="font-semibold text-sm text-gray-900">{tmpl.name}</div>
-								<div class="text-xs text-gray-500 mt-1">{tmpl.description}</div>
-							</div>
-							{#if instagramTemplate === tmpl.id}
-								<span class="inline-block mt-2 text-[10px] font-bold text-pink-600 uppercase">Selected</span>
-							{/if}
-						</button>
-					{/each}
-				</div>
-				<input {...fields.settings.selectedTemplate.as("hidden", instagramTemplate)} />
+				<label for="brevoApiKey" class="block text-sm font-medium text-gray-700 mb-1">
+					Brevo API Key (Optional)
+				</label>
+				<input
+					{...fields.settings.apiKey.as("password")}
+					id="brevoApiKey"
+					bind:value={brevoApiKey}
+					placeholder="xkeysib-..."
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+				<p class="text-xs text-gray-500 mt-1">
+					Your Brevo API Key (Leave empty to use global BREVO_API_KEY env or sandbox mode)
+				</p>
 			</div>
+
+			<div>
+				<label for="recipientEmail" class="block text-sm font-medium text-gray-700 mb-1">
+					Default Recipient Email (Optional)
+				</label>
+				<input
+					{...fields.settings.recipientEmail.as("email")}
+					id="recipientEmail"
+					bind:value={recipientEmail}
+					placeholder="recipient@example.com"
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+				<p class="text-xs text-gray-500 mt-1">
+					An optional single recipient email address for sync notifications
+				</p>
+			</div>
+
+			<div class="border-t pt-4">
+				<label class="flex items-center gap-2 cursor-pointer">
+					<input
+						type="checkbox"
+						checked={includeEventContacts}
+						onchange={(e) => (includeEventContacts = e.currentTarget.checked)}
+						class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+					/>
+					<span class="text-sm font-medium text-gray-700">
+						Also send to contacts attached to the synchronized event/announcement
+					</span>
+				</label>
+				<input {...fields.settings.includeEventContacts.as("hidden", includeEventContacts ? "true" : "false")} />
+			</div>
+
+			<div class="border-t pt-4">
+				<h3 class="text-md font-semibold text-gray-900 mb-2 flex items-center gap-2">
+					<Users size={18} class="text-blue-600" />
+					Configured Recipient Contacts
+				</h3>
+				<EntityManager
+					{m}
+					title="Recipient Contacts"
+					icon={Users}
+					mode="embedded"
+					type="sync_config"
+					entityId={initialData?.id || ""}
+					initialItems={initialContacts}
+					onchange={(ids: string[]) => {
+						recipientContactIds = ids;
+					}}
+					listItemsRemote={listContacts as any}
+					deleteItemRemote={async (ids: string[]) => {
+						return await handleDelete({
+							ids,
+							deleteFn: deleteContact,
+							itemName: "contact",
+						});
+					}}
+					createRemote={createContact}
+					createSchema={createContactSchema}
+					updateRemote={updateContact}
+					updateSchema={updateContactSchema}
+					getFormData={(c: any) => ({
+						contact: c,
+						emails: c.emails,
+						phones: c.phones,
+						addresses: c.addresses,
+						relations: c.relations,
+						tags: c.tags,
+					})}
+					searchPredicate={(c: any, q: string) => {
+						const name = (
+							c.displayName ||
+							`${c.givenName || ""} ${c.familyName || ""}`
+						).toLowerCase();
+						return name.includes(q.toLowerCase());
+					}}
+				>
+					{#snippet renderItemLabel(contact: any)}
+						{contact.displayName ||
+							`${contact.givenName || ""} ${contact.familyName || ""}`}
+					{/snippet}
+
+					{#snippet renderForm({
+						remoteFunction: rfState,
+						schema,
+						initialData: formData,
+						onSuccess,
+						onCancel,
+						id,
+					}: any)}
+						<ContactForm
+							remoteFunction={rfState}
+							validationSchema={schema}
+							initialData={formData}
+							isUpdating={!!id}
+							{onSuccess}
+							{onCancel}
+							{m}
+						/>
+					{/snippet}
+				</EntityManager>
+				<input {...fields.settings.recipientContactIds.as("hidden", JSON.stringify(recipientContactIds))} />
+			</div>
+		{/if}
+
+		{#if selectedProvider === "instagram"}
+			<TemplateSelector
+				templates={instagramTemplates}
+				selectedTemplate={instagramTemplate}
+				onselect={(id) => (instagramTemplate = id)}
+				label="Select Template (Svelte Templating)"
+				accent="pink"
+			/>
+			<input {...fields.settings.selectedTemplate.as("hidden", instagramTemplate)} />
 
 			<div>
 				<label for="instagramAccountId" class="block text-sm font-medium text-gray-700 mb-1">
@@ -542,7 +717,7 @@
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
 	<h2 class="text-xl font-semibold mb-4">Sync Direction</h2>
 	<div class="space-y-3">
-		{#each directions as dir}
+		{#each directions as dir (dir.value)}
 			{@const Icon = dir.icon}
 			<label
 				class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors {direction === dir.value

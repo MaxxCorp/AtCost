@@ -19,6 +19,10 @@ export const synchronizationBaseSchema = v.object({
         instagramAccountId: v.optional(v.string()),
         accessToken: v.optional(v.string()),
         defaultHashtags: v.optional(v.string()),
+        recipientEmail: v.optional(v.string()),
+        recipientContactIds: v.optional(v.union([v.array(v.string()), v.string()])),
+        includeEventContacts: v.optional(v.union([v.boolean(), v.string()])),
+        apiKey: v.optional(v.string()),
     })),
 });
 
@@ -40,4 +44,3 @@ export const getEmailCampaignsSchema = v.object({
     limit: v.optional(v.union([v.number(), v.string()])),
     offset: v.optional(v.union([v.number(), v.string()])),
 });
-
