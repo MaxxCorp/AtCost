@@ -5,11 +5,8 @@
 	import { goto } from "$app/navigation";
     import { browser } from "$app/environment";
 	import { readSynchronization as read, getOperations } from "./read.remote";
-	import {
-		updateSynchronization as update,
-		type UpdateSynchronizationInput as UpdateSyncInput,
-	} from "./update.remote";
-	import { updateSynchronizationSchema } from "$lib/validations/synchronizations";
+	import { updateSynchronization as update } from "./update.remote";
+	import { updateSynchronizationSchema, type UpdateSynchronizationInput as UpdateSyncInput } from "$lib/validations/synchronizations";
 	import { removeBulk } from "./delete.remote";
 	import { sync } from "./sync.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";

@@ -1,10 +1,9 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { db } from '@ac/db';
 import { syncConfig } from '@ac/db';
 import { eq, and } from '@ac/db';
-import { updateSynchronizationSchema, type UpdateSynchronizationInput } from '$lib/validations/synchronizations';
-export type { UpdateSynchronizationInput };
+import { updateSynchronizationSchema } from '$lib/validations/synchronizations';
 import { list as listSynchronizations } from '../list.remote';
 import { readSynchronization as read } from './read.remote';
 
@@ -46,6 +45,7 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 			.update(syncConfig)
 			.set({
 				name: input.name !== undefined ? input.name : existing.name,
+				providerId: input.providerId !== undefined ? input.providerId : (input.name !== undefined ? input.name : existing.providerId),
 				enabled: typeof input.enabled === 'string' ? input.enabled === 'true' : (input.enabled !== undefined ? !!input.enabled : existing.enabled),
 				direction: input.direction !== undefined ? input.direction : existing.direction,
 				credentials: newCredentials,
@@ -60,6 +60,7 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 		}
 
 		read(id).set(updated);
+		await requested(listSynchronizations, 50).refreshAll();
 		await listSynchronizations().refresh();
 
 		console.log('--- updateSynchronization SUCCESS ---');
