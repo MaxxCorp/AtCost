@@ -162,9 +162,13 @@
 		return rawEvents
 			.filter((e: any) => !e.recurringEventId)
 			.map((master: any) => {
-				const instances = rawEvents.filter(
-					(e: any) => e.recurringEventId === master.id,
-				);
+				const instances = rawEvents
+					.filter((e: any) => e.recurringEventId === master.id)
+					.sort((a: any, b: any) => {
+						const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+						const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+						return dateA - dateB;
+					});
 				return { ...master, instances };
 			});
 	}
@@ -361,222 +365,223 @@
 			</div>
 		</div>
 
-		<!-- List using exactly the requested reactive pattern -->
 		<div class="grid grid-cols-1 gap-5">
-			{#each groupEvents((await listEvents(filterState)).data || []) as event (event.id)}
-				<div
-					class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
-				>
-					<div class="flex-1 mb-5">
-						<a
-							href="/events/{event.id}/view"
-							class="block group mb-2"
-						>
-							<div
-								class="flex items-start justify-between gap-4"
+			{#await listEvents(filterState) then eventsRes}
+				{#each groupEvents(eventsRes?.data || []) as event (event.id)}
+					<div
+						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+					>
+						<div class="flex-1 mb-5">
+							<a
+								href="/events/{event.id}/view"
+								class="block group mb-2"
 							>
-								<h3
-									class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors"
+								<div
+									class="flex items-start justify-between gap-4"
 								>
-									{event.summary || m.untitled_event()}
-								</h3>
-								{#if event.tags && event.tags.length > 0}
-									<div
-										class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]"
+									<h3
+										class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors"
 									>
-										{#each event.tags as t (t.tag?.id || t.tagName)}
-											{#if t.tag}
-												<span
-													class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
-												>
-													{t.tag.name}
-												</span>
-											{/if}
-										{/each}
-									</div>
-								{/if}
-							</div>
-						</a>
+										{event.summary || m.untitled_event()}
+									</h3>
+									{#if event.tags && event.tags.length > 0}
+										<div
+											class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]"
+										>
+											{#each event.tags as t (t.tag?.id || t.tagName)}
+												{#if t.tag}
+													<span
+														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+													>
+														{t.tag.name}
+													</span>
+												{/if}
+											{/each}
+										</div>
+									{/if}
+								</div>
+							</a>
 
-						<div
-							class="flex items-center text-sm text-gray-500 dark:text-gray-400"
-						>
-							<Clock
-								class="w-4 h-4 mr-2 text-primary-500 shrink-0"
-							/>
-							<span class="truncate font-medium"
-								>{formatEventTime(event)}</span
-							>
-						</div>
-						{#if event.locations && event.locations.length > 0}
 							<div
-								class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2"
+								class="flex items-center text-sm text-gray-500 dark:text-gray-400"
 							>
-								<MapPin
+								<Clock
 									class="w-4 h-4 mr-2 text-primary-500 shrink-0"
 								/>
-								<span class="truncate">
-									{#each event.locations as l, i (l.location?.id || i)}
-										{#if l.location}
-											<a
-												href="/locations/{l.location
-													.id}"
-												class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-												>{l.location.name}</a
-											>{i <
-											event.locations.length - 1
-												? ", "
-												: ""}
-										{/if}
-									{/each}
-								</span>
-							</div>
-						{/if}
-
-						{#if event.recurrence && event.recurrence.length > 0}
-							<div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
-								<RefreshCw class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
-								<span class="truncate">{formatRecurrenceText(event.recurrence)}</span>
-							</div>
-						{/if}
-
-						{#if event.instances && event.instances.length > 0}
-							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-								<button
-									class="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-									onclick={() => toggleSeries(event.id)}
+								<span class="truncate font-medium"
+									>{formatEventTime(event)}</span
 								>
-									<CalendarDays class="w-4 h-4 mr-2 text-primary-500" />
-									{event.instances.length} {m.instances()}
-									{#if expandedSeries[event.id]}
-										<ChevronDown class="w-4 h-4 ml-1" />
-									{:else}
-										<ChevronRight class="w-4 h-4 ml-1" />
-									{/if}
-								</button>
 							</div>
-
-							<!-- Instances List -->
-							{#if expandedSeries[event.id]}
-								<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg p-4 space-y-3">
-									<h4
-									class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3"
+							{#if event.locations && event.locations.length > 0}
+								<div
+									class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2"
 								>
-									{m.instances()}
-								</h4>
-								{#each event.instances as instance (instance.id)}
-									<div
-										class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-700"
+									<MapPin
+										class="w-4 h-4 mr-2 text-primary-500 shrink-0"
+									/>
+									<span class="truncate">
+										{#each event.locations as l, i (l.location?.id || i)}
+											{#if l.location}
+												<a
+													href="/locations/{l.location
+														.id}"
+													class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+													>{l.location.name}</a
+												>{i <
+												event.locations.length - 1
+													? ", "
+													: ""}
+											{/if}
+										{/each}
+									</span>
+								</div>
+							{/if}
+
+							{#if event.recurrence && event.recurrence.length > 0}
+								<div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
+									<RefreshCw class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
+									<span class="truncate">{formatRecurrenceText(event.recurrence)}</span>
+								</div>
+							{/if}
+
+							{#if event.instances && event.instances.length > 0}
+								<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+									<button
+										class="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+										onclick={() => toggleSeries(event.id)}
 									>
-										<div
-											class="flex items-center text-sm text-gray-600 dark:text-gray-300"
-										>
-											<Clock
-												class="w-3.5 h-3.5 mr-2 text-primary-400 shrink-0"
-											/>
-											<span
-												>{formatEventTime(
-													instance,
-												)}</span
-											>
-										</div>
-										<div
-											class="flex gap-2 w-full sm:w-auto"
-										>
-											<Button
-												variant="outline"
-												size="sm"
-												href="/events/{instance.id}"
-												class="flex-1 sm:flex-none h-8 px-2 text-xs"
-											>
-												<Pencil
-													class="w-3.5 h-3.5 mr-1"
-												/>
-												{m.edit()}
-											</Button>
-											<button
-												class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-8 px-2 text-red-500"
-												onclick={() =>
-													handleDelete(
-														instance,
-														false,
-													)}
-											>
-												<Trash2
-													class="w-3.5 h-3.5 mr-1"
-												/>
-												{m.delete()}
-											</button>
-										</div>
-									</div>
-								{/each}
-							</div>
-						{/if}
-						{/if}
-					</div>
+										<CalendarDays class="w-4 h-4 mr-2 text-primary-500" />
+										{event.instances.length} {m.instances()}
+										{#if expandedSeries[event.id]}
+											<ChevronDown class="w-4 h-4 ml-1" />
+										{:else}
+											<ChevronRight class="w-4 h-4 ml-1" />
+										{/if}
+									</button>
+								</div>
 
-					<div
-						class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto"
-					>
-						<Button
-							variant="outline"
-							size="sm"
-							href="/events/{event.id}"
-							class="flex-1 sm:flex-none"
+								<!-- Instances List -->
+								{#if expandedSeries[event.id]}
+									<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg p-4 space-y-3">
+										<h4
+										class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3"
+									>
+										{m.instances()}
+									</h4>
+									{#each event.instances as instance (instance.id)}
+										<div
+											class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-700"
+										>
+											<div
+												class="flex items-center text-sm text-gray-600 dark:text-gray-300"
+											>
+												<Clock
+													class="w-3.5 h-3.5 mr-2 text-primary-400 shrink-0"
+												/>
+												<span
+													>{formatEventTime(
+														instance,
+													)}</span
+												>
+											</div>
+											<div
+												class="flex gap-2 w-full sm:w-auto"
+											>
+												<Button
+													variant="outline"
+													size="sm"
+													href="/events/{instance.id}"
+													class="flex-1 sm:flex-none h-8 px-2 text-xs"
+												>
+													<Pencil
+														class="w-3.5 h-3.5 mr-1"
+													/>
+													{m.edit()}
+												</Button>
+												<button
+													class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-8 px-2 text-red-500"
+													onclick={() =>
+														handleDelete(
+															instance,
+															false,
+														)}
+												>
+													<Trash2
+														class="w-3.5 h-3.5 mr-1"
+													/>
+													{m.delete()}
+												</button>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+							{/if}
+						</div>
+
+						<div
+							class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto"
 						>
-							<Pencil class="w-4 h-4 mr-2" />
-							{m.edit()}
-						</Button>
-						<button
-							class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-							onclick={() => handleDelete(event, event.instances && event.instances.length > 0)}
-						>
-							<Trash2 class="w-4 h-4 mr-2" />
-							{m.delete()}
-						</button>
-					</div>
-					<div
-						class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2"
-					>
-						{m.updated_on({
-							date: new Date(
-								event.updatedAt,
-							).toLocaleString([], {
-								year: "numeric",
-								month: "2-digit",
-								day: "2-digit",
-								hour: "2-digit",
-								minute: "2-digit",
-							}),
-						})}
-						{#if event.user}
-							| <a
-								href="/users/{event.user.id}"
-								class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-								>{event.user.name ||
-									event.user.email ||
-									"User"}</a
+							<Button
+								variant="outline"
+								size="sm"
+								href="/events/{event.id}"
+								class="flex-1 sm:flex-none"
 							>
-						{/if}
+								<Pencil class="w-4 h-4 mr-2" />
+								{m.edit()}
+							</Button>
+							<button
+								class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
+								onclick={() => handleDelete(event, event.instances && event.instances.length > 0)}
+							>
+								<Trash2 class="w-4 h-4 mr-2" />
+								{m.delete()}
+							</button>
+						</div>
+						<div
+							class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2"
+						>
+							{m.updated_on({
+								date: new Date(
+									event.updatedAt,
+								).toLocaleString([], {
+									year: "numeric",
+									month: "2-digit",
+									day: "2-digit",
+									hour: "2-digit",
+									minute: "2-digit",
+								}),
+							})}
+							{#if event.user}
+								| <a
+									href="/users/{event.user.id}"
+									class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+									>{event.user.name ||
+										event.user.email ||
+										"User"}</a
+								>
+							{/if}
+						</div>
 					</div>
-				</div>
-			{:else}
-				<div
-					class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
-				>
-					<CalendarDays
-						class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3"
-					/>
-					<h3
-						class="text-lg font-medium text-gray-900 dark:text-gray-100"
+				{:else}
+					<div
+						class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800"
 					>
-						No events found
-					</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						Try adjusting your search or filters.
-					</p>
-				</div>
-			{/each}
+						<CalendarDays
+							class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3"
+						/>
+						<h3
+							class="text-lg font-medium text-gray-900 dark:text-gray-100"
+						>
+							No events found
+						</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+							Try adjusting your search or filters.
+						</p>
+					</div>
+				{/each}
+			{/await}
 		</div>
 
 		<!-- Pagination -->
