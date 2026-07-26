@@ -9,6 +9,7 @@
 		Users,
 		MapPin,
 		Search,
+		Camera
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import * as m from "$lib/paraglide/messages";
@@ -100,6 +101,13 @@
 			icon: Users,
 			available: true,
 		},
+		{
+			id: "instagram" as const,
+			name: "Instagram",
+			description: "Push events to Instagram feed & stories with Svelte templates",
+			icon: Camera,
+			available: true,
+		},
 	];
 
 	const directions = [
@@ -145,6 +153,28 @@
 	let nebenanEmail = $state(untrack(() => initialData?.credentials?.email || ""));
 	let nebenanPassword = $state(untrack(() => initialData?.credentials?.password || ""));
 	let nebenanProfileId = $state(untrack(() => initialData?.settings?.profileId || ""));
+	let instagramAccountId = $state(untrack(() => initialData?.settings?.instagramAccountId || ""));
+	let instagramAccessToken = $state(untrack(() => initialData?.settings?.accessToken || initialData?.credentials?.accessToken || ""));
+	let instagramTemplate = $state(untrack(() => initialData?.settings?.selectedTemplate || "standard"));
+	let instagramHashtags = $state(untrack(() => initialData?.settings?.defaultHashtags || "#events #community"));
+
+	const instagramTemplates = [
+		{
+			id: "standard",
+			name: "Standard Event Post",
+			description: "Feature-rich post template with emojis, date/time, location, and hashtags."
+		},
+		{
+			id: "minimal",
+			name: "Minimal & Punchy",
+			description: "Concise summary ideal for fast scrolling on Instagram feed."
+		},
+		{
+			id: "story-banner",
+			name: "Story Banner Layout",
+			description: "Vibrant highlight design layout suitable for Instagram Stories and highlights."
+		}
+	];
 
 	// Set default direction based on provider if we are creating
 	$effect(() => {
@@ -158,7 +188,8 @@
 			selectedProvider === "seniorennetz-berlin" ||
 			selectedProvider === "bewegungsatlas-berlin" ||
 			selectedProvider === "email" ||
-			selectedProvider === "nebenan-de")
+			selectedProvider === "nebenan-de" ||
+			selectedProvider === "instagram")
 		) {
 			direction = "push";
 		}
@@ -417,6 +448,77 @@
 			</div>
 		{/if}
 
+		{#if selectedProvider === "instagram"}
+			<div>
+				<span class="block text-sm font-medium text-gray-700 mb-2">
+					Select Template (Svelte Templating)
+				</span>
+				<div class="grid gap-3 grid-cols-1 sm:grid-cols-3">
+					{#each instagramTemplates as tmpl}
+						<button
+							type="button"
+							class="text-left p-3 rounded-lg border-2 transition-all flex flex-col justify-between {instagramTemplate === tmpl.id ? 'border-pink-600 bg-pink-50' : 'border-gray-200 hover:border-gray-300'}"
+							onclick={() => (instagramTemplate = tmpl.id)}
+						>
+							<div>
+								<div class="font-semibold text-sm text-gray-900">{tmpl.name}</div>
+								<div class="text-xs text-gray-500 mt-1">{tmpl.description}</div>
+							</div>
+							{#if instagramTemplate === tmpl.id}
+								<span class="inline-block mt-2 text-[10px] font-bold text-pink-600 uppercase">Selected</span>
+							{/if}
+						</button>
+					{/each}
+				</div>
+				<input {...fields.settings.selectedTemplate.as("hidden", instagramTemplate)} />
+			</div>
+
+			<div>
+				<label for="instagramAccountId" class="block text-sm font-medium text-gray-700 mb-1">
+					Instagram Account ID / Page ID
+				</label>
+				<input
+					{...fields.settings.instagramAccountId.as("text")}
+					id="instagramAccountId"
+					bind:value={instagramAccountId}
+					placeholder="17841400000000000"
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+				<p class="text-xs text-gray-500 mt-1">
+					Your Instagram Business / Creator Account ID (Leave empty for sandbox mode)
+				</p>
+			</div>
+
+			<div>
+				<label for="instagramAccessToken" class="block text-sm font-medium text-gray-700 mb-1">
+					Instagram Graph API Access Token
+				</label>
+				<input
+					{...fields.settings.accessToken.as("password")}
+					id="instagramAccessToken"
+					bind:value={instagramAccessToken}
+					placeholder="EAAG..."
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+				<p class="text-xs text-gray-500 mt-1">
+					User or Page access token with instagram_content_publish permissions
+				</p>
+			</div>
+
+			<div>
+				<label for="instagramHashtags" class="block text-sm font-medium text-gray-700 mb-1">
+					Default Hashtags
+				</label>
+				<input
+					{...fields.settings.defaultHashtags.as("text")}
+					id="instagramHashtags"
+					bind:value={instagramHashtags}
+					placeholder="#events #community #berlin"
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+			</div>
+		{/if}
+
 		<div>
 			<label for="syncInterval" class="block text-sm font-medium text-gray-700 mb-1">
 				Sync Interval (minutes)
@@ -452,6 +554,7 @@
 					selectedProvider === 'seniorennetz-berlin' ||
 					selectedProvider === 'email' ||
 					selectedProvider === 'nebenan-de' ||
+					selectedProvider === 'instagram' ||
 					selectedProvider === 'bewegungsatlas-berlin' ||
 					selectedProvider === 'eventbrite' ||
 					selectedProvider === 'meetup') &&
@@ -472,6 +575,7 @@
 						selectedProvider === "seniorennetz-berlin" ||
 						selectedProvider === "email" ||
 						selectedProvider === "nebenan-de" ||
+						selectedProvider === "instagram" ||
 						selectedProvider === "bewegungsatlas-berlin" ||
 						selectedProvider === "eventbrite" ||
 						selectedProvider === "meetup") &&
@@ -486,7 +590,7 @@
 					<div class="text-sm text-gray-600">
 						{dir.description}
 					</div>
-					{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "berlin-de-mh-calendar" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email" || selectedProvider === "nebenan-de" || selectedProvider === "bewegungsatlas-berlin" || selectedProvider === "eventbrite" || selectedProvider === "meetup") && dir.value !== "push"}
+					{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "berlin-de-mh-calendar" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email" || selectedProvider === "nebenan-de" || selectedProvider === "instagram" || selectedProvider === "bewegungsatlas-berlin" || selectedProvider === "eventbrite" || selectedProvider === "meetup") && dir.value !== "push"}
 						<div class="text-xs text-orange-600 mt-1">
 							Not supported for {selectedProvider === "berlin-de-main-calendar"
 								? "Berlin.de"
@@ -498,6 +602,8 @@
 											? "Seniorennetz Berlin"
 											: selectedProvider === "nebenan-de"
 											? "Nebenan.de"
+											: selectedProvider === "instagram"
+											? "Instagram"
 											: selectedProvider === "bewegungsatlas-berlin"
 											? "Bewegungsatlas Berlin"
 											: selectedProvider === "eventbrite"

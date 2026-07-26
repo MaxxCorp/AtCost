@@ -15,6 +15,10 @@ export const synchronizationBaseSchema = v.object({
         username: v.optional(v.string()),
         applicationPassword: v.optional(v.string()),
         profileId: v.optional(v.string()),
+        selectedTemplate: v.optional(v.string()),
+        instagramAccountId: v.optional(v.string()),
+        accessToken: v.optional(v.string()),
+        defaultHashtags: v.optional(v.string()),
     })),
 });
 

@@ -43,6 +43,7 @@ import { SeniorennetzBerlinProvider } from './providers/seniorennetz-berlin';
 import { BewegungsatlasBerlinProvider } from './providers/bewegungsatlas-berlin';
 import { EmailProvider } from './providers/email';
 import { NebenanDeProvider } from './providers/nebenan-de';
+import { InstagramProvider } from './providers/instagram';
 import { env } from '$env/dynamic/private';
 import { publishEventChange } from '../realtime';
 
@@ -66,6 +67,7 @@ export class SyncService {
 		this.registerProvider('bewegungsatlas-berlin', BewegungsatlasBerlinProvider);
 		this.registerProvider('email', EmailProvider);
 		this.registerProvider('nebenan-de', NebenanDeProvider);
+		this.registerProvider('instagram', InstagramProvider);
 	}
 
 	/**

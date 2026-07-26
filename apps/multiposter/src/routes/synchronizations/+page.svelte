@@ -27,7 +27,8 @@
 		ArrowLeft,
 		ArrowRight,
 		ChevronsLeft,
-		ChevronsRight
+		ChevronsRight,
+		Camera
 	} from "@lucide/svelte";
 
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -73,6 +74,7 @@
 	function getProviderIcon(providerType: string) {
 		if (providerType === "google-calendar") return Calendar;
 		if (providerType === "email") return Mail;
+		if (providerType === "instagram") return Camera;
 		return Calendar;
 	}
 
@@ -86,6 +88,7 @@
 		if (providerType === "wp-the-events-calendar")
 			return m.wp_the_events_calendar();
 		if (providerType === "email") return m.email_brevo();
+		if (providerType === "instagram") return "Instagram";
 		return providerType;
 	}
 	function getDirectionLabel(direction: string) {
