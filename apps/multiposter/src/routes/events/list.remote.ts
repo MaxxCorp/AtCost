@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, eq, ne, notInArray, inArray, and, or, ilike, sql, desc, asc, exists, isNull, gte, lte } from '@ac/db';
+import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, eq, ne, notInArray, inArray, and, or, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { eventPaginationSchema as PaginationSchema, type PaginatedResult, type Event } from '@ac/validations';
 
@@ -109,19 +109,30 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 
 	if (excludePast) {
-		const now = new Date();
+		const cutoff = new Date();
+		cutoff.setHours(0, 0, 0, 0);
+
+		const instanceEvent = alias(event, 'instance_event');
+
 		conditionalFilters.push(
 			or(
-				gte(event.startDateTime, now),
-				gte(event.endDateTime, now),
-				sql`EXISTS (
-					SELECT 1 FROM ${event} e_inst
-					WHERE e_inst.recurring_event_id = ${event.id}
-					AND (
-						e_inst.start_date_time >= ${now}
-						OR e_inst.end_date_time >= ${now}
-					)
-				)`
+				gte(event.startDateTime, cutoff),
+				gte(event.endDateTime, cutoff),
+				isNotNull(event.recurrence),
+				isNotNull(event.seriesId),
+				exists(
+					db.select({ id: sql`1` })
+					  .from(instanceEvent)
+					  .where(
+						  and(
+							  eq(instanceEvent.recurringEventId, event.id),
+							  or(
+								  gte(instanceEvent.startDateTime, cutoff),
+								  gte(instanceEvent.endDateTime, cutoff)
+							  )
+						  )
+					  )
+				)
 			)
 		);
 	}
@@ -239,16 +250,40 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	let results = rawResults;
 	if (excludePast) {
-		const now = new Date();
+		const cutoff = new Date();
+		cutoff.setHours(0, 0, 0, 0);
+
+		const instancesByMaster = new Map<string, any[]>();
+		for (const item of rawResults) {
+			if (item.recurringEventId) {
+				const list = instancesByMaster.get(item.recurringEventId) || [];
+				list.push(item);
+				instancesByMaster.set(item.recurringEventId, list);
+			}
+		}
+
 		results = rawResults.filter((e: any) => {
-			if (!e.recurringEventId) return true;
 			const start = e.startDateTime ? new Date(e.startDateTime) : null;
 			const end = e.endDateTime ? new Date(e.endDateTime) : null;
-			const isStartFuture = start ? start >= now : false;
-			const isEndFuture = end ? end >= now : false;
-			return isStartFuture || isEndFuture;
+			const isSelfFuture = (start ? start >= cutoff : false) || (end ? end >= cutoff : false);
+
+			if (!e.recurringEventId) {
+				// Master or single event
+				if (isSelfFuture) return true;
+				// If master's anchor date is past, check if it has any current/future instances
+				const instances = instancesByMaster.get(e.id) || [];
+				return instances.some((inst: any) => {
+					const iStart = inst.startDateTime ? new Date(inst.startDateTime) : null;
+					const iEnd = inst.endDateTime ? new Date(inst.endDateTime) : null;
+					return (iStart ? iStart >= cutoff : false) || (iEnd ? iEnd >= cutoff : false);
+				});
+			} else {
+				// Child instance event
+				return isSelfFuture;
+			}
 		});
 	}
 
 	return { data: results, total };
 });
+
