@@ -17,6 +17,7 @@
     import AsyncButton from "./AsyncButton.svelte";
     import * as Dialog from "./dialog";
     import { toast } from "svelte-sonner";
+    import { getContactDisplayName } from "../utils.js";
 
     interface Props<T extends { id?: string | null; name?: string }> {
         title: string;
@@ -206,12 +207,35 @@
 
     let searchQuery = $state("");
 
+    const effectiveSortField = $derived(propSortField ?? "displayName");
+    const effectiveSortOrder = $derived(propSortOrder ?? "asc");
+
     const filterState = $derived({
         search: searchQuery || undefined,
         limit: 100,
-        sortField: "name",
-        sortOrder: "asc",
+        sortField: effectiveSortField,
+        sortOrder: effectiveSortOrder,
     });
+
+    function getItemSortValue(item: any, field: string) {
+        if (!item) return "";
+        if (field === "displayName" || field === "name") {
+            const displayName = getContactDisplayName(item);
+            if (displayName) return displayName.toLowerCase();
+            return (item.name || item.title || item.company || item.id || "").toString().toLowerCase();
+        }
+        return (item[field] ?? "").toString().toLowerCase();
+    }
+
+    function sortItemsList<I>(items: I[], field: string, order: "asc" | "desc"): I[] {
+        if (!items || !Array.isArray(items)) return [];
+        return [...items].sort((a, b) => {
+            const valA = getItemSortValue(a, field);
+            const valB = getItemSortValue(b, field);
+            const cmp = valA.localeCompare(valB, undefined, { sensitivity: "base", numeric: true });
+            return order === "desc" ? -cmp : cmp;
+        });
+    }
 
     function normalize(res: any) {
         if (!res) return { data: [], total: 0 };
@@ -548,15 +572,16 @@
             <div class={["max-h-64 overflow-y-auto space-y-1 p-1 transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
                 {#await selectorListPromise then res}
                     {@const allItems = normalize(res).data}
+                    {@const sortedAllItems = sortItemsList(allItems, effectiveSortField, effectiveSortOrder)}
                     {@const filteredItems = searchQuery
-                        ? allItems.filter(
+                        ? sortedAllItems.filter(
                               (i: any) =>
                                   searchPredicate
                                       ? searchPredicate(i, searchQuery)
                                       : (i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                          i.title?.toLowerCase().includes(searchQuery.toLowerCase())),
                           )
-                        : allItems}
+                        : sortedAllItems}
                     
                     {#if filteredItems.length === 0}
                         <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
@@ -682,7 +707,8 @@
         {/if}
         <div class={$effect.pending() ? 'opacity-50 pointer-events-none transition-opacity duration-200' : 'transition-opacity duration-200'}>
             {#await associationsPromise then res}
-                {@const { data: currentAssociations } = normalize(res)}
+                {@const { data: rawAssociations } = normalize(res)}
+                {@const currentAssociations = sortItemsList(rawAssociations, effectiveSortField, effectiveSortOrder)}
                 {@const items = searchQuery
                     ? currentAssociations.filter(
                           (i: any) =>

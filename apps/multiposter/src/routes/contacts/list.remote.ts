@@ -68,10 +68,11 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
     const { sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
     
     let orderExpression: any;
-    if (sortField === 'displayName') {
+    if (sortField === 'displayName' || sortField === 'name') {
+        const lowerNameSql = sql`lower(coalesce(nullif(${contact.displayName}, ''), nullif(trim(concat(${contact.givenName}, ' ', ${contact.familyName})), ''), ${contact.company}))`;
         orderExpression = sortOrder === 'desc' 
-            ? sql`lower(${contact.displayName}) desc nulls last` 
-            : sql`lower(${contact.displayName}) asc nulls last`;
+            ? sql`${lowerNameSql} desc nulls last` 
+            : sql`${lowerNameSql} asc nulls last`;
     } else {
         const orderField = sortField === 'createdAt' ? contact.createdAt : contact.updatedAt;
         orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
@@ -92,10 +93,12 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
     const rawResults = await db.query.contact.findMany({
         where: inArray(contact.id, ids),
         with: { user: true },
-        orderBy: [orderExpression]
     });
 
-	const data = rawResults.map((row) => ({
+    const rawMap = new Map(rawResults.map((r) => [r.id, r]));
+    const sortedResults = ids.map((id) => rawMap.get(id)!).filter(Boolean);
+
+	const data = sortedResults.map((row) => ({
 		...row,
         displayName: row.displayName || '',
         givenName: row.givenName ?? undefined,
