@@ -63,7 +63,6 @@
 		"@ac/validations": "workspace:*",
 		"@google/genai": "^2.15.0",
 		"@googleapis/calendar": "^15.0.0",
-		"@types/sharp": "^0.32.0",
 		"@vercel/blob": "^2.6.1",
 		"ably": "^2.26.0",
 		"better-auth": "^1.6.25",
