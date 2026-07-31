@@ -14,7 +14,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		// unauthorized can only see public events
 	}
 
-	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
+	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: event.id }).from(event).$dynamic();
@@ -106,6 +106,24 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	
 	if (excludeNonPublic) {
 		conditionalFilters.push(eq(event.isPublic, true));
+	}
+
+	if (excludePast) {
+		const now = new Date();
+		conditionalFilters.push(
+			or(
+				gte(event.endDateTime, now),
+				and(isNull(event.endDateTime), gte(event.startDateTime, now)),
+				sql`EXISTS (
+					SELECT 1 FROM ${event} e_inst
+					WHERE e_inst.recurring_event_id = ${event.id}
+					AND (
+						e_inst.end_date_time >= ${now}
+						OR (e_inst.end_date_time IS NULL AND e_inst.start_date_time >= ${now})
+					)
+				)`
+			)
+		);
 	}
 	
 	if (startDate) {
@@ -218,5 +236,15 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		orderBy: [orderExpression]
 	});
 
-	return { data: rawResults, total };
+	let results = rawResults;
+	if (excludePast) {
+		const now = new Date();
+		results = rawResults.filter((e: any) => {
+			if (!e.recurringEventId) return true;
+			const end = e.endDateTime ? new Date(e.endDateTime) : (e.startDateTime ? new Date(e.startDateTime) : null);
+			return end ? end >= now : true;
+		});
+	}
+
+	return { data: results, total };
 });

@@ -31,4 +31,24 @@ describe('groupEvents instance ordering', () => {
 		expect(grouped[0].instances[1].id).toBe('inst2');
 		expect(grouped[0].instances[2].id).toBe('inst3');
 	});
+
+	it('filters out past instances when excludePast filter is applied', () => {
+		const now = new Date('2026-08-05T00:00:00Z');
+		const rawEvents = [
+			{ id: 'master1', summary: 'Series Master', recurringEventId: null, endDateTime: '2026-08-15T12:00:00Z' },
+			{ id: 'inst1', summary: 'Past Instance', recurringEventId: 'master1', endDateTime: '2026-08-01T10:00:00Z' },
+			{ id: 'inst2', summary: 'Future Instance', recurringEventId: 'master1', endDateTime: '2026-08-10T10:00:00Z' },
+		];
+
+		const filteredRaw = rawEvents.filter((e) => {
+			if (!e.recurringEventId) return true;
+			const end = e.endDateTime ? new Date(e.endDateTime) : null;
+			return end ? end >= now : true;
+		});
+
+		const grouped = groupEvents(filteredRaw);
+		expect(grouped).toHaveLength(1);
+		expect(grouped[0].instances).toHaveLength(1);
+		expect(grouped[0].instances[0].id).toBe('inst2');
+	});
 });

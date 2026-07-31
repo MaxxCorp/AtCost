@@ -675,6 +675,7 @@
 	"time": "Time",
 	"event_detail": "Event Detail",
 	"qr": "QR",
-	"no_scheduled_events": "No Scheduled Events"
+	"no_scheduled_events": "No Scheduled Events",
+	"hide_past_events": "Hide past events"
 }
 

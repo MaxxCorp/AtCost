@@ -675,6 +675,7 @@
 	"time": "Zeit",
 	"event_detail": "Event-Details",
 	"qr": "QR",
-	"no_scheduled_events": "Keine geplanten Events"
+	"no_scheduled_events": "Keine geplanten Events",
+	"hide_past_events": "Vergangene Events ausblenden"
 }
 

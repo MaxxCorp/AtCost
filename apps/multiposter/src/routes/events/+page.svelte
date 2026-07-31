@@ -70,6 +70,7 @@
 	let searchQuery = $state("");
 	let selectedTags = $state<string[]>([]);
 	let selectedLocations = $state<string[]>([]);
+	let excludePast = $state(true);
 	let page = $state(1);
 	let limit = $state(50);
 
@@ -83,6 +84,8 @@
 				if (prefs.selectedTags) selectedTags = prefs.selectedTags;
 				if (prefs.selectedLocations)
 					selectedLocations = prefs.selectedLocations;
+				if (prefs.excludePast !== undefined)
+					excludePast = prefs.excludePast;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -95,6 +98,7 @@
 			sortOrder,
 			selectedTags,
 			selectedLocations,
+			excludePast,
 		};
 		setPreference("eventsFilters", JSON.stringify(prefsToSave)).catch(
 			console.error,
@@ -110,12 +114,15 @@
 			selectedLocations.length > 0 ? selectedLocations : undefined,
 		sortField,
 		sortOrder,
+		excludePast,
 	});
 
 	const tagsQuery = listTags({ limit: 100 });
 	const locationsQuery = listLocations({ limit: 100 });
 
-	const activeFiltersCount = $derived(selectedTags.length + selectedLocations.length);
+	const activeFiltersCount = $derived(
+		selectedTags.length + selectedLocations.length + (!excludePast ? 1 : 0),
+	);
 
 	function toggleSeries(id: string) {
 		expandedSeries[id] = !expandedSeries[id];
@@ -241,6 +248,18 @@
 							>
 							<DropdownMenu.Separator class="bg-gray-50" />
 
+							<DropdownMenu.CheckboxItem
+								checked={excludePast}
+								onCheckedChange={(v) => {
+									excludePast = !!v;
+									page = 1;
+								}}
+								closeOnSelect={false}
+								class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+							>
+								<span class="truncate block w-full">{m.hide_past_events()}</span>
+							</DropdownMenu.CheckboxItem>
+
 							{#await tagsQuery then tagsRes}
 							{#if tagsRes.data && tagsRes.data.length > 0}
 								<DropdownMenu.Sub>
@@ -258,7 +277,7 @@
 									<DropdownMenu.SubContent
 										class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
 									>
-										{#each tagsRes.data as tag}
+										{#each tagsRes.data as tag (tag.id)}
 											<DropdownMenu.CheckboxItem
 												checked={selectedTags.includes(
 													tag.id,
@@ -296,7 +315,7 @@
 									<DropdownMenu.SubContent
 										class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
 									>
-										{#each locationsRes.data as location}
+										{#each locationsRes.data as location (location.id)}
 											<DropdownMenu.CheckboxItem
 												checked={selectedLocations.includes(
 													location.id,
@@ -324,6 +343,7 @@
 									onclick={() => {
 										selectedTags = [];
 										selectedLocations = [];
+										excludePast = true;
 										page = 1;
 									}}
 								>
@@ -634,7 +654,7 @@
 								bind:value={page}
 								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
 							>
-								{#each Array(totalPages) as _, i}
+								{#each Array(totalPages) as _, i (i)}
 									<option value={i + 1}>{i + 1}</option>
 								{/each}
 							</select>

@@ -57,6 +57,7 @@ export const eventPaginationSchema = v.optional(v.object({
     excludeTentative: v.optional(v.boolean()),
     excludeCancelled: v.optional(v.boolean()),
     excludeNonPublic: v.optional(v.boolean()),
+    excludePast: v.optional(v.boolean()),
     excludedEventIds: v.optional(v.array(v.string())),
     includedEventIds: v.optional(v.array(v.string())),
     excludedTags: v.optional(v.array(v.string())),
