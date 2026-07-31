@@ -17,8 +17,9 @@
 	import TemplateSelector from "./TemplateSelector.svelte";
 	import ContactForm from "../contacts/ContactForm.svelte";
 	import { listContacts } from "../../../routes/contacts/list.remote";
-	import { createContact, createContactSchema } from "../../../routes/contacts/new/create.remote";
-	import { updateContact, updateContactSchema } from "../../../routes/contacts/[id]/update.remote";
+	import { createContact } from "../../../routes/contacts/new/create.remote";
+	import { updateContact } from "../../../routes/contacts/[id]/update.remote";
+	import { createContactSchema, updateContactSchema } from "@ac/validations";
 	import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
 
 	interface Props {
@@ -624,7 +625,7 @@
 					}: any)}
 						<ContactForm
 							remoteFunction={rfState}
-							validationSchema={schema}
+							schema={schema}
 							initialData={formData}
 							isUpdating={!!id}
 							{onSuccess}

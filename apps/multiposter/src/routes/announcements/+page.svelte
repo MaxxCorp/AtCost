@@ -351,7 +351,7 @@
 					<LoadingSection />
 				{/snippet}
 
-				{#snippet failed(error, reset)}
+				{#snippet failed(error: any, reset: () => void)}
 					<ErrorSection {error} onRetry={reset} />
 				{/snippet}
 			</svelte:boundary>

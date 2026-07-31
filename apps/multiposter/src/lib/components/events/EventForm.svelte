@@ -212,7 +212,7 @@
         ? Intl.supportedValuesOf("timeZone")
         : [];
 
-    function updateEndDateTime(e: Event, isDate: boolean) {
+    function updateEndDateTime(e: globalThis.Event, isDate: boolean) {
         const target = e.target as HTMLInputElement;
         const newVal = target.value;
         const currentStartDate = rf.fields.startDate.value() || startParsed.date || localNow.date;

@@ -30,7 +30,7 @@
 			<Collapsible.Root open={item.isActive} class="group/collapsible">
 				<Sidebar.MenuItem>
 					<Collapsible.Trigger>
-						{#snippet child({ props })}
+						{#snippet child({ props }: { props: Record<string, any> })}
 							<Sidebar.MenuButton {...props} tooltipContent={item.title}>
 								{#if item.icon}
 									<item.icon />
@@ -47,7 +47,7 @@
 							{#each item.items ?? [] as subItem}
 								<Sidebar.MenuSubItem>
 									<Sidebar.MenuSubButton>
-										{#snippet child({ props })}
+										{#snippet child({ props }: { props: Record<string, any> })}
 											<a href={subItem.url} {...props}>
 												{#if subItem.iconPath}
 													<svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

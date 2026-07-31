@@ -157,7 +157,7 @@
                                             class={config.enabled ? "bg-gray-600 text-white hover:bg-gray-700" : "bg-green-600 text-white hover:bg-green-700"}
                                             onclick={async () => {
                                                 try {
-                                                    const result = await update({ id: configId, enabled: !config.enabled });
+                                                    const result = await (update as any)({ id: configId, enabled: !config.enabled });
                                                     if (result?.error) {
                                                         toast.error(
                                                             result.error.message ||

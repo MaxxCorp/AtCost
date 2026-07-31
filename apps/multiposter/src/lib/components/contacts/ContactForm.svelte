@@ -14,6 +14,9 @@
         initialData?: any;
         remoteFunction?: any;
         schema?: any;
+        validationSchema?: any;
+        isUpdating?: boolean;
+        m?: any;
         onSuccess?: (result: any) => void;
         onCancel?: () => void;
         cancelHref?: string;
