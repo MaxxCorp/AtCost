@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
-    import { handleDelete, EntityManager, LocationForm, translateIssue } from "@ac/ui";
+    import { handleDelete, EntityManager, LocationForm, translateIssue, matchContactSearch } from "@ac/ui";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import ResourceForm from "$lib/components/resources/ResourceForm.svelte";
@@ -22,7 +22,7 @@
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { onMount, type Snippet, untrack } from "svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact, matchContactSearch } from "@ac/validations";
+    import { type Contact } from "@ac/validations";
     import TagForm from "@ac/ui/components/forms/TagForm.svelte";
         
     import {
@@ -1155,7 +1155,9 @@
     >
         {#snippet renderItemLabel(contact: any)}
             {contact.displayName ||
-                `${contact.givenName || ""} ${contact.familyName || ""}`}
+                `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
+                contact.company ||
+                m.unnamed_contact()}
         {/snippet}
 
         {#snippet participationSnippet(contact: any)}

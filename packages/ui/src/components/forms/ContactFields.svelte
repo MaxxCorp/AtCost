@@ -570,7 +570,8 @@
                             >
                                 <span
                                     >{c.displayName ||
-                                        `${c.givenName || ""} ${c.familyName || ""}`.trim()}</span
+                                        `${c.givenName || ""} ${c.familyName || ""}`.trim() ||
+                                        c.company}</span
                                 >
                                 <Plus size={14} class="text-gray-400" />
                             </button>

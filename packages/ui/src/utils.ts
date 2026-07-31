@@ -56,3 +56,6 @@ export function translateIssue(message: string, m: any): string {
 	return message;
 }
 
+export { matchContactSearch, getContactDisplayName } from "./utils/contacts.js";
+
+

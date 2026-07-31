@@ -30,7 +30,6 @@
         createLocationSchema,
         updateLocationSchema,
         createTalentSchema,
-        matchContactSearch,
     } from "@ac/validations";
     import {
         Button,
@@ -39,6 +38,7 @@
         EntityManager,
         LocationForm,
         handleDelete,
+        matchContactSearch,
     } from "@ac/ui";
 
     interface Props {

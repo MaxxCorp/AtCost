@@ -142,7 +142,9 @@
                                         >
                                             {#snippet renderItemLabel(contact: any)}
                                                 {contact.displayName ||
-                                                    `${contact.givenName || ""} ${contact.familyName || ""}`}
+                                                    `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
+                                                    contact.company ||
+                                                    m.unnamed_contact()}
                                             {/snippet}
                                             {#snippet renderForm(props: any)}
                                                 <ContactForm

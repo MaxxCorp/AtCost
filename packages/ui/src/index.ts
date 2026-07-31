@@ -3,7 +3,7 @@
 // Or for sidebar: import * as Sidebar from "@ac/ui/components/sidebar";
 
 // Utilities
-export { cn, translateIssue, type WithoutChild, type WithoutChildren, type WithoutChildrenOrChild, type WithElementRef } from "./utils.js";
+export { cn, translateIssue, matchContactSearch, getContactDisplayName, type WithoutChild, type WithoutChildren, type WithoutChildrenOrChild, type WithElementRef } from "./utils.js";
 
 // Icons
 export { ICONS, type IconDef } from "./icons.js";

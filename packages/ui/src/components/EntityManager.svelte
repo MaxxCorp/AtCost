@@ -79,6 +79,10 @@
         // Search predicate
         searchPredicate?: (item: T, query: string) => boolean;
 
+        // Sorting props
+        sortField?: string;
+        sortOrder?: "asc" | "desc";
+
         // Localization props
         loadingLabel?: string;
         noItemsLabel?: string;
@@ -118,6 +122,8 @@
         participationSnippet,
         initialItems = [],
         searchPredicate = undefined,
+        sortField: propSortField = undefined,
+        sortOrder: propSortOrder = undefined,
 
         // Localization defaults
         loadingLabel = `Loading ${title.toLowerCase()}...`,
@@ -575,7 +581,10 @@
                                             {#if renderItemLabel}
                                                 {@render renderItemLabel(item)}
                                             {:else}
-                                                {item.name ||
+                                                {item.displayName ||
+                                                    item.name ||
+                                                    (`${item.givenName || ""} ${item.familyName || ""}`.trim() || undefined) ||
+                                                    item.company ||
                                                     item.id ||
                                                     "Unnamed Item"}
                                             {/if}
@@ -700,7 +709,12 @@
                                 {#if renderItemLabel}
                                     {@render renderItemLabel(item)}
                                 {:else}
-                                    {item.name || item.id}
+                                    {item.displayName ||
+                                        item.name ||
+                                        (`${item.givenName || ""} ${item.familyName || ""}`.trim() || undefined) ||
+                                        item.company ||
+                                        item.id ||
+                                        "Unnamed Item"}
                                 {/if}
                             </div>
                             <div class="flex items-center gap-2 mt-0.5">

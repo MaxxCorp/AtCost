@@ -218,7 +218,7 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         with: withOptions
     });
 
-    return associations.map((a: any) => {
+    const contacts = associations.map((a: any) => {
         const c = a.contact;
         if (!c) return null;
         
@@ -251,4 +251,10 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         }
         return result;
     }).filter(Boolean);
+
+    return contacts.sort((a: any, b: any) => {
+        const nameA = (a.displayName || `${a.givenName || ''} ${a.familyName || ''}`.trim() || a.company || '').toLowerCase();
+        const nameB = (b.displayName || `${b.givenName || ''} ${b.familyName || ''}`.trim() || b.company || '').toLowerCase();
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
 }

@@ -7,7 +7,7 @@
     import { FEATURES } from "$lib/features";
     import type { updateUser } from "../../../routes/users/[id]/update.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import { EntityManager } from "@ac/ui";
+    import { EntityManager, matchContactSearch } from "@ac/ui";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
 
@@ -21,7 +21,6 @@
     import {
         createContactSchema,
         updateContactSchema,
-        matchContactSearch,
     } from "$lib/validations/contacts";
     import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
@@ -263,7 +262,9 @@
         >
             {#snippet renderItemLabel(contact: any)}
                 {contact.displayName ||
-                    `${contact.givenName || ""} ${contact.familyName || ""}`}
+                    `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
+                    contact.company ||
+                    m.unnamed_contact()}
             {/snippet}
             {#snippet renderForm({
                 remoteFunction: rf,

@@ -4,7 +4,7 @@
     import EntityManager_ from "./EntityManager.svelte";
     const EntityManager = EntityManager_ as any;
     import { User } from "@lucide/svelte";
-    import { matchContactSearch } from "@ac/validations";
+    import { matchContactSearch } from "../utils.js";
 
     interface Props<T extends { id: string }> {
         title: string;
@@ -34,6 +34,10 @@
         
         // Specialized props
         contactId?: string | null;
+
+        // Sorting
+        sortField?: string;
+        sortOrder?: "asc" | "desc";
     }
 
     let {
@@ -52,6 +56,8 @@
         renderItemBadge,
         renderItemDetail,
         searchPredicate = matchContactSearch,
+        sortField = "displayName",
+        sortOrder = "asc",
         ...rest
     }: Props<any> = $props();
 
@@ -73,5 +79,7 @@
     {renderItemBadge}
     {renderItemDetail}
     {searchPredicate}
+    {sortField}
+    {sortOrder}
     {...rest}
 />

@@ -157,34 +157,6 @@ export const contactPaginationSchema = v.optional(v.object({
     sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});
 
-/**
- * Match search query against contact fields: first name (givenName), last name (familyName),
- * display name, company, department, role, and notes.
- */
-export function matchContactSearch(c: any, q: string): boolean {
-	if (!q) return true;
-	const term = q.toLowerCase().trim();
-	if (!term) return true;
 
-	const displayName = (c?.displayName || '').toLowerCase();
-	const givenName = (c?.givenName || '').toLowerCase();
-	const familyName = (c?.familyName || '').toLowerCase();
-	const fullName = `${givenName} ${familyName}`.trim();
-	const company = (c?.company || '').toLowerCase();
-	const department = (c?.department || '').toLowerCase();
-	const role = (c?.role || '').toLowerCase();
-	const notes = (c?.notes || '').toLowerCase();
-
-	return (
-		displayName.includes(term) ||
-		givenName.includes(term) ||
-		familyName.includes(term) ||
-		fullName.includes(term) ||
-		company.includes(term) ||
-		department.includes(term) ||
-		role.includes(term) ||
-		notes.includes(term)
-	);
-}
 
 

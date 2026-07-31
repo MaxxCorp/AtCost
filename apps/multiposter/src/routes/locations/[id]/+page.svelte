@@ -6,7 +6,7 @@
     import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { deleteLocation } from "./delete.remote";
-    import { LocationForm, handleDelete, EntityManager } from "@ac/ui";
+    import { LocationForm, handleDelete, EntityManager, matchContactSearch } from "@ac/ui";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
             import { updateLocationSchema, type Location, type Contact } from "@ac/validations";
@@ -17,7 +17,7 @@
     import { deleteContact } from "../../contacts/[id]/delete.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
-    import { createContactSchema, updateContactSchema, matchContactSearch } from "@ac/validations";
+    import { createContactSchema, updateContactSchema } from "@ac/validations";
 
     const locationId = $derived(page.params.id || "");
 </script>
@@ -25,8 +25,7 @@
 {#snippet contactLabel(item: any)}
     <div class="flex flex-col">
         <span class="font-medium">
-            {item.givenName}
-            {item.familyName}
+            {item.displayName || `${item.givenName || ""} ${item.familyName || ""}`.trim() || item.company || m.unnamed_contact()}
         </span>
         <span class="text-xs text-gray-500"
             >{item.emails?.[0]?.value || ""}</span

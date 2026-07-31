@@ -9,7 +9,7 @@
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
     import type { AllocationCalendar } from "$lib/validations/resources";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import { EntityManager, LocationForm, handleDelete, translateIssue } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
@@ -28,7 +28,6 @@
         updateContactSchema,
         type Location,
         type Contact,
-        matchContactSearch,
     } from "@ac/validations";
     import { User, MapPin } from "@lucide/svelte";
 
@@ -490,7 +489,9 @@
             >
                 {#snippet renderItemLabel(contact: any)}
                     {contact.displayName ||
-                        `${contact.givenName || ""} ${contact.familyName || ""}`}
+                        `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
+                        contact.company ||
+                        m.unnamed_contact()}
                 {/snippet}
                 {#snippet renderForm({
                     remoteFunction: rf,

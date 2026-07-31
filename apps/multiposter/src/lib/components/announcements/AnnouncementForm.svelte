@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
-    import { EntityManager, LocationForm, handleDelete, translateIssue } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -33,7 +33,7 @@
         removeLocationAssociation,
     } from "../../../routes/locations/associate.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact, matchContactSearch } from "@ac/validations";
+    import { type Contact } from "@ac/validations";
 
     import {
         addAssociation,
@@ -604,7 +604,9 @@
                 >
                     {#snippet renderItemLabel(contact: any)}
                         {contact.displayName ||
-                            `${contact.givenName || ""} ${contact.familyName || ""}`}
+                            `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
+                            contact.company ||
+                            m.unnamed_contact()}
                     {/snippet}
                     {#snippet renderForm({
                         remoteFunction: rf,

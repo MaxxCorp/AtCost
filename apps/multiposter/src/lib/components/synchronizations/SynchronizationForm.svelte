@@ -13,13 +13,13 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import * as m from "$lib/paraglide/messages";
-	import { translateIssue, EntityManager, handleDelete } from "@ac/ui";
+	import { translateIssue, EntityManager, handleDelete, matchContactSearch } from "@ac/ui";
 	import TemplateSelector from "./TemplateSelector.svelte";
 	import ContactForm from "../contacts/ContactForm.svelte";
 	import { listContacts } from "../../../routes/contacts/list.remote";
 	import { createContact } from "../../../routes/contacts/new/create.remote";
 	import { updateContact } from "../../../routes/contacts/[id]/update.remote";
-	import { createContactSchema, updateContactSchema, matchContactSearch } from "@ac/validations";
+	import { createContactSchema, updateContactSchema } from "@ac/validations";
 	import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
 
 	interface Props {
@@ -606,7 +606,9 @@
 				>
 					{#snippet renderItemLabel(contact: any)}
 						{contact.displayName ||
-							`${contact.givenName || ""} ${contact.familyName || ""}`}
+							`${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
+							contact.company ||
+							m.unnamed_contact()}
 					{/snippet}
 
 					{#snippet renderForm({
