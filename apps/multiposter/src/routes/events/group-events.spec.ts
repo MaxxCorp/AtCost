@@ -40,10 +40,13 @@ describe('groupEvents instance ordering', () => {
 			{ id: 'inst2', summary: 'Future Instance', recurringEventId: 'master1', endDateTime: '2026-08-10T10:00:00Z' },
 		];
 
-		const filteredRaw = rawEvents.filter((e) => {
+		const filteredRaw = rawEvents.filter((e: any) => {
 			if (!e.recurringEventId) return true;
+			const start = e.startDateTime ? new Date(e.startDateTime) : null;
 			const end = e.endDateTime ? new Date(e.endDateTime) : null;
-			return end ? end >= now : true;
+			const isStartFuture = start ? start >= now : false;
+			const isEndFuture = end ? end >= now : false;
+			return isStartFuture || isEndFuture;
 		});
 
 		const grouped = groupEvents(filteredRaw);

@@ -112,14 +112,14 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const now = new Date();
 		conditionalFilters.push(
 			or(
+				gte(event.startDateTime, now),
 				gte(event.endDateTime, now),
-				and(isNull(event.endDateTime), gte(event.startDateTime, now)),
 				sql`EXISTS (
 					SELECT 1 FROM ${event} e_inst
 					WHERE e_inst.recurring_event_id = ${event.id}
 					AND (
-						e_inst.end_date_time >= ${now}
-						OR (e_inst.end_date_time IS NULL AND e_inst.start_date_time >= ${now})
+						e_inst.start_date_time >= ${now}
+						OR e_inst.end_date_time >= ${now}
 					)
 				)`
 			)
@@ -127,10 +127,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 	
 	if (startDate) {
+		const startD = new Date(startDate);
 		conditionalFilters.push(or(
-            gte(event.endDateTime, new Date(startDate)),
-            and(isNull(event.endDateTime), gte(event.startDateTime, new Date(startDate)))
-        ));
+			gte(event.startDateTime, startD),
+			gte(event.endDateTime, startD)
+		));
 	}
 	
 	if (endDate) {
@@ -241,8 +242,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const now = new Date();
 		results = rawResults.filter((e: any) => {
 			if (!e.recurringEventId) return true;
-			const end = e.endDateTime ? new Date(e.endDateTime) : (e.startDateTime ? new Date(e.startDateTime) : null);
-			return end ? end >= now : true;
+			const start = e.startDateTime ? new Date(e.startDateTime) : null;
+			const end = e.endDateTime ? new Date(e.endDateTime) : null;
+			const isStartFuture = start ? start >= now : false;
+			const isEndFuture = end ? end >= now : false;
+			return isStartFuture || isEndFuture;
 		});
 	}
 
