@@ -34,7 +34,11 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 		conditions.push(or(
 			ilike(contact.displayName, `%${search}%`),
 			ilike(contact.givenName, `%${search}%`),
-			ilike(contact.familyName, `%${search}%`)
+			ilike(contact.familyName, `%${search}%`),
+			ilike(contact.company, `%${search}%`),
+			ilike(contact.department, `%${search}%`),
+			ilike(contact.role, `%${search}%`),
+			ilike(contact.notes, `%${search}%`)
 		));
 	}
 

@@ -130,3 +130,6 @@ export const getAssociationsSchema = v.object({
     type: v.picklist(['event', 'user', 'location', 'resource', 'announcement']),
     entityId: v.string(),
 });
+
+export { matchContactSearch } from '@ac/validations';
+

@@ -28,6 +28,7 @@
         updateContactSchema,
         type Location,
         type Contact,
+        matchContactSearch,
     } from "@ac/validations";
     import { User, MapPin } from "@lucide/svelte";
 
@@ -469,13 +470,7 @@
                     relations: c.relations,
                     tags: c.tags,
                 })}
-                searchPredicate={(c: Contact, q: string) => {
-                    const name = (
-                        c.displayName ||
-                        `${c.givenName || ""} ${c.familyName || ""}`
-                    ).toLowerCase();
-                    return name.includes(q.toLowerCase());
-                }}
+                searchPredicate={matchContactSearch}
                 loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
                 noItemsLabel={m.no_items_associated_label({ item: m.feature_contacts_title() })}
                 noItemsFoundLabel={m.no_items_found({ item: m.feature_contacts_title() })}

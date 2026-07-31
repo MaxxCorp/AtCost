@@ -17,7 +17,7 @@
     import { deleteContact } from "../../contacts/[id]/delete.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
-    import { createContactSchema, updateContactSchema } from "@ac/validations";
+    import { createContactSchema, updateContactSchema, matchContactSearch } from "@ac/validations";
 
     const locationId = $derived(page.params.id || "");
 </script>
@@ -182,12 +182,7 @@
                                                 locationAssociations: c.locationAssociations,
                                             })}
                                             renderItemLabel={contactLabel}
-                                            searchPredicate={(c: Contact, q: string) => {
-                                                const name = (
-                                                    c.displayName || `${c.givenName || ""} ${c.familyName || ""}`
-                                                ).toLowerCase();
-                                                return name.includes(q.toLowerCase());
-                                            }}
+                                            searchPredicate={matchContactSearch}
                                             renderForm={contactForm}
                                             loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
                                             noItemsLabel={m.no_items_associated_label({

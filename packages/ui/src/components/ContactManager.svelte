@@ -4,6 +4,7 @@
     import EntityManager_ from "./EntityManager.svelte";
     const EntityManager = EntityManager_ as any;
     import { User } from "@lucide/svelte";
+    import { matchContactSearch } from "@ac/validations";
 
     interface Props<T extends { id: string }> {
         title: string;
@@ -29,7 +30,7 @@
         renderItemDetail?: Snippet<[T]>;
         
         // Search
-        searchPredicate: (item: T, query: string) => boolean;
+        searchPredicate?: (item: T, query: string) => boolean;
         
         // Specialized props
         contactId?: string | null;
@@ -50,7 +51,7 @@
         renderItemLabel,
         renderItemBadge,
         renderItemDetail,
-        searchPredicate,
+        searchPredicate = matchContactSearch,
         ...rest
     }: Props<any> = $props();
 

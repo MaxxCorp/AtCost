@@ -19,7 +19,7 @@
 	import { listContacts } from "../../../routes/contacts/list.remote";
 	import { createContact } from "../../../routes/contacts/new/create.remote";
 	import { updateContact } from "../../../routes/contacts/[id]/update.remote";
-	import { createContactSchema, updateContactSchema } from "@ac/validations";
+	import { createContactSchema, updateContactSchema, matchContactSearch } from "@ac/validations";
 	import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
 
 	interface Props {
@@ -602,13 +602,7 @@
 						relations: c.relations,
 						tags: c.tags,
 					})}
-					searchPredicate={(c: any, q: string) => {
-						const name = (
-							c.displayName ||
-							`${c.givenName || ""} ${c.familyName || ""}`
-						).toLowerCase();
-						return name.includes(q.toLowerCase());
-					}}
+					searchPredicate={matchContactSearch}
 				>
 					{#snippet renderItemLabel(contact: any)}
 						{contact.displayName ||

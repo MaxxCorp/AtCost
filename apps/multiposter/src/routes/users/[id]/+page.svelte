@@ -15,7 +15,7 @@
     import { addAssociation, removeAssociation, fetchEntityContacts } from "../../contacts/associate.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
-    import { createContactSchema, updateContactSchema } from "$lib/validations/contacts";
+    import { createContactSchema, updateContactSchema, matchContactSearch } from "$lib/validations/contacts";
     import { deleteContact } from "../../contacts/[id]/delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { User as UserIcon } from "@lucide/svelte";
@@ -122,13 +122,7 @@
                                                 relations: c.relations,
                                                 tags: c.tags,
                                             })}
-                                            searchPredicate={(c: any, q: string) => {
-                                                const name = (
-                                                    c.displayName ||
-                                                    `${c.givenName || ""} ${c.familyName || ""}`
-                                                ).toLowerCase();
-                                                return name.includes(q.toLowerCase());
-                                            }}
+                                            searchPredicate={matchContactSearch}
                                             loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
                                             noItemsFoundLabel={m.no_items_found({ item: m.feature_contacts_title() })}
                                             searchPlaceholder={m.search_placeholder({ item: m.feature_contacts_title() })}

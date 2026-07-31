@@ -30,6 +30,7 @@
         createLocationSchema,
         updateLocationSchema,
         createTalentSchema,
+        matchContactSearch,
     } from "@ac/validations";
     import {
         Button,
@@ -686,16 +687,7 @@
                     associatedItemLabel={m.selected_contact()}
                     searchPlaceholder={m.search_contacts_placeholder()}
                     noItemsLabel={m.no_contact_selected()}
-                    searchPredicate={(item: any, term: string) =>
-                        item.displayName
-                            ?.toLowerCase()
-                            .includes(term.toLowerCase()) ||
-                        item.givenName
-                            ?.toLowerCase()
-                            .includes(term.toLowerCase()) ||
-                        item.familyName
-                            ?.toLowerCase()
-                            .includes(term.toLowerCase())}
+                    searchPredicate={matchContactSearch}
                 >
                     {#snippet renderItemLabel(item: any)}
                         <div class="flex flex-col">

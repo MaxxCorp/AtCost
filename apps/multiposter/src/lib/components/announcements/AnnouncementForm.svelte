@@ -33,7 +33,7 @@
         removeLocationAssociation,
     } from "../../../routes/locations/associate.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
-    import { type Contact } from "@ac/validations";
+    import { type Contact, matchContactSearch } from "@ac/validations";
 
     import {
         addAssociation,
@@ -576,13 +576,7 @@
                         relations: c.relations,
                         tags: c.tags,
                     })}
-                    searchPredicate={(c: Contact, q: string) => {
-                        const name = (
-                            c.displayName ||
-                            `${c.givenName || ""} ${c.familyName || ""}`
-                        ).toLowerCase();
-                        return name.includes(q.toLowerCase());
-                    }}
+                    searchPredicate={matchContactSearch}
                     loadingLabel={m.loading_item({ item: m.contacts() })}
                     noItemsLabel={m.no_items_associated_label({
                         item: m.contacts(),
