@@ -72,8 +72,12 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         if (kioskData.startDate) startDate = kioskData.startDate.toISOString();
         if (kioskData.endDate) endDate = kioskData.endDate.toISOString();
     } else {
+        let lookAheadSeconds = kioskData.lookAhead;
+        if (kioskData.uiMode === 'flat_list' && lookAheadSeconds <= 604800) {
+            lookAheadSeconds = 2592000; // 30 days default for monthly listings
+        }
         startDate = new Date(now.getTime() - (kioskData.lookPast * 1000)).toISOString();
-        endDate = new Date(now.getTime() + (kioskData.lookAhead * 1000)).toISOString();
+        endDate = new Date(now.getTime() + (lookAheadSeconds * 1000)).toISOString();
     }
 
     const eventsResult = await listEvents({

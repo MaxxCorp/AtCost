@@ -370,6 +370,7 @@
                         <option value="table">{m.table_view_list()}</option>
                         <option value="flat_list">{m.flat_list_print_export()}</option>
                     </select>
+                    <input {...rf.fields.uiMode.as("text", uiMode)} class="hidden" />
                 </div>
 
                 <div class="space-y-2">
@@ -390,6 +391,7 @@
                         <option value="rolling">{m.rolling_window()}</option>
                         <option value="fixed">{m.fixed_date_range()}</option>
                     </select>
+                    <input {...rf.fields.rangeMode.as("text", rangeMode)} class="hidden" />
                 </div>
             </div>
         </div>

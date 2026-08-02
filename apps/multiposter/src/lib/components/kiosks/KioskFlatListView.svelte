@@ -161,7 +161,7 @@
                     <!-- Flat List Rows -->
                     <div class="divide-y divide-slate-800/60 print:divide-slate-200">
                         {#each group.items as item (item.id)}
-                            {@const isEvent = "startDateTime" in item}
+                            {@const isEvent = "startDateTime" in item || "summary" in item || "startDate" in item}
                             <article class="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid group hover:bg-slate-900/40 print:hover:bg-transparent rounded-xl px-3 transition-colors">
                                 <!-- Date & Time Badge -->
                                 <div class="flex items-center gap-4 shrink-0 min-w-[140px]">
