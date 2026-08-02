@@ -3,12 +3,13 @@ import * as v from 'valibot';
 export interface AllocationCalendar {
     provider: string;
     calendarId: string;
+    name?: string;
 }
 
 export const resourceBaseSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
     description: v.optional(v.string()),
-    type: v.pipe(v.string(), v.minLength(1, 'Resource type is required')),
+    type: v.picklist(['room', 'equipment'], 'Resource type is required'),
     maxOccupancy: v.optional(v.union([v.number(), v.string()])), 
     locationId: v.optional(v.string()),
     inventoryNumber: v.optional(v.string()),

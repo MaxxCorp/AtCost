@@ -45,6 +45,8 @@ export interface ExternalEvent {
 		email: string;
 		displayName?: string;
 		responseStatus?: string;
+		type?: 'required' | 'optional' | 'resource';
+		resourceId?: string;
 	}>;
 	recurrence?: string[];
 	reminders?: {

@@ -7,6 +7,7 @@ import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
 import { readResource } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateResourceSchema } from '$lib/validations/resources';
+import { syncService } from '$lib/server/sync/service';
 
 export const updateResource = form(updateResourceSchema, async (data) => {
     console.log('--- updateResource START ---');
@@ -130,8 +131,9 @@ export const updateResource = form(updateResourceSchema, async (data) => {
         };
 
         readResource(data.id).set(updatedResource);
-        await 
-        await 
+        await listResources().refresh();
+        await listResourcesWithHierarchy().refresh();
+        await syncService.syncResourceConfigChange(user.id, data.id);
 
         console.log('--- updateResource SUCCESS ---');
         return { success: true, resource: updated };

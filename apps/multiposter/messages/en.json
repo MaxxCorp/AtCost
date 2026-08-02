@@ -676,6 +676,22 @@
 	"event_detail": "Event Detail",
 	"qr": "QR",
 	"no_scheduled_events": "No Scheduled Events",
-	"hide_past_events": "Hide past events"
+	"hide_past_events": "Hide past events",
+	"room": "Room",
+	"equipment": "Equipment",
+	"resource_type": "Resource Type",
+	"select_ms_tenant_resource": "Select MS Tenant Resource",
+	"ms_tenant_resources": "Microsoft Tenant Resources",
+	"loading_ms_resources": "Loading tenant resources...",
+	"no_ms_resources_found": "No tenant resources found for this type",
+	"select_resource_type": "Select Resource Type...",
+	"resource_synced_success": "Resource reservation synchronized successfully.",
+	"resource_unlinked_sync_cleaned": "Resource unlinked and external reservation cancelled.",
+	"resource_sync_failed": "Failed to synchronize resource reservation.",
+	"resource_config_updated_resyncing": "Resource configuration updated. Re-syncing affected event reservations...",
+	"available": "Available",
+	"busy_conflict": "Busy / Conflict",
+	"checking_availability": "Checking availability...",
+	"conflict_details": "Conflict with another event or calendar"
 }
 

@@ -20,6 +20,8 @@ const fieldMap = {
     location: 'locationId'
 } as const;
 
+import { syncService } from '$lib/server/sync/service';
+
 export const addResourceAssociation = command(resourceAssociationSchema, async (data) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'resources');
@@ -35,6 +37,10 @@ export const addResourceAssociation = command(resourceAssociationSchema, async (
         itemField: 'resourceId'
     });
     
+    if (type === 'event' && user?.id) {
+        await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'link');
+    }
+
     await fetchEntityResources({ type, entityId }).refresh();
     return { success: true };
 });
@@ -54,6 +60,10 @@ export const removeResourceAssociation = command(resourceAssociationSchema, asyn
         itemField: 'resourceId'
     });
     
+    if (type === 'event' && user?.id) {
+        await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'unlink');
+    }
+
     await fetchEntityResources({ type, entityId }).refresh();
     return { success: true };
 });

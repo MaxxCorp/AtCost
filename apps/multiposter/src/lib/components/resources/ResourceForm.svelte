@@ -38,6 +38,7 @@
     } from "../../../routes/locations/associate.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import { listMsTenantResources } from "../../../routes/resources/list-ms-tenant-resources.remote";
 
     let {
         remoteFunction,
@@ -72,6 +73,7 @@
     });
 
     // Allocation calendars management
+    let resourceType = $state<string>(untrack(() => initialData?.type || "room"));
     let allocationCalendars = $state<AllocationCalendar[]>(untrack(() => initialData?.allocationCalendars || []));
     let newProvider = $state("google-calendar");
     let newCalendarId = $state("");
@@ -81,6 +83,62 @@
     // Sync state from props
     let selectedContactIds = $state<string[]>(untrack(() => initialData?.contactIds || []));
     let selectedLocationIds = $state<string[]>(untrack(() => initialData?.locationIds || []));
+
+    let msResourcesState = $state<{
+        loading: boolean;
+        data: Array<{ id: string; displayName: string; emailAddress: string; type: "room" | "equipment" }>;
+        success?: boolean;
+        configured?: boolean;
+        error?: string;
+        message?: string;
+    }>({ loading: false, data: [] });
+
+    let prevFetchKey = $state<string>("");
+
+    $effect(() => {
+        if (newProvider === "microsoft-calendar") {
+            const fetchKey = `${newProvider}:${resourceType}`;
+            if (prevFetchKey !== fetchKey) {
+                prevFetchKey = fetchKey;
+                msResourcesState = { loading: true, data: [] };
+
+                listMsTenantResources({ type: resourceType })
+                    .then((res) => {
+                        if (prevFetchKey !== fetchKey) return;
+                        msResourcesState = {
+                            loading: false,
+                            data: res?.data || [],
+                            success: res?.success,
+                            configured: res?.configured,
+                            error: res?.error,
+                            message: res?.message,
+                        };
+
+                        if (res?.success === false && res?.error) {
+                            toast.error(res.error);
+                        } else if (res?.configured === false && res?.message) {
+                            toast.warning(res.message);
+                        } else if (res?.success && (!res?.data || res.data.length === 0)) {
+                            toast.info(m.no_ms_resources_found());
+                        }
+                    })
+                    .catch((err) => {
+                        if (prevFetchKey !== fetchKey) return;
+                        const errorMsg = err?.message || m.something_went_wrong();
+                        msResourcesState = {
+                            loading: false,
+                            data: [],
+                            success: false,
+                            error: errorMsg,
+                        };
+                        toast.error(errorMsg);
+                    });
+            }
+        } else {
+            prevFetchKey = "";
+        }
+    });
+
     function addAllocationCalendar() {
         if (newCalendarId.trim()) {
             allocationCalendars = [
@@ -113,6 +171,9 @@
                     return;
                 }
                 toast.success(m.successfully_saved());
+                if (isUpdating) {
+                    toast.info(m.resource_config_updated_resyncing());
+                }
                 if (onSuccess) {
                     onSuccess(result);
                 } else {
@@ -144,15 +205,19 @@
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{m.direction()}</span>
-        <input
-            {...rf.fields.type.as("text", initialData?.type ?? "")}
+        <span class="text-sm font-medium text-gray-700 mb-2">{m.resource_type()}</span>
+        <select
+            {...rf.fields.type.as("select", resourceType)}
+            bind:value={resourceType}
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.type.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            placeholder={m.resource_type_placeholder()}
+            onchange={() => rf.validate()}
             onblur={() => rf.validate()}
-        />
+        >
+            <option value="room">{m.room()}</option>
+            <option value="equipment">{m.equipment()}</option>
+        </select>
         {#each rf.fields.type.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
@@ -393,33 +458,71 @@
             </div>
         {/if}
 
-        <div class="flex gap-2">
-            <select
-                bind:value={newProvider}
-                class="px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-                <option value="google-calendar">{m.google_calendar()}</option>
-                <option value="microsoft-calendar">{m.microsoft_calendar()}</option>
-            </select>
-            <input
-                type="text"
-                bind:value={newCalendarId}
-                placeholder={m.calendar_id()}
-                class="flex-1 px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                onkeydown={(e) => {
-                    if (e.key === "Enter") {
-                        e.preventDefault();
-                        addAllocationCalendar();
-                    }
-                }}
-            />
-            <button
-                type="button"
-                onclick={addAllocationCalendar}
-                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-                {m.add()}
-            </button>
+        <div class="flex flex-col gap-2">
+            <div class="flex gap-2">
+                <select
+                    bind:value={newProvider}
+                    class="px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                >
+                    <option value="google-calendar">{m.google_calendar()}</option>
+                    <option value="microsoft-calendar">{m.microsoft_calendar()}</option>
+                </select>
+
+                {#if newProvider === "microsoft-calendar"}
+                    {#if msResourcesState.loading}
+                        <span class="text-xs text-gray-500 self-center">{m.loading_ms_resources()}</span>
+                    {:else if msResourcesState.success === false}
+                        <div class="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-900 flex-1 flex items-center gap-1.5">
+                            <span>{msResourcesState.error || m.something_went_wrong()}</span>
+                        </div>
+                    {:else if msResourcesState.configured === false}
+                        <div class="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-900 flex-1 flex items-center gap-1.5">
+                            <span>{msResourcesState.message}</span>
+                        </div>
+                    {:else if msResourcesState.data && msResourcesState.data.length > 0}
+                        <select
+                            class="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            onchange={(e) => {
+                                const val = (e.target as HTMLSelectElement).value;
+                                if (val) newCalendarId = val;
+                            }}
+                        >
+                            <option value="">-- {m.select_ms_tenant_resource()} --</option>
+                            {#each msResourcesState.data as tenantItem}
+                                <option value={tenantItem.emailAddress || tenantItem.id}>
+                                    {tenantItem.displayName} ({tenantItem.emailAddress || tenantItem.id})
+                                </option>
+                            {/each}
+                        </select>
+                    {:else}
+                        <div class="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-900 flex-1 flex items-center gap-1.5">
+                            <span>{m.no_ms_resources_found()}</span>
+                        </div>
+                    {/if}
+                {/if}
+            </div>
+
+            <div class="flex gap-2">
+                <input
+                    type="text"
+                    bind:value={newCalendarId}
+                    placeholder={m.calendar_id()}
+                    class="flex-1 px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onkeydown={(e) => {
+                        if (e.key === "Enter") {
+                            e.preventDefault();
+                            addAllocationCalendar();
+                        }
+                    }}
+                />
+                <button
+                    type="button"
+                    onclick={addAllocationCalendar}
+                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                    {m.add()}
+                </button>
+            </div>
         </div>
 
         <input

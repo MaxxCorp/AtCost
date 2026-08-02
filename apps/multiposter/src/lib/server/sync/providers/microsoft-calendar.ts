@@ -437,7 +437,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 					address: a.email,
 					name: a.displayName
 				},
-				type: 'required'
+				type: a.type || 'required'
 			}));
 		}
 

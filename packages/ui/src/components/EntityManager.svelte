@@ -570,7 +570,12 @@
             {/if}
 
             <div class={["max-h-64 overflow-y-auto space-y-1 p-1 transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
-                {#await selectorListPromise then res}
+                {#await selectorListPromise}
+                    <div class="flex items-center justify-center py-8 text-gray-500 gap-2 font-medium text-sm">
+                        <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
+                        <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                    </div>
+                {:then res}
                     {@const allItems = normalize(res).data}
                     {@const sortedAllItems = sortItemsList(allItems, effectiveSortField, effectiveSortOrder)}
                     {@const filteredItems = searchQuery
@@ -588,7 +593,12 @@
                             {searchQuery ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
                         </div>
                     {:else}
-                        {#await associationsPromise then ares}
+                        {#await associationsPromise}
+                            <div class="flex items-center justify-center py-8 text-gray-500 gap-2 font-medium text-sm">
+                                <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
+                                <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                            </div>
+                        {:then ares}
                             {@const currentAssociations = normalize(ares).data}
                             {#each filteredItems as item (item.id)}
                                 {@const isLinked = isAssociated(item, currentAssociations)}
@@ -706,7 +716,12 @@
             </div>
         {/if}
         <div class={$effect.pending() ? 'opacity-50 pointer-events-none transition-opacity duration-200' : 'transition-opacity duration-200'}>
-            {#await associationsPromise then res}
+            {#await associationsPromise}
+                <div class="flex items-center justify-center py-6 text-gray-500 gap-2 font-medium text-sm">
+                    <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
+                    <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                </div>
+            {:then res}
                 {@const { data: rawAssociations } = normalize(res)}
                 {@const currentAssociations = sortItemsList(rawAssociations, effectiveSortField, effectiveSortOrder)}
                 {@const items = searchQuery

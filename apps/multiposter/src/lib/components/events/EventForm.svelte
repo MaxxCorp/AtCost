@@ -63,6 +63,7 @@
         MapPin,
         Tag as TagIcon,
         Database,
+        Loader2,
     } from "@lucide/svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -289,6 +290,8 @@
         rf.fields.reminders.overrides.value() ?? [],
     );
 
+    import { checkEventAvailability } from "../../../routes/events/availability/check.remote";
+
     let isTicketPriceUnknown = $derived(
         rf.fields.ticketPriceUnknown.value() !== undefined
             ? (rf.fields.ticketPriceUnknown.value() === true ||
@@ -296,6 +299,67 @@
                rf.fields.ticketPriceUnknown.value() === "on")
             : (initialData?.id ? !!initialData.ticketPriceUnknown : true),
     );
+
+    let resourceAvailability = $state<Record<string, { available: boolean; reason?: string }>>({});
+    let contactAvailability = $state<Record<string, { available: boolean; reason?: string }>>({});
+    let availabilityLoading = $state(false);
+
+    function hasAllocationCalendars(resItem: any): boolean {
+        if (!resItem || !resItem.allocationCalendars) return false;
+        let cals = resItem.allocationCalendars;
+        if (typeof cals === 'string') {
+            try { cals = JSON.parse(cals); } catch { return false; }
+        }
+        return Array.isArray(cals) && cals.length > 0;
+    }
+
+    const currentStartDateVal = $derived(rf.fields.startDate.value() || startParsed.date || localNow.date);
+    const currentStartTimeVal = $derived(rf.fields.startTime.value() || startParsed.time || localNow.time);
+    const currentEndDateVal = $derived(rf.fields.endDate.value() || initialEnd.date || currentStartDateVal);
+    const currentEndTimeVal = $derived(rf.fields.endTime.value() || initialEnd.time || currentStartTimeVal);
+
+    const activeStartIso = $derived.by(() => {
+        if (!currentStartDateVal) return '';
+        const timeStr = isAllDay ? '00:00:00' : `${currentStartTimeVal || '00:00'}:00`;
+        const d = new Date(`${currentStartDateVal}T${timeStr}`);
+        return isNaN(d.getTime()) ? '' : d.toISOString();
+    });
+
+    const activeEndIso = $derived.by(() => {
+        if (!currentEndDateVal) return '';
+        const timeStr = isAllDay ? '23:59:59' : `${currentEndTimeVal || '23:59'}:00`;
+        const d = new Date(`${currentEndDateVal}T${timeStr}`);
+        return isNaN(d.getTime()) ? '' : d.toISOString();
+    });
+
+    let lastQueryKey = $state('');
+
+    $effect(() => {
+        const startIso = activeStartIso;
+        const endIso = activeEndIso;
+        const queryKey = `${startIso}_${endIso}_${initialData?.id || 'new'}`;
+
+        if (!startIso || !endIso || queryKey === lastQueryKey) return;
+        lastQueryKey = queryKey;
+
+        untrack(() => {
+            availabilityLoading = true;
+            checkEventAvailability({
+                startDateTime: startIso,
+                endDateTime: endIso,
+                eventId: initialData?.id
+            }).then((res) => {
+                if (res) {
+                    resourceAvailability = res.resourceAvailability || {};
+                    contactAvailability = res.contactAvailability || {};
+                }
+                availabilityLoading = false;
+            }).catch((err) => {
+                console.error('[EventForm] availability error:', err);
+                availabilityLoading = false;
+            });
+        });
+    });
 </script>
 
 <datalist id="timezones">
@@ -358,6 +422,170 @@
             <option value="cancelled">{m.cancelled()}</option>
         </select>
     </div>
+
+    <div class="border-t pt-4 space-y-4">
+        <h2 class="text-xl font-semibold mb-4 border-b pb-2">
+            {m.date_and_time()}
+        </h2>
+
+        <div class="flex items-center gap-2">
+            <input
+                {...rf.fields.isAllDay.as(
+                    "checkbox",
+                    initialData?.isAllDay ?? false,
+                )}
+                id="isAllDay"
+                class="w-4 h-4 text-blue-600"
+            />
+            <label for="isAllDay" class="text-sm font-medium text-gray-700"
+                >{m.all_day_event()}</label
+            >
+        </div>
+
+        <div class="grid grid-cols-1 gap-6">
+            <!-- Start Block -->
+            <div class="space-y-4">
+                <div>
+                    <label
+                        for="startDate"
+                        class="block text-sm font-medium text-gray-700 mb-1"
+                        >{m.start_date()}
+                        <span class="text-red-500">*</span></label
+                    >
+                    <input
+                        {...rf.fields.startDate.as(
+                            "date",
+                            startParsed.date || localNow.date,
+                        )}
+                        required
+                        oninput={(e) => updateEndDateTime(e, true)}
+                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                    />
+                </div>
+                {#if !isAllDay}
+                    <div>
+                        <label
+                            for="startTime"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >{m.start_time()}
+                            <span class="text-red-500">*</span></label
+                        >
+                        <input
+                            {...rf.fields.startTime.as(
+                                "time",
+                                startParsed.time || localNow.time,
+                            )}
+                            required
+                            oninput={(e) => updateEndDateTime(e, false)}
+                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                        />
+                    </div>
+                {/if}
+                <div>
+                    <label
+                        for="startTimeZone"
+                        class="block text-sm font-medium text-gray-700 mb-1"
+                        >{m.timezone()}</label
+                    >
+                    <input
+                        {...rf.fields.startTimeZone.as(
+                            "text",
+                            initialData?.startTimeZone || browserTimezone,
+                        )}
+                        list="timezones"
+                        placeholder={browserTimezone}
+                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                    />
+                </div>
+            </div>
+
+            <!-- End Block -->
+            <div class="space-y-4">
+                <div>
+                    <label
+                        for="endDate"
+                        class="block text-sm font-medium text-gray-700 mb-1"
+                        >{m.end_date()}
+                        <span class="text-red-500">*</span></label
+                    >
+                    <input
+                        {...rf.fields.endDate.as("date", initialEnd.date)}
+                        placeholder={rf.fields.startDate.value()}
+                        required
+                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                    />
+                </div>
+                {#if !isAllDay}
+                    <div>
+                        <label
+                            for="endTime"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >{m.end_time()}
+                            <span class="text-red-500">*</span></label
+                        >
+                        <input
+                            {...rf.fields.endTime.as("time", initialEnd.time)}
+                            placeholder={getDefaultEndTime(rf)}
+                            required
+                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                        />
+                    </div>
+                {/if}
+                <div>
+                    <label
+                        for="endTimeZone"
+                        class="block text-sm font-medium text-gray-700 mb-1"
+                        >{m.end_time()} {m.timezone()}</label
+                    >
+                    <input
+                        {...rf.fields.endTimeZone.as(
+                            "text",
+                            initialData?.endTimeZone ||
+                                initialData?.startTimeZone ||
+                                browserTimezone,
+                        )}
+                        list="timezones"
+                        placeholder={rf.fields.startTimeZone.value()}
+                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Recurrence Button -->
+        <div class="pt-4 border-t flex flex-wrap items-center justify-between gap-4">
+            <button
+                type="button"
+                class="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+                onclick={() => (showRecurrenceDialog = true)}
+            >
+                <RefreshCw size={16} />
+                <span class="text-left">{recurrenceText}</span>
+            </button>
+
+            {#if initialData?.recurringEventId}
+                <a href={`/events/${initialData.recurringEventId}`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
+                    {m.view_series()}
+                </a>
+            {:else if initialData?.seriesId && !initialData?.recurringEventId && initialData?.recurrence && initialData.recurrence.length > 0}
+                <a href={`/events/${initialData.id}/view`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
+                    {m.instances()}
+                </a>
+            {/if}
+        </div>
+    </div>
+
+    <RecurrenceDialog
+        bind:open={showRecurrenceDialog}
+        value={rf.fields.recurrence.value() ?? initialData?.recurrence?.[0] ?? ""}
+        onchange={(val) => rf.fields.recurrence.set(val)}
+    />
+    {#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
+        <input
+            {...rf.fields.recurrence.as("text", initialData?.recurrence?.[0] ?? "")}
+            class="hidden"
+        />
+    {/if}
 
     <div>
         <ImageUploader
@@ -504,10 +732,18 @@
                 entityId={initialData?.id}
                 listItemsRemote={listResourcesWithHierarchy as any}
                 fetchAssociationsRemote={fetchEntityResources as any}
-                addAssociationRemote={async (p: any) =>
-                    addResourceAssociation({ ...p, resourceId: p.itemId } as any)}
-                removeAssociationRemote={async (p: any) =>
-                    removeResourceAssociation({ ...p, resourceId: p.itemId } as any)}
+                addAssociationRemote={async (p: any) => {
+                    const res = await addResourceAssociation({ ...p, resourceId: p.itemId } as any);
+                    if (res?.success) toast.success(m.resource_synced_success());
+                    else toast.error(m.resource_sync_failed());
+                    return res;
+                }}
+                removeAssociationRemote={async (p: any) => {
+                    const res = await removeResourceAssociation({ ...p, resourceId: p.itemId } as any);
+                    if (res?.success) toast.success(m.resource_unlinked_sync_cleaned());
+                    else toast.error(m.resource_sync_failed());
+                    return res;
+                }}
                 onchange={(ids: string[]) =>
                     rf.fields.resourceIds.set(JSON.stringify(ids))}
                 deleteItemRemote={async (ids: string[]) => {
@@ -556,14 +792,32 @@
                 selectAllLabel={m.select_all()}
                 deselectAllLabel={m.deselect_all()}
             >
-                {#snippet renderItemLabel(resource: any)}
-                    <span style="padding-left: {resource.level * 12}px">
-                        {resource.name}
-                        <span class="text-xs text-gray-500 font-normal ml-2">
-                            ({resource.type === "room"
+                {#snippet renderItemLabel(resItem: any)}
+                    {@const hasSyncs = hasAllocationCalendars(resItem)}
+                    <span style="padding-left: {(resItem.level || 0) * 12}px" class="inline-flex items-center gap-2 flex-wrap">
+                        <span>{resItem.name}</span>
+                        <span class="text-xs text-gray-500 font-normal">
+                            ({resItem.type === "room"
                                 ? m.room_type_suffix()
                                 : m.equipment_type_suffix()})
                         </span>
+                        {#if hasSyncs}
+                            {@const avail = resourceAvailability[resItem.id]}
+                            {#if availabilityLoading && !avail}
+                                <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-100">
+                                    <Loader2 size={12} class="animate-spin text-blue-600" />
+                                    {m.checking_availability()}
+                                </span>
+                            {:else if avail && !avail.available}
+                                <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium" title={avail.reason || m.conflict_details()}>
+                                    🔴 {m.busy_conflict()}
+                                </span>
+                            {:else}
+                                <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium" title={m.available()}>
+                                    🟢 {m.available()}
+                                </span>
+                            {/if}
+                        {/if}
                     </span>
                 {/snippet}
                 {#snippet renderForm({
@@ -815,169 +1069,7 @@
     </div>
 </div>
 
-<div class="bg-white shadow rounded-lg p-6 space-y-4">
-    <h2 class="text-xl font-semibold mb-4 border-b pb-2">
-        {m.date_and_time()}
-    </h2>
 
-    <div class="flex items-center gap-2">
-        <input
-            {...rf.fields.isAllDay.as(
-                "checkbox",
-                initialData?.isAllDay ?? false,
-            )}
-            id="isAllDay"
-            class="w-4 h-4 text-blue-600"
-        />
-        <label for="isAllDay" class="text-sm font-medium text-gray-700"
-            >{m.all_day_event()}</label
-        >
-    </div>
-
-    <div class="grid grid-cols-1 gap-6">
-        <!-- Start Block -->
-        <div class="space-y-4">
-            <div>
-                <label
-                    for="startDate"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                    >{m.start_date()}
-                    <span class="text-red-500">*</span></label
-                >
-                <input
-                    {...rf.fields.startDate.as(
-                        "date",
-                        startParsed.date || localNow.date,
-                    )}
-                    required
-                    oninput={(e) => updateEndDateTime(e, true)}
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                />
-            </div>
-            {#if !isAllDay}
-                <div>
-                    <label
-                        for="startTime"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >{m.start_time()}
-                        <span class="text-red-500">*</span></label
-                    >
-                    <input
-                        {...rf.fields.startTime.as(
-                            "time",
-                            startParsed.time || localNow.time,
-                        )}
-                        required
-                        oninput={(e) => updateEndDateTime(e, false)}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    />
-                </div>
-            {/if}
-            <div>
-                <label
-                    for="startTimeZone"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                    >{m.timezone()}</label
-                >
-                <input
-                    {...rf.fields.startTimeZone.as(
-                        "text",
-                        initialData?.startTimeZone || browserTimezone,
-                    )}
-                    list="timezones"
-                    placeholder={browserTimezone}
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                />
-            </div>
-        </div>
-
-        <!-- End Block -->
-        <div class="space-y-4">
-            <div>
-                <label
-                    for="endDate"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                    >{m.end_date()}
-                    <span class="text-red-500">*</span></label
-                >
-                <input
-                    {...rf.fields.endDate.as("date", initialEnd.date)}
-                    placeholder={rf.fields.startDate.value()}
-                    required
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                />
-            </div>
-            {#if !isAllDay}
-                <div>
-                    <label
-                        for="endTime"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >{m.end_time()}
-                        <span class="text-red-500">*</span></label
-                    >
-                    <input
-                        {...rf.fields.endTime.as("time", initialEnd.time)}
-                        placeholder={getDefaultEndTime(rf)}
-                        required
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    />
-                </div>
-            {/if}
-            <div>
-                <label
-                    for="endTimeZone"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                    >{m.end_time()} {m.timezone()}</label
-                >
-                <input
-                    {...rf.fields.endTimeZone.as(
-                        "text",
-                        initialData?.endTimeZone ||
-                            initialData?.startTimeZone ||
-                            browserTimezone,
-                    )}
-                    list="timezones"
-                    placeholder={rf.fields.startTimeZone.value()}
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                />
-            </div>
-        </div>
-    </div>
-
-    <!-- Recurrence Button -->
-    <div class="pt-4 border-t flex flex-wrap items-center justify-between gap-4">
-        <button
-            type="button"
-            class="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
-            onclick={() => (showRecurrenceDialog = true)}
-        >
-            <RefreshCw size={16} />
-            <span class="text-left">{recurrenceText}</span>
-        </button>
-
-        {#if initialData?.recurringEventId}
-            <a href={`/events/${initialData.recurringEventId}`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
-                {m.view_series()}
-            </a>
-        {:else if initialData?.seriesId && !initialData?.recurringEventId && initialData?.recurrence && initialData.recurrence.length > 0}
-            <a href={`/events/${initialData.id}/view`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
-                {m.instances()}
-            </a>
-        {/if}
-    </div>
-</div>
-
-<RecurrenceDialog
-    bind:open={showRecurrenceDialog}
-    value={rf.fields.recurrence.value() ?? initialData?.recurrence?.[0] ?? ""}
-    onchange={(val) => rf.fields.recurrence.set(val)}
-/>
-{#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
-    <input
-        {...rf.fields.recurrence.as("text", initialData?.recurrence?.[0] ?? "")}
-        class="hidden"
-    />
-{/if}
 
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
     <h2 class="text-xl font-semibold mb-4 border-b pb-2">
@@ -1153,11 +1245,36 @@
         deselectAllLabel={m.deselect_all()}
         confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
     >
-        {#snippet renderItemLabel(contact: any)}
-            {contact.displayName ||
-                `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
-                contact.company ||
+        {#snippet renderItemLabel(contactItem: any)}
+            {@const contactName = contactItem.displayName ||
+                `${contactItem.givenName || ""} ${contactItem.familyName || ""}`.trim() ||
+                contactItem.company ||
                 m.unnamed_contact()}
+            {@const contactTags = contactItem.tags || []}
+            {@const isEmployee = contactTags.some((ct: any) => {
+                const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
+                return tagName === 'employee' || tagName === 'employees';
+            })}
+            <span class="inline-flex items-center gap-2 flex-wrap">
+                <span>{contactName}</span>
+                {#if isEmployee}
+                    {@const avail = contactAvailability[contactItem.id]}
+                    {#if availabilityLoading && !avail}
+                        <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-100">
+                            <Loader2 size={12} class="animate-spin text-blue-600" />
+                            {m.checking_availability()}
+                        </span>
+                    {:else if avail && !avail.available}
+                        <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium" title={avail.reason || m.conflict_details()}>
+                            🔴 {m.busy_conflict()}
+                        </span>
+                    {:else}
+                        <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium" title={m.available()}>
+                            🟢 {m.available()}
+                        </span>
+                    {/if}
+                {/if}
+            </span>
         {/snippet}
 
         {#snippet participationSnippet(contact: any)}

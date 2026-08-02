@@ -27,7 +27,9 @@ import {
 	eventTag as eventTag,
 	recurringSeries as recurringSeries,
 	campaign as campaignTable,
-	emailCampaign as emailCampaignTable
+	emailCampaign as emailCampaignTable,
+	eventResource as eventResourceTable,
+	resource as resourceTable
 } from '@ac/db';
 import { getEntityContacts } from '../contacts';
 import { resolveEventContact } from '../contact-resolution';
@@ -935,7 +937,7 @@ export class SyncService {
 		const associatedContacts = await getEntityContacts(entityType, internal.id);
 
 		// Filter out contacts with "Employee" tag
-		const attendees = [];
+		const attendees: NonNullable<ExternalEvent['attendees']> = [];
 		for (const contact of associatedContacts) {
 			const contactTags = (contact as any).tags || [];
 			const isEmployee = contactTags.some((ct: any) => {
@@ -969,6 +971,37 @@ export class SyncService {
 						displayName: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
 						responseStatus: participationStatus || 'needsAction'
 					});
+				}
+			}
+		}
+
+		// Resolve Attached Resources
+		if (isEvent) {
+			const linkedResources = await db
+				.select({ resource: resourceTable })
+				.from(eventResourceTable)
+				.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
+				.where(eq(eventResourceTable.eventId, internal.id));
+
+			for (const { resource: res } of linkedResources) {
+				let calendars: any[] = [];
+				if (typeof res.allocationCalendars === 'string') {
+					try { calendars = JSON.parse(res.allocationCalendars); } catch { calendars = []; }
+				} else if (Array.isArray(res.allocationCalendars)) {
+					calendars = res.allocationCalendars;
+				}
+
+				for (const cal of calendars) {
+					const email = cal.calendarId || cal.email;
+					if (email && typeof email === 'string' && email.includes('@')) {
+						attendees.push({
+							email: email,
+							displayName: res.name || cal.name || 'Resource',
+							responseStatus: 'accepted',
+							type: 'resource',
+							resourceId: res.id
+						});
+					}
 				}
 			}
 		}
@@ -1497,6 +1530,55 @@ export class SyncService {
 		} catch (error: any) {
 			console.error(`[SyncService] Error in deleteEventMappings:`, error);
 			// Don't throw - sync failures shouldn't break delete operations
+		}
+	}
+
+	/**
+	 * Triggered when a resource association to an event changes (link or unlink).
+	 */
+	async syncResourceAssociationsChange(
+		userId: string,
+		eventId: string,
+		resourceId: string,
+		action: 'link' | 'unlink'
+	): Promise<void> {
+		try {
+			if (action === 'unlink') {
+				// Remove specific sync_mapping records for this event + resource
+				await db
+					.delete(syncMappingTable)
+					.where(
+						and(
+							eq(syncMappingTable.eventId, eventId),
+							eq(syncMappingTable.resourceId, resourceId)
+						)
+					);
+			}
+			// Trigger re-sync of the event so external calendar events update (adding or removing room attendee)
+			await this.syncItems(userId, [eventId], 'event');
+		} catch (err) {
+			console.error(`[SyncService] Failed to sync resource association change (${action}) for event ${eventId}:`, err);
+		}
+	}
+
+	/**
+	 * Triggered when a resource's allocation configuration or resource entity itself changes.
+	 */
+	async syncResourceConfigChange(userId: string, resourceId: string): Promise<void> {
+		try {
+			// Find all events associated with this resource
+			const linkedEvents = await db
+				.select({ eventId: eventResourceTable.eventId })
+				.from(eventResourceTable)
+				.where(eq(eventResourceTable.resourceId, resourceId));
+
+			const eventIds = Array.from(new Set(linkedEvents.map(e => e.eventId)));
+			if (eventIds.length > 0) {
+				console.log(`[SyncService] Re-syncing ${eventIds.length} events affected by resource ${resourceId} configuration change.`);
+				await this.syncItems(userId, eventIds, 'event');
+			}
+		} catch (err) {
+			console.error(`[SyncService] Failed to sync resource config change for resource ${resourceId}:`, err);
 		}
 	}
 
