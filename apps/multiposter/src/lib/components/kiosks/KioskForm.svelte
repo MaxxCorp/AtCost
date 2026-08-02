@@ -358,19 +358,15 @@
                         >{m.visualization()}</label
                     >
                     <select
-                        name="uiMode"
-                        value={uiMode}
-                        onchange={(e) => {
-                            uiMode = e.currentTarget.value;
-                            rf.validate();
-                        }}
+                        {...rf.fields.uiMode.as("select", uiMode)}
+                        bind:value={uiMode}
+                        onchange={() => rf.validate()}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="carousel">{m.carousel_full_screen()}</option>
                         <option value="table">{m.table_view_list()}</option>
                         <option value="flat_list">{m.flat_list_print_export()}</option>
                     </select>
-                    <input {...rf.fields.uiMode.as("text", uiMode)} class="hidden" />
                 </div>
 
                 <div class="space-y-2">
@@ -380,18 +376,14 @@
                         >{m.time_range_mode()}</label
                     >
                     <select
-                        name="rangeMode"
-                        value={rangeMode}
-                        onchange={(e) => {
-                            rangeMode = e.currentTarget.value as any;
-                            rf.validate();
-                        }}
+                        {...rf.fields.rangeMode.as("select", rangeMode)}
+                        bind:value={rangeMode}
+                        onchange={() => rf.validate()}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="rolling">{m.rolling_window()}</option>
                         <option value="fixed">{m.fixed_date_range()}</option>
                     </select>
-                    <input {...rf.fields.rangeMode.as("text", rangeMode)} class="hidden" />
                 </div>
             </div>
         </div>
