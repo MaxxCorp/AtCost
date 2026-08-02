@@ -210,11 +210,14 @@
 
                                     <!-- Room & Recurrence info -->
                                     {#if isEvent}
+                                        {@const roomText = typeof (item as any).roomTitle === 'object'
+                                            ? ((item as any).roomTitle?.name || (item as any).roomTitle?.title || (item as any).roomTitle?.roomId || '')
+                                            : ((item as any).roomTitle || '')}
                                         <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 print:text-slate-600">
-                                            {#if (item as any).roomTitle}
+                                            {#if roomText}
                                                 <span class="inline-flex items-center gap-1 font-medium text-blue-300 print:text-slate-800">
                                                     <MapPin class="w-3.5 h-3.5" />
-                                                    {(item as any).roomTitle}
+                                                    {roomText}
                                                 </span>
                                             {/if}
                                             {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}

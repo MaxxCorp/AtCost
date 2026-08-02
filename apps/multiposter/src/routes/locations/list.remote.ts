@@ -32,6 +32,22 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
             const { eventLocation } = await import('@ac/db');
             baseQuery = baseQuery.innerJoin(eventLocation, eq(location.id, eventLocation.locationId)) as any;
             conditions.push(eq(eventLocation.eventId, associatedWith.id));
+        } else if (associatedWith.type === 'contact') {
+            const { locationContact } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(locationContact, eq(location.id, locationContact.locationId)) as any;
+            conditions.push(eq(locationContact.contactId, associatedWith.id));
+        } else if (associatedWith.type === 'resource') {
+            const { resourceLocation } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(resourceLocation, eq(location.id, resourceLocation.locationId)) as any;
+            conditions.push(eq(resourceLocation.resourceId, associatedWith.id));
+        } else if (associatedWith.type === 'kiosk') {
+            const { kioskLocation } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(kioskLocation, eq(location.id, kioskLocation.locationId)) as any;
+            conditions.push(eq(kioskLocation.kioskId, associatedWith.id));
+        } else if (associatedWith.type === 'announcement') {
+            const { announcementLocation } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(announcementLocation, eq(location.id, announcementLocation.locationId)) as any;
+            conditions.push(eq(announcementLocation.announcementId, associatedWith.id));
         }
     }
 
@@ -65,7 +81,7 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	}
 
     let orderField: any = location.updatedAt;
-	if (sortField === 'name') orderField = location.name;
+	if (sortField === 'name' || sortField === 'displayName') orderField = location.name;
 	else if (sortField === 'createdAt') orderField = location.createdAt;
 
 	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;

@@ -48,7 +48,7 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
     const total = Number(countResult[0]?.count || 0);
 
     let orderField: any = resource.updatedAt;
-	if (sortField === 'name') orderField = resource.name;
+	if (sortField === 'name' || sortField === 'displayName') orderField = resource.name;
 	else if (sortField === 'createdAt') orderField = resource.createdAt;
 
 	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;

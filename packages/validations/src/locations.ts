@@ -49,7 +49,7 @@ export const LocationPaginationSchema = v.optional(v.object({
         type: v.string(),
         id: v.string()
     })),
-    sortField: v.optional(v.union([v.literal('updatedAt'), v.literal('createdAt'), v.literal('name')])),
+    sortField: v.optional(v.union([v.literal('updatedAt'), v.literal('createdAt'), v.literal('name'), v.literal('displayName')])),
 	sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});
 

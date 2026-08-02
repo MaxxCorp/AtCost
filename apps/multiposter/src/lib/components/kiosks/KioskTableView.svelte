@@ -180,6 +180,9 @@
                 <tbody>
                     {#key currentPage}
                         {#each currentPageData.items as item, i}
+                            {@const roomText = typeof (item as any).roomTitle === 'object'
+                                ? ((item as any).roomTitle?.name || (item as any).roomTitle?.title || (item as any).roomTitle?.roomId || '')
+                                : ((item as any).roomTitle || '')}
                             <tr 
                                 class="border-b border-gray-900/30 hover:bg-blue-500/5 transition-all duration-300 h-[12vh] min-h-[100px]"
                                 in:fly={{ x: 20, duration: 600, delay: i * 80 }}
@@ -198,10 +201,10 @@
                                             {/if}
                                             <span class={(item as any).status === 'cancelled' ? 'line-through opacity-50 text-gray-500' : ''}>{item.summary || m.untitled_event().toUpperCase()}</span>
                                         </div>
-                                        {#if (item as any).roomTitle}
+                                        {#if roomText}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-800 rounded-md text-blue-300 text-base font-bold">
                                                 <div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                                                {(item as any).roomTitle}
+                                                {roomText}
                                             </div>
                                         {/if}
                                         {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}

@@ -236,7 +236,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					location: true
 				}
 			},
-			resources: true,
+			resources: {
+				with: {
+					resource: true
+				}
+			},
 			tags: {
 				with: {
 					tag: true
@@ -284,6 +288,28 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		});
 	}
 
-	return { data: results, total };
+	const data = results.map((e: any) => {
+		const evtLocations = e.locations?.map((l: any) => l.location).filter(Boolean) || [];
+		const evtResources = e.resources?.map((r: any) => r.resource).filter(Boolean) || [];
+		const roomResource = evtResources.find((r: any) => r?.type === 'room');
+		const primaryLoc = evtLocations[0];
+		
+		const roomTitle: string | null = roomResource?.name || primaryLoc?.roomId || primaryLoc?.name || null;
+
+		return {
+			...e,
+			startDateTime: e.startDateTime ? e.startDateTime.toISOString() : null,
+			endDateTime: e.endDateTime ? e.endDateTime.toISOString() : null,
+			createdAt: e.createdAt ? e.createdAt.toISOString() : null,
+			updatedAt: e.updatedAt ? e.updatedAt.toISOString() : null,
+			locations: evtLocations,
+			locationIds: evtLocations.map((l: any) => l.id),
+			resourceIds: evtResources.map((r: any) => r.id),
+			tags: e.tags?.map((t: any) => t.tag || t).filter(Boolean) || [],
+			roomTitle
+		};
+	});
+
+	return { data, total };
 });
 
