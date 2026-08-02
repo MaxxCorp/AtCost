@@ -368,6 +368,7 @@
                     >
                         <option value="carousel">{m.carousel_full_screen()}</option>
                         <option value="table">{m.table_view_list()}</option>
+                        <option value="flat_list">{m.flat_list_print_export()}</option>
                     </select>
                 </div>
 

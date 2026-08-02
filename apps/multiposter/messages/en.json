@@ -692,6 +692,12 @@
 	"available": "Available",
 	"busy_conflict": "Busy / Conflict",
 	"checking_availability": "Checking availability...",
-	"conflict_details": "Conflict with another event or calendar"
+	"conflict_details": "Conflict with another event or calendar",
+	"carousel_full_screen": "Carousel (Full Screen)",
+	"table_view_list": "Table View (List)",
+	"flat_list_print_export": "Flat List (Monthly / Print / Export)",
+	"print_export": "Print / Export PDF",
+	"monthly_events_overview": "Monthly Event Overview",
+	"events_for": "Events for {month}"
 }
 

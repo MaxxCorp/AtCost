@@ -6,6 +6,7 @@
     import EventView from "$lib/components/events/EventView.svelte";
     import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
     import KioskTableView from "$lib/components/kiosks/KioskTableView.svelte";
+    import KioskFlatListView from "$lib/components/kiosks/KioskFlatListView.svelte";
     import { type Event, type Announcement } from "@ac/validations";
 
     import { browser } from "$app/environment";
@@ -387,6 +388,8 @@
         </div>
     {:else if kiosk?.uiMode === "table"}
         <KioskTableView {items} {kiosk} />
+    {:else if kiosk?.uiMode === "flat_list"}
+        <KioskFlatListView {items} {kiosk} />
     {:else}
                     <div
                 class="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 overflow-y-auto"

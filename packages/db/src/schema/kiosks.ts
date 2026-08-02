@@ -16,7 +16,7 @@ export const kiosk = pgTable("kiosk", {
     lookAhead: integer("look_ahead").default(604800).notNull(), // 7 days in seconds
     lookPast: integer("look_past").default(86400).notNull(), // 1 day in seconds
     loopDuration: integer("loop_duration").default(30).notNull(),
-    uiMode: text("ui_mode", { enum: ["carousel", "table"] }).default("carousel").notNull(),
+    uiMode: text("ui_mode", { enum: ["carousel", "table", "flat_list"] }).default("carousel").notNull(),
     excludeNonPublic: boolean("exclude_non_public").default(true).notNull(),
     excludeTentative: boolean("exclude_tentative").default(true).notNull(),
     excludeCancelled: boolean("exclude_cancelled").default(false).notNull(),

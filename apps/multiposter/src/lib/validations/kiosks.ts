@@ -29,7 +29,7 @@ export const createKioskSchema = v.object({
         numberCoerce,
         v.minValue(0, 'Look past cannot be negative')
     ), 0),
-    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table')])),
+    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list')])),
     rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
@@ -52,7 +52,7 @@ export const updateKioskSchema = v.object({
     loopDuration: v.optional(v.pipe(numberCoerce, v.minValue(3))),
     lookAheadDays: v.optional(v.pipe(numberCoerce, v.minValue(0))),
     lookPastDays: v.optional(v.pipe(numberCoerce, v.minValue(0))),
-    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table')])),
+    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list')])),
     rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
