@@ -273,7 +273,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 			if (!e.recurringEventId) {
 				// Master or single event
-				if (isSelfFuture) return true;
+				if (isSelfFuture || e.recurrence || e.seriesId) return true;
 				// If master's anchor date is past, check if it has any current/future instances
 				const instances = instancesByMaster.get(e.id) || [];
 				return instances.some((inst: any) => {

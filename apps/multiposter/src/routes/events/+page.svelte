@@ -70,7 +70,7 @@
 	let searchQuery = $state("");
 	let selectedTags = $state<string[]>([]);
 	let selectedLocations = $state<string[]>([]);
-	let excludePast = $state(true);
+	let excludePast = $state(false);
 	let page = $state(1);
 	let limit = $state(50);
 
@@ -121,7 +121,7 @@
 	const locationsQuery = listLocations({ limit: 100 });
 
 	const activeFiltersCount = $derived(
-		selectedTags.length + selectedLocations.length + (!excludePast ? 1 : 0),
+		selectedTags.length + selectedLocations.length + (excludePast ? 1 : 0),
 	);
 
 	function toggleSeries(id: string) {
@@ -343,7 +343,7 @@
 									onclick={() => {
 										selectedTags = [];
 										selectedLocations = [];
-										excludePast = true;
+										excludePast = false;
 										page = 1;
 									}}
 								>
