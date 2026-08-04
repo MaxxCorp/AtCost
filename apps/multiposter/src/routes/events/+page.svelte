@@ -408,12 +408,13 @@
 										<div
 											class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]"
 										>
-											{#each event.tags as t (t.tag?.id || t.tagName)}
-												{#if t.tag}
+											{#each event.tags as t (t.id || t.tag?.id || t.tagName || t.name)}
+												{@const tagObj = t.tag || t}
+												{#if tagObj && tagObj.name}
 													<span
 														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
 													>
-														{t.tag.name}
+														{tagObj.name}
 													</span>
 												{/if}
 											{/each}
@@ -440,13 +441,13 @@
 										class="w-4 h-4 mr-2 text-primary-500 shrink-0"
 									/>
 									<span class="truncate">
-										{#each event.locations as l, i (l.location?.id || i)}
-											{#if l.location}
+										{#each event.locations as l, i (l.id || l.location?.id || i)}
+											{@const locObj = l.location || l}
+											{#if locObj && locObj.name}
 												<a
-													href="/locations/{l.location
-														.id}"
+													href="/locations/{locObj.id}"
 													class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-													>{l.location.name}</a
+													>{locObj.name}</a
 												>{i <
 												event.locations.length - 1
 													? ", "
