@@ -15,7 +15,12 @@ let _connectionString: string | null = null;
  * Should be called during application initialization (e.g. in hooks or auth).
  */
 export function setConnectionString(url: string) {
-    _connectionString = url;
+    const cleanUrl = url ? url.replace(/^"|"$/g, '') : url;
+    if (_connectionString !== cleanUrl) {
+        _connectionString = cleanUrl;
+        process.env.DATABASE_URL = cleanUrl;
+        _db = null;
+    }
 }
 
 function getDb() {

@@ -6,7 +6,11 @@ import { auth } from "$lib/server/auth";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building, dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
-import { db, user, eq } from '@ac/db';
+import { db, user, eq, setConnectionString } from '@ac/db';
+
+if (env.DATABASE_URL) {
+	setConnectionString(env.DATABASE_URL);
+}
 
 const handleWebhook: Handle = async ({ event, resolve }) => {
 	// Microsoft Graph webhooks send POST requests with Content-Type: text/plain during validation challenge.
