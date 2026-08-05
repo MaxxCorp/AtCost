@@ -6,6 +6,7 @@ import { getAuthenticatedUser, ensureAccess, getOptionalUser, hasAccess } from '
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { type Event } from '@ac/validations';
+import { getEventRooms } from '$lib/utils/format-rooms';
 
 /**
  * Query: Read an event by ID
@@ -101,6 +102,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		}));
 	}
 
+	const publicLocations = result.locations.filter(l => l.location.isPublic).map(l => l.location);
+	const publicResources = result.resources.filter(r => r.resource).map(r => r.resource);
+
 	// 4. Return Data
 	if (!isAuthorized) {
 		// Public safe object
@@ -119,16 +123,21 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			categoryBerlinDotDe: result.categoryBerlinDotDe,
 			createdAt: result.createdAt.toISOString(),
 			updatedAt: result.updatedAt.toISOString(),
-			locations: result.locations.filter(l => l.location.isPublic).map(l => l.location),
-			locationIds: result.locations.filter(l => l.location.isPublic).map(l => l.location.id),
+			locations: publicLocations,
+			resources: publicResources,
+			rooms: getEventRooms({ locations: publicLocations, resources: publicResources }),
+			locationIds: publicLocations.map(l => l.id),
+			resourceIds: publicResources.map(r => r.id),
 			tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 			resolvedContact,
-			resourceIds: [],
 			contactIds: [],
 			syncIds: [],
 			instances: instances.length > 0 ? instances : undefined,
 		} as any;
 	}
+
+	const allLocations = result.locations.map(l => l.location);
+	const allResources = result.resources.map(r => r.resource).filter(Boolean);
 
 	// Full object
 	return {
@@ -139,7 +148,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		updatedAt: result.updatedAt.toISOString(),
 		startDateTime: result.startDateTime?.toISOString() ?? null,
 		endDateTime: result.endDateTime?.toISOString() ?? null,
-		locations: result.locations.map(l => l.location),
+		locations: allLocations,
+		resources: allResources,
+		rooms: getEventRooms({ locations: allLocations, resources: allResources }),
 		resourceIds: result.resources.map(r => r.resourceId),
 		contactIds: result.contacts.map(c => c.contactId),
 		locationIds: result.locations.map(l => l.locationId),

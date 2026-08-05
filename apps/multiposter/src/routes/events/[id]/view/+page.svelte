@@ -27,6 +27,7 @@
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { getEventRooms } from "$lib/utils/format-rooms";
 
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import * as Dialog from "$lib/components/ui/dialog";
@@ -409,6 +410,20 @@
                                             </li>
                                         {/each}
                                     {/if}
+
+                                    {#if getEventRooms(event).length > 0}
+                                        <li class="flex items-center gap-2 pl-7">
+                                            {#each getEventRooms(event) as roomName (roomName)}
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200"
+                                                >
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                                    {roomName}
+                                                </span>
+                                            {/each}
+                                        </li>
+                                    {/if}
+
                                     {#if event.categoryBerlinDotDe}
                                         <li
                                             class="flex items-center gap-3 text-gray-700"

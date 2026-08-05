@@ -91,18 +91,16 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
             const loc = kl.location;
             if (!loc) return null;
 
-            const employeeLocContact = loc.locationContacts.find((lc: any) => 
-                lc.contact.tags?.some((t: any) => t.tag.name === 'Employee')
-            ) || loc.locationContacts[0];
-
+            const contactId = loc.locationContacts?.[0]?.contactId || loc.locationContacts?.[0]?.contact?.id;
             let publicContactQrCodePath: string | null = null;
-            if (employeeLocContact?.contact?.id) {
-                publicContactQrCodePath = `/api/contacts/${employeeLocContact.contact.id}/qr.png`;
+            if (contactId) {
+                publicContactQrCodePath = `/api/contacts/${contactId}/qr.png`;
             }
 
             return {
                 id: loc.id,
                 name: loc.name,
+                contactId: contactId || null,
                 publicContactQrCodePath
             };
         }).filter(l => l !== null) as any[];

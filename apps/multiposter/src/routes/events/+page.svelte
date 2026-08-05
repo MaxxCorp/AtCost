@@ -29,6 +29,7 @@
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "$lib/utils/idb";
 	import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+	import { getEventRooms } from "$lib/utils/format-rooms";
 
 	// Simple date formatter function
 	function formatEventTime(event: any): string {
@@ -455,6 +456,19 @@
 											{/if}
 										{/each}
 									</span>
+								</div>
+							{/if}
+
+							{#if getEventRooms(event).length > 0}
+								<div class="flex flex-wrap items-center gap-1.5 mt-2">
+									{#each getEventRooms(event) as roomName (roomName)}
+										<span
+											class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/50"
+										>
+											<span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+											{roomName}
+										</span>
+									{/each}
 								</div>
 							{/if}
 

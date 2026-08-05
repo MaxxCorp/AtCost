@@ -11,6 +11,7 @@ import { generateEventAssets } from '$lib/server/events/assets';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
+import { getEventRooms } from '$lib/utils/format-rooms';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {
@@ -497,13 +498,18 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					};
 				}
 
+				const locs = fullEventData.locations.map(l => l.location);
+				const res = fullEventData.resources.map(r => r.resource).filter(Boolean);
+
 				const transformed = {
 					...fullEventData,
 					createdAt: fullEventData.createdAt.toISOString(),
 					updatedAt: fullEventData.updatedAt.toISOString(),
 					startDateTime: fullEventData.startDateTime?.toISOString() ?? null,
 					endDateTime: fullEventData.endDateTime?.toISOString() ?? null,
-					locations: fullEventData.locations.map(l => l.location),
+					locations: locs,
+					resources: res,
+					rooms: getEventRooms({ locations: locs, resources: res }),
 					resourceIds: fullEventData.resources.map(r => r.resourceId),
 					contactIds: fullEventData.contacts.map(c => c.contactId),
 					locationIds: fullEventData.locations.map(l => l.locationId),
@@ -511,7 +517,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
 					resolvedContact,
 				};
-				readEvent(data.id).set(transformed);
+				readEvent(data.id).set(transformed as any);
 			} else {
 				void readEvent(data.id).refresh();
 			}

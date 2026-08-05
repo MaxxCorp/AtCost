@@ -2,6 +2,7 @@
     import { type Event, type Announcement } from "@ac/validations";
     import { Printer, Calendar, MapPin, RefreshCw, Megaphone } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { getEventRooms } from "$lib/utils/format-rooms";
     import * as m from "$lib/paraglide/messages";
 
     interface LocationInfo {
@@ -210,15 +211,15 @@
 
                                     <!-- Room & Recurrence info -->
                                     {#if isEvent}
-                                        {@const roomText = typeof (item as any).roomTitle === 'object'
-                                            ? ((item as any).roomTitle?.name || (item as any).roomTitle?.title || (item as any).roomTitle?.roomId || '')
-                                            : ((item as any).roomTitle || '')}
+                                        {@const eventRooms = getEventRooms(item)}
                                         <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 print:text-slate-600">
-                                            {#if roomText}
-                                                <span class="inline-flex items-center gap-1 font-medium text-blue-300 print:text-slate-800">
-                                                    <MapPin class="w-3.5 h-3.5" />
-                                                    {roomText}
-                                                </span>
+                                            {#if eventRooms.length > 0}
+                                                {#each eventRooms as roomName (roomName)}
+                                                    <span class="inline-flex items-center gap-1 font-medium text-blue-300 print:text-slate-800">
+                                                        <MapPin class="w-3.5 h-3.5" />
+                                                        {roomName}
+                                                    </span>
+                                                {/each}
                                             {/if}
                                             {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
                                                 <span class="inline-flex items-center gap-1 text-slate-400">

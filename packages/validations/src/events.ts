@@ -16,6 +16,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	locations?: {
 		id: string;
 		name: string;
+		roomId?: string | null;
 		street: string | null;
 		houseNumber: string | null;
 		zip: string | null;
@@ -23,6 +24,13 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 		country: string | null;
 		isPublic: boolean;
 	}[];
+	resources?: {
+		id: string;
+		name: string;
+		type: string;
+		description?: string | null;
+	}[];
+	rooms?: string[];
 	tags?: Tag[];
 	syncIds?: string[];
 	participationStatuses?: Record<string, string>;
