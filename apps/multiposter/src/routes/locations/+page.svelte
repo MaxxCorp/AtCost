@@ -271,6 +271,15 @@
 										minute: "2-digit",
 									}),
 								})}
+								{#if location.user}
+									| <a
+										href="/users/{location.user.id}"
+										class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+										>{location.user.name ||
+											location.user.email ||
+											"User"}</a
+									>
+								{/if}
 							</div>
 						</div>
 						{:else}

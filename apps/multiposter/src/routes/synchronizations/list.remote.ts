@@ -49,10 +49,21 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 
 	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
 
-	const rawResults = await baseQuery
+	const paginatedIdsQuery = baseQuery
 		.orderBy(orderExpression)
 		.limit(limit)
 		.offset(offset);
+	const paginatedIds = (await paginatedIdsQuery).map((r) => r.id);
+
+	if (paginatedIds.length === 0) {
+		return { data: [], total: 0 };
+	}
+
+	const rawResults = await db.query.syncConfig.findMany({
+		where: inArray(syncConfig.id, paginatedIds),
+		with: { user: true },
+		orderBy: [orderExpression]
+	});
 
 	const data = rawResults.map((row) => ({
 		...row,

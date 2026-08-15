@@ -341,15 +341,24 @@
 								</button>
 							</div>
 							<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
-								{contact.createdAt ? m.updated_on({
-									date: new Date(contact.createdAt).toLocaleString([], {
+								{m.updated_on({
+									date: new Date(contact.updatedAt || contact.createdAt || Date.now()).toLocaleString([], {
 										year: "numeric",
 										month: "2-digit",
 										day: "2-digit",
 										hour: "2-digit",
 										minute: "2-digit",
 									}),
-								}) : ''}
+								})}
+								{#if contact.user}
+									| <a
+										href="/users/{contact.user.id}"
+										class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+										>{contact.user.name ||
+											contact.user.email ||
+											"User"}</a
+									>
+								{/if}
 							</div>
 						</div>
 						{:else}

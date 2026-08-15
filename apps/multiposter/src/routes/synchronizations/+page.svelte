@@ -594,6 +594,26 @@
 								</button>
 							{/if}
 						</div>
+						<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
+							{m.updated_on({
+								date: new Date(config.updatedAt).toLocaleString([], {
+									year: "numeric",
+									month: "2-digit",
+									day: "2-digit",
+									hour: "2-digit",
+									minute: "2-digit",
+								}),
+							})}
+							{#if config.user}
+								| <a
+									href="/users/{config.user.id}"
+									class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+									>{config.user.name ||
+										config.user.email ||
+										"User"}</a
+								>
+							{/if}
+						</div>
 					</div>
 				{:else}
 					<div

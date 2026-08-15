@@ -8,6 +8,11 @@ import type { SyncConfig as DbSyncConfig } from '@ac/db';
 export type Synchronization = Omit<DbSyncConfig, 'createdAt' | 'updatedAt'> & {
 	createdAt: string;
 	updatedAt: string;
+	user?: {
+		id: string;
+		name?: string | null;
+		email?: string;
+	} | null;
 };
 
 export const synchronizationPaginationSchema = v.optional(v.object({
