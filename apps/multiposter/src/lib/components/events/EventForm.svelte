@@ -642,10 +642,8 @@
     </div>
 
     <div>
-        <h3
-            class="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2"
-        >
-            <TagIcon size={16} class="text-indigo-500" />
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <TagIcon size={18} class="text-blue-600" />
             {m.tags()}
         </h3>
         {#key initialData?.id || "new"}
@@ -720,9 +718,10 @@
     </div>
 
     <div>
-        <span class="block text-sm font-medium text-gray-700 mb-2"
-            >{m.feature_resources_title()} ({m.optional()})</span
-        >
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <Database size={18} class="text-blue-600" />
+            {m.feature_resources_title()} ({m.optional()})
+        </h3>
         {#key initialData?.id || "new"}
             <EntityManager {m}
                 title={m.feature_resources_title()}
@@ -922,10 +921,6 @@
     </div>
 
     <div>
-        <span class="block text-sm font-medium text-gray-700 mb-2"
-            >{m.location()}</span
-        >
-        <!-- Using Multi-Location Selector -->
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
             <MapPin size={18} class="text-blue-600" />
             {m.feature_locations_title()}

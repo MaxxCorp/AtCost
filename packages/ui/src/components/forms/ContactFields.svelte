@@ -442,8 +442,8 @@
 
         {#if listTagsRemote}
             <div>
-                <h3 class="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
-                    <TagIcon size={16} class="text-indigo-500" />
+                <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                    <TagIcon size={18} class="text-blue-600" />
                     {labels?.tags ?? "Tags"}
                 </h3>
                 <EntityManager
