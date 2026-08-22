@@ -698,6 +698,23 @@
 	"flat_list_print_export": "Flat List (Monthly / Print / Export)",
 	"print_export": "Print / Export PDF",
 	"monthly_events_overview": "Monthly Event Overview",
-	"events_for": "Events for {month}"
+	"events_for": "Events for {month}",
+	"print_export_preview": "Print & Export Document Preview",
+	"print_export_btn": "Print / Save as PDF",
+	"show_qr_codes": "QR Codes",
+	"show_descriptions": "Descriptions",
+	"layout_density": "Density",
+	"layout_standard": "Standard",
+	"layout_compact": "Compact",
+	"news_and_announcements_heading": "News & Announcements",
+	"events_schedule_heading": "Event Schedule",
+	"no_events_or_news": "No scheduled events or announcements found matching this kiosk's criteria.",
+	"generated_on": "Generated on {date}",
+	"scan_event_qr": "Scan for details",
+	"scan_location_qr": "Scan for location info",
+	"all_day_label": "All Day",
+	"back_to_kiosks_btn": "Back to Kiosks",
+	"event_label": "Event",
+	"events_count": "{count} Events"
 }
 

@@ -1,9 +1,22 @@
 <script lang="ts">
     import { type Event, type Announcement } from "@ac/validations";
-    import { Printer, Calendar, MapPin, RefreshCw, Megaphone } from "@lucide/svelte";
+    import { 
+        Printer, 
+        Calendar, 
+        MapPin, 
+        RefreshCw, 
+        Megaphone, 
+        FileText, 
+        ArrowLeft, 
+        Clock, 
+        User,
+        Phone,
+        Mail
+    } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import * as m from "$lib/paraglide/messages";
+    import { resolve } from "$app/paths";
 
     interface LocationInfo {
         id: string;
@@ -22,28 +35,49 @@
         } | null;
     }
 
+    type EnrichedEvent = Event & {
+        qrCodeDataUrl?: string;
+    };
+
+    type EnrichedAnnouncement = Announcement & {
+        qrCodeDataUrl?: string;
+    };
+
     let { items = [], kiosk }: {
         items: (Event | Announcement)[],
         kiosk: {
             name?: string;
             description?: string;
             locations?: LocationInfo[];
+            rangeMode?: string;
+            startDate?: string | Date;
+            endDate?: string | Date;
         }
     } = $props();
 
-    // Group items by Month & Year (or category for undated items)
-    let groupedItems = $derived.by(() => {
-        const monthMap: Record<string, { monthKey: string; monthName: string; items: (Event | Announcement)[] }> = {};
+    // View customization options
+    let showQrCodes = $state(true);
+    let showDescriptions = $state(true);
+    let density = $state<"standard" | "compact">("standard");
+    let activeFilter = $state<"all" | "events" | "news">("all");
 
-        for (const item of items) {
-            const rawDate = "startDateTime" in item && item.startDateTime 
-                ? item.startDateTime 
-                : ("startDate" in (item as any) && (item as any).startDate 
-                    ? (item as any).startDate 
-                    : ("createdAt" in item ? item.createdAt : null));
+    // Separate Announcements (News) from Scheduled Events
+    let announcements = $derived(
+        items.filter(item => !("startDateTime" in item) && "content" in item) as EnrichedAnnouncement[]
+    );
 
+    let events = $derived(
+        items.filter(item => "startDateTime" in item) as EnrichedEvent[]
+    );
+
+    // Group events chronologically by Month & Year
+    let groupedEvents = $derived.by(() => {
+        const monthMap: Record<string, { monthKey: string; monthName: string; items: EnrichedEvent[] }> = {};
+
+        for (const event of events) {
+            const rawDate = event.startDateTime;
             let monthKey = "9999-99";
-            let monthName = m.announcements ? m.announcements() : "General Announcements";
+            let monthName: string = String(m.monthly_events_overview());
 
             if (rawDate) {
                 const d = new Date(rawDate);
@@ -56,21 +90,27 @@
             if (!monthMap[monthKey]) {
                 monthMap[monthKey] = { monthKey, monthName, items: [] };
             }
-            monthMap[monthKey].items.push(item);
+            monthMap[monthKey].items.push(event);
         }
 
-        // Sort months chronologically
-        const keys = Object.keys(monthMap).sort((a, b) => a.localeCompare(b));
+        const sortedKeys = Object.keys(monthMap).sort((a, b) => a.localeCompare(b));
 
-        return keys.map(key => {
-            // Sort items inside each month chronologically
+        return sortedKeys.map(key => {
             monthMap[key].items.sort((a, b) => {
-                const dateA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-                const dateB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+                const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+                const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
                 return dateA - dateB;
             });
             return monthMap[key];
         });
+    });
+
+    const generatedDateStr = new Date().toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
     });
 
     function formatDateDay(dateStr: string | null | undefined) {
@@ -97,6 +137,17 @@
         return isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     }
 
+    function formatFullDate(dateStr: string | null | undefined) {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    }
+
     function triggerPrint() {
         if (typeof window !== "undefined") {
             window.print();
@@ -104,174 +155,432 @@
     }
 </script>
 
-<div class="w-full h-full min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8 overflow-y-auto print:bg-white print:text-slate-900 print:p-0 print:min-h-0 print:overflow-visible">
-    <!-- Printable / Screen Header Bar -->
-    <div class="max-w-6xl mx-auto mb-8 print:mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-800 print:border-slate-300">
-        <div>
+<div class="min-h-screen bg-slate-100 dark:bg-slate-900 py-6 px-3 sm:px-6 lg:px-8 text-slate-800 dark:text-slate-100 print:bg-white print:p-0 print:m-0 print:text-black">
+    <!-- Screen-Only Controls & Export Toolbar -->
+    <header class="max-w-5xl mx-auto mb-6 print:hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-                <div class="h-8 w-1.5 bg-blue-500 rounded-full print:hidden"></div>
-                <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white print:text-slate-900">
-                    {kiosk?.name || m.monthly_events_overview()}
-                </h1>
-            </div>
-            {#if kiosk?.description}
-                <p class="mt-1 text-slate-400 print:text-slate-600 text-sm">{kiosk.description}</p>
-            {/if}
-            {#if kiosk?.locations && kiosk.locations.length > 0}
-                <div class="flex items-center gap-2 mt-2 text-xs text-blue-400 print:text-slate-700">
-                    <MapPin class="w-4 h-4 text-blue-500 print:text-slate-800" />
-                    <span>{kiosk.locations.map(l => l.name).join(", ")}</span>
+                <a 
+                    href={resolve('/kiosks')} 
+                    class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors inline-flex items-center gap-1.5 text-sm font-medium"
+                    title={m.back_to_kiosks_btn()}
+                >
+                    <ArrowLeft class="w-4 h-4" />
+                    <span class="hidden sm:inline">{m.back_to_kiosks_btn()}</span>
+                </a>
+                <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <FileText class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        <h1 class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                            {m.print_export_preview()}
+                        </h1>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        {events.length} {events.length === 1 ? m.event_label() : m.feature_events_title()} • {announcements.length} {m.feature_announcements_title()}
+                    </p>
                 </div>
-            {/if}
-        </div>
-
-        <!-- Action Toolbar (hidden on print) -->
-        <div class="flex items-center gap-3 print:hidden self-end md:self-auto">
-            <button
-                type="button"
-                onclick={triggerPrint}
-                class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-            >
-                <Printer class="w-4 h-4" />
-                <span>{m.print_export()}</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Main Content Area -->
-    <div class="max-w-6xl mx-auto space-y-10 print:space-y-8 pb-12">
-        {#if items.length === 0}
-            <div class="text-center py-16 bg-slate-900/50 rounded-2xl border border-slate-800 print:border-slate-200 print:bg-slate-50">
-                <Calendar class="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p class="text-slate-400 print:text-slate-600 text-lg font-medium">{m.no_scheduled_events()}</p>
             </div>
-        {:else}
-            {#each groupedItems as group (group.monthKey)}
-                <section class="space-y-4 print:break-inside-avoid-page">
-                    <!-- Month Banner -->
-                    <div class="flex items-center gap-3 border-b-2 border-blue-500/40 print:border-slate-400 pb-2">
-                        <Calendar class="w-5 h-5 text-blue-400 print:text-slate-800" />
-                        <h2 class="text-2xl font-bold uppercase tracking-wider text-blue-400 print:text-slate-900">
-                            {group.monthName}
-                        </h2>
-                        <span class="text-xs bg-blue-500/20 text-blue-300 print:bg-slate-200 print:text-slate-700 px-2.5 py-0.5 rounded-full font-medium ml-auto">
-                            {group.items.length} {group.items.length === 1 ? m.event_label() : m.feature_events_title()}
+
+            <!-- View Options & Controls -->
+            <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs">
+                <!-- Filter Tabs -->
+                <div class="flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <button
+                        type="button"
+                        onclick={() => activeFilter = "all"}
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors {activeFilter === 'all' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}"
+                    >
+                        {m.filters()} ({items.length})
+                    </button>
+                    {#if events.length > 0}
+                        <button
+                            type="button"
+                            onclick={() => activeFilter = "events"}
+                            class="px-2.5 py-1 rounded-lg font-medium transition-colors {activeFilter === 'events' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}"
+                        >
+                            {m.feature_events_title()} ({events.length})
+                        </button>
+                    {/if}
+                    {#if announcements.length > 0}
+                        <button
+                            type="button"
+                            onclick={() => activeFilter = "news"}
+                            class="px-2.5 py-1 rounded-lg font-medium transition-colors {activeFilter === 'news' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}"
+                        >
+                            {m.feature_announcements_title()} ({announcements.length})
+                        </button>
+                    {/if}
+                </div>
+
+                <!-- Density Toggle -->
+                <div class="flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <button
+                        type="button"
+                        onclick={() => density = "standard"}
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors {density === 'standard' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs' : 'text-slate-500 dark:text-slate-400'}"
+                        title={m.layout_standard()}
+                    >
+                        {m.layout_standard()}
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => density = "compact"}
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors {density === 'compact' ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs' : 'text-slate-500 dark:text-slate-400'}"
+                        title={m.layout_compact()}
+                    >
+                        {m.layout_compact()}
+                    </button>
+                </div>
+
+                <!-- Options Checkboxes -->
+                <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-100 dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium">
+                    <input type="checkbox" bind:checked={showQrCodes} class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5" />
+                    <span>{m.show_qr_codes()}</span>
+                </label>
+
+                <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-100 dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium">
+                    <input type="checkbox" bind:checked={showDescriptions} class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5" />
+                    <span>{m.show_descriptions()}</span>
+                </label>
+
+                <!-- Primary Print Action -->
+                <button
+                    type="button"
+                    onclick={triggerPrint}
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all transform hover:scale-[1.01]"
+                >
+                    <Printer class="w-4 h-4" />
+                    <span>{m.print_export_btn()}</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Document Paper Preview Container -->
+    <main class="max-w-5xl mx-auto bg-white text-slate-900 shadow-xl print:shadow-none border border-slate-200 print:border-none rounded-2xl print:rounded-none p-6 sm:p-10 print:p-0">
+        <!-- Printable Document Header -->
+        <div class="border-b-2 border-slate-900 print:border-black pb-6 mb-8">
+            <div class="flex flex-col md:flex-row justify-between items-start gap-6">
+                <!-- Title & Meta -->
+                <div class="space-y-2 flex-1">
+                    <div class="flex items-center gap-3">
+                        <span class="px-2.5 py-0.5 bg-slate-900 text-white print:bg-black text-[11px] font-bold tracking-widest uppercase rounded">
+                            {m.flat_list_print_export()}
+                        </span>
+                        <span class="text-xs text-slate-500 font-medium">
+                            {m.generated_on({ date: generatedDateStr })}
                         </span>
                     </div>
 
-                    <!-- Flat List Rows -->
-                    <div class="divide-y divide-slate-800/60 print:divide-slate-200">
-                        {#each group.items as item (item.id)}
-                            {@const isEvent = "startDateTime" in item || "summary" in item || "startDate" in item}
-                            <article class="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid group hover:bg-slate-900/40 print:hover:bg-transparent rounded-xl px-3 transition-colors">
-                                <!-- Date & Time Badge -->
-                                <div class="flex items-center gap-4 shrink-0 min-w-[140px]">
-                                    {#if isEvent}
-                                        <div class="flex flex-col items-center justify-center w-14 h-14 bg-slate-900 print:bg-slate-100 border border-slate-800 print:border-slate-300 rounded-xl text-center shadow-sm">
-                                            <span class="text-xs font-semibold text-blue-400 print:text-slate-600 leading-none">
-                                                {formatDateMonth((item as Event).startDateTime)}
-                                            </span>
-                                            <span class="text-xl font-black text-white print:text-slate-900 leading-tight">
-                                                {formatDateDay((item as Event).startDateTime)}
-                                            </span>
-                                            <span class="text-[10px] text-slate-400 print:text-slate-500 leading-none uppercase">
-                                                {formatDateWeekday((item as Event).startDateTime)}
-                                            </span>
-                                        </div>
+                    <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
+                        {kiosk?.name || m.monthly_events_overview()}
+                    </h1>
 
-                                        <div class="text-sm font-semibold text-slate-300 print:text-slate-700">
-                                            {#if (item as Event).isAllDay}
-                                                <span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 print:bg-slate-200 print:text-slate-800 rounded text-xs">All Day</span>
-                                            {:else}
-                                                <div>{formatTime((item as Event).startDateTime)}</div>
-                                                {#if (item as Event).endDateTime}
-                                                    <div class="text-xs text-slate-500 print:text-slate-500">- {formatTime((item as Event).endDateTime)}</div>
-                                                {/if}
-                                            {/if}
-                                        </div>
-                                    {:else}
-                                        <div class="flex flex-col items-center justify-center w-14 h-14 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
-                                            <Megaphone class="w-6 h-6 text-amber-400 print:text-amber-700" />
-                                        </div>
-                                    {/if}
+                    {#if kiosk?.description}
+                        <p class="text-sm text-slate-600 max-w-2xl leading-relaxed">
+                            {kiosk.description}
+                        </p>
+                    {/if}
+
+                    <!-- Location & Address Strip -->
+                    {#if kiosk?.locations && kiosk.locations.length > 0}
+                        <div class="flex flex-wrap items-center gap-4 pt-2 text-xs text-slate-700 font-medium">
+                            {#each kiosk.locations as loc (loc.id)}
+                                <div class="inline-flex items-center gap-1.5 bg-slate-100 print:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                                    <MapPin class="w-3.5 h-3.5 text-slate-700" />
+                                    <span>
+                                        {loc.name}
+                                        {#if loc.street}
+                                            • {loc.street} {loc.houseNumber || ''}, {loc.zip || ''} {loc.city || ''}
+                                        {/if}
+                                    </span>
                                 </div>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
 
-                                <!-- Event / Announcement Details -->
-                                <div class="flex-1 space-y-1 min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        {#if isEvent && (item as any).status === 'cancelled'}
-                                            <span class="bg-red-600/90 text-white text-xs font-bold px-2 py-0.5 rounded uppercase">
-                                                {m.cancelled()}
+                <!-- Location / Kiosk Contact Information Box -->
+                {#if kiosk?.locations && kiosk.locations.some(l => l.contact)}
+                    {@const primaryLoc = kiosk.locations.find(l => l.contact)}
+                    {@const contact = primaryLoc?.contact}
+                    {#if contact}
+                        <div class="shrink-0 bg-slate-50 print:bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 text-xs space-y-1.5 min-w-[220px]">
+                            <div class="font-bold text-slate-900 uppercase tracking-wider text-[10px] text-slate-500 flex items-center gap-1">
+                                <User class="w-3 h-3" />
+                                <span>{m.contact()}</span>
+                            </div>
+                            <div class="font-bold text-slate-900 text-sm">{contact.name}</div>
+                            {#if contact.phone}
+                                <div class="flex items-center gap-1.5 text-slate-600">
+                                    <Phone class="w-3 h-3 text-slate-400" />
+                                    <span>{contact.phone}</span>
+                                </div>
+                            {/if}
+                            {#if contact.email}
+                                <div class="flex items-center gap-1.5 text-slate-600">
+                                    <Mail class="w-3 h-3 text-slate-400" />
+                                    <span>{contact.email}</span>
+                                </div>
+                            {/if}
+
+                            {#if showQrCodes && (contact.qrCodeDataUrl || contact.qrCodePath)}
+                                <div class="pt-1 flex items-center gap-2">
+                                    <img 
+                                        src={contact.qrCodeDataUrl || contact.qrCodePath} 
+                                        alt="Contact QR" 
+                                        class="w-12 h-12 bg-white p-0.5 rounded border border-slate-200 shrink-0" 
+                                    />
+                                    <span class="text-[10px] text-slate-500 leading-tight">
+                                        {m.scan_location_qr()}
+                                    </span>
+                                </div>
+                            {/if}
+                        </div>
+                    {/if}
+                {/if}
+            </div>
+        </div>
+
+        {#if items.length === 0}
+            <!-- Empty State -->
+            <div class="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <Calendar class="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                <p class="text-slate-600 text-base font-semibold">{m.no_events_or_news()}</p>
+            </div>
+        {:else}
+            <!-- Section 1: News & Announcements (Prominent Bulletin) -->
+            {#if (activeFilter === "all" || activeFilter === "news") && announcements.length > 0}
+                <section class="mb-10 print:mb-8 space-y-4 print:break-inside-avoid-page">
+                    <div class="flex items-center gap-2.5 border-b-2 border-amber-500 pb-2">
+                        <Megaphone class="w-5 h-5 text-amber-600" />
+                        <h2 class="text-xl font-bold uppercase tracking-wider text-slate-900">
+                            {m.news_and_announcements_heading()}
+                        </h2>
+                        <span class="ml-auto text-xs font-semibold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
+                            {announcements.length}
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 {density === 'standard' ? 'gap-4' : 'gap-3'}">
+                        {#each announcements as announcement (announcement.id)}
+                            <article class="p-4 sm:p-5 rounded-xl border border-amber-200/80 bg-amber-50/40 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col sm:flex-row justify-between gap-4">
+                                <div class="space-y-2 flex-1">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <h3 class="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                                            {announcement.title}
+                                        </h3>
+                                        {#if announcement.createdAt}
+                                            <span class="text-[11px] text-slate-500 font-medium whitespace-nowrap shrink-0">
+                                                {formatFullDate(announcement.createdAt)}
                                             </span>
                                         {/if}
-                                        <h3 class="text-lg font-bold text-white print:text-slate-900 leading-snug truncate {isEvent && (item as any).status === 'cancelled' ? 'line-through text-slate-500' : ''}">
-                                            {isEvent ? ((item as Event).summary || m.untitled_event()) : ((item as Announcement).title || "Announcement")}
-                                        </h3>
                                     </div>
 
-                                    <!-- Room & Recurrence info -->
-                                    {#if isEvent}
-                                        {@const eventRooms = getEventRooms(item)}
-                                        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 print:text-slate-600">
-                                            {#if eventRooms.length > 0}
-                                                {#each eventRooms as roomName (roomName)}
-                                                    <span class="inline-flex items-center gap-1 font-medium text-blue-300 print:text-slate-800">
-                                                        <MapPin class="w-3.5 h-3.5" />
-                                                        {roomName}
-                                                    </span>
-                                                {/each}
-                                            {/if}
-                                            {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
-                                                <span class="inline-flex items-center gap-1 text-slate-400">
-                                                    <RefreshCw class="w-3 h-3" />
-                                                    {formatRecurrenceText((item as any).recurrence)}
-                                                </span>
-                                            {/if}
-                                        </div>
-                                    {/if}
-
-                                    {#if isEvent ? (item as Event).description : (item as Announcement).content}
-                                        <p class="text-xs text-slate-400 print:text-slate-600 line-clamp-2 mt-1">
-                                            {isEvent ? (item as Event).description : (item as Announcement).content}
+                                    {#if showDescriptions && announcement.content}
+                                        <p class="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+                                            {announcement.content}
                                         </p>
                                     {/if}
 
-                                    <!-- Tags -->
-                                    {#if item.tags && item.tags.length > 0}
-                                        <div class="flex flex-wrap gap-1.5 pt-1">
-                                            {#each item.tags as tag (typeof tag === 'string' ? tag : tag.id || tag.name)}
-                                                <span class="px-2 py-0.5 bg-slate-900 print:bg-slate-100 border border-slate-800 print:border-slate-300 text-slate-400 print:text-slate-700 rounded-md text-[11px]">
-                                                    #{tag.name || tag}
+                                    <!-- Tags & Associated Locations -->
+                                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                                        {#if announcement.locations && announcement.locations.length > 0}
+                                            {#each announcement.locations as loc (loc.id)}
+                                                <span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-white print:bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                                                    <MapPin class="w-3 h-3 text-slate-500" />
+                                                    {loc.name}
                                                 </span>
                                             {/each}
-                                        </div>
-                                    {/if}
+                                        {/if}
+
+                                        {#if announcement.tags && announcement.tags.length > 0}
+                                            {#each announcement.tags as tag (typeof tag === 'string' ? tag : tag.id || tag.name)}
+                                                <span class="text-[11px] text-slate-600 bg-white print:bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                                                    #{typeof tag === 'string' ? tag : tag.name}
+                                                </span>
+                                            {/each}
+                                        {/if}
+                                    </div>
                                 </div>
 
-                                <!-- QR Code Badge -->
-                                {#if (item as any).qrCodeDataUrl || (item as any).qrCodePath}
-                                    <div class="shrink-0 bg-white p-1 rounded-lg shadow print:shadow-none border border-slate-200 self-end sm:self-center">
-                                        <img src={(item as any).qrCodeDataUrl || (item as any).qrCodePath} alt="QR" class="w-14 h-14" />
+                                <!-- Announcement QR Code -->
+                                {#if showQrCodes && ((announcement as any).qrCodeDataUrl || (announcement as any).qrCodePath)}
+                                    <div class="shrink-0 flex flex-col items-center justify-center p-2 bg-white border border-slate-200 rounded-xl self-end sm:self-center">
+                                        <img 
+                                            src={(announcement as any).qrCodeDataUrl || (announcement as any).qrCodePath} 
+                                            alt="Announcement QR" 
+                                            class="w-14 h-14" 
+                                        />
+                                        <span class="text-[9px] font-semibold text-slate-500 mt-1 uppercase tracking-tight">
+                                            {m.scan_event_qr()}
+                                        </span>
                                     </div>
                                 {/if}
                             </article>
                         {/each}
                     </div>
                 </section>
-            {/each}
+            {/if}
+
+            <!-- Section 2: Scheduled Events by Month -->
+            {#if (activeFilter === "all" || activeFilter === "events") && events.length > 0}
+                <section class="space-y-8 print:space-y-6">
+                    {#each groupedEvents as group (group.monthKey)}
+                        <div class="space-y-3 print:break-inside-avoid-page">
+                            <!-- Month Banner -->
+                            <div class="flex items-center gap-2.5 border-b-2 border-slate-900 print:border-black pb-1.5">
+                                <Calendar class="w-5 h-5 text-blue-600 print:text-black" />
+                                <h2 class="text-xl font-bold uppercase tracking-wider text-slate-900">
+                                    {group.monthName}
+                                </h2>
+                                <span class="ml-auto text-xs font-semibold bg-slate-100 text-slate-700 print:bg-slate-200 px-2 py-0.5 rounded-full">
+                                    {group.items.length} {group.items.length === 1 ? m.event_label() : m.feature_events_title()}
+                                </span>
+                            </div>
+
+                            <!-- Events List / Rows -->
+                            <div class="divide-y divide-slate-200 print:divide-slate-300">
+                                {#each group.items as event (event.id)}
+                                    {@const eventRooms = getEventRooms(event)}
+                                    <article class="{density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid">
+                                        <!-- Left Date & Time Column -->
+                                        <div class="flex items-center gap-3 shrink-0 min-w-[130px]">
+                                            <!-- Date Badge -->
+                                            <div class="flex flex-col items-center justify-center w-12 h-12 bg-slate-100 print:bg-slate-50 border border-slate-200 rounded-xl text-center shadow-xs">
+                                                <span class="text-[10px] font-bold text-blue-600 print:text-black leading-none uppercase">
+                                                    {formatDateMonth(event.startDateTime)}
+                                                </span>
+                                                <span class="text-lg font-black text-slate-900 leading-tight">
+                                                    {formatDateDay(event.startDateTime)}
+                                                </span>
+                                                <span class="text-[9px] text-slate-500 leading-none uppercase">
+                                                    {formatDateWeekday(event.startDateTime)}
+                                                </span>
+                                            </div>
+
+                                            <!-- Time Details -->
+                                            <div class="text-xs font-semibold text-slate-700">
+                                                {#if event.isAllDay}
+                                                    <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 print:bg-slate-100 print:text-black rounded text-[11px] font-bold">
+                                                        {m.all_day_label()}
+                                                    </span>
+                                                {:else}
+                                                    <div class="flex items-center gap-1 font-bold text-slate-900">
+                                                        <Clock class="w-3 h-3 text-slate-400" />
+                                                        <span>{formatTime(event.startDateTime)}</span>
+                                                    </div>
+                                                    {#if event.endDateTime}
+                                                        <div class="text-slate-500 pl-4 text-[11px]">
+                                                            – {formatTime(event.endDateTime)}
+                                                        </div>
+                                                    {/if}
+                                                {/if}
+                                            </div>
+                                        </div>
+
+                                        <!-- Center Event Details -->
+                                        <div class="flex-1 space-y-1 min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                {#if event.status === 'cancelled'}
+                                                    <span class="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                                        {m.cancelled()}
+                                                    </span>
+                                                {/if}
+                                                {#if event.status === 'tentative'}
+                                                    <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                                        Tentative
+                                                    </span>
+                                                {/if}
+                                                <h3 class="text-base sm:text-lg font-bold text-slate-900 leading-snug {event.status === 'cancelled' ? 'line-through text-slate-400' : ''}">
+                                                    {event.summary || m.untitled_event()}
+                                                </h3>
+                                            </div>
+
+                                            <!-- Room, Location & Recurrence Info -->
+                                            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                                                {#if eventRooms.length > 0}
+                                                    {#each eventRooms as roomName (roomName)}
+                                                        <span class="inline-flex items-center gap-1 font-semibold text-blue-700 print:text-black">
+                                                            <MapPin class="w-3.5 h-3.5 text-blue-600 print:text-black" />
+                                                            {roomName}
+                                                        </span>
+                                                    {/each}
+                                                {/if}
+
+                                                {#if (event as any).recurrence && ((event as any).recurrence as string[]).length > 0}
+                                                    <span class="inline-flex items-center gap-1 text-slate-600 font-medium">
+                                                        <RefreshCw class="w-3 h-3 text-slate-500" />
+                                                        {formatRecurrenceText((event as any).recurrence)}
+                                                    </span>
+                                                {/if}
+                                            </div>
+
+                                            {#if showDescriptions && event.description}
+                                                <p class="text-xs text-slate-600 line-clamp-2 leading-relaxed pt-0.5">
+                                                    {event.description}
+                                                </p>
+                                            {/if}
+
+                                            <!-- Tags -->
+                                            {#if event.tags && event.tags.length > 0}
+                                                <div class="flex flex-wrap gap-1.5 pt-1">
+                                                    {#each event.tags as tag (typeof tag === 'string' ? tag : tag.id || tag.name)}
+                                                        <span class="px-1.5 py-0.5 bg-slate-100 print:bg-slate-50 border border-slate-200 text-slate-600 rounded text-[10px]">
+                                                            #{typeof tag === 'string' ? tag : tag.name}
+                                                        </span>
+                                                    {/each}
+                                                </div>
+                                            {/if}
+                                        </div>
+
+                                        <!-- Right Scannable QR Code -->
+                                        {#if showQrCodes && (event.qrCodeDataUrl || event.qrCodePath)}
+                                            <div class="shrink-0 flex flex-col items-center justify-center p-1.5 bg-white border border-slate-200 rounded-xl self-end sm:self-center">
+                                                <img 
+                                                    src={event.qrCodeDataUrl || event.qrCodePath} 
+                                                    alt="Event QR" 
+                                                    class="{density === 'standard' ? 'w-14 h-14' : 'w-10 h-10'}" 
+                                                />
+                                                <span class="text-[8px] font-semibold text-slate-500 mt-0.5 uppercase tracking-tight">
+                                                    {m.scan_event_qr()}
+                                                </span>
+                                            </div>
+                                        {/if}
+                                    </article>
+                                {/each}
+                            </div>
+                        </div>
+                    {/each}
+                </section>
+            {/if}
         {/if}
-    </div>
+
+        <!-- Printable Document Footer -->
+        <footer class="mt-12 pt-6 border-t border-slate-200 print:border-slate-300 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 print:break-inside-avoid">
+            <div>
+                {kiosk?.name || m.monthly_events_overview()} • {m.generated_on({ date: generatedDateStr })}
+            </div>
+            <div class="font-medium">
+                AC Multiposter
+            </div>
+        </footer>
+    </main>
 </div>
 
 <style>
     @media print {
         @page {
-            margin: 15mm;
+            margin: 12mm 15mm;
             size: A4 portrait;
         }
+
         :global(body) {
-            background-color: white !important;
-            color: black !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
     }
 </style>

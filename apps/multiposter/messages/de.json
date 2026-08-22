@@ -698,6 +698,23 @@
 	"flat_list_print_export": "Flache Liste (Monatlich / Drucken / Exportieren)",
 	"print_export": "Drucken / PDF Exportieren",
 	"monthly_events_overview": "Monatsübersicht Veranstaltungen",
-	"events_for": "Veranstaltungen für {month}"
+	"events_for": "Veranstaltungen für {month}",
+	"print_export_preview": "Druck- & Export-Dokumentvorschau",
+	"print_export_btn": "Drucken / Als PDF speichern",
+	"show_qr_codes": "QR-Codes",
+	"show_descriptions": "Beschreibungen",
+	"layout_density": "Dichte",
+	"layout_standard": "Standard",
+	"layout_compact": "Kompakt",
+	"news_and_announcements_heading": "Aushänge & Mitteilungen",
+	"events_schedule_heading": "Veranstaltungskalender",
+	"no_events_or_news": "Keine anstehenden Veranstaltungen oder Mitteilungen gefunden.",
+	"generated_on": "Erstellt am {date}",
+	"scan_event_qr": "Für Details scannen",
+	"scan_location_qr": "Standort-Info scannen",
+	"all_day_label": "Ganztägig",
+	"back_to_kiosks_btn": "Zurück zu Kiosken",
+	"event_label": "Veranstaltung",
+	"events_count": "{count} Veranstaltungen"
 }
 

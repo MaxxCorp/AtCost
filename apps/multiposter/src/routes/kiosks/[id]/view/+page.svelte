@@ -42,6 +42,7 @@
     }
 
     function resetInactivity() {
+        if (kiosk?.uiMode === 'flat_list') return;
         console.log("Resetting inactivity timer"); // debug
         showHeader();
         // Reset loop timer on interaction to prevent flipping while reading/swiping
@@ -51,6 +52,7 @@
     // --- Loop Logic ---
     function startLoop() {
         clearInterval(timer);
+        if (kiosk?.uiMode === 'flat_list') return;
         timer = setInterval(
             () => {
                 nextSlide(true); // Auto-advance
@@ -362,36 +364,39 @@
     onkeydown={resetInactivity}
 />
 
-<div
-    class="fixed inset-0 bg-gray-900 overflow-hidden flex items-center justify-center"
-    onpointerdown={handlePointerDown}
-    onpointerup={handlePointerUp}
-    role="region"
-    aria-label="Event Kiosk"
->
-    {#if items.length === 0}
-        <div
-            class="text-white text-xl opacity-50 flex flex-col items-center gap-4"
-        >
-            <p>
-                {#if isOffline}
-                    No cached content available offline.
-                {:else}
-                    No upcoming content matching this kiosk's settings.
-                {/if}
-            </p>
-            <p class="text-sm">
-                Location: {kiosk?.locations && kiosk.locations.length > 0
-                    ? kiosk.locations.map((l: any) => l.name).join(", ")
-                    : "All Locations"}
-            </p>
-        </div>
-    {:else if kiosk?.uiMode === "table"}
-        <KioskTableView {items} {kiosk} />
-    {:else if kiosk?.uiMode === "flat_list"}
+{#if kiosk?.uiMode === "flat_list"}
+    <div class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto">
         <KioskFlatListView {items} {kiosk} />
-    {:else}
-                    <div
+    </div>
+{:else}
+    <div
+        class="fixed inset-0 bg-gray-900 overflow-hidden flex items-center justify-center"
+        onpointerdown={handlePointerDown}
+        onpointerup={handlePointerUp}
+        role="region"
+        aria-label="Event Kiosk"
+    >
+        {#if items.length === 0}
+            <div
+                class="text-white text-xl opacity-50 flex flex-col items-center gap-4"
+            >
+                <p>
+                    {#if isOffline}
+                        No cached content available offline.
+                    {:else}
+                        No upcoming content matching this kiosk's settings.
+                    {/if}
+                </p>
+                <p class="text-sm">
+                    Location: {kiosk?.locations && kiosk.locations.length > 0
+                        ? kiosk.locations.map((l: any) => l.name).join(", ")
+                        : "All Locations"}
+                </p>
+            </div>
+        {:else if kiosk?.uiMode === "table"}
+            <KioskTableView {items} {kiosk} />
+        {:else}
+            <div
                 class="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 overflow-y-auto"
                 in:fly={{
                     x: direction * 500,
@@ -427,7 +432,7 @@
 
                     <!-- Progress/Status Indicator -->
                     <div class="mt-6 flex gap-2">
-                        {#each items as _, i}
+                        {#each items as _, i (i)}
                             <div
                                 class="w-2 h-2 rounded-full transition-colors duration-300 {i ===
                                 currentIndex
@@ -446,5 +451,6 @@
                     {/if}
                 </div>
             </div>
-            {/if}
-</div>
+        {/if}
+    </div>
+{/if}
