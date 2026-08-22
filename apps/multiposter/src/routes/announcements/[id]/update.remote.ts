@@ -163,53 +163,9 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
         // Notify listeners
         await publishAnnouncementChange('update', [announcementId]);
 
-        // Refresh caches - Fetch the full state inlined for "easier reasoning"
-        const fullAnnouncementData = await db.query.announcement.findFirst({
-            where: eq(announcement.id, announcementId),
-            with: {
-                locations: { with: { location: true } },
-                contacts: {
-                    with: {
-                        contact: {
-                            with: {
-                                emails: true,
-                                phones: true,
-                                tags: { with: { tag: true } }
-                            }
-                        }
-                    }
-                },
-                tags: { with: { tag: true } },
-                campaign: true,
-            }
-        });
-
-        if (fullAnnouncementData) {
-            // Compute resolved contact (duplicated for self-containment)
-            const c = fullAnnouncementData.contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'))?.contact || fullAnnouncementData.contacts[0]?.contact;
-            let resolvedContact = null;
-            if (c) {
-                resolvedContact = {
-                    name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
-                    email: c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '',
-                    phone: c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '',
-                    qrCodeDataUrl: c.qrCodePath?.includes('/api/') ? c.qrCodePath : `/api/contacts/${c.id}/qr.png`
-                };
-            }
-
-            const transformed = {
-                ...fullAnnouncementData,
-                createdAt: fullAnnouncementData.createdAt.toISOString(),
-                updatedAt: fullAnnouncementData.updatedAt.toISOString(),
-                tags: fullAnnouncementData.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
-                contactIds: fullAnnouncementData.contacts.map(c => c.contactId),
-                locationIds: fullAnnouncementData.locations.map(l => l.locationId),
-                locations: fullAnnouncementData.locations.map(l => l.location),
-                syncIds: (fullAnnouncementData.campaign?.content as any)?.syncIds || [],
-                resolvedContact,
-            } as Announcement;
-            readAnnouncement(announcementId).set(transformed);
-        }
+        // Refresh caches
+        await readAnnouncement(announcementId).refresh();
+        await listAnnouncements().refresh();
 
 
         // Trigger background sync to external providers

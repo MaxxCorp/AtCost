@@ -1,12 +1,12 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { event, contactEmail, contactPhone, tag } from '@ac/db';
-import { eq, and, asc } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess, getOptionalUser, hasAccess } from '$lib/server/authorization';
+import { event, locationContact, inArray, eq, asc } from '@ac/db';
+import { getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { type Event } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
+import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 
 /**
  * Query: Read an event by ID
@@ -16,16 +16,22 @@ import { getEventRooms } from '$lib/utils/format-rooms';
  * - If event is private: only authenticated users with 'events' access can view
  */
 export const readEvent = query(v.string(), async (eventId: string): Promise<Event | null> => {
-	// 1. Fetch event with relations using Drizzle Relational Queries for "easier reasoning"
+	// 1. Fetch event with relations using Drizzle Relational Queries
 	const result = await db.query.event.findFirst({
 		where: eq(event.id, eventId),
 		with: {
 			locations: { with: { location: true } },
-			contacts: { with: { contact: { with: { 
-				emails: true, 
-				phones: true,
-				tags: { with: { tag: true } }
-			} } } },
+			contacts: {
+				with: {
+					contact: {
+						with: {
+							emails: true,
+							phones: true,
+							tags: { with: { tag: true } }
+						}
+					}
+				}
+			},
 			resources: { with: { resource: true } },
 			tags: { with: { tag: true } },
 			campaign: true,
@@ -49,42 +55,69 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		}
 	}
 
-	// 3. Resolve Primary Contact (Resolved Contact logic inlined)
-	let resolvedContact = null;
+	// 3. Resolve Primary Contact
+	const hasEventEmployee = (result.contacts || []).some((ec: any) => isEmployeeContact(ec.contact || ec));
+	const locationContactsMap = new Map<string, any[]>();
 
-	// find "Employee" tagged contact in event or fallback
-	const findEmployee = (contacts: any[]) => {
-		return contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'));
-	};
+	if (!hasEventEmployee) {
+		const neededLocationIds = new Set<string>();
+		for (const l of result.locations || []) {
+			if (l.location?.id) neededLocationIds.add(l.location.id);
+			else if (l.locationId) neededLocationIds.add(l.locationId);
+		}
+		for (const r of result.resources || []) {
+			const locId = (r.resource as any)?.locationId;
+			if (locId) neededLocationIds.add(locId);
+		}
 
-	let chosenContact = findEmployee(result.contacts);
-	
-	// Fallback to first contact if no employee
-	if (!chosenContact && result.contacts.length > 0) {
-		chosenContact = result.contacts[0];
-	}
-
-	if (chosenContact) {
-		const c = chosenContact.contact;
-		const name = c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim();
-		
-		if (!isAuthorized) {
-			// Public view: filter for work info
-			const workEmail = c.emails.find((e: any) => e.type === 'work')?.value || '';
-			const workPhone = c.phones.find((p: any) => p.type === 'work')?.value || '';
-			resolvedContact = { name, email: workEmail, phone: workPhone };
-		} else {
-			// Auth view: primary info
-			const primaryEmail = c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '';
-			const primaryPhone = c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '';
-			resolvedContact = { 
-				name, 
-				email: primaryEmail, 
-				phone: primaryPhone,
-				qrCodeDataUrl: c.qrCodePath?.includes('/api/') ? c.qrCodePath : `/api/contacts/${c.id}/qr.png`
-			};
+		if (neededLocationIds.size > 0) {
+			const locContactsData = await db.query.locationContact.findMany({
+				where: inArray(locationContact.locationId, Array.from(neededLocationIds)),
+				with: {
+					contact: {
+						with: {
+							emails: true,
+							phones: true,
+							tags: { with: { tag: true } }
+						}
+					}
+				}
+			});
+			for (const lc of locContactsData) {
+				const list = locationContactsMap.get(lc.locationId) || [];
+				list.push(lc);
+				locationContactsMap.set(lc.locationId, list);
+			}
 		}
 	}
+
+	const evtLocations = (result.locations?.map((l: any) => l.location).filter(Boolean) || []).map((loc: any) => ({
+		...loc,
+		locationContacts: locationContactsMap.get(loc.id) || []
+	}));
+
+	const evtResources = (result.resources?.map((r: any) => r.resource).filter(Boolean) || []).map((res: any) => {
+		if (res.locationId && locationContactsMap.has(res.locationId)) {
+			return {
+				...res,
+				location: {
+					id: res.locationId,
+					locationContacts: locationContactsMap.get(res.locationId) || []
+				}
+			};
+		}
+		return res;
+	});
+
+	const resolvedContact = resolveEventContactSync({
+		...result,
+		locations: evtLocations,
+		resources: evtResources
+	}, {
+		filterWorkOnly: !isAuthorized,
+		fallbackToLocation: true,
+		fallbackToFirst: true
+	});
 
 	// 3.5. Fetch instances if this is a series master
 	let instances: any[] = [];

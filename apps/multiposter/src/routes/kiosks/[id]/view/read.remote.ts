@@ -6,6 +6,8 @@ import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq } from '@ac/db';
 import * as v from 'valibot';
 
+import { resolveLocationContactSync } from '$lib/server/contact-resolution';
+
 export const readKioskView = query(v.string(), async (kioskId) => {
     const kioskData = await db.query.kiosk.findFirst({
         where: eq(kiosk.id, kioskId),
@@ -23,7 +25,12 @@ export const readKioskView = query(v.string(), async (kioskId) => {
                             contact: {
                                 with: {
                                     emails: true,
-                                    phones: true
+                                    phones: true,
+                                    tags: {
+                                        with: {
+                                            tag: true
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -35,11 +42,11 @@ export const readKioskView = query(v.string(), async (kioskId) => {
 
     const locations = kioskLocationsData.map(kl => {
         const loc = kl.location;
-        const mainContact = loc.locationContacts?.[0]?.contact;
-        let publicQrCodePath = mainContact?.qrCodePath;
-        if (mainContact && (!publicQrCodePath || !publicQrCodePath.includes('/api/'))) {
-            publicQrCodePath = `/api/contacts/${mainContact.id}/qr.png`;
-        }
+        const resolvedContact = resolveLocationContactSync(loc, {
+            filterWorkOnly: true,
+            fallbackToFirst: true
+        });
+
         return {
             id: loc.id,
             name: loc.name,
@@ -48,12 +55,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             zip: loc.zip,
             city: loc.city,
             country: loc.country,
-            contact: mainContact ? {
-                name: mainContact.displayName || `${mainContact.givenName || ''} ${mainContact.familyName || ''}`.trim(),
-                email: mainContact.emails?.find((e: any) => e.type === 'work')?.value || mainContact.emails?.[0]?.value,
-                phone: mainContact.phones?.find((p: any) => p.type === 'work')?.value || mainContact.phones?.[0]?.value,
-                qrCodePath: publicQrCodePath
-            } : null
+            contact: resolvedContact
         };
     });
 

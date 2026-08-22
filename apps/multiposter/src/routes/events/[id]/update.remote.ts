@@ -11,7 +11,6 @@ import { generateEventAssets } from '$lib/server/events/assets';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
-import { getEventRooms } from '$lib/utils/format-rooms';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {
@@ -463,65 +462,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			await syncService.syncItems(user.id, allAffectedIds, 'event');
 		}
 
-		// Refresh caches - Fetch the full state inlined for "easier reasoning" and avoiding partial state wiping
-		const fullEventData = await db.query.event.findFirst({
-			where: eq(event.id, data.id),
-			with: {
-				locations: { with: { location: true } },
-				contacts: {
-					with: {
-						contact: {
-							with: {
-								emails: true,
-								phones: true,
-								tags: { with: { tag: true } }
-							}
-						}
-					}
-				},
-				resources: { with: { resource: true } },
-				tags: { with: { tag: true } },
-				campaign: true,
-			},
-		});
-
-			if (fullEventData) {
-				// Compute resolved contact (duplicated from read.remote for self-containment)
-				const c = fullEventData.contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'))?.contact || fullEventData.contacts[0]?.contact;
-				let resolvedContact = null;
-				if (c) {
-					resolvedContact = {
-						name: c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim(),
-						email: c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '',
-						phone: c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '',
-						qrCodeDataUrl: c.qrCodePath?.includes('/api/') ? c.qrCodePath : `/api/contacts/${c.id}/qr.png`
-					};
-				}
-
-				const locs = fullEventData.locations.map(l => l.location);
-				const res = fullEventData.resources.map(r => r.resource).filter(Boolean);
-
-				const transformed = {
-					...fullEventData,
-					createdAt: fullEventData.createdAt.toISOString(),
-					updatedAt: fullEventData.updatedAt.toISOString(),
-					startDateTime: fullEventData.startDateTime?.toISOString() ?? null,
-					endDateTime: fullEventData.endDateTime?.toISOString() ?? null,
-					locations: locs,
-					resources: res,
-					rooms: getEventRooms({ locations: locs, resources: res }),
-					resourceIds: fullEventData.resources.map(r => r.resourceId),
-					contactIds: fullEventData.contacts.map(c => c.contactId),
-					locationIds: fullEventData.locations.map(l => l.locationId),
-					tags: fullEventData.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
-					syncIds: (fullEventData.campaign?.content as any)?.syncIds || [],
-					resolvedContact,
-				};
-				readEvent(data.id).set(transformed as any);
-			} else {
-				void readEvent(data.id).refresh();
-			}
-
+		// Refresh caches
+		await readEvent(data.id).refresh();
 		await listEvents().refresh();
 		console.log('--- updateEvent DONE ---');
 		return { success: true };

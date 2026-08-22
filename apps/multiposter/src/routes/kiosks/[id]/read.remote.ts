@@ -1,9 +1,10 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { kiosk, kioskLocation, location, contactEmail, contactPhone } from '@ac/db';
-import { eq, and, inArray } from '@ac/db';
+import { kiosk, kioskLocation, location } from '@ac/db';
+import { eq, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
+import { resolveLocationContactSync } from '$lib/server/contact-resolution';
 
 export const getKiosk = query(v.string(), async (id: string) => {
     const user = getAuthenticatedUser();
@@ -47,8 +48,8 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
                 with: {
                     contact: {
                         with: {
-                            emails: { where: eq(contactEmail.type, 'work'), limit: 1 },
-                            phones: { where: eq(contactPhone.type, 'work'), limit: 1 },
+                            emails: true,
+                            phones: true,
                             tags: {
                                 with: {
                                     tag: true
@@ -63,29 +64,15 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
 
     return {
         ...result,
-        locations: locations.map((l: any) => {
-            // Find the contact with the "Employee" tag
-            const employeeLocContact = l.locationContacts.find((lc: any) => 
-                lc.contact.tags.some((t: any) => t.tag.name === 'Employee')
-            ) || l.locationContacts[0]; // Fallback to first contact if no Employee tag found
-
-            const contactDetails = employeeLocContact?.contact;
-
-            return {
-                id: l.id,
-                name: l.name,
-                street: l.street,
-                houseNumber: l.houseNumber,
-                zip: l.zip,
-                city: l.city,
-                country: l.country,
-                contact: contactDetails ? {
-                    name: contactDetails.displayName || `${contactDetails.givenName || ''} ${contactDetails.familyName || ''}`.trim(),
-                    email: contactDetails.emails[0]?.value,
-                    phone: contactDetails.phones[0]?.value,
-                    qrCodePath: `/api/contacts/${contactDetails.id}/qr.png`,
-                } : null
-            };
-        }),
+        locations: locations.map((l: any) => ({
+            id: l.id,
+            name: l.name,
+            street: l.street,
+            houseNumber: l.houseNumber,
+            zip: l.zip,
+            city: l.city,
+            country: l.country,
+            contact: resolveLocationContactSync(l, { filterWorkOnly: true, fallbackToFirst: true })
+        })),
     };
 });

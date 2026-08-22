@@ -1,11 +1,12 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, campaign, announcementLocation, announcementTag, tag, announcementResource, resource } from '@ac/db';
+import { announcement, campaign, announcementLocation, announcementTag, tag, announcementResource, resource, locationContact } from '@ac/db';
 import { eq, desc, inArray, notInArray, and, or, ilike, sql, exists } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { Announcement as DbAnnouncement } from '@ac/db';
 import { announcementPaginationSchema as PaginationSchema, type Announcement, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
+import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 
 /**
  * List all announcements for the authenticated user
@@ -136,16 +137,92 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
                 with: {
                     tag: true
                 }
+            },
+            locations: {
+                with: {
+                    location: true
+                }
+            },
+            contacts: {
+                with: {
+                    contact: {
+                        with: {
+                            emails: true,
+                            phones: true,
+                            tags: {
+                                with: {
+                                    tag: true
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     });
 
-    const data = rawResults.map((row) => ({
-        ...row,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-        tags: row.tags?.map((t: any) => t.tag) || [],
-    }));
+    const neededLocationIds = new Set<string>();
+    for (const a of rawResults) {
+        const hasEmployee = (a.contacts || []).some((ac: any) => isEmployeeContact(ac.contact || ac));
+        if (!hasEmployee) {
+            for (const l of a.locations || []) {
+                if (l.location?.id) neededLocationIds.add(l.location.id);
+                else if (l.locationId) neededLocationIds.add(l.locationId);
+            }
+        }
+    }
+
+    const locationContactsMap = new Map<string, any[]>();
+    if (neededLocationIds.size > 0) {
+        const locContactsData = await db.query.locationContact.findMany({
+            where: inArray(locationContact.locationId, Array.from(neededLocationIds)),
+            with: {
+                contact: {
+                    with: {
+                        emails: true,
+                        phones: true,
+                        tags: {
+                            with: {
+                                tag: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        for (const lc of locContactsData) {
+            const list = locationContactsMap.get(lc.locationId) || [];
+            list.push(lc);
+            locationContactsMap.set(lc.locationId, list);
+        }
+    }
+
+    const data = rawResults.map((row) => {
+        const locations = (row.locations?.map((l: any) => l.location).filter(Boolean) || []).map((loc: any) => ({
+            ...loc,
+            locationContacts: locationContactsMap.get(loc.id) || []
+        }));
+
+        const resolvedContact = resolveAnnouncementContactSync({
+            ...row,
+            locations
+        }, {
+            filterWorkOnly: !hasAccess,
+            fallbackToLocation: true,
+            fallbackToFirst: true
+        });
+
+        return {
+            ...row,
+            createdAt: row.createdAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
+            tags: row.tags?.map((t: any) => t.tag) || [],
+            locations,
+            locationIds: locations.map((l: any) => l.id),
+            contactIds: row.contacts?.map((c: any) => c.contactId) || [],
+            resolvedContact,
+        };
+    });
 
     return { data: data as any, total };
 });

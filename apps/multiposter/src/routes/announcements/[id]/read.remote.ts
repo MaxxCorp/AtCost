@@ -6,6 +6,8 @@ import { getOptionalUser, hasAccess, ensureAccess } from '$lib/server/authorizat
 import * as v from 'valibot';
 import { type Announcement } from '@ac/validations';
 
+import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
+
 /**
  * Query: Read an announcement by ID
  * 
@@ -19,11 +21,17 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 		where: eq(announcement.id, announcementId),
 		with: {
 			locations: { with: { location: true } },
-			contacts: { with: { contact: { with: {
-				emails: true,
-				phones: true,
-				tags: { with: { tag: true } }
-			} } } },
+			contacts: {
+				with: {
+					contact: {
+						with: {
+							emails: true,
+							phones: true,
+							tags: { with: { tag: true } }
+						}
+					}
+				}
+			},
 			tags: { with: { tag: true } },
 			campaign: true,
 		}
@@ -40,35 +48,50 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     }
 
     // 3. Resolve Primary Contact
-	let resolvedContact = null;
-    const findEmployee = (contacts: any[]) => {
-		return contacts.find(ec => ec.contact.tags.some((ct: any) => ct.tag.name === 'Employee'));
-	};
+    const hasAnnouncementEmployee = (result.contacts || []).some((ac: any) => isEmployeeContact(ac.contact || ac));
+    const locationContactsMap = new Map<string, any[]>();
 
-	let chosenContact = findEmployee(result.contacts);
-	if (!chosenContact && result.contacts.length > 0) {
-		chosenContact = result.contacts[0];
-	}
+    if (!hasAnnouncementEmployee) {
+        const neededLocationIds = new Set<string>();
+        for (const l of result.locations || []) {
+            if (l.location?.id) neededLocationIds.add(l.location.id);
+            else if (l.locationId) neededLocationIds.add(l.locationId);
+        }
 
-    if (chosenContact) {
-		const c = chosenContact.contact;
-		const name = c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim();
-		
-		if (!isAuthorized) {
-			const workEmail = c.emails.find((e: any) => e.type === 'work')?.value || '';
-			const workPhone = c.phones.find((p: any) => p.type === 'work')?.value || '';
-			resolvedContact = { name, email: workEmail, phone: workPhone };
-		} else {
-			const primaryEmail = c.emails.find((e: any) => e.primary)?.value || c.emails[0]?.value || '';
-			const primaryPhone = c.phones.find((p: any) => p.primary)?.value || c.phones[0]?.value || '';
-			resolvedContact = { 
-				name, 
-				email: primaryEmail, 
-				phone: primaryPhone,
-				qrCodeDataUrl: c.qrCodePath?.includes('/api/') ? c.qrCodePath : `/api/contacts/${c.id}/qr.png`
-			};
-		}
-	}
+        if (neededLocationIds.size > 0) {
+            const locContactsData = await db.query.locationContact.findMany({
+                where: inArray(locationContact.locationId, Array.from(neededLocationIds)),
+                with: {
+                    contact: {
+                        with: {
+                            emails: true,
+                            phones: true,
+                            tags: { with: { tag: true } }
+                        }
+                    }
+                }
+            });
+            for (const lc of locContactsData) {
+                const list = locationContactsMap.get(lc.locationId) || [];
+                list.push(lc);
+                locationContactsMap.set(lc.locationId, list);
+            }
+        }
+    }
+
+    const locations = (result.locations?.map((l: any) => l.location).filter(Boolean) || []).map((loc: any) => ({
+        ...loc,
+        locationContacts: locationContactsMap.get(loc.id) || []
+    }));
+
+	const resolvedContact = resolveAnnouncementContactSync({
+        ...result,
+        locations
+    }, {
+		filterWorkOnly: !isAuthorized,
+		fallbackToLocation: true,
+		fallbackToFirst: true
+	});
 
     // 4. Return Data
     if (!isAuthorized) {

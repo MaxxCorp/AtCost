@@ -1,9 +1,10 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, eq, ne, notInArray, inArray, and, or, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
+import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { eventPaginationSchema as PaginationSchema, type PaginatedResult, type Event } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
+import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
 	let hasAccess = false;
@@ -231,7 +232,21 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	const rawResults = await db.query.event.findMany({
 		where: or(inArray(event.id, ids), inArray(event.recurringEventId, ids)),
 		with: {
-			contacts: true,
+			contacts: {
+				with: {
+					contact: {
+						with: {
+							emails: true,
+							phones: true,
+							tags: {
+								with: {
+									tag: true
+								}
+							}
+						}
+					}
+				}
+			},
 			locations: {
 				with: {
 					location: true
@@ -252,6 +267,47 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		},
 		orderBy: [orderExpression]
 	});
+
+	// Collect location IDs for events that might need location contact fallback
+	const neededLocationIds = new Set<string>();
+	for (const e of rawResults) {
+		const hasEmployee = (e.contacts || []).some((ec: any) => isEmployeeContact(ec.contact || ec));
+		if (!hasEmployee) {
+			for (const l of e.locations || []) {
+				if (l.location?.id) neededLocationIds.add(l.location.id);
+				else if (l.locationId) neededLocationIds.add(l.locationId);
+			}
+			for (const r of e.resources || []) {
+				const locId = (r.resource as any)?.locationId;
+				if (locId) neededLocationIds.add(locId);
+			}
+		}
+	}
+
+	const locationContactsMap = new Map<string, any[]>();
+	if (neededLocationIds.size > 0) {
+		const locContactsData = await db.query.locationContact.findMany({
+			where: inArray(locationContact.locationId, Array.from(neededLocationIds)),
+			with: {
+				contact: {
+					with: {
+						emails: true,
+						phones: true,
+						tags: {
+							with: {
+								tag: true
+							}
+						}
+					}
+				}
+			}
+		});
+		for (const lc of locContactsData) {
+			const list = locationContactsMap.get(lc.locationId) || [];
+			list.push(lc);
+			locationContactsMap.set(lc.locationId, list);
+		}
+	}
 
 	let results = rawResults;
 	if (excludePast) {
@@ -290,9 +346,35 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 
 	const data = results.map((e: any) => {
-		const evtLocations = e.locations?.map((l: any) => l.location).filter(Boolean) || [];
+		const evtLocations = (e.locations?.map((l: any) => l.location).filter(Boolean) || []).map((loc: any) => ({
+			...loc,
+			locationContacts: locationContactsMap.get(loc.id) || []
+		}));
 		const evtResources = e.resources?.map((r: any) => r.resource).filter(Boolean) || [];
 		const rooms = getEventRooms({ locations: evtLocations, resources: evtResources });
+
+		const resWithLocContacts = evtResources.map((res: any) => {
+			if (res.locationId && locationContactsMap.has(res.locationId)) {
+				return {
+					...res,
+					location: {
+						id: res.locationId,
+						locationContacts: locationContactsMap.get(res.locationId) || []
+					}
+				};
+			}
+			return res;
+		});
+
+		const resolvedContact = resolveEventContactSync({
+			...e,
+			locations: evtLocations,
+			resources: resWithLocContacts
+		}, {
+			filterWorkOnly: !hasAccess,
+			fallbackToLocation: true,
+			fallbackToFirst: true
+		});
 
 		return {
 			...e,
@@ -306,6 +388,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			locationIds: evtLocations.map((l: any) => l.id),
 			resourceIds: evtResources.map((r: any) => r.id),
 			tags: e.tags?.map((t: any) => t.tag || t).filter(Boolean) || [],
+			resolvedContact,
 		};
 	});
 
