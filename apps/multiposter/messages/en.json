@@ -715,6 +715,8 @@
 	"all_day_label": "All Day",
 	"back_to_kiosks_btn": "Back to Kiosks",
 	"event_label": "Event",
-	"events_count": "{count} Events"
+	"events_count": "{count} Events",
+	"all_items_tab": "All Items",
+	"document_badge": "Event & News Schedule"
 }
 

@@ -191,7 +191,7 @@
                         onclick={() => activeFilter = "all"}
                         class="px-2.5 py-1 rounded-lg font-medium transition-colors {activeFilter === 'all' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}"
                     >
-                        {m.filters()} ({items.length})
+                        {m.all_items_tab()} ({items.length})
                     </button>
                     {#if events.length > 0}
                         <button
@@ -266,7 +266,7 @@
                 <div class="space-y-2 flex-1">
                     <div class="flex items-center gap-3">
                         <span class="px-2.5 py-0.5 bg-slate-900 text-white print:bg-black text-[11px] font-bold tracking-widest uppercase rounded">
-                            {m.flat_list_print_export()}
+                            {m.document_badge()}
                         </span>
                         <span class="text-xs text-slate-500 font-medium">
                             {m.generated_on({ date: generatedDateStr })}
@@ -379,9 +379,9 @@
                                     </div>
 
                                     {#if showDescriptions && announcement.content}
-                                        <p class="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
-                                            {announcement.content}
-                                        </p>
+                                        <div class="rich-description text-xs sm:text-sm text-slate-700 dark:text-slate-300 print:text-black leading-relaxed">
+                                            {@html announcement.content}
+                                        </div>
                                     {/if}
 
                                     <!-- Tags & Associated Locations -->
@@ -484,13 +484,13 @@
                                         <div class="flex-1 space-y-1 min-w-0">
                                             <div class="flex flex-wrap items-center gap-2">
                                                 {#if event.status === 'cancelled'}
-                                                    <span class="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                                    <span class="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
                                                         {m.cancelled()}
                                                     </span>
                                                 {/if}
                                                 {#if event.status === 'tentative'}
-                                                    <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                                                        Tentative
+                                                    <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
+                                                        {m.tentative()}
                                                     </span>
                                                 {/if}
                                                 <h3 class="text-base sm:text-lg font-bold text-slate-900 leading-snug {event.status === 'cancelled' ? 'line-through text-slate-400' : ''}">
@@ -518,9 +518,9 @@
                                             </div>
 
                                             {#if showDescriptions && event.description}
-                                                <p class="text-xs text-slate-600 line-clamp-2 leading-relaxed pt-0.5">
-                                                    {event.description}
-                                                </p>
+                                                <div class="rich-description text-xs text-slate-600 dark:text-slate-300 print:text-black leading-relaxed pt-0.5">
+                                                    {@html event.description}
+                                                </div>
                                             {/if}
 
                                             <!-- Tags -->
@@ -570,6 +570,40 @@
 </div>
 
 <style>
+    .rich-description :global(p) {
+        margin-top: 0;
+        margin-bottom: 0.35rem;
+    }
+    .rich-description :global(p:last-child) {
+        margin-bottom: 0;
+    }
+    .rich-description :global(ul),
+    .rich-description :global(ol) {
+        margin: 0.35rem 0 0.35rem 1.25rem;
+        padding: 0;
+    }
+    .rich-description :global(ul) {
+        list-style-type: disc;
+    }
+    .rich-description :global(ol) {
+        list-style-type: decimal;
+    }
+    .rich-description :global(li) {
+        margin-bottom: 0.15rem;
+    }
+    .rich-description :global(a) {
+        color: #2563eb;
+        text-decoration: underline;
+    }
+    .rich-description :global(strong),
+    .rich-description :global(b) {
+        font-weight: 700;
+    }
+    .rich-description :global(em),
+    .rich-description :global(i) {
+        font-style: italic;
+    }
+
     @media print {
         @page {
             margin: 12mm 15mm;
@@ -581,6 +615,15 @@
             color: #000000 !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+        }
+
+        .rich-description :global(a) {
+            color: #000000 !important;
+            text-decoration: none !important;
+        }
+
+        .rich-description :global(*) {
+            color: #000000 !important;
         }
     }
 </style>

@@ -715,6 +715,8 @@
 	"all_day_label": "Ganztägig",
 	"back_to_kiosks_btn": "Zurück zu Kiosken",
 	"event_label": "Veranstaltung",
-	"events_count": "{count} Veranstaltungen"
+	"events_count": "{count} Veranstaltungen",
+	"all_items_tab": "Alle Einträge",
+	"document_badge": "Veranstaltungs- & Aushangübersicht"
 }
 
