@@ -34,126 +34,128 @@
 
     const i18n = {
         get name() {
-            return labels?.name ?? "Name";
+            return labels?.name ?? m?.location_name?.() ?? m?.name?.() ?? "Name";
         },
         get description() {
-            return labels?.description ?? "Description";
+            return labels?.description ?? m?.description?.() ?? "Description";
         },
         get capacity() {
-            return labels?.capacity ?? "Capacity";
+            return labels?.capacity ?? m?.capacity?.() ?? "Capacity";
         },
         get street() {
-            return labels?.street ?? "Street";
+            return labels?.street ?? m?.street?.() ?? "Street";
         },
         get houseNumber() {
-            return labels?.houseNumber ?? "House Number";
+            return labels?.houseNumber ?? m?.house_number?.() ?? "House Number";
         },
         get addressSuffix() {
-            return labels?.addressSuffix ?? "Address Suffix";
+            return labels?.addressSuffix ?? m?.address_suffix?.() ?? "Address Suffix";
         },
         get zip() {
-            return labels?.zip ?? "ZIP Code";
+            return labels?.zip ?? m?.zip_code?.() ?? m?.zip?.() ?? "ZIP Code";
         },
         get city() {
-            return labels?.city ?? "City";
+            return labels?.city ?? m?.city?.() ?? "City";
         },
         get state() {
-            return labels?.state ?? "State/Region";
+            return labels?.state ?? m?.state_region?.() ?? m?.state?.() ?? "State/Region";
         },
         get country() {
-            return labels?.country ?? "Country";
+            return labels?.country ?? m?.country?.() ?? "Country";
         },
         get roomId() {
-            return labels?.roomId ?? "Room ID";
+            return labels?.roomId ?? m?.room_id?.() ?? "Room ID";
         },
         get latitude() {
-            return labels?.latitude ?? "Latitude";
+            return labels?.latitude ?? m?.latitude?.() ?? "Latitude";
         },
         get longitude() {
-            return labels?.longitude ?? "Longitude";
+            return labels?.longitude ?? m?.longitude?.() ?? "Longitude";
         },
         get what3words() {
-            return labels?.what3words ?? "what3words";
+            return labels?.what3words ?? m?.what3words?.() ?? "what3words";
         },
         get inclusivitySupport() {
-            return labels?.inclusivitySupport ?? "Inclusivity Support";
+            return labels?.inclusivitySupport ?? m?.inclusivity_support?.() ?? "Inclusivity Support";
         },
         get isPublic() {
-            return labels?.isPublic ?? "Public";
+            return labels?.isPublic ?? m?.public?.() ?? "Public";
         },
         get saveChanges() {
-            return labels?.saveChanges ?? "Save Changes";
+            return labels?.saveChanges ?? m?.save_changes?.() ?? m?.save?.() ?? "Save Changes";
         },
         get createLocation() {
-            return labels?.createLocation ?? "Create Location";
+            return labels?.createLocation ?? (m?.create_item ? m.create_item({ item: m.location ? m.location() : 'Location' }) : undefined) ?? "Create Location";
         },
         get cancel() {
-            return labels?.cancel ?? "Cancel";
+            return labels?.cancel ?? m?.cancel?.() ?? "Cancel";
         },
         get saving() {
-            return labels?.saving ?? "Saving...";
+            return labels?.saving ?? m?.saving?.() ?? "Saving...";
         },
         get creating() {
-            return labels?.creating ?? "Creating...";
+            return labels?.creating ?? m?.creating?.() ?? "Creating...";
         },
         get successfullySaved() {
-            return labels?.successfullySaved ?? "Successfully Saved!";
+            return labels?.successfullySaved ?? m?.successfully_saved?.() ?? "Successfully Saved!";
         },
         get errorSomethingWentWrong() {
             return (
-                labels?.errorSomethingWentWrong ?? "Oh no! Something went wrong"
+                labels?.errorSomethingWentWrong ?? m?.something_went_wrong?.() ?? "Oh no! Something went wrong"
             );
         },
         get enterLocationName() {
-            return labels?.enterLocationName ?? "Enter location name";
+            return labels?.enterLocationName ?? m?.enter_location_name?.() ?? "Enter location name";
         },
         get streetName() {
-            return labels?.streetName ?? "Street name";
+            return labels?.streetName ?? m?.street_placeholder?.() ?? "Street name";
         },
         get houseNumberPlaceholder() {
-            return labels?.houseNumberPlaceholder ?? "e.g. 10A";
+            return labels?.houseNumberPlaceholder ?? m?.house_number_placeholder?.() ?? "e.g. 10A";
         },
         get addressSuffixPlaceholder() {
             return (
-                labels?.addressSuffixPlaceholder ?? "e.g. Backyard, 2nd floor"
+                labels?.addressSuffixPlaceholder ?? m?.address_suffix_placeholder?.() ?? "e.g. Backyard, 2nd floor"
             );
         },
         get zipCodePlaceholder() {
-            return labels?.zipCodePlaceholder ?? "Postal code";
+            return labels?.zipCodePlaceholder ?? m?.zip_code_placeholder?.() ?? "Postal code";
         },
         get cityNamePlaceholder() {
-            return labels?.cityNamePlaceholder ?? "City name";
+            return labels?.cityNamePlaceholder ?? m?.city_placeholder?.() ?? "City name";
         },
         get statePlaceholder() {
-            return labels?.statePlaceholder ?? "State";
+            return labels?.statePlaceholder ?? m?.state_placeholder?.() ?? "State";
         },
         get countryPlaceholder() {
-            return labels?.countryPlaceholder ?? "Country";
+            return labels?.countryPlaceholder ?? m?.country_placeholder?.() ?? "Country";
         },
         get enterRoomId() {
-            return labels?.enterRoomId ?? "Enter room ID (e.g. 101)";
+            return labels?.enterRoomId ?? m?.room_id_placeholder?.() ?? "Enter room ID (e.g. 101)";
         },
         get latitudePlaceholder() {
-            return labels?.latitudePlaceholder ?? "Latitude";
+            return labels?.latitudePlaceholder ?? m?.latitude_placeholder?.() ?? "Latitude";
         },
         get longitudePlaceholder() {
-            return labels?.longitudePlaceholder ?? "Longitude";
+            return labels?.longitudePlaceholder ?? m?.longitude_placeholder?.() ?? "Longitude";
         },
         get what3wordsPlaceholder() {
-            return labels?.what3wordsPlaceholder ?? "e.g. filled.count.soap";
+            return labels?.what3wordsPlaceholder ?? m?.what3words_placeholder?.() ?? "e.g. filled.count.soap";
         },
         get inclusivitySupportPlaceholder() {
             return (
                 labels?.inclusivitySupportPlaceholder ??
+                m?.accessibility_info?.() ??
                 "Accessibility and inclusivity information"
             );
         },
         get heroImage() {
-            return labels?.heroImage ?? "Hero Image";
+            return labels?.heroImage ?? m?.hero_image?.() ?? "Hero Image";
         },
         get pleaseFixValidation() {
             return (
                 labels?.pleaseFixValidation ??
+                m?.please_fix_validation_errors?.() ??
                 "Please fix the validation errors in the form."
             );
         },
@@ -170,8 +172,6 @@
 
     $effect(() => {
         const data = initialData || {};
-        console.log("LocationForm initialData:", data);
-        console.log("LocationForm validationSchema:", validationSchema);
         
         // Extract keys from Valibot schema (handles object, intersect, pipe, etc.)
         const getKeys = (s: any): string[] => {
@@ -188,19 +188,14 @@
         };
 
         const schemaKeys = [...new Set(getKeys(validationSchema))];
-        console.log("LocationForm schemaKeys:", schemaKeys);
-        console.log("LocationForm remoteFunction fields:", Object.keys(remoteFunction.fields || {}));
         
         for (const key of schemaKeys) {
             const value = data[key];
             const defaultValue = key === "isPublic" ? true : "";
             const finalValue = value ?? defaultValue;
             
-            if (remoteFunction.fields[key]) {
-                console.log(`Setting field ${key} to:`, finalValue);
+            if (remoteFunction?.fields?.[key]) {
                 remoteFunction.fields[key].set(finalValue);
-            } else {
-                console.warn(`Field ${key} not found in remoteFunction.fields`);
             }
         }
     });

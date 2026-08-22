@@ -1,7 +1,6 @@
 <script lang="ts">
     import { MapPin } from "@lucide/svelte";
-    import { EntityManager } from "@ac/ui";
-    import LocationForm from "@ac/ui/components/forms/LocationForm.svelte";
+    import { EntityManager, LocationForm } from "@ac/ui";
     import { listLocations } from "./list.remote";
     import { createLocation } from "./new/create.remote";
     import { updateLocation } from "./[id]/update.remote";

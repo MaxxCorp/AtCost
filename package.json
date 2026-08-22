@@ -16,8 +16,8 @@
 		"db:check": "pnpm --filter @ac/db run db:check"
 	},
 	"devDependencies": {
-		"typescript": "^5.7.3",
-		"@typescript/native": "npm:typescript@7.0.2"
+		"@typescript/native": "npm:typescript@7.0.2",
+		"typescript": "^5.7.3"
 	},
 	"overrides": {
 		"typescript": "^5.7.3",
@@ -28,7 +28,7 @@
 		"drizzle-kit": "0.31.10"
 	},
 	"dependencies": {
-		"@rolldown/binding-win32-x64-msvc": "1.2.1",
+		"@rolldown/binding-win32-x64-msvc": "1.2.5",
 		"@tailwindcss/oxide-win32-x64-msvc": "^4.3.3",
 		"valibot": "^1.4.2"
 	}

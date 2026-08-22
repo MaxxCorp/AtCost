@@ -1,5 +1,6 @@
 <script lang="ts">
-    import LocationForm from "@ac/ui/components/forms/LocationForm.svelte";
+    import * as m from "$lib/paraglide/messages";
+    import { LocationForm } from "@ac/ui";
     import { createLocation } from "./create.remote";
     import { createLocationSchema } from "@ac/validations/locations";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
@@ -22,6 +23,7 @@
         class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8"
     >
         <LocationForm
+            {m}
             remoteFunction={rf}
             validationSchema={createLocationSchema}
             cancelHref="/locations"

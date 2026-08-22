@@ -6,7 +6,7 @@
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 
     import { createContactSchema } from "$lib/validations/contacts";
-    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
+    import { LocationManager, handleDelete } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
     import * as m from "$lib/paraglide/messages";
     import { listLocations } from "../../locations/list.remote";
@@ -60,10 +60,7 @@
                                     <MapPin size={18} class="text-blue-600" />
                                     {m.feature_locations_title()}
                                 </h3>
-                                <EntityManager {m}
-                                    title={m.feature_locations_title()}
-                                    icon={MapPin}
-                                    type="contact"
+                                <LocationManager {m}
                                     entityId={""}
                                     initialItems={[]}
                                     onchange={onLocationsChange}
@@ -79,106 +76,22 @@
                                             ...p,
                                             locationId: p.itemId,
                                         } as any)}
-                            deleteItemRemote={async (ids: any) => {
-                                return await handleDelete({
-                                    ids: Array.isArray(ids)
-                                        ? ids
-                                        : [ids],
-                                    deleteFn: deleteLocation,
-                                    itemName: m
-                                        .location()
-                                        .toLowerCase(),
-                                });
-                            }}
-                            createRemote={createLocation}
-                            createSchema={createLocationSchema}
-                            updateRemote={updateLocation}
-                            updateSchema={updateLocationSchema}
-                            getFormData={(l: any) => l}
-                                    searchPredicate={(l: any, q: string) => {
-                                        return (
-                                            l.name
-                                                .toLowerCase()
-                                                .includes(q.toLowerCase()) ||
-                                            (l.roomId
-                                                ?.toLowerCase()
-                                                .includes(
-                                                    q.toLowerCase(),
-                                                ) ??
-                                                false)
-                                        );
+                                    deleteItemRemote={async (ids: any) => {
+                                        return await handleDelete({
+                                            ids: Array.isArray(ids)
+                                                ? ids
+                                                : [ids],
+                                            deleteFn: deleteLocation,
+                                            itemName: m
+                                                .location()
+                                                .toLowerCase(),
+                                        });
                                     }}
-                                    loadingLabel={m.loading_item({ item: m.feature_locations_title() })}
-                                    noItemsLabel={m.no_items_associated_label({ item: m.feature_locations_title() })}
-                                    noItemsFoundLabel={m.no_items_found({ item: m.feature_locations_title() })}
-                                    searchPlaceholder={m.search_placeholder({ item: m.feature_locations_title() })}
-                                    linkItemLabel={m.link_item_label({ item: m.feature_locations_title() })}
-                                    associatedItemLabel={m.associated_item_label({ item: m.feature_locations_title() })}
-                                    quickCreateLabel={m.quick_create()}
-                                    closeSearchLabel={m.close_search()}
-                                    editLabel={m.edit()}
-                                    deleteLabel={m.delete()}
-                                    unlinkLabel={m.unlink()}
-                                    deleteForeverLabel={m.delete_forever({ item: m.location() })}
-                                    bulkDeleteLabel={m.delete_selected({ count: 0 })}
-                                    selectAllLabel={m.select_all()}
-                                    deselectAllLabel={m.deselect_all()}
-                                    confirmUnlinkLabel={m.confirm_unlink_label({ item: m.location() })}
-                                >
-                            {#snippet renderItemLabel(location: any)}
-                                {location.name}
-                                {location.roomId
-                                    ? `(${location.roomId})`
-                                    : ""}
-                            {/snippet}
-                            {#snippet renderForm({ remoteFunction: rf, schema, id, initialData: formData, onSuccess, onCancel }: any)}
-                                <LocationForm
-                                    remoteFunction={rf}
-                                    validationSchema={schema}
-                                    isUpdating={!!id}
-                                    initialData={formData}
-                                    {onSuccess}
-                                    {onCancel}
-                                    labels={{
-                                        name: m.location_name(),
-                                        street: m.street(),
-                                        houseNumber: m.house_number(),
-                                        addressSuffix: m.address_suffix(),
-                                        zip: m.zip_code(),
-                                        city: m.city(),
-                                        state: m.state_region(),
-                                        country: m.country(),
-                                        roomId: m.room_id(),
-                                        latitude: m.latitude(),
-                                        longitude: m.longitude(),
-                                        what3words: m.what3words(),
-                                        inclusivitySupport: m.inclusivity_support(),
-                                        isPublic: m.public(),
-                                        heroImage: m.hero_image(),
-                                        saveChanges: m.save_changes(),
-                                        createLocation: m.create_location(),
-                                        cancel: m.cancel(),
-                                        saving: m.loading(),
-                                        creating: m.creating(),
-                                        successfullySaved: m.successfully_saved(),
-                                        errorSomethingWentWrong: m.something_went_wrong(),
-                                        enterLocationName: m.enter_location_name(),
-                                        streetName: m.street_placeholder(),
-                                        houseNumberPlaceholder: m.house_number_placeholder(),
-                                        addressSuffixPlaceholder: m.address_suffix_placeholder(),
-                                        zipCodePlaceholder: m.zip_code_placeholder(),
-                                        cityNamePlaceholder: m.city_placeholder(),
-                                        statePlaceholder: m.state_placeholder(),
-                                        countryPlaceholder: m.country_placeholder(),
-                                        enterRoomId: m.room_id_placeholder(),
-                                        latitudePlaceholder: m.latitude_placeholder(),
-                                        longitudePlaceholder: m.longitude_placeholder(),
-                                        what3wordsPlaceholder: m.what3words_placeholder(),
-                                        inclusivitySupportPlaceholder: m.accessibility_info(),
-                                    }}
+                                    createRemote={createLocation}
+                                    createSchema={createLocationSchema}
+                                    updateRemote={updateLocation}
+                                    updateSchema={updateLocationSchema}
                                 />
-                            {/snippet}
-                        </EntityManager>
                     </div>
                 {/snippet}
             </ContactForm>

@@ -51,7 +51,10 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 	const session = result?.session ?? null;
 	event.locals.session = session;
 	event.locals.user = result?.user ?? null;
-	return svelteKitHandler({ event, resolve, auth, building });
+	if (event.url.pathname.startsWith('/api/auth')) {
+		return svelteKitHandler({ event, resolve, auth, building });
+	}
+	return resolve(event);
 };
 
 const handleRouteGuard: Handle = async ({ event, resolve }) => {
@@ -89,30 +92,26 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-const handleE2EAuth: Handle = async ({ event, resolve }) => {
-	if (env.PLAYWRIGHT_TEST === 'true' && !event.locals.user) {
-		const mockUserId = 'playwright-test-user';
+const handleDevAuth: Handle = async ({ event, resolve }) => {
+	if ((dev || env.PLAYWRIGHT_TEST === 'true') && !event.locals.user) {
+		const mockUserId = 'dev-test-user';
 		
-		// Ensure user exists in the database using onConflictDoNothing to handle concurrent requests gracefully
-		console.log('[E2E Auth] Attempting to insert mock user:', mockUserId);
 		await db.insert(user).values({
 			id: mockUserId,
 			email: `${mockUserId}@example.com`,
-			name: 'Playwright Test',
+			name: 'Dev User',
 			emailVerified: true,
 			createdAt: new Date(),
 			updatedAt: new Date()
-		}).onConflictDoNothing({ target: user.id }).then(() => {
-			console.log('[E2E Auth] Successfully inserted mock user:', mockUserId);
-		}).catch(err => {
-			console.error('[E2E Auth] Failed to insert mock user:', err);
+		}).onConflictDoNothing({ target: user.id }).catch(err => {
+			console.error('[Dev Auth] Failed to insert mock user:', err);
 		});
 
 		event.locals.user = {
 			id: mockUserId,
-			email: 'test@example.com',
+			email: 'dev@example.com',
 			emailVerified: true,
-			name: 'Playwright Test',
+			name: 'Dev User',
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			roles: ['admin'] // Ensure 'admin' role is present based on ensureAccess
@@ -122,6 +121,6 @@ const handleE2EAuth: Handle = async ({ event, resolve }) => {
 };
 
 export const handle: Handle = dev
-	? sequence(handleWebhook, handleBetterAuth, handleE2EAuth, handleRouteGuard)
+	? sequence(handleWebhook, handleBetterAuth, handleDevAuth, handleRouteGuard)
 	: sequence(handleWebhook, handleBetterAuth, handleRouteGuard);
 

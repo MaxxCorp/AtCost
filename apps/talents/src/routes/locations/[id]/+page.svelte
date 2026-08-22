@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "$lib/paraglide/messages";
-    import { Users } from "@lucide/svelte";
-    import { EntityManager } from "@ac/ui";
-    import TalentForm from "$lib/components/talent/TalentForm.svelte";
     import { page } from "$app/state";
-    import LocationForm from "@ac/ui/components/forms/LocationForm.svelte";
-        import { readLocation } from "./read.remote";
+    import { Users } from "@lucide/svelte";
+    import { EntityManager, LocationForm, LoadingSection, ErrorSection, handleDelete } from "@ac/ui";
+    import TalentForm from "$lib/components/talent/TalentForm.svelte";
+    import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { updateLocationSchema } from "@ac/validations/locations";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
@@ -18,7 +16,6 @@
     import { listTags } from "../../talents/talents.remote";
     import { listLocations } from "../list.remote";
     import { createTalentSchema, updateTalentSchema } from "@ac/validations/talents";
-    import { handleDelete } from "@ac/ui";
 
 
     const id = $derived(page.params.id as string);
@@ -58,6 +55,7 @@
             class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8"
         >
             <LocationForm
+                {m}
                 remoteFunction={updateLocation.for(id)}
                 validationSchema={updateLocationSchema}
                 initialData={locationQuery.data}

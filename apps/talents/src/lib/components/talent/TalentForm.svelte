@@ -36,7 +36,7 @@
         AsyncButton,
         ContactFields,
         EntityManager,
-        LocationForm,
+        LocationManager,
         handleDelete,
         matchContactSearch,
     } from "@ac/ui";
@@ -794,10 +794,7 @@
                     <p class="text-sm text-gray-500">
                         {m.manage_locations_description()}
                     </p>
-                    <EntityManager
-                        title={m.locations()}
-                        icon={MapPin}
-                        mode="embedded"
+                    <LocationManager {m}
                         initialItems={allLocations.filter((l) =>
                             locationIds.includes(l.id),
                         )}
@@ -809,7 +806,6 @@
                         createSchema={createLocationSchema}
                         updateRemote={updateLocation}
                         updateSchema={updateLocationSchema}
-                        getFormData={(l: any) => l}
                         deleteItemRemote={async (ids: string[]) => {
                             return await handleDelete({
                                 ids,
@@ -817,39 +813,7 @@
                                 itemName: "location",
                             });
                         }}
-                        searchPredicate={(item: any, term: string) =>
-                            item.name
-                                .toLowerCase()
-                                .includes(term.toLowerCase())}
-                    >
-                        {#snippet renderItemLabel(l: any)}
-                            <span>{l.name}</span>
-                            {#if l.city}
-                                <span class="text-gray-400 text-xs ml-1"
-                                    >({l.city})</span
-                                >
-                            {/if}
-
-                        {/snippet}
-
-                        {#snippet renderForm({
-                            remoteFunction: rf,
-                            schema,
-                            initialData: formData,
-                            onSuccess: os,
-                            onCancel: oc,
-                            id: lid,
-                        }: any)}
-                            <LocationForm
-                                remoteFunction={rf}
-                                validationSchema={schema}
-                                initialData={formData}
-                                onSuccess={os}
-                                onCancel={oc}
-                                isUpdating={!!lid}
-                            />
-                        {/snippet}
-                    </EntityManager>
+                    />
                 </div>
             </div>
         </div>
