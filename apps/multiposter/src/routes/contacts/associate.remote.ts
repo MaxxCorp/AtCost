@@ -31,7 +31,14 @@ export const addAssociation = command(associationSchema, async (data) => {
     const { type, entityId, contactId } = data;
 
     // Authorization check
-    if (!hasAccess(user, 'contacts') && !(type === 'event' && hasAccess(user, 'events')) && !(type === 'announcement' && hasAccess(user, 'announcements'))) {
+    const isAuthorized = 
+        hasAccess(user, 'contacts') ||
+        (type === 'event' && hasAccess(user, 'events')) ||
+        (type === 'announcement' && hasAccess(user, 'announcements')) ||
+        (type === 'location' && hasAccess(user, 'locations')) ||
+        (type === 'resource' && hasAccess(user, 'resources'));
+
+    if (!isAuthorized) {
         throw new Error('Forbidden');
     }
 
@@ -53,7 +60,14 @@ export const removeAssociation = command(associationSchema, async (data) => {
     const { type, entityId, contactId } = data;
 
     // Authorization check
-    if (!hasAccess(user, 'contacts') && !(type === 'event' && hasAccess(user, 'events')) && !(type === 'announcement' && hasAccess(user, 'announcements'))) {
+    const isAuthorized = 
+        hasAccess(user, 'contacts') ||
+        (type === 'event' && hasAccess(user, 'events')) ||
+        (type === 'announcement' && hasAccess(user, 'announcements')) ||
+        (type === 'location' && hasAccess(user, 'locations')) ||
+        (type === 'resource' && hasAccess(user, 'resources'));
+
+    if (!isAuthorized) {
         throw new Error('Forbidden');
     }
 
@@ -98,7 +112,14 @@ export const fetchEntityContacts = query(getAssociationsSchema, async (data): Pr
     
     // Auth check
     const user = getAuthenticatedUser();
-    if (!hasAccess(user, 'contacts') && !(type === 'event' && hasAccess(user, 'events')) && !(type === 'announcement' && hasAccess(user, 'announcements'))) {
+    const isAuthorized = 
+        hasAccess(user, 'contacts') ||
+        (type === 'event' && hasAccess(user, 'events')) ||
+        (type === 'announcement' && hasAccess(user, 'announcements')) ||
+        (type === 'location' && hasAccess(user, 'locations')) ||
+        (type === 'resource' && hasAccess(user, 'resources'));
+
+    if (!isAuthorized) {
         throw new Error('Forbidden');
     }
 
