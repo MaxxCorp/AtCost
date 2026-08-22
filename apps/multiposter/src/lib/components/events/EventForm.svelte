@@ -1329,27 +1329,24 @@
                             title={m.feature_locations_title()}
                             icon={MapPin}
                             mode="embedded"
-                            type="location"
+                            type="contact"
                             entityId={id}
                             initialItems={(
                                 (formData as any)?.locationAssociations || []
-                            ).map((la: any) => la.location)}
+                            ).map((la: any) => la.location).filter(Boolean)}
                             onchange={onLocationsChange}
                             listItemsRemote={listLocations as any}
-                            addAssociationRemote={async (p: any) => {
-                                return await addAssociation({
-                                    type: "location",
-                                    entityId: p.itemId,
-                                    contactId: p.entityId,
-                                });
-                            }}
-                            removeAssociationRemote={async (p: any) => {
-                                return await removeAssociation({
-                                    type: "location",
-                                    entityId: p.itemId,
-                                    contactId: p.entityId,
-                                });
-                            }}
+                            fetchAssociationsRemote={fetchEntityLocations as any}
+                            addAssociationRemote={async (p: any) =>
+                                addLocationAssociation({
+                                    ...p,
+                                    locationId: p.itemId,
+                                } as any)}
+                            removeAssociationRemote={async (p: any) =>
+                                removeLocationAssociation({
+                                    ...p,
+                                    locationId: p.itemId,
+                                } as any)}
                             deleteItemRemote={async (ids: any) => {
                                 return await handleDelete({
                                     ids: Array.isArray(ids) ? ids : [ids],

@@ -27,7 +27,7 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	const conditions = [];
 
     if (associatedWith) {
-        const { eq } = await import('@ac/db');
+        const { eq, sql } = await import('@ac/db');
         if (associatedWith.type === 'event') {
             const { eventLocation } = await import('@ac/db');
             baseQuery = baseQuery.innerJoin(eventLocation, eq(location.id, eventLocation.locationId)) as any;
@@ -48,6 +48,8 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
             const { announcementLocation } = await import('@ac/db');
             baseQuery = baseQuery.innerJoin(announcementLocation, eq(location.id, announcementLocation.locationId)) as any;
             conditions.push(eq(announcementLocation.announcementId, associatedWith.id));
+        } else {
+            conditions.push(sql`1 = 0`);
         }
     }
 

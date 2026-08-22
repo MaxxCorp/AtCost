@@ -576,8 +576,6 @@
 					title="Recipient Contacts"
 					icon={Users}
 					mode="embedded"
-					type="sync_config"
-					entityId={initialData?.id || ""}
 					initialItems={initialContacts}
 					onchange={(ids: string[]) => {
 						recipientContactIds = ids;

@@ -286,11 +286,12 @@
     let deletingItemId = $state<string | null>(null);
     let editingItem = $state<any | null>(null);
 
-    // --- HELPERS ---
     function isAssociated(item: T, list: T[]) {
+        if (!item || !list || !Array.isArray(list)) return false;
         return list.some((ai) => {
+            if (!ai) return false;
             if (item.id && ai.id) return ai.id === item.id;
-            if (item.name && ai.name) return ai.name === item.name;
+            if (item.name && ai.name && item.name.trim() === ai.name.trim()) return true;
             return false;
         });
     }

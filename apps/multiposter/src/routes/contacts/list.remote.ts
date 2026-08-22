@@ -27,6 +27,24 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
             const { eventContact } = await import('@ac/db');
             baseQuery = baseQuery.innerJoin(eventContact, eq(contact.id, eventContact.contactId)) as any;
             conditions.push(eq(eventContact.eventId, associatedWith.id));
+        } else if (associatedWith.type === 'location') {
+            const { locationContact } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(locationContact, eq(contact.id, locationContact.contactId)) as any;
+            conditions.push(eq(locationContact.locationId, associatedWith.id));
+        } else if (associatedWith.type === 'resource') {
+            const { resourceContact } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(resourceContact, eq(contact.id, resourceContact.contactId)) as any;
+            conditions.push(eq(resourceContact.resourceId, associatedWith.id));
+        } else if (associatedWith.type === 'announcement') {
+            const { announcementContact } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(announcementContact, eq(contact.id, announcementContact.contactId)) as any;
+            conditions.push(eq(announcementContact.announcementId, associatedWith.id));
+        } else if (associatedWith.type === 'user') {
+            const { userContact } = await import('@ac/db');
+            baseQuery = baseQuery.innerJoin(userContact, eq(contact.id, userContact.contactId)) as any;
+            conditions.push(eq(userContact.userId, associatedWith.id));
+        } else {
+            conditions.push(sql`1 = 0`);
         }
     }
 

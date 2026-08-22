@@ -17,6 +17,11 @@
         createLocationSchema,
         updateLocationSchema,
     } from "@ac/validations";
+    import {
+        addLocationAssociation,
+        removeLocationAssociation,
+        fetchEntityLocations,
+    } from "../../locations/associate.remote";
 
 
     function handleSuccess(result: any) {
@@ -58,32 +63,22 @@
                                 <EntityManager {m}
                                     title={m.feature_locations_title()}
                                     icon={MapPin}
-                                    type="location"
+                                    type="contact"
                                     entityId={""}
                                     initialItems={[]}
-                                    
-                            onchange={onLocationsChange}
-                            listItemsRemote={listLocations}
-                            addAssociationRemote={async (p: any) => {
-                                const { addAssociation } = await import(
-                                    "../associate.remote"
-                                );
-                                return await addAssociation({
-                                    type: "location",
-                                    entityId: p.itemId,
-                                    contactId: p.entityId,
-                                });
-                            }}
-                            removeAssociationRemote={async (p: any) => {
-                                const {
-                                    removeAssociation,
-                                } = await import("../associate.remote");
-                                return await removeAssociation({
-                                    type: "location",
-                                    entityId: p.itemId,
-                                    contactId: p.entityId,
-                                });
-                            }}
+                                    onchange={onLocationsChange}
+                                    listItemsRemote={listLocations}
+                                    fetchAssociationsRemote={fetchEntityLocations as any}
+                                    addAssociationRemote={async (p: any) =>
+                                        addLocationAssociation({
+                                            ...p,
+                                            locationId: p.itemId,
+                                        } as any)}
+                                    removeAssociationRemote={async (p: any) =>
+                                        removeLocationAssociation({
+                                            ...p,
+                                            locationId: p.itemId,
+                                        } as any)}
                             deleteItemRemote={async (ids: any) => {
                                 return await handleDelete({
                                     ids: Array.isArray(ids)

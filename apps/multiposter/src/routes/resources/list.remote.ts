@@ -25,6 +25,9 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
             const { eventResource } = await import('@ac/db');
             baseQuery = baseQuery.innerJoin(eventResource, eq(resource.id, eventResource.resourceId)) as any;
             conditions.push(eq(eventResource.eventId, associatedWith.id));
+        } else {
+            const { sql } = await import('@ac/db');
+            conditions.push(sql`1 = 0`);
         }
     }
 

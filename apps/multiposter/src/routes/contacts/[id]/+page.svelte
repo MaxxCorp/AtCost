@@ -125,7 +125,7 @@
                                             entityId={contactId}
                                             initialItems={(
                                                 contact.locationAssociations || []
-                                            ).map((la: any) => la.location)}
+                                            ).map((la: any) => la.location).filter(Boolean)}
                                             onchange={onLocationsChange}
                                             listItemsRemote={listLocations}
                                             fetchAssociationsRemote={fetchEntityLocations as any}

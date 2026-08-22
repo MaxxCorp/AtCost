@@ -32,9 +32,12 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
 
     if (associatedWith) {
         if (associatedWith.type === 'event') {
-            const { eventResource } = await import('@ac/db');
+            const { eventResource, eq } = await import('@ac/db');
             baseQuery = baseQuery.innerJoin(eventResource, eq(resource.id, eventResource.resourceId)) as any;
             baseQuery = baseQuery.where(eq(eventResource.eventId, associatedWith.id)) as any;
+        } else {
+            const { sql } = await import('@ac/db');
+            baseQuery = baseQuery.where(sql`1 = 0`) as any;
         }
     }
 
