@@ -45,6 +45,13 @@ export const auth = betterAuth({
 
         },
     },
+    account: {
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ["google", "microsoft"],
+            requireLocalEmailVerified: false,
+        },
+    },
     socialProviders: {
         google: {
             clientId: env.GOOGLE_CLIENT_ID || "",
@@ -75,6 +82,7 @@ export const auth = betterAuth({
                     email: email,
                     name: profile.name || (profile as any).displayName || (profile as any).userPrincipalName,
                     image: profile.picture,
+                    emailVerified: true,
                     claims: {
                         ...(profile as any),
                         email: email

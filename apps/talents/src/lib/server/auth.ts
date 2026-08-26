@@ -38,6 +38,13 @@ export const auth = betterAuth({
             },
         },
     },
+    account: {
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ["google", "microsoft"],
+            requireLocalEmailVerified: false,
+        },
+    },
     socialProviders: {
         google: {
             clientId: env.GOOGLE_CLIENT_ID || "",

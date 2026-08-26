@@ -52,8 +52,10 @@ export const account = pgTable("account", {
     updatedAt: timestamp("updated_at")
         .$onUpdate(() => new Date())
         .notNull(),
+    issuer: text("issuer"),
 }, (table) => [
     index("account_user_provider_id_idx").on(table.userId, table.providerId),
+    index("account_issuer_account_id_idx").on(table.issuer, table.accountId),
 ]);
 
 export const verification = pgTable("verification", {

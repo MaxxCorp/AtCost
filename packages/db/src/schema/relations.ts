@@ -25,6 +25,16 @@ export const userRelations = relations(user, ({ many }) => ({
     syncConfigs: many(syncConfig),
     timeOffRequests: many(timeOffRequest),
     userTalents: many(userTalent),
+    accounts: many(account),
+    sessions: many(session),
+}));
+
+export const sessionRelations = relations(session, ({ one }) => ({
+    user: one(user, { fields: [session.userId], references: [user.id] }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+    user: one(user, { fields: [account.userId], references: [user.id] }),
 }));
 
 export const contactRelations = relations(contact, ({ many, one }) => ({
