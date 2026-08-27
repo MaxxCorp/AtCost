@@ -63,17 +63,67 @@
 
 	let expandedSeries = $state<Record<string, boolean>>({});
 
+	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+
 	// Filter state
 	let sortField = $state<"updatedAt" | "startDateTime" | "createdAt">(
 		"updatedAt",
 	);
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let selectedTags = $state<string[]>([]);
-	let selectedLocations = $state<string[]>([]);
+	let filterValues = $state<FilterStateMap>({});
 	let excludePast = $state(false);
+	let excludeSeries = $state(false);
+	let onlySeries = $state(false);
 	let page = $state(1);
 	let limit = $state(50);
+
+	const filterGroups = $derived<FilterGroup[]>([
+		{
+			id: "tagId",
+			label: m.tags(),
+			optionsRemote: listTags,
+			searchable: true,
+		},
+		{
+			id: "locationId",
+			label: m.locations(),
+			optionsRemote: listLocations,
+			searchable: true,
+		},
+	]);
+
+	const booleanFilters = $derived([
+		{
+			id: "excludePast",
+			label: m.hide_past_events(),
+			checked: excludePast,
+			onchange: (val: boolean) => {
+				excludePast = val;
+				page = 1;
+			},
+		},
+		{
+			id: "excludeSeries",
+			label: m.hide_series_events(),
+			checked: excludeSeries,
+			onchange: (val: boolean) => {
+				excludeSeries = val;
+				if (excludeSeries) onlySeries = false;
+				page = 1;
+			},
+		},
+		{
+			id: "onlySeries",
+			label: m.only_series_events(),
+			checked: onlySeries,
+			onchange: (val: boolean) => {
+				onlySeries = val;
+				if (onlySeries) excludeSeries = false;
+				page = 1;
+			},
+		},
+	]);
 
 	onMount(async () => {
 		try {
@@ -82,11 +132,13 @@
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.sortField) sortField = prefs.sortField;
 				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
-				if (prefs.selectedTags) selectedTags = prefs.selectedTags;
-				if (prefs.selectedLocations)
-					selectedLocations = prefs.selectedLocations;
+				if (prefs.filterValues) filterValues = prefs.filterValues;
 				if (prefs.excludePast !== undefined)
 					excludePast = prefs.excludePast;
+				if (prefs.excludeSeries !== undefined)
+					excludeSeries = prefs.excludeSeries;
+				if (prefs.onlySeries !== undefined)
+					onlySeries = prefs.onlySeries;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -97,9 +149,10 @@
 		const prefsToSave = {
 			sortField,
 			sortOrder,
-			selectedTags,
-			selectedLocations,
+			filterValues,
 			excludePast,
+			excludeSeries,
+			onlySeries,
 		};
 		setPreference("eventsFilters", JSON.stringify(prefsToSave)).catch(
 			console.error,
@@ -109,21 +162,15 @@
 	const filterState = $derived({
 		page,
 		limit,
-		search: searchQuery,
-		tagId: selectedTags.length > 0 ? selectedTags : undefined,
-		locationId:
-			selectedLocations.length > 0 ? selectedLocations : undefined,
+		search: searchQuery || undefined,
+		tagId: (filterValues.tagId?.include?.length || filterValues.tagId?.exclude?.length) ? filterValues.tagId : undefined,
+		locationId: (filterValues.locationId?.include?.length || filterValues.locationId?.exclude?.length) ? filterValues.locationId : undefined,
 		sortField,
 		sortOrder,
 		excludePast,
+		excludeSeries: excludeSeries || undefined,
+		onlySeries: onlySeries || undefined,
 	});
-
-	const tagsQuery = listTags({ limit: 100 });
-	const locationsQuery = listLocations({ limit: 100 });
-
-	const activeFiltersCount = $derived(
-		selectedTags.length + selectedLocations.length + (excludePast ? 1 : 0),
-	);
 
 	function toggleSeries(id: string) {
 		expandedSeries[id] = !expandedSeries[id];
@@ -146,24 +193,6 @@
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
-	}
-
-	function toggleTag(id: string) {
-		if (selectedTags.includes(id)) {
-			selectedTags = selectedTags.filter((t) => t !== id);
-		} else {
-			selectedTags = [...selectedTags, id];
-		}
-		page = 1;
-	}
-
-	function toggleLocation(id: string) {
-		if (selectedLocations.includes(id)) {
-			selectedLocations = selectedLocations.filter((l) => l !== id);
-		} else {
-			selectedLocations = [...selectedLocations, id];
-		}
-		page = 1;
 	}
 
 	function groupEvents(rawEvents: any[]) {
@@ -222,138 +251,13 @@
 				/>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger>
-							<Button
-								variant="outline"
-								class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-							>
-								<FilterIcon size={16} class="mr-2" />
-								{m.filters()}
-								{#if activeFiltersCount > 0}
-									<span
-										class="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm"
-									>
-										{activeFiltersCount}
-									</span>
-								{/if}
-							</Button>
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content
-							align="end"
-							class="min-w-[200px] rounded-2xl shadow-xl border-gray-100 p-1"
-						>
-							<DropdownMenu.Label
-								class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2"
-								>{m.system_filters()}</DropdownMenu.Label
-							>
-							<DropdownMenu.Separator class="bg-gray-50" />
-
-							<DropdownMenu.CheckboxItem
-								checked={excludePast}
-								onCheckedChange={(v) => {
-									excludePast = !!v;
-									page = 1;
-								}}
-								closeOnSelect={false}
-								class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-							>
-								<span class="truncate block w-full">{m.hide_past_events()}</span>
-							</DropdownMenu.CheckboxItem>
-
-							{#await tagsQuery then tagsRes}
-							{#if tagsRes.data && tagsRes.data.length > 0}
-								<DropdownMenu.Sub>
-									<DropdownMenu.SubTrigger
-										class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
-									>
-										<span>{m.tags()}</span>
-										{#if selectedTags.length > 0}
-											<span
-												class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold"
-												>{selectedTags.length}</span
-											>
-										{/if}
-									</DropdownMenu.SubTrigger>
-									<DropdownMenu.SubContent
-										class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
-									>
-										{#each tagsRes.data as tag (tag.id)}
-											<DropdownMenu.CheckboxItem
-												checked={selectedTags.includes(
-													tag.id,
-												)}
-												onCheckedChange={() =>
-													toggleTag(tag.id)}
-												closeOnSelect={false}
-												class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
-											>
-												<span
-													class="truncate block w-full"
-													>{tag.name}</span
-												>
-											</DropdownMenu.CheckboxItem>
-										{/each}
-									</DropdownMenu.SubContent>
-								</DropdownMenu.Sub>
-							{/if}
-							{/await}
-
-							{#await locationsQuery then locationsRes}
-							{#if locationsRes.data && locationsRes.data.length > 0}
-								<DropdownMenu.Sub>
-									<DropdownMenu.SubTrigger
-										class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
-									>
-										<span>{m.locations()}</span>
-										{#if selectedLocations.length > 0}
-											<span
-												class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold"
-												>{selectedLocations.length}</span
-											>
-										{/if}
-									</DropdownMenu.SubTrigger>
-									<DropdownMenu.SubContent
-										class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
-									>
-										{#each locationsRes.data as location (location.id)}
-											<DropdownMenu.CheckboxItem
-												checked={selectedLocations.includes(
-													location.id,
-												)}
-												onCheckedChange={() =>
-													toggleLocation(location.id)}
-												closeOnSelect={false}
-												class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
-											>
-												<span
-													class="truncate block w-full"
-													>{location.name}</span
-												>
-											</DropdownMenu.CheckboxItem>
-										{/each}
-									</DropdownMenu.SubContent>
-								</DropdownMenu.Sub>
-							{/if}
-							{/await}
-
-							{#if activeFiltersCount > 0}
-								<DropdownMenu.Separator class="bg-gray-50" />
-								<DropdownMenu.Item
-									class="text-red-600 font-medium py-2 rounded-lg cursor-pointer hover:bg-red-50 hover:text-red-700"
-									onclick={() => {
-										selectedTags = [];
-										selectedLocations = [];
-										excludePast = false;
-										page = 1;
-									}}
-								>
-									<X size={14} class="mr-2" />
-									{m.clear_filters()}
-								</DropdownMenu.Item>
-							{/if}
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
+				<FilterMenu
+					groups={filterGroups}
+					booleanFilters={booleanFilters}
+					bind:filters={filterValues}
+					buttonLabel={m.filters()}
+					onchange={() => (page = 1)}
+				/>
 
 				<div
 					class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1"
@@ -363,7 +267,7 @@
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
 						<option value="updatedAt">{m.sort_last_updated()}</option>
-						<option value="startDateTime">Start Date</option>
+						<option value="startDateTime">{m.start_date()}</option>
 						<option value="createdAt">{m.sort_created_date()}</option>
 					</select>
 					<button
@@ -371,8 +275,8 @@
 						onclick={() =>
 							(sortOrder = sortOrder === "desc" ? "asc" : "desc")}
 						title={sortOrder === "desc"
-							? "Descending"
-							: "Ascending"}
+							? m.descending()
+							: m.ascending()}
 					>
 						<ChevronDown
 							size={14}
@@ -385,6 +289,37 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Active Filter Chips -->
+		<ActiveFilterChips
+			groups={filterGroups}
+			filters={filterValues}
+			booleanFilters={booleanFilters}
+			activeFiltersLabel={m.active_filters()}
+			clearAllLabel={m.clear_all_filters()}
+			onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+				const current = filterValues[groupId] || { include: [], exclude: [] };
+				filterValues = {
+					...filterValues,
+					[groupId]: {
+						include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+					},
+				};
+				page = 1;
+			}}
+			onclearall={() => {
+				const reset: FilterStateMap = {};
+				for (const g of filterGroups) {
+					reset[g.id] = { include: [], exclude: [] };
+				}
+				filterValues = reset;
+				excludePast = false;
+				excludeSeries = false;
+				onlySeries = false;
+				page = 1;
+			}}
+		/>
 
 		<div class="grid grid-cols-1 gap-5">
 			{#await listEvents(filterState) then eventsRes}

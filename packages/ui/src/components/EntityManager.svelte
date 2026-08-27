@@ -1,6 +1,8 @@
 <script lang="ts" generics="T extends { id?: string | null; name?: string }">
     import { onMount, untrack, type Component, type Snippet } from "svelte";
-    import type { ListItemContext } from "./EntityManager.types";
+    import type { ListItemContext, FilterDefinition, FilterAssociation, FilterGroup, FilterStateMap } from "./EntityManager.types";
+    import FilterMenu from "./FilterMenu.svelte";
+    import ActiveFilterChips from "./ActiveFilterChips.svelte";
     import {
         Search,
         Plus,
@@ -22,8 +24,9 @@
     interface Props<T extends { id?: string | null; name?: string }> {
         title: string;
         icon?: Component<any>;
-        type: string;
-        entityId: string;
+        type?: string;
+        entityId?: string;
+        mode?: "embedded" | "standalone";
         singleSelect?: boolean;
         onchange?: (ids: string[], items: T[]) => void;
 
@@ -46,6 +49,14 @@
             itemId: string;
         }) => Promise<any>;
         deleteItemRemote?: (ids: string[]) => Promise<any>;
+
+        // Filters
+        filterAssociations?: FilterAssociation[];
+        filters?: FilterDefinition[];
+
+        // Creation link (standalone mode)
+        createHref?: string;
+        createLabel?: string;
 
         // Form Data
         createRemote?: any;
@@ -102,8 +113,9 @@
     let {
         title,
         icon: Icon = Database,
-        type,
-        entityId,
+        type = "",
+        entityId = "",
+        mode = "embedded",
         singleSelect = false,
         onchange = undefined,
         listItemsRemote,
@@ -111,6 +123,10 @@
         addAssociationRemote,
         removeAssociationRemote,
         deleteItemRemote,
+        filterAssociations = undefined,
+        filters = undefined,
+        createHref = undefined,
+        createLabel = undefined,
         createRemote,
         createSchema,
         updateRemote,
@@ -206,6 +222,12 @@
     });
 
     let searchQuery = $state("");
+    let activeFilters = $state<FilterStateMap>({});
+
+    const allFilterGroups = $derived<FilterGroup[]>([
+        ...(filterAssociations || []),
+        ...(filters || []),
+    ]);
 
     const effectiveSortField = $derived(propSortField ?? "displayName");
     const effectiveSortOrder = $derived(propSortOrder ?? "asc");
@@ -215,7 +237,57 @@
         limit: 100,
         sortField: effectiveSortField,
         sortOrder: effectiveSortOrder,
+        ...Object.fromEntries(
+            Object.entries(activeFilters).filter(
+                ([_, v]) => (v?.include && v.include.length > 0) || (v?.exclude && v.exclude.length > 0)
+            )
+        ),
     });
+
+    function matchesFilters(item: any, currentFilters: FilterStateMap): boolean {
+        if (!item) return false;
+        for (const [groupId, state] of Object.entries(currentFilters || {})) {
+            if (!state) continue;
+            const { include = [], exclude = [] } = state;
+            if (include.length === 0 && exclude.length === 0) continue;
+
+            const values: string[] = [];
+            if (item[groupId] !== undefined && item[groupId] !== null) {
+                const rawVal = item[groupId];
+                if (Array.isArray(rawVal)) {
+                    for (const v of rawVal) values.push(String(v?.id ?? v?.value ?? v));
+                } else {
+                    values.push(String(rawVal?.id ?? rawVal?.value ?? rawVal));
+                }
+            }
+            if (groupId === "locationId" || groupId === "location" || groupId === "locations") {
+                for (const l of item.locations || []) values.push(String(l?.id ?? l?.locationId ?? l?.location?.id));
+                if (item.location?.id) values.push(String(item.location.id));
+                if (item.locationId) values.push(String(item.locationId));
+            } else if (groupId === "tagId" || groupId === "tag" || groupId === "tags") {
+                for (const t of item.tags || []) values.push(String(t?.id ?? t?.tagId ?? t?.tag?.id ?? t?.name));
+                if (item.contact?.tags) {
+                    for (const ct of item.contact.tags || []) values.push(String(ct?.id ?? ct?.tagId ?? ct?.tag?.id ?? ct?.name));
+                }
+            } else if (groupId === "status") {
+                if (item.status) values.push(String(item.status));
+            } else if (groupId === "talentId" || groupId === "talent") {
+                if (item.talent?.id) values.push(String(item.talent.id));
+                if (item.talentId) values.push(String(item.talentId));
+            } else if (groupId === "frameworkId" || groupId === "framework") {
+                if (item.framework?.id) values.push(String(item.framework.id));
+                if (item.frameworkId) values.push(String(item.frameworkId));
+            }
+
+            if (exclude.length > 0 && values.some((v) => exclude.includes(v))) {
+                return false;
+            }
+            if (include.length > 0 && !values.some((v) => include.includes(v))) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     function getItemSortValue(item: any, field: string) {
         if (!item) return "";
@@ -495,8 +567,8 @@
     }
 </script>
 
-<!-- Action Bar (Search, Actions) -->
-<div class="flex flex-col gap-3 mb-3">
+<!-- Action Bar (Search, Filters, Actions) -->
+<div class="flex flex-col gap-2 mb-3">
     <div class="flex flex-col md:flex-row gap-3">
         <div class="relative flex-1">
             <Search
@@ -507,41 +579,62 @@
                 type="text"
                 placeholder={i18n.searchPlaceholder}
                 bind:value={searchQuery}
-                class="pl-9 w-full px-2 py-1.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all bg-gray-50/50"
+                class="pl-9 w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:bg-gray-800 dark:text-gray-100 transition-all bg-gray-50/50"
             />
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5 md:ml-auto shrink-0 w-full md:w-auto">
-            {#await associationsPromise}
-                <div class="flex items-center justify-center p-1">
-                    <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
-                </div>
-            {:then res}
-                {@const { data: currentAssociations } = normalize(res)}
-                {#if !singleSelect || currentAssociations.length === 0}
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onclick={toggleSelector}
-                        class="h-9 px-3 rounded-xl {showSelector
-                            ? 'bg-blue-50 text-blue-600'
-                            : 'text-gray-500 hover:bg-gray-100'}"
-                    >
-                        {#if showSelector}
-                            <X size={16} class="mr-1.5" />
-                            <span class="text-sm font-semibold"
-                                >{i18n.closeSearchLabel}</span
-                            >
-                        {:else}
-                            <Link size={16} class="mr-1.5" />
-                            <span class="text-sm font-semibold"
-                                >{i18n.linkItemLabel}</span
-                            >
-                        {/if}
-                    </Button>
-                {/if}
-            {/await}
+            {#if allFilterGroups.length > 0}
+                <FilterMenu
+                    groups={allFilterGroups}
+                    bind:filters={activeFilters}
+                />
+            {/if}
+
+            {#if createHref}
+                <Button
+                    href={createHref}
+                    size="sm"
+                    class="h-9 px-3 rounded-xl shadow-xs"
+                >
+                    <Plus size={16} class="mr-1.5" />
+                    <span class="text-sm font-semibold">{createLabel || i18n.quickCreateLabel}</span>
+                </Button>
+            {/if}
+
+            {#if mode !== "standalone"}
+                {#await associationsPromise}
+                    <div class="flex items-center justify-center p-1">
+                        <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
+                    </div>
+                {:then res}
+                    {@const { data: currentAssociations } = normalize(res)}
+                    {#if !singleSelect || currentAssociations.length === 0}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onclick={toggleSelector}
+                            class="h-9 px-3 rounded-xl {showSelector
+                                ? 'bg-blue-50 text-blue-600'
+                                : 'text-gray-500 hover:bg-gray-100'}"
+                        >
+                            {#if showSelector}
+                                <X size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{i18n.closeSearchLabel}</span
+                                >
+                            {:else}
+                                <Link size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{i18n.linkItemLabel}</span
+                                >
+                            {/if}
+                        </Button>
+                    {/if}
+                {/await}
+            {/if}
+
             {#if renderForm && showQuickCreateButton}
                 <Button
                     type="button"
@@ -551,12 +644,36 @@
                     class="h-9 px-3 text-gray-500 hover:bg-gray-100 rounded-xl"
                 >
                     <Plus size={16} class="mr-1.5" />
-                    <span class="text-sm font-semibold">{i18n.quickCreateLabel}</span
-                    >
+                    <span class="text-sm font-semibold">{i18n.quickCreateLabel}</span>
                 </Button>
             {/if}
         </div>
     </div>
+
+    <!-- Active Filter Chips -->
+    {#if allFilterGroups.length > 0}
+        <ActiveFilterChips
+            groups={allFilterGroups}
+            filters={activeFilters}
+            onremove={(groupId, optId, type) => {
+                const current = activeFilters[groupId] || { include: [], exclude: [] };
+                activeFilters = {
+                    ...activeFilters,
+                    [groupId]: {
+                        include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                        exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                    },
+                };
+            }}
+            onclearall={() => {
+                const reset: FilterStateMap = {};
+                for (const g of allFilterGroups) {
+                    reset[g.id] = { include: [], exclude: [] };
+                }
+                activeFilters = reset;
+            }}
+        />
+    {/if}
 </div>
 
 {#if showSelector}
@@ -579,7 +696,7 @@
                 {:then res}
                     {@const allItems = normalize(res).data}
                     {@const sortedAllItems = sortItemsList(allItems, effectiveSortField, effectiveSortOrder)}
-                    {@const filteredItems = searchQuery
+                    {@const searchedItems = searchQuery
                         ? sortedAllItems.filter(
                               (i: any) =>
                                   searchPredicate
@@ -588,6 +705,7 @@
                                          i.title?.toLowerCase().includes(searchQuery.toLowerCase())),
                           )
                         : sortedAllItems}
+                    {@const filteredItems = searchedItems.filter((i: any) => matchesFilters(i, activeFilters))}
                     
                     {#if filteredItems.length === 0}
                         <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
@@ -725,7 +843,7 @@
             {:then res}
                 {@const { data: rawAssociations } = normalize(res)}
                 {@const currentAssociations = sortItemsList(rawAssociations, effectiveSortField, effectiveSortOrder)}
-                {@const items = searchQuery
+                {@const searchedAssoc = searchQuery
                     ? currentAssociations.filter(
                           (i: any) =>
                               searchPredicate
@@ -738,6 +856,7 @@
                                         .includes(searchQuery.toLowerCase())),
                       )
                     : currentAssociations}
+                {@const items = searchedAssoc.filter((i: any) => matchesFilters(i, activeFilters))}
                 {#if items.length > 0}
                     <div class="grid gap-2">
                         {#each items as item (item.id)}

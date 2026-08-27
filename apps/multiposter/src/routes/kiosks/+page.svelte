@@ -24,13 +24,24 @@
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "$lib/utils/idb";
 
+	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+
 	// Filter state
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let selectedLocations = $state<string[]>([]);
+	let filterValues = $state<FilterStateMap>({});
 	let page = $state(1);
 	let limit = $state(50);
+
+	const filterGroups = $derived<FilterGroup[]>([
+		{
+			id: "locationId",
+			label: m.locations(),
+			optionsRemote: listLocations,
+			searchable: true,
+		},
+	]);
 
 	onMount(async () => {
 		try {
@@ -39,8 +50,7 @@
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.sortField) sortField = prefs.sortField;
 				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
-				if (prefs.selectedLocations)
-					selectedLocations = prefs.selectedLocations;
+				if (prefs.filterValues) filterValues = prefs.filterValues;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -51,7 +61,7 @@
 		const prefsToSave = {
 			sortField,
 			sortOrder,
-			selectedLocations,
+			filterValues,
 		};
 		setPreference("kiosksFilters", JSON.stringify(prefsToSave)).catch(
 			console.error,
@@ -61,16 +71,12 @@
 	const filterState = $derived({
 		page,
 		limit,
-		search: searchQuery,
+		search: searchQuery || undefined,
 		locationId:
-			selectedLocations.length > 0 ? selectedLocations : undefined,
+			(filterValues.locationId?.include?.length || filterValues.locationId?.exclude?.length) ? filterValues.locationId : undefined,
 		sortField,
 		sortOrder,
 	});
-
-	const locationsQuery = listLocations({ limit: 100 });
-
-	const locations = $derived(locationsQuery.current?.data || []);
 
 	async function handleDelete(kiosk: any) {
 		try {
@@ -83,14 +89,6 @@
 		}
 	}
 
-	function toggleLocation(id: string) {
-		if (selectedLocations.includes(id)) {
-			selectedLocations = selectedLocations.filter((l) => l !== id);
-		} else {
-			selectedLocations = [...selectedLocations, id];
-		}
-		page = 1;
-	}
 	let query = $derived(listKiosks(filterState));
 	let res = $derived(query.current);
 </script>
@@ -132,85 +130,12 @@
 				/>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
-				{#if locations.length > 0}
-					{@const activeFiltersCount = selectedLocations.length}
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger>
-							<Button
-								variant="outline"
-								class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-							>
-								<FilterIcon size={16} class="mr-2" />
-								{m.filters()}
-								{#if activeFiltersCount > 0}
-									<span
-										class="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm"
-									>
-										{activeFiltersCount}
-									</span>
-								{/if}
-							</Button>
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content
-							align="end"
-							class="min-w-[200px] rounded-2xl shadow-xl border-gray-100 p-1"
-						>
-							<DropdownMenu.Label
-								class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2"
-								>{m.system_filters()}</DropdownMenu.Label
-							>
-							<DropdownMenu.Separator class="bg-gray-50" />
-
-							<DropdownMenu.Sub>
-								<DropdownMenu.SubTrigger
-									class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
-								>
-									<span>{m.locations()}</span>
-									{#if selectedLocations.length > 0}
-										<span
-											class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold"
-											>{selectedLocations.length}</span
-										>
-									{/if}
-								</DropdownMenu.SubTrigger>
-								<DropdownMenu.SubContent
-									class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
-								>
-									{#each locations as location}
-										<DropdownMenu.CheckboxItem
-											checked={selectedLocations.includes(
-												location.id,
-											)}
-											onCheckedChange={() =>
-												toggleLocation(location.id)}
-											closeOnSelect={false}
-											class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
-										>
-											<span
-												class="truncate block w-full"
-												>{location.name}</span
-											>
-										</DropdownMenu.CheckboxItem>
-									{/each}
-								</DropdownMenu.SubContent>
-							</DropdownMenu.Sub>
-
-							{#if activeFiltersCount > 0}
-								<DropdownMenu.Separator class="bg-gray-50" />
-								<DropdownMenu.Item
-									class="text-red-600 font-medium py-2 rounded-lg cursor-pointer hover:bg-red-50 hover:text-red-700"
-									onclick={() => {
-										selectedLocations = [];
-										page = 1;
-									}}
-								>
-									<X size={14} class="mr-2" />
-									{m.clear_filters()}
-								</DropdownMenu.Item>
-							{/if}
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
-				{/if}
+				<FilterMenu
+					groups={filterGroups}
+					bind:filters={filterValues}
+					buttonLabel={m.filters()}
+					onchange={() => (page = 1)}
+				/>
 
 				<div
 					class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1"
@@ -228,8 +153,8 @@
 						onclick={() =>
 							(sortOrder = sortOrder === "desc" ? "asc" : "desc")}
 						title={sortOrder === "desc"
-							? "Descending"
-							: "Ascending"}
+							? m.descending()
+							: m.ascending()}
 					>
 						<ChevronDown
 							size={14}
@@ -242,6 +167,33 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Active Filter Chips -->
+		<ActiveFilterChips
+			groups={filterGroups}
+			filters={filterValues}
+			activeFiltersLabel={m.active_filters()}
+			clearAllLabel={m.clear_all_filters()}
+			onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+				const current = filterValues[groupId] || { include: [], exclude: [] };
+				filterValues = {
+					...filterValues,
+					[groupId]: {
+						include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+					},
+				};
+				page = 1;
+			}}
+			onclearall={() => {
+				const reset: FilterStateMap = {};
+				for (const g of filterGroups) {
+					reset[g.id] = { include: [], exclude: [] };
+				}
+				filterValues = reset;
+				page = 1;
+			}}
+		/>
 
 		<svelte:boundary>
 			{#if $effect.pending()}

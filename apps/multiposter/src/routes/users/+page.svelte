@@ -25,11 +25,29 @@
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "$lib/utils/idb";
 
+	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+
 	let sortField = $state<"createdAt" | "name" | "email">("createdAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
+	let filterValues = $state<FilterStateMap>({});
 	let page = $state(1);
 	let limit = $state(50);
+
+	const ROLE_OPTIONS = $derived([
+		{ id: "admin", label: m.admin ? m.admin() : "Admin" },
+		{ id: "user", label: m.user ? m.user() : "User" },
+		{ id: "guest", label: m.guest ? m.guest() : "Guest" },
+	]);
+
+	const filterGroups = $derived<FilterGroup[]>([
+		{
+			id: "role",
+			label: m.role ? m.role() : "Role",
+			options: ROLE_OPTIONS,
+			searchable: true,
+		},
+	]);
 
 	onMount(async () => {
 		try {
@@ -38,6 +56,7 @@
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.sortField) sortField = prefs.sortField;
 				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
+				if (prefs.filterValues) filterValues = prefs.filterValues;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -48,6 +67,7 @@
 		const prefsToSave = {
 			sortField,
 			sortOrder,
+			filterValues,
 		};
 		setPreference("usersFilters", JSON.stringify(prefsToSave)).catch(console.error);
 	});
@@ -55,13 +75,14 @@
 	const filterState = $derived({
 		page,
 		limit,
-		search: searchQuery,
+		search: searchQuery || undefined,
+		role: (filterValues.role?.include?.length || filterValues.role?.exclude?.length) ? filterValues.role : undefined,
 		sortField,
 		sortOrder,
 	});
 
 	async function handleDelete(user: any) {
-		if (!window.confirm(m.delete_confirm({ item: "User" }))) return;
+		if (!window.confirm(m.delete_confirm({ item: m.user ? m.user() : "User" }))) return;
 		try {
 			await deleteUser([user.id]);
 			toast.success(m.delete_successful());
@@ -86,9 +107,8 @@
 		<!-- Header -->
 		<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
 			<div>
-				<h1 class="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tight">
-					{m.users()}
-				</h1>
+				<h1 class="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tight">{m.feature_users_title()}</h1>
+				<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{m.feature_users_description()}</p>
 			</div>
 			<!-- Optional: New user creation link -->
 		</div>
@@ -106,6 +126,13 @@
 				/>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
+				<FilterMenu
+					groups={filterGroups}
+					bind:filters={filterValues}
+					buttonLabel={m.filters()}
+					onchange={() => (page = 1)}
+				/>
+
 				<div class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1">
 					<select
 						bind:value={sortField}
@@ -125,6 +152,33 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Active Filter Chips -->
+		<ActiveFilterChips
+			groups={filterGroups}
+			filters={filterValues}
+			activeFiltersLabel={m.active_filters()}
+			clearAllLabel={m.clear_all_filters()}
+			onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+				const current = filterValues[groupId] || { include: [], exclude: [] };
+				filterValues = {
+					...filterValues,
+					[groupId]: {
+						include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+					},
+				};
+				page = 1;
+			}}
+			onclearall={() => {
+				const reset: FilterStateMap = {};
+				for (const g of filterGroups) {
+					reset[g.id] = { include: [], exclude: [] };
+				}
+				filterValues = reset;
+				page = 1;
+			}}
+		/>
 
 		<svelte:boundary>
 			{#if $effect.pending()}

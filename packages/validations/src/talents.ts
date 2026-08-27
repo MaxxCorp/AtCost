@@ -125,4 +125,6 @@ export const timeOffPaginationSchema = v.optional(v.object({
 	limit: v.optional(v.number(), 50),
 	search: v.optional(v.string()),
 	talentId: FilterableIdSchema,
+	type: FilterableIdSchema,
+	status: FilterableIdSchema,
 }), {});

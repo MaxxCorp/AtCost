@@ -40,11 +40,13 @@ export const updateLocationSchema = v.intersect([
     v.object({ id: v.pipe(v.string(), v.uuid()) })
 ]);
 
+import { FilterableIdSchema } from './pagination.js';
+
 export const LocationPaginationSchema = v.optional(v.object({
     page: v.optional(v.number(), 1),
     limit: v.optional(v.number(), 50),
     search: v.optional(v.string()),
-    city: v.optional(v.union([v.string(), v.array(v.string())])),
+    city: FilterableIdSchema,
     associatedWith: v.optional(v.object({
         type: v.string(),
         id: v.string()

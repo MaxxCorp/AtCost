@@ -3,9 +3,9 @@ import { query } from '$app/server';
 import { contact, locationContact, contactTag, tag } from '@ac/db';
 import type { Contact as DbContact } from '@ac/db';
 import { db } from '@ac/db';
-import { desc, eq, inArray, and, or, ilike, sql } from '@ac/db';
+import { desc, eq, inArray, and, or, not, ilike, sql, exists } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { contactPaginationSchema as PaginationSchema, type Contact, type PaginatedResult } from '@ac/validations';
+import { contactPaginationSchema as PaginationSchema, parseFilterValue, type Contact, type PaginatedResult } from '@ac/validations';
 
 /**
  * Query: List all contacts
@@ -61,15 +61,47 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	}
 
 	if (locationId) {
-		const ids = Array.isArray(locationId) ? locationId : [locationId];
-		baseQuery = baseQuery.leftJoin(locationContact, eq(contact.id, locationContact.contactId)) as any;
-		conditions.push(inArray(locationContact.locationId, ids));
+		const { include, exclude } = parseFilterValue(locationId);
+		if (include.length > 0) {
+			conditions.push(
+				exists(
+					db.select({ id: sql`1` })
+					  .from(locationContact)
+					  .where(and(eq(locationContact.contactId, contact.id), inArray(locationContact.locationId, include)))
+				)
+			);
+		}
+		if (exclude.length > 0) {
+			conditions.push(
+				not(exists(
+					db.select({ id: sql`1` })
+					  .from(locationContact)
+					  .where(and(eq(locationContact.contactId, contact.id), inArray(locationContact.locationId, exclude)))
+				))
+			);
+		}
 	}
 
 	if (tagId) {
-		const ids = Array.isArray(tagId) ? tagId : [tagId];
-		baseQuery = baseQuery.leftJoin(contactTag, eq(contact.id, contactTag.contactId)) as any;
-		conditions.push(inArray(contactTag.tagId, ids));
+		const { include, exclude } = parseFilterValue(tagId);
+		if (include.length > 0) {
+			conditions.push(
+				exists(
+					db.select({ id: sql`1` })
+					  .from(contactTag)
+					  .where(and(eq(contactTag.contactId, contact.id), inArray(contactTag.tagId, include)))
+				)
+			);
+		}
+		if (exclude.length > 0) {
+			conditions.push(
+				not(exists(
+					db.select({ id: sql`1` })
+					  .from(contactTag)
+					  .where(and(eq(contactTag.contactId, contact.id), inArray(contactTag.tagId, exclude)))
+				))
+			);
+		}
 	}
 
 	if (conditions.length > 0) {

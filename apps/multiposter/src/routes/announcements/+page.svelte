@@ -2,11 +2,12 @@
 	import * as m from "$lib/paraglide/messages.js";
 	import { listAnnouncements } from "./list.remote";
 	import { listLocations } from "../locations/list.remote";
+	import { listTags } from "../tags/list.remote";
 	import { deleteAnnouncements } from "./[id]/delete.remote";
 
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import { Button } from "@ac/ui/components/button";
-	import { LoadingSection, ErrorSection, EmptyState } from "@ac/ui";
+	import { LoadingSection, ErrorSection, EmptyState, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import {
 		Megaphone,
@@ -17,7 +18,6 @@
 		Earth,
 		Plus,
 		Search,
-		Filter as FilterIcon,
 		ChevronDown,
 		ChevronRight,
 		ArrowLeft,
@@ -35,7 +35,22 @@
 	let searchQuery = $state("");
 	let page = $state(1);
 	let limit = $state(50);
-	let selectedLocationId = $state<string | null>(null);
+	let filterValues = $state<FilterStateMap>({});
+
+	const filterGroups = $derived<FilterGroup[]>([
+		{
+			id: "locationId",
+			label: m.locations(),
+			optionsRemote: listLocations,
+			searchable: true,
+		},
+		{
+			id: "tagId",
+			label: m.tags(),
+			optionsRemote: listTags,
+			searchable: true,
+		},
+	]);
 
 	onMount(async () => {
 		try {
@@ -44,7 +59,7 @@
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.sortField) sortField = prefs.sortField;
 				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
-				if (prefs.locationId) selectedLocationId = prefs.locationId;
+				if (prefs.filterValues) filterValues = prefs.filterValues;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -55,7 +70,7 @@
 		const prefsToSave = {
 			sortField,
 			sortOrder,
-			locationId: selectedLocationId,
+			filterValues,
 		};
 		setPreference("announcementsFilters", JSON.stringify(prefsToSave)).catch(console.error);
 	});
@@ -63,15 +78,12 @@
 	const filterState = $derived({
 		page,
 		limit,
-		search: searchQuery,
-		locationId: selectedLocationId || undefined,
+		search: searchQuery || undefined,
+		locationId: (filterValues.locationId?.include?.length || filterValues.locationId?.exclude?.length) ? filterValues.locationId : undefined,
+		tagId: (filterValues.tagId?.include?.length || filterValues.tagId?.exclude?.length) ? filterValues.tagId : undefined,
 		sortField,
 		sortOrder,
 	});
-
-	const activeFiltersCount = $derived(selectedLocationId ? 1 : 0);
-
-	const allLocationsQuery = listLocations({ limit: 1000, sortField: 'name', sortOrder: 'asc' });
 
 	async function handleDelete(announcement: any) {
 		if (!window.confirm(m.delete_confirm({ item: "Announcement" }))) return;
@@ -116,53 +128,12 @@
 				/>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						<Button variant="outline" class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
-							<FilterIcon size={16} class="mr-2" />
-							Filters
-							{#if activeFiltersCount > 0}
-								<span class="absolute -top-2 -right-2 bg-primary-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm">
-									{activeFiltersCount}
-								</span>
-							{/if}
-						</Button>
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-64 p-2 rounded-xl">
-						<div class="px-2 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-							Location
-						</div>
-						<div class="max-h-48 overflow-y-auto p-1 space-y-0.5">
-							<button
-								class="w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors {selectedLocationId === null ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}"
-								onclick={() => { selectedLocationId = null; page = 1; }}
-							>
-								All Locations
-							</button>
-							{#await allLocationsQuery then locations}
-								{#each locations.data as loc}
-									<button
-										class="w-full text-left px-2 py-1.5 text-sm rounded-md transition-colors {selectedLocationId === loc.id ? 'bg-primary-50 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}"
-										onclick={() => { selectedLocationId = loc.id; page = 1; }}
-									>
-										{loc.name}
-									</button>
-								{/each}
-							{/await}
-						</div>
-						
-						{#if activeFiltersCount > 0}
-							<div class="p-1 mt-2 border-t border-gray-100 dark:border-gray-800">
-								<button
-									class="w-full flex items-center justify-center gap-2 px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-md transition-colors"
-									onclick={() => { selectedLocationId = null; page = 1; }}
-								>
-									<X size={14} /> Clear all
-								</button>
-							</div>
-						{/if}
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+				<FilterMenu
+					groups={filterGroups}
+					bind:filters={filterValues}
+					buttonLabel={m.filters()}
+					onchange={() => (page = 1)}
+				/>
 
 				<div class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1">
 					<select
@@ -171,7 +142,7 @@
 					>
 						<option value="updatedAt">{m.sort_last_updated()}</option>
 						<option value="createdAt">{m.sort_created_date()}</option>
-						<option value="title">Title</option>
+						<option value="title">{m.title()}</option>
 					</select>
 					<button
 						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -183,6 +154,33 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Active Filter Chips -->
+		<ActiveFilterChips
+			groups={filterGroups}
+			filters={filterValues}
+			activeFiltersLabel={m.active_filters()}
+			clearAllLabel={m.clear_all_filters()}
+			onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+				const current = filterValues[groupId] || { include: [], exclude: [] };
+				filterValues = {
+					...filterValues,
+					[groupId]: {
+						include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+					},
+				};
+				page = 1;
+			}}
+			onclearall={() => {
+				const reset: FilterStateMap = {};
+				for (const g of filterGroups) {
+					reset[g.id] = { include: [], exclude: [] };
+				}
+				filterValues = reset;
+				page = 1;
+			}}
+		/>
 
 		<!-- List -->
 		<div class="relative min-h-[200px]">

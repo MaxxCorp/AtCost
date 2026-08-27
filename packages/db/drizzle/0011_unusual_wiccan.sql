@@ -1,0 +1,1 @@
+ALTER TABLE "kiosk" ADD COLUMN "exclude_series" boolean DEFAULT false NOT NULL;

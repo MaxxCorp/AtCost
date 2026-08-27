@@ -49,6 +49,7 @@
     let excludeNonPublic = $state(untrack(() => initialData?.excludeNonPublic ?? true));
     let excludeTentative = $state(untrack(() => initialData?.excludeTentative ?? true));
     let excludeCancelled = $state(untrack(() => initialData?.excludeCancelled ?? false));
+    let excludeSeries = $state(untrack(() => initialData?.excludeSeries ?? false));
     
     let excludedEventIds = $state<string[]>(untrack(() => initialData?.excludedEventIds || []));
     let includedEventIds = $state<string[]>(untrack(() => initialData?.includedEventIds || []));
@@ -161,7 +162,7 @@
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 onblur={() => rf.validate()}
             />
-            {#each (rf.fields.name.issues() ?? []) as issue}
+            {#each (rf.fields.name.issues() ?? []) as issue (issue.message)}
                 <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </div>
@@ -331,7 +332,7 @@
                     )}
                     class="hidden"
                 />
-                {#each (rf.fields.locationIds.issues() ?? []) as issue}
+                {#each (rf.fields.locationIds.issues() ?? []) as issue (issue.message)}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             {:catch error}
@@ -402,7 +403,7 @@
                     onblur={() => rf.validate()}
                 />
                 <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
-                {#each (rf.fields.loopDuration.issues() ?? []) as issue}
+                {#each (rf.fields.loopDuration.issues() ?? []) as issue (issue.message)}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -421,7 +422,7 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         onblur={() => rf.validate()}
                     />
-                    {#each (rf.fields.lookAheadDays.issues() ?? []) as issue}
+                    {#each (rf.fields.lookAheadDays.issues() ?? []) as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">
                             {translateIssue(issue.message, m)}
                         </p>
@@ -441,7 +442,7 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         onblur={() => rf.validate()}
                     />
-                    {#each (rf.fields.lookPastDays.issues() ?? []) as issue}
+                    {#each (rf.fields.lookPastDays.issues() ?? []) as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">
                             {translateIssue(issue.message, m)}
                         </p>
@@ -486,7 +487,7 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each (rf.fields.startDate.issues() ?? []) as issue}
+                    {#each (rf.fields.startDate.issues() ?? []) as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
@@ -507,7 +508,7 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each (rf.fields.endDate.issues() ?? []) as issue}
+                    {#each (rf.fields.endDate.issues() ?? []) as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
@@ -533,11 +534,16 @@
                         <input type="checkbox" bind:checked={excludeCancelled} class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" />
                         {m.exclude_cancelled_items()}
                     </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700 font-medium">
+                        <input type="checkbox" bind:checked={excludeSeries} class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" />
+                        {m.exclude_series_events()}
+                    </label>
                 </div>
                 
                 <input {...rf.fields.excludeNonPublic.as("text", String(excludeNonPublic))} class="hidden" />
                 <input {...rf.fields.excludeTentative.as("text", String(excludeTentative))} class="hidden" />
                 <input {...rf.fields.excludeCancelled.as("text", String(excludeCancelled))} class="hidden" />
+                <input {...rf.fields.excludeSeries.as("text", String(excludeSeries))} class="hidden" />
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {#await listTags({ limit: 1000 })}

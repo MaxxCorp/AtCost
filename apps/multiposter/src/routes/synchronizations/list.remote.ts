@@ -3,10 +3,10 @@ import { query } from '$app/server';
 import { syncConfig } from '@ac/db';
 import type { SyncConfig as DbSyncConfig } from '@ac/db';
 import { db } from '@ac/db';
-import { desc, and, or, ilike, sql, inArray } from '@ac/db';
+import { desc, and, or, not, ilike, sql, inArray, notInArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 
-import { synchronizationPaginationSchema as PaginationSchema, type Synchronization, type PaginatedResult } from '@ac/validations';
+import { synchronizationPaginationSchema as PaginationSchema, parseFilterValue, type Synchronization, type PaginatedResult } from '@ac/validations';
 
 /**
  * Query: List all synchronizations
@@ -15,7 +15,7 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'synchronizations', 'use');
 
-	const { page = 1, limit = 50, search = '', providerType, sortField = 'createdAt', sortOrder = 'desc' } = input || {};
+	const { page = 1, limit = 50, search = '', providerType, status, sortField = 'createdAt', sortOrder = 'desc' } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select().from(syncConfig).$dynamic();
@@ -30,9 +30,22 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
 	}
 
 	if (providerType) {
-		const ids = Array.isArray(providerType) ? providerType : [providerType];
-		if (ids.length > 0) {
-			conditions.push(inArray(syncConfig.providerType, ids));
+		const { include, exclude } = parseFilterValue(providerType);
+		if (include.length > 0) {
+			conditions.push(inArray(syncConfig.providerType, include));
+		}
+		if (exclude.length > 0) {
+			conditions.push(notInArray(syncConfig.providerType, exclude));
+		}
+	}
+
+	if (status) {
+		const { include, exclude } = parseFilterValue(status);
+		if (include.length > 0) {
+			conditions.push(inArray(syncConfig.status, include));
+		}
+		if (exclude.length > 0) {
+			conditions.push(notInArray(syncConfig.status, exclude));
 		}
 	}
 

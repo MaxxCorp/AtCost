@@ -1,8 +1,8 @@
 import { query, form, command } from '$app/server';
-import { db, desc, and, or, ilike, sql, eq, inArray } from '@ac/db';
+import { db, desc, and, or, not, ilike, sql, eq, inArray, notInArray, exists } from '@ac/db';
 import { contract, contractFrameworkContract } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { PaginationSchema, type PaginatedResult } from '@ac/validations/pagination';
+import { PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations/pagination';
 import { contractPaginationSchema, contractSchema } from '@ac/validations/contracts';
 import * as v from 'valibot';
 
@@ -17,14 +17,35 @@ export const listContracts = query(contractPaginationSchema, async (input) => {
     
     const conditions = [];
     if (talentId) {
-        const ids = Array.isArray(talentId) ? talentId : [talentId];
-        conditions.push(inArray(contract.talentId, ids));
+        const { include, exclude } = parseFilterValue(talentId);
+        if (include.length > 0) {
+            conditions.push(inArray(contract.talentId, include));
+        }
+        if (exclude.length > 0) {
+            conditions.push(notInArray(contract.talentId, exclude));
+        }
     }
     
     if (frameworkId) {
-        const ids = Array.isArray(frameworkId) ? frameworkId : [frameworkId];
-        baseQuery = baseQuery.innerJoin(contractFrameworkContract, eq(contractFrameworkContract.contractId, contract.id)) as any;
-        conditions.push(inArray(contractFrameworkContract.frameworkId, ids));
+        const { include, exclude } = parseFilterValue(frameworkId);
+        if (include.length > 0) {
+            conditions.push(
+                exists(
+                    db.select({ id: sql`1` })
+                      .from(contractFrameworkContract)
+                      .where(and(eq(contractFrameworkContract.contractId, contract.id), inArray(contractFrameworkContract.frameworkId, include)))
+                )
+            );
+        }
+        if (exclude.length > 0) {
+            conditions.push(
+                not(exists(
+                    db.select({ id: sql`1` })
+                      .from(contractFrameworkContract)
+                      .where(and(eq(contractFrameworkContract.contractId, contract.id), inArray(contractFrameworkContract.frameworkId, exclude)))
+                ))
+            );
+        }
     }
 
     if (search) {

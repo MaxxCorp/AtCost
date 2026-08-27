@@ -62,10 +62,14 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	}
 
 	if (city) {
-		const { inArray } = await import('@ac/db');
-		const cities = Array.isArray(city) ? city : [city];
-		if (cities.length > 0) {
-			conditions.push(inArray(location.city, cities as any));
+		const { inArray, notInArray } = await import('@ac/db');
+		const { parseFilterValue } = await import('@ac/validations');
+		const { include, exclude } = parseFilterValue(city);
+		if (include.length > 0) {
+			conditions.push(inArray(location.city, include as any));
+		}
+		if (exclude.length > 0) {
+			conditions.push(notInArray(location.city, exclude as any));
 		}
 	}
 

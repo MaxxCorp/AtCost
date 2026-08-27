@@ -40,6 +40,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 		email: string;
 		phone: string;
 		qrCodeDataUrl?: string;
+		qrCodePath?: string;
 	} | null;
 	qrCodePath?: string | null;
 	iCalPath?: string | null;
@@ -66,6 +67,8 @@ export const eventPaginationSchema = v.optional(v.object({
     excludeCancelled: v.optional(v.boolean()),
     excludeNonPublic: v.optional(v.boolean()),
     excludePast: v.optional(v.boolean()),
+    excludeSeries: v.optional(v.boolean()),
+    onlySeries: v.optional(v.boolean()),
     excludedEventIds: v.optional(v.array(v.string())),
     includedEventIds: v.optional(v.array(v.string())),
     excludedTags: v.optional(v.array(v.string())),

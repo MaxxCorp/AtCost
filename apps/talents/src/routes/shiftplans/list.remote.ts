@@ -1,10 +1,10 @@
 import { query } from '$app/server';
-import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike, inArray } from '@ac/db';
+import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike, inArray, notInArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { ShiftPlanTemplate } from '@ac/db';
 import * as v from 'valibot';
 
-import { ShiftplanPaginationSchema as PaginationSchema, type ShiftplanOverview, type PaginatedResult } from '@ac/validations';
+import { ShiftplanPaginationSchema as PaginationSchema, parseFilterValue, type ShiftplanOverview, type PaginatedResult } from '@ac/validations';
 
 
 export const listShiftplans = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
@@ -33,9 +33,12 @@ export const listShiftplans = query(PaginationSchema, async (input): Promise<Pag
         }
 
         if (locationId) {
-            const ids = Array.isArray(locationId) ? locationId : [locationId];
-            if (ids.length > 0) {
-                conditions.push(inArray(shiftPlanTemplate.locationId, ids as any));
+            const { include, exclude } = parseFilterValue(locationId);
+            if (include.length > 0) {
+                conditions.push(inArray(shiftPlanTemplate.locationId, include as any));
+            }
+            if (exclude.length > 0) {
+                conditions.push(notInArray(shiftPlanTemplate.locationId, exclude as any));
             }
         }
 

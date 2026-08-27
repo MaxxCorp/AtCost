@@ -18,6 +18,9 @@ export { default as BulkActionToolbar } from './components/BulkActionToolbar.sve
 export { default as LoadingSection } from './components/LoadingSection.svelte';
 export { default as DashboardCard } from './components/DashboardCard.svelte';
 export { default as ErrorSection } from './components/ErrorSection.svelte';
+export { default as FilterMenu } from './components/FilterMenu.svelte';
+export { default as ActiveFilterChips } from './components/ActiveFilterChips.svelte';
+export type { FilterGroup, FilterOption, FilterStateMap, FilterGroupState, BooleanFilter, FilterDefinition, FilterAssociation } from './components/EntityManager.types.js';
 export { default as TagInput } from './components/TagInput.svelte';
 export { default as EmptyState } from './components/EmptyState.svelte';
 export { Button } from './components/button/index.js';

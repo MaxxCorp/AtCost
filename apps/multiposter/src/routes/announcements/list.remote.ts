@@ -1,10 +1,10 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, campaign, announcementLocation, announcementTag, tag, announcementResource, resource, locationContact } from '@ac/db';
-import { eq, desc, inArray, notInArray, and, or, ilike, sql, exists } from '@ac/db';
+import { eq, desc, inArray, notInArray, and, or, not, ilike, sql, exists } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import type { Announcement as DbAnnouncement } from '@ac/db';
-import { announcementPaginationSchema as PaginationSchema, type Announcement, type PaginatedResult } from '@ac/validations';
+import { announcementPaginationSchema as PaginationSchema, parseFilterValue, type Announcement, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
 import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 
@@ -21,7 +21,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 		// unauthorized can only see public announcements
 	}
 
-    const { page = 1, limit = 50, search = '', locationId, sortField = 'updatedAt', sortOrder = 'desc', excludedAnnouncementIds, includedAnnouncementIds, excludedTags, includedTags } = input || {};
+    const { page = 1, limit = 50, search = '', locationId, tagId, sortField = 'updatedAt', sortOrder = 'desc', excludedAnnouncementIds, includedAnnouncementIds, excludedTags, includedTags } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select({ id: announcement.id }).from(announcement).$dynamic();
@@ -37,22 +37,61 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     }
 
     if (locationId) {
-        const ids = Array.isArray(locationId) ? locationId : [locationId];
-        if (ids.length > 0) {
+        const { include, exclude } = parseFilterValue(locationId);
+        if (include.length > 0) {
             conditions.push(
                 or(
                     exists(
                         db.select({ id: sql`1` })
                         .from(announcementLocation)
-                        .where(and(eq(announcementLocation.announcementId, announcement.id), inArray(announcementLocation.locationId, ids)))
+                        .where(and(eq(announcementLocation.announcementId, announcement.id), inArray(announcementLocation.locationId, include)))
                     ),
                     exists(
                         db.select({ id: sql`1` })
                         .from(announcementResource)
                         .innerJoin(resource, eq(announcementResource.resourceId, resource.id))
-                        .where(and(eq(announcementResource.announcementId, announcement.id), inArray(resource.locationId, ids)))
+                        .where(and(eq(announcementResource.announcementId, announcement.id), inArray(resource.locationId, include)))
                     )
                 )
+            );
+        }
+        if (exclude.length > 0) {
+            conditions.push(
+                and(
+                    not(exists(
+                        db.select({ id: sql`1` })
+                        .from(announcementLocation)
+                        .where(and(eq(announcementLocation.announcementId, announcement.id), inArray(announcementLocation.locationId, exclude)))
+                    )),
+                    not(exists(
+                        db.select({ id: sql`1` })
+                        .from(announcementResource)
+                        .innerJoin(resource, eq(announcementResource.resourceId, resource.id))
+                        .where(and(eq(announcementResource.announcementId, announcement.id), inArray(resource.locationId, exclude)))
+                    ))
+                )
+            );
+        }
+    }
+
+    if (tagId) {
+        const { include, exclude } = parseFilterValue(tagId);
+        if (include.length > 0) {
+            conditions.push(
+                exists(
+                    db.select({ id: sql`1` })
+                    .from(announcementTag)
+                    .where(and(eq(announcementTag.announcementId, announcement.id), inArray(announcementTag.tagId, include)))
+                )
+            );
+        }
+        if (exclude.length > 0) {
+            conditions.push(
+                not(exists(
+                    db.select({ id: sql`1` })
+                    .from(announcementTag)
+                    .where(and(eq(announcementTag.announcementId, announcement.id), inArray(announcementTag.tagId, exclude)))
+                ))
             );
         }
     }

@@ -1,9 +1,10 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages.js";
     import { listTimeOffRequests, requestTimeOff } from "./time-off.remote";
-    import { Button, AsyncButton } from "@ac/ui";
+    import { listTalents } from "../talents/list.remote";
+    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     import * as Dialog from "@ac/ui/components/dialog";
-    import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight } from "@lucide/svelte";
+    import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, HelpCircle } from "@lucide/svelte";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import { timeOffRequestSchema } from "@ac/validations";
     import { authClient } from "$lib/auth";
@@ -28,14 +29,50 @@
     };
 
     let searchQuery = $state("");
+    let filterValues = $state<FilterStateMap>({});
     let page = $state(1);
     let limit = $state(50);
     let showQuickCreate = $state(false);
 
+    const STATUS_OPTIONS = $derived([
+        { id: "pending", label: m.status_pending ? m.status_pending() : "Pending" },
+        { id: "approved", label: m.status_approved ? m.status_approved() : "Approved" },
+        { id: "rejected", label: m.status_rejected ? m.status_rejected() : "Rejected" },
+    ]);
+
+    const TYPE_OPTIONS = $derived([
+        { id: "vacation", label: m.leave_vacation ? m.leave_vacation() : "Vacation" },
+        { id: "sick", label: m.leave_sick ? m.leave_sick() : "Sick" },
+        { id: "unpaid", label: m.leave_unpaid ? m.leave_unpaid() : "Unpaid" },
+        { id: "other", label: m.leave_other ? m.leave_other() : "Other" },
+    ]);
+
+    const filterGroups = $derived<FilterGroup[]>([
+        {
+            id: "talentId",
+            label: m.talent ? m.talent() : "Talent",
+            optionsRemote: listTalents,
+            searchable: true,
+        },
+        {
+            id: "status",
+            label: m.status ? m.status() : "Status",
+            options: STATUS_OPTIONS,
+        },
+        {
+            id: "type",
+            label: m.type ? m.type() : "Type",
+            options: TYPE_OPTIONS,
+        },
+    ]);
+
     const filterState = $derived({
         page,
         limit,
-        search: searchQuery,
+        search: searchQuery || undefined,
+        talentId: (filterValues.talentId?.include?.length || filterValues.talentId?.exclude?.length) ? filterValues.talentId : undefined,
+        status: (filterValues.status?.include?.length || filterValues.status?.exclude?.length) ? filterValues.status : undefined,
+        type: (filterValues.type?.include?.length || filterValues.type?.exclude?.length) ? filterValues.type : undefined,
     });
 
     // TODO: implement actual cancel API if there's one. For now just toast a message.
@@ -51,18 +88,18 @@
             <div>
                 <h1 class="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
                     <Plane class="text-amber-500" size={32} />
-                    Time Off Requests
+                    {m.time_off_requests ? m.time_off_requests() : "Time Off Requests"}
                 </h1>
-                <p class="text-gray-500 mt-1">Request leave and manage your absence history.</p>
+                <p class="text-gray-500 mt-1">{m.time_off_subtitle ? m.time_off_subtitle() : "Request leave and manage your absence history."}</p>
             </div>
             <Button onclick={() => (showQuickCreate = true)} class="w-full md:w-auto shadow-sm">
                 <Plus class="w-4 h-4 mr-2" />
-                New Request
+                {m.new_request ? m.new_request() : "New Request"}
             </Button>
         </div>
 
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">Time Off Requests</h1>
+            <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">{m.time_off_requests ? m.time_off_requests() : "Time Off Requests"}</h1>
 
             <!-- Action Bar -->
             <div class="flex flex-col md:flex-row gap-3 mb-6">
@@ -70,34 +107,75 @@
                     <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
-                        placeholder={m.search_requests()}
+                        placeholder={m.search_requests ? m.search_requests() : "Search requests..."}
                         bind:value={searchQuery}
                         oninput={() => (page = 1)}
                         class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all bg-gray-50/50"
                     />
                 </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <FilterMenu
+                        groups={filterGroups}
+                        bind:filters={filterValues}
+                        buttonLabel={m.filters ? m.filters() : "Filters"}
+                        onchange={() => (page = 1)}
+                    />
+                </div>
             </div>
+
+            <!-- Active Filter Chips -->
+            <ActiveFilterChips
+                groups={filterGroups}
+                filters={filterValues}
+                activeFiltersLabel={m.active_filters ? m.active_filters() : "Active Filters:"}
+                clearAllLabel={m.clear_all_filters ? m.clear_all_filters() : "Clear all"}
+                onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+                    const current = filterValues[groupId] || { include: [], exclude: [] };
+                    filterValues = {
+                        ...filterValues,
+                        [groupId]: {
+                            include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                            exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                        },
+                    };
+                    page = 1;
+                }}
+                onclearall={() => {
+                    const reset: FilterStateMap = {};
+                    for (const g of filterGroups) {
+                        reset[g.id] = { include: [], exclude: [] };
+                    }
+                    filterValues = reset;
+                    page = 1;
+                }}
+            />
 
             <!-- Main List -->
             <svelte:boundary>
                 {#if $effect.pending()}
-                    <div class="py-12 text-center text-gray-500">Loading...</div>
+                    <div class="py-12 text-center text-gray-500">{m.loading ? m.loading() : "Loading..."}</div>
                 {/if}
                 <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-                    <div class="grid grid-cols-1 gap-5">
+                    <div class="grid grid-cols-1 gap-4">
                         {#each (await listTimeOffRequests(filterState)).data || [] as req (req.id)}
-                            {@const status = statusMap[req.status] || statusMap.pending}
-                            <div class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-amber-200 transition-all duration-300">
-                                <div class="flex flex-col sm:flex-row items-start justify-between gap-6">
+                            {@const status = statusMap[req.status] || { label: req.status, color: "text-gray-600 bg-gray-50 border-gray-100", icon: HelpCircle }}
+                            {@const StatusIcon = status.icon}
+                            <div class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-amber-200 transition-all hover:shadow-lg group flex flex-col justify-between">
+                                <div class="flex flex-col sm:flex-row items-start justify-between gap-4">
                                     <div class="flex items-start gap-4 flex-1">
+                                        <div class="p-3 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl text-amber-600 border border-amber-200 shadow-sm shrink-0">
+                                            <Plane size={24} />
+                                        </div>
+                                        
                                         <div class="space-y-3 flex-1">
-                                            <div class="flex items-center gap-3 flex-wrap">
-                                                <h3 class="text-xl font-black text-gray-900 uppercase tracking-tighter">
+                                            <div class="flex flex-wrap items-center gap-3">
+                                                <h3 class="text-lg font-black text-gray-900 capitalize flex items-center gap-2">
                                                     {req.type}
                                                 </h3>
-                                                <div class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border {status.color}">
-                                                    <status.icon size={12} />
-                                                    {status.label}
+                                                
+                                                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border {status.color}">
+                                                    <StatusIcon size={12} strokeWidth={3} />
+                                                    <span>{status.label}</span>
                                                 </div>
                                             </div>
 
@@ -109,7 +187,7 @@
                                                 <div class="flex items-center gap-2">
                                                     <Clock size={16} class="text-amber-400" />
                                                     <span>
-                                                        {Math.ceil((new Date(req.endDate).getTime() - new Date(req.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} Days
+                                                        {m.days_count_plain ? m.days_count_plain({ count: Math.ceil((new Date(req.endDate).getTime() - new Date(req.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1 }) : `${Math.ceil((new Date(req.endDate).getTime() - new Date(req.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} Days`}
                                                     </span>
                                                 </div>
                                             </div>
@@ -129,7 +207,7 @@
                                             onclick={() => cancelRequest(req)}
                                         >
                                             <Trash2 size={16} class="mr-2" />
-                                            Cancel
+                                            {m.cancel_request ? m.cancel_request() : "Cancel"}
                                         </Button>
                                     </div>
                                 </div>
@@ -138,7 +216,7 @@
                             <div class="text-center py-12 bg-white rounded-xl border border-gray-100 col-span-full">
                                 <Plane class="w-12 h-12 text-gray-300 mx-auto mb-3" />
                                 <h3 class="text-lg font-medium text-gray-900">
-                                    No leave requests found
+                                    {m.no_leave_requests_found ? m.no_leave_requests_found() : "No leave requests found"}
                                 </h3>
                             </div>
                         {/each}
@@ -229,14 +307,14 @@
 <Dialog.Root bind:open={showQuickCreate}>
     <Dialog.Content class="sm:max-w-[600px]">
         <Dialog.Header>
-            <Dialog.Title>New Leave Request</Dialog.Title>
+            <Dialog.Title>{m.new_leave_request ? m.new_leave_request() : "New Leave Request"}</Dialog.Title>
         </Dialog.Header>
         
         <form 
             {...requestTimeOff.preflight(timeOffRequestSchema).enhance(async ({ submit }) => {
                 const res = await submit();
                 if (res) {
-                    toast.success("Request submitted");
+                    toast.success(m.request_submitted ? m.request_submitted() : "Request submitted");
                     showQuickCreate = false;
                     listTimeOffRequests(filterState).refresh();
                 }
@@ -249,7 +327,7 @@
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
-                    <label for="type" class="text-xs font-black uppercase tracking-widest text-gray-400">Request Type</label>
+                    <label for="type" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.request_type ? m.request_type() : "Request Type"}</label>
                     <select 
                         name="type" 
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all"
@@ -264,7 +342,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
-                    <label for="startDate" class="text-xs font-black uppercase tracking-widest text-gray-400">Start Date</label>
+                    <label for="startDate" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.start_date ? m.start_date() : "Start Date"}</label>
                     <input 
                         type="date" 
                         name="startDate" 
@@ -272,7 +350,7 @@
                     />
                 </div>
                 <div class="space-y-1.5">
-                    <label for="endDate" class="text-xs font-black uppercase tracking-widest text-gray-400">End Date</label>
+                    <label for="endDate" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.end_date ? m.end_date() : "End Date"}</label>
                     <input 
                         type="date" 
                         name="endDate" 
@@ -282,12 +360,12 @@
             </div>
 
             <div class="space-y-1.5">
-                <label for="reason" class="text-xs font-black uppercase tracking-widest text-gray-400">Reason / Notes</label>
+                <label for="reason" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.reason_notes ? m.reason_notes() : "Reason / Notes"}</label>
                 <textarea 
                     name="reason" 
                     rows="3"
                     class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all resize-none"
-                    placeholder="Briefly describe the reason for your request..."
+                    placeholder={m.reason_placeholder ? m.reason_placeholder() : "Briefly describe the reason for your request..."}
                 ></textarea>
             </div>
 
@@ -297,15 +375,13 @@
                     variant="outline" 
                     onclick={() => (showQuickCreate = false)}
                 >
-                    Cancel
+                    {m.cancel ? m.cancel() : "Cancel"}
                 </Button>
                 <AsyncButton 
                     type="submit" 
                     class="bg-amber-600 hover:bg-amber-700 text-white"
-                    
-                    
                 >
-                    Submit Request
+                    {m.submit_request ? m.submit_request() : "Submit Request"}
                 </AsyncButton>
             </Dialog.Footer>
         </form>

@@ -2,7 +2,7 @@
     import * as m from "$lib/paraglide/messages.js";
     import { listShiftplans } from "./list.remote";
     import { deleteShiftplans } from "./[id]/delete.remote";
-    import { Button, AsyncButton } from "@ac/ui";
+    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     
     import { listLocations } from "../locations/list.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
@@ -11,16 +11,13 @@
         MapPin, 
         Pencil, 
         Trash2, 
-        ChevronRight,
-        Search,
-        Filter,
-        ChevronDown,
+        ChevronRight, 
+        Search, 
+        Plus,
         ArrowLeft,
         ArrowRight,
         ChevronsLeft,
-        ChevronsRight,
-        X,
-        Plus
+        ChevronsRight
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
@@ -31,31 +28,36 @@
     let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
+    let filterValues = $state<FilterStateMap>({});
     let page = $state(1);
     let limit = $state(50);
-    let selectedLocationId = $state<string | null>(null);
+
+    const filterGroups = $derived<FilterGroup[]>([
+        {
+            id: "locationId",
+            label: m.locations ? m.locations() : "Locations",
+            optionsRemote: listLocations,
+            searchable: true,
+        },
+    ]);
 
     const filterState = $derived({
         page,
         limit,
-        search: searchQuery,
-        locationId: selectedLocationId || undefined,
+        search: searchQuery || undefined,
+        locationId: (filterValues.locationId?.include?.length || filterValues.locationId?.exclude?.length) ? filterValues.locationId : undefined,
         sortField,
         sortOrder,
     });
 
-    const activeFiltersCount = $derived((selectedLocationId ? 1 : 0));
-
-    const allLocationsQuery = listLocations({ limit: 1000, sortField: 'name', sortOrder: 'asc' });
-
     async function deleteItem(plan: Shiftplan) {
-        if (!window.confirm("Are you sure you want to delete this shift plan?")) return;
+        if (!window.confirm(m.delete_confirm ? m.delete_confirm({ item: m.shiftplans ? m.shiftplans() : "Shift plan" }) : "Delete this shift plan?")) return;
         try {
             await deleteShiftplans([plan.id]);
-            toast.success("Shift plan deleted successfully");
+            toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
             listShiftplans(filterState).refresh();
         } catch (error: any) {
-            toast.error(error?.message || "Something went wrong");
+            toast.error(error?.message || (m.something_went_wrong ? m.something_went_wrong() : "Something went wrong"));
         }
     }
 </script>
@@ -66,18 +68,18 @@
             <div>
                 <h1 class="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
                     <Calendar class="text-purple-500" size={32} />
-                    Shift Plans
+                    {m.shiftplans_title ? m.shiftplans_title() : "Shift Plans"}
                 </h1>
-                <p class="text-gray-500 mt-1">Manage schedules, templates, and workdays.</p>
+                <p class="text-gray-500 mt-1">{m.shiftplans_subtitle ? m.shiftplans_subtitle() : "Manage schedules, templates, and workdays."}</p>
             </div>
             <Button href="/shiftplans/new" class="w-full md:w-auto shadow-sm">
                 <Plus class="w-4 h-4 mr-2" />
-                Create Shift Plan
+                {m.create_shiftplan ? m.create_shiftplan() : "Create Shift Plan"}
             </Button>
         </div>
 
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">Shiftplans</h1>
+            <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">{m.shiftplans ? m.shiftplans() : "Shiftplans"}</h1>
 
             <!-- Action Bar -->
             <div class="flex flex-col md:flex-row gap-3 mb-6">
@@ -92,36 +94,52 @@
                     />
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    
-    <div class="flex items-center gap-2">
-        <span class="text-sm text-gray-500 font-medium">Location:</span>
-        <select
-            bind:value={selectedLocationId}
-            onchange={() => page = 1}
-            class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-        >
-            <option value={null}>{m.all_locations()}</option>
-            {#await allLocationsQuery then locations}
-                {#each locations.data as loc}
-                    <option value={loc.id}>{loc.name}</option>
-                {/each}
-            {/await}
-        </select>
-    </div>
-    
+                    <FilterMenu
+                        groups={filterGroups}
+                        bind:filters={filterValues}
+                        buttonLabel={m.filters ? m.filters() : "Filters"}
+                        onchange={() => (page = 1)}
+                    />
                 </div>
             </div>
+
+            <!-- Active Filter Chips -->
+            <ActiveFilterChips
+                groups={filterGroups}
+                filters={filterValues}
+                activeFiltersLabel={m.active_filters ? m.active_filters() : "Active Filters:"}
+                clearAllLabel={m.clear_all_filters ? m.clear_all_filters() : "Clear all"}
+                onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+                    const current = filterValues[groupId] || { include: [], exclude: [] };
+                    filterValues = {
+                        ...filterValues,
+                        [groupId]: {
+                            include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                            exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                        },
+                    };
+                    page = 1;
+                }}
+                onclearall={() => {
+                    const reset: FilterStateMap = {};
+                    for (const g of filterGroups) {
+                        reset[g.id] = { include: [], exclude: [] };
+                    }
+                    filterValues = reset;
+                    page = 1;
+                }}
+            />
 
             <!-- Main List -->
             <svelte:boundary>
                 {#if $effect.pending()}
-                    <div class="py-12 text-center text-gray-500">Loading...</div>
+                    <div class="py-12 text-center text-gray-500">{m.loading ? m.loading() : "Loading..."}</div>
                 {/if}
                 <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {#each (await listShiftplans(filterState)).data || [] as plan (plan.id)}
-                            <div class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-purple-200 transition-all duration-300">
-                                <div class="flex items-start justify-between gap-4 mb-4">
+                            <div class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-purple-200 transition-all hover:shadow-lg group flex flex-col justify-between">
+                                <div class="flex items-start justify-between mb-4">
                                     <div class="flex items-center gap-3">
                                         <div class="p-3 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 border border-purple-200 shadow-sm">
                                             <Calendar size={20} />
@@ -157,12 +175,12 @@
                                         <div class="mt-3 space-y-2">
                                             <div class="flex items-center gap-2 text-sm text-gray-500 font-medium">
                                                 <MapPin size={14} class="text-purple-400" />
-                                                <span>{plan.locationName || 'Unassigned Location'}</span>
+                                                <span>{plan.locationName || (m.unassigned_location ? m.unassigned_location() : "Unassigned Location")}</span>
                                             </div>
                                             <div class="flex items-center gap-2 text-sm text-gray-500 font-medium font-mono uppercase tracking-tighter">
                                                 <Calendar size={14} class="text-purple-400" />
                                                 <span>
-                                                    {(plan.schedule as any[])?.filter((d: any) => d.isActive).length ?? 0} Workdays configured
+                                                    {m.workdays_configured ? m.workdays_configured({ count: (plan.schedule as any[])?.filter((d: any) => d.isActive).length ?? 0 }) : `${(plan.schedule as any[])?.filter((d: any) => d.isActive).length ?? 0} Workdays configured`}
                                                 </span>
                                             </div>
                                         </div>
@@ -170,7 +188,7 @@
 
                                     <div class="pt-4 border-t border-gray-50 flex items-center justify-between">
                                         <span class="text-[10px] font-black text-gray-300 uppercase tracking-widest">
-                                            Identified {new Date(plan.createdAt).toLocaleDateString()}
+                                            {m.identified ? m.identified() : "Identified"} {new Date(plan.createdAt).toLocaleDateString()}
                                         </span>
                                         <div class="p-2 bg-gray-50 rounded-xl group-hover:bg-purple-600 group-hover:text-white transition-all">
                                             <ChevronRight size={16} />
@@ -182,7 +200,7 @@
                             <div class="text-center py-12 bg-white rounded-xl border border-gray-100 col-span-full">
                                 <Calendar class="w-12 h-12 text-gray-300 mx-auto mb-3" />
                                 <h3 class="text-lg font-medium text-gray-900">
-                                    No shift plans found
+                                    {m.no_shiftplans_found ? m.no_shiftplans_found() : "No shift plans found"}
                                 </h3>
                             </div>
                         {/each}

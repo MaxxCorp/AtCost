@@ -20,6 +20,7 @@ export const kiosk = pgTable("kiosk", {
     excludeNonPublic: boolean("exclude_non_public").default(true).notNull(),
     excludeTentative: boolean("exclude_tentative").default(true).notNull(),
     excludeCancelled: boolean("exclude_cancelled").default(false).notNull(),
+    excludeSeries: boolean("exclude_series").default(false).notNull(),
     excludedEventIds: jsonb("excluded_event_ids").$type<string[]>().default([]).notNull(),
     includedEventIds: jsonb("included_event_ids").$type<string[]>().default([]).notNull(),
     excludedAnnouncementIds: jsonb("excluded_announcement_ids").$type<string[]>().default([]).notNull(),
