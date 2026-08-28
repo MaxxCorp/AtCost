@@ -7,14 +7,11 @@ import { ensureAccess, getAuthenticatedUser, parseRoles } from '$lib/server/auth
 import { UserPaginationSchema as PaginationSchema, parseFilterValue, type User, type PaginatedResult } from '@ac/validations';
 
 /**
- * Query: List all users (Admin only)
+ * Query: List all users
  */
 export const listUsers = query(PaginationSchema, async (input): Promise<PaginatedResult<User>> => {
     const currentUser = getAuthenticatedUser();
-    const roles = parseRoles(currentUser);
-    if (!roles.includes('admin')) {
-        throw new Error('Forbidden: Admin access only');
-    }
+    ensureAccess(currentUser, 'users');
 
     const { page = 1, limit = 50, search = '', role } = input || {};
     const offset = (page - 1) * limit;
@@ -64,8 +61,8 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
 
     const data = rawResults.map(row => ({
         ...row,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString()
+        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
+        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : new Date(row.updatedAt).toISOString()
     }));
 
     return { data, total };

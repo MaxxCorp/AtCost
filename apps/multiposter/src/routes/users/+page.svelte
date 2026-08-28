@@ -86,7 +86,7 @@
 		try {
 			await deleteUser([user.id]);
 			toast.success(m.delete_successful());
-			listUsers(filterState).refresh();
+			await listUsers(filterState).refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}

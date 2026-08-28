@@ -34,6 +34,7 @@
 		clearGroupText?: (groupLabel: string) => string;
 		clearAllText?: (count: number) => string;
 		onfilterchange?: (filters: FilterStateMap) => void;
+		onchange?: (filters?: FilterStateMap) => void;
 		onclear?: () => void;
 	}
 
@@ -58,6 +59,7 @@
 		clearGroupText = (label: string) => `Clear ${label}`,
 		clearAllText = (count: number) => `Clear all filters (${count})`,
 		onfilterchange,
+		onchange,
 		onclear,
 	}: Props = $props();
 
@@ -128,6 +130,7 @@
 		};
 
 		onfilterchange?.(filters);
+		onchange?.(filters);
 	}
 
 	function clearGroup(groupId: string) {
@@ -139,6 +142,7 @@
 			},
 		};
 		onfilterchange?.(filters);
+		onchange?.(filters);
 	}
 
 	function clearAll() {
@@ -152,6 +156,7 @@
 		}
 		onclear?.();
 		onfilterchange?.(filters);
+		onchange?.(filters);
 	}
 
 	function normalizeOptions(res: any, group: FilterGroup) {
@@ -340,13 +345,13 @@
 												</div>
 
 												<!-- Action Buttons -->
-												<div class="flex items-center gap-1 shrink-0" onclick={(e) => e.stopPropagation()}>
+												<div class="flex items-center gap-1 shrink-0">
 													<button
 														type="button"
 														class="w-6 h-6 rounded-lg flex items-center justify-center font-bold transition-colors {state === 'include'
 															? 'bg-emerald-600 text-white shadow-xs'
 															: 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/80'}"
-														onclick={() => setOptionState(group.id, option.id, state === 'include' ? 'neutral' : 'include')}
+														onclick={(e) => { e.stopPropagation(); setOptionState(group.id, option.id, state === 'include' ? 'neutral' : 'include'); }}
 														title={includeTooltip}
 													>
 														<Plus size={12} strokeWidth={2.5} />
@@ -356,7 +361,7 @@
 														class="w-6 h-6 rounded-lg flex items-center justify-center font-bold transition-colors {state === 'exclude'
 															? 'bg-rose-600 text-white shadow-xs'
 															: 'text-gray-400 hover:text-rose-600 hover:bg-rose-100/80 dark:hover:bg-rose-950/80'}"
-														onclick={() => setOptionState(group.id, option.id, state === 'exclude' ? 'neutral' : 'exclude')}
+														onclick={(e) => { e.stopPropagation(); setOptionState(group.id, option.id, state === 'exclude' ? 'neutral' : 'exclude'); }}
 														title={excludeTooltip}
 													>
 														<Minus size={12} strokeWidth={2.5} />
@@ -413,13 +418,13 @@
 											</div>
 
 											<!-- Action Buttons -->
-											<div class="flex items-center gap-1 shrink-0" onclick={(e) => e.stopPropagation()}>
+											<div class="flex items-center gap-1 shrink-0">
 												<button
 													type="button"
 													class="w-6 h-6 rounded-lg flex items-center justify-center font-bold transition-colors {state === 'include'
 														? 'bg-emerald-600 text-white shadow-xs'
 														: 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/80'}"
-													onclick={() => setOptionState(group.id, option.id, state === 'include' ? 'neutral' : 'include')}
+													onclick={(e) => { e.stopPropagation(); setOptionState(group.id, option.id, state === 'include' ? 'neutral' : 'include'); }}
 													title={includeTooltip}
 												>
 													<Plus size={12} strokeWidth={2.5} />
@@ -429,7 +434,7 @@
 													class="w-6 h-6 rounded-lg flex items-center justify-center font-bold transition-colors {state === 'exclude'
 														? 'bg-rose-600 text-white shadow-xs'
 														: 'text-gray-400 hover:text-rose-600 hover:bg-rose-100/80 dark:hover:bg-rose-950/80'}"
-													onclick={() => setOptionState(group.id, option.id, state === 'exclude' ? 'neutral' : 'exclude')}
+													onclick={(e) => { e.stopPropagation(); setOptionState(group.id, option.id, state === 'exclude' ? 'neutral' : 'exclude'); }}
 													title={excludeTooltip}
 												>
 													<Minus size={12} strokeWidth={2.5} />

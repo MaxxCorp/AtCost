@@ -33,7 +33,7 @@ export const cmsContentVersion = pgTable("cms_content_version", {
     language: text("language").notNull(),
     branch: text("branch").default("published").notNull(),
     content: jsonb("content").notNull(),
-    createdBy: text("created_by").references(() => user.id),
+    createdBy: text("created_by"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -43,7 +43,7 @@ export const cmsMedia = pgTable("cms_media", {
     path: text("path").notNull(),
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
-    userId: text("user_id").references(() => user.id),
+    userId: text("user_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

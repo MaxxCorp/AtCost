@@ -8,7 +8,7 @@ import { campaign } from "./campaigns";
 
 export const announcement = pgTable("announcement", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     campaignId: uuid("campaign_id").references(() => campaign.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     summary: text("summary"),
