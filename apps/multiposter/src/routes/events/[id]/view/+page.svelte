@@ -510,8 +510,8 @@
                                     >
                                         <Lock size={13} /> {m.internal_notes()} <span class="text-gray-400 font-normal">(Staff Only)</span>
                                     </h3>
-                                    <div class="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 text-amber-900 text-xs whitespace-pre-wrap leading-relaxed">
-                                        {event.internalNotes}
+                                    <div class="prose prose-sm prose-amber max-w-none bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 text-amber-900 leading-relaxed">
+                                        {@html event.internalNotes}
                                     </div>
                                 </section>
                             {/if}
