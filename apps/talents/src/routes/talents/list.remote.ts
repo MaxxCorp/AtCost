@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db, talent, contact, eq, desc, inArray, ilike, or, and, sql, talentTimelineEntry, userContact, user } from '@ac/db';
+import { db, talent, contact, eq, desc, inArray, notInArray, not, ilike, or, and, sql, exists, talentTimelineEntry, userContact, user } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { talentPaginationSchema as PaginationSchema, type PaginatedResult } from '@ac/validations';
+import { talentPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 
 export const listTalents = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
     const authUser = getAuthenticatedUser();
@@ -10,7 +10,7 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
     const { page = 1, limit = 50, search = '', tagId, locationId, status } = input || {};
     const offset = (page - 1) * limit;
 
-    let baseQuery = db.select({ id: talent.id }).from(talent);
+    let baseQuery = db.select({ id: talent.id }).from(talent).$dynamic();
     
     const conditions: any[] = [];
     if (search) {
@@ -21,24 +21,59 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
     }
 
     if (status) {
-        const ids = Array.isArray(status) ? status : [status];
-        conditions.push(inArray(talent.status, ids as any));
+        const { include, exclude } = parseFilterValue(status);
+        if (include.length > 0) {
+            conditions.push(inArray(talent.status, include as any));
+        }
+        if (exclude.length > 0) {
+            conditions.push(notInArray(talent.status, exclude as any));
+        }
     }
 
     if (tagId) {
         const { contactTag } = await import('@ac/db');
-        const ids = Array.isArray(tagId) ? tagId : [tagId];
-        baseQuery = baseQuery.innerJoin(contact, eq(contact.id, talent.contactId))
-                     .innerJoin(contactTag, eq(contactTag.contactId, talent.contactId)) as any;
-        conditions.push(inArray(contactTag.tagId, ids));
+        const { include, exclude } = parseFilterValue(tagId);
+        if (include.length > 0) {
+            conditions.push(
+                exists(
+                    db.select({ id: sql`1` })
+                      .from(contactTag)
+                      .where(and(eq(contactTag.contactId, talent.contactId), inArray(contactTag.tagId, include)))
+                )
+            );
+        }
+        if (exclude.length > 0) {
+            conditions.push(
+                not(exists(
+                    db.select({ id: sql`1` })
+                      .from(contactTag)
+                      .where(and(eq(contactTag.contactId, talent.contactId), inArray(contactTag.tagId, exclude)))
+                ))
+            );
+        }
     }
 
     if (locationId) {
         const { locationContact } = await import('@ac/db');
-        const ids = Array.isArray(locationId) ? locationId : [locationId];
-        if (!tagId) baseQuery = baseQuery.innerJoin(contact, eq(contact.id, talent.contactId)) as any;
-        baseQuery = baseQuery.innerJoin(locationContact, eq(locationContact.contactId, talent.contactId)) as any;
-        conditions.push(inArray(locationContact.locationId, ids));
+        const { include, exclude } = parseFilterValue(locationId);
+        if (include.length > 0) {
+            conditions.push(
+                exists(
+                    db.select({ id: sql`1` })
+                      .from(locationContact)
+                      .where(and(eq(locationContact.contactId, talent.contactId), inArray(locationContact.locationId, include)))
+                )
+            );
+        }
+        if (exclude.length > 0) {
+            conditions.push(
+                not(exists(
+                    db.select({ id: sql`1` })
+                      .from(locationContact)
+                      .where(and(eq(locationContact.contactId, talent.contactId), inArray(locationContact.locationId, exclude)))
+                ))
+            );
+        }
     }
 
     if (conditions.length > 0) {

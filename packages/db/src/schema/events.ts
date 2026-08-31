@@ -9,7 +9,7 @@ import { campaign } from "./campaigns";
 
 export const recurringSeries = pgTable("recurring_series", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     rrule: text("rrule").notNull(),
     anchorDate: timestamp("anchor_date").notNull(),
     anchorEndDate: timestamp("anchor_end_date"),
@@ -19,7 +19,7 @@ export const recurringSeries = pgTable("recurring_series", {
 
 export const event = pgTable("event", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     seriesId: uuid("series_id").references((): AnyPgColumn => recurringSeries.id, { onDelete: "cascade" }),
     summary: text("summary").notNull(),
     description: text("description"),

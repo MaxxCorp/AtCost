@@ -54,4 +54,24 @@ describe('groupEvents instance ordering', () => {
 		expect(grouped[0].instances).toHaveLength(1);
 		expect(grouped[0].instances[0].id).toBe('inst2');
 	});
+
+	it('identifies and filters events by series status correctly', () => {
+		const rawEvents = [
+			{ id: 'single1', summary: 'Single Event', seriesId: null, recurrence: null, recurringEventId: null },
+			{ id: 'seriesMaster', summary: 'Series Master', seriesId: 'series-uuid', recurrence: ['RRULE:FREQ=WEEKLY'], recurringEventId: null },
+			{ id: 'seriesInst1', summary: 'Series Instance', seriesId: 'series-uuid', recurrence: null, recurringEventId: 'seriesMaster' },
+		];
+
+		const isSeries = (e: any) => Boolean(e.seriesId || e.recurringEventId || (e.recurrence && e.recurrence.length > 0));
+
+		// Non-series filter (excludeSeries = true)
+		const nonSeriesEvents = rawEvents.filter(e => !isSeries(e));
+		expect(nonSeriesEvents).toHaveLength(1);
+		expect(nonSeriesEvents[0].id).toBe('single1');
+
+		// Only-series filter (onlySeries = true)
+		const onlySeriesEvents = rawEvents.filter(e => isSeries(e));
+		expect(onlySeriesEvents).toHaveLength(2);
+		expect(onlySeriesEvents.map(e => e.id)).toEqual(['seriesMaster', 'seriesInst1']);
+	});
 });

@@ -6,7 +6,7 @@ import { contact } from "./contacts";
 
 export const location = pgTable("location", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     name: text("name").notNull(),
     description: text("description"),
     roomId: text("room_id"),
@@ -30,7 +30,7 @@ export const location = pgTable("location", {
 
 export const resource = pgTable("resource", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     locationId: uuid("location_id").references(() => location.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     description: text("description"),

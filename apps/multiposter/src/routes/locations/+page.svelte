@@ -26,10 +26,12 @@
 	import { getPreference, setPreference } from "$lib/utils/idb";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
+	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let selectedCities = $state<string[]>([]);
+	let filterValues = $state<FilterStateMap>({});
 	let page = $state(1);
 	let limit = $state(50);
 
@@ -40,7 +42,7 @@
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.sortField) sortField = prefs.sortField;
 				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
-				if (prefs.selectedCities) selectedCities = prefs.selectedCities;
+				if (prefs.filterValues) filterValues = prefs.filterValues;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -51,18 +53,9 @@
 		const prefsToSave = {
 			sortField,
 			sortOrder,
-			selectedCities,
+			filterValues,
 		};
 		setPreference("locationsFilters", JSON.stringify(prefsToSave)).catch(console.error);
-	});
-
-	const filterState = $derived({
-		page,
-		limit,
-		search: searchQuery,
-		city: selectedCities.length > 0 ? selectedCities : undefined,
-		sortField,
-		sortOrder,
 	});
 
 	// For the city filter options
@@ -70,7 +63,25 @@
 	const availableCities = $derived.by(() => {
 		const res = allCitiesQuery.current?.data || [];
 		const cities = new Set(res.map((r: any) => r.city).filter(Boolean));
-		return Array.from(cities).sort();
+		return Array.from(cities).sort().map((c) => ({ id: c as string, label: c as string }));
+	});
+
+	const filterGroups = $derived<FilterGroup[]>([
+		{
+			id: "city",
+			label: m.cities(),
+			options: availableCities,
+			searchable: true,
+		},
+	]);
+
+	const filterState = $derived({
+		page,
+		limit,
+		search: searchQuery || undefined,
+		city: (filterValues.city?.include?.length || filterValues.city?.exclude?.length) ? filterValues.city : undefined,
+		sortField,
+		sortOrder,
 	});
 
 	async function handleDelete(location: any) {
@@ -82,15 +93,6 @@
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
-	}
-
-	function toggleCity(city: string) {
-		if (selectedCities.includes(city)) {
-			selectedCities = selectedCities.filter((c) => c !== city);
-		} else {
-			selectedCities = [...selectedCities, city];
-		}
-		page = 1;
 	}
 
 </script>
@@ -126,59 +128,12 @@
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
 				{#if availableCities.length > 0}
-					{@const activeFiltersCount = selectedCities.length}
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger>
-							<Button variant="outline" class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
-								<FilterIcon size={16} class="mr-2" />
-								{m.filters()}
-								{#if activeFiltersCount > 0}
-									<span class="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm">
-										{activeFiltersCount}
-									</span>
-								{/if}
-							</Button>
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content align="end" class="min-w-[200px] rounded-2xl shadow-xl border-gray-100 p-1">
-							<DropdownMenu.Label class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2">{m.system_filters()}</DropdownMenu.Label>
-							<DropdownMenu.Separator class="bg-gray-50" />
-							<DropdownMenu.Sub>
-								<DropdownMenu.SubTrigger class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg">
-									<span>{m.cities()}</span>
-									{#if selectedCities.length > 0}
-										<span class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold">
-											{selectedCities.length}
-										</span>
-									{/if}
-								</DropdownMenu.SubTrigger>
-								<DropdownMenu.SubContent class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100">
-									{#each availableCities as city}
-										<DropdownMenu.CheckboxItem
-											checked={selectedCities.includes(city as string)}
-											onCheckedChange={() => toggleCity(city as string)}
-											closeOnSelect={false}
-											class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
-										>
-											<span class="truncate block w-full">{city}</span>
-										</DropdownMenu.CheckboxItem>
-									{/each}
-								</DropdownMenu.SubContent>
-							</DropdownMenu.Sub>
-							{#if activeFiltersCount > 0}
-								<DropdownMenu.Separator class="bg-gray-50" />
-								<DropdownMenu.Item
-									class="text-red-600 font-medium py-2 rounded-lg cursor-pointer hover:bg-red-50 hover:text-red-700"
-									onclick={() => {
-										selectedCities = [];
-										page = 1;
-									}}
-								>
-									<X size={14} class="mr-2" />
-									{m.clear_filters()}
-								</DropdownMenu.Item>
-							{/if}
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
+					<FilterMenu
+						groups={filterGroups}
+						bind:filters={filterValues}
+						buttonLabel={m.filters()}
+						onchange={() => (page = 1)}
+					/>
 				{/if}
 
 				<div class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1">
@@ -200,6 +155,35 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Active Filter Chips -->
+		{#if availableCities.length > 0}
+			<ActiveFilterChips
+				groups={filterGroups}
+				filters={filterValues}
+				activeFiltersLabel={m.active_filters()}
+				clearAllLabel={m.clear_all_filters()}
+				onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+					const current = filterValues[groupId] || { include: [], exclude: [] };
+					filterValues = {
+						...filterValues,
+						[groupId]: {
+							include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+							exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+						},
+					};
+					page = 1;
+				}}
+				onclearall={() => {
+					const reset: FilterStateMap = {};
+					for (const g of filterGroups) {
+						reset[g.id] = { include: [], exclude: [] };
+					}
+					filterValues = reset;
+					page = 1;
+				}}
+			/>
+		{/if}
 
 		<svelte:boundary>
 			{#if $effect.pending()}

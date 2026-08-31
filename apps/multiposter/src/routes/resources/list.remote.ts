@@ -1,9 +1,8 @@
 import { query } from '$app/server';
-import { db } from '@ac/db';
-import { resource, resourceLocation, location } from '@ac/db';
+import { db, resource, resourceLocation, location, eventResource } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { desc, getTableColumns, and, inArray, eq } from '@ac/db';
-import { resourcePaginationSchema as PaginationSchema, type Resource, type PaginatedResult } from '@ac/validations';
+import { desc, getTableColumns, and, or, not, inArray, notInArray, eq, exists, sql, ilike } from '@ac/db';
+import { resourcePaginationSchema as PaginationSchema, parseFilterValue, type Resource, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
 
 /**
@@ -22,31 +21,49 @@ export const listResources = query(PaginationSchema, async (input: v.InferOutput
 
     if (associatedWith) {
         if (associatedWith.type === 'event') {
-            const { eventResource } = await import('@ac/db');
             baseQuery = baseQuery.innerJoin(eventResource, eq(resource.id, eventResource.resourceId)) as any;
             conditions.push(eq(eventResource.eventId, associatedWith.id));
         } else {
-            const { sql } = await import('@ac/db');
             conditions.push(sql`1 = 0`);
         }
     }
 
     if (search) {
-        const { ilike } = await import('@ac/db');
         conditions.push(ilike(resource.name, `%${search}%`));
     }
 
     if (locationId) {
-        const ids = Array.isArray(locationId) ? locationId : [locationId];
-        baseQuery = baseQuery.leftJoin(resourceLocation, eq(resource.id, resourceLocation.resourceId)) as any;
-        conditions.push(inArray(resourceLocation.locationId, ids));
+        const { include, exclude } = parseFilterValue(locationId);
+        if (include.length > 0) {
+            conditions.push(
+                or(
+                    inArray(resource.locationId, include),
+                    exists(
+                        db.select({ id: sql`1` })
+                          .from(resourceLocation)
+                          .where(and(eq(resourceLocation.resourceId, resource.id), inArray(resourceLocation.locationId, include)))
+                    )
+                )
+            );
+        }
+        if (exclude.length > 0) {
+            conditions.push(
+                and(
+                    notInArray(resource.locationId, exclude),
+                    not(exists(
+                        db.select({ id: sql`1` })
+                          .from(resourceLocation)
+                          .where(and(eq(resourceLocation.resourceId, resource.id), inArray(resourceLocation.locationId, exclude)))
+                    ))
+                )
+            );
+        }
     }
 
     if (conditions.length > 0) {
         baseQuery = baseQuery.where(and(...conditions)) as any;
     }
 
-    const { sql } = await import('@ac/db');
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
     const total = Number(countResult[0]?.count || 0);
 

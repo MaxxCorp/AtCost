@@ -159,6 +159,24 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	async updateEvent(externalId: string, event: ExternalEvent): Promise<{ etag?: string }> {
 		if (!this.accessToken) throw new Error('Provider not initialized');
 
+		if (event.status === 'cancelled') {
+			try {
+				const cancelUrl = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}/cancel`;
+				await this.makeRequest(cancelUrl, {
+					method: 'POST',
+					body: JSON.stringify({
+						comment: 'Event cancelled'
+					})
+				});
+				return {};
+			} catch (cancelError: any) {
+				console.warn(
+					'[MicrosoftCalendarProvider] POST /cancel failed (may not be an organizer meeting with attendees), falling back to PATCH:',
+					cancelError?.message || cancelError
+				);
+			}
+		}
+
 		const msEvent = this.mapToMicrosoftEvent(event);
 		const url = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}`;
 
@@ -406,9 +424,21 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	}
 
 	private mapToMicrosoftEvent(event: ExternalEvent): any {
+		let showAs = 'busy';
+		if (event.status === 'tentative') {
+			showAs = 'tentative';
+		} else if (event.status === 'cancelled') {
+			showAs = 'free';
+		}
+
+		let subject = event.summary;
+		if (event.status === 'cancelled' && !subject.startsWith('[Cancelled]') && !subject.startsWith('[Abgesagt]')) {
+			subject = `[Cancelled] ${subject}`;
+		}
+
 		const msEvent: any = {
-			subject: event.summary,
-			showAs: event.status === 'tentative' ? 'tentative' : 'busy',
+			subject,
+			showAs,
 			body: event.description ? { contentType: 'HTML', content: event.description } : undefined,
 			location: event.location ? { displayName: event.location } : undefined,
 			isAllDay: event.isAllDay,

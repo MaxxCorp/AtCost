@@ -90,6 +90,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         excludeTentative: kioskData.excludeTentative,
         excludeCancelled: kioskData.excludeCancelled,
         excludeNonPublic: kioskData.excludeNonPublic,
+        excludeSeries: kioskData.excludeSeries,
         excludedEventIds: kioskData.excludedEventIds || [],
         includedEventIds: kioskData.includedEventIds || [],
         excludedTags: kioskData.excludedTags || [],

@@ -265,6 +265,11 @@ export class GoogleCalendarProvider implements SyncProvider {
 			throw new Error('Provider not initialized');
 		}
 
+		if (event.status === 'cancelled') {
+			await this.deleteEvent(externalId);
+			return {};
+		}
+
 		const gcalEvent = this.mapToGoogleEvent(event);
 
 		const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(this.calendarId)}/events/${encodeURIComponent(externalId)}?sendUpdates=all`;
@@ -287,7 +292,7 @@ export class GoogleCalendarProvider implements SyncProvider {
 			throw new Error('Provider not initialized');
 		}
 
-		const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(this.calendarId)}/events/${encodeURIComponent(externalId)}`;
+		const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(this.calendarId)}/events/${encodeURIComponent(externalId)}?sendUpdates=all`;
 
 		await this.makeRequest({
 			url,

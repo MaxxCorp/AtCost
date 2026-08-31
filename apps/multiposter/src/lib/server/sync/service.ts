@@ -410,8 +410,15 @@ export class SyncService {
 
 		if (externalEvent.status === 'cancelled') {
 			if (mapping && mapping.eventId) {
-				await db.delete(eventTable).where(eq(eventTable.id, mapping.eventId));
-				await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
+				await db
+					.update(eventTable)
+					.set({ status: 'cancelled', updatedAt: new Date() })
+					.where(eq(eventTable.id, mapping.eventId));
+				await db
+					.update(syncMappingTable)
+					.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
+					.where(eq(syncMappingTable.id, mapping.id));
+				await publishEventChange('update', [mapping.eventId]);
 			}
 			return;
 		}
@@ -1156,6 +1163,7 @@ export class SyncService {
 			externalId: '',
 			providerId,
 			summary,
+			status: internal.status,
 			description,
 			location: venue?.name || internal.location || undefined,
 			startDateTime: internal.startDateTime || internal.createdAt || new Date(),

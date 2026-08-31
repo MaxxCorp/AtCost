@@ -1,6 +1,6 @@
 <script lang="ts">
     import * as m from "$lib/paraglide/messages";
-    import { Button, AsyncButton } from "@ac/ui";
+    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     
     import { listUsers } from "./list.remote";
     import { deleteUser } from "./[id]/delete.remote";
@@ -13,7 +13,6 @@
         Pencil, 
         Trash2,
         Search,
-        Filter,
         ChevronDown,
         ChevronRight,
         ArrowLeft,
@@ -37,29 +36,42 @@
     let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
+    let filterValues = $state<FilterStateMap>({});
     let page = $state(1);
     let limit = $state(50);
-    let selectedRole = $state<string | null>(null);
+
+    const ROLE_OPTIONS = $derived([
+        { id: "admin", label: m.admin ? m.admin() : "Admin" },
+        { id: "manager", label: m.manager ? m.manager() : "Manager" },
+        { id: "user", label: m.role_user ? m.role_user() : "User" },
+    ]);
+
+    const filterGroups = $derived<FilterGroup[]>([
+        {
+            id: "role",
+            label: m.role ? m.role() : "Role",
+            options: ROLE_OPTIONS,
+            searchable: true,
+        },
+    ]);
 
     const filterState = $derived({
         page,
         limit,
-        search: searchQuery,
-        role: selectedRole || undefined,
+        search: searchQuery || undefined,
+        role: (filterValues.role?.include?.length || filterValues.role?.exclude?.length) ? filterValues.role : undefined,
         sortField,
         sortOrder,
     });
 
-    const activeFiltersCount = $derived((selectedRole ? 1 : 0));
-
     async function deleteItem(user: User) {
-        if (!window.confirm("Are you sure you want to delete this user?")) return;
+        if (!window.confirm(m.delete_confirm ? m.delete_confirm({ item: m.role_user ? m.role_user() : "User" }) : "Delete this user?")) return;
         try {
             await deleteUser([user.id]);
-            toast.success("User deleted successfully");
+            toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
             listUsers(filterState).refresh();
         } catch (error: any) {
-            toast.error(error?.message || "Something went wrong");
+            toast.error(error?.message || (m.something_went_wrong ? m.something_went_wrong() : "Something went wrong"));
         }
     }
 </script>
@@ -69,7 +81,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight text-gray-900">{m.users()}</h1>
-                <p class="text-gray-500 mt-1">Manage system access, roles, and user profiles.</p>
+                <p class="text-gray-500 mt-1">{m.users_subtitle ? m.users_subtitle() : "Manage system access, roles, and user profiles."}</p>
             </div>
         </div>
 
@@ -89,22 +101,41 @@
                     />
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    
-    <div class="flex items-center gap-2">
-        <select
-            bind:value={selectedRole}
-            onchange={() => page = 1}
-            class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white capitalize"
-        >
-            <option value={null}>{m.all_roles()}</option>
-            <option value="admin">{m.admin()}</option>
-            <option value="manager">{m.manager()}</option>
-            <option value="user">{m.role_user()}</option>
-        </select>
-    </div>
-    
+                    <FilterMenu
+                        groups={filterGroups}
+                        bind:filters={filterValues}
+                        buttonLabel={m.filters ? m.filters() : "Filters"}
+                        onchange={() => (page = 1)}
+                    />
                 </div>
             </div>
+
+            <!-- Active Filter Chips -->
+            <ActiveFilterChips
+                groups={filterGroups}
+                filters={filterValues}
+                activeFiltersLabel={m.active_filters ? m.active_filters() : "Active Filters:"}
+                clearAllLabel={m.clear_all_filters ? m.clear_all_filters() : "Clear all"}
+                onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+                    const current = filterValues[groupId] || { include: [], exclude: [] };
+                    filterValues = {
+                        ...filterValues,
+                        [groupId]: {
+                            include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                            exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                        },
+                    };
+                    page = 1;
+                }}
+                onclearall={() => {
+                    const reset: FilterStateMap = {};
+                    for (const g of filterGroups) {
+                        reset[g.id] = { include: [], exclude: [] };
+                    }
+                    filterValues = reset;
+                    page = 1;
+                }}
+            />
 
             <!-- Main List -->
             <svelte:boundary>

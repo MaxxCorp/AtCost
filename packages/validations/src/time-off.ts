@@ -1,10 +1,12 @@
 import * as v from 'valibot';
-import { PaginationBaseSchema } from './pagination.js';
+import { PaginationBaseSchema, FilterableIdSchema } from './pagination.js';
 
 export const TimeOffPaginationSchema = v.intersect([
     PaginationBaseSchema,
     v.object({
-        talentId: v.optional(v.string())
+        talentId: FilterableIdSchema,
+        type: FilterableIdSchema,
+        status: FilterableIdSchema,
     })
 ]);
 

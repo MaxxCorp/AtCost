@@ -6,7 +6,7 @@ import { location } from "./resources";
 
 export const kiosk = pgTable("kiosk", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     name: text("name").notNull(),
     description: text("description"),
     status: text("status").default("offline").notNull(),
@@ -20,6 +20,7 @@ export const kiosk = pgTable("kiosk", {
     excludeNonPublic: boolean("exclude_non_public").default(true).notNull(),
     excludeTentative: boolean("exclude_tentative").default(true).notNull(),
     excludeCancelled: boolean("exclude_cancelled").default(false).notNull(),
+    excludeSeries: boolean("exclude_series").default(false).notNull(),
     excludedEventIds: jsonb("excluded_event_ids").$type<string[]>().default([]).notNull(),
     includedEventIds: jsonb("included_event_ids").$type<string[]>().default([]).notNull(),
     excludedAnnouncementIds: jsonb("excluded_announcement_ids").$type<string[]>().default([]).notNull(),

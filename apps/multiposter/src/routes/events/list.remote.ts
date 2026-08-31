@@ -1,8 +1,8 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
+import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { eventPaginationSchema as PaginationSchema, type PaginatedResult, type Event } from '@ac/validations';
+import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult, type Event } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
 import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 
@@ -16,7 +16,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		// unauthorized can only see public events
 	}
 
-	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
+	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: event.id }).from(event).$dynamic();
@@ -45,52 +45,87 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		));
 	}
 
-	// Location filter
+	// Location filter (include / exclude)
 	if (locationId) {
-		const ids = Array.isArray(locationId) ? locationId : [locationId];
-		if (ids.length > 0) {
+		const { include, exclude } = parseFilterValue(locationId);
+		if (include.length > 0) {
 			conditions.push(
 				or(
 					exists(
 						db.select({ id: sql`1` })
 						  .from(eventLocation)
-						  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, ids)))
+						  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, include)))
 					),
 					exists(
 						db.select({ id: sql`1` })
 						  .from(eventResource)
 						  .innerJoin(resource, eq(eventResource.resourceId, resource.id))
-						  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, ids)))
+						  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, include)))
 					)
 				)
 			);
 		}
-	}
-
-	// Tag filter
-	if (tagId) {
-		const ids = Array.isArray(tagId) ? tagId : [tagId];
-		if (ids.length > 0) {
+		if (exclude.length > 0) {
 			conditions.push(
-				exists(
-					db.select({ id: sql`1` })
-					  .from(eventTag)
-					  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, ids)))
+				and(
+					not(exists(
+						db.select({ id: sql`1` })
+						  .from(eventLocation)
+						  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, exclude)))
+					)),
+					not(exists(
+						db.select({ id: sql`1` })
+						  .from(eventResource)
+						  .innerJoin(resource, eq(eventResource.resourceId, resource.id))
+						  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, exclude)))
+					))
 				)
 			);
 		}
 	}
 
-	// Contact filter
+	// Tag filter (include / exclude)
+	if (tagId) {
+		const { include, exclude } = parseFilterValue(tagId);
+		if (include.length > 0) {
+			conditions.push(
+				exists(
+					db.select({ id: sql`1` })
+					  .from(eventTag)
+					  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, include)))
+				)
+			);
+		}
+		if (exclude.length > 0) {
+			conditions.push(
+				not(exists(
+					db.select({ id: sql`1` })
+					  .from(eventTag)
+					  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, exclude)))
+				))
+			);
+		}
+	}
+
+	// Contact filter (include / exclude)
 	if (contactId) {
-		const ids = Array.isArray(contactId) ? contactId : [contactId];
-		if (ids.length > 0) {
+		const { include, exclude } = parseFilterValue(contactId);
+		if (include.length > 0) {
 			conditions.push(
 				exists(
 					db.select({ id: sql`1` })
 					  .from(eventContact)
-					  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, ids)))
+					  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, include)))
 				)
+			);
+		}
+		if (exclude.length > 0) {
+			conditions.push(
+				not(exists(
+					db.select({ id: sql`1` })
+					  .from(eventContact)
+					  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, exclude)))
+				))
 			);
 		}
 	}
@@ -108,6 +143,30 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	
 	if (excludeNonPublic) {
 		conditionalFilters.push(eq(event.isPublic, true));
+	}
+
+	if (excludeSeries) {
+		conditionalFilters.push(
+			and(
+				isNull(event.seriesId),
+				or(
+					isNull(event.recurrence),
+					sql`${event.recurrence} = '[]'::jsonb`
+				)
+			)
+		);
+	}
+
+	if (onlySeries) {
+		conditionalFilters.push(
+			or(
+				isNotNull(event.seriesId),
+				and(
+					isNotNull(event.recurrence),
+					sql`${event.recurrence} != '[]'::jsonb`
+				)
+			)
+		);
 	}
 
 	if (excludePast) {
@@ -376,8 +435,15 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			fallbackToFirst: true
 		});
 
+		const isSeries = Boolean(
+			e.seriesId ||
+			e.recurringEventId ||
+			(e.recurrence && (e.recurrence as any[]).length > 0)
+		);
+
 		return {
 			...e,
+			isSeries,
 			startDateTime: e.startDateTime ? e.startDateTime.toISOString() : null,
 			endDateTime: e.endDateTime ? e.endDateTime.toISOString() : null,
 			createdAt: e.createdAt ? e.createdAt.toISOString() : null,

@@ -27,7 +27,7 @@
     import { bulkDeleteTalents, listTags } from "./talents.remote";
     import { listLocations } from "../locations/list.remote";
     import { toast } from "svelte-sonner";
-    import { Button, AsyncButton } from "@ac/ui";
+    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import { onMount } from "svelte";
@@ -41,36 +41,55 @@
     let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
+    let filterValues = $state<FilterStateMap>({});
     let page = $state(1);
     let limit = $state(50);
-    let selectedLocationId = $state<string | null>(null);
-    let selectedTagId = $state<string | null>(null);
-    let selectedStatus = $state<string | null>(null);
+
+    const STATUS_OPTIONS = [
+        { id: "active", label: m.status_active ? m.status_active() : "Active" },
+        { id: "applicant", label: m.status_applicant ? m.status_applicant() : "Applicant" },
+        { id: "inactive", label: m.status_inactive ? m.status_inactive() : "Inactive" },
+    ];
+
+    const filterGroups = $derived<FilterGroup[]>([
+        {
+            id: "locationId",
+            label: m.locations ? m.locations() : "Locations",
+            optionsRemote: listLocations,
+            searchable: true,
+        },
+        {
+            id: "tagId",
+            label: m.tags ? m.tags() : "Tags",
+            optionsRemote: listTags,
+            searchable: true,
+        },
+        {
+            id: "status",
+            label: m.status ? m.status() : "Status",
+            options: STATUS_OPTIONS,
+        },
+    ]);
 
     const filterState = $derived({
         page,
         limit,
-        search: searchQuery,
-        locationId: selectedLocationId || undefined,
-        tagId: selectedTagId || undefined,
-        status: selectedStatus || undefined,
+        search: searchQuery || undefined,
+        locationId: (filterValues.locationId?.include?.length || filterValues.locationId?.exclude?.length) ? filterValues.locationId : undefined,
+        tagId: (filterValues.tagId?.include?.length || filterValues.tagId?.exclude?.length) ? filterValues.tagId : undefined,
+        status: (filterValues.status?.include?.length || filterValues.status?.exclude?.length) ? filterValues.status : undefined,
         sortField,
         sortOrder,
     });
 
-    const activeFiltersCount = $derived((selectedLocationId ? 1 : 0) + (selectedTagId ? 1 : 0) + (selectedStatus ? 1 : 0));
-
-    const allLocationsQuery = listLocations({ limit: 1000 });
-    const allTagsQuery = listTags({ limit: 1000 });
-
     async function deleteItem(talent: Talent) {
-        if (!window.confirm("Are you sure you want to delete this talent?")) return;
+        if (!window.confirm(m.delete_confirm ? m.delete_confirm({ item: m.talents ? m.talents() : "Talent" }) : "Delete this talent?")) return;
         try {
             await deleteTalent(talent.id);
-            toast.success("Talent deleted successfully");
+            toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
             listTalents(filterState).refresh();
         } catch (error: any) {
-            toast.error(error?.message || "Something went wrong");
+            toast.error(error?.message || (m.something_went_wrong ? m.something_went_wrong() : "Something went wrong"));
         }
     }
 
@@ -80,14 +99,14 @@
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-100 pb-6">
         <div>
-            <h1 class="text-4xl font-black text-gray-900 tracking-tight">Talents</h1>
+            <h1 class="text-4xl font-black text-gray-900 tracking-tight">{m.talents ? m.talents() : "Talents"}</h1>
             <p class="text-gray-500 mt-1 font-medium italic">
-                Strategic recruitment pipeline and professional network
+                {m.talents_subtitle ? m.talents_subtitle() : "Strategic recruitment pipeline and professional network"}
             </p>
         </div>
         <Button href="/talents/new" class="w-full md:w-auto shadow-sm">
             <UserPlusIcon class="w-4 h-4 mr-2" />
-            Create Talent
+            {m.create_talent ? m.create_talent() : "Create Talent"}
         </Button>
     </div>
 
@@ -104,53 +123,46 @@
             />
         </div>
         <div class="flex items-center gap-2 shrink-0">
-            
-    <div class="flex items-center gap-2">
-        <select
-            bind:value={selectedLocationId}
-            onchange={() => page = 1}
-            class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white max-w-[120px]"
-        >
-            <option value={null}>{m.all_locations()}</option>
-            {#await allLocationsQuery then locations}
-                {#each locations.data as loc}
-                    <option value={loc.id}>{loc.name}</option>
-                {/each}
-            {/await}
-        </select>
-
-        <select
-            bind:value={selectedTagId}
-            onchange={() => page = 1}
-            class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white max-w-[120px]"
-        >
-            <option value={null}>{m.all_tags()}</option>
-            {#await allTagsQuery then tags}
-                {#each tags.data as tag}
-                    <option value={tag.id}>{tag.name}</option>
-                {/each}
-            {/await}
-        </select>
-
-        <select
-            bind:value={selectedStatus}
-            onchange={() => page = 1}
-            class="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white max-w-[120px] capitalize"
-        >
-            <option value={null}>{m.all_statuses()}</option>
-            <option value="active">{m.status_active()}</option>
-            <option value="applicant">{m.status_applicant()}</option>
-            <option value="inactive">{m.status_inactive()}</option>
-        </select>
-    </div>
-    
+            <FilterMenu
+                groups={filterGroups}
+                bind:filters={filterValues}
+                buttonLabel={m.filters ? m.filters() : "Filters"}
+                onchange={() => (page = 1)}
+            />
         </div>
     </div>
+
+    <!-- Active Filter Chips -->
+    <ActiveFilterChips
+        groups={filterGroups}
+        filters={filterValues}
+        activeFiltersLabel={m.active_filters ? m.active_filters() : "Active Filters:"}
+        clearAllLabel={m.clear_all_filters ? m.clear_all_filters() : "Clear all"}
+        onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+            const current = filterValues[groupId] || { include: [], exclude: [] };
+            filterValues = {
+                ...filterValues,
+                [groupId]: {
+                    include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                    exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                },
+            };
+            page = 1;
+        }}
+        onclearall={() => {
+            const reset: FilterStateMap = {};
+            for (const g of filterGroups) {
+                reset[g.id] = { include: [], exclude: [] };
+            }
+            filterValues = reset;
+            page = 1;
+        }}
+    />
 
     <!-- Main List -->
     <svelte:boundary>
         {#if $effect.pending()}
-            <div class="py-12 text-center text-gray-500">Loading...</div>
+            <div class="py-12 text-center text-gray-500">{m.loading ? m.loading() : "Loading..."}</div>
         {/if}
         <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
             <div class="grid grid-cols-1 gap-5">
@@ -170,15 +182,15 @@
                                     
                                     {#if talent.status === 'active'}
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-bold uppercase tracking-wider border border-green-100">
-                                            <CheckCircle2 size={10} /> Active
+                                            <CheckCircle2 size={10} /> {m.status_active ? m.status_active() : "Active"}
                                         </span>
                                     {:else if talent.status === 'applicant'}
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider border border-indigo-100">
-                                            <Clock size={10} /> Applicant
+                                            <Clock size={10} /> {m.status_applicant ? m.status_applicant() : "Applicant"}
                                         </span>
                                     {:else}
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 text-[10px] font-bold uppercase tracking-wider border border-gray-100">
-                                            <Archive size={10} /> Inactive
+                                            <Archive size={10} /> {m.status_inactive ? m.status_inactive() : "Inactive"}
                                         </span>
                                     {/if}
                                 </div>
@@ -192,13 +204,13 @@
                             <div class="flex-1 md:flex-initial">
                                 {#if talent.linkedUser}
                                     <div class="flex flex-col">
-                                        <span class="text-[10px] uppercase font-black text-gray-300 tracking-tighter mb-0.5">Linked Account</span>
+                                        <span class="text-[10px] uppercase font-black text-gray-300 tracking-tighter mb-0.5">{m.linked_account ? m.linked_account() : "Linked Account"}</span>
                                         <span class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600">
                                             <User size={12} class="text-indigo-400" /> {talent.linkedUser.name}
                                         </span>
                                     </div>
                                 {:else}
-                                    <span class="text-[10px] uppercase font-black text-gray-200 tracking-tighter">No Account Link</span>
+                                    <span class="text-[10px] uppercase font-black text-gray-200 tracking-tighter">{m.no_account_link ? m.no_account_link() : "No Account Link"}</span>
                                 {/if}
                             </div>
 
@@ -207,7 +219,7 @@
                                     href="/talents/{talent.id}" 
                                     variant="ghost"
                                     class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                                    title="Edit Profile"
+                                    title={m.edit_profile ? m.edit_profile() : "Edit Profile"}
                                 >
                                     <Edit2 size={18} />
                                 </Button>

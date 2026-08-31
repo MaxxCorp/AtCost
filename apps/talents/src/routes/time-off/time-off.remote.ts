@@ -1,10 +1,10 @@
 import { query, form } from '$app/server';
 import { 
     db, timeOffRequest, timeOffBalance, talent, 
-    eq, and, desc, or, ilike, sql, inArray
+    eq, and, desc, or, ilike, sql, inArray, notInArray
 } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { timeOffRequestSchema, type PaginatedResult } from '@ac/validations';
+import { timeOffRequestSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 
 /**
@@ -41,7 +41,7 @@ export const listTimeOffRequests = query(PaginationSchema, async (input): Promis
     const user = getAuthenticatedUser();
     ensureAccess(user, 'timesheets');
 
-    const { page = 1, limit = 50, search = '', talentId } = input || {};
+    const { page = 1, limit = 50, search = '', talentId, status, type } = input || {};
     const offset = (page - 1) * limit;
     
     const { contact } = await import('@ac/db');
@@ -63,8 +63,33 @@ export const listTimeOffRequests = query(PaginationSchema, async (input): Promis
     
     const conditions = [];
     if (talentId) {
-        const ids = Array.isArray(talentId) ? talentId : [talentId];
-        conditions.push(inArray(timeOffRequest.talentId, ids));
+        const { include, exclude } = parseFilterValue(talentId);
+        if (include.length > 0) {
+            conditions.push(inArray(timeOffRequest.talentId, include));
+        }
+        if (exclude.length > 0) {
+            conditions.push(notInArray(timeOffRequest.talentId, exclude));
+        }
+    }
+
+    if (status) {
+        const { include, exclude } = parseFilterValue(status);
+        if (include.length > 0) {
+            conditions.push(inArray(timeOffRequest.status, include as any));
+        }
+        if (exclude.length > 0) {
+            conditions.push(notInArray(timeOffRequest.status, exclude as any));
+        }
+    }
+
+    if (type) {
+        const { include, exclude } = parseFilterValue(type);
+        if (include.length > 0) {
+            conditions.push(inArray(timeOffRequest.type, include as any));
+        }
+        if (exclude.length > 0) {
+            conditions.push(notInArray(timeOffRequest.type, exclude as any));
+        }
     }
     
     if (search) {

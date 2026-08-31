@@ -24,7 +24,7 @@ export const talent = pgTable("talent", {
 export const talentTimelineEntry = pgTable("talent_timeline_entry", {
     id: uuid("id").primaryKey().defaultRandom(),
     talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
-    addedByUserId: text("added_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    addedByUserId: text("added_by_user_id"),
     title: text("title").notNull(),
     description: text("description"),
     date: timestamp("date").notNull(),
@@ -70,7 +70,7 @@ export const timesheetEntry = pgTable("timesheet_entry", {
     startTime: timestamp("start_time").notNull(),
     endTime: timestamp("end_time"),
     status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
-    managerId: text("manager_id").references(() => user.id),
+    managerId: text("manager_id"),
     managerComment: text("manager_comment"),
     type: text("type", { enum: ["qr", "gps", "manual"] }).notNull(),
     locationId: uuid("location_id").references(() => location.id),
@@ -83,7 +83,7 @@ export const timesheetEntry = pgTable("timesheet_entry", {
 export const timesheetAuditTrail = pgTable("timesheet_audit_trail", {
     id: uuid("id").primaryKey().defaultRandom(),
     timesheetEntryId: uuid("timesheet_entry_id").notNull().references(() => timesheetEntry.id, { onDelete: "cascade" }),
-    changedByUserId: text("changed_by_user_id").notNull().references(() => user.id),
+    changedByUserId: text("changed_by_user_id").notNull(),
     operation: text("operation", { enum: ["create", "update", "delete", "approve", "reject"] }).notNull(),
     previousData: jsonb("previous_data"),
     newData: jsonb("new_data"),
@@ -98,8 +98,8 @@ export const timeOffRequest = pgTable("time_off_request", {
     status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
     startDate: timestamp("start_date").notNull(),
     endDate: timestamp("end_date").notNull(),
-    note: text("note"), // Note
-    managerId: text("manager_id").references(() => user.id),
+    reason: text("reason"),
+    managerId: text("manager_id"),
     managerComment: text("manager_comment"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
@@ -131,7 +131,7 @@ export const task = pgTable("task", {
 });
 
 export const userTalent = pgTable("user_talent", {
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.userId, table.talentId] })]);
 

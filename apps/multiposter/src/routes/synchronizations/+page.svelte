@@ -226,12 +226,32 @@
 		}
 	}
 
+	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("createdAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let selectedProviders = $state<string[]>([]);
+	let filterValues = $state<FilterStateMap>({});
 	let page = $state(1);
 	let limit = $state(50);
+
+	const PROVIDER_OPTIONS = [
+		{ id: "google-calendar", label: "Google Calendar" },
+		{ id: "microsoft-calendar", label: "Microsoft Calendar" },
+		{ id: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
+		{ id: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
+		{ id: "wp-the-events-calendar", label: "WP The Events Calendar" },
+		{ id: "email", label: "E-Mail (Brevo)" },
+	];
+
+	const filterGroups = $derived<FilterGroup[]>([
+		{
+			id: "providerType",
+			label: m.providers(),
+			options: PROVIDER_OPTIONS,
+			searchable: true,
+		},
+	]);
 
 	onMount(async () => {
 		try {
@@ -240,7 +260,7 @@
 				const prefs = JSON.parse(savedPrefs as string);
 				if (prefs.sortField) sortField = prefs.sortField;
 				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
-				if (prefs.selectedProviders) selectedProviders = prefs.selectedProviders;
+				if (prefs.filterValues) filterValues = prefs.filterValues;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -251,7 +271,7 @@
 		const prefsToSave = {
 			sortField,
 			sortOrder,
-			selectedProviders,
+			filterValues,
 		};
 		setPreference("syncsFilters", JSON.stringify(prefsToSave)).catch(
 			console.error,
@@ -261,31 +281,11 @@
 	const filterState = $derived({
 		page,
 		limit,
-		search: searchQuery,
-		providerType: selectedProviders.length > 0 ? selectedProviders : undefined,
+		search: searchQuery || undefined,
+		providerType: (filterValues.providerType?.include?.length || filterValues.providerType?.exclude?.length) ? filterValues.providerType : undefined,
 		sortField,
 		sortOrder,
 	});
-
-	const activeFiltersCount = $derived(selectedProviders.length);
-
-	const PROVIDER_OPTIONS = [
-		{ value: "google-calendar", label: "Google Calendar" },
-		{ value: "microsoft-calendar", label: "Microsoft Calendar" },
-		{ value: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
-		{ value: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
-		{ value: "wp-the-events-calendar", label: "WP The Events Calendar" },
-		{ value: "email", label: "E-Mail (Brevo)" },
-	];
-
-	function toggleProvider(value: string) {
-		if (selectedProviders.includes(value)) {
-			selectedProviders = selectedProviders.filter((t) => t !== value);
-		} else {
-			selectedProviders = [...selectedProviders, value];
-		}
-		page = 1;
-	}
 
 	async function deleteItem(config: Synchronization) {
 		if (!window.confirm(m.delete_confirm({ item: m.feature_synchronizations_title() }))) return;
@@ -345,75 +345,12 @@
 				/>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						<Button
-							variant="outline"
-							class="relative border-gray-200 rounded-xl hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-						>
-							<FilterIcon size={16} class="mr-2" />
-							{m.filters()}
-							{#if activeFiltersCount > 0}
-								<span
-									class="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-sm"
-								>
-									{activeFiltersCount}
-								</span>
-							{/if}
-						</Button>
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content
-						align="end"
-						class="min-w-[200px] rounded-2xl shadow-xl border-gray-100 p-1"
-					>
-						<DropdownMenu.Label
-							class="text-xs font-bold uppercase tracking-wider text-gray-400 px-3 py-2"
-						>{m.system_filters()}</DropdownMenu.Label>
-						<DropdownMenu.Separator class="bg-gray-50" />
-
-						<DropdownMenu.Sub>
-							<DropdownMenu.SubTrigger
-								class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg"
-							>
-								<span>{m.providers()}</span>
-								{#if selectedProviders.length > 0}
-									<span
-										class="ml-auto text-[10px] py-0.5 px-2 h-4 bg-primary-50 text-primary-700 rounded-full flex items-center justify-center font-bold"
-										>{selectedProviders.length}</span
-									>
-								{/if}
-							</DropdownMenu.SubTrigger>
-							<DropdownMenu.SubContent
-								class="w-56 p-1 max-h-[300px] overflow-y-auto rounded-xl shadow-lg border-gray-100"
-							>
-								{#each PROVIDER_OPTIONS as provider}
-									<DropdownMenu.CheckboxItem
-										checked={selectedProviders.includes(provider.value)}
-										onCheckedChange={() => toggleProvider(provider.value)}
-										closeOnSelect={false}
-										class="rounded-lg py-2 px-3 text-sm cursor-pointer hover:bg-gray-50"
-									>
-										<span class="truncate block w-full">{getProviderLabel(provider.value)}</span>
-									</DropdownMenu.CheckboxItem>
-								{/each}
-							</DropdownMenu.SubContent>
-						</DropdownMenu.Sub>
-
-						{#if activeFiltersCount > 0}
-							<DropdownMenu.Separator class="bg-gray-50" />
-							<DropdownMenu.Item
-								class="text-red-600 font-medium py-2 rounded-lg cursor-pointer hover:bg-red-50 hover:text-red-700"
-								onclick={() => {
-									selectedProviders = [];
-									page = 1;
-								}}
-							>
-								<X size={14} class="mr-2" />
-								{m.clear_filters()}
-							</DropdownMenu.Item>
-						{/if}
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+				<FilterMenu
+					groups={filterGroups}
+					bind:filters={filterValues}
+					buttonLabel={m.filters()}
+					onchange={() => (page = 1)}
+				/>
 
 				<div
 					class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1"
@@ -443,6 +380,33 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Active Filter Chips -->
+		<ActiveFilterChips
+			groups={filterGroups}
+			filters={filterValues}
+			activeFiltersLabel={m.active_filters()}
+			clearAllLabel={m.clear_all_filters()}
+			onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+				const current = filterValues[groupId] || { include: [], exclude: [] };
+				filterValues = {
+					...filterValues,
+					[groupId]: {
+						include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+					},
+				};
+				page = 1;
+			}}
+			onclearall={() => {
+				const reset: FilterStateMap = {};
+				for (const g of filterGroups) {
+					reset[g.id] = { include: [], exclude: [] };
+				}
+				filterValues = reset;
+				page = 1;
+			}}
+		/>
 
 		<!-- List -->
 		{#await list(filterState) then res}

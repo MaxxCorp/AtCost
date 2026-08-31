@@ -66,7 +66,7 @@
                                                 const confirmed = await handleDelete({
                                                     ids: [user.id],
                                                     deleteFn: async (ids: string[]) => deleteUser(ids),
-                                                    itemName: m.users(),
+                                                    itemName: m.user ? m.user() : "User",
                                                 });
                                                 if (confirmed) {
                                                     goto("/users");

@@ -41,6 +41,11 @@ vi.mock('../contact-resolution', () => ({
 	resolveEventContact: vi.fn().mockResolvedValue(null)
 }));
 
+// Mock contacts
+vi.mock('../contacts', () => ({
+	getEntityContacts: vi.fn().mockResolvedValue([])
+}));
+
 describe('SyncService - processExternalEvent deduplication', () => {
 	let service: SyncService;
 	const mockConfig = { id: 'config-1', userId: 'user-1', providerId: 'provider-1' } as any;
@@ -137,4 +142,81 @@ describe('SyncService - processExternalEvent deduplication', () => {
 		expect(updateSetCall.summary).toBe('Updated Summary');
 		expect(updateSetCall).not.toHaveProperty('description');
 	});
+
+	it('should update local event status to cancelled when external cancellation is received', async () => {
+		const eventId = 'event-456';
+		const externalEvent = {
+			externalId: 'ext-456',
+			summary: 'Cancelled Meeting',
+			status: 'cancelled',
+			etag: 'etag-123'
+		} as any;
+
+		// Mock mapping exists
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([{ id: 'map-456', eventId }])
+			})
+		});
+
+		// Mock update for eventTable and syncMappingTable
+		const updateWhereMock = vi.fn().mockResolvedValue({});
+		(db.update as any).mockReturnValue({
+			set: vi.fn().mockReturnValue({
+				where: updateWhereMock
+			})
+		});
+
+		// @ts-ignore
+		await service.processExternalEvent(mockConfig, externalEvent);
+
+		// Verify eventTable was updated with status: 'cancelled'
+		expect(db.update).toHaveBeenCalledWith(eventTable);
+		const eventUpdateSet = (db.update(eventTable).set as any).mock.calls[0][0];
+		expect(eventUpdateSet.status).toBe('cancelled');
+
+		// Verify syncMappingTable was updated with etag
+		expect(db.update).toHaveBeenCalledWith(syncMappingTable);
+		const mappingUpdateSet = (db.update(syncMappingTable).set as any).mock.calls[1][0];
+		expect(mappingUpdateSet.etag).toBe('etag-123');
+
+		// Verify eventTable was NOT deleted
+		expect(db.delete).not.toHaveBeenCalledWith(eventTable);
+	});
 });
+
+describe('SyncService - mapInternalToExternal status mapping', () => {
+	let service: SyncService;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		service = new SyncService();
+
+		// Mock db.select for associations in mapInternalToExternal
+		(db.select as any).mockReturnValue({
+			from: vi.fn().mockReturnValue({
+				innerJoin: vi.fn().mockReturnValue({
+					where: vi.fn().mockResolvedValue([])
+				}),
+				where: vi.fn().mockResolvedValue([])
+			})
+		});
+	});
+
+	it('should map status field to external event', async () => {
+		const internalCancelled = {
+			id: 'evt-1',
+			summary: 'Team Sync',
+			status: 'cancelled',
+			startDateTime: new Date('2026-09-01T10:00:00Z'),
+			endDateTime: new Date('2026-09-01T11:00:00Z')
+		};
+
+		// @ts-ignore - private method
+		const externalResult = await service.mapInternalToExternal(internalCancelled, 'microsoft-calendar');
+
+		expect(externalResult.status).toBe('cancelled');
+		expect(externalResult.summary).toBe('Team Sync');
+	});
+});
+

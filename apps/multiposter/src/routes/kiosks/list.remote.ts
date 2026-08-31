@@ -2,8 +2,8 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { desc, asc, eq, inArray, and, or, ilike, sql } from '@ac/db';
-import { kioskPaginationSchema as PaginationSchema, type Kiosk, type PaginatedResult } from '@ac/validations';
+import { desc, asc, eq, inArray, and, or, not, ilike, sql, exists } from '@ac/db';
+import { kioskPaginationSchema as PaginationSchema, parseFilterValue, type Kiosk, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 
 /**
@@ -27,9 +27,25 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
     }
 
     if (locationId) {
-        const ids = Array.isArray(locationId) ? locationId : [locationId];
-        baseQuery = baseQuery.leftJoin(kioskLocation, eq(kiosk.id, kioskLocation.kioskId)) as any;
-        conditions.push(inArray(kioskLocation.locationId, ids));
+        const { include, exclude } = parseFilterValue(locationId);
+        if (include.length > 0) {
+            conditions.push(
+                exists(
+                    db.select({ id: sql`1` })
+                      .from(kioskLocation)
+                      .where(and(eq(kioskLocation.kioskId, kiosk.id), inArray(kioskLocation.locationId, include)))
+                )
+            );
+        }
+        if (exclude.length > 0) {
+            conditions.push(
+                not(exists(
+                    db.select({ id: sql`1` })
+                      .from(kioskLocation)
+                      .where(and(eq(kioskLocation.kioskId, kiosk.id), inArray(kioskLocation.locationId, exclude)))
+                ))
+            );
+        }
     }
 
     if (conditions.length > 0) {

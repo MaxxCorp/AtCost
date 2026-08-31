@@ -4,7 +4,7 @@ import { getOptionalUser, parseRoles } from '$lib/server/authorization';
 import { desc, type InferSelectModel, sql, and, or, ilike } from '@ac/db';
 import * as v from 'valibot';
 
-import { UserPaginationSchema as PaginationSchema, type User, type PaginatedResult } from '@ac/validations';
+import { UserPaginationSchema as PaginationSchema, parseFilterValue, type User, type PaginatedResult } from '@ac/validations';
 
 
 export const listUsers = query(PaginationSchema, async (input): Promise<PaginatedResult<User>> => {
@@ -31,10 +31,12 @@ export const listUsers = query(PaginationSchema, async (input): Promise<Paginate
         }
 
         if (role) {
-            const roles = Array.isArray(role) ? role : [role];
-            if (roles.length > 0) {
-                // For JSONB roles, we check if any of the provided roles are in the array
-                conditions.push(sql`${user.roles} ?| ${roles}`);
+            const { include, exclude } = parseFilterValue(role);
+            if (include.length > 0) {
+                conditions.push(sql`${user.roles} ?| array[${sql.join(include.map(r => sql`${r}`), sql`, `)}]`);
+            }
+            if (exclude.length > 0) {
+                conditions.push(sql`NOT (${user.roles} ?| array[${sql.join(exclude.map(r => sql`${r}`), sql`, `)}])`);
             }
         }
 

@@ -5,9 +5,7 @@ import { user } from "./auth";
 
 export const contact = pgTable("contact", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-        .notNull()
-        .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     displayName: text("display_name"),
     givenName: text("given_name"),
     familyName: text("family_name"),
@@ -80,7 +78,7 @@ export const contactRelation = pgTable("contact_relation", {
 export const tag = pgTable("tag", {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
     index("tag_user_idx").on(table.userId),
@@ -95,7 +93,7 @@ export const contactTag = pgTable("contact_tag", {
 ]);
 
 export const userContact = pgTable("user_contact", {
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.userId, table.contactId] })]);
 

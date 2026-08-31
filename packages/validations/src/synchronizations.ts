@@ -20,6 +20,7 @@ export const synchronizationPaginationSchema = v.optional(v.object({
 	limit: v.optional(v.number(), 50),
 	search: v.optional(v.string()),
 	providerType: FilterableIdSchema,
+	status: FilterableIdSchema,
 	sortField: v.optional(v.union([v.literal('createdAt'), v.literal('updatedAt'), v.literal('name')])),
 	sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});

@@ -5,7 +5,7 @@ import { user } from "./auth";
 
 export const syncConfig = pgTable("sync_config", {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     name: text("name").notNull(),
     providerId: text("provider_id"),
     providerType: text("provider_type").notNull(),
