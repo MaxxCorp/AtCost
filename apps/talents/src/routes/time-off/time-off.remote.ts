@@ -52,7 +52,8 @@ export const listTimeOffRequests = query(PaginationSchema, async (input): Promis
         status: timeOffRequest.status,
         startDate: timeOffRequest.startDate,
         endDate: timeOffRequest.endDate,
-        reason: timeOffRequest.reason,
+        note: timeOffRequest.note,
+        reason: timeOffRequest.note,
         talentId: timeOffRequest.talentId,
         talentName: contact.displayName,
     }).from(timeOffRequest)
@@ -93,7 +94,7 @@ export const listTimeOffRequests = query(PaginationSchema, async (input): Promis
     
     if (search) {
         conditions.push(or(
-            ilike(timeOffRequest.reason, `%${search}%`),
+            ilike(timeOffRequest.note, `%${search}%`),
             ilike(timeOffRequest.type, `%${search}%`),
             ilike(contact.displayName, `%${search}%`)
         ));
@@ -130,11 +131,11 @@ export const requestTimeOff = form(timeOffRequestSchema, async (data) => {
     // In a real app, we'd check balances here
     const [newRequest] = await db.insert(timeOffRequest).values({
         talentId: data.talentId,
-        type: data.type,
+        type: data.type as any,
         status: 'pending',
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
-        reason: data.reason
+        note: data.note || data.reason || null
     }).returning();
 
     // Update pending days in balance

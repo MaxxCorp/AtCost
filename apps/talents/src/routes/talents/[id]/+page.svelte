@@ -64,6 +64,12 @@
                                 Edit Talent Profile
                             </h1>
                             <div class="flex gap-2">
+                                <a href="/talents/{talentIdParam}/timetable">
+                                    <Button variant="outline" size="sm">
+                                        <Calendar size={16} class="mr-2" />
+                                        Monthly Timetable
+                                    </Button>
+                                </a>
                                 <a href="/talents/{talentIdParam}/view">
                                     <Button variant="outline" size="sm">
                                         <ExternalLink size={16} class="mr-2" />
