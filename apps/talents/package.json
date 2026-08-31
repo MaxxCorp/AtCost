@@ -55,6 +55,7 @@
         "drizzle-valibot": "^0.4.2",
         "pg": "^8.23.0",
         "postgres": "^3.4.9",
-        "valibot": "^1.4.2"
+        "valibot": "^1.4.2",
+        "xlsx-js-style": "^1.2.0"
     }
 }

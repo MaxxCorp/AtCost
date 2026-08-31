@@ -18,6 +18,7 @@ export const talent = pgTable("talent", {
     internalNotes: text("internal_notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+    jcNumber: text("jc_number"),
 });
 
 export const talentTimelineEntry = pgTable("talent_timeline_entry", {
@@ -59,7 +60,8 @@ export const shiftPlanTemplate = pgTable("shift_plan_template", {
 export const shiftPlanTemplateTalent = pgTable("shift_plan_template_talent", {
     templateId: uuid("template_id").notNull().references(() => shiftPlanTemplate.id, { onDelete: "cascade" }),
     talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
-}, (table) => [primaryKey({ columns: [table.templateId, table.talentId] })]);
+    validFrom: timestamp("valid_from", { withTimezone: true }).defaultNow().notNull(), // temporary solution for changing timetables (e.g. reduced working hours via new contract)
+}, (table) => [primaryKey({ columns: [table.templateId, table.talentId, table.validFrom]})]);
 
 export const timesheetEntry = pgTable("timesheet_entry", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -92,11 +94,11 @@ export const timesheetAuditTrail = pgTable("timesheet_audit_trail", {
 export const timeOffRequest = pgTable("time_off_request", {
     id: uuid("id").primaryKey().defaultRandom(),
     talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
-    type: text("type", { enum: ["vacation", "sick", "other"] }).notNull(),
+    type: text("type", { enum: ["AZV", "Urlaub", "Krank", "Kind krank", "Tel. Krankmeldung", "Wichtiger Grund", "Unentschuldigt"] }).notNull(), // Weiterbildung might be valid as well. Since the code should be fail-safe, the enum could also be dropped.
     status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
     startDate: timestamp("start_date").notNull(),
     endDate: timestamp("end_date").notNull(),
-    reason: text("reason"),
+    note: text("note"), // Note
     managerId: text("manager_id").references(() => user.id),
     managerComment: text("manager_comment"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -133,6 +135,37 @@ export const userTalent = pgTable("user_talent", {
     talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.userId, table.talentId] })]);
 
+export const talentGroups = pgTable('talent_groups', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+
+export const talentGroupMembers = pgTable('talent_group_members', {
+    groupId: uuid('group_id').notNull().references(() => talentGroups.id, { onDelete: 'cascade' }),
+    talentId: uuid('talent_id').notNull().references(() => talent.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+},(table) => [primaryKey({ columns: [table.groupId, table.talentId] }),]);
+
+export const talentTimetableConflicts = pgTable('talent_timetable_conflict', {
+    id: uuid("id").primaryKey().defaultRandom(),
+    talentId: uuid('talent_id').notNull().references(() => talent.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    day: timestamp('day', { mode: "date" }).notNull(),
+    note: text('note'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const talentAzv = pgTable('talent_azv', {
+    id: uuid("id").primaryKey().defaultRandom(),
+    talentId: uuid('talent_id').notNull().references(() => talent.id, { onDelete: 'cascade' }),
+    from: timestamp('from', { mode: "date" }).notNull(),
+    usedOn: timestamp('used_on', { mode: "date" }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export type Talent = typeof talent.$inferSelect;
 export type NewTalent = typeof talent.$inferInsert;
 export type TalentTimelineEntry = typeof talentTimelineEntry.$inferSelect;
@@ -150,6 +183,10 @@ export type NewTimeOffBalance = typeof timeOffBalance.$inferInsert;
 export type UserTalent = typeof userTalent.$inferSelect;
 export type NewUserTalent = typeof userTalent.$inferInsert;
 export type ShiftPlanTemplate = typeof shiftPlanTemplate.$inferSelect;
+export type TalentTimetableConflict = typeof talentTimetableConflicts.$inferSelect;
+export type NewTalentTimetableConflict = typeof talentTimetableConflicts.$inferInsert;
+export type TalentAzv = typeof talentAzv.$inferSelect;
+export type NewTalentAzv = typeof talentAzv.$inferInsert;
 export type NewShiftPlanTemplate = typeof shiftPlanTemplate.$inferInsert;
 export type ShiftPlanTemplateTalent = typeof shiftPlanTemplateTalent.$inferSelect;
 export type NewShiftPlanTemplateTalent = typeof shiftPlanTemplateTalent.$inferInsert;

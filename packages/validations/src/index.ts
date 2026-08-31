@@ -14,3 +14,4 @@ export * from './synchronizations.js';
 export * from './time-off.js';
 export * from './contracts.js';
 export * from './tags.js';
+export * from './talent-groups.js';
