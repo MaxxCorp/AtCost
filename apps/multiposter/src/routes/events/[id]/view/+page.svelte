@@ -33,6 +33,11 @@
     import Button from "$lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { getEventRooms } from "$lib/utils/format-rooms";
+    import {
+        formatEventStatus,
+        getStatusBadgeClass,
+        getStatusDotClass,
+    } from "$lib/utils/format-event-status";
 
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import * as Dialog from "$lib/components/ui/dialog";
@@ -203,15 +208,16 @@
                                 {/if}
                                 {#if event.status}
                                     <span
-                                        class="px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize {
-                                            event.status === 'cancelled'
-                                                ? 'bg-red-100 text-red-800'
-                                                : event.status === 'confirmed'
-                                                ? 'bg-emerald-100 text-emerald-800'
-                                                : 'bg-amber-100 text-amber-800'
-                                        }"
+                                        class="px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize inline-flex items-center gap-1.5 {getStatusBadgeClass(
+                                            event.status,
+                                        )}"
                                     >
-                                        {event.status}
+                                        <span
+                                            class="w-1.5 h-1.5 rounded-full {getStatusDotClass(
+                                                event.status,
+                                            )}"
+                                        ></span>
+                                        {formatEventStatus(event.status)}
                                     </span>
                                 {/if}
                                 {#if event.tags && event.tags.length > 0}
@@ -404,9 +410,27 @@
                                                                     </Dialog.Description>
                                                                 </Dialog.Header>
                                                                 <div class="max-h-[60vh] overflow-y-auto pr-1 mt-4 space-y-2">
-                                                                    {#each eventInstances as instance}
+                                                                    {#each eventInstances as instance (instance.id)}
                                                                         <a href={`/events/${instance.id}/view`} class="block p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
-                                                                            <div class="font-medium text-gray-900 text-sm">{instance.summary}</div>
+                                                                            <div class="flex items-center justify-between gap-2">
+                                                                                <div class="font-medium text-gray-900 text-sm">{instance.summary}</div>
+                                                                                {#if instance.status}
+                                                                                    <span
+                                                                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 {getStatusBadgeClass(
+                                                                                            instance.status,
+                                                                                        )}"
+                                                                                    >
+                                                                                        <span
+                                                                                            class="w-1.5 h-1.5 rounded-full {getStatusDotClass(
+                                                                                                instance.status,
+                                                                                            )}"
+                                                                                        ></span>
+                                                                                        {formatEventStatus(
+                                                                                            instance.status,
+                                                                                        )}
+                                                                                    </span>
+                                                                                {/if}
+                                                                            </div>
                                                                             <div class="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
                                                                                 <Calendar size={13} />
                                                                                 {formatDate(instance.startDateTime)} 

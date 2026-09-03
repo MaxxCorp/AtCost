@@ -31,6 +31,11 @@
 	import { getPreference, setPreference } from "$lib/utils/idb";
 	import { formatRecurrenceText } from "$lib/utils/format-recurrence";
 	import { getEventRooms } from "$lib/utils/format-rooms";
+	import {
+		formatEventStatus,
+		getStatusBadgeClass,
+		getStatusDotClass,
+	} from "$lib/utils/format-event-status";
 
 	// Simple date formatter function
 	function formatEventTime(event: any): string {
@@ -338,11 +343,32 @@
 								<div
 									class="flex items-start justify-between gap-4"
 								>
-									<h3
-										class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors"
+									<div
+										class="flex items-center gap-2.5 flex-wrap min-w-0"
 									>
-										{event.summary || m.untitled_event()}
-									</h3>
+										<h3
+											class="text-lg font-bold group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors {event.status === 'cancelled'
+												? 'line-through text-gray-500 dark:text-gray-400'
+												: 'text-gray-900 dark:text-gray-100'}"
+										>
+											{event.summary || m.untitled_event()}
+										</h3>
+										{#if event.status}
+											<span
+												data-testid="event-status-{event.id}"
+												class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 transition-all {getStatusBadgeClass(
+													event.status,
+												)}"
+											>
+												<span
+													class="w-1.5 h-1.5 rounded-full {getStatusDotClass(
+														event.status,
+													)}"
+												></span>
+												{formatEventStatus(event.status)}
+											</span>
+										{/if}
+									</div>
 									{#if event.tags && event.tags.length > 0}
 										<div
 											class="flex flex-wrap gap-1 mt-1 shrink-0 justify-end max-w-[50%]"
@@ -446,7 +472,7 @@
 											class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-700"
 										>
 											<div
-												class="flex items-center text-sm text-gray-600 dark:text-gray-300"
+												class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 flex-wrap"
 											>
 												<Clock
 													class="w-3.5 h-3.5 mr-2 text-primary-400 shrink-0"
@@ -456,6 +482,22 @@
 														instance,
 													)}</span
 												>
+												{#if instance.status}
+													<span
+														class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 {getStatusBadgeClass(
+															instance.status,
+														)}"
+													>
+														<span
+															class="w-1.5 h-1.5 rounded-full {getStatusDotClass(
+																instance.status,
+															)}"
+														></span>
+														{formatEventStatus(
+															instance.status,
+														)}
+													</span>
+												{/if}
 											</div>
 											<div
 												class="flex gap-2 w-full sm:w-auto"
