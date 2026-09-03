@@ -55,18 +55,21 @@
         {
             id: "locationId",
             label: m.locations ? m.locations() : "Locations",
+            icon: MapPin,
             optionsRemote: listLocations,
             searchable: true,
         },
         {
             id: "tagId",
             label: m.tags ? m.tags() : "Tags",
+            icon: Tag,
             optionsRemote: listTags,
             searchable: true,
         },
         {
             id: "status",
             label: m.status ? m.status() : "Status",
+            icon: Clock,
             options: STATUS_OPTIONS,
         },
     ]);

@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { untrack } from "svelte";
 	import type { FilterGroup, FilterStateMap, BooleanFilter } from "./EntityManager.types";
+	import { normalizeOption, registerGroupOptions } from "../utils/filterOptionsCache.svelte";
 	import * as DropdownMenu from "./dropdown-menu";
 	import Button from "./button/button.svelte";
 	import {
@@ -159,19 +161,36 @@
 		onchange?.(filters);
 	}
 
-	function normalizeOptions(res: any, group: FilterGroup) {
-		if (!res) return [];
+	async function fetchGroupOptions(group: FilterGroup) {
+		const remoteFn = group.optionsRemote || group.listRemote;
+		if (!remoteFn) return [];
+		let res: any;
+		try {
+			res = await remoteFn({ limit: 500, sortField: "name", sortOrder: "asc" });
+		} catch {
+			try {
+				res = await remoteFn({ limit: 500 });
+			} catch {
+				res = await remoteFn({});
+			}
+		}
 		const raw = Array.isArray(res) ? res : (res?.data ?? []);
-		return raw.map((item: any) => {
-			const id = group.getOptionId ? group.getOptionId(item) : (item.id ?? item.value ?? item.name);
-			const label = group.getOptionLabel ? group.getOptionLabel(item) : (item.label ?? item.name ?? item.title ?? item.displayName ?? item.id ?? item.value);
-			return {
-				id: String(id),
-				label: String(label || id),
-				raw: item,
-			};
-		});
+		const items = raw.map((item: any) => normalizeOption(item, group));
+		registerGroupOptions(group.id, items);
+		return items;
 	}
+
+	$effect(() => {
+		const currentGroups = groups;
+		untrack(() => {
+			for (const g of currentGroups) {
+				if (g.options && Array.isArray(g.options)) {
+					const items = g.options.map((opt: any) => normalizeOption(opt, g));
+					registerGroupOptions(g.id, items);
+				}
+			}
+		});
+	});
 </script>
 
 <DropdownMenu.Root>
@@ -297,13 +316,12 @@
 						<!-- Options List -->
 						<div class="flex-1 overflow-y-auto space-y-0.5 max-h-[260px] p-0.5">
 							{#if remoteFn}
-								{#await remoteFn({ limit: 500, sortField: 'name', sortOrder: 'asc' })}
+								{#await fetchGroupOptions(group)}
 									<div class="flex items-center justify-center py-6 text-gray-400 gap-2 text-xs">
 										<Loader2 class="h-4 w-4 animate-spin text-blue-500" />
 										<span>{loadingText(group.label)}</span>
 									</div>
-								{:then res}
-									{@const allOptions = normalizeOptions(res, group)}
+								{:then allOptions}
 									{@const search = (groupSearches[group.id] || "").toLowerCase().trim()}
 									{@const filteredOptions = search
 										? allOptions.filter((opt: any) => opt.label.toLowerCase().includes(search))
@@ -372,11 +390,7 @@
 									{/if}
 								{/await}
 							{:else if group.options}
-								{@const allOptions = group.options.map((o: any) => ({
-									id: String(o.id ?? o.value ?? o.name),
-									label: String(o.label ?? o.name ?? o.title ?? o.value ?? o.id),
-									raw: o,
-								}))}
+								{@const allOptions = group.options.map((o: any) => normalizeOption(o, group))}
 								{@const search = (groupSearches[group.id] || "").toLowerCase().trim()}
 								{@const filteredOptions = search
 									? allOptions.filter((opt) => opt.label.toLowerCase().includes(search))

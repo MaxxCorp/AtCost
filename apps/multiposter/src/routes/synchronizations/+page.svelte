@@ -28,7 +28,8 @@
 		ArrowRight,
 		ChevronsLeft,
 		ChevronsRight,
-		Camera
+		Camera,
+		RefreshCw
 	} from "@lucide/svelte";
 
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -248,6 +249,7 @@
 		{
 			id: "providerType",
 			label: m.providers(),
+			icon: RefreshCw,
 			options: PROVIDER_OPTIONS,
 			searchable: true,
 		},

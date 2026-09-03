@@ -1,7 +1,7 @@
 {
 	"name": "@ac/monorepo",
 	"private": true,
-	"packageManager": "pnpm@11.18.0",
+	"packageManager": "pnpm@11.25.0",
 	"engines": {
 		"node": ">=24.0.0",
 		"pnpm": ">=10.0.0"
@@ -16,8 +16,8 @@
 		"db:check": "pnpm --filter @ac/db run db:check"
 	},
 	"devDependencies": {
-		"typescript": "^5.7.3",
-		"@typescript/native": "npm:typescript@7.0.2"
+		"@typescript/native": "npm:typescript@7.0.2",
+		"typescript": "^5.7.3"
 	},
 	"overrides": {
 		"typescript": "^5.7.3",

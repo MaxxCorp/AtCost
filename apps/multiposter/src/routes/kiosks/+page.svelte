@@ -38,6 +38,7 @@
 		{
 			id: "locationId",
 			label: m.locations(),
+			icon: MapPin,
 			optionsRemote: listLocations,
 			searchable: true,
 		},

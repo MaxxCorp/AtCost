@@ -36,6 +36,7 @@
         {
             id: "locationId",
             label: m.locations ? m.locations() : "Locations",
+            icon: MapPin,
             optionsRemote: listLocations,
             searchable: true,
         },

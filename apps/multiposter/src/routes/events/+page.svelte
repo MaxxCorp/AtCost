@@ -23,6 +23,7 @@
 		ChevronsRight,
 		X,
 		RefreshCw,
+		Tag as TagIcon,
 	} from "@lucide/svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { toast } from "svelte-sonner";
@@ -82,12 +83,14 @@
 		{
 			id: "tagId",
 			label: m.tags(),
+			icon: TagIcon,
 			optionsRemote: listTags,
 			searchable: true,
 		},
 		{
 			id: "locationId",
 			label: m.locations(),
+			icon: MapPin,
 			optionsRemote: listLocations,
 			searchable: true,
 		},

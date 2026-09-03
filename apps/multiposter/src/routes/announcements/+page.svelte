@@ -24,7 +24,9 @@
 		ArrowRight,
 		ChevronsLeft,
 		ChevronsRight,
-		X
+		X,
+		MapPin,
+		Tag as TagIcon
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
@@ -41,12 +43,14 @@
 		{
 			id: "locationId",
 			label: m.locations(),
+			icon: MapPin,
 			optionsRemote: listLocations,
 			searchable: true,
 		},
 		{
 			id: "tagId",
 			label: m.tags(),
+			icon: TagIcon,
 			optionsRemote: listTags,
 			searchable: true,
 		},

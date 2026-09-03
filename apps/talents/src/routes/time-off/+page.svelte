@@ -51,17 +51,21 @@
         {
             id: "talentId",
             label: m.talent ? m.talent() : "Talent",
+            icon: HelpCircle,
             optionsRemote: listTalents,
             searchable: true,
+            getOptionLabel: (t: any) => t.contact?.displayName || t.contact?.name || t.id,
         },
         {
             id: "status",
             label: m.status ? m.status() : "Status",
+            icon: Clock,
             options: STATUS_OPTIONS,
         },
         {
             id: "type",
             label: m.type ? m.type() : "Type",
+            icon: Calendar,
             options: TYPE_OPTIONS,
         },
     ]);

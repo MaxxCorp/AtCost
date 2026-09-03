@@ -33,3 +33,4 @@ export { default as ContactFields } from './components/forms/ContactFields.svelt
 export { default as LocationForm } from './components/forms/LocationForm.svelte';
 export { IsMobile } from "./hooks/is-mobile.svelte.ts";
 export { handleDelete } from "./hooks/handleDelete.svelte.ts";
+export { getCachedOptionLabel, loadOptionsForGroup, registerGroupOptions, normalizeOption } from "./utils/filterOptionsCache.svelte.ts";

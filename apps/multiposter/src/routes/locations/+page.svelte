@@ -70,6 +70,7 @@
 		{
 			id: "city",
 			label: m.cities(),
+			icon: Home,
 			options: availableCities,
 			searchable: true,
 		},

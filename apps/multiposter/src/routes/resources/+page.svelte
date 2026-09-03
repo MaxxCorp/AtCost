@@ -18,7 +18,8 @@
 		ArrowRight,
 		ChevronsLeft,
 		ChevronsRight,
-		X
+		X,
+		MapPin
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
@@ -38,6 +39,7 @@
 		{
 			id: "locationId",
 			label: m.locations(),
+			icon: MapPin,
 			optionsRemote: listLocations,
 			searchable: true,
 		},

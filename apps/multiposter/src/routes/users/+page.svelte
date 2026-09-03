@@ -44,6 +44,7 @@
 		{
 			id: "role",
 			label: m.role ? m.role() : "Role",
+			icon: Shield,
 			options: ROLE_OPTIONS,
 			searchable: true,
 		},

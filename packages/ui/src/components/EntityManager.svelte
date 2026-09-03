@@ -211,6 +211,12 @@
         },
         get failedToLoadAssociations() {
             return m?.failed_to_load_associations?.() ?? "Failed to load associations";
+        },
+        get activeFiltersLabel() {
+            return m?.active_filters?.() ?? "Active Filters:";
+        },
+        get clearAllLabel() {
+            return m?.clear_all_filters?.() ?? m?.clear_all?.() ?? "Clear all";
         }
     };
 
@@ -655,6 +661,8 @@
         <ActiveFilterChips
             groups={allFilterGroups}
             filters={activeFilters}
+            activeFiltersLabel={i18n.activeFiltersLabel}
+            clearAllLabel={i18n.clearAllLabel}
             onremove={(groupId, optId, type) => {
                 const current = activeFilters[groupId] || { include: [], exclude: [] };
                 activeFilters = {
