@@ -133,6 +133,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 
 		// Insert Master Event
 		console.log('Inserting event into DB...');
+		const participantsCount = data.participantsCount !== undefined ? Number(data.participantsCount) || 0 : 0;
 		const [newEvent] = await db.insert(event).values({
 			id: eventId,
 			userId: user.id,
@@ -155,6 +156,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 			// Legacy fields (kept for backward compatibility)
 			recurrence: recurrenceRule ? [recurrenceRule] : null,
 			attendees: (data.attendees as any) || null,
+			participantsCount,
 			reminders: reminders as any,
 			isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
 			heroImage: data.heroImage || null,
@@ -260,6 +262,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 						recurringEventId: newEvent.id, // Link to master (legacy)
 						originalStartTime: { dateTime: date.toISOString() }, // The date this instance represents
 						attendees: (data.attendees as any) || null,
+						participantsCount,
 						reminders: reminders as any,
 						isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
 						heroImage: data.heroImage || null,

@@ -131,5 +131,4 @@ export const getAssociationsSchema = v.object({
     entityId: v.string(),
 });
 
-export { matchContactSearch } from '@ac/ui';
 

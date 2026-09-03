@@ -224,6 +224,14 @@
                                         </span>
                                     {/each}
                                 {/if}
+                                {#if (event.participantsCount ?? 0) > 0}
+                                    <span
+                                        class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100 flex items-center gap-1"
+                                    >
+                                        <Users size={12} />
+                                        {event.participantsCount} {m.participants()}
+                                    </span>
+                                {/if}
                             </div>
                         </div>
 

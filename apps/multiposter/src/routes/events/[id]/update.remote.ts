@@ -142,6 +142,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		updateData.guestsCanModify = data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on';
 		updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
 		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
+		if (data.participantsCount !== undefined) updateData.participantsCount = Number(data.participantsCount) || 0;
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
@@ -339,6 +340,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							recurringEventId: updatedEvent.id,
 							originalStartTime: { dateTime: date.toISOString() },
 							attendees: updatedEvent.attendees,
+							participantsCount: updatedEvent.participantsCount,
 							reminders: updatedEvent.reminders,
 							isPublic: updatedEvent.isPublic,
 							guestsCanInviteOthers: updatedEvent.guestsCanInviteOthers,

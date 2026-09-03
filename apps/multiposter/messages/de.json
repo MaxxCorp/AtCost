@@ -749,6 +749,11 @@
 	"no_announcements_found": "Keine Ankündigungen gefunden",
 	"no_announcements_description": "Erstellen Sie eine neue Ankündigung, um zu beginnen",
 	"create_announcement": "Ankündigung erstellen",
-	"all_locations": "Alle Standorte"
+	"all_locations": "Alle Standorte",
+	"participants_count": "Teilnehmerzahl",
+	"participants": "Teilnehmer",
+	"participants_baseline_help": "{contacts} aus Kontakten + {baseline} zusätzlich",
+	"increase_participants": "Teilnehmer erhöhen",
+	"decrease_participants": "Teilnehmer verringern"
 }
 

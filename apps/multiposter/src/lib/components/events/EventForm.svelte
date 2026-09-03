@@ -60,6 +60,9 @@
         RefreshCw,
         CalendarClock,
         User,
+        Users,
+        Plus,
+        Minus,
         MapPin,
         Tag as TagIcon,
         Database,
@@ -360,6 +363,38 @@
             });
         });
     });
+
+    // svelte-ignore state_referenced_locally
+    const initialContacts = (initialData?.contactIds ?? []) as string[];
+    let currentContactIds = $state<string[]>(initialContacts);
+
+    // svelte-ignore state_referenced_locally
+    const rawInitialParticipants = initialData?.participantsCount;
+    const initialParticipants = typeof rawInitialParticipants === 'number'
+        ? rawInitialParticipants
+        : (rawInitialParticipants ? parseInt(String(rawInitialParticipants), 10) : undefined);
+
+    let baseline = $state<number>(
+        initialParticipants !== undefined
+            ? Math.max(0, initialParticipants - initialContacts.length)
+            : 0
+    );
+
+    let totalParticipants = $derived(baseline + currentContactIds.length);
+
+    function updateBaseline(delta: number) {
+        baseline = Math.max(0, baseline + delta);
+        rf.fields.participantsCount.set(baseline + currentContactIds.length);
+    }
+
+    function handleParticipantsInput(e: globalThis.Event) {
+        const target = e.target as HTMLInputElement;
+        const val = parseInt(target.value, 10);
+        if (!isNaN(val)) {
+            baseline = Math.max(0, val - currentContactIds.length);
+            rf.fields.participantsCount.set(baseline + currentContactIds.length);
+        }
+    }
 </script>
 
 <datalist id="timezones">
@@ -1173,6 +1208,58 @@
             </div>
         {/if}
     </div>
+
+    <!-- Participants Count Section -->
+    <div class="border border-gray-200 bg-gray-50/70 rounded-lg p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <label for="participants-count-input" class="text-base font-semibold flex items-center gap-2 text-gray-900">
+                    <Users size={18} class="text-blue-600" />
+                    {m.participants_count()}
+                </label>
+                <p class="text-xs text-gray-500 mt-1">
+                    {m.participants_baseline_help({
+                        contacts: String(currentContactIds.length),
+                        baseline: String(baseline),
+                    })}
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onclick={() => updateBaseline(-1)}
+                    disabled={baseline <= 0}
+                    aria-label={m.decrease_participants()}
+                    class="h-9 w-9"
+                >
+                    <Minus size={16} />
+                </Button>
+
+                <input
+                    id="participants-count-input"
+                    {...rf.fields.participantsCount.as("number", totalParticipants)}
+                    type="number"
+                    min={currentContactIds.length}
+                    oninput={handleParticipantsInput}
+                    class="w-20 h-9 text-center font-bold text-lg border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onclick={() => updateBaseline(1)}
+                    aria-label={m.increase_participants()}
+                    class="h-9 w-9"
+                >
+                    <Plus size={16} />
+                </Button>
+            </div>
+        </div>
+    </div>
+
     <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
         <User size={18} class="text-blue-600" />
         {m.feature_contacts_title()}
@@ -1184,8 +1271,11 @@
         mode="embedded"
         type="event"
         entityId={initialData?.id}
-        onchange={(ids: string[]) =>
-            rf.fields.contactIds.set(JSON.stringify(ids))}
+        onchange={(ids: string[]) => {
+            currentContactIds = ids;
+            rf.fields.contactIds.set(JSON.stringify(ids));
+            rf.fields.participantsCount.set(baseline + ids.length);
+        }}
         listItemsRemote={listContacts as any}
         fetchAssociationsRemote={fetchEntityContacts as any}
         addAssociationRemote={async (p: any) =>

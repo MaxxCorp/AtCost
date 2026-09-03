@@ -7,7 +7,7 @@
     import { deleteUser } from "./delete.remote";
     import { updateUserSchema } from "$lib/validations/users";
 
-    import { UserForm, EntityManager, ErrorSection, LoadingSection, AsyncButton, handleDelete } from "@ac/ui";
+    import { UserForm, EntityManager, ErrorSection, LoadingSection, AsyncButton, handleDelete, matchContactSearch } from "@ac/ui";
     import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import { FEATURES } from "$lib/features";
 
@@ -15,7 +15,7 @@
     import { addAssociation, removeAssociation, fetchEntityContacts } from "../../contacts/associate.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
-    import { createContactSchema, updateContactSchema, matchContactSearch } from "$lib/validations/contacts";
+    import { createContactSchema, updateContactSchema } from "$lib/validations/contacts";
     import { deleteContact } from "../../contacts/[id]/delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { User as UserIcon } from "@lucide/svelte";

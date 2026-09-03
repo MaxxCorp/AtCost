@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, uuid, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, jsonb, integer, index, primaryKey } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { contact } from "./contacts";
@@ -48,6 +48,7 @@ export const event = pgTable("event", {
     iCalUID: text("ical_uid"),
     heroImage: text("hero_image"),
     attendees: jsonb("attendees"),
+    participantsCount: integer("participants_count").default(0).notNull(),
     reminders: jsonb("reminders").$type<{ useDefault?: boolean; overrides?: any[] }>(),
     fingerprints: jsonb("fingerprints").$type<Record<string, string>>().default({}).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -749,6 +749,11 @@
 	"no_announcements_found": "No announcements found",
 	"no_announcements_description": "Get started by creating a new announcement",
 	"create_announcement": "Create Announcement",
-	"all_locations": "All Locations"
+	"all_locations": "All Locations",
+	"participants_count": "Participants Count",
+	"participants": "Participants",
+	"participants_baseline_help": "{contacts} from contacts + {baseline} additional",
+	"increase_participants": "Increase participants",
+	"decrease_participants": "Decrease participants"
 }
 
