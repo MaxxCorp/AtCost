@@ -4,6 +4,7 @@ import { SyncService } from './service';
 import { db } from '@ac/db';
 import { syncMapping as syncMappingTable, event as eventTable } from '@ac/db';
 import { eq, and } from '@ac/db';
+import { getEntityContacts } from '../contacts';
 
 // Mock the database
 vi.mock('@ac/db', async (importOriginal) => {
@@ -37,9 +38,13 @@ vi.mock('../realtime', () => ({
 }));
 
 // Mock contact resolution
-vi.mock('../contact-resolution', () => ({
-	resolveEventContact: vi.fn().mockResolvedValue(null)
-}));
+vi.mock('../contact-resolution', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../contact-resolution')>();
+	return {
+		...actual,
+		resolveEventContact: vi.fn().mockResolvedValue(null)
+	};
+});
 
 // Mock contacts
 vi.mock('../contacts', () => ({
@@ -217,6 +222,55 @@ describe('SyncService - mapInternalToExternal status mapping', () => {
 
 		expect(externalResult.status).toBe('cancelled');
 		expect(externalResult.summary).toBe('Team Sync');
+	});
+
+	it('should only include contacts tagged as Employee in attendees and exclude external contacts', async () => {
+		const internalEvent = {
+			id: 'evt-2',
+			summary: 'Privacy Test Event',
+			status: 'confirmed',
+			startDateTime: new Date('2026-09-01T10:00:00Z'),
+			endDateTime: new Date('2026-09-01T11:00:00Z')
+		};
+
+		// Mock associated contacts: one Employee, one External
+		vi.mocked(getEntityContacts).mockResolvedValueOnce([
+			{
+				id: 'contact-emp',
+				displayName: 'Employee Staff',
+				emails: [{ value: 'employee@company.com', primary: true }],
+				tags: [{ name: 'Employee' }]
+			},
+			{
+				id: 'contact-ext',
+				displayName: 'External Guest',
+				emails: [{ value: 'guest@external.com', primary: true }],
+				tags: [{ name: 'Customer' }]
+			}
+		]);
+
+		// Mock db.select for eventContactTable association
+		(db.select as any).mockReturnValue({
+			from: vi.fn().mockReturnValue({
+				innerJoin: vi.fn().mockReturnValue({
+					where: vi.fn().mockResolvedValue([])
+				}),
+				where: vi.fn().mockReturnValue({
+					limit: vi.fn().mockResolvedValue([{ participationStatus: 'accepted' }])
+				})
+			})
+		});
+
+		// @ts-ignore - private method
+		const externalResult = await service.mapInternalToExternal(internalEvent, 'google-calendar');
+
+		expect(externalResult.attendees).toBeDefined();
+		expect(externalResult.attendees).toHaveLength(1);
+		expect(externalResult.attendees![0]).toEqual({
+			email: 'employee@company.com',
+			displayName: 'Employee Staff',
+			responseStatus: 'accepted'
+		});
 	});
 });
 

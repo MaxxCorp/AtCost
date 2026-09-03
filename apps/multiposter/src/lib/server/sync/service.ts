@@ -32,7 +32,7 @@ import {
 	resource as resourceTable
 } from '@ac/db';
 import { getEntityContacts } from '../contacts';
-import { resolveEventContact } from '../contact-resolution';
+import { resolveEventContact, isEmployeeContact } from '../contact-resolution';
 import { eq, and, isNull, lt, gt, gte, lte, or, inArray, desc } from '@ac/db';
 import { GoogleCalendarProvider } from './providers/google-calendar';
 import { MicrosoftCalendarProvider } from './providers/microsoft-calendar';
@@ -943,16 +943,13 @@ export class SyncService {
 		// Fetch associated contacts
 		const associatedContacts = await getEntityContacts(entityType, internal.id);
 
-		// Filter out contacts with "Employee" tag
+		// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
+		// External contacts are commented out for data privacy reasons until privacy flows are finalized.
 		const attendees: NonNullable<ExternalEvent['attendees']> = [];
 		for (const contact of associatedContacts) {
-			const contactTags = (contact as any).tags || [];
-			const isEmployee = contactTags.some((ct: any) => {
-				const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
-				return tagName === 'employee' || tagName === 'employees';
-			});
+			const isEmployee = isEmployeeContact(contact);
 
-			if (!isEmployee) {
+			if (isEmployee) {
 				// Get primary email
 				const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
 					(contact as any).emails?.[0]?.value;
@@ -980,6 +977,12 @@ export class SyncService {
 					});
 				}
 			}
+			/*
+			// External contacts excluded until data privacy flows are finalized:
+			else {
+				// Do not sync external contacts as attendees
+			}
+			*/
 		}
 
 		// Resolve Attached Resources
