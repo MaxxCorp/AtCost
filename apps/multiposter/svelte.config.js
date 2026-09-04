@@ -17,7 +17,8 @@ const config = {
 			// Split API routes from pages for better performance
 			split: false,
 			// Set maxDuration for all functions (free tier: 60s)
-			maxDuration: 60
+			maxDuration: 60,
+			runtime: 'nodejs24.x'
 		}),
 		csrf: {
 			checkOrigin: false
