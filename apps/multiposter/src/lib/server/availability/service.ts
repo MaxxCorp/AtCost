@@ -4,6 +4,8 @@ import { env } from '$env/dynamic/private';
 export interface AvailabilityResult {
     available: boolean;
     reason?: string;
+    eventId?: string;
+    eventTitle?: string;
 }
 
 export interface AvailabilityProvider {
@@ -105,9 +107,19 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
                         // '0' = free, '1' = tentative, '2' = busy, '3' = out of office, '4' = working elsewhere
                         const isBusy = view.includes('1') || view.includes('2') || view.includes('3');
                         if (isBusy) {
+                            let eventTitle: string | undefined;
+                            if (Array.isArray(item.scheduleItems)) {
+                                const busyItem = item.scheduleItems.find((s: any) =>
+                                    ['busy', 'tentative', 'oof'].includes((s.status || '').toLowerCase())
+                                );
+                                if (busyItem?.subject) {
+                                    eventTitle = busyItem.subject;
+                                }
+                            }
                             results.set(email, {
                                 available: false,
-                                reason: 'Busy in Microsoft 365 Calendar'
+                                reason: eventTitle ? `Busy in Microsoft 365: "${eventTitle}"` : 'Busy in Microsoft 365 Calendar',
+                                eventTitle
                             });
                         } else {
                             results.set(email, { available: true });
@@ -152,6 +164,7 @@ export class AvailabilityService {
             const resourceCollisions = await db
                 .select({
                     resourceId: eventResource.resourceId,
+                    eventId: event.id,
                     eventTitle: event.summary
                 })
                 .from(eventResource)
@@ -167,7 +180,9 @@ export class AvailabilityService {
             for (const c of resourceCollisions) {
                 resourceAvailability[c.resourceId] = {
                     available: false,
-                    reason: `Booked in "${c.eventTitle || 'another event'}"`
+                    reason: `Booked in "${c.eventTitle || 'another event'}"`,
+                    eventId: c.eventId,
+                    eventTitle: c.eventTitle || undefined
                 };
             }
         }
@@ -177,6 +192,7 @@ export class AvailabilityService {
             const contactCollisions = await db
                 .select({
                     contactId: eventContact.contactId,
+                    eventId: event.id,
                     eventTitle: event.summary
                 })
                 .from(eventContact)
@@ -192,7 +208,9 @@ export class AvailabilityService {
             for (const c of contactCollisions) {
                 contactAvailability[c.contactId] = {
                     available: false,
-                    reason: `Assigned to "${c.eventTitle || 'another event'}"`
+                    reason: `Assigned to "${c.eventTitle || 'another event'}"`,
+                    eventId: c.eventId,
+                    eventTitle: c.eventTitle || undefined
                 };
             }
         }
@@ -248,6 +266,52 @@ export class AvailabilityService {
                                 resourceAvailability[target.id] = res;
                             } else {
                                 contactAvailability[target.id] = res;
+                            }
+                        }
+                    }
+
+                    // For any newly flagged busy resources from external provider without eventId,
+                    // attempt to find a matching local event in this timeslot
+                    const externalBusyResourceIds = Object.entries(resourceAvailability)
+                        .filter(([_, r]) => !r.available && !r.eventId)
+                        .map(([id]) => id);
+
+                    if (externalBusyResourceIds.length > 0) {
+                        const candidateEvents = await db
+                            .select({
+                                id: event.id,
+                                summary: event.summary
+                            })
+                            .from(event)
+                            .where(and(
+                                ne(event.status, 'cancelled'),
+                                params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                                lte(event.startDateTime, params.endDateTime),
+                                gte(event.endDateTime, params.startDateTime)
+                            ));
+
+                        if (candidateEvents.length > 0) {
+                            for (const id of externalBusyResourceIds) {
+                                const r = resourceAvailability[id];
+                                if (!r || r.eventId) continue;
+
+                                if (r.eventTitle) {
+                                    const matched = candidateEvents.find(e =>
+                                        e.summary && e.summary.toLowerCase().trim() === r.eventTitle!.toLowerCase().trim()
+                                    );
+                                    if (matched) {
+                                        r.eventId = matched.id;
+                                        r.eventTitle = matched.summary;
+                                        continue;
+                                    }
+                                }
+
+                                if (candidateEvents.length === 1) {
+                                    r.eventId = candidateEvents[0].id;
+                                    if (!r.eventTitle) {
+                                        r.eventTitle = candidateEvents[0].summary;
+                                    }
+                                }
                             }
                         }
                     }

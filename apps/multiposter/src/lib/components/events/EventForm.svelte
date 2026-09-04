@@ -67,6 +67,7 @@
         Tag as TagIcon,
         Database,
         Loader2,
+        ExternalLink,
     } from "@lucide/svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -303,8 +304,8 @@
             : (initialData?.id ? !!initialData.ticketPriceUnknown : true),
     );
 
-    let resourceAvailability = $state<Record<string, { available: boolean; reason?: string }>>({});
-    let contactAvailability = $state<Record<string, { available: boolean; reason?: string }>>({});
+    let resourceAvailability = $state<Record<string, { available: boolean; reason?: string; eventId?: string; eventTitle?: string }>>({});
+    let contactAvailability = $state<Record<string, { available: boolean; reason?: string; eventId?: string; eventTitle?: string }>>({});
     let availabilityLoading = $state(false);
 
     function hasAllocationCalendars(resItem: any): boolean {
@@ -335,7 +336,28 @@
         return isNaN(d.getTime()) ? '' : d.toISOString();
     });
 
-    let lastQueryKey = $state('');
+    let lastQueryKey = '';
+
+    function refreshAvailability() {
+        const startIso = activeStartIso;
+        const endIso = activeEndIso;
+        if (!startIso || !endIso) return;
+        availabilityLoading = true;
+        checkEventAvailability({
+            startDateTime: startIso,
+            endDateTime: endIso,
+            eventId: initialData?.id
+        }).then((res) => {
+            if (res) {
+                resourceAvailability = res.resourceAvailability || {};
+                contactAvailability = res.contactAvailability || {};
+            }
+            availabilityLoading = false;
+        }).catch((err) => {
+            console.error('[EventForm] availability error:', err);
+            availabilityLoading = false;
+        });
+    }
 
     $effect(() => {
         const startIso = activeStartIso;
@@ -346,22 +368,19 @@
         lastQueryKey = queryKey;
 
         untrack(() => {
-            availabilityLoading = true;
-            checkEventAvailability({
-                startDateTime: startIso,
-                endDateTime: endIso,
-                eventId: initialData?.id
-            }).then((res) => {
-                if (res) {
-                    resourceAvailability = res.resourceAvailability || {};
-                    contactAvailability = res.contactAvailability || {};
-                }
-                availabilityLoading = false;
-            }).catch((err) => {
-                console.error('[EventForm] availability error:', err);
-                availabilityLoading = false;
-            });
+            refreshAvailability();
         });
+    });
+
+    $effect(() => {
+        if (typeof window === 'undefined') return;
+        const handleFocus = () => {
+            refreshAvailability();
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
     });
 
     // svelte-ignore state_referenced_locally
@@ -843,9 +862,32 @@
                                     {m.checking_availability()}
                                 </span>
                             {:else if avail && !avail.available}
-                                <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium" title={avail.reason || m.conflict_details()}>
-                                    🔴 {m.busy_conflict()}
-                                </span>
+                                {#if avail.eventId}
+                                    <a
+                                        href={`/events/${avail.eventId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium hover:bg-red-200 hover:text-red-900 transition-colors underline-offset-2 hover:underline"
+                                        title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
+                                        onclick={(e) => e.stopPropagation()}
+                                    >
+                                        <span>🔴</span>
+                                        <span class="max-w-[200px] truncate">
+                                            {avail.eventTitle || m.busy_conflict()}
+                                        </span>
+                                        <ExternalLink size={12} class="shrink-0 opacity-70" />
+                                    </a>
+                                {:else}
+                                    <span
+                                        class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium"
+                                        title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
+                                    >
+                                        <span>🔴</span>
+                                        <span class="max-w-[200px] truncate">
+                                            {avail.eventTitle || m.busy_conflict()}
+                                        </span>
+                                    </span>
+                                {/if}
                             {:else}
                                 <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium" title={m.available()}>
                                     🟢 {m.available()}
@@ -1350,9 +1392,32 @@
                             {m.checking_availability()}
                         </span>
                     {:else if avail && !avail.available}
-                        <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium" title={avail.reason || m.conflict_details()}>
-                            🔴 {m.busy_conflict()}
-                        </span>
+                        {#if avail.eventId}
+                            <a
+                                href={`/events/${avail.eventId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium hover:bg-red-200 hover:text-red-900 transition-colors underline-offset-2 hover:underline"
+                                title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
+                                onclick={(e) => e.stopPropagation()}
+                            >
+                                <span>🔴</span>
+                                <span class="max-w-[200px] truncate">
+                                    {avail.eventTitle || m.busy_conflict()}
+                                </span>
+                                <ExternalLink size={12} class="shrink-0 opacity-70" />
+                            </a>
+                        {:else}
+                            <span
+                                class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium"
+                                title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
+                            >
+                                <span>🔴</span>
+                                <span class="max-w-[200px] truncate">
+                                    {avail.eventTitle || m.busy_conflict()}
+                                </span>
+                            </span>
+                        {/if}
                     {:else}
                         <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium" title={m.available()}>
                             🟢 {m.available()}
