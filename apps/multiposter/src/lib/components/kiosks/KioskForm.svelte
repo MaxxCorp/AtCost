@@ -17,6 +17,7 @@
         updateLocationSchema,
     } from "@ac/validations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { MapPin } from "@lucide/svelte";
     import { onMount, untrack } from "svelte";
     import { toast } from "svelte-sonner";
@@ -212,7 +213,7 @@
                         createSchema={createLocationSchema}
                         updateRemote={updateLocation}
                         updateSchema={updateLocationSchema}
-                        getFormData={(l: Location) => l}
+                        readItemRemote={readLocation}
                         searchPredicate={(l: Location, q: string) => {
                             return (
                                 l.name

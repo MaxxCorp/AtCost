@@ -3,7 +3,7 @@
     import { FileText } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
     import ContractForm from "./ContractForm.svelte";
-    import { listContracts, createContract, updateContract, deleteContract } from "./contracts.remote";
+    import { listContracts, readContract, createContract, updateContract, deleteContract } from "./contracts.remote";
     import { listTalents } from "../talents/list.remote";
     import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
@@ -40,7 +40,7 @@
         createSchema={contractSchema}
         updateRemote={updateContract}
         updateSchema={contractSchema}
-        getFormData={(c: any) => c}
+        readItemRemote={(id: string) => readContract({ id })}
         searchPredicate={(c: any, q: any) => {
             return (c.entgeltgruppe?.toLowerCase() || '').includes(q.toLowerCase());
         }}

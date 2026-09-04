@@ -2,7 +2,7 @@
     import { FileSignature } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
     import ContractFrameworkForm from "./ContractFrameworkForm.svelte";
-    import { listContractFrameworks, createContractFramework, updateContractFramework, deleteContractFramework } from "./frameworks.remote";
+    import { listContractFrameworks, readContractFramework, createContractFramework, updateContractFramework, deleteContractFramework } from "./frameworks.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import { contractFrameworkSchema } from "@ac/validations/contracts";
 
@@ -23,7 +23,7 @@
         createSchema={contractFrameworkSchema}
         updateRemote={updateContractFramework}
         updateSchema={contractFrameworkSchema}
-        getFormData={(fw: any) => fw}
+        readItemRemote={(id: string) => readContractFramework({ id })}
         searchPredicate={(fw: any, q: any) => {
             return fw.name.toLowerCase().includes(q.toLowerCase());
         }}

@@ -13,6 +13,7 @@
     import { createLocation } from "../../locations/new/create.remote";
     import { updateLocation } from "../../locations/[id]/update.remote";
     import { deleteLocation } from "../../locations/[id]/delete.remote";
+    import { readLocation } from "../../locations/[id]/read.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
@@ -94,7 +95,7 @@
                             createSchema={createLocationSchema}
                             updateRemote={updateLocation}
                             updateSchema={updateLocationSchema}
-                            getFormData={(l: any) => l}
+                            readItemRemote={readLocation}
                                     searchPredicate={(l: any, q: string) => {
                                         return (
                                             l.name

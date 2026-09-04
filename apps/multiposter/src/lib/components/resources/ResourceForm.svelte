@@ -11,8 +11,10 @@
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
+    import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
+    import { readContact } from "../../../routes/contacts/[id]/read.remote";
     import {
         fetchEntityContacts,
         addAssociation,
@@ -289,7 +291,7 @@
                 createSchema={createLocationSchema}
                 updateRemote={updateLocation}
                 updateSchema={updateLocationSchema}
-                getFormData={(l: any) => l}
+                readItemRemote={readLocation}
                 searchPredicate={(l: any, q: string) => {
                     return l.name.toLowerCase().includes(q.toLowerCase()) || 
                            (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false);
@@ -564,14 +566,7 @@
                 createSchema={createContactSchema}
                 updateRemote={updateContact}
                 updateSchema={updateContactSchema}
-                getFormData={(c: Contact) => ({
-                    contact: c,
-                    emails: c.emails,
-                    phones: c.phones,
-                    addresses: c.addresses,
-                    relations: c.relations,
-                    tags: c.tags,
-                })}
+                readItemRemote={readContact}
                 searchPredicate={matchContactSearch}
                 loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
                 noItemsLabel={m.no_items_associated_label({ item: m.feature_contacts_title() })}

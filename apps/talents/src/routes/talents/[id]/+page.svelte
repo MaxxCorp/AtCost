@@ -10,7 +10,7 @@
         invokeAddTimelineEntry, 
         listEmployees 
     } from '../talents.remote';
-    import { listContracts, deleteContract, createContract, updateContract } from '../../contracts/contracts.remote';
+    import { listContracts, readContract, deleteContract, createContract, updateContract } from '../../contracts/contracts.remote';
     import ContractForm from '../../contracts/ContractForm.svelte';
 
     import { contractSchema } from "@ac/validations/contracts";
@@ -116,7 +116,7 @@
                                 createSchema={contractSchema}
                                 updateRemote={updateContract}
                                 updateSchema={contractSchema}
-                                getFormData={(c: any) => c}
+                                readItemRemote={(id: string) => readContract({ id })}
                                 searchPredicate={(c: any, q: any) => {
                                     return (c.entgeltgruppe?.toLowerCase() || '').includes(q.toLowerCase());
                                 }}

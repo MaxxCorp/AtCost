@@ -19,6 +19,7 @@
 	import { listContacts } from "../../../routes/contacts/list.remote";
 	import { createContact } from "../../../routes/contacts/new/create.remote";
 	import { updateContact } from "../../../routes/contacts/[id]/update.remote";
+	import { readContact } from "../../../routes/contacts/[id]/read.remote";
 	import { createContactSchema, updateContactSchema } from "@ac/validations";
 	import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
 
@@ -592,14 +593,7 @@
 					createSchema={createContactSchema}
 					updateRemote={updateContact}
 					updateSchema={updateContactSchema}
-					getFormData={(c: any) => ({
-						contact: c,
-						emails: c.emails,
-						phones: c.phones,
-						addresses: c.addresses,
-						relations: c.relations,
-						tags: c.tags,
-					})}
+					readItemRemote={readContact}
 					searchPredicate={matchContactSearch}
 				>
 					{#snippet renderItemLabel(contact: any)}

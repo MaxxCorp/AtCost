@@ -17,6 +17,7 @@
     import { deleteContact } from "../../contacts/[id]/delete.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
+    import { readContact } from "../../contacts/[id]/read.remote";
     import { createContactSchema, updateContactSchema } from "@ac/validations";
 
     const locationId = $derived(page.params.id || "");
@@ -171,15 +172,7 @@
                                             createSchema={createContactSchema}
                                             updateRemote={updateContact}
                                             updateSchema={updateContactSchema}
-                                            getFormData={(c: Contact) => ({
-                                                contact: c,
-                                                emails: c.emails,
-                                                phones: c.phones,
-                                                addresses: c.addresses,
-                                                relations: c.relations,
-                                                tags: c.tags,
-                                                locationAssociations: c.locationAssociations,
-                                            })}
+                                            readItemRemote={readContact}
                                             renderItemLabel={contactLabel}
                                             searchPredicate={matchContactSearch}
                                             renderForm={contactForm}

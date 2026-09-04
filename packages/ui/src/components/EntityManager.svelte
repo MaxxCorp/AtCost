@@ -63,7 +63,7 @@
         createSchema?: any;
         updateRemote?: any;
         updateSchema?: any;
-        getFormData?: (item: T) => any;
+        readItemRemote?: (id: string) => Promise<any>;
 
         // Form Rendering
         renderForm?: Snippet<
@@ -131,7 +131,7 @@
         createSchema,
         updateRemote,
         updateSchema,
-        getFormData,
+        readItemRemote,
         renderForm,
         renderItemLabel,
         renderItemBadge,
@@ -501,7 +501,7 @@
             }
         }
 
-        let newItem = result?.data || result?.contact || result?.resource || result?.tag;
+        let newItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
         if (!newItem && result && typeof result === 'object' && 'id' in result) {
             newItem = result;
         }
@@ -544,7 +544,7 @@
         editingItem = null;
         if (!targetId) return;
 
-        let updatedItem = result?.data || result?.contact || result?.resource || result?.tag;
+        let updatedItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
         if (!updatedItem && result && typeof result === 'object' && 'id' in result) {
             updatedItem = result;
         }
@@ -754,7 +754,7 @@
                                     </div>
 
                                     <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start">
-                                        {#if updateRemote && renderForm && getFormData}
+                                        {#if updateRemote && renderForm && readItemRemote}
                                             <button
                                                 type="button"
                                                 class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -905,7 +905,7 @@
                         {/if}
 
                         <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start mt-1 sm:mt-0">
-                            {#if updateRemote && renderForm && getFormData}
+                            {#if updateRemote && renderForm && readItemRemote}
                                 <button
                                     type="button"
                                     class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -1013,22 +1013,33 @@
                 {:then res}
                     {@const currentAssociations = normalize(res).data}
                     <svelte:boundary>
-                        {#if editingItem && getFormData}
-                            {@render renderForm({
-                                remoteFunction: updateRemote,
-                                schema: updateSchema,
-                                initialData: getFormData(editingItem),
-                                onSuccess: (result) => {
-                                    void handleInPlaceUpdateSuccess(
-                                        result,
-                                        currentAssociations,
-                                    );
-                                },
-                                onCancel: () => {
-                                    editingItem = null;
-                                },
-                                id: editingItem.id,
-                            })}
+                        {#if editingItem && readItemRemote}
+                            {#await invokeRemote(readItemRemote, editingItem.id)}
+                                <div class="p-8 flex flex-col items-center justify-center gap-2">
+                                    <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                    <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                                </div>
+                            {:then fullItem}
+                                {@render renderForm({
+                                    remoteFunction: updateRemote,
+                                    schema: updateSchema,
+                                    initialData: fullItem,
+                                    onSuccess: (result) => {
+                                        void handleInPlaceUpdateSuccess(
+                                            result,
+                                            currentAssociations,
+                                        );
+                                    },
+                                    onCancel: () => {
+                                        editingItem = null;
+                                    },
+                                    id: editingItem.id,
+                                })}
+                            {:catch error}
+                                <div class="p-8 text-center text-red-500 text-sm">
+                                    {error?.message || i18n.failedToLoadLabel}
+                                </div>
+                            {/await}
                         {:else if showQuickCreate}
                             {@render renderForm({
                                 remoteFunction: createRemote,

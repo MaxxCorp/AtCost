@@ -7,12 +7,13 @@
     import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
-    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
+    import { EntityManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
     import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
+    import { readTag as readTagRemote } from "../../../routes/tags/[id]/read.remote";
     import * as v from "valibot";
 
 
@@ -22,6 +23,7 @@
 
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
@@ -42,6 +44,7 @@
     } from "../../../routes/contacts/associate.remote";
     import { createContact } from "../../../routes/contacts/new/create.remote";
     import { updateContact } from "../../../routes/contacts/[id]/update.remote";
+    import { readContact } from "../../../routes/contacts/[id]/read.remote";
     import {
         createContactSchema,
         updateContactSchema,
@@ -240,7 +243,7 @@
                         updateSchema={v.object({
                             name: v.pipe(v.string(), v.minLength(1)),
                         })}
-                        getFormData={(t: any) => t}
+                        readItemRemote={readTagRemote}
                         searchPredicate={(t: any, q: string) =>
                             t.name.toLowerCase().includes(q.toLowerCase())}
                         loadingLabel={m.loading_item({ item: m.tags() })}
@@ -274,67 +277,15 @@
                             onCancel,
                             id,
                         }: any)}
-                            {@const rfState = remoteFunction.preflight(schema)}
-                            <form
-                                {...rfState.enhance(
-                                    async ({ submit }: { submit: any }) => {
-                                        try {
-                                            const res = await submit();
-                                            if (res && res.success !== false) {
-                                                onSuccess(res);
-                                            }
-                                        } catch (err) {
-                                            console.error(
-                                                "[AnnouncementForm] Quick Create Error:",
-                                                err,
-                                            );
-                                        }
-                                    },
-                                )}
-                                class="space-y-4 p-4"
-                            >
-                                {#if id && rfState.fields?.id}
-                                    <input
-                                        {...rfState.fields.id.as("text", id)}
-                                        class="hidden"
-                                    />
-                                {/if}
-                                <div>
-                                    <label
-                                        for="tag-name"
-                                        class="block text-sm font-medium text-gray-700"
-                                        >{m.summary()}</label
-                                    >
-                                    <input
-                                        {...rfState.fields.name.as("text")}
-                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                        value={formData?.name ?? ""}
-                                    />
-                                    {#each (rfState.fields.name.issues() ?? []) as issue}
-                                        <p class="mt-1 text-sm text-red-600">
-                                            {translateIssue(issue.message, m)}
-                                        </p>
-                                    {/each}
-                                </div>
-                                <div
-                                    class="flex justify-end gap-2 pt-4 border-t"
-                                >
-                                    <Button
-                                        variant="outline"
-                                        type="button"
-                                        onclick={onCancel}
-                                        >{m.cancel()}</Button
-                                    >
-                                    <AsyncButton
-                                        type="submit"
-                                        loading={rfState.pending}
-                                    >
-                                        {id
-                                            ? m.save_changes()
-                                            : m.create_item({ item: "Tag" })}
-                                    </AsyncButton>
-                                </div>
-                            </form>
+                            <TagForm
+                                {remoteFunction}
+                                validationSchema={schema}
+                                isUpdating={!!id}
+                                initialData={formData}
+                                {onSuccess}
+                                {onCancel}
+                                {m}
+                            />
                         {/snippet}
                     </EntityManager>
                 {/key}
@@ -391,7 +342,7 @@
                             createSchema={createLocationSchema}
                             updateRemote={updateLocation}
                             updateSchema={updateLocationSchema}
-                            getFormData={(l: Location) => l}
+                            readItemRemote={readLocation}
                             searchPredicate={(l: Location, q: string) => {
                                 return (
                                     l.name
@@ -568,14 +519,7 @@
                     createSchema={createContactSchema}
                     updateRemote={updateContact}
                     updateSchema={updateContactSchema}
-                    getFormData={(c: Contact) => ({
-                        contact: c,
-                        emails: c.emails,
-                        phones: c.phones,
-                        addresses: c.addresses,
-                        relations: c.relations,
-                        tags: c.tags,
-                    })}
+                    readItemRemote={readContact}
                     searchPredicate={matchContactSearch}
                     loadingLabel={m.loading_item({ item: m.contacts() })}
                     noItemsLabel={m.no_items_associated_label({

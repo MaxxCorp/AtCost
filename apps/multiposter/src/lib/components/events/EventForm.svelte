@@ -13,6 +13,7 @@
     import ResourceForm from "$lib/components/resources/ResourceForm.svelte";
     import { createResource } from "../../../routes/resources/new/create.remote";
     import { updateResource } from "../../../routes/resources/[id]/update.remote";
+    import { readResource } from "../../../routes/resources/[id]/read.remote";
     import { deleteResource as deleteResourceRemote } from "../../../routes/resources/[id]/delete.remote";
     import { listResources } from "../../../routes/resources/list.remote";
     import { createResourceSchema, updateResourceSchema } from "$lib/validations/resources";
@@ -24,6 +25,7 @@
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
     import TagForm from "@ac/ui/components/forms/TagForm.svelte";
+    import { readTag } from "../../../routes/tags/[id]/read.remote";
         
     import {
         addAssociation,
@@ -33,10 +35,12 @@
     } from "../../../routes/contacts/associate.remote";
     import { createContact } from "../../../routes/contacts/new/create.remote";
     import { updateContact } from "../../../routes/contacts/[id]/update.remote";
+    import { readContact } from "../../../routes/contacts/[id]/read.remote";
     import { createContactSchema, updateContactSchema } from "@ac/validations";
     import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
@@ -725,7 +729,7 @@
                     itemName: m.tags(),
                 });
             }}
-            getFormData={(t: any) => t}
+            readItemRemote={readTag}
             searchPredicate={(t: any, q: string) =>
                 t.name.toLowerCase().includes(q.toLowerCase())}
             loadingLabel={m.loading_item({ item: m.tags() })}
@@ -810,7 +814,7 @@
                 createSchema={createResourceSchema}
                 updateRemote={updateResource}
                 updateSchema={updateResourceSchema}
-                getFormData={(r: any) => r}
+                readItemRemote={readResource}
                 searchPredicate={(r: any, q: string) =>
                     r.name.toLowerCase().includes(q.toLowerCase())}
                 loadingLabel={m.loading_item({
@@ -1028,7 +1032,7 @@
                 createSchema={createLocationSchema}
                 updateRemote={updateLocation}
                 updateSchema={updateLocationSchema}
-                getFormData={(l: Location) => l}
+                readItemRemote={readLocation}
                 searchPredicate={(l: Location, q: string) => {
                     return (
                         l.name.toLowerCase().includes(q.toLowerCase()) ||
@@ -1335,15 +1339,7 @@
         createSchema={createContactSchema}
         updateRemote={updateContact}
         updateSchema={updateContactSchema}
-        getFormData={(c: Contact) => ({
-            contact: c,
-            emails: c.emails,
-            phones: c.phones,
-            addresses: c.addresses,
-            relations: c.relations,
-            tags: c.tags,
-            locationAssociations: c.locationAssociations,
-        })}
+        readItemRemote={readContact}
         searchPredicate={matchContactSearch}
         loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
         noItemsLabel={m.no_items_associated_label({
@@ -1513,7 +1509,7 @@
                             createSchema={createLocationSchema}
                             updateRemote={updateLocation}
                             updateSchema={updateLocationSchema}
-                            getFormData={(l: any) => l}
+                            readItemRemote={readLocation}
                             searchPredicate={(l: any, q: string) => {
                                 return (
                                     l.name

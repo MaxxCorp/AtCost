@@ -79,6 +79,7 @@
         createTagRemote?: any;
         deleteTagRemote?: any;
         updateTagRemote?: any;
+        readTagRemote?: any;
         createTagSchema?: any;
         updateTagSchema?: any;
         m?: any;
@@ -103,6 +104,7 @@
         createTagRemote,
         deleteTagRemote,
         updateTagRemote,
+        readTagRemote,
         createTagSchema,
         updateTagSchema,
     }: Props = $props();
@@ -133,54 +135,55 @@
 
     // svelte-ignore state_referenced_locally
     let locationIds = $state<string[]>(
-        (initialData?.locationAssociations || []).map(
+        (initialData?.locationIds || (initialData?.locationAssociations ?? initialData?.contact?.locationAssociations ?? []).map(
             (la: any) => la.locationId || la.location?.id,
-        ),
+        )).filter(Boolean),
     );
     const locationIdsJson = $derived(JSON.stringify(locationIds));
 
     // svelte-ignore state_referenced_locally
     let contactData = $state({
-        displayName: d(initialData.contact?.displayName, ""),
-        givenName: d(initialData.contact?.givenName, ""),
-        familyName: d(initialData.contact?.familyName, ""),
-        middleName: d(initialData.contact?.middleName, ""),
-        honorificPrefix: d(initialData.contact?.honorificPrefix, ""),
-        honorificSuffix: d(initialData.contact?.honorificSuffix, ""),
-        company: d(initialData.contact?.company, ""),
-        role: d(initialData.contact?.role, ""),
-        department: d(initialData.contact?.department, ""),
-        gender: d(initialData.contact?.gender, ""),
+        displayName: d(initialData.displayName ?? initialData.contact?.displayName, ""),
+        givenName: d(initialData.givenName ?? initialData.contact?.givenName, ""),
+        familyName: d(initialData.familyName ?? initialData.contact?.familyName, ""),
+        middleName: d(initialData.middleName ?? initialData.contact?.middleName, ""),
+        honorificPrefix: d(initialData.honorificPrefix ?? initialData.contact?.honorificPrefix, ""),
+        honorificSuffix: d(initialData.honorificSuffix ?? initialData.contact?.honorificSuffix, ""),
+        company: d(initialData.company ?? initialData.contact?.company, ""),
+        role: d(initialData.role ?? initialData.contact?.role, ""),
+        department: d(initialData.department ?? initialData.contact?.department, ""),
+        gender: d(initialData.gender ?? initialData.contact?.gender, ""),
         birthday: d(
-            initialData.contact?.birthday
-                ? initialData.contact.birthday instanceof Date
-                    ? initialData.contact.birthday.toISOString().split("T")[0]
-                    : String(initialData.contact.birthday).split("T")[0]
+            (initialData.birthday ?? initialData.contact?.birthday)
+                ? (initialData.birthday ?? initialData.contact.birthday) instanceof Date
+                    ? (initialData.birthday ?? initialData.contact.birthday).toISOString().split("T")[0]
+                    : String(initialData.birthday ?? initialData.contact.birthday).split("T")[0]
                 : "",
             "",
         ),
-        notes: d(initialData.contact?.notes, ""),
-        isPublic: d(initialData.contact?.isPublic, false),
+        notes: d(initialData.notes ?? initialData.contact?.notes, ""),
+        isPublic: d(initialData.isPublic ?? initialData.contact?.isPublic, false),
     });
 
     // svelte-ignore state_referenced_locally
-    let emails = $state([...d(initialData.emails, [])]);
+    let emails = $state([...d(initialData.emails ?? initialData.contact?.emails, [])]);
     // svelte-ignore state_referenced_locally
-    let phones = $state([...d(initialData.phones, [])]);
+    let phones = $state([...d(initialData.phones ?? initialData.contact?.phones, [])]);
     // svelte-ignore state_referenced_locally
-    let relations = $state([...d(initialData.relations, [])]);
+    let relations = $state([...d(initialData.relations ?? initialData.contact?.relations, [])]);
     // svelte-ignore state_referenced_locally
-    let addresses = $state([...d(initialData.addresses, [])]);
+    let addresses = $state([...d(initialData.addresses ?? initialData.contact?.addresses, [])]);
     // svelte-ignore state_referenced_locally
     let tagsInput = $state(
-        (initialData.tags || tags || [])
+        (initialData.tags ?? initialData.contact?.tags ?? tags ?? [])
             .map((t: any) => t.name || t)
             .join(", ") || (!contactId ? "Customer" : ""),
     );
 
     $effect(() => {
-        if (initialData.tags) {
-            tagsInput = initialData.tags
+        const currentTags = initialData.tags ?? initialData.contact?.tags;
+        if (currentTags) {
+            tagsInput = currentTags
                 .map((t: any) => t.name || t)
                 .join(", ");
         }
@@ -375,9 +378,10 @@
         {createTagRemote}
         {deleteTagRemote}
         {updateTagRemote}
+        {readTagRemote}
         {createTagSchema}
         {updateTagSchema}
-        initialTags={initialData.tags || []}
+        initialTags={initialData.tags ?? initialData.contact?.tags ?? []}
     />
 
     {#if children}

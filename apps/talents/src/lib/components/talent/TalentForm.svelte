@@ -20,6 +20,7 @@
     import { listLocations } from "../../../routes/locations/list.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
+    import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -681,8 +682,7 @@
                             clearContactSelection();
                         }
                     }}
-                    createRemote={createTalent}
-                    createSchema={createTalentSchema}
+                    showQuickCreateButton={false}
                     linkItemLabel={m.search_existing()}
                     associatedItemLabel={m.selected_contact()}
                     searchPlaceholder={m.search_contacts_placeholder()}
@@ -700,87 +700,6 @@
                                 >
                             {/if}
                         </div>
-                    {/snippet}
-
-                    {#snippet renderForm({
-                        remoteFunction: crf,
-                        schema,
-                        initialData: formData,
-                        onSuccess: os,
-                        onCancel: oc,
-                    }: any)}
-                        <form
-                            {...crf.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
-                                try {
-                                    const result = await submit();
-                                    if (result && result.success !== false) {
-                                        os(result.data);
-                                    } else {
-                                        toast.error(
-                                            result?.error || "Failed to create contact"
-                                        );
-                                    }
-                                } catch (err) {
-                                    console.error("[TalentForm] Contact Quick Create Error:", err);
-                                    toast.error("An unexpected error occurred");
-                                }
-                            })}
-                            class="p-4 space-y-4"
-                        >
-                            <ContactFields
-                                bind:contactData
-                                bind:emails
-                                bind:phones
-                                bind:relations
-                                bind:tagsInput
-                                bind:locationIds
-                                bind:addresses
-                                listContactsRemote={async () => {
-                                    const res = await listContacts();
-                                    return res.data;
-                                }}
-                                rf={crf}
-                                onEmailChange={tryAutoLink}
-                                listTagsRemote={listTagsHandle}
-                                createTagRemote={createTagHandle}
-                                deleteTagRemote={deleteTagHandle}
-                                updateTagRemote={updateTagHandle}
-                                initialTags={getInitial("contact.tags", [])}
-                            />
-
-                            <!-- Hidden fields for the remote function payload -->
-                            {#if crf.fields?.contact}
-                                <input {...crf.fields.contact.as("hidden", contactData)} />
-                            {/if}
-                            {#if crf.fields?.emailsJson}
-                                <input {...crf.fields.emailsJson.as("hidden", JSON.stringify(emails))} />
-                            {/if}
-                            {#if crf.fields?.phonesJson}
-                                <input {...crf.fields.phonesJson.as("hidden", JSON.stringify(phones))} />
-                            {/if}
-                            {#if crf.fields?.relationsJson}
-                                <input {...crf.fields.relationsJson.as("hidden", JSON.stringify(relations))} />
-                            {/if}
-                            {#if crf.fields?.tagsJson}
-                                <input {...crf.fields.tagsJson.as("hidden", JSON.stringify(tagsInput.split(",").map(t => t.trim()).filter(Boolean)))} />
-                            {/if}
-                            {#if crf.fields?.addressesJson}
-                                <input {...crf.fields.addressesJson.as("hidden", JSON.stringify(addresses))} />
-                            {/if}
-                            {#if crf.fields?.locationIdsJson}
-                                <input {...crf.fields.locationIdsJson.as("hidden", JSON.stringify(locationIds))} />
-                            {/if}
-
-                            <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" type="button" onclick={oc}>{m.cancel()}</Button>
-                                <AsyncButton
-                                    type="submit"
-                                    loading={crf.pending}
-                                >
-                                    {m.create_contact()}
-                                </AsyncButton>
-                            </div>
-                        </form>
                     {/snippet}
                 </EntityManager>
 
@@ -809,7 +728,7 @@
                         createSchema={createLocationSchema}
                         updateRemote={updateLocation}
                         updateSchema={updateLocationSchema}
-                        getFormData={(l: any) => l}
+                        readItemRemote={readLocation}
                         deleteItemRemote={async (ids: string[]) => {
                             return await handleDelete({
                                 ids,

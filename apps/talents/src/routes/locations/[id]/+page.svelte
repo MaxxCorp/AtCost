@@ -15,9 +15,10 @@
     import { deleteTalent } from "../../talents/[id]/delete.remote";
     import { createTalent } from "../../talents/new/create.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";
+    import { readTalent } from "../../talents/[id]/read.remote";
     import { listTags } from "../../talents/talents.remote";
     import { listLocations } from "../list.remote";
-    import { createTalentSchema, updateTalentSchema } from "@ac/validations/talents";
+    import { unifiedTalentSchema } from "@ac/validations";
     import { handleDelete } from "@ac/ui";
 
 
@@ -123,23 +124,11 @@
                                     itemName: "talent"
                                 });
                             }}
-                            createRemote={createTalent}
-                            createSchema={createTalentSchema}
+                            createRemote={updateTalent}
+                            createSchema={unifiedTalentSchema}
                             updateRemote={updateTalent}
-                            updateSchema={updateTalentSchema}
-                            getFormData={(t: any) => ({
-                                id: t.id,
-                                data: {
-                                    jobTitle: t.jobTitle,
-                                    status: t.status,
-                                    salaryExpectation: t.salaryExpectation,
-                                    availabilityDate: t.availabilityDate,
-                                    onboardingStatus: t.onboardingStatus,
-                                    resumeUrl: t.resumeUrl,
-                                    source: t.source,
-                                    internalNotes: t.internalNotes,
-                                }
-                            })}
+                            updateSchema={unifiedTalentSchema}
+                            readItemRemote={readTalent}
                         >
                             {#snippet renderItemLabel(talent: any)}
                                 <div class="flex flex-col">

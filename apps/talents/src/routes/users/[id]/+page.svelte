@@ -21,6 +21,7 @@
     import { listLocations } from "../../locations/list.remote";
     import { createTalent } from "../../talents/new/create.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";
+    import { readTalent } from "../../talents/[id]/read.remote";
     import { unifiedTalentSchema } from "@ac/validations";
     import { EntityManager } from "@ac/ui";
     import TalentForm from "$lib/components/talent/TalentForm.svelte";
@@ -135,11 +136,7 @@
                                         createSchema={unifiedTalentSchema}
                                         updateRemote={updateTalent}
                                         updateSchema={unifiedTalentSchema}
-                                        getFormData={(t: any) => ({
-                                            talent: { ...t },
-                                            contact: { ...t.contact },
-                                            linkedUserId: userId
-                                        })}
+                                        readItemRemote={readTalent}
                                         searchPredicate={(t: any, q: string) => {
                                             const query = q.toLowerCase();
                                             const name = (

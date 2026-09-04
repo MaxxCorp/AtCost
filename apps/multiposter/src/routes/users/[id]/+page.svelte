@@ -15,6 +15,7 @@
     import { addAssociation, removeAssociation, fetchEntityContacts } from "../../contacts/associate.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
+    import { readContact } from "../../contacts/[id]/read.remote";
     import { createContactSchema, updateContactSchema } from "$lib/validations/contacts";
     import { deleteContact } from "../../contacts/[id]/delete.remote";
     import ContactForm from "$lib/components/contacts/ContactForm.svelte";
@@ -114,14 +115,7 @@
                                             createSchema={createContactSchema}
                                             updateRemote={updateContact}
                                             updateSchema={updateContactSchema}
-                                            getFormData={(c: any) => ({
-                                                contact: c,
-                                                emails: c.emails,
-                                                phones: c.phones,
-                                                addresses: c.addresses,
-                                                relations: c.relations,
-                                                tags: c.tags,
-                                            })}
+                                            readItemRemote={readContact}
                                             searchPredicate={matchContactSearch}
                                             loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
                                             noItemsFoundLabel={m.no_items_found({ item: m.feature_contacts_title() })}

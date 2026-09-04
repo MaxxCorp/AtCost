@@ -5,6 +5,7 @@
     import { listLocations } from "./list.remote";
     import { createLocation } from "./new/create.remote";
     import { updateLocation } from "./[id]/update.remote";
+    import { readLocation } from "./[id]/read.remote";
     import { deleteLocation } from "./[id]/delete.remote";
     import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
     import {
@@ -29,7 +30,7 @@
         createSchema={createLocationSchema}
         updateRemote={updateLocation}
         updateSchema={updateLocationSchema}
-        getFormData={(loc: any) => loc}
+        readItemRemote={readLocation}
         searchPredicate={(loc: any, q: any) => {
             return (
                 loc.name.toLowerCase().includes(q.toLowerCase()) ||
