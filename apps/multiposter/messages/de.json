@@ -808,6 +808,9 @@
 	"events_overview": "Programmübersicht",
 	"more_events": "Weitere Termine",
 	"scan_info": "Info",
-	"flyer_specs_subtitle": "A4 Querformat • Beidseitig • Faltet auf 1/3 A4 (3 Spalten)"
+	"flyer_specs_subtitle": "A4 Querformat • Beidseitig • Faltet auf 1/3 A4 (3 Spalten)",
+	"show_footers": "Fußzeilen",
+	"compress_series": "Serien komprimieren",
+	"compress_series_tooltip": "Wiederkehrende Termine zu einem Eintrag mit allen Daten und Wiederholungsmuster zusammenfassen"
 }
 

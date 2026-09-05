@@ -91,6 +91,8 @@
     let showQrCodes = $state(true);
     let showEventQrCodes = $state<boolean>(untrack(() => (kiosk as any)?.showEventQrCodes ?? false));
     let showDescriptions = $state(true);
+    let showFooters = $state(false);
+    let compressSeries = $state(true);
     let density = $state<FlyerDensity>("standard");
     let zoomLevel = $state<number>(0.85); // Preview zoom scale
     let isSummarizing = $state(false);
@@ -357,13 +359,103 @@
         }
     }
 
+    type FlyerDisplayItem = (Event | Announcement) & {
+        isCompressedSeries?: boolean;
+        seriesDates?: string[];
+        recurrenceText?: string;
+        instanceCount?: number;
+    };
+
+    function compressSeriesEvents(eventList: Event[]): FlyerDisplayItem[] {
+        if (!compressSeries) return eventList;
+
+        const seriesGroups = new Map<string, Event[]>();
+        const nonSeriesEvents: Event[] = [];
+
+        for (const evt of eventList) {
+            if (isSeriesItem(evt)) {
+                const anyEvt = evt as any;
+                const sKey = anyEvt.recurringEventId ||
+                    (anyEvt.seriesId ? `series_${anyEvt.seriesId}` : null) ||
+                    (evt.id.includes('_inst_') ? evt.id.split('_inst_')[0] : evt.id);
+
+                const group = seriesGroups.get(sKey) || [];
+                group.push(evt);
+                seriesGroups.set(sKey, group);
+            } else {
+                nonSeriesEvents.push(evt);
+            }
+        }
+
+        const compressed: FlyerDisplayItem[] = [...nonSeriesEvents];
+
+        for (const [sKey, group] of seriesGroups) {
+            group.sort((a, b) => {
+                const tA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+                const tB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+                return tA - tB;
+            });
+
+            const first = group[0];
+            const dateSet = new Set<string>();
+            const dates: string[] = [];
+            for (const g of group) {
+                if (g.startDateTime) {
+                    const d = new Date(g.startDateTime);
+                    if (!isNaN(d.getTime())) {
+                        const iso = d.toISOString();
+                        const dTime = d.getTime();
+                        if (!dateSet.has(String(dTime))) {
+                            dateSet.add(String(dTime));
+                            dates.push(iso);
+                        }
+                    }
+                }
+            }
+
+            let rruleStr: string | null = null;
+            for (const g of group) {
+                if (g.recurrence && Array.isArray(g.recurrence) && g.recurrence[0]) {
+                    rruleStr = g.recurrence[0];
+                    break;
+                }
+            }
+
+            const recText = formatRecurrenceText(rruleStr);
+
+            if (dates.length > 1) {
+                compressed.push({
+                    ...first,
+                    id: sKey,
+                    isCompressedSeries: true,
+                    seriesDates: dates,
+                    recurrenceText: recText,
+                    instanceCount: dates.length
+                });
+            } else {
+                compressed.push({
+                    ...first,
+                    recurrenceText: recText
+                });
+            }
+        }
+
+        compressed.sort((a, b) => {
+            const timeA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+            const timeB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+            return timeA - timeB;
+        });
+
+        return compressed;
+    }
+
     interface DistributedFlyerPanels {
-        flapItems: (Event | Announcement)[];
+        flapItems: FlyerDisplayItem[];
         backAnnouncements: Announcement[];
-        backEvents: (Event | Announcement)[];
-        inside1: (Event | Announcement)[];
-        inside2: (Event | Announcement)[];
-        inside3: (Event | Announcement)[];
+        backEvents: FlyerDisplayItem[];
+        inside1: FlyerDisplayItem[];
+        inside2: FlyerDisplayItem[];
+        inside3: FlyerDisplayItem[];
         total: number;
     }
 
@@ -372,18 +464,20 @@
     // Sheet 2: Inside 1 (Left), Inside 2 (Center), Inside 3 (Right)
     function distributeItemsForFlyer(locationItems: (Event | Announcement)[]): DistributedFlyerPanels {
         const announcements = locationItems.filter(i => !("startDateTime" in i)) as Announcement[];
-        const events = (locationItems.filter(i => "startDateTime" in i) as Event[]).sort((a, b) => {
+        const rawEvents = (locationItems.filter(i => "startDateTime" in i) as Event[]).sort((a, b) => {
             const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
             const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
             return timeA - timeB;
         });
 
-        const flapItems: (Event | Announcement)[] = [];
+        const events = compressSeries ? compressSeriesEvents(rawEvents) : rawEvents;
+
+        const flapItems: FlyerDisplayItem[] = [];
         const backAnnouncements: Announcement[] = [...announcements];
-        const backEvents: (Event | Announcement)[] = [];
-        const inside1: (Event | Announcement)[] = [];
-        const inside2: (Event | Announcement)[] = [];
-        const inside3: (Event | Announcement)[] = [];
+        const backEvents: FlyerDisplayItem[] = [];
+        const inside1: FlyerDisplayItem[] = [];
+        const inside2: FlyerDisplayItem[] = [];
+        const inside3: FlyerDisplayItem[] = [];
 
         if (announcements.length > 0) {
             // Announcements take the back panel (Rückseite)
@@ -420,7 +514,7 @@
             inside1,
             inside2,
             inside3,
-            total: locationItems.length
+            total: events.length + announcements.length
         };
     }
 </script>
@@ -562,6 +656,17 @@
                         <span>{m.event_qr_codes()}</span>
                     </label>
 
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-100 dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 font-medium" title={m.compress_series_tooltip()}>
+                        <input type="checkbox" bind:checked={compressSeries} class="rounded text-blue-600 w-3.5 h-3.5" />
+                        <RefreshCw class="w-3.5 h-3.5 text-slate-500" />
+                        <span>{m.compress_series()}</span>
+                    </label>
+
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-100 dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 font-medium">
+                        <input type="checkbox" bind:checked={showFooters} class="rounded text-blue-600 w-3.5 h-3.5" />
+                        <span>{m.show_footers()}</span>
+                    </label>
+
                     <!-- Preview Zoom controls -->
                     <div class="hidden md:flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                         <button
@@ -628,7 +733,7 @@
                         <div class="sheet-grid">
                             <!-- PANEL 5: INSIDE FLAP (Left on Outside Sheet) - USED FOR EVENTS -->
                             <section class="panel panel-flap border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                <div class="panel-inner p-3.5 flex flex-col h-full {showFooters ? 'justify-between' : 'justify-start gap-2'} overflow-hidden">
                                     <div class="space-y-2 overflow-hidden">
                                         <!-- Top Accent Header -->
                                         <div class="border-b-2 border-slate-900 pb-1.5 flex items-center justify-between">
@@ -663,17 +768,19 @@
                                         </div>
                                     </div>
 
-                                    <!-- Bottom note & page hint -->
-                                    <div class="pt-2 border-t border-slate-200 text-[9px] text-slate-500 flex items-center justify-between shrink-0">
-                                        <span>{getDateRangeTitle()}</span>
-                                        <span class="font-mono text-slate-400">{m.flyer_inside_flap()}</span>
-                                    </div>
+                                    {#if showFooters}
+                                        <!-- Bottom note & page hint -->
+                                        <div class="pt-2 border-t border-slate-200 text-[9px] text-slate-500 flex items-center justify-between shrink-0">
+                                            <span>{getDateRangeTitle()}</span>
+                                            <span class="font-mono text-slate-400">{m.flyer_inside_flap()}</span>
+                                        </div>
+                                    {/if}
                                 </div>
                             </section>
 
                             <!-- PANEL 6: BACK COVER (Center on Outside Sheet) - ANNOUNCEMENTS OR EVENTS -->
                             <section class="panel panel-back border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                <div class="panel-inner p-3.5 flex flex-col h-full {showFooters ? 'justify-between' : 'justify-start gap-2'} overflow-hidden">
                                     <div class="space-y-2 overflow-hidden">
                                         <!-- Header -->
                                         <div class="border-b-2 border-slate-900 pb-1.5 flex items-center justify-between">
@@ -732,11 +839,13 @@
                                         {/if}
                                     </div>
 
-                                    <!-- Bottom Back Cover note -->
-                                    <div class="pt-2 border-t border-slate-200 text-[9px] text-slate-500 flex items-center justify-between shrink-0">
-                                        <span>{kiosk.name || 'AtCost'}</span>
-                                        <span class="font-mono text-slate-400">{m.flyer_back_cover()}</span>
-                                    </div>
+                                    {#if showFooters}
+                                        <!-- Bottom Back Cover note -->
+                                        <div class="pt-2 border-t border-slate-200 text-[9px] text-slate-500 flex items-center justify-between shrink-0">
+                                            <span>{kiosk.name || 'AtCost'}</span>
+                                            <span class="font-mono text-slate-400">{m.flyer_back_cover()}</span>
+                                        </div>
+                                    {/if}
                                 </div>
                             </section>
 
@@ -885,13 +994,16 @@
                         <div class="sheet-grid">
                             <!-- INSIDE PANEL 2 (Left) -->
                             <section class="panel panel-inside-1 border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                <div class="panel-inner p-3.5 flex flex-col h-full {showFooters ? 'justify-between' : 'justify-start gap-2'} overflow-hidden">
                                     <div class="space-y-2 overflow-hidden">
                                         <!-- Column Banner -->
                                         <div class="flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
-                                            <span class="text-xs font-black uppercase tracking-wider text-slate-900">
-                                                {m.flyer_panel_1()}
-                                            </span>
+                                            <div class="flex items-center gap-1.5">
+                                                <Calendar class="w-3.5 h-3.5 text-blue-600" />
+                                                <h3 class="text-xs font-black uppercase tracking-wider text-slate-900">
+                                                    {m.events_overview()}
+                                                </h3>
+                                            </div>
                                             <span class="text-[10px] font-bold text-slate-500 truncate max-w-[120px]">
                                                 {loc.name}
                                             </span>
@@ -909,21 +1021,26 @@
                                             {/if}
                                         </div>
                                     </div>
-                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
-                                        {m.flyer_panel_1()}
-                                    </div>
+                                    {#if showFooters}
+                                        <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
+                                            {m.flyer_panel_1()}
+                                        </div>
+                                    {/if}
                                 </div>
                             </section>
 
                             <!-- INSIDE PANEL 3 (Center) -->
                             <section class="panel panel-inside-2 border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                <div class="panel-inner p-3.5 flex flex-col h-full {showFooters ? 'justify-between' : 'justify-start gap-2'} overflow-hidden">
                                     <div class="space-y-2 overflow-hidden">
                                         <!-- Column Banner -->
                                         <div class="flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
-                                            <span class="text-xs font-black uppercase tracking-wider text-slate-900">
-                                                {m.flyer_panel_2()}
-                                            </span>
+                                            <div class="flex items-center gap-1.5">
+                                                <Calendar class="w-3.5 h-3.5 text-blue-600" />
+                                                <h3 class="text-xs font-black uppercase tracking-wider text-slate-900">
+                                                    {m.events_overview()}
+                                                </h3>
+                                            </div>
                                             <span class="text-[10px] font-bold text-slate-500">
                                                 {getDateRangeTitle()}
                                             </span>
@@ -936,21 +1053,26 @@
                                             {/each}
                                         </div>
                                     </div>
-                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
-                                        {m.flyer_panel_2()}
-                                    </div>
+                                    {#if showFooters}
+                                        <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
+                                            {m.flyer_panel_2()}
+                                        </div>
+                                    {/if}
                                 </div>
                             </section>
 
                             <!-- INSIDE PANEL 4 (Right) -->
                             <section class="panel panel-inside-3">
-                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                <div class="panel-inner p-3.5 flex flex-col h-full {showFooters ? 'justify-between' : 'justify-start gap-2'} overflow-hidden">
                                     <div class="space-y-2 overflow-hidden">
                                         <!-- Column Banner -->
                                         <div class="flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
-                                            <span class="text-xs font-black uppercase tracking-wider text-slate-900">
-                                                {m.flyer_panel_3()}
-                                            </span>
+                                            <div class="flex items-center gap-1.5">
+                                                <Calendar class="w-3.5 h-3.5 text-blue-600" />
+                                                <h3 class="text-xs font-black uppercase tracking-wider text-slate-900">
+                                                    {m.events_overview()}
+                                                </h3>
+                                            </div>
                                             <span class="text-[10px] font-bold text-slate-500">
                                                 {m.entry_count({ count: totalItems })}
                                             </span>
@@ -963,9 +1085,11 @@
                                             {/each}
                                         </div>
                                     </div>
-                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
-                                        {m.flyer_panel_3()}
-                                    </div>
+                                    {#if showFooters}
+                                        <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
+                                            {m.flyer_panel_3()}
+                                        </div>
+                                    {/if}
                                 </div>
                             </section>
                         </div>
@@ -977,7 +1101,7 @@
 </div>
 
 <!-- SNIPPET: ITEM CARD ON PANELS -->
-{#snippet itemCard(item: Event | Announcement)}
+{#snippet itemCard(item: FlyerDisplayItem)}
     {@const isEvent = "startDateTime" in item}
     {@const title = getItemTitle(item)}
     {@const summary = getItemSummary(item)}
@@ -987,44 +1111,85 @@
 
     <article class="event-item-card p-2 rounded-lg border border-slate-200/90 bg-white hover:border-slate-300 transition-colors space-y-1 print:break-inside-avoid">
         <!-- Date Badge & Meta Row -->
-        <div class="flex items-center justify-between gap-1.5">
-            {#if isEvent}
-                {@const isSeries = isSeriesItem(item)}
-                <div class="flex items-center gap-1.5 flex-wrap">
-                    <!-- Date badge -->
-                    <div class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">
-                        {formatDay((item as Event).startDateTime)} {formatMonth((item as Event).startDateTime)}
-                    </div>
-                    <!-- Time -->
-                    <div class="text-[9.5px] text-slate-600 font-medium flex items-center gap-0.5">
-                        <Clock class="w-2.5 h-2.5 text-slate-400" />
-                        <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
-                    </div>
-                    <!-- Series entry badge -->
-                    {#if isSeries}
-                        <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
+        {#if isEvent && item.isCompressedSeries && item.seriesDates && item.seriesDates.length > 1}
+            <!-- Compressed Series View: Recurrence pattern + multiple date tags -->
+            <div class="space-y-1">
+                <div class="flex items-center justify-between gap-1.5 flex-wrap">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <!-- Recurrence pattern badge -->
+                        <span class="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
                             <RefreshCw class="w-2.5 h-2.5 text-indigo-500" />
-                            <span>{m.series_badge()}</span>
+                            <span>{item.recurrenceText || m.series_badge()}</span>
+                        </span>
+                        <!-- Shared Time -->
+                        <div class="text-[9.5px] text-slate-600 font-medium flex items-center gap-0.5">
+                            <Clock class="w-2.5 h-2.5 text-slate-400" />
+                            <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
+                        </div>
+                    </div>
+
+                    <!-- Room or Highlight Badge -->
+                    {#if highlight}
+                        <span class="text-[8.5px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded truncate max-w-[90px]">
+                            {highlight}
+                        </span>
+                    {:else if rooms.length > 0}
+                        <span class="text-[8.5px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]">
+                            {rooms[0]}
                         </span>
                     {/if}
                 </div>
-            {:else}
-                <div class="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-tight">
-                    {m.news_badge()}
-                </div>
-            {/if}
 
-            <!-- Room or Highlight Badge -->
-            {#if highlight}
-                <span class="text-[8.5px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded truncate max-w-[90px]">
-                    {highlight}
-                </span>
-            {:else if rooms.length > 0}
-                <span class="text-[8.5px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]">
-                    {rooms[0]}
-                </span>
-            {/if}
-        </div>
+                <!-- Multiple dates list -->
+                <div class="flex items-center gap-1 flex-wrap pt-0.5">
+                    {#each item.seriesDates as dateStr}
+                        <span class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8.5px] font-bold tracking-tight">
+                            {formatDay(dateStr)} {formatMonth(dateStr)}
+                        </span>
+                    {/each}
+                </div>
+            </div>
+        {:else}
+            <!-- Standard single item row -->
+            <div class="flex items-center justify-between gap-1.5">
+                {#if isEvent}
+                    {@const isSeries = isSeriesItem(item)}
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <!-- Date badge -->
+                        <div class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">
+                            {formatDay((item as Event).startDateTime)} {formatMonth((item as Event).startDateTime)}
+                        </div>
+                        <!-- Time -->
+                        <div class="text-[9.5px] text-slate-600 font-medium flex items-center gap-0.5">
+                            <Clock class="w-2.5 h-2.5 text-slate-400" />
+                            <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
+                        </div>
+                        <!-- Series entry badge -->
+                        {#if isSeries}
+                            <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
+                                <RefreshCw class="w-2.5 h-2.5 text-indigo-500" />
+                                <span>{item.recurrenceText || m.series_badge()}</span>
+                            </span>
+                        {/if}
+                    </div>
+                {:else}
+                    <div class="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-tight">
+                        {m.news_badge()}
+                    </div>
+                {/if}
+
+                <!-- Room or Highlight Badge -->
+                {#if highlight}
+                    <span class="text-[8.5px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded truncate max-w-[90px]">
+                        {highlight}
+                    </span>
+                {:else if rooms.length > 0}
+                    <span class="text-[8.5px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]">
+                        {rooms[0]}
+                    </span>
+                {/if}
+            </div>
+        {/if}
 
         <!-- Content Row: Title & Summary on Left, Optional Event QR on Right -->
         <div class="flex items-start justify-between gap-1.5">

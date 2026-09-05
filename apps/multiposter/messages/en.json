@@ -808,6 +808,9 @@
 	"events_overview": "Program Overview",
 	"more_events": "More Events",
 	"scan_info": "Info",
-	"flyer_specs_subtitle": "A4 Landscape • Double-Sided • Folds into 1/3 A4 (3 Panels)"
+	"flyer_specs_subtitle": "A4 Landscape • Double-Sided • Folds into 1/3 A4 (3 Panels)",
+	"show_footers": "Footers",
+	"compress_series": "Compress Series",
+	"compress_series_tooltip": "Group recurring events into a single entry with all dates and recurrence pattern"
 }
 
