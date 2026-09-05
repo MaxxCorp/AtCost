@@ -787,6 +787,27 @@
 	"edit_summary_tooltip": "Klicken zum Bearbeiten vor dem Drucken",
 	"no_events_for_location": "Keine bevorstehenden Termine für diesen Standort in diesem Zeitraum.",
 	"show_event_qr_codes": "Event-QR-Codes anzeigen",
-	"event_qr_codes": "Event-QR-Codes"
+	"event_qr_codes": "Event-QR-Codes",
+	"room": "Raum",
+	"room_label": "Raum: {room}",
+	"accessibility_and_inclusivity": "Barrierefreiheit & Inklusion",
+	"printed_flyer": "Gedruckter Flyer",
+	"events_and_culture": "Veranstaltungen & Kultur",
+	"program_and_schedule": "Programm & Termine",
+	"event_calendar": "Veranstaltungskalender",
+	"welcome_title": "Willkommen",
+	"welcome_description": "Entdecken Sie unser aktuelles Programm mit Veranstaltungen, Aktivitäten und Angeboten. Alle sind herzlich willkommen.",
+	"entry_count": "{count} Einträge",
+	"series_badge": "Serie",
+	"news_badge": "Aktuelles",
+	"community_center": "Gemeindezentrum",
+	"flyer_number": "Flyer #{number}",
+	"zoom_in": "Vergrößern",
+	"zoom_out": "Verkleinern",
+	"ai_summarize_tooltip": "Textlänge mit KI optimal an die Flyer-Spalten anpassen",
+	"events_overview": "Programmübersicht",
+	"more_events": "Weitere Termine",
+	"scan_info": "Info",
+	"flyer_specs_subtitle": "A4 Querformat • Beidseitig • Faltet auf 1/3 A4 (3 Spalten)"
 }
 

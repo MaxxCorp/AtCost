@@ -105,7 +105,7 @@
         }
         return [{
             id: "default",
-            name: kiosk.name || "Community Center",
+            name: kiosk.name || m.community_center(),
             street: null,
             houseNumber: null,
             addressSuffix: null,
@@ -328,37 +328,75 @@
         }
     }
 
-    // Split events across 3 inside panels evenly or distribute
-    function distributeItemsAcrossPanels(locationItems: (Event | Announcement)[]) {
-        const panel1: (Event | Announcement)[] = [];
-        const panel2: (Event | Announcement)[] = [];
-        const panel3: (Event | Announcement)[] = [];
+    interface DistributedFlyerPanels {
+        flapItems: (Event | Announcement)[];
+        backAnnouncements: Announcement[];
+        backEvents: (Event | Announcement)[];
+        inside1: (Event | Announcement)[];
+        inside2: (Event | Announcement)[];
+        inside3: (Event | Announcement)[];
+        total: number;
+    }
 
-        // Sort items chronologically
-        const sorted = [...locationItems].sort((a, b) => {
-            const dateA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-            const dateB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
-            return dateA - dateB;
+    // Distribute items across the 5 available event/announcement panels:
+    // Sheet 1: Flap (Left: Events), Back (Center: Announcements or Events)
+    // Sheet 2: Inside 1 (Left), Inside 2 (Center), Inside 3 (Right)
+    function distributeItemsForFlyer(locationItems: (Event | Announcement)[]): DistributedFlyerPanels {
+        const announcements = locationItems.filter(i => !("startDateTime" in i)) as Announcement[];
+        const events = (locationItems.filter(i => "startDateTime" in i) as Event[]).sort((a, b) => {
+            const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+            const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+            return timeA - timeB;
         });
 
-        const count = sorted.length;
-        const perPanel = Math.ceil(count / 3);
+        const flapItems: (Event | Announcement)[] = [];
+        const backAnnouncements: Announcement[] = [...announcements];
+        const backEvents: (Event | Announcement)[] = [];
+        const inside1: (Event | Announcement)[] = [];
+        const inside2: (Event | Announcement)[] = [];
+        const inside3: (Event | Announcement)[] = [];
 
-        for (let i = 0; i < count; i++) {
-            if (i < perPanel) {
-                panel1.push(sorted[i]);
-            } else if (i < perPanel * 2) {
-                panel2.push(sorted[i]);
+        if (announcements.length > 0) {
+            // Announcements take the back panel (Rückseite)
+            // Events are distributed across the other 4 panels: Flap + 3 Inside panels
+            const count = events.length;
+            const perPanel = Math.ceil(count / 4);
+            flapItems.push(...events.slice(0, perPanel));
+            inside1.push(...events.slice(perPanel, perPanel * 2));
+            inside2.push(...events.slice(perPanel * 2, perPanel * 3));
+            inside3.push(...events.slice(perPanel * 3));
+        } else {
+            // No announcements: Back panel can also host events if there are many
+            const count = events.length;
+            if (count > 8) {
+                const perPanel = Math.ceil(count / 5);
+                flapItems.push(...events.slice(0, perPanel));
+                backEvents.push(...events.slice(perPanel, perPanel * 2));
+                inside1.push(...events.slice(perPanel * 2, perPanel * 3));
+                inside2.push(...events.slice(perPanel * 3, perPanel * 4));
+                inside3.push(...events.slice(perPanel * 4));
             } else {
-                panel3.push(sorted[i]);
+                const perPanel = Math.ceil(count / 4);
+                flapItems.push(...events.slice(0, perPanel));
+                inside1.push(...events.slice(perPanel, perPanel * 2));
+                inside2.push(...events.slice(perPanel * 2, perPanel * 3));
+                inside3.push(...events.slice(perPanel * 3));
             }
         }
 
-        return { panel1, panel2, panel3, total: count };
+        return {
+            flapItems,
+            backAnnouncements,
+            backEvents,
+            inside1,
+            inside2,
+            inside3,
+            total: locationItems.length
+        };
     }
 </script>
 
-<div class="min-h-screen bg-slate-100 dark:bg-slate-900 py-6 px-2 sm:px-4 lg:px-6 text-slate-800 dark:text-slate-100 print:bg-white print:p-0 print:m-0 print:text-black">
+<div class="min-h-screen bg-slate-100 dark:bg-slate-900 py-6 px-2 sm:px-4 lg:px-6 text-slate-800 dark:text-slate-100 print:bg-white print:p-0 print:m-0 print:min-h-0 print:h-auto print:text-black">
     <!-- SCREEN ONLY: Floating Toolbar & Controls -->
     <header class="max-w-6xl mx-auto mb-6 print:hidden">
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex flex-col gap-4">
@@ -383,7 +421,7 @@
                                 {m.folded_flyer_print_template()}
                             </h1>
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                A4 Landscape • Double-Sided • Folds into 1/3 A4 (3 Panels)
+                                {m.flyer_specs_subtitle()}
                             </p>
                         </div>
                     </div>
@@ -460,7 +498,7 @@
                         onclick={handleAiSummarize}
                         disabled={isSummarizing || items.length === 0}
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl shadow-xs transition-colors disabled:opacity-50"
-                        title="Use AI to adapt text length for tri-fold brochure panels"
+                        title={m.ai_summarize_tooltip()}
                     >
                         <Sparkles class="w-3.5 h-3.5 {isSummarizing ? 'animate-spin' : ''}" />
                         <span>{isSummarizing ? m.summarizing_with_ai() : m.summarize_with_ai()}</span>
@@ -501,7 +539,7 @@
                             type="button"
                             onclick={() => zoomLevel = Math.max(0.5, zoomLevel - 0.1)}
                             class="p-1 text-slate-500 hover:text-slate-900 rounded"
-                            title="Zoom Out"
+                            title={m.zoom_out()}
                         >
                             <ZoomOut class="w-3.5 h-3.5" />
                         </button>
@@ -510,7 +548,7 @@
                             type="button"
                             onclick={() => zoomLevel = Math.min(1.2, zoomLevel + 0.1)}
                             class="p-1 text-slate-500 hover:text-slate-900 rounded"
-                            title="Zoom In"
+                            title={m.zoom_in()}
                         >
                             <ZoomIn class="w-3.5 h-3.5" />
                         </button>
@@ -521,11 +559,10 @@
     </header>
 
     <!-- FLYER PRINT CANVAS CONTAINER -->
-    <main class="max-w-6xl mx-auto flex flex-col items-center gap-10 print:m-0 print:p-0 print:gap-0">
+    <main class="max-w-6xl mx-auto flex flex-col items-center gap-10 print:m-0 print:p-0 print:gap-0 print:max-w-none print:w-auto">
         {#each displayedLocations as loc, locIdx (loc.id)}
             {@const locItems = items.filter(it => itemBelongsToLocation(it, loc.id))}
-            {@const { panel1, panel2, panel3, total: totalItems } = distributeItemsAcrossPanels(locItems)}
-            {@const announcements = locItems.filter(i => !("startDateTime" in i)) as EnrichedAnnouncement[]}
+            {@const { flapItems, backAnnouncements, backEvents, inside1, inside2, inside3, total: totalItems } = distributeItemsForFlyer(locItems)}
 
             <div class="flyer-document-pair w-full flex flex-col items-center gap-8 print:gap-0 print:m-0">
                 <!-- Location Divider Label (Screen Only) -->
@@ -533,12 +570,12 @@
                     <div class="print:hidden w-full max-w-[297mm] flex items-center justify-between px-2 pt-2 border-t border-slate-300 dark:border-slate-700">
                         <div class="flex items-center gap-2">
                             <span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                Flyer #{locIdx + 1}
+                                {m.flyer_number({ number: locIdx + 1 })}
                             </span>
                             <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">{loc.name}</h2>
                         </div>
                         <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                            {totalItems} {totalItems === 1 ? m.event_label() : m.feature_events_title()}
+                            {m.entry_count({ count: totalItems })}
                         </span>
                     </div>
                 {/if}
@@ -560,181 +597,125 @@
                         {/if}
 
                         <div class="sheet-grid">
-                            <!-- PANEL 5: INSIDE FLAP (Left on Outside Sheet) -->
+                            <!-- PANEL 5: INSIDE FLAP (Left on Outside Sheet) - USED FOR EVENTS -->
                             <section class="panel panel-flap border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-5 flex flex-col h-full justify-between">
-                                    <div class="space-y-4">
+                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                    <div class="space-y-2 overflow-hidden">
                                         <!-- Top Accent Header -->
-                                        <div class="border-b-2 border-slate-900 pb-2">
-                                            <span class="text-[10px] font-bold tracking-widest uppercase text-slate-500">
+                                        <div class="border-b-2 border-slate-900 pb-1.5 flex items-center justify-between">
+                                            <div class="flex items-center gap-1.5">
+                                                <Calendar class="w-3.5 h-3.5 text-blue-600" />
+                                                <h3 class="text-xs font-black uppercase tracking-wider text-slate-900">
+                                                    {m.events_overview()}
+                                                </h3>
+                                            </div>
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
                                                 {m.flyer_inside_flap()}
                                             </span>
-                                            <h3 class="text-base font-extrabold text-slate-900 leading-tight flex items-center gap-1.5 mt-0.5">
-                                                <Sparkles class="w-4 h-4 text-amber-500" />
-                                                {m.flyer_highlights_title()}
-                                            </h3>
                                         </div>
 
-                                        <!-- Location description or intro note -->
-                                        {#if loc.description}
-                                            <div class="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                        <!-- Optional Location description note if space permits -->
+                                        {#if loc.description && flapItems.length <= 3}
+                                            <div class="text-[10px] text-slate-700 leading-snug bg-slate-50 p-1.5 rounded border border-slate-100 line-clamp-2">
                                                 {loc.description}
                                             </div>
                                         {/if}
 
-                                        <!-- Announcements on Inside Flap -->
-                                        {#if announcements.length > 0}
-                                            <div class="space-y-2.5">
-                                                <div class="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
-                                                    {m.feature_announcements_title()}
-                                                </div>
-                                                {#each announcements.slice(0, 3) as ann (ann.id)}
-                                                    <div class="p-2.5 rounded-lg border border-amber-200 bg-amber-50/50 space-y-1">
-                                                        <h4 class="text-xs font-bold text-slate-900 leading-snug">
-                                                            {getItemTitle(ann)}
-                                                        </h4>
-                                                        {#if showDescriptions}
-                                                            <p
-                                                                class="text-[11px] text-slate-700 leading-normal"
-                                                                contenteditable="true"
-                                                                onblur={(e) => handleInlineEdit(ann.id, getItemTitle(ann), getItemSummary(ann), e)}
-                                                                title={m.edit_summary_tooltip()}
-                                                            >
-                                                                {getItemSummary(ann)}
-                                                            </p>
-                                                        {/if}
-                                                    </div>
+                                        <!-- Events on Inside Flap -->
+                                        <div class="space-y-1.5 overflow-hidden">
+                                            {#each flapItems as item (item.id)}
+                                                {@render itemCard(item)}
+                                            {/each}
+                                            {#if flapItems.length === 0}
+                                                <p class="text-xs text-slate-400 italic pt-4 text-center">
+                                                    {m.no_events_for_location()}
+                                                </p>
+                                            {/if}
+                                        </div>
+                                    </div>
+
+                                    <!-- Bottom note & page hint -->
+                                    <div class="pt-2 border-t border-slate-200 text-[9px] text-slate-500 flex items-center justify-between shrink-0">
+                                        <span>{getDateRangeTitle()}</span>
+                                        <span class="font-mono text-slate-400">{m.flyer_inside_flap()}</span>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- PANEL 6: BACK COVER (Center on Outside Sheet) - ANNOUNCEMENTS OR EVENTS -->
+                            <section class="panel panel-back border-r border-slate-200 print:border-slate-300">
+                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                    <div class="space-y-2 overflow-hidden">
+                                        <!-- Header -->
+                                        <div class="border-b-2 border-slate-900 pb-1.5 flex items-center justify-between">
+                                            <div class="flex items-center gap-1.5">
+                                                {#if backAnnouncements.length > 0}
+                                                    <Sparkles class="w-3.5 h-3.5 text-amber-500" />
+                                                    <h3 class="text-xs font-black uppercase tracking-wider text-slate-900">
+                                                        {m.feature_announcements_title()}
+                                                    </h3>
+                                                {:else}
+                                                    <Calendar class="w-3.5 h-3.5 text-blue-600" />
+                                                    <h3 class="text-xs font-black uppercase tracking-wider text-slate-900">
+                                                        {m.events_overview()}
+                                                    </h3>
+                                                {/if}
+                                            </div>
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                                {m.flyer_back_cover()}
+                                            </span>
+                                        </div>
+
+                                        <!-- Announcements on Back Cover -->
+                                        {#if backAnnouncements.length > 0}
+                                            <div class="space-y-1.5 overflow-hidden">
+                                                {#each backAnnouncements as ann (ann.id)}
+                                                    {@render itemCard(ann)}
                                                 {/each}
                                             </div>
-                                        {:else}
-                                            <!-- Fallback community welcome block -->
-                                            <div class="p-3 rounded-lg border border-blue-100 bg-blue-50/40 text-xs text-slate-700 space-y-2">
+                                        {/if}
+
+                                        <!-- Additional Events on Back Cover -->
+                                        {#if backEvents.length > 0}
+                                            <div class="space-y-1.5 overflow-hidden">
+                                                {#if backAnnouncements.length > 0}
+                                                    <div class="text-[9px] font-bold text-slate-700 uppercase tracking-wider pt-1 border-t border-slate-200">
+                                                        {m.more_events()}
+                                                    </div>
+                                                {/if}
+                                                {#each backEvents as item (item.id)}
+                                                    {@render itemCard(item)}
+                                                {/each}
+                                            </div>
+                                        {/if}
+
+                                        <!-- Fallback community welcome block if empty -->
+                                        {#if backAnnouncements.length === 0 && backEvents.length === 0}
+                                            <div class="p-2.5 rounded-lg border border-blue-100 bg-blue-50/40 text-xs text-slate-700 space-y-1.5">
                                                 <div class="font-bold text-blue-900 flex items-center gap-1">
-                                                    <Info class="w-3.5 h-3.5" />
-                                                    <span>Welcome</span>
+                                                    <Info class="w-3.5 h-3.5 text-blue-600" />
+                                                    <span>{m.welcome_title()}</span>
                                                 </div>
-                                                <p class="leading-relaxed">
-                                                    Discover our current program of events, activities, and community sessions. Open to everyone.
+                                                <p class="leading-relaxed text-[11px]">
+                                                    {m.welcome_description()}
                                                 </p>
                                             </div>
                                         {/if}
                                     </div>
 
-                                    <!-- Bottom note & page hint -->
-                                    <div class="pt-3 border-t border-slate-200 text-[10px] text-slate-500 flex items-center justify-between">
-                                        <span>{getDateRangeTitle()}</span>
-                                        <span class="font-mono text-slate-400">1/3 A4</span>
+                                    <!-- Bottom Back Cover note -->
+                                    <div class="pt-2 border-t border-slate-200 text-[9px] text-slate-500 flex items-center justify-between shrink-0">
+                                        <span>{kiosk.name || 'AtCost'}</span>
+                                        <span class="font-mono text-slate-400">{m.flyer_back_cover()}</span>
                                     </div>
                                 </div>
                             </section>
 
-                            <!-- PANEL 6: BACK COVER (Center on Outside Sheet) -->
-                            <section class="panel panel-back border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-5 flex flex-col h-full justify-between">
-                                    <div class="space-y-4">
-                                        <!-- Header -->
-                                        <div class="border-b-2 border-slate-900 pb-2">
-                                            <span class="text-[10px] font-bold tracking-widest uppercase text-slate-500">
-                                                {m.flyer_back_cover()}
-                                            </span>
-                                            <h3 class="text-base font-extrabold text-slate-900 leading-tight flex items-center gap-1.5 mt-0.5">
-                                                <MapPin class="w-4 h-4 text-blue-600" />
-                                                {m.contact_and_location()}
-                                            </h3>
-                                        </div>
-
-                                        <!-- Address & Venue Info -->
-                                        <div class="space-y-2 text-xs text-slate-800 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-                                            <div class="font-bold text-slate-900 text-sm">{loc.name}</div>
-                                            {#if loc.street || loc.houseNumber}
-                                                <div class="flex items-start gap-1.5 text-slate-700">
-                                                    <MapPin class="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                                                    <span>{loc.street || ''} {loc.houseNumber || ''}{loc.addressSuffix ? ` ${loc.addressSuffix}` : ''}</span>
-                                                </div>
-                                            {/if}
-                                            {#if loc.zip || loc.city}
-                                                <div class="text-slate-700 pl-5">
-                                                    {loc.zip || ''} {loc.city || ''}
-                                                </div>
-                                            {/if}
-                                            {#if loc.roomId}
-                                                <div class="text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-block">
-                                                    Room: {loc.roomId}
-                                                </div>
-                                            {/if}
-                                        </div>
-
-                                        <!-- Inclusivity & Accessibility -->
-                                        {#if loc.inclusivitySupport}
-                                            <div class="p-2.5 rounded-lg border border-slate-200 text-[11px] text-slate-700 bg-white space-y-1">
-                                                <div class="font-semibold text-slate-900 flex items-center gap-1">
-                                                    <CheckCircle2 class="w-3 h-3 text-emerald-600" />
-                                                    <span>Accessibility & Inclusivity</span>
-                                                </div>
-                                                <p>{loc.inclusivitySupport}</p>
-                                            </div>
-                                        {/if}
-
-                                        <!-- Contact Card -->
-                                        {#if loc.contact}
-                                            <div class="p-3 rounded-xl border border-slate-200 bg-white space-y-2 text-xs">
-                                                <div class="font-bold text-slate-900 flex items-center gap-1.5">
-                                                    <User class="w-3.5 h-3.5 text-slate-500" />
-                                                    <span>{loc.contact.name}</span>
-                                                </div>
-                                                {#if loc.contact.phone}
-                                                    <div class="flex items-center gap-1.5 text-slate-700 text-[11px]">
-                                                        <Phone class="w-3 h-3 text-slate-400" />
-                                                        <a href="tel:{loc.contact.phone}" class="hover:underline">{loc.contact.phone}</a>
-                                                    </div>
-                                                {/if}
-                                                {#if loc.contact.email}
-                                                    <div class="flex items-center gap-1.5 text-slate-700 text-[11px]">
-                                                        <Mail class="w-3 h-3 text-slate-400" />
-                                                        <a href="mailto:{loc.contact.email}" class="hover:underline truncate">{loc.contact.email}</a>
-                                                    </div>
-                                                {/if}
-                                            </div>
-                                        {/if}
-
-                                        <!-- What3Words / Location coordinate note -->
-                                        {#if loc.what3words}
-                                            <div class="text-[10px] font-mono text-slate-500 flex items-center gap-1">
-                                                <Compass class="w-3 h-3 text-red-500" />
-                                                <span>///{loc.what3words}</span>
-                                            </div>
-                                        {/if}
-                                    </div>
-
-                                    <!-- Bottom Contact QR or Imprint -->
-                                    <div class="pt-3 border-t border-slate-200 flex items-center justify-between">
-                                        {#if showQrCodes && (loc.contact?.qrCodeDataUrl || loc.contact?.qrCodePath)}
-                                            <div class="flex items-center gap-2">
-                                                <img
-                                                    src={loc.contact.qrCodeDataUrl || loc.contact.qrCodePath}
-                                                    alt="Location Contact QR"
-                                                    class="w-12 h-12 border border-slate-200 rounded p-0.5"
-                                                />
-                                                <div class="text-[9px] text-slate-500 font-medium leading-tight">
-                                                    {m.scan_vcard_qr()}
-                                                </div>
-                                            </div>
-                                        {:else}
-                                            <div class="text-[9px] text-slate-400 font-medium">
-                                                {kiosk.name || 'AC Multiposter'}
-                                            </div>
-                                        {/if}
-                                        <span class="text-[9px] text-slate-400">Printed Flyer</span>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <!-- PANEL 1: FRONT COVER (Right on Outside Sheet) -->
-                            <!-- When folded into 1/3 A4, this is the very front of the brochure! -->
+                            <!-- PANEL 1: FRONT COVER (Right on Outside Sheet) - STANDORT & KONTAKT -->
                             <section class="panel panel-front relative bg-slate-900 text-white overflow-hidden flex flex-col justify-between">
-                                <!-- Location Hero Image (Dynamic visual element depending on location) -->
+                                <!-- Location Hero Image or Artwork Header -->
                                 {#if loc.heroImage}
-                                    <div class="hero-image-container relative h-48 w-full shrink-0 overflow-hidden">
+                                    <div class="hero-image-container relative h-36 w-full shrink-0 overflow-hidden">
                                         <img
                                             src={loc.heroImage}
                                             alt={loc.name}
@@ -743,64 +724,107 @@
                                         <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
                                     </div>
                                 {:else}
-                                    <!-- Elegant geometric cover artwork banner if no image is set -->
-                                    <div class="h-44 w-full bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-950 p-5 flex flex-col justify-between relative overflow-hidden shrink-0">
-                                        <div class="absolute -right-8 -top-8 w-32 h-32 bg-blue-500/20 rounded-full blur-xl"></div>
-                                        <div class="absolute -left-8 -bottom-8 w-32 h-32 bg-indigo-500/20 rounded-full blur-xl"></div>
-                                        <div class="relative z-10 flex items-center gap-2 text-blue-300 text-xs font-semibold uppercase tracking-wider">
-                                            <MapPin class="w-4 h-4" />
-                                            <span>{loc.city || 'Events & Culture'}</span>
+                                    <!-- Geometric cover artwork banner -->
+                                    <div class="h-28 w-full bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-950 p-3 flex flex-col justify-between relative overflow-hidden shrink-0">
+                                        <div class="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl"></div>
+                                        <div class="absolute -left-6 -bottom-6 w-24 h-24 bg-indigo-500/20 rounded-full blur-xl"></div>
+                                        <div class="relative z-10 flex items-center gap-1.5 text-blue-300 text-[10px] font-semibold uppercase tracking-wider">
+                                            <MapPin class="w-3.5 h-3.5" />
+                                            <span>{loc.city || m.events_and_culture()}</span>
                                         </div>
                                     </div>
                                 {/if}
 
-                                <!-- Front Cover Content -->
-                                <div class="p-5 flex-1 flex flex-col justify-between relative z-10 space-y-4">
-                                    <div class="space-y-2.5">
+                                <!-- Front Cover Body: Location Name, Address, Room & Contact -->
+                                <div class="p-3 flex-1 flex flex-col justify-between relative z-10 space-y-2 overflow-hidden">
+                                    <div class="space-y-2 overflow-hidden">
                                         <!-- Date Range Badge -->
-                                        <div class="inline-flex items-center gap-1.5 bg-blue-500/20 border border-blue-400/40 text-blue-200 px-2.5 py-0.5 rounded-full text-[11px] font-semibold">
+                                        <div class="inline-flex items-center gap-1.5 bg-blue-500/20 border border-blue-400/40 text-blue-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">
                                             <Calendar class="w-3 h-3" />
                                             <span>{getDateRangeTitle()}</span>
                                         </div>
 
                                         <!-- Location Name (Headline) -->
-                                        <h2 class="text-xl font-black tracking-tight text-white leading-tight">
+                                        <h2 class="text-base font-black tracking-tight text-white leading-tight">
                                             {loc.name}
                                         </h2>
 
-                                        <!-- Kiosk Name / Subtitle -->
-                                        <p class="text-xs text-slate-300 font-medium leading-relaxed">
-                                            {kiosk.name || 'Program & Schedule'}
+                                        <!-- Subtitle -->
+                                        <p class="text-[10.5px] text-slate-300 font-medium leading-tight">
+                                            {kiosk.name || m.program_and_schedule()}
                                         </p>
 
-                                        <!-- Address snippet -->
-                                        {#if loc.street || loc.city}
-                                            <p class="text-[11px] text-slate-400">
-                                                {loc.street || ''} {loc.houseNumber || ''} • {loc.zip || ''} {loc.city || ''}
-                                            </p>
+                                        <!-- Address & Venue Info -->
+                                        <div class="space-y-1 text-[10.5px] text-slate-300 bg-slate-800/80 p-2 rounded-lg border border-slate-700/60">
+                                            {#if loc.street || loc.houseNumber}
+                                                <div class="flex items-start gap-1.5">
+                                                    <MapPin class="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
+                                                    <span>{loc.street || ''} {loc.houseNumber || ''}{loc.addressSuffix ? ` ${loc.addressSuffix}` : ''}</span>
+                                                </div>
+                                            {/if}
+                                            {#if loc.zip || loc.city}
+                                                <div class="pl-4 text-[10px] text-slate-400">
+                                                    {loc.zip || ''} {loc.city || ''}
+                                                </div>
+                                            {/if}
+                                            {#if loc.roomId}
+                                                <div class="text-[9.5px] font-medium text-blue-300 bg-blue-900/60 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                                                    {m.room_label({ room: loc.roomId })}
+                                                </div>
+                                            {/if}
+                                        </div>
+
+                                        <!-- Contact Person Card -->
+                                        {#if loc.contact}
+                                            <div class="p-2 rounded-lg border border-slate-700/60 bg-slate-800/60 text-[10px] text-slate-300 space-y-1">
+                                                <div class="font-bold text-white flex items-center gap-1">
+                                                    <User class="w-3 h-3 text-slate-400" />
+                                                    <span>{loc.contact.name}</span>
+                                                </div>
+                                                {#if loc.contact.phone}
+                                                    <div class="flex items-center gap-1 text-slate-300">
+                                                        <Phone class="w-2.5 h-2.5 text-slate-400" />
+                                                        <a href="tel:{loc.contact.phone}" class="hover:underline">{loc.contact.phone}</a>
+                                                    </div>
+                                                {/if}
+                                                {#if loc.contact.email}
+                                                    <div class="flex items-center gap-1 text-slate-300">
+                                                        <Mail class="w-2.5 h-2.5 text-slate-400" />
+                                                        <a href="mailto:{loc.contact.email}" class="hover:underline truncate">{loc.contact.email}</a>
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                        {/if}
+
+                                        <!-- Accessibility Support Notice -->
+                                        {#if loc.inclusivitySupport}
+                                            <div class="text-[9px] text-slate-300 flex items-start gap-1 bg-slate-800/50 p-1.5 rounded border border-slate-700/40">
+                                                <CheckCircle2 class="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                                                <span class="line-clamp-2">{loc.inclusivitySupport}</span>
+                                            </div>
                                         {/if}
                                     </div>
 
                                     <!-- Bottom Front QR Code & Call to Action -->
-                                    <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+                                    <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0">
                                         <div>
-                                            <div class="text-[11px] font-bold text-white tracking-wide uppercase">
-                                                Event Calendar
+                                            <div class="text-[10px] font-bold text-white tracking-wide uppercase">
+                                                {m.event_calendar()}
                                             </div>
-                                            <div class="text-[9px] text-slate-400">
+                                            <div class="text-[8px] text-slate-400 leading-tight">
                                                 {m.scan_flyer_schedule_qr()}
                                             </div>
                                         </div>
 
                                         <!-- Online Calendar / Kiosk QR code -->
                                         {#if showQrCodes}
-                                            <div class="bg-white p-1 rounded-lg shrink-0 shadow-sm">
+                                            <div class="bg-white p-1 rounded-md shrink-0 shadow-xs">
                                                 {#if loc.contact?.qrCodeDataUrl}
-                                                    <img src={loc.contact.qrCodeDataUrl} alt="Calendar QR" class="w-11 h-11" />
+                                                    <img src={loc.contact.qrCodeDataUrl} alt="Calendar QR" class="w-10 h-10 object-contain image-pixelated" />
                                                 {:else if (locItems[0] as any)?.qrCodeDataUrl}
-                                                    <img src={(locItems[0] as any).qrCodeDataUrl} alt="Calendar QR" class="w-11 h-11" />
+                                                    <img src={(locItems[0] as any).qrCodeDataUrl} alt="Calendar QR" class="w-10 h-10 object-contain image-pixelated" />
                                                 {:else}
-                                                    <div class="w-11 h-11 bg-slate-100 flex items-center justify-center text-slate-800 font-mono text-[9px] font-bold">
+                                                    <div class="w-10 h-10 bg-slate-100 flex items-center justify-center text-slate-800 font-mono text-[8px] font-bold">
                                                         QR
                                                     </div>
                                                 {/if}
@@ -832,40 +856,40 @@
                         <div class="sheet-grid">
                             <!-- INSIDE PANEL 2 (Left) -->
                             <section class="panel panel-inside-1 border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-4 flex flex-col h-full justify-between">
-                                    <div class="space-y-3">
+                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                    <div class="space-y-2 overflow-hidden">
                                         <!-- Column Banner -->
                                         <div class="flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
                                             <span class="text-xs font-black uppercase tracking-wider text-slate-900">
                                                 {m.flyer_panel_1()}
                                             </span>
-                                            <span class="text-[10px] font-bold text-slate-500">
+                                            <span class="text-[10px] font-bold text-slate-500 truncate max-w-[120px]">
                                                 {loc.name}
                                             </span>
                                         </div>
 
                                         <!-- Items List -->
-                                        <div class="space-y-2.5">
-                                            {#each panel1 as item (item.id)}
+                                        <div class="space-y-1.5 overflow-hidden">
+                                            {#each inside1 as item (item.id)}
                                                 {@render itemCard(item)}
                                             {/each}
-                                            {#if panel1.length === 0}
+                                            {#if inside1.length === 0}
                                                 <p class="text-xs text-slate-400 italic pt-4 text-center">
                                                     {m.no_events_for_location()}
                                                 </p>
                                             {/if}
                                         </div>
                                     </div>
-                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2">
-                                        Panel 1
+                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
+                                        {m.flyer_panel_1()}
                                     </div>
                                 </div>
                             </section>
 
                             <!-- INSIDE PANEL 3 (Center) -->
                             <section class="panel panel-inside-2 border-r border-slate-200 print:border-slate-300">
-                                <div class="panel-inner p-4 flex flex-col h-full justify-between">
-                                    <div class="space-y-3">
+                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                    <div class="space-y-2 overflow-hidden">
                                         <!-- Column Banner -->
                                         <div class="flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
                                             <span class="text-xs font-black uppercase tracking-wider text-slate-900">
@@ -877,41 +901,41 @@
                                         </div>
 
                                         <!-- Items List -->
-                                        <div class="space-y-2.5">
-                                            {#each panel2 as item (item.id)}
+                                        <div class="space-y-1.5 overflow-hidden">
+                                            {#each inside2 as item (item.id)}
                                                 {@render itemCard(item)}
                                             {/each}
                                         </div>
                                     </div>
-                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2">
-                                        Panel 2
+                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
+                                        {m.flyer_panel_2()}
                                     </div>
                                 </div>
                             </section>
 
                             <!-- INSIDE PANEL 4 (Right) -->
                             <section class="panel panel-inside-3">
-                                <div class="panel-inner p-4 flex flex-col h-full justify-between">
-                                    <div class="space-y-3">
+                                <div class="panel-inner p-3.5 flex flex-col h-full justify-between overflow-hidden">
+                                    <div class="space-y-2 overflow-hidden">
                                         <!-- Column Banner -->
                                         <div class="flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
                                             <span class="text-xs font-black uppercase tracking-wider text-slate-900">
                                                 {m.flyer_panel_3()}
                                             </span>
                                             <span class="text-[10px] font-bold text-slate-500">
-                                                {totalItems} {totalItems === 1 ? 'Entry' : 'Entries'}
+                                                {m.entry_count({ count: totalItems })}
                                             </span>
                                         </div>
 
                                         <!-- Items List -->
-                                        <div class="space-y-2.5">
-                                            {#each panel3 as item (item.id)}
+                                        <div class="space-y-1.5 overflow-hidden">
+                                            {#each inside3 as item (item.id)}
                                                 {@render itemCard(item)}
                                             {/each}
                                         </div>
                                     </div>
-                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2">
-                                        Panel 3
+                                    <div class="text-[9px] font-mono text-slate-400 text-right pt-2 border-t border-slate-100 shrink-0">
+                                        {m.flyer_panel_3()}
                                     </div>
                                 </div>
                             </section>
@@ -923,7 +947,7 @@
     </main>
 </div>
 
-<!-- SNIPPET: ITEM CARD ON INSIDE PANELS -->
+<!-- SNIPPET: ITEM CARD ON PANELS -->
 {#snippet itemCard(item: Event | Announcement)}
     {@const isEvent = "startDateTime" in item}
     {@const title = getItemTitle(item)}
@@ -932,59 +956,59 @@
     {@const rooms = isEvent ? getEventRooms(item as Event) : []}
     {@const eventQr = isEvent ? ((item as any).qrCodeDataUrl || (item as any).qrCodePath || `/api/events/${item.id}/qr.png`) : null}
 
-    <article class="event-item-card p-2.5 rounded-lg border border-slate-200/90 bg-white hover:border-slate-300 transition-colors space-y-1.5 print:break-inside-avoid">
+    <article class="event-item-card p-2 rounded-lg border border-slate-200/90 bg-white hover:border-slate-300 transition-colors space-y-1 print:break-inside-avoid">
         <!-- Date Badge & Meta Row -->
-        <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center justify-between gap-1.5">
             {#if isEvent}
                 {@const isSeries = isSeriesItem(item)}
                 <div class="flex items-center gap-1.5 flex-wrap">
                     <!-- Date badge -->
-                    <div class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[10px] font-bold tracking-tight">
+                    <div class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">
                         {formatDay((item as Event).startDateTime)} {formatMonth((item as Event).startDateTime)}
                     </div>
                     <!-- Time -->
-                    <div class="text-[10px] text-slate-600 font-medium flex items-center gap-0.5">
+                    <div class="text-[9.5px] text-slate-600 font-medium flex items-center gap-0.5">
                         <Clock class="w-2.5 h-2.5 text-slate-400" />
                         <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
                     </div>
                     <!-- Series entry badge -->
                     {#if isSeries}
-                        <span class="text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
+                        <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
                             <RefreshCw class="w-2.5 h-2.5 text-indigo-500" />
-                            <span>Series</span>
+                            <span>{m.series_badge()}</span>
                         </span>
                     {/if}
                 </div>
             {:else}
-                <div class="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight">
-                    News
+                <div class="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-tight">
+                    {m.news_badge()}
                 </div>
             {/if}
 
             <!-- Room or Highlight Badge -->
             {#if highlight}
-                <span class="text-[9px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded">
+                <span class="text-[8.5px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded truncate max-w-[90px]">
                     {highlight}
                 </span>
             {:else if rooms.length > 0}
-                <span class="text-[9px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]">
+                <span class="text-[8.5px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]">
                     {rooms[0]}
                 </span>
             {/if}
         </div>
 
         <!-- Content Row: Title & Summary on Left, Optional Event QR on Right -->
-        <div class="flex items-start justify-between gap-2">
-            <div class="flex-1 min-w-0 space-y-1">
+        <div class="flex items-start justify-between gap-1.5">
+            <div class="flex-1 min-w-0 space-y-0.5">
                 <!-- Title -->
-                <h4 class="text-xs font-bold text-slate-900 leading-snug">
+                <h4 class="text-[11.5px] font-bold text-slate-900 leading-tight">
                     {title}
                 </h4>
 
                 <!-- Summary (Editable inline) -->
                 {#if showDescriptions && summary}
                     <p
-                        class="text-[11px] text-slate-700 leading-normal line-clamp-3 print:line-clamp-none outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
+                        class="text-[10px] text-slate-600 leading-snug {density === 'compact' ? 'line-clamp-2' : density === 'standard' ? 'line-clamp-2' : 'line-clamp-3'} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
                         contenteditable="true"
                         onblur={(e) => handleInlineEdit(item.id, title, summary, e)}
                         title={m.edit_summary_tooltip()}
@@ -1000,10 +1024,11 @@
                         <img
                             src={eventQr}
                             alt="Event QR"
-                            class="w-11 h-11 object-contain print:w-10 print:h-10 image-pixelated"
+                            class="w-10 h-10 print:w-9 print:h-9 object-contain image-pixelated"
                             loading="lazy"
                         />
                     </div>
+                    <span class="text-[7.5px] text-slate-400 font-medium tracking-tight mt-0.5 print:hidden">{m.scan_info()}</span>
                 </div>
             {/if}
         </div>
@@ -1029,13 +1054,16 @@
         display: grid;
         grid-template-columns: 99mm 99mm 99mm;
         height: 210mm;
+        max-height: 210mm;
         width: 297mm;
         box-sizing: border-box;
+        overflow: hidden;
     }
 
     .panel {
         width: 99mm;
         height: 210mm;
+        max-height: 210mm;
         box-sizing: border-box;
         overflow: hidden;
     }
@@ -1048,7 +1076,9 @@
 
     .panel-inner {
         height: 210mm;
+        max-height: 210mm;
         box-sizing: border-box;
+        overflow: hidden;
     }
 
     /* Subtle fold lines at 99mm and 198mm marks */
@@ -1081,10 +1111,10 @@
         letter-spacing: 0.05em;
     }
 
-    /* PRINT STYLES */
+    /* PRINT STYLES - ZERO OVERFLOW GUARANTEED */
     @media print {
         @page {
-            size: A4 landscape;
+            size: 297mm 210mm;
             margin: 0;
         }
 
@@ -1092,38 +1122,84 @@
         :global(body) {
             margin: 0 !important;
             padding: 0 !important;
+            width: 297mm !important;
+            height: auto !important;
+            min-height: 100% !important;
             background: #ffffff !important;
             color: #000000 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .flyer-document-pair {
+            margin: 0 !important;
+            padding: 0 !important;
+            gap: 0 !important;
         }
 
         .flyer-wrapper {
             margin: 0 !important;
             padding: 0 !important;
-            overflow: visible !important;
+            overflow: hidden !important;
+            width: 297mm !important;
+            height: 209.5mm !important;
+            max-height: 209.5mm !important;
+            box-sizing: border-box !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
 
         .flyer-sheet {
             width: 297mm !important;
-            height: 210mm !important;
+            height: 209.5mm !important;
             max-width: 297mm !important;
-            max-height: 210mm !important;
+            max-height: 209.5mm !important;
             margin: 0 !important;
             padding: 0 !important;
             transform: none !important;
+            overflow: hidden !important;
             page-break-after: always !important;
             break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-sizing: border-box !important;
+            border: none !important;
             border-radius: 0 !important;
             box-shadow: none !important;
         }
 
-        .flyer-document-pair {
-            page-break-after: always !important;
-            break-after: page !important;
-            margin: 0 !important;
-            gap: 0 !important;
+        /* Prevent blank trailing page after the last sheet of the document */
+        .flyer-document-pair:last-child .flyer-wrapper:last-child .flyer-sheet {
+            page-break-after: auto !important;
+            break-after: auto !important;
         }
+
+        .sheet-grid {
+            width: 297mm !important;
+            height: 209.5mm !important;
+            max-height: 209.5mm !important;
+            grid-template-columns: 99mm 99mm 99mm !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+        }
+
+        .panel {
+            width: 99mm !important;
+            height: 209.5mm !important;
+            max-height: 209.5mm !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .panel-inner {
+            height: 209.5mm !important;
+            max-height: 209.5mm !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+        }
+
 
         .fold-line {
             border-left: 1px dashed #cbd5e1 !important;
@@ -1131,6 +1207,11 @@
 
         .fold-indicator {
             display: none !important;
+        }
+
+        .event-item-card {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
     }
 </style>

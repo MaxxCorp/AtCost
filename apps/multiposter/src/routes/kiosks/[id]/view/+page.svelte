@@ -370,7 +370,7 @@
         <KioskFlatListView {items} {kiosk} />
     </div>
 {:else if kiosk?.uiMode === "folded_flyer"}
-    <div class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto">
+    <div class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto">
         <KioskFoldedFlyerView {items} {kiosk} />
     </div>
 {:else}

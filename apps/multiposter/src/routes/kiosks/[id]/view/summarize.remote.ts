@@ -37,7 +37,7 @@ function generateFallbackSummaries(
                 summary = words.slice(0, maxWords).join(' ') + '...';
             }
         } else {
-            summary = item.type === 'event' ? 'Scheduled event' : 'Announcement update';
+            summary = '';
         }
 
         result[item.id] = {

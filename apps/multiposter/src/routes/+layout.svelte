@@ -39,6 +39,9 @@
 	let isKioskPage = $derived(
 		page.url.pathname.startsWith("/kiosks/") || kioskState.isKiosk,
 	);
+	let isKioskView = $derived(
+		page.url.pathname.includes("/view") || kioskState.isKiosk,
+	);
 
 	const featureMeta = $derived.by(() =>
 		breadcrumbState.feature
@@ -65,14 +68,25 @@
 			{@render children()}
 		{/key}
 	</main>
-{:else if isKioskPage}
-	{#if !kioskState.isKiosk || kioskState.isHeaderVisible}
-		<div transition:slide class="relative z-50">
+{:else if isKioskView}
+	{#if kioskState.isHeaderVisible}
+		<div transition:slide class="relative z-50 print:hidden">
 			<AuthHeader />
 		</div>
 	{/if}
-	<main class="min-h-screen bg-gray-50">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+	<main class="min-h-screen bg-gray-50 print:bg-white print:min-h-0 print:p-0 print:m-0">
+		{#key page.url.pathname}
+			{@render children()}
+		{/key}
+	</main>
+{:else if isKioskPage}
+	{#if !kioskState.isKiosk || kioskState.isHeaderVisible}
+		<div transition:slide class="relative z-50 print:hidden">
+			<AuthHeader />
+		</div>
+	{/if}
+	<main class="min-h-screen bg-gray-50 print:bg-white print:min-h-0 print:p-0 print:m-0">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:p-0 print:m-0 print:max-w-none">
 			{#key page.url.pathname}
 				{@render children()}
 			{/key}
@@ -95,7 +109,7 @@
 									>
 								</Breadcrumb.Item>
 
-								{#each breadcrumbSegments as segment, i}
+								{#each breadcrumbSegments as segment, i (segment.href || segment.label || i)}
 									<Breadcrumb.Separator />
 									<Breadcrumb.Item>
 										{#if segment.href && (i < breadcrumbSegments.length - 1 || breadcrumbState.current)}

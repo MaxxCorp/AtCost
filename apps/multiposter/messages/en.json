@@ -787,6 +787,27 @@
 	"edit_summary_tooltip": "Click to edit text before printing",
 	"no_events_for_location": "No upcoming events scheduled for this location in this period.",
 	"show_event_qr_codes": "Show Event QR Codes",
-	"event_qr_codes": "Event QR Codes"
+	"event_qr_codes": "Event QR Codes",
+	"room": "Room",
+	"room_label": "Room: {room}",
+	"accessibility_and_inclusivity": "Accessibility & Inclusivity",
+	"printed_flyer": "Printed Flyer",
+	"events_and_culture": "Events & Culture",
+	"program_and_schedule": "Program & Schedule",
+	"event_calendar": "Event Calendar",
+	"welcome_title": "Welcome",
+	"welcome_description": "Discover our current program of events, activities, and community sessions. Open to everyone.",
+	"entry_count": "{count} Entries",
+	"series_badge": "Series",
+	"news_badge": "News",
+	"community_center": "Community Center",
+	"flyer_number": "Flyer #{number}",
+	"zoom_in": "Zoom In",
+	"zoom_out": "Zoom Out",
+	"ai_summarize_tooltip": "Use AI to adapt text length for tri-fold brochure panels",
+	"events_overview": "Program Overview",
+	"more_events": "More Events",
+	"scan_info": "Info",
+	"flyer_specs_subtitle": "A4 Landscape • Double-Sided • Folds into 1/3 A4 (3 Panels)"
 }
 
