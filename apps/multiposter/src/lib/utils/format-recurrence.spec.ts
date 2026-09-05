@@ -62,4 +62,30 @@ describe("formatRecurrenceText", () => {
             expect(text).toContain("letzten Sonntag");
         });
     });
+
+    describe("omitLength option", () => {
+        it("should omit until date in English", () => {
+            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;UNTIL=20261231T000000Z;BYDAY=MO", "en", { omitLength: true });
+            expect(text.toLowerCase()).toContain("every week");
+            expect(text.toLowerCase()).toContain("monday");
+            expect(text.toLowerCase()).not.toContain("until");
+            expect(text.toLowerCase()).not.toContain("december");
+        });
+
+        it("should omit until date in German", () => {
+            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;UNTIL=20261231T000000Z;BYDAY=MO", "de", { omitLength: true });
+            expect(text).toContain("jede Woche");
+            expect(text).toContain("Montag");
+            expect(text).not.toContain("bis");
+            expect(text).not.toContain("Dezember");
+        });
+
+        it("should omit count in English and German", () => {
+            const textEn = formatRecurrenceText("RRULE:FREQ=WEEKLY;COUNT=10;BYDAY=TU", "en", { omitLength: true });
+            expect(textEn.toLowerCase()).not.toContain("10 times");
+
+            const textDe = formatRecurrenceText("RRULE:FREQ=WEEKLY;COUNT=10;BYDAY=TU", "de", { omitLength: true });
+            expect(textDe).not.toContain("10 mal");
+        });
+    });
 });

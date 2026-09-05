@@ -23,7 +23,8 @@
         ZoomOut,
         Maximize2,
         RefreshCw,
-        QrCode
+        QrCode,
+        Ticket
     } from "@lucide/svelte";
     import { summarizeFlyerItems } from "../../../routes/kiosks/[id]/view/summarize.remote";
     import type { FlyerItemSummary, FlyerDensity } from "$lib/validations/flyer";
@@ -329,7 +330,7 @@
             return aiSummaries[item.id].summary;
         }
         const raw = "startDateTime" in item ? (item as Event).description : (item as Announcement).content;
-        return raw ? raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "";
+        return raw ? raw.trim() : "";
     }
 
     function getItemHighlight(item: Event | Announcement): string | undefined {
@@ -348,7 +349,7 @@
 
     function handleInlineEdit(itemId: string, currentTitle: string, currentSummary: string, event: FocusEvent) {
         const el = event.target as HTMLElement;
-        const newText = el.innerText.trim();
+        const newText = (el.innerHTML || el.innerText).trim();
         if (newText !== currentSummary) {
             aiSummaries[itemId] = {
                 id: itemId,
@@ -421,7 +422,7 @@
                 }
             }
 
-            const recText = formatRecurrenceText(rruleStr);
+            const recText = formatRecurrenceText(rruleStr, undefined, { omitLength: true });
 
             if (dates.length > 1) {
                 compressed.push({
@@ -750,8 +751,8 @@
 
                                         <!-- Optional Location description note if space permits -->
                                         {#if loc.description && flapItems.length <= 3}
-                                            <div class="text-[10px] text-slate-700 leading-snug bg-slate-50 p-1.5 rounded border border-slate-100 line-clamp-2">
-                                                {loc.description}
+                                            <div class="rich-description text-[10px] text-slate-700 leading-snug bg-slate-50 p-1.5 rounded border border-slate-100 line-clamp-2">
+                                                {@html loc.description}
                                             </div>
                                         {/if}
 
@@ -1126,6 +1127,13 @@
                             <Clock class="w-2.5 h-2.5 text-slate-400" />
                             <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
                         </div>
+                        <!-- Price Badge -->
+                        {#if (item as Event).ticketPrice && !(item as Event).ticketPriceUnknown}
+                            <span class="text-[8.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
+                                <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                <span>{(item as Event).ticketPrice}</span>
+                            </span>
+                        {/if}
                     </div>
 
                     <!-- Room or Highlight Badge -->
@@ -1171,6 +1179,13 @@
                                 <span>{item.recurrenceText || m.series_badge()}</span>
                             </span>
                         {/if}
+                        <!-- Price Badge -->
+                        {#if (item as Event).ticketPrice && !(item as Event).ticketPriceUnknown}
+                            <span class="text-[8.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
+                                <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                <span>{(item as Event).ticketPrice}</span>
+                            </span>
+                        {/if}
                     </div>
                 {:else}
                     <div class="bg-amber-500 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-tight">
@@ -1201,14 +1216,14 @@
 
                 <!-- Summary (Editable inline) -->
                 {#if showDescriptions && summary}
-                    <p
-                        class="text-[10px] text-slate-600 leading-snug {density === 'compact' ? 'line-clamp-2' : density === 'standard' ? 'line-clamp-2' : 'line-clamp-3'} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
+                    <div
+                        class="rich-description text-[10px] text-slate-600 leading-snug {density === 'compact' ? 'line-clamp-2' : density === 'standard' ? 'line-clamp-2' : 'line-clamp-4'} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
                         contenteditable="true"
                         onblur={(e) => handleInlineEdit(item.id, title, summary, e)}
                         title={m.edit_summary_tooltip()}
                     >
-                        {summary}
-                    </p>
+                        {@html summary}
+                    </div>
                 {/if}
             </div>
 
@@ -1273,6 +1288,41 @@
         max-height: 210mm;
         box-sizing: border-box;
         overflow: hidden;
+    }
+
+    .rich-description :global(p) {
+        margin-top: 0;
+        margin-bottom: 0.15rem;
+        display: inline;
+    }
+
+    .rich-description :global(p + p) {
+        display: block;
+        margin-top: 0.15rem;
+    }
+
+    .rich-description :global(ul),
+    .rich-description :global(ol) {
+        margin: 0.15rem 0 0.15rem 1rem;
+        padding: 0;
+    }
+
+    .rich-description :global(li) {
+        margin-bottom: 0.1rem;
+    }
+
+    .rich-description :global(strong),
+    .rich-description :global(b) {
+        font-weight: 700;
+    }
+
+    .rich-description :global(em),
+    .rich-description :global(i) {
+        font-style: italic;
+    }
+
+    .rich-description :global(u) {
+        text-decoration: underline;
     }
 
     /* Subtle fold lines at 99mm and 198mm marks */

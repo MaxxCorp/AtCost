@@ -11,7 +11,8 @@
         Clock, 
         User,
         Phone,
-        Mail
+        Mail,
+        Ticket
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { getEventRooms } from "$lib/utils/format-rooms";
@@ -278,9 +279,9 @@
                     </h1>
 
                     {#if kiosk?.description}
-                        <p class="text-sm text-slate-600 max-w-2xl leading-relaxed">
-                            {kiosk.description}
-                        </p>
+                        <div class="rich-description text-sm text-slate-600 max-w-2xl leading-relaxed">
+                            {@html kiosk.description}
+                        </div>
                     {/if}
 
                     <!-- Location & Address Strip -->
@@ -509,10 +510,17 @@
                                                     {/each}
                                                 {/if}
 
+                                                {#if event.ticketPrice && !event.ticketPriceUnknown}
+                                                    <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400 print:text-black">
+                                                        <Ticket class="w-3.5 h-3.5 text-emerald-600 print:text-black" />
+                                                        {event.ticketPrice}
+                                                    </span>
+                                                {/if}
+
                                                 {#if (event as any).recurrence && ((event as any).recurrence as string[]).length > 0}
                                                     <span class="inline-flex items-center gap-1 text-slate-600 font-medium">
                                                         <RefreshCw class="w-3 h-3 text-slate-500" />
-                                                        {formatRecurrenceText((event as any).recurrence)}
+                                                        {formatRecurrenceText((event as any).recurrence, undefined, { omitLength: true })}
                                                     </span>
                                                 {/if}
                                             </div>

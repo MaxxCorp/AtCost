@@ -5,7 +5,7 @@
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { RefreshCw } from "@lucide/svelte";
+    import { RefreshCw, Ticket } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import * as m from "$lib/paraglide/messages";
@@ -210,10 +210,16 @@
                                                 {/each}
                                             </div>
                                         {/if}
+                                        {#if (item as any).ticketPrice && !(item as any).ticketPriceUnknown}
+                                            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-sm font-semibold">
+                                                <Ticket class="w-3.5 h-3.5 text-emerald-400" />
+                                                <span>{(item as any).ticketPrice}</span>
+                                            </div>
+                                        {/if}
                                         {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-300 text-sm font-semibold">
                                                 <RefreshCw class="w-3.5 h-3.5" />
-                                                <span>{formatRecurrenceText((item as any).recurrence)}</span>
+                                                <span>{formatRecurrenceText((item as any).recurrence, undefined, { omitLength: true })}</span>
                                             </div>
                                         {/if}
                                     </div>

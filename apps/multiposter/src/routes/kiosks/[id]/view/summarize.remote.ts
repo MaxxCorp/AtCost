@@ -20,7 +20,7 @@ function generateFallbackSummaries(
     const wordLimits = {
         compact: 14,
         standard: 28,
-        detailed: 48
+        detailed: 65
     };
     const maxWords = wordLimits[targetDensity] || 28;
 
@@ -67,7 +67,7 @@ export const summarizeFlyerItems = command(summarizeFlyerSchema, async (data): P
     const densityDescriptions = {
         compact: 'Extremely concise (target 10-15 words per item). Focus only on the core activity so dozens of events fit within the tight physical fold panels.',
         standard: 'Concise editorial blurb (target 20-30 words per item). Crisp, informative, appealing community flyer style.',
-        detailed: 'Detailed brochure blurb (target 35-50 words per item). Highlights benefits, atmosphere, and special details.'
+        detailed: 'Detailed brochure blurb (target 45-65 words per item, up to 4 lines of text). Highlights benefits, atmosphere, and special details.'
     };
 
     if (!env.GEMINI_API_KEY) {

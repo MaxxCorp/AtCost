@@ -3,9 +3,19 @@ import ENGLISH from "rrule/dist/esm/nlp/i18n.js";
 import * as m from "$lib/paraglide/messages";
 import { getLocale } from "$lib/paraglide/runtime";
 
-export function formatRecurrenceText(ruleStr: string | string[] | null | undefined, localeOverride?: string): string {
+export interface FormatRecurrenceOptions {
+    omitLength?: boolean;
+}
+
+export function formatRecurrenceText(
+    ruleStr: string | string[] | null | undefined,
+    localeOverride?: string,
+    options?: FormatRecurrenceOptions | boolean
+): string {
     if (!ruleStr) return m.recurrence();
     
+    const omitLength = options === true || (typeof options === 'object' && Boolean(options?.omitLength));
+
     // Extract string if it's an array
     let cleanRule = Array.isArray(ruleStr) ? ruleStr[0] : ruleStr;
     if (!cleanRule) return m.recurrence();
@@ -17,6 +27,11 @@ export function formatRecurrenceText(ruleStr: string | string[] | null | undefin
 
         // Generate English string first
         let textEn = RRule.fromString(cleanRule).toText();
+
+        if (omitLength) {
+            textEn = textEn.replace(/,?\s+until\s+.*$/i, '').trim();
+            textEn = textEn.replace(/,?\s+for\s+\d+\s+times?$/i, '').trim();
+        }
 
         if (cleanRule.includes('BYSETPOS=')) {
             const setposMatch = cleanRule.match(/BYSETPOS=(-?\d+)/);
@@ -101,6 +116,12 @@ export function formatRecurrenceText(ruleStr: string | string[] | null | undefin
             textDe = textDe.replace(/ for 1 time/gi, ' einmal');
             textDe = textDe.replace(/ and /gi, ' und ');
             textDe = textDe.replace(/ or /gi, ' oder ');
+
+            if (omitLength) {
+                textDe = textDe.replace(/,?\s+bis\s+(?:zum\s+)?.*$/i, '').trim();
+                textDe = textDe.replace(/,?\s+\d+\s*mal.*$/i, '').trim();
+                textDe = textDe.replace(/,?\s+einmal.*$/i, '').trim();
+            }
             
             return textDe;
         }
@@ -109,6 +130,11 @@ export function formatRecurrenceText(ruleStr: string | string[] | null | undefin
         return textEn;
     } catch (e) {
         console.error('Error formatting recurrence rule', e);
-        return Array.isArray(ruleStr) ? ruleStr[0] : ruleStr;
+        let fallback = Array.isArray(ruleStr) ? ruleStr[0] : ruleStr;
+        if (typeof fallback === 'string' && omitLength) {
+            fallback = fallback.replace(/,?\s+(?:until|bis(?:\s+zum)?)\s+.*$/i, '').trim();
+            fallback = fallback.replace(/,?\s+(?:for\s+\d+\s+times?|\d+\s*mal).*$/i, '').trim();
+        }
+        return fallback;
     }
 }
