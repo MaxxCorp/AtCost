@@ -7,9 +7,16 @@ import { env } from '$env/dynamic/private';
 
 export const GET: RequestHandler = async ({ params, url }) => {
     const eventId = params.id;
-    const data = await db.query.event.findFirst({
+    let data = await db.query.event.findFirst({
         where: (table, { eq }) => eq(table.id, eventId),
     });
+
+    if (!data && eventId.includes('_inst_')) {
+        const masterId = eventId.split('_inst_')[0];
+        data = await db.query.event.findFirst({
+            where: (table, { eq }) => eq(table.id, masterId),
+        });
+    }
 
     if (!data) {
         error(404, 'Event not found');

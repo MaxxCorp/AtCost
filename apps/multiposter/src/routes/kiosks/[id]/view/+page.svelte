@@ -7,6 +7,7 @@
     import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
     import KioskTableView from "$lib/components/kiosks/KioskTableView.svelte";
     import KioskFlatListView from "$lib/components/kiosks/KioskFlatListView.svelte";
+    import KioskFoldedFlyerView from "$lib/components/kiosks/KioskFoldedFlyerView.svelte";
     import { type Event, type Announcement } from "@ac/validations";
 
     import { browser } from "$app/environment";
@@ -42,7 +43,7 @@
     }
 
     function resetInactivity() {
-        if (kiosk?.uiMode === 'flat_list') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer') return;
         console.log("Resetting inactivity timer"); // debug
         showHeader();
         // Reset loop timer on interaction to prevent flipping while reading/swiping
@@ -52,7 +53,7 @@
     // --- Loop Logic ---
     function startLoop() {
         clearInterval(timer);
-        if (kiosk?.uiMode === 'flat_list') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer') return;
         timer = setInterval(
             () => {
                 nextSlide(true); // Auto-advance
@@ -367,6 +368,10 @@
 {#if kiosk?.uiMode === "flat_list"}
     <div class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto">
         <KioskFlatListView {items} {kiosk} />
+    </div>
+{:else if kiosk?.uiMode === "folded_flyer"}
+    <div class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto">
+        <KioskFoldedFlyerView {items} {kiosk} />
     </div>
 {:else}
     <div

@@ -1,0 +1,1 @@
+ALTER TABLE "kiosk" ADD COLUMN "show_event_qr_codes" boolean DEFAULT false NOT NULL;

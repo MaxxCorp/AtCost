@@ -220,6 +220,15 @@
 								>
 									<Monitor class="w-5 h-5 text-gray-400" />
 									{kiosk.name}
+									{#if kiosk.uiMode === "folded_flyer"}
+										<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+											{m.folded_flyer_badge()}
+										</span>
+									{:else if kiosk.uiMode === "flat_list"}
+										<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+											Flat List
+										</span>
+									{/if}
 								</h3>
 							</div>
 						</a>

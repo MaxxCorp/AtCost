@@ -69,6 +69,7 @@ export const eventPaginationSchema = v.optional(v.object({
     excludePast: v.optional(v.boolean()),
     excludeSeries: v.optional(v.boolean()),
     onlySeries: v.optional(v.boolean()),
+    includeSeriesEntries: v.optional(v.boolean()),
     excludedEventIds: v.optional(v.array(v.string())),
     includedEventIds: v.optional(v.array(v.string())),
     excludedTags: v.optional(v.array(v.string())),

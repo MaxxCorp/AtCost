@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
+import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult, type Event } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
@@ -16,11 +16,14 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		// unauthorized can only see public events
 	}
 
-	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
+	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, includeSeriesEntries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: event.id }).from(event).$dynamic();
-	const conditions: any[] = [isNull(event.recurringEventId)];
+	const conditions: any[] = [];
+	if (!includeSeriesEntries) {
+		conditions.push(isNull(event.recurringEventId));
+	}
 
 	if (!hasAccess) {
 		conditions.push(eq(event.isPublic, true));
@@ -289,7 +292,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	// Fetch full data for the paginated IDs
 	const rawResults = await db.query.event.findMany({
-		where: or(inArray(event.id, ids), inArray(event.recurringEventId, ids)),
+		where: includeSeriesEntries ? inArray(event.id, ids) : or(inArray(event.id, ids), inArray(event.recurringEventId, ids)),
 		with: {
 			contacts: {
 				with: {
@@ -326,6 +329,103 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		},
 		orderBy: [orderExpression]
 	});
+
+	// If includeSeriesEntries and date window is specified, also check for any recurring series masters that have instances in this window
+	if (includeSeriesEntries && startDate && endDate && !excludeSeries) {
+		const startD = new Date(startDate);
+		const endD = new Date(endDate);
+
+		const masters = await db.query.event.findMany({
+			where: and(
+				isNull(event.recurringEventId),
+				or(
+					isNotNull(event.seriesId),
+					and(isNotNull(event.recurrence), sql`${event.recurrence} != '[]'::jsonb`)
+				),
+				lte(event.startDateTime, endD),
+				hasAccess ? sql`true` : eq(event.isPublic, true),
+				excludeTentative ? ne(event.status, 'tentative') : sql`true`,
+				excludeCancelled ? ne(event.status, 'cancelled') : sql`true`,
+				excludeNonPublic ? eq(event.isPublic, true) : sql`true`
+			),
+			with: {
+				contacts: {
+					with: {
+						contact: {
+							with: {
+								emails: true,
+								phones: true,
+								tags: { with: { tag: true } }
+							}
+						}
+					}
+				},
+				locations: { with: { location: true } },
+				resources: { with: { resource: true } },
+				tags: { with: { tag: true } },
+				campaign: true,
+				user: true
+			}
+		});
+
+		if (masters.length > 0) {
+			const { expandRecurrence } = await import('$lib/server/events/recurrence');
+			const existingKeys = new Set(
+				rawResults.map((r: any) => {
+					const masterId = r.recurringEventId || r.id;
+					const time = r.startDateTime ? new Date(r.startDateTime).getTime() : 0;
+					return `${masterId}_${time}`;
+				})
+			);
+
+			for (const master of masters) {
+				let rruleStr: string | null = null;
+				if (master.recurrence && Array.isArray(master.recurrence) && master.recurrence[0]) {
+					rruleStr = master.recurrence[0];
+				} else if (master.seriesId) {
+					const [seriesRecord] = await db.select().from(recurringSeries).where(eq(recurringSeries.id, master.seriesId));
+					if (seriesRecord?.rrule) rruleStr = seriesRecord.rrule;
+				}
+
+				if (!rruleStr || !master.startDateTime) continue;
+
+				const masterTime = new Date(master.startDateTime).getTime();
+				if (masterTime >= startD.getTime() && masterTime <= endD.getTime()) {
+					const key = `${master.id}_${masterTime}`;
+					if (!existingKeys.has(key)) {
+						rawResults.push(master);
+						existingKeys.add(key);
+					}
+				}
+
+				const instances = expandRecurrence(
+					rruleStr,
+					new Date(master.startDateTime),
+					master.endDateTime ? new Date(master.endDateTime) : null,
+					100,
+					false,
+					master.startTimeZone
+				);
+
+				for (const inst of instances) {
+					const instTime = inst.date.getTime();
+					if (instTime >= startD.getTime() && instTime <= endD.getTime()) {
+						const key = `${master.id}_${instTime}`;
+						if (!existingKeys.has(key)) {
+							rawResults.push({
+								...master,
+								id: `${master.id}_inst_${inst.date.toISOString()}`,
+								recurringEventId: master.id,
+								startDateTime: inst.date,
+								endDateTime: inst.end || master.endDateTime
+							} as any);
+							existingKeys.add(key);
+						}
+					}
+				}
+			}
+		}
+	}
 
 	// Collect location IDs for events that might need location contact fallback
 	const neededLocationIds = new Set<string>();
@@ -369,7 +469,16 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 
 	let results = rawResults;
-	if (excludePast) {
+	if (includeSeriesEntries && (startDate || endDate)) {
+		const startD = startDate ? new Date(startDate) : null;
+		const endD = endDate ? new Date(endDate) : null;
+		results = results.filter((e: any) => {
+			const s = e.startDateTime ? new Date(e.startDateTime) : null;
+			if (startD && s && s < startD) return false;
+			if (endD && s && s > endD) return false;
+			return true;
+		});
+	} else if (excludePast) {
 		const cutoff = new Date();
 		cutoff.setHours(0, 0, 0, 0);
 
@@ -444,10 +553,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		return {
 			...e,
 			isSeries,
-			startDateTime: e.startDateTime ? e.startDateTime.toISOString() : null,
-			endDateTime: e.endDateTime ? e.endDateTime.toISOString() : null,
-			createdAt: e.createdAt ? e.createdAt.toISOString() : null,
-			updatedAt: e.updatedAt ? e.updatedAt.toISOString() : null,
+			qrCodePath: e.qrCodePath?.includes('/api/') ? e.qrCodePath : `/api/events/${e.id}/qr.png`,
+			startDateTime: e.startDateTime ? (e.startDateTime instanceof Date ? e.startDateTime.toISOString() : new Date(e.startDateTime).toISOString()) : null,
+			endDateTime: e.endDateTime ? (e.endDateTime instanceof Date ? e.endDateTime.toISOString() : new Date(e.endDateTime).toISOString()) : null,
+			createdAt: e.createdAt ? (e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString()) : null,
+			updatedAt: e.updatedAt ? (e.updatedAt instanceof Date ? e.updatedAt.toISOString() : new Date(e.updatedAt).toISOString()) : null,
 			locations: evtLocations,
 			resources: evtResources,
 			rooms,
@@ -458,6 +568,14 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		};
 	});
 
-	return { data, total };
+	if (sortField === 'startDateTime' || includeSeriesEntries) {
+		data.sort((a: any, b: any) => {
+			const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+			const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+			return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+		});
+	}
+
+	return { data, total: includeSeriesEntries ? data.length : total };
 });
 

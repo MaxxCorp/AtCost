@@ -52,9 +52,19 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             name: loc.name,
             street: loc.street,
             houseNumber: loc.houseNumber,
+            addressSuffix: loc.addressSuffix,
             zip: loc.zip,
             city: loc.city,
+            state: loc.state,
             country: loc.country,
+            roomId: loc.roomId,
+            capacity: loc.capacity,
+            inclusivitySupport: loc.inclusivitySupport,
+            what3words: loc.what3words,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            heroImage: loc.heroImage,
+            description: loc.description,
             contact: resolvedContact
         };
     });
@@ -75,15 +85,21 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         if (kioskData.endDate) endDate = kioskData.endDate.toISOString();
     } else {
         let lookAheadSeconds = kioskData.lookAhead;
-        if (kioskData.uiMode === 'flat_list' && lookAheadSeconds <= 604800) {
+        if ((kioskData.uiMode === 'flat_list' || kioskData.uiMode === 'folded_flyer') && lookAheadSeconds <= 604800) {
             lookAheadSeconds = 2592000; // 30 days default for monthly listings
         }
         startDate = new Date(now.getTime() - (kioskData.lookPast * 1000)).toISOString();
         endDate = new Date(now.getTime() + (lookAheadSeconds * 1000)).toISOString();
     }
 
+    // If kioskData.excludeSeries is false, ensure 'Series' tag is not excluded
+    let effectiveExcludedTags = kioskData.excludedTags || [];
+    if (!kioskData.excludeSeries) {
+        effectiveExcludedTags = effectiveExcludedTags.filter(t => t !== 'Series');
+    }
+
     const eventsResult = await listEvents({
-        limit: 100,
+        limit: 250,
         locationId: locationIds.length > 0 ? locationIds : undefined,
         startDate,
         endDate,
@@ -91,10 +107,13 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         excludeCancelled: kioskData.excludeCancelled,
         excludeNonPublic: kioskData.excludeNonPublic,
         excludeSeries: kioskData.excludeSeries,
+        includeSeriesEntries: !kioskData.excludeSeries,
         excludedEventIds: kioskData.excludedEventIds || [],
         includedEventIds: kioskData.includedEventIds || [],
-        excludedTags: kioskData.excludedTags || [],
+        excludedTags: effectiveExcludedTags,
         includedTags: kioskData.includedTags || [],
+        sortField: 'startDateTime',
+        sortOrder: 'asc'
     });
 
     const announcementsResult = await listAnnouncements({
@@ -102,12 +121,14 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         locationId: locationIds.length > 0 ? locationIds : undefined,
         excludedAnnouncementIds: kioskData.excludedAnnouncementIds || [],
         includedAnnouncementIds: kioskData.includedAnnouncementIds || [],
-        excludedTags: kioskData.excludedTags || [],
+        excludedTags: effectiveExcludedTags,
         includedTags: kioskData.includedTags || [],
     });
 
     const items = [...eventsResult.data, ...announcementsResult.data].sort((a, b) => {
-        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        const timeA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
+        const timeB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
+        return timeA - timeB;
     });
 
     return {
