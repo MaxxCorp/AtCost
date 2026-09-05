@@ -335,19 +335,128 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const startD = new Date(startDate);
 		const endD = new Date(endDate);
 
-		const masters = await db.query.event.findMany({
-			where: and(
-				isNull(event.recurringEventId),
-				or(
-					isNotNull(event.seriesId),
-					and(isNotNull(event.recurrence), sql`${event.recurrence} != '[]'::jsonb`)
-				),
-				lte(event.startDateTime, endD),
-				hasAccess ? sql`true` : eq(event.isPublic, true),
-				excludeTentative ? ne(event.status, 'tentative') : sql`true`,
-				excludeCancelled ? ne(event.status, 'cancelled') : sql`true`,
-				excludeNonPublic ? eq(event.isPublic, true) : sql`true`
+		const masterConditions: any[] = [
+			isNull(event.recurringEventId),
+			or(
+				isNotNull(event.seriesId),
+				and(isNotNull(event.recurrence), sql`${event.recurrence} != '[]'::jsonb`)
 			),
+			lte(event.startDateTime, endD),
+			hasAccess ? sql`true` : eq(event.isPublic, true)
+		];
+
+		if (excludeTentative) masterConditions.push(ne(event.status, 'tentative'));
+		if (excludeCancelled) masterConditions.push(ne(event.status, 'cancelled'));
+		if (excludeNonPublic) masterConditions.push(eq(event.isPublic, true));
+
+		if (locationId) {
+			const { include, exclude } = parseFilterValue(locationId);
+			if (include.length > 0) {
+				masterConditions.push(
+					or(
+						exists(
+							db.select({ id: sql`1` })
+							  .from(eventLocation)
+							  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, include)))
+						),
+						exists(
+							db.select({ id: sql`1` })
+							  .from(eventResource)
+							  .innerJoin(resource, eq(eventResource.resourceId, resource.id))
+							  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, include)))
+						)
+					)
+				);
+			}
+			if (exclude.length > 0) {
+				masterConditions.push(
+					and(
+						not(exists(
+							db.select({ id: sql`1` })
+							  .from(eventLocation)
+							  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, exclude)))
+						)),
+						not(exists(
+							db.select({ id: sql`1` })
+							  .from(eventResource)
+							  .innerJoin(resource, eq(eventResource.resourceId, resource.id))
+							  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, exclude)))
+						))
+					)
+				);
+			}
+		}
+
+		if (tagId) {
+			const { include, exclude } = parseFilterValue(tagId);
+			if (include.length > 0) {
+				masterConditions.push(
+					exists(
+						db.select({ id: sql`1` })
+						  .from(eventTag)
+						  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, include)))
+					)
+				);
+			}
+			if (exclude.length > 0) {
+				masterConditions.push(
+					not(exists(
+						db.select({ id: sql`1` })
+						  .from(eventTag)
+						  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, exclude)))
+					))
+				);
+			}
+		}
+
+		if (contactId) {
+			const { include, exclude } = parseFilterValue(contactId);
+			if (include.length > 0) {
+				masterConditions.push(
+					exists(
+						db.select({ id: sql`1` })
+						  .from(eventContact)
+						  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, include)))
+					)
+				);
+			}
+			if (exclude.length > 0) {
+				masterConditions.push(
+					not(exists(
+						db.select({ id: sql`1` })
+						  .from(eventContact)
+						  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, exclude)))
+					))
+				);
+			}
+		}
+
+		if (excludedTags && excludedTags.length > 0) {
+			masterConditions.push(
+				sql`NOT EXISTS (
+					SELECT 1 FROM ${eventTag} et
+					JOIN ${tag} t ON et.tag_id = t.id
+					WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+				)`
+			);
+		}
+
+		if (includedTags && includedTags.length > 0) {
+			masterConditions.push(
+				sql`EXISTS (
+					SELECT 1 FROM ${eventTag} et
+					JOIN ${tag} t ON et.tag_id = t.id
+					WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+				)`
+			);
+		}
+
+		if (excludedEventIds && excludedEventIds.length > 0) {
+			masterConditions.push(notInArray(event.id, excludedEventIds));
+		}
+
+		const masters = await db.query.event.findMany({
+			where: and(...masterConditions as any),
 			with: {
 				contacts: {
 					with: {
@@ -478,6 +587,31 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			if (endD && s && s > endD) return false;
 			return true;
 		});
+	}
+
+	if (locationId) {
+		const { include, exclude } = parseFilterValue(locationId);
+		if (include.length > 0 || exclude.length > 0) {
+			results = results.filter((e: any) => {
+				const eventLocIds = new Set<string>();
+				for (const l of (e.locations || [])) {
+					const id = l?.id || l?.locationId || l?.location?.id;
+					if (id) eventLocIds.add(id);
+				}
+				for (const r of (e.resources || [])) {
+					const id = r?.locationId || r?.resource?.locationId || r?.location?.id;
+					if (id) eventLocIds.add(id);
+				}
+
+				if (exclude.length > 0 && exclude.some(ex => eventLocIds.has(ex))) {
+					return false;
+				}
+				if (include.length > 0) {
+					return include.some(inc => eventLocIds.has(inc));
+				}
+				return true;
+			});
+		}
 	} else if (excludePast) {
 		const cutoff = new Date();
 		cutoff.setHours(0, 0, 0, 0);
@@ -521,6 +655,14 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const evtResources = e.resources?.map((r: any) => r.resource).filter(Boolean) || [];
 		const rooms = getEventRooms({ locations: evtLocations, resources: evtResources });
 
+		const allLocIds = new Set<string>();
+		for (const l of evtLocations) {
+			if (l?.id) allLocIds.add(l.id);
+		}
+		for (const r of evtResources) {
+			if (r?.locationId) allLocIds.add(r.locationId);
+		}
+
 		const resWithLocContacts = evtResources.map((res: any) => {
 			if (res.locationId && locationContactsMap.has(res.locationId)) {
 				return {
@@ -561,7 +703,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			locations: evtLocations,
 			resources: evtResources,
 			rooms,
-			locationIds: evtLocations.map((l: any) => l.id),
+			locationIds: Array.from(allLocIds),
 			resourceIds: evtResources.map((r: any) => r.id),
 			tags: e.tags?.map((t: any) => t.tag || t).filter(Boolean) || [],
 			resolvedContact,

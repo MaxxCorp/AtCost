@@ -125,7 +125,42 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         includedTags: kioskData.includedTags || [],
     });
 
-    const items = [...eventsResult.data, ...announcementsResult.data].sort((a, b) => {
+    const locationIdSet = new Set(locationIds);
+    const validEvents = locationIds.length > 0
+        ? eventsResult.data.filter((e: any) => {
+            const eLocIds = new Set<string>();
+            for (const l of (e.locations || [])) {
+                const id = l?.id || l?.locationId || l?.location?.id;
+                if (id) eLocIds.add(id);
+            }
+            for (const r of (e.resources || [])) {
+                const id = r?.locationId || r?.resource?.locationId || r?.location?.id;
+                if (id) eLocIds.add(id);
+            }
+            for (const id of (e.locationIds || [])) {
+                if (id) eLocIds.add(id);
+            }
+            return Array.from(eLocIds).some(id => locationIdSet.has(id));
+        })
+        : eventsResult.data;
+
+    const validAnnouncements = locationIds.length > 0
+        ? announcementsResult.data.filter((a: any) => {
+            const aLocIds = new Set<string>();
+            for (const l of (a.locations || [])) {
+                const id = l?.id || l?.locationId || l?.location?.id;
+                if (id) aLocIds.add(id);
+            }
+            for (const id of (a.locationIds || [])) {
+                if (id) aLocIds.add(id);
+            }
+            // General announcements without specific location are permitted
+            if (aLocIds.size === 0) return true;
+            return Array.from(aLocIds).some(id => locationIdSet.has(id));
+        })
+        : announcementsResult.data;
+
+    const items = [...validEvents, ...validAnnouncements].sort((a, b) => {
         const timeA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
         const timeB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
         return timeA - timeB;

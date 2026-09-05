@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount, untrack } from "svelte";
+    import { SvelteSet } from "svelte/reactivity";
     import { type Event, type Announcement } from "@ac/validations";
     import {
         Printer,
@@ -132,23 +133,51 @@
             : flyerLocations.filter(l => l.id === activeLocationId)
     );
 
-    // Check if an item belongs to a location
-    function itemBelongsToLocation(item: Event | Announcement, locId: string): boolean {
-        if (locId === "default" || flyerLocations.length <= 1) return true;
+    // Helper to get all location IDs associated with an item (events & announcements)
+    function getItemLocationIds(item: Event | Announcement): SvelteSet<string> {
+        const ids = new SvelteSet<string>();
 
         if ("locations" in item && Array.isArray((item as any).locations)) {
-            const locs = (item as any).locations;
-            if (locs.length === 0) return true; // General item for all locations
-            return locs.some((l: any) => (l.id === locId || l.locationId === locId));
+            for (const l of (item as any).locations) {
+                if (typeof l === "string") ids.add(l);
+                else if (l?.id) ids.add(l.id);
+                else if (l?.locationId) ids.add(l.locationId);
+                else if (l?.location?.id) ids.add(l.location.id);
+            }
         }
 
         if ("locationIds" in item && Array.isArray((item as any).locationIds)) {
-            const ids = (item as any).locationIds;
-            if (ids.length === 0) return true;
-            return ids.includes(locId);
+            for (const id of (item as any).locationIds) {
+                if (id) ids.add(id);
+            }
         }
 
-        return true;
+        if ("resources" in item && Array.isArray((item as any).resources)) {
+            for (const r of (item as any).resources) {
+                if (r?.locationId) ids.add(r.locationId);
+                else if (r?.resource?.locationId) ids.add(r.resource.locationId);
+                else if (r?.location?.id) ids.add(r.location.id);
+            }
+        }
+
+        return ids;
+    }
+
+    // Check if an item belongs to a location
+    function itemBelongsToLocation(item: Event | Announcement, locId: string): boolean {
+        if (locId === "default") return true;
+
+        const itemLocIds = getItemLocationIds(item);
+
+        // If the item has explicit locations assigned, it MUST belong to locId
+        if (itemLocIds.size > 0) {
+            return itemLocIds.has(locId);
+        }
+
+        // If the item has NO location specified (e.g. general news announcement):
+        // Only include general announcements if kiosk has this single location
+        const isAnnouncement = !("startDateTime" in item);
+        return isAnnouncement && flyerLocations.length <= 1;
     }
 
     // Load cached summaries from localStorage on mount
