@@ -29,6 +29,7 @@
     import { summarizeFlyerItems } from "../../../routes/kiosks/[id]/view/summarize.remote";
     import type { FlyerItemSummary, FlyerDensity } from "$lib/validations/flyer";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import * as m from "$lib/paraglide/messages";
     import { resolve } from "$app/paths";
@@ -1109,6 +1110,7 @@
     {@const highlight = getItemHighlight(item)}
     {@const rooms = isEvent ? getEventRooms(item as Event) : []}
     {@const eventQr = isEvent ? ((item as any).qrCodeDataUrl || (item as any).qrCodePath || `/api/events/${item.id}/qr.png`) : null}
+    {@const displayPrice = isEvent ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown) : null}
 
     <article class="event-item-card p-2 rounded-lg border border-slate-200/90 bg-white hover:border-slate-300 transition-colors space-y-1 print:break-inside-avoid">
         <!-- Date Badge & Meta Row -->
@@ -1128,10 +1130,10 @@
                             <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
                         </div>
                         <!-- Price Badge -->
-                        {#if (item as Event).ticketPrice && !(item as Event).ticketPriceUnknown}
+                        {#if displayPrice}
                             <span class="text-[8.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
                                 <Ticket class="w-2.5 h-2.5 text-emerald-600" />
-                                <span>{(item as Event).ticketPrice}</span>
+                                <span>{displayPrice}</span>
                             </span>
                         {/if}
                     </div>
@@ -1180,10 +1182,10 @@
                             </span>
                         {/if}
                         <!-- Price Badge -->
-                        {#if (item as Event).ticketPrice && !(item as Event).ticketPriceUnknown}
+                        {#if displayPrice}
                             <span class="text-[8.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
                                 <Ticket class="w-2.5 h-2.5 text-emerald-600" />
-                                <span>{(item as Event).ticketPrice}</span>
+                                <span>{displayPrice}</span>
                             </span>
                         {/if}
                     </div>
@@ -1217,7 +1219,7 @@
                 <!-- Summary (Editable inline) -->
                 {#if showDescriptions && summary}
                     <div
-                        class="rich-description text-[10px] text-slate-600 leading-snug {density === 'compact' ? 'line-clamp-2' : density === 'standard' ? 'line-clamp-2' : 'line-clamp-4'} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
+                        class="rich-description text-[10px] text-slate-600 leading-snug {density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10'} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
                         contenteditable="true"
                         onblur={(e) => handleInlineEdit(item.id, title, summary, e)}
                         title={m.edit_summary_tooltip()}

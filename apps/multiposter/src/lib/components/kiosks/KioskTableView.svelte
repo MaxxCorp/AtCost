@@ -7,6 +7,7 @@
     import { fly } from "svelte/transition";
     import { RefreshCw, Ticket } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import * as m from "$lib/paraglide/messages";
 
@@ -182,6 +183,7 @@
                     {#key currentPage}
                         {#each currentPageData.items as item, i}
                             {@const eventRooms = getEventRooms(item)}
+                            {@const displayPrice = formatTicketPrice((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
                             <tr 
                                 class="border-b border-gray-900/30 hover:bg-blue-500/5 transition-all duration-300 h-[12vh] min-h-[100px]"
                                 in:fly={{ x: 20, duration: 600, delay: i * 80 }}
@@ -210,10 +212,10 @@
                                                 {/each}
                                             </div>
                                         {/if}
-                                        {#if (item as any).ticketPrice && !(item as any).ticketPriceUnknown}
+                                        {#if displayPrice}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-sm font-semibold">
                                                 <Ticket class="w-3.5 h-3.5 text-emerald-400" />
-                                                <span>{(item as any).ticketPrice}</span>
+                                                <span>{displayPrice}</span>
                                             </div>
                                         {/if}
                                         {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}

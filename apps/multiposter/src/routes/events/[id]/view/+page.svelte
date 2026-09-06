@@ -32,6 +32,7 @@
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import {
         formatEventStatus,
@@ -172,6 +173,7 @@
                 {@const eventInstances = event.instances || []}
                 {@const hasContact = !!event.resolvedContact}
                 {@const hasStaffNotes = !!(checkCanEdit(event) && event.internalNotes && event.internalNotes.trim().length > 0)}
+                {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
 
                 <Breadcrumb feature="events" current={event.summary} />
 
@@ -520,7 +522,7 @@
                                     {/if}
 
                                     <!-- Ticket Price -->
-                                    {#if event.ticketPrice && !event.ticketPriceUnknown}
+                                    {#if displayTicketPrice}
                                         <li
                                             class="flex items-center gap-3 text-gray-700"
                                         >
@@ -528,7 +530,7 @@
                                                 size={18}
                                                 class="text-green-600 flex-shrink-0"
                                             />
-                                            <span class="font-medium">{event.ticketPrice}</span>
+                                            <span class="font-medium">{displayTicketPrice}</span>
                                         </li>
                                     {/if}
                                 </ul>

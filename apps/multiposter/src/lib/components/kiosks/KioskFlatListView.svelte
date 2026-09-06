@@ -15,6 +15,7 @@
         Ticket
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import * as m from "$lib/paraglide/messages";
     import { resolve } from "$app/paths";
@@ -445,6 +446,7 @@
                             <div class="divide-y divide-slate-200 print:divide-slate-300">
                                 {#each group.items as event (event.id)}
                                     {@const eventRooms = getEventRooms(event)}
+                                    {@const displayPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
                                     <article class="{density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid">
                                         <!-- Left Date & Time Column -->
                                         <div class="flex items-center gap-3 shrink-0 min-w-[130px]">
@@ -510,10 +512,10 @@
                                                     {/each}
                                                 {/if}
 
-                                                {#if event.ticketPrice && !event.ticketPriceUnknown}
+                                                {#if displayPrice}
                                                     <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400 print:text-black">
                                                         <Ticket class="w-3.5 h-3.5 text-emerald-600 print:text-black" />
-                                                        {event.ticketPrice}
+                                                        {displayPrice}
                                                     </span>
                                                 {/if}
 

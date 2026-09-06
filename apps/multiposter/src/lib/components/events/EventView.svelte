@@ -18,6 +18,7 @@
         Info,
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
 
     let { event }: { event: Event } = $props();
@@ -58,10 +59,11 @@
 
     const hasContact = $derived(!!event.resolvedContact);
     const hasDescription = $derived(!!(event.description && event.description.trim().length > 0));
+    const displayTicketPrice = $derived(formatTicketPrice((event as any).ticketPrice, (event as any).ticketPriceUnknown));
     const hasSidebar = $derived(
         !!(event as any).qrCodeDataUrl ||
         !!event.qrCodePath ||
-        !!(event as any).ticketPrice ||
+        !!displayTicketPrice ||
         !!(event as any).categoryBerlinDotDe ||
         (((event as any).confirmedParticipants !== undefined) && (event as any).confirmedParticipants > 0) ||
         (((event as any).inclusivityInformation) && (event as any).inclusivityInformation.length > 0)
@@ -242,7 +244,7 @@
                 {/if}
 
                 <!-- Event Details Sidebar -->
-                {#if (event as any).ticketPrice || (event as any).categoryBerlinDotDe || ((event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0) || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
+                {#if displayTicketPrice || (event as any).categoryBerlinDotDe || ((event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0) || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
                     <div
                         class="bg-indigo-50/70 rounded-xl p-4 border border-indigo-100 space-y-3"
                     >
@@ -254,10 +256,10 @@
                         </h3>
 
                         <div class="space-y-2.5 text-xs">
-                            {#if (event as any).ticketPrice && !(event as any).ticketPriceUnknown}
+                            {#if displayTicketPrice}
                                 <div class="flex items-center gap-2 text-indigo-800">
                                     <Euro class="w-4 h-4 opacity-75" />
-                                    <span class="font-semibold">{(event as any).ticketPrice}</span>
+                                    <span class="font-semibold">{displayTicketPrice}</span>
                                 </div>
                             {/if}
 

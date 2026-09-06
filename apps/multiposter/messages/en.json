@@ -339,6 +339,7 @@
 	"select_category": "-- Select Category --",
 	"ticket_price": "Ticket Price",
 	"ticket_price_placeholder": "e.g. 15.00 EUR",
+	"ticket_price_free": "Free",
 	"use_custom_location": "Use custom location text",
 	"enter_custom_location": "Enter custom location",
 	"date_and_time": "Date & Time",

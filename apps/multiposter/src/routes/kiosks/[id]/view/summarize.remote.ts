@@ -18,11 +18,11 @@ function generateFallbackSummaries(
     targetDensity: 'compact' | 'standard' | 'detailed'
 ): Record<string, FlyerItemSummary> {
     const wordLimits = {
-        compact: 14,
-        standard: 28,
-        detailed: 65
+        compact: 20,
+        standard: 40,
+        detailed: 90
     };
-    const maxWords = wordLimits[targetDensity] || 28;
+    const maxWords = wordLimits[targetDensity] || 40;
 
     const result: Record<string, FlyerItemSummary> = {};
 
@@ -65,9 +65,9 @@ export const summarizeFlyerItems = command(summarizeFlyerSchema, async (data): P
     }
 
     const densityDescriptions = {
-        compact: 'Extremely concise (target 10-15 words per item). Focus only on the core activity so dozens of events fit within the tight physical fold panels.',
-        standard: 'Concise editorial blurb (target 20-30 words per item). Crisp, informative, appealing community flyer style.',
-        detailed: 'Detailed brochure blurb (target 45-65 words per item, up to 4 lines of text). Highlights benefits, atmosphere, and special details.'
+        compact: 'Extremely concise (target up to 20 words per item). Focus only on the core activity so dozens of events fit within the tight physical fold panels.',
+        standard: 'Concise editorial blurb (target up to 40 words per item). Crisp, informative, appealing community flyer style.',
+        detailed: 'Detailed brochure blurb (target up to 90 words per item). Highlights benefits, atmosphere, and special details.'
     };
 
     if (!env.GEMINI_API_KEY) {
@@ -90,7 +90,7 @@ ${customInstructions ? `Additional User Guidance: ${customInstructions}` : ''}
 
 Rules:
 1. For each item, provide a clear, punchy 'title' (max 6-8 words).
-2. Write a captivating 'summary' respecting the target word length for ${targetDensity} density.
+2. Write a captivating 'summary' respecting the target word length for ${targetDensity} density (compact: up to 20 words, standard: up to 40 words, detailed: up to 90 words).
 3. If relevant, include a short 'highlight' badge text (max 3-4 words, e.g. "Free admission", "Family friendly", "Registration needed", "All ages").
 4. Maintain the original language of the events (e.g. German if in German, English if in English).
 5. Ensure dates, times, and essential facts remain accurate.
