@@ -16,10 +16,12 @@
         RefreshCw,
         Earth,
         Info,
+        Sparkles,
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
+    import { isNonSeriesEvent } from "$lib/utils/event-series";
 
     let { event }: { event: Event } = $props();
 
@@ -99,6 +101,12 @@
             {:else if event.isPublic}
                 <span class="bg-emerald-500/90 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                     <Earth size={12} /> {m.public_label?.() || 'Public'}
+                </span>
+            {/if}
+            {#if isNonSeriesEvent(event)}
+                <span class="bg-amber-500 text-white text-xs sm:text-sm font-black px-3 py-1 rounded-full border border-white/20 uppercase tracking-wider shadow-sm flex items-center gap-1.5" title={m.special_event_tooltip?.() || ''}>
+                    <Sparkles class="w-3.5 h-3.5 text-amber-100" />
+                    <span>{m.special_event_badge?.() || 'Highlight'}</span>
                 </span>
             {/if}
         </div>

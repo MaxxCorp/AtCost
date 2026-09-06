@@ -31,6 +31,7 @@
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
+    import { isSeriesItem, isNonSeriesEvent } from "$lib/utils/event-series";
     import * as m from "$lib/paraglide/messages";
     import { resolve } from "$app/paths";
     import { toast } from "svelte-sonner";
@@ -338,15 +339,6 @@
         return aiSummaries[item.id]?.highlight;
     }
 
-    function isSeriesItem(item: Event | Announcement): boolean {
-        const itemAny = item as Record<string, any>;
-        return Boolean(
-            itemAny.isSeries ||
-            itemAny.seriesId ||
-            itemAny.recurringEventId ||
-            (Array.isArray(itemAny.recurrence) && itemAny.recurrence.length > 0)
-        );
-    }
 
     function handleInlineEdit(itemId: string, currentTitle: string, currentSummary: string, event: FocusEvent) {
         const el = event.target as HTMLElement;
@@ -1105,6 +1097,7 @@
 <!-- SNIPPET: ITEM CARD ON PANELS -->
 {#snippet itemCard(item: FlyerDisplayItem)}
     {@const isEvent = "startDateTime" in item}
+    {@const isSpecialNonSeries = isNonSeriesEvent(item)}
     {@const title = getItemTitle(item)}
     {@const summary = getItemSummary(item)}
     {@const highlight = getItemHighlight(item)}
@@ -1112,7 +1105,7 @@
     {@const eventQr = isEvent ? ((item as any).qrCodeDataUrl || (item as any).qrCodePath || `/api/events/${item.id}/qr.png`) : null}
     {@const displayPrice = isEvent ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown) : null}
 
-    <article class="event-item-card p-2 rounded-lg border border-slate-200/90 bg-white hover:border-slate-300 transition-colors space-y-1 print:break-inside-avoid">
+    <article class="event-item-card p-2 rounded-lg transition-all space-y-1 print:break-inside-avoid {isSpecialNonSeries ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30' : 'border border-slate-200/90 bg-white hover:border-slate-300'}">
         <!-- Date Badge & Meta Row -->
         {#if isEvent && item.isCompressedSeries && item.seriesDates && item.seriesDates.length > 1}
             <!-- Compressed Series View: Recurrence pattern + multiple date tags -->
@@ -1166,7 +1159,7 @@
                     {@const isSeries = isSeriesItem(item)}
                     <div class="flex items-center gap-1.5 flex-wrap">
                         <!-- Date badge -->
-                        <div class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">
+                        <div class="{isSpecialNonSeries ? 'bg-amber-600 text-white shadow-2xs font-black' : 'bg-slate-900 text-white'} px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">
                             {formatDay((item as Event).startDateTime)} {formatMonth((item as Event).startDateTime)}
                         </div>
                         <!-- Time -->
@@ -1174,6 +1167,13 @@
                             <Clock class="w-2.5 h-2.5 text-slate-400" />
                             <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
                         </div>
+                        <!-- Special Non-Series Highlight Badge -->
+                        {#if isSpecialNonSeries}
+                            <span class="text-[8.5px] font-black bg-amber-500 text-white border border-amber-600 px-1.5 py-0.5 rounded inline-flex items-center gap-1 shadow-2xs uppercase tracking-tight" title={m.special_event_tooltip()}>
+                                <Sparkles class="w-2.5 h-2.5 text-amber-100" />
+                                <span>{m.special_event_badge()}</span>
+                            </span>
+                        {/if}
                         <!-- Series entry badge -->
                         {#if isSeries}
                             <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">

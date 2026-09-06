@@ -5,10 +5,11 @@
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { RefreshCw, Ticket } from "@lucide/svelte";
+    import { RefreshCw, Ticket, Sparkles } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
+    import { isNonSeriesEvent } from "$lib/utils/event-series";
     import * as m from "$lib/paraglide/messages";
 
     interface LocationInfo {
@@ -184,12 +185,13 @@
                         {#each currentPageData.items as item, i}
                             {@const eventRooms = getEventRooms(item)}
                             {@const displayPrice = formatTicketPrice((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
+                            {@const isSpecialNonSeries = isNonSeriesEvent(item)}
                             <tr 
-                                class="border-b border-gray-900/30 hover:bg-blue-500/5 transition-all duration-300 h-[12vh] min-h-[100px]"
+                                class="border-b border-gray-900/30 hover:bg-blue-500/5 transition-all duration-300 h-[12vh] min-h-[100px] {isSpecialNonSeries ? 'bg-amber-500/10 border-l-4 border-l-amber-400' : ''}"
                                 in:fly={{ x: 20, duration: 600, delay: i * 80 }}
                             >
                                 <td class="py-4 px-6 align-middle">
-                                    <div class="text-3xl font-black whitespace-nowrap">{formatDate(item.startDateTime)}</div>
+                                    <div class="text-3xl font-black whitespace-nowrap {isSpecialNonSeries ? 'text-amber-400' : ''}">{formatDate(item.startDateTime)}</div>
                                 </td>
                                 <td class="py-4 px-6 align-middle">
                                     <div class="text-2xl font-bold text-gray-400 whitespace-nowrap">{formatTime(item.startDateTime)}</div>
@@ -200,7 +202,13 @@
                                             {#if (item as any).status === 'cancelled'}
                                                 <span class="inline-block bg-red-600/80 text-white text-sm font-black px-3 py-1 rounded-full uppercase tracking-widest self-center shrink-0">{m.cancelled()}</span>
                                             {/if}
-                                            <span class={(item as any).status === 'cancelled' ? 'line-through opacity-50 text-gray-500' : ''}>{item.summary || m.untitled_event().toUpperCase()}</span>
+                                            {#if isSpecialNonSeries}
+                                                <span class="inline-flex items-center gap-1.5 bg-amber-500 text-white text-xs font-black px-2.5 py-1 rounded-md uppercase tracking-wider shadow-[0_0_12px_rgba(245,158,11,0.4)] shrink-0" title={m.special_event_tooltip()}>
+                                                    <Sparkles class="w-3.5 h-3.5 text-amber-100" />
+                                                    <span>{m.special_event_badge()}</span>
+                                                </span>
+                                            {/if}
+                                            <span class={(item as any).status === 'cancelled' ? 'line-through opacity-50 text-gray-500' : isSpecialNonSeries ? 'text-amber-100' : ''}>{item.summary || m.untitled_event().toUpperCase()}</span>
                                         </div>
                                         {#if eventRooms.length > 0}
                                             <div class="flex flex-wrap items-center gap-1.5">

@@ -12,11 +12,13 @@
         User,
         Phone,
         Mail,
-        Ticket
+        Ticket,
+        Sparkles
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
+    import { isNonSeriesEvent } from "$lib/utils/event-series";
     import * as m from "$lib/paraglide/messages";
     import { resolve } from "$app/paths";
 
@@ -447,18 +449,19 @@
                                 {#each group.items as event (event.id)}
                                     {@const eventRooms = getEventRooms(event)}
                                     {@const displayPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
-                                    <article class="{density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid">
+                                    {@const isSpecialNonSeries = isNonSeriesEvent(event)}
+                                    <article class="{density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid transition-all {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 pl-3 sm:pl-4 bg-linear-to-r from-amber-50/60 via-amber-50/20 to-transparent print:bg-slate-50/60 rounded-r-xl my-1.5' : ''}">
                                         <!-- Left Date & Time Column -->
                                         <div class="flex items-center gap-3 shrink-0 min-w-[130px]">
                                             <!-- Date Badge -->
-                                            <div class="flex flex-col items-center justify-center w-12 h-12 bg-slate-100 print:bg-slate-50 border border-slate-200 rounded-xl text-center shadow-xs">
-                                                <span class="text-[10px] font-bold text-blue-600 print:text-black leading-none uppercase">
+                                            <div class="flex flex-col items-center justify-center w-12 h-12 {isSpecialNonSeries ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/40' : 'bg-slate-100 print:bg-slate-50 border-slate-200'} border rounded-xl text-center shadow-xs">
+                                                <span class="text-[10px] font-bold {isSpecialNonSeries ? 'text-amber-700 font-extrabold' : 'text-blue-600 print:text-black'} leading-none uppercase">
                                                     {formatDateMonth(event.startDateTime)}
                                                 </span>
-                                                <span class="text-lg font-black text-slate-900 leading-tight">
+                                                <span class="text-lg font-black {isSpecialNonSeries ? 'text-amber-950' : 'text-slate-900'} leading-tight">
                                                     {formatDateDay(event.startDateTime)}
                                                 </span>
-                                                <span class="text-[9px] text-slate-500 leading-none uppercase">
+                                                <span class="text-[9px] {isSpecialNonSeries ? 'text-amber-700/80 font-semibold' : 'text-slate-500'} leading-none uppercase">
                                                     {formatDateWeekday(event.startDateTime)}
                                                 </span>
                                             </div>
@@ -494,6 +497,12 @@
                                                 {#if event.status === 'tentative'}
                                                     <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
                                                         {m.tentative()}
+                                                    </span>
+                                                {/if}
+                                                {#if isSpecialNonSeries}
+                                                    <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center gap-1 shadow-xs" title={m.special_event_tooltip()}>
+                                                        <Sparkles class="w-3 h-3 text-amber-100" />
+                                                        <span>{m.special_event_badge()}</span>
                                                     </span>
                                                 {/if}
                                                 <h3 class="text-base sm:text-lg font-bold text-slate-900 leading-snug {event.status === 'cancelled' ? 'line-through text-slate-400' : ''}">
