@@ -30,11 +30,28 @@ function generateFallbackSummaries(
         const cleanDesc = stripFormatting(item.description);
         let summary = '';
         if (cleanDesc) {
-            const words = cleanDesc.split(' ');
+            const words = cleanDesc.split(/\s+/).filter(Boolean);
             if (words.length <= maxWords) {
                 summary = cleanDesc;
             } else {
-                summary = words.slice(0, maxWords).join(' ') + '...';
+                // Extract complete sentences that fit within maxWords
+                const sentenceMatches = cleanDesc.match(/[^.!?]+[.!?]+/g);
+                let accumulated = '';
+                if (sentenceMatches) {
+                    for (const s of sentenceMatches) {
+                        const candidate = accumulated ? `${accumulated} ${s.trim()}` : s.trim();
+                        if (candidate.split(/\s+/).length <= maxWords) {
+                            accumulated = candidate;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                if (accumulated && accumulated.split(/\s+/).length >= Math.min(10, Math.floor(maxWords * 0.4))) {
+                    summary = accumulated;
+                } else {
+                    summary = words.slice(0, maxWords).join(' ') + '...';
+                }
             }
         } else {
             summary = '';
@@ -90,7 +107,7 @@ ${customInstructions ? `Additional User Guidance: ${customInstructions}` : ''}
 
 Rules:
 1. For each item, provide a clear, punchy 'title' (max 6-8 words).
-2. Write a captivating 'summary' respecting the target word length for ${targetDensity} density (compact: up to 20 words, standard: up to 40 words, detailed: up to 90 words).
+2. Write a captivating, original 'summary' that condenses the event description down to the target length (${targetDensity} density: up to 20 words for compact, up to 40 words for standard, up to 90 words for detailed). IMPORTANT: DO NOT just truncate or cut off the existing text with an ellipsis (...). Actively synthesize and rewrite the description into complete, elegant sentences that retain the core meaning, main activities, atmosphere, and spirit of the event within the word count limit.
 3. If relevant, include a short 'highlight' badge text (max 3-4 words, e.g. "Free admission", "Family friendly", "Registration needed", "All ages").
 4. Maintain the original language of the events (e.g. German if in German, English if in English).
 5. Ensure dates, times, and essential facts remain accurate.
@@ -105,34 +122,43 @@ ${JSON.stringify(items.map(i => ({
     rooms: i.roomNames
 })))}`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        items: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    id: { type: Type.STRING },
-                                    title: { type: Type.STRING },
-                                    summary: { type: Type.STRING },
-                                    highlight: { type: Type.STRING }
-                                },
-                                required: ['id', 'title', 'summary']
-                            }
-                        }
-                    },
-                    required: ['items']
-                }
-            }
-        });
+        const candidateModels = ['gemini-3.5-flash', 'gemini-3.6-flash'];
+        let rawText: string | undefined;
 
-        const rawText = response.text;
+        for (const modelName of candidateModels) {
+            try {
+                const response = await ai.models.generateContent({
+                    model: modelName,
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    config: {
+                        responseMimeType: 'application/json',
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                items: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            id: { type: Type.STRING },
+                                            title: { type: Type.STRING },
+                                            summary: { type: Type.STRING },
+                                            highlight: { type: Type.STRING }
+                                        },
+                                        required: ['id', 'title', 'summary']
+                                    }
+                                }
+                            },
+                            required: ['items']
+                        }
+                    }
+                });
+                rawText = response.text;
+                if (rawText) break;
+            } catch (modelErr: any) {
+                console.warn(`[AI Summarize] Model ${modelName} failed, trying next:`, modelErr?.message || modelErr);
+            }
+        }
         if (rawText) {
             const parsed = JSON.parse(rawText);
             if (parsed && Array.isArray(parsed.items)) {
