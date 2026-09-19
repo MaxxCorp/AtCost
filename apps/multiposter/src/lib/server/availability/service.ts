@@ -71,19 +71,17 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
             }
         }
 
-        if (!accessToken) return results;
-
-        try {
-            const endpoint = isUserToken
+        const makeScheduleCall = async (token: string, asUser: boolean) => {
+            const endpoint = asUser
                 ? 'https://graph.microsoft.com/v1.0/me/calendar/getSchedule'
                 : (emails.length > 0 ? `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(emails[0])}/calendar/getSchedule` : null);
 
-            if (!endpoint) return results;
+            if (!endpoint) return null;
 
-            const response = await fetch(endpoint, {
+            return await fetch(endpoint, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${accessToken}`,
+                    Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -99,6 +97,42 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
                     availabilityViewInterval: 60
                 })
             });
+        };
+
+        const getUserToken = async (): Promise<string | null> => {
+            if (!userId) return null;
+            const [userAccount] = await db
+                .select()
+                .from(account)
+                .where(and(eq(account.userId, userId), eq(account.providerId, 'microsoft')))
+                .limit(1);
+            return userAccount?.accessToken || null;
+        };
+
+        try {
+            let response: Response | null = null;
+            if (accessToken) {
+                response = await makeScheduleCall(accessToken, isUserToken);
+                // If app token was rejected with 403 or 401 and we have a userId, fallback to user delegated token
+                if (response && (response.status === 403 || response.status === 401) && !isUserToken && userId) {
+                    console.log(`[MicrosoftAvailabilityProvider] App token returned ${response.status}. Falling back to user delegated token for user ${userId}...`);
+                    const userToken = await getUserToken();
+                    if (userToken) {
+                        accessToken = userToken;
+                        isUserToken = true;
+                        response = await makeScheduleCall(userToken, true);
+                    }
+                }
+            } else if (userId) {
+                const userToken = await getUserToken();
+                if (userToken) {
+                    accessToken = userToken;
+                    isUserToken = true;
+                    response = await makeScheduleCall(userToken, true);
+                }
+            }
+
+            if (!response) return results;
 
             if (response.ok) {
                 const data = await response.json();

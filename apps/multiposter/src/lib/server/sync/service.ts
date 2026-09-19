@@ -239,23 +239,50 @@ export class SyncService {
 
 			// Detect instances needing master event campaign (healing bit rot)
 			const instancesNeedingMaster = allEventsWithCampaign.filter(
-				r => !r.campaign && r.event.recurringEventId
+				r => !r.campaign && (r.event.recurringEventId || r.event.seriesId)
 			);
 
 			const masterCampaignMap = new Map<string, typeof campaignTable.$inferSelect>();
-			if (instancesNeedingMaster.length > 0) {
-				const masterIds = Array.from(new Set(instancesNeedingMaster.map(r => r.event.recurringEventId!)));
-				const masterEvents = await db
-					.select({
-						event: eventTable,
-						campaign: campaignTable
-					})
-					.from(eventTable)
-					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-					.where(inArray(eventTable.id, masterIds));
+			const seriesCampaignMap = new Map<string, typeof campaignTable.$inferSelect>();
 
-				for (const m of masterEvents) {
-					if (m.campaign) masterCampaignMap.set(m.event.id, m.campaign);
+			if (instancesNeedingMaster.length > 0) {
+				const masterIds = Array.from(new Set(
+					instancesNeedingMaster.map(r => r.event.recurringEventId).filter(Boolean) as string[]
+				));
+				const seriesIds = Array.from(new Set(
+					instancesNeedingMaster.map(r => r.event.seriesId).filter(Boolean) as string[]
+				));
+
+				if (masterIds.length > 0) {
+					const masterEvents = await db
+						.select({
+							event: eventTable,
+							campaign: campaignTable
+						})
+						.from(eventTable)
+						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+						.where(inArray(eventTable.id, masterIds));
+
+					for (const m of masterEvents) {
+						if (m.campaign) masterCampaignMap.set(m.event.id, m.campaign);
+					}
+				}
+
+				if (seriesIds.length > 0) {
+					const seriesMasterEvents = await db
+						.select({
+							event: eventTable,
+							campaign: campaignTable
+						})
+						.from(eventTable)
+						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+						.where(and(inArray(eventTable.seriesId, seriesIds), isNull(eventTable.recurringEventId)));
+
+					for (const sm of seriesMasterEvents) {
+						if (sm.campaign && sm.event.seriesId) {
+							seriesCampaignMap.set(sm.event.seriesId, sm.campaign);
+						}
+					}
 				}
 			}
 
@@ -264,10 +291,14 @@ export class SyncService {
 				let eventCampaign = r.campaign;
 
 				// Heal instance bit rot if missing campaignId
-				if (!eventCampaign && r.event.recurringEventId && masterCampaignMap.has(r.event.recurringEventId)) {
-					eventCampaign = masterCampaignMap.get(r.event.recurringEventId)!;
-					// Heal in DB for future queries
-					await db.update(eventTable).set({ campaignId: eventCampaign.id }).where(eq(eventTable.id, r.event.id));
+				if (!eventCampaign) {
+					if (r.event.recurringEventId && masterCampaignMap.has(r.event.recurringEventId)) {
+						eventCampaign = masterCampaignMap.get(r.event.recurringEventId)!;
+						await db.update(eventTable).set({ campaignId: eventCampaign.id }).where(eq(eventTable.id, r.event.id));
+					} else if (r.event.seriesId && seriesCampaignMap.has(r.event.seriesId)) {
+						eventCampaign = seriesCampaignMap.get(r.event.seriesId)!;
+						await db.update(eventTable).set({ campaignId: eventCampaign.id }).where(eq(eventTable.id, r.event.id));
+					}
 				}
 
 				const syncIds = getCampaignTargetIds(eventCampaign?.content);
@@ -1517,11 +1548,19 @@ export class SyncService {
 					continue;
 				}
 
+				// Instantiate provider once per config for pre-flight and execution
+				let provider: SyncProvider;
+				try {
+					provider = await this.getProviderInstance(config);
+				} catch (providerInitErr) {
+					console.warn(`[SyncService] Could not initialize provider for config ${config.id} (${config.providerType}):`, providerInitErr);
+					continue;
+				}
+
 				// Pre-flight check: see if ANY of the items need sync for THIS config
-				// This avoids initializing providers (and their network/auth checks) if not needed.
 				const itemsToProcess: string[] = [];
 				for (const itemId of itemIds) {
-					const { needsSync } = await this.checkSyncRequirement(config, itemId, entityType);
+					const { needsSync } = await this.checkSyncRequirement(config, itemId, entityType, provider);
 					if (needsSync) {
 						itemsToProcess.push(itemId);
 					}
@@ -1547,7 +1586,6 @@ export class SyncService {
 				const operationId = operationRow.id;
 
 				try {
-					const provider = await this.getProviderInstance(config);
 
 					for (const itemId of itemsToProcess) {
 						if (Date.now() - syncStartTime > MAX_SYNC_DURATION_MS) {
@@ -1596,9 +1634,10 @@ export class SyncService {
 	private async checkSyncRequirement(
 		config: SyncConfig,
 		itemId: string,
-		entityType: 'event' | 'announcement'
+		entityType: 'event' | 'announcement',
+		providerInstance?: SyncProvider
 	): Promise<{ needsSync: boolean }> {
-		const provider = await this.getProviderInstance(config);
+		const provider = providerInstance || await this.getProviderInstance(config);
 		if (!provider.supportedEntityTypes.includes(entityType)) {
 			return { needsSync: false };
 		}
@@ -1686,8 +1725,13 @@ export class SyncService {
 			(campaign!.content as CampaignContent).items?.[itemId]?.syncs?.[config.id]?.externalId
 		);
 
+		const needsSync = shouldBeSynced || !!mapping || hasCampaignSync;
+		if (!needsSync) {
+			console.log(`[SyncService] Item ${itemId} checkSync skipped: shouldBeSynced=${shouldBeSynced} (targets: [${syncIds.join(', ')}]), hasMapping=${!!mapping}, hasCampaignSync=${hasCampaignSync} for config ${config.id} (${config.providerType})`);
+		}
+
 		return {
-			needsSync: shouldBeSynced || !!mapping || hasCampaignSync
+			needsSync
 		};
 	}
 
@@ -1796,6 +1840,15 @@ export class SyncService {
 
 			if (campaignRow) {
 				await db.update(campaignTable).set({ content: campContent, updatedAt: new Date() }).where(eq(campaignTable.id, campaignRow.id));
+			} else {
+				const [newCamp] = await db.insert(campaignTable).values({
+					userId: itemRow.userId || config.userId,
+					name: `Campaign for ${(itemRow as any).summary || (itemRow as any).title || itemId}`,
+					content: campContent
+				}).returning();
+				if (newCamp) {
+					await db.update(table).set({ campaignId: newCamp.id } as any).where(eq(table.id, itemId));
+				}
 			}
 
 			// Clean up legacy mapping if one existed, as it is now migrated into campaign

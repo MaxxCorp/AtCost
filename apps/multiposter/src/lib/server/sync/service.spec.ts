@@ -535,9 +535,11 @@ describe('SyncService - Bulk Sync', () => {
 				where: vi.fn().mockResolvedValue([])
 			})
 		});
-		// mapping insert
+		// campaign/mapping insert
 		(db.insert as any).mockReturnValue({
-			values: vi.fn().mockResolvedValue({})
+			values: vi.fn().mockReturnValue({
+				returning: vi.fn().mockResolvedValue([{ id: 'new-camp-id' }])
+			})
 		});
 		// operation update
 		(db.update as any).mockReturnValue({

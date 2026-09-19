@@ -38,7 +38,7 @@ export const checkMigrationStatus = query(async () => {
 	const [unlinkedRes] = await db
 		.select({ count: count() })
 		.from(eventTable)
-		.where(and(isNull(eventTable.campaignId), isNotNull(eventTable.recurringEventId)));
+		.where(and(isNull(eventTable.campaignId), or(isNotNull(eventTable.recurringEventId), isNotNull(eventTable.seriesId))));
 	const unlinkedInstances = Number(unlinkedRes?.count || 0);
 
 	// Check campaigns with legacy content (no version=1 or has syncIds array)
@@ -95,7 +95,7 @@ export const startMigration = command(async () => {
 	const unlinkedInstances = await db
 		.select({ id: eventTable.id })
 		.from(eventTable)
-		.where(and(isNull(eventTable.campaignId), isNotNull(eventTable.recurringEventId)));
+		.where(and(isNull(eventTable.campaignId), or(isNotNull(eventTable.recurringEventId), isNotNull(eventTable.seriesId))));
 
 	if (unlinkedInstances.length > 0) {
 		const ids = unlinkedInstances.map((i) => i.id);
@@ -197,17 +197,25 @@ export const processMigrationBatch = command(
 					const instances = await db
 						.select({
 							id: eventTable.id,
-							recurringEventId: eventTable.recurringEventId
+							recurringEventId: eventTable.recurringEventId,
+							seriesId: eventTable.seriesId
 						})
 						.from(eventTable)
 						.where(inArray(eventTable.id, task.ids));
 
 					for (const inst of instances) {
-						if (!inst.recurringEventId) continue;
-						const [master] = await db
-							.select({ id: eventTable.id, campaignId: eventTable.campaignId, userId: eventTable.userId, summary: eventTable.summary })
-							.from(eventTable)
-							.where(eq(eventTable.id, inst.recurringEventId));
+						let master: any = null;
+						if (inst.recurringEventId) {
+							[master] = await db
+								.select({ id: eventTable.id, campaignId: eventTable.campaignId, userId: eventTable.userId, summary: eventTable.summary })
+								.from(eventTable)
+								.where(eq(eventTable.id, inst.recurringEventId));
+						} else if (inst.seriesId) {
+							[master] = await db
+								.select({ id: eventTable.id, campaignId: eventTable.campaignId, userId: eventTable.userId, summary: eventTable.summary })
+								.from(eventTable)
+								.where(and(eq(eventTable.seriesId, inst.seriesId), isNull(eventTable.recurringEventId)));
+						}
 
 						if (master) {
 							let masterCampaignId = master.campaignId;
@@ -230,6 +238,19 @@ export const processMigrationBatch = command(
 								.update(eventTable)
 								.set({ campaignId: masterCampaignId })
 								.where(eq(eventTable.id, inst.id));
+
+							// Ensure instance is in campaign content items
+							const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, masterCampaignId));
+							if (camp) {
+								const cContent: CampaignContent = (camp.content as any)?.version === 1
+									? (camp.content as any)
+									: createDefaultCampaignContent();
+								if (!cContent.items) cContent.items = {};
+								if (!cContent.items[inst.id]) {
+									cContent.items[inst.id] = { entityType: 'event', syncs: {} };
+									await db.update(campaignTable).set({ content: cContent, updatedAt: new Date() }).where(eq(campaignTable.id, masterCampaignId));
+								}
+							}
 						}
 					}
 				} else if (task.type === 'migrate_campaign') {

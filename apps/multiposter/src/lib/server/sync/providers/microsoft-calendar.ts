@@ -446,20 +446,20 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		};
 
 		const startTimeZone = event.startTimeZone || 'UTC';
-		if (event.startDateTime) {
-			msEvent.start = {
-				dateTime: this.formatLocal(event.startDateTime, startTimeZone),
-				timeZone: startTimeZone
-			};
-		}
+		const start = event.startDateTime ? new Date(event.startDateTime) : new Date();
+		msEvent.start = {
+			dateTime: this.formatLocal(start, startTimeZone),
+			timeZone: startTimeZone
+		};
 
 		const endTimeZone = event.endTimeZone || startTimeZone;
-		if (event.endDateTime) {
-			msEvent.end = {
-				dateTime: this.formatLocal(event.endDateTime, endTimeZone),
-				timeZone: endTimeZone
-			};
-		}
+		const end = event.endDateTime
+			? new Date(event.endDateTime)
+			: new Date(start.getTime() + 60 * 60 * 1000);
+		msEvent.end = {
+			dateTime: this.formatLocal(end, endTimeZone),
+			timeZone: endTimeZone
+		};
 
 		if (event.attendees && event.attendees.length > 0) {
 			msEvent.attendees = event.attendees.map(a => ({

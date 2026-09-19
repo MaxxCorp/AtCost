@@ -95,6 +95,27 @@ describe('MicrosoftCalendarProvider', () => {
 			expect(mapped.showAs).toBe('busy');
 			expect(mapped.subject).toBe('Client Workshop');
 		});
+
+		it('should always populate start and end dates even if endDateTime is missing', () => {
+			const start = new Date('2026-09-01T10:00:00Z');
+			const event: ExternalEvent = {
+				externalId: 'ext-4',
+				providerId: 'microsoft-calendar',
+				summary: 'Solo Focus Time',
+				status: 'confirmed',
+				startDateTime: start,
+				endDateTime: undefined,
+				metadata: { app_event_id: 'internal-id-123' }
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.start).toBeDefined();
+			expect(mapped.start.dateTime).toBeDefined();
+			expect(mapped.end).toBeDefined();
+			expect(mapped.end.dateTime).toBeDefined();
+			expect(mapped.transactionId).toBe('internal-id-123');
+		});
 	});
 
 	describe('updateEvent', () => {

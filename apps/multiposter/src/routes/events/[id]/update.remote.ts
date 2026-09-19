@@ -342,9 +342,11 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					let end2: Date | null = updatedEvent.endDateTime ? new Date(updatedEvent.endDateTime) : null;
 
 					const instances = expandRecurrence(newRecurrenceRule, start2, end2, 50, true, updatedEvent.startTimeZone || 'UTC');
+					const newInstanceIds: string[] = [];
 
 					for (const { date, end: instanceEnd } of instances) {
 						const instanceId = crypto.randomUUID();
+						newInstanceIds.push(instanceId);
 
 						await tx.insert(event).values({
 							id: instanceId,
@@ -376,6 +378,49 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						});
 
 						await linkAssociations(instanceId, tx);
+					}
+
+					// Update campaign content with new instances and remove deleted ones
+					if (updatedEvent.campaignId) {
+						const [campRow] = await tx.select().from(campaign).where(eq(campaign.id, updatedEvent.campaignId));
+						if (campRow) {
+							const campContent: CampaignContent = (campRow.content as any)?.version === 1
+								? (campRow.content as any)
+								: createDefaultCampaignContent();
+
+							if (!campContent.items) campContent.items = {};
+							for (const oldId of oldInstanceIds) {
+								delete campContent.items[oldId];
+							}
+							if (campContent.externalIds) {
+								for (const [extId, mapping] of Object.entries(campContent.externalIds)) {
+									if (oldInstanceIds.includes(mapping.itemId)) {
+										delete campContent.externalIds[extId];
+									}
+								}
+							}
+							for (const newId of newInstanceIds) {
+								campContent.items[newId] = { entityType: 'event', syncs: {} };
+							}
+
+							await tx.update(campaign).set({ content: campContent, updatedAt: new Date() }).where(eq(campaign.id, updatedEvent.campaignId));
+						}
+					} else if (newInstanceIds.length > 0) {
+						const newContent = createDefaultCampaignContent();
+						newContent.items[updatedEvent.id] = { entityType: 'event', syncs: {} };
+						for (const newId of newInstanceIds) {
+							newContent.items[newId] = { entityType: 'event', syncs: {} };
+						}
+						const [newCamp] = await tx.insert(campaign).values({
+							userId: user.id,
+							name: `Campaign for ${updatedEvent.summary}`,
+							content: newContent
+						}).returning();
+						if (newCamp) {
+							updatedEvent.campaignId = newCamp.id;
+							await tx.update(event).set({ campaignId: newCamp.id }).where(eq(event.id, updatedEvent.id));
+							await tx.update(event).set({ campaignId: newCamp.id }).where(inArray(event.id, newInstanceIds));
+						}
 					}
 				} else {
 					if (seriesId) {
