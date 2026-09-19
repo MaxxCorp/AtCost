@@ -13,11 +13,14 @@
             <h1 class="text-3xl font-bold text-gray-900">
                 {announcement.title}
             </h1>
-            {#if announcement.isPublic}
-                <span
-                    class="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded-full"
-                    >{m.public()}</span
-                >
+            {#if announcement.tags && announcement.tags.length > 0}
+                {#each announcement.tags as tag}
+                    <span
+                        class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100"
+                    >
+                        #{typeof tag === 'string' ? tag : tag.name}
+                    </span>
+                {/each}
             {/if}
         </div>
         <div class="text-sm text-gray-500 flex items-center gap-2 mt-2">

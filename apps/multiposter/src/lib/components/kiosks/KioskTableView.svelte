@@ -5,9 +5,9 @@
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { RefreshCw, Ticket, Sparkles } from "@lucide/svelte";
+    import { RefreshCw, Ticket } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
+    import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import { isNonSeriesEvent } from "$lib/utils/event-series";
     import * as m from "$lib/paraglide/messages";
@@ -202,12 +202,6 @@
                                             {#if (item as any).status === 'cancelled'}
                                                 <span class="inline-block bg-red-600/80 text-white text-sm font-black px-3 py-1 rounded-full uppercase tracking-widest self-center shrink-0">{m.cancelled()}</span>
                                             {/if}
-                                            {#if isSpecialNonSeries}
-                                                <span class="inline-flex items-center gap-1.5 bg-amber-500 text-white text-xs font-black px-2.5 py-1 rounded-md uppercase tracking-wider shadow-[0_0_12px_rgba(245,158,11,0.4)] shrink-0" title={m.special_event_tooltip()}>
-                                                    <Sparkles class="w-3.5 h-3.5 text-amber-100" />
-                                                    <span>{m.special_event_badge()}</span>
-                                                </span>
-                                            {/if}
                                             <span class={(item as any).status === 'cancelled' ? 'line-through opacity-50 text-gray-500' : isSpecialNonSeries ? 'text-amber-100' : ''}>{item.summary || m.untitled_event().toUpperCase()}</span>
                                         </div>
                                         {#if eventRooms.length > 0}
@@ -220,7 +214,7 @@
                                                 {/each}
                                             </div>
                                         {/if}
-                                        {#if displayPrice}
+                                        {#if displayPrice && !isEventFree((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-sm font-semibold">
                                                 <Ticket class="w-3.5 h-3.5 text-emerald-400" />
                                                 <span>{displayPrice}</span>
@@ -236,6 +230,12 @@
                                 </td>
                                 <td class="py-4 px-6 align-middle">
                                     <div class="flex flex-wrap gap-1.5 max-h-[8vh] overflow-hidden">
+                                        {#if isEventFree((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
+                                            <span class="px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                                                <Ticket class="w-3 h-3" />
+                                                {m.ticket_price_free?.() || 'Free'}
+                                            </span>
+                                        {/if}
                                         {#each (item.tags || []).slice(0, 3) as tag}
                                             <span class="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-xs font-bold uppercase tracking-wider">
                                                 {tag.name || tag}

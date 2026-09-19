@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatTicketPrice } from "./format-ticket-price";
+import { formatTicketPrice, isEventFree } from "./format-ticket-price";
 
 describe("formatTicketPrice", () => {
     describe("when price is unknown or not set", () => {
@@ -71,5 +71,45 @@ describe("formatTicketPrice", () => {
             expect(formatTicketPrice("Spende", false)).toBe("Spende");
             expect(formatTicketPrice("ab 5 €", false)).toBe("ab 5 €");
         });
+    });
+});
+
+describe("isEventFree", () => {
+    it("returns false when ticketPriceUnknown is true, 'true', or 'on'", () => {
+        expect(isEventFree("0", true)).toBe(false);
+        expect(isEventFree("0", "true")).toBe(false);
+        expect(isEventFree("0", "on")).toBe(false);
+        expect(isEventFree("Free", true)).toBe(false);
+    });
+
+    it("returns false when ticketPrice is null, undefined, or empty", () => {
+        expect(isEventFree(null, false)).toBe(false);
+        expect(isEventFree(undefined, false)).toBe(false);
+        expect(isEventFree("", false)).toBe(false);
+        expect(isEventFree("   ", false)).toBe(false);
+    });
+
+    it("returns true for zero and free keywords in English and German", () => {
+        expect(isEventFree("0", false)).toBe(true);
+        expect(isEventFree("0.00", false)).toBe(true);
+        expect(isEventFree("0,00 €", false)).toBe(true);
+        expect(isEventFree("0 €", false)).toBe(true);
+        expect(isEventFree("0 EUR", false)).toBe(true);
+        expect(isEventFree("0,-", false)).toBe(true);
+        expect(isEventFree("kostenlos", false)).toBe(true);
+        expect(isEventFree("Kostenlos", false)).toBe(true);
+        expect(isEventFree("frei", false)).toBe(true);
+        expect(isEventFree("Eintritt frei", false)).toBe(true);
+        expect(isEventFree("gratis", false)).toBe(true);
+        expect(isEventFree("free", false)).toBe(true);
+        expect(isEventFree("Free", false)).toBe(true);
+    });
+
+    it("returns false for paid prices", () => {
+        expect(isEventFree("15 €", false)).toBe(false);
+        expect(isEventFree("12,50 €", false)).toBe(false);
+        expect(isEventFree("10.00 EUR", false)).toBe(false);
+        expect(isEventFree("Spende", false)).toBe(false);
+        expect(isEventFree("ab 5 €", false)).toBe(false);
     });
 });

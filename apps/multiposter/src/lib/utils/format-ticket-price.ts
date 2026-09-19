@@ -54,3 +54,50 @@ export function formatTicketPrice(
 
 	return trimmed;
 }
+
+/**
+ * Checks whether an event is free of charge based on ticket price and unknown flag.
+ */
+export function isEventFree(
+	ticketPrice?: string | null,
+	ticketPriceUnknown?: boolean | string | null
+): boolean {
+	if (
+		ticketPriceUnknown === true ||
+		ticketPriceUnknown === 'true' ||
+		ticketPriceUnknown === 'on'
+	) {
+		return false;
+	}
+
+	if (!ticketPrice) {
+		return false;
+	}
+
+	const trimmed = ticketPrice.trim();
+	if (!trimmed) {
+		return false;
+	}
+
+	// Check for common words indicating free admission
+	if (/^(kostenlos|free|frei|eintritt\s*frei|gratis)$/i.test(trimmed)) {
+		return true;
+	}
+
+	// Strip currency symbols/names and dash notations like 0,- or 0.-
+	const numClean = trimmed
+		.replace(/euro|eur|€|\$|£/gi, '')
+		.replace(/,\s*-|\.\s*-/g, '')
+		.replace(',', '.')
+		.trim();
+
+	// Check if the cleaned value represents a numeric zero (e.g. 0, 0.0, 0.00, +0, -0)
+	if (/^[+-]?\d+(\.\d+)?$/.test(numClean)) {
+		const parsed = parseFloat(numClean);
+		if (!isNaN(parsed) && parsed === 0) {
+			return true;
+		}
+	}
+
+	return false;
+}

@@ -12,11 +12,10 @@
         User,
         Phone,
         Mail,
-        Ticket,
-        Sparkles
+        Ticket
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
+    import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import { isNonSeriesEvent } from "$lib/utils/event-series";
     import * as m from "$lib/paraglide/messages";
@@ -499,12 +498,6 @@
                                                         {m.tentative()}
                                                     </span>
                                                 {/if}
-                                                {#if isSpecialNonSeries}
-                                                    <span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center gap-1 shadow-xs" title={m.special_event_tooltip()}>
-                                                        <Sparkles class="w-3 h-3 text-amber-100" />
-                                                        <span>{m.special_event_badge()}</span>
-                                                    </span>
-                                                {/if}
                                                 <h3 class="text-base sm:text-lg font-bold text-slate-900 leading-snug {event.status === 'cancelled' ? 'line-through text-slate-400' : ''}">
                                                     {event.summary || m.untitled_event()}
                                                 </h3>
@@ -521,7 +514,7 @@
                                                     {/each}
                                                 {/if}
 
-                                                {#if displayPrice}
+                                                {#if displayPrice && !isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                                                     <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400 print:text-black">
                                                         <Ticket class="w-3.5 h-3.5 text-emerald-600 print:text-black" />
                                                         {displayPrice}
@@ -542,14 +535,22 @@
                                                 </div>
                                             {/if}
 
-                                            <!-- Tags -->
-                                            {#if event.tags && event.tags.length > 0}
+                                            <!-- Tags & Free Pill -->
+                                            {#if (event.tags && event.tags.length > 0) || isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                                                 <div class="flex flex-wrap gap-1.5 pt-1">
-                                                    {#each event.tags as tag (typeof tag === 'string' ? tag : tag.id || tag.name)}
-                                                        <span class="px-1.5 py-0.5 bg-slate-100 print:bg-slate-50 border border-slate-200 text-slate-600 rounded text-[10px]">
-                                                            #{typeof tag === 'string' ? tag : tag.name}
+                                                    {#if isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
+                                                        <span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold inline-flex items-center gap-1">
+                                                            <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                                            {m.ticket_price_free?.() || 'Free'}
                                                         </span>
-                                                    {/each}
+                                                    {/if}
+                                                    {#if event.tags && event.tags.length > 0}
+                                                        {#each event.tags as tag (typeof tag === 'string' ? tag : tag.id || tag.name)}
+                                                            <span class="px-1.5 py-0.5 bg-slate-100 print:bg-slate-50 border border-slate-200 text-slate-600 rounded text-[10px]">
+                                                                #{typeof tag === 'string' ? tag : tag.name}
+                                                            </span>
+                                                        {/each}
+                                                    {/if}
                                                 </div>
                                             {/if}
                                         </div>

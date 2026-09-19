@@ -1131,12 +1131,8 @@
                         {/if}
                     </div>
 
-                    <!-- Room or Highlight Badge -->
-                    {#if highlight}
-                        <span class="text-[8.5px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded truncate max-w-[90px]">
-                            {highlight}
-                        </span>
-                    {:else if rooms.length > 0}
+                    <!-- Room Badge -->
+                    {#if rooms.length > 0}
                         <span class="text-[8.5px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]">
                             {rooms[0]}
                         </span>
@@ -1167,13 +1163,6 @@
                             <Clock class="w-2.5 h-2.5 text-slate-400" />
                             <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
                         </div>
-                        <!-- Special Non-Series Highlight Badge -->
-                        {#if isSpecialNonSeries}
-                            <span class="text-[8.5px] font-black bg-amber-500 text-white border border-amber-600 px-1.5 py-0.5 rounded inline-flex items-center gap-1 shadow-2xs uppercase tracking-tight" title={m.special_event_tooltip()}>
-                                <Sparkles class="w-2.5 h-2.5 text-amber-100" />
-                                <span>{m.special_event_badge()}</span>
-                            </span>
-                        {/if}
                         <!-- Series entry badge -->
                         {#if isSeries}
                             <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
@@ -1195,12 +1184,8 @@
                     </div>
                 {/if}
 
-                <!-- Room or Highlight Badge -->
-                {#if highlight}
-                    <span class="text-[8.5px] font-bold bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded truncate max-w-[90px]">
-                        {highlight}
-                    </span>
-                {:else if rooms.length > 0}
+                <!-- Room Badge -->
+                {#if rooms.length > 0}
                     <span class="text-[8.5px] font-medium bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]">
                         {rooms[0]}
                     </span>
@@ -1225,6 +1210,17 @@
                         title={m.edit_summary_tooltip()}
                     >
                         {@html summary}
+                    </div>
+                {/if}
+
+                <!-- Tags -->
+                {#if item.tags && item.tags.length > 0}
+                    <div class="flex items-center gap-1 flex-wrap pt-0.5">
+                        {#each item.tags.slice(0, 3) as tag}
+                            <span class="text-[8px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                                #{typeof tag === 'string' ? tag : tag.name}
+                            </span>
+                        {/each}
                     </div>
                 {/if}
             </div>

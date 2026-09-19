@@ -14,7 +14,7 @@
         MapPin,
         Users,
         Tag as TagIcon,
-        Earth,
+        Ticket,
         Euro,
         Info,
         Download,
@@ -32,7 +32,7 @@
     } from "@lucide/svelte";
     import Button from "$lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
+    import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import {
         formatEventStatus,
@@ -201,11 +201,12 @@
                                 <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight">
                                     {event.summary}
                                 </h1>
-                                {#if event.isPublic}
+                                {#if isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                                     <span
-                                        class="px-2.5 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full flex items-center gap-1"
+                                        class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full border border-emerald-200 flex items-center gap-1"
                                     >
-                                        <Earth size={12} /> {m.public_label()}
+                                        <Ticket size={12} />
+                                        {m.ticket_price_free?.() || 'Free'}
                                     </span>
                                 {/if}
                                 {#if event.status}
