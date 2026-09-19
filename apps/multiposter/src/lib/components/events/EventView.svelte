@@ -65,7 +65,6 @@
         !!event.qrCodePath ||
         !!displayTicketPrice ||
         !!(event as any).categoryBerlinDotDe ||
-        (((event as any).confirmedParticipants !== undefined) && (event as any).confirmedParticipants > 0) ||
         (((event as any).inclusivityInformation) && (event as any).inclusivityInformation.length > 0)
     );
 </script>
@@ -104,7 +103,7 @@
                 </span>
             {/if}
             {#if event.tags && event.tags.length > 0}
-                {#each event.tags as tag}
+                {#each event.tags as tag (typeof tag === 'string' ? tag : tag.id || tag.name)}
                     <span class="bg-white/20 text-white text-xs sm:text-sm font-medium px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs flex items-center gap-1">
                         <Tag class="w-3 h-3 text-blue-200" />
                         <span>{typeof tag === 'string' ? tag : tag.name}</span>
@@ -138,7 +137,7 @@
                         <h3 class="font-semibold text-gray-900 text-sm">
                             {m.location()}
                         </h3>
-                        {#each event.locations as loc}
+                        {#each event.locations as loc (loc.id || loc.name)}
                             <p class="text-gray-700 text-sm font-medium mt-0.5">{loc.name}</p>
                             {#if loc.street || loc.city}
                                 <p class="text-xs text-gray-500">{loc.street || ''} {loc.houseNumber || ''} {loc.zip || ''} {loc.city || ''}</p>
@@ -254,7 +253,7 @@
                 {/if}
 
                 <!-- Event Details Sidebar -->
-                {#if displayTicketPrice || (event as any).categoryBerlinDotDe || ((event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0) || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
+                {#if displayTicketPrice || (event as any).categoryBerlinDotDe || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
                     <div
                         class="bg-indigo-50/70 rounded-xl p-4 border border-indigo-100 space-y-3"
                     >
@@ -282,23 +281,11 @@
                                 </div>
                             {/if}
 
-                            {#if (event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0}
-                                <div class="flex items-start gap-2 text-indigo-800">
-                                    <Users class="w-4 h-4 opacity-75 mt-0.5" />
-                                    <span>
-                                        <strong>{(event as any).confirmedParticipants}</strong> {m.confirmed_participants()}
-                                        {#if event.maxOccupancy}
-                                            <span class="opacity-75 block">{m.capacity()}: {event.maxOccupancy}</span>
-                                        {/if}
-                                    </span>
-                                </div>
-                            {/if}
-
                             {#if (event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0}
                                 <div class="flex items-start gap-2 text-indigo-800">
                                     <Accessibility class="w-4 h-4 opacity-75 mt-0.5" />
                                     <div class="flex flex-wrap gap-1">
-                                        {#each (event as any).inclusivityInformation as info}
+                                        {#each (event as any).inclusivityInformation as info, idx (idx)}
                                             <span class="bg-white/60 text-indigo-900 px-1.5 py-0.5 rounded border border-indigo-100/50">
                                                 {info}
                                             </span>
