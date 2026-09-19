@@ -787,6 +787,10 @@
                 entityId={initialData?.id}
                 listItemsRemote={listResourcesWithHierarchy as any}
                 fetchAssociationsRemote={fetchEntityResources as any}
+                selectorGroupBy={(r: any) => (r.locationNames?.length ? r.locationNames : (r.locationName || m.no_location?.() || "No Location"))}
+                selectorSortField="maxOccupancy"
+                selectorSortOrder="desc"
+                groupIcon={MapPin}
                 addAssociationRemote={async (p: any) => {
                     const res = await addResourceAssociation({ ...p, resourceId: p.itemId } as any);
                     if (res?.success) toast.success(m.resource_synced_success());
@@ -850,6 +854,12 @@
                 {#snippet renderItemLabel(resItem: any)}
                     {@const hasSyncs = hasAllocationCalendars(resItem)}
                     <span style="padding-left: {(resItem.level || 0) * 12}px" class="inline-flex items-center gap-2 flex-wrap">
+                        <span
+                            class="inline-block w-[3.5ch] text-right font-mono text-xs text-gray-500 tabular-nums shrink-0"
+                            title={resItem.maxOccupancy != null ? `${m.max_occupancy()}: ${resItem.maxOccupancy}` : ""}
+                        >
+                            {resItem.maxOccupancy != null ? resItem.maxOccupancy : ""}
+                        </span>
                         <span>{resItem.name}</span>
                         <span class="text-xs text-gray-500 font-normal">
                             ({resItem.type === "room"

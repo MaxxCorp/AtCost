@@ -13,6 +13,7 @@
         Trash2,
         Database,
         Loader2,
+        MapPin,
     } from "@lucide/svelte";
 
     import Button from "./button/button.svelte";
@@ -91,9 +92,16 @@
         // Search predicate
         searchPredicate?: (item: T, query: string) => boolean;
 
+        // Grouping props
+        groupBy?: ((item: T) => string | string[] | null | undefined) | string;
+        selectorGroupBy?: ((item: T) => string | string[] | null | undefined) | string;
+        groupIcon?: Component<any>;
+
         // Sorting props
         sortField?: string;
         sortOrder?: "asc" | "desc";
+        selectorSortField?: string;
+        selectorSortOrder?: "asc" | "desc";
 
         // Localization props
         loadingLabel?: string;
@@ -139,8 +147,13 @@
         participationSnippet,
         initialItems = [],
         searchPredicate = undefined,
+        groupBy = undefined,
+        selectorGroupBy = undefined,
+        groupIcon = undefined,
         sortField: propSortField = undefined,
         sortOrder: propSortOrder = undefined,
+        selectorSortField = undefined,
+        selectorSortOrder = undefined,
 
         // Localization defaults
         loadingLabel = `Loading ${title.toLowerCase()}...`,
@@ -217,6 +230,9 @@
         },
         get clearAllLabel() {
             return m?.clear_all_filters?.() ?? m?.clear_all?.() ?? "Clear all";
+        },
+        get unassignedGroupLabel() {
+            return m?.no_location?.() ?? m?.no_locations_associated?.() ?? "No Location";
         }
     };
 
@@ -237,6 +253,10 @@
 
     const effectiveSortField = $derived(propSortField ?? "displayName");
     const effectiveSortOrder = $derived(propSortOrder ?? "asc");
+    const effectiveSelectorSortField = $derived(selectorSortField ?? propSortField ?? "displayName");
+    const effectiveSelectorSortOrder = $derived(selectorSortOrder ?? propSortOrder ?? "asc");
+    const activeSelectorGroupBy = $derived(selectorGroupBy ?? groupBy);
+    const GroupIcon = $derived(groupIcon ?? MapPin);
 
     const filterState = $derived({
         search: searchQuery || undefined,
@@ -307,12 +327,71 @@
 
     function sortItemsList<I>(items: I[], field: string, order: "asc" | "desc"): I[] {
         if (!items || !Array.isArray(items)) return [];
-        return [...items].sort((a, b) => {
-            const valA = getItemSortValue(a, field);
-            const valB = getItemSortValue(b, field);
-            const cmp = valA.localeCompare(valB, undefined, { sensitivity: "base", numeric: true });
-            return order === "desc" ? -cmp : cmp;
+        return [...items].sort((a: any, b: any) => {
+            const rawA = a?.[field];
+            const rawB = b?.[field];
+            const numA = rawA !== null && rawA !== undefined && rawA !== "" && !isNaN(Number(rawA)) ? Number(rawA) : null;
+            const numB = rawB !== null && rawB !== undefined && rawB !== "" && !isNaN(Number(rawB)) ? Number(rawB) : null;
+
+            if (numA !== null && numB === null) {
+                return -1;
+            }
+            if (numA === null && numB !== null) {
+                return 1;
+            }
+
+            let cmp = 0;
+            if (numA !== null && numB !== null) {
+                cmp = numA - numB;
+            } else {
+                const valA = getItemSortValue(a, field);
+                const valB = getItemSortValue(b, field);
+                cmp = valA.localeCompare(valB, undefined, { sensitivity: "base", numeric: true });
+            }
+
+            const res = order === "desc" ? -cmp : cmp;
+            if (res !== 0) return res;
+
+            const nameA = getItemSortValue(a, "displayName");
+            const nameB = getItemSortValue(b, "displayName");
+            return nameA.localeCompare(nameB, undefined, { sensitivity: "base", numeric: true });
         });
+    }
+
+    function groupItems<I>(
+        items: I[],
+        grouper: ((item: I) => string | string[] | null | undefined) | string,
+        unassignedLabel = "No Location"
+    ) {
+        const groups: Record<string, I[]> = {};
+        for (const item of items) {
+            const rawKey = typeof grouper === "function" ? grouper(item) : (item as any)?.[grouper];
+            const keys = Array.isArray(rawKey)
+                ? (rawKey.length > 0 ? rawKey : [unassignedLabel])
+                : [rawKey];
+
+            for (let key of keys) {
+                key = (typeof key === "string" ? key.trim() : (key != null ? String(key) : "")) || "";
+                if (!key) key = unassignedLabel;
+                if (!groups[key]) {
+                    groups[key] = [];
+                }
+                groups[key].push(item);
+            }
+        }
+
+        return Object.entries(groups)
+            .map(([name, groupItems]) => ({
+                name,
+                items: groupItems,
+            }))
+            .sort((a, b) => {
+                const isUnassignedA = a.name === unassignedLabel || !a.name;
+                const isUnassignedB = b.name === unassignedLabel || !b.name;
+                if (isUnassignedA && !isUnassignedB) return 1;
+                if (!isUnassignedA && isUnassignedB) return -1;
+                return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+            });
     }
 
     function normalize(res: any) {
@@ -703,7 +782,7 @@
                     </div>
                 {:then res}
                     {@const allItems = normalize(res).data}
-                    {@const sortedAllItems = sortItemsList(allItems, effectiveSortField, effectiveSortOrder)}
+                    {@const sortedAllItems = sortItemsList(allItems, effectiveSelectorSortField, effectiveSelectorSortOrder)}
                     {@const searchedItems = searchQuery
                         ? sortedAllItems.filter(
                               (i: any) =>
@@ -727,7 +806,8 @@
                             </div>
                         {:then ares}
                             {@const currentAssociations = normalize(ares).data}
-                            {#each filteredItems as item (item.id)}
+
+                            {#snippet renderSelectorItem(item: T)}
                                 {@const isLinked = isAssociated(item, currentAssociations)}
                                 <div
                                     class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 transition-all rounded-xl p-2 {isLinked
@@ -812,7 +892,31 @@
                                         {/if}
                                     </div>
                                 </div>
-                            {/each}
+                            {/snippet}
+
+                            {#if activeSelectorGroupBy}
+                                {@const grouped = groupItems(filteredItems, activeSelectorGroupBy, i18n.unassignedGroupLabel)}
+                                {#each grouped as group (group.name)}
+                                    <div class="pt-2.5 pb-1 px-2 first:pt-1 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xs z-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                        <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                            <GroupIcon size={13} class="text-gray-400 shrink-0" />
+                                            <span>{group.name}</span>
+                                        </div>
+                                        <span class="text-[11px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-full">
+                                            {group.items.length}
+                                        </span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        {#each group.items as item (group.name + '-' + item.id)}
+                                            {@render renderSelectorItem(item)}
+                                        {/each}
+                                    </div>
+                                {/each}
+                            {:else}
+                                {#each filteredItems as item (item.id)}
+                                    {@render renderSelectorItem(item)}
+                                {/each}
+                            {/if}
                         {/await}
                     {/if}
                 {/await}

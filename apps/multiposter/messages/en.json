@@ -831,6 +831,7 @@
 	"entire_series_master": "Entire Series (Master)",
 	"switch_series_or_instance": "Select series or occurrence",
 	"unsaved_changes_switch_confirm": "You may have unsaved changes. Are you sure you want to switch?",
-	"all_instances_count": "Occurrences ({count})"
+	"all_instances_count": "Occurrences ({count})",
+	"no_location": "No Location"
 }
 

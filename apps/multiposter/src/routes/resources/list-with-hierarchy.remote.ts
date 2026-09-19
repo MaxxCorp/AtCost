@@ -7,8 +7,8 @@ import { PaginationSchema } from '@ac/validations';
 
 
 export type ResourceWithHierarchy = InferSelectModel<typeof resource> & {
-
     locationName?: string | null;
+    locationNames?: string[];
     parentIds: string[];
     childIds: string[];
     level: number; // Depth in hierarchy (0 = root)
@@ -43,7 +43,6 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
 
     const resources = await baseQuery;
 
-
     // Fetch all location associations for these resources
     const resourceIds = resources.map(r => r.id);
     const locationMap = new Map<string, string[]>();
@@ -60,15 +59,38 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
 
         locAssociations.forEach(assoc => {
             const names = locationMap.get(assoc.resourceId) || [];
-            names.push(assoc.locationName);
+            if (!names.includes(assoc.locationName)) {
+                names.push(assoc.locationName);
+            }
+            locationMap.set(assoc.resourceId, names);
+        });
+
+        const directLocAssociations = await db
+            .select({
+                resourceId: resource.id,
+                locationName: location.name,
+            })
+            .from(resource)
+            .innerJoin(location, eq(resource.locationId, location.id))
+            .where(inArray(resource.id, resourceIds));
+
+        directLocAssociations.forEach(assoc => {
+            const names = locationMap.get(assoc.resourceId) || [];
+            if (!names.includes(assoc.locationName)) {
+                names.push(assoc.locationName);
+            }
             locationMap.set(assoc.resourceId, names);
         });
     }
 
-    const resourcesWithLocation = resources.map(r => ({
-        ...r,
-        locationName: locationMap.get(r.id)?.join(', ') || null,
-    }));
+    const resourcesWithLocation = resources.map(r => {
+        const locNames = locationMap.get(r.id) || [];
+        return {
+            ...r,
+            locationNames: locNames,
+            locationName: locNames.length > 0 ? locNames.join(', ') : null,
+        };
+    });
 
     // Fetch all relationships
     const relations = await db

@@ -831,6 +831,7 @@
 	"entire_series_master": "Ganze Serie (Master)",
 	"switch_series_or_instance": "Serie oder Termin wählen",
 	"unsaved_changes_switch_confirm": "Du hast möglicherweise ungespeicherte Änderungen. Möchtest du wirklich wechseln?",
-	"all_instances_count": "Termine ({count})"
+	"all_instances_count": "Termine ({count})",
+	"no_location": "Kein Standort"
 }
 
