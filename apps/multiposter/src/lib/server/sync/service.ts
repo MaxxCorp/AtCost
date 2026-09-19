@@ -542,6 +542,11 @@ export class SyncService {
 				lastSyncAt: new Date(),
 				nextSyncAt: this.calculateNextSync(config)
 			}).where(eq(syncConfigTable.id, configId));
+
+			// Opportunistically prune old completed operations in the background
+			this.pruneOldOperations().catch((err) =>
+				console.error('[SyncService] Opportunistic pruneOldOperations failed:', err)
+			);
 		} else {
 			await db.update(syncOperationTable).set({
 				results: {
@@ -1174,6 +1179,52 @@ export class SyncService {
 			} catch (error: any) {
 				console.error(`[SyncService] Failed to renew webhook for subscription ${subscription.id}:`, error);
 			}
+		}
+	}
+
+	/**
+	 * Prune old sync operations based on rolling retention policy.
+	 * - Completed operations older than retentionHours (default: 48h) are permanently deleted.
+	 * - Stale pending operations older than 24 hours (crashed/interrupted serverless runs) are cleaned up.
+	 * - Failed operations are retained permanently for user inspection and troubleshooting.
+	 */
+	async pruneOldOperations(retentionHours = 48): Promise<{ deletedCompleted: number; deletedStalePending: number }> {
+		const cutoffDate = new Date(Date.now() - retentionHours * 60 * 60 * 1000);
+		const stalePendingCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+		try {
+			// Delete completed operations older than cutoffDate (checking completedAt, falling back to createdAt if completedAt is null)
+			const deletedCompleted = await db
+				.delete(syncOperationTable)
+				.where(
+					and(
+						eq(syncOperationTable.status, 'completed'),
+						or(
+							lt(syncOperationTable.completedAt, cutoffDate),
+							and(isNull(syncOperationTable.completedAt), lt(syncOperationTable.createdAt, cutoffDate))
+						)
+					)
+				)
+				.returning({ id: syncOperationTable.id });
+
+			// Clean up stale pending operations older than 24 hours
+			const deletedStalePending = await db
+				.delete(syncOperationTable)
+				.where(
+					and(
+						eq(syncOperationTable.status, 'pending'),
+						lt(syncOperationTable.startedAt, stalePendingCutoff)
+					)
+				)
+				.returning({ id: syncOperationTable.id });
+
+			return {
+				deletedCompleted: deletedCompleted.length,
+				deletedStalePending: deletedStalePending.length
+			};
+		} catch (error) {
+			console.error('[SyncService] Error during pruneOldOperations:', error);
+			throw error;
 		}
 	}
 

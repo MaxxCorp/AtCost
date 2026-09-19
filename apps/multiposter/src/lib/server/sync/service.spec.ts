@@ -344,6 +344,11 @@ describe('SyncService - Bulk Sync', () => {
 
 	beforeEach(() => {
 		vi.resetAllMocks();
+		(db.delete as any).mockReturnValue({
+			where: vi.fn().mockReturnValue({
+				returning: vi.fn().mockResolvedValue([])
+			})
+		});
 		vi.mocked(getEntityContacts).mockResolvedValue([]);
 		service = new SyncService();
 		service.registerProvider('mock-provider' as any, MockSyncProvider as any);
@@ -554,6 +559,48 @@ describe('SyncService - Bulk Sync', () => {
 		expect(batchResult.processed).toBe(1);
 		expect(batchResult.pushed).toBe(1);
 		expect(batchResult.errors).toHaveLength(0);
+	});
+
+	describe('pruneOldOperations', () => {
+		it('deletes completed operations older than retention threshold and stale pending operations', async () => {
+			const service = new SyncService();
+
+			const deleteMock = vi.fn().mockReturnValue({
+				where: vi.fn().mockReturnValue({
+					returning: vi.fn()
+						.mockResolvedValueOnce([{ id: 'completed-old-1' }, { id: 'completed-old-2' }])
+						.mockResolvedValueOnce([{ id: 'stale-pending-1' }])
+				})
+			});
+			(db.delete as any) = deleteMock;
+
+			const result = await service.pruneOldOperations(48);
+
+			expect(deleteMock).toHaveBeenCalledTimes(2);
+			expect(result).toEqual({
+				deletedCompleted: 2,
+				deletedStalePending: 1
+			});
+		});
+
+		it('supports custom retention hours', async () => {
+			const service = new SyncService();
+
+			const returningMock = vi.fn()
+				.mockResolvedValueOnce([])
+				.mockResolvedValueOnce([]);
+			const whereMock = vi.fn().mockReturnValue({ returning: returningMock });
+			const deleteMock = vi.fn().mockReturnValue({ where: whereMock });
+			(db.delete as any) = deleteMock;
+
+			const result = await service.pruneOldOperations(24);
+
+			expect(deleteMock).toHaveBeenCalledTimes(2);
+			expect(result).toEqual({
+				deletedCompleted: 0,
+				deletedStalePending: 0
+			});
+		});
 	});
 });
 

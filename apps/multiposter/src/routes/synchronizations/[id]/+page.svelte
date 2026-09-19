@@ -317,7 +317,10 @@
                                 {/if}
 
                                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
-                                    <h2 class="text-lg font-semibold mb-4">{m.recent_sync_operations()}</h2>
+                                    <div>
+                                        <h2 class="text-lg font-semibold">{m.recent_sync_operations()}</h2>
+                                        <p class="text-xs text-gray-500 mt-0.5">{m.recent_sync_operations_retention_hint()}</p>
+                                    </div>
                                     {#await operationsPromise}
                                         <div class="flex justify-center py-8">
                                             <RefreshCw class="h-6 w-6 animate-spin text-gray-400" />

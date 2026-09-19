@@ -30,8 +30,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		}
 
 		await syncService.renewWebhooks();
+		const pruned = await syncService.pruneOldOperations();
 
-		return json({ success: true, message: 'Webhooks renewed successfully' });
+		return json({
+			success: true,
+			message: 'Webhooks renewed and old operations pruned successfully',
+			pruned
+		});
 	} catch (error: any) {
 		console.error('[RenewWebhooks][POST] Error renewing webhooks:', error);
 		return json(
@@ -66,8 +71,13 @@ export const GET: RequestHandler = async ({ request, url }) => {
 		}
 
 		await syncService.renewWebhooks();
+		const pruned = await syncService.pruneOldOperations();
 
-		return json({ success: true, message: 'Webhooks renewed successfully' });
+		return json({
+			success: true,
+			message: 'Webhooks renewed and old operations pruned successfully',
+			pruned
+		});
 	} catch (error: any) {
 		console.error('[RenewWebhooks][GET] Error renewing webhooks:', error);
 		return json(

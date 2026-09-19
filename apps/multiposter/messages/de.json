@@ -138,6 +138,7 @@
 	"updated": "Aktualisiert",
 	"sync_failed": "Synchronisierung fehlgeschlagen",
 	"recent_sync_operations": "Kürzliche Synchronisierungsvorgänge",
+	"recent_sync_operations_retention_hint": "Erfolgreiche Vorgänge werden 48 Stunden aufbewahrt. Fehlgeschlagene Vorgänge bleiben sichtbar, bis sie behoben sind.",
 	"no_sync_operations_yet": "Noch keine Synchronisierungsvorgänge",
 	"retried_x_times": "{count}x wiederholt",
 	"error_details": "Fehlerdetails:",

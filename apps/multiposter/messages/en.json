@@ -138,6 +138,7 @@
 	"updated": "Updated",
 	"sync_failed": "Sync failed",
 	"recent_sync_operations": "Recent Sync Operations",
+	"recent_sync_operations_retention_hint": "Completed operations are retained for 48 hours. Failed operations remain until resolved.",
 	"no_sync_operations_yet": "No sync operations yet",
 	"retried_x_times": "retried {count}x",
 	"error_details": "Error Details:",
