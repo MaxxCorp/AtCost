@@ -317,15 +317,22 @@ export class SyncService {
 				const existingExternalId = itemSyncState?.externalId || existingMapping?.externalId;
 
 				if (shouldBeSynced) {
-					itemsToSync.push({ id: r.event.id, entityType: 'event', action: 'sync' });
+					let priority = 2; // Default: brand new / unsynced
+					if (existingExternalId) {
+						const lastSyncedAt = itemSyncState?.lastSyncedAt ? new Date(itemSyncState.lastSyncedAt) : (existingMapping?.lastSyncedAt ? new Date(existingMapping.lastSyncedAt) : null);
+						const isModified = r.event.updatedAt && lastSyncedAt && new Date(r.event.updatedAt) > lastSyncedAt;
+						priority = isModified ? 3 : 4;
+					}
+					itemsToSync.push({ id: r.event.id, entityType: 'event', action: 'sync', _priority: priority } as any);
 				} else if (existingExternalId) {
 					itemsToSync.push({
 						id: r.event.id,
 						entityType: 'event',
 						action: 'unpublish',
 						mappingId: existingMapping?.id,
-						externalId: existingExternalId
-					});
+						externalId: existingExternalId,
+						_priority: 1
+					} as any);
 				}
 			}
 		}
@@ -338,8 +345,9 @@ export class SyncService {
 					entityType: 'event',
 					action: 'unpublish',
 					mappingId: mapping.id,
-					externalId: mapping.externalId
-				});
+					externalId: mapping.externalId,
+					_priority: 1
+				} as any);
 			}
 		}
 
@@ -366,15 +374,22 @@ export class SyncService {
 				const existingExternalId = itemSyncState?.externalId || existingMapping?.externalId;
 
 				if (shouldBeSynced) {
-					itemsToSync.push({ id: r.announcement.id, entityType: 'announcement', action: 'sync' });
+					let priority = 2; // Default: brand new / unsynced
+					if (existingExternalId) {
+						const lastSyncedAt = itemSyncState?.lastSyncedAt ? new Date(itemSyncState.lastSyncedAt) : (existingMapping?.lastSyncedAt ? new Date(existingMapping.lastSyncedAt) : null);
+						const isModified = r.announcement.updatedAt && lastSyncedAt && new Date(r.announcement.updatedAt) > lastSyncedAt;
+						priority = isModified ? 3 : 4;
+					}
+					itemsToSync.push({ id: r.announcement.id, entityType: 'announcement', action: 'sync', _priority: priority } as any);
 				} else if (existingExternalId) {
 					itemsToSync.push({
 						id: r.announcement.id,
 						entityType: 'announcement',
 						action: 'unpublish',
 						mappingId: existingMapping?.id,
-						externalId: existingExternalId
-					});
+						externalId: existingExternalId,
+						_priority: 1
+					} as any);
 				}
 			}
 		}
@@ -387,9 +402,16 @@ export class SyncService {
 					entityType: 'announcement',
 					action: 'unpublish',
 					mappingId: mapping.id,
-					externalId: mapping.externalId
-				});
+					externalId: mapping.externalId,
+					_priority: 1
+				} as any);
 			}
+		}
+
+		// Sort items by priority: unpublish (1) -> unsynced (2) -> modified (3) -> already synced (4)
+		itemsToSync.sort((a, b) => ((a as any)._priority ?? 2) - ((b as any)._priority ?? 2));
+		for (const item of itemsToSync) {
+			delete (item as any)._priority;
 		}
 
 		// If queue is empty, finish immediately
@@ -1564,6 +1586,32 @@ export class SyncService {
 	}
 
 	/**
+	 * Determines the execution budget in milliseconds for a sync operation or sweep.
+	 * Prioritizes per-config settings, then dynamic env vars, and defaults to 60s.
+	 */
+	public getMaxSyncDurationMs(config?: SyncConfig): number {
+		if (config?.settings && typeof config.settings === 'object') {
+			const configLimit = (config.settings as any).maxDurationSeconds || (config.settings as any).timeoutSeconds;
+			if (typeof configLimit === 'number' && configLimit > 0) {
+				return configLimit * 1000;
+			}
+		}
+
+		const envVal = (typeof env !== 'undefined' && env ? (env.SYNC_MAX_DURATION_SECONDS || env.MAX_DURATION) : undefined)
+			|| (typeof process !== 'undefined' && process.env ? (process.env.SYNC_MAX_DURATION_SECONDS || process.env.MAX_DURATION) : undefined);
+
+		if (envVal) {
+			const parsed = Number(envVal);
+			if (!isNaN(parsed) && parsed > 0) {
+				return parsed * 1000;
+			}
+		}
+
+		// Default fallback: 60 seconds
+		return 60000;
+	}
+
+	/**
 	 * Calculate next sync time based on config settings
 	 */
 	private calculateNextSync(config: SyncConfig): Date {
@@ -1574,30 +1622,163 @@ export class SyncService {
 	}
 
 	async syncItems(userId: string, itemIds: string[], entityType: 'event' | 'announcement' = 'event'): Promise<void> {
+		if (!itemIds || itemIds.length === 0) {
+			return;
+		}
+
 		try {
 			const syncStartTime = Date.now();
-			const MAX_SYNC_DURATION_MS = 25000; // 25s execution budget to prevent serverless timeouts
+			const totalMaxDurationMs = this.getMaxSyncDurationMs();
 
-			// Get all enabled sync configs that support push (Global sweep)
+			// 1. Identify relevant sync config IDs for these items to avoid evaluating irrelevant providers
+			const relevantConfigIds = new Set<string>();
+
+			if (entityType === 'event') {
+				const items = await db
+					.select({
+						event: eventTable,
+						campaign: campaignTable
+					})
+					.from(eventTable)
+					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+					.where(inArray(eventTable.id, itemIds));
+
+				// Handle any instances needing master/series campaign inheritance
+				const masterIds = Array.from(new Set(
+					items
+						.filter(r => !r.campaign && r.event.recurringEventId)
+						.map(r => r.event.recurringEventId as string)
+				));
+				const seriesIds = Array.from(new Set(
+					items
+						.filter(r => !r.campaign && r.event.seriesId)
+						.map(r => r.event.seriesId as string)
+				));
+
+				const inheritedCampaigns: (typeof campaignTable.$inferSelect | null)[] = [];
+				if (masterIds.length > 0) {
+					const masters = await db
+						.select({ campaign: campaignTable })
+						.from(eventTable)
+						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+						.where(inArray(eventTable.id, masterIds));
+					for (const m of masters) {
+						if (m.campaign) inheritedCampaigns.push(m.campaign);
+					}
+				}
+				if (seriesIds.length > 0) {
+					const seriesMasters = await db
+						.select({ campaign: campaignTable })
+						.from(eventTable)
+						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+						.where(and(inArray(eventTable.seriesId, seriesIds), isNull(eventTable.recurringEventId)));
+					for (const sm of seriesMasters) {
+						if (sm.campaign) inheritedCampaigns.push(sm.campaign);
+					}
+				}
+
+				for (const r of items) {
+					if (r.campaign?.content) {
+						const targets = getCampaignTargetIds(r.campaign.content);
+						for (const t of targets) relevantConfigIds.add(t);
+						const content = r.campaign.content as CampaignContent;
+						if (content.items?.[r.event.id]?.syncs) {
+							for (const cfgId of Object.keys(content.items[r.event.id].syncs)) {
+								relevantConfigIds.add(cfgId);
+							}
+						}
+					}
+				}
+
+				for (const c of inheritedCampaigns) {
+					if (c?.content) {
+						const targets = getCampaignTargetIds(c.content);
+						for (const t of targets) relevantConfigIds.add(t);
+					}
+				}
+
+				const mappings = await db
+					.select({ syncConfigId: syncMappingTable.syncConfigId })
+					.from(syncMappingTable)
+					.where(inArray(syncMappingTable.eventId, itemIds));
+				for (const m of mappings) {
+					relevantConfigIds.add(m.syncConfigId);
+				}
+			} else {
+				const items = await db
+					.select({
+						announcement: announcementTable,
+						campaign: campaignTable
+					})
+					.from(announcementTable)
+					.leftJoin(campaignTable, eq(announcementTable.campaignId, campaignTable.id))
+					.where(inArray(announcementTable.id, itemIds));
+
+				for (const r of items) {
+					if (r.campaign?.content) {
+						const targets = getCampaignTargetIds(r.campaign.content);
+						for (const t of targets) relevantConfigIds.add(t);
+						const content = r.campaign.content as CampaignContent;
+						if (content.items?.[r.announcement.id]?.syncs) {
+							for (const cfgId of Object.keys(content.items[r.announcement.id].syncs)) {
+								relevantConfigIds.add(cfgId);
+							}
+						}
+					}
+				}
+
+				const mappings = await db
+					.select({ syncConfigId: syncMappingTable.syncConfigId })
+					.from(syncMappingTable)
+					.where(inArray(syncMappingTable.announcementId, itemIds));
+				for (const m of mappings) {
+					relevantConfigIds.add(m.syncConfigId);
+				}
+			}
+
+			if (relevantConfigIds.size === 0) {
+				console.log(`[SyncService] syncItems: No relevant sync configs or mappings found for ${itemIds.length} ${entityType}(s).`);
+				return;
+			}
+
+			// Get all enabled sync configs that are actually relevant for these items
 			const syncConfigs = await db
 				.select()
 				.from(syncConfigTable)
 				.where(
-					eq(syncConfigTable.enabled, true)
+					and(
+						eq(syncConfigTable.enabled, true),
+						inArray(syncConfigTable.id, Array.from(relevantConfigIds))
+					)
 				);
 
-			for (const configRow of syncConfigs) {
-				if (Date.now() - syncStartTime > MAX_SYNC_DURATION_MS) {
-					console.warn(`[SyncService] Execution budget reached (${MAX_SYNC_DURATION_MS / 1000}s). Stopping syncItems sweep to avoid serverless timeout.`);
-					break;
-				}
+			const candidateConfigs = syncConfigs
+				.map(row => this.rowToConfig(row))
+				.filter(config => config.direction === 'push' || config.direction === 'bidirectional');
 
-				const config = this.rowToConfig(configRow);
+			for (let i = 0; i < candidateConfigs.length; i++) {
+				const config = candidateConfigs[i];
+				const elapsedTotal = Date.now() - syncStartTime;
+				const remainingTotalMs = totalMaxDurationMs - elapsedTotal;
 
-				// Only consider push/bidirectional for push sync
-				if (config.direction !== 'push' && config.direction !== 'bidirectional') {
+				if (remainingTotalMs <= 3000) {
+					console.warn(`[SyncService] Execution budget reached (${Math.round(elapsedTotal / 1000)}s / ${totalMaxDurationMs / 1000}s). Skipping remaining ${candidateConfigs.length - i} configs.`);
+					await db.insert(syncOperationTable).values({
+						syncConfigId: config.id,
+						operation: 'push',
+						status: 'failed',
+						errorMessage: `Sync skipped: Serverless execution budget (${totalMaxDurationMs / 1000}s) reached before this provider could run.`,
+						entityType: entityType,
+						startedAt: new Date(),
+						completedAt: new Date()
+					});
 					continue;
 				}
+
+				// Allocate fair time budget for this config: remaining time divided by remaining configs
+				const remainingConfigsCount = candidateConfigs.length - i;
+				const configBudgetMs = Math.max(5000, Math.floor(remainingTotalMs / remainingConfigsCount));
+				const configStartTime = Date.now();
 
 				// Instantiate provider once per config for pre-flight and execution
 				let provider: SyncProvider;
@@ -1617,10 +1798,9 @@ export class SyncService {
 					}
 				}
 
-				console.log(`[SyncService] syncItems: Config ${config.id} (${config.providerType}) - ${itemsToProcess.length}/${itemIds.length} items to process`);
+				console.log(`[SyncService] syncItems: Config ${config.id} (${config.providerType}) - ${itemsToProcess.length}/${itemIds.length} items to process (Budget: ${Math.round(configBudgetMs / 1000)}s)`);
 
 				if (itemsToProcess.length === 0) {
-					// None of the items are selected for this config and no mappings exist to clean up
 					continue;
 				}
 
@@ -1635,22 +1815,32 @@ export class SyncService {
 				}).returning({ id: syncOperationTable.id });
 
 				const operationId = operationRow.id;
+				let timedOut = false;
+				let processedCount = 0;
 
 				try {
-
 					for (const itemId of itemsToProcess) {
-						if (Date.now() - syncStartTime > MAX_SYNC_DURATION_MS) {
-							console.warn(`[SyncService] Execution budget reached (${MAX_SYNC_DURATION_MS / 1000}s). Stopping syncItems for config ${config.id} to avoid serverless timeout.`);
+						const configElapsed = Date.now() - configStartTime;
+						const overallElapsed = Date.now() - syncStartTime;
+
+						if (configElapsed > configBudgetMs || (totalMaxDurationMs - overallElapsed) <= 3000) {
+							console.warn(`[SyncService] Execution budget reached for config ${config.id} (${config.providerType}) after ${Math.round(configElapsed / 1000)}s (${processedCount}/${itemsToProcess.length} items synced). Yielding to next config.`);
+							timedOut = true;
 							break;
 						}
+
 						await this.syncSingleItem(config, provider, itemId, entityType);
+						processedCount++;
 					}
 
 					// Update operation status
 					await db
 						.update(syncOperationTable)
 						.set({
-							status: 'completed',
+							status: timedOut && processedCount === 0 ? 'failed' : 'completed',
+							errorMessage: timedOut
+								? `Time budget reached: ${processedCount}/${itemsToProcess.length} items synced before budget limit.`
+								: null,
 							completedAt: new Date()
 						})
 						.where(eq(syncOperationTable.id, operationId));
@@ -1658,7 +1848,6 @@ export class SyncService {
 				} catch (error: any) {
 					console.error(`[SyncService] Failed to sync with config ${config.id}:`, error);
 
-					// Update operation status
 					await db
 						.update(syncOperationTable)
 						.set({
@@ -1667,10 +1856,8 @@ export class SyncService {
 							error: `${error.message}\n\nStack:\n${error.stack}`
 						})
 						.where(eq(syncOperationTable.id, operationId));
-					// Continue with other configs even if one fails
 				}
 			}
-
 
 		} catch (error: any) {
 			console.error(`[SyncService] Error in syncItems:`, error);

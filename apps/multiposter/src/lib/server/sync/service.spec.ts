@@ -602,6 +602,34 @@ describe('SyncService - Bulk Sync', () => {
 			});
 		});
 	});
+
+	describe('getMaxSyncDurationMs', () => {
+		it('defaults to 60000ms when no setting is found', () => {
+			const service = new SyncService();
+			expect(service.getMaxSyncDurationMs()).toBe(60000);
+		});
+
+		it('respects per-config maxDurationSeconds or timeoutSeconds', () => {
+			const service = new SyncService();
+			expect(service.getMaxSyncDurationMs({ settings: { maxDurationSeconds: 40 } } as any)).toBe(40000);
+			expect(service.getMaxSyncDurationMs({ settings: { timeoutSeconds: 30 } } as any)).toBe(30000);
+		});
+
+		it('respects process.env.SYNC_MAX_DURATION_SECONDS', () => {
+			const originalEnv = process.env.SYNC_MAX_DURATION_SECONDS;
+			try {
+				process.env.SYNC_MAX_DURATION_SECONDS = '45';
+				const service = new SyncService();
+				expect(service.getMaxSyncDurationMs()).toBe(45000);
+			} finally {
+				if (originalEnv !== undefined) {
+					process.env.SYNC_MAX_DURATION_SECONDS = originalEnv;
+				} else {
+					delete process.env.SYNC_MAX_DURATION_SECONDS;
+				}
+			}
+		});
+	});
 });
 
 
