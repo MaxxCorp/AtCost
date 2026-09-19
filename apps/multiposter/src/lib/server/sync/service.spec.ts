@@ -2,7 +2,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SyncService } from './service';
 import { db } from '@ac/db';
-import { syncMapping as syncMappingTable, event as eventTable } from '@ac/db';
+import {
+	syncMapping as syncMappingTable,
+	event as eventTable,
+	syncConfig as syncConfigTable,
+	syncOperation as syncOperationTable,
+	campaign as campaignTable,
+	announcement as announcementTable
+} from '@ac/db';
 import { eq, and } from '@ac/db';
 import { getEntityContacts } from '../contacts';
 
@@ -16,6 +23,8 @@ vi.mock('@ac/db', async (importOriginal) => {
 			from: vi.fn().mockReturnThis(),
 			where: vi.fn().mockReturnThis(),
 			limit: vi.fn().mockReturnThis(),
+			leftJoin: vi.fn().mockReturnThis(),
+			innerJoin: vi.fn().mockReturnThis(),
 			insert: vi.fn().mockReturnThis(),
 			values: vi.fn().mockReturnThis(),
 			onConflictDoUpdate: vi.fn().mockReturnThis(),
@@ -272,5 +281,248 @@ describe('SyncService - mapInternalToExternal status mapping', () => {
 			responseStatus: 'accepted'
 		});
 	});
+
+	it('should map announcement with entityType and announcementId in metadata', async () => {
+		const internalAnnouncement = {
+			id: 'ann-1',
+			title: 'Community Announcement',
+			content: 'Important updates',
+			status: 'active',
+			isPublic: true,
+			updatedAt: new Date()
+		};
+
+		// @ts-ignore - private method
+		const externalResult = await service.mapInternalToExternal(internalAnnouncement, 'email');
+
+		expect(externalResult.summary).toBe('Community Announcement');
+		expect(externalResult.metadata?.entityType).toBe('announcement');
+		expect(externalResult.metadata?.announcementId).toBe('ann-1');
+	});
 });
+
+describe('SyncService - Bulk Sync', () => {
+	let service: SyncService;
+	class MockSyncProvider {
+		providerType = 'mock-provider' as any;
+		supportedEntityTypes = ['event'];
+		initialize = vi.fn().mockResolvedValue(undefined);
+		pullEvents = vi.fn().mockResolvedValue({ events: [] });
+		pushEvent = vi.fn().mockResolvedValue({ externalId: 'ext-mock-1', etag: 'etag-1' });
+		updateEvent = vi.fn().mockResolvedValue({ etag: 'etag-2' });
+		deleteEvent = vi.fn().mockResolvedValue(undefined);
+	}
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		service = new SyncService();
+		service.registerProvider('mock-provider' as any, MockSyncProvider as any);
+	});
+
+	it('should throw error if config does not exist or is disabled', async () => {
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			})
+		});
+
+		await expect(service.startBulkSync('non-existent')).rejects.toThrow(
+			/Sync config not found or disabled/
+		);
+	});
+
+	it('should build queue including standalone event and recurring instance with healed campaign', async () => {
+		const configId = 'config-bulk-1';
+		const mockConfigRow = {
+			id: configId,
+			userId: 'user-1',
+			providerId: 'provider-1',
+			providerType: 'mock-provider',
+			direction: 'push',
+			enabled: true,
+			createdAt: new Date(),
+			updatedAt: new Date()
+		};
+
+		// 1. Config lookup
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([mockConfigRow])
+			})
+		});
+
+		// 2. Existing mappings lookup
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			})
+		});
+
+		// 3. Events with campaign lookup:
+		// - event 1: standalone event with campaign containing configId
+		// - event 2: recurring instance with null campaign, but recurringEventId: 'master-1'
+		const standaloneEvent = {
+			id: 'event-standalone',
+			summary: 'Standalone Event',
+			isPublic: true,
+			status: 'confirmed'
+		};
+		const instanceEvent = {
+			id: 'event-instance',
+			summary: 'Instance Event',
+			isPublic: true,
+			status: 'confirmed',
+			recurringEventId: 'master-1'
+		};
+		const campaignObj = {
+			id: 'camp-1',
+			content: { syncIds: [configId] }
+		};
+
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				leftJoin: vi.fn().mockResolvedValueOnce([
+					{ event: standaloneEvent, campaign: campaignObj },
+					{ event: instanceEvent, campaign: null }
+				])
+			})
+		});
+
+		// 4. Master events lookup for instances needing master:
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				leftJoin: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([
+						{
+							event: { id: 'master-1', summary: 'Master Series' },
+							campaign: campaignObj
+						}
+					])
+				})
+			})
+		});
+
+		// 5. Update call for healing instance campaignId in DB
+		(db.update as any).mockReturnValue({
+			set: vi.fn().mockReturnValue({
+				where: vi.fn().mockResolvedValueOnce({})
+			})
+		});
+
+		// 6. Insert into syncOperationTable
+		const valuesSpy = vi.fn().mockReturnValue({
+			returning: vi.fn().mockResolvedValue([{ id: 'op-123' }])
+		});
+		(db.insert as any).mockReturnValue({
+			values: valuesSpy
+		});
+
+		const result = await service.startBulkSync(configId);
+
+		expect(result.operationId).toBe('op-123');
+		expect(result.total).toBe(2);
+		expect(result.done).toBe(false);
+
+		// Verify healing update was performed on instance
+		expect(db.update).toHaveBeenCalledWith(eventTable);
+
+		// Verify syncOperationTable insert recorded the queued items
+		const insertOpCall = valuesSpy.mock.calls[0][0];
+		expect(insertOpCall.results.total).toBe(2);
+		expect(insertOpCall.results.itemsToSync).toEqual([
+			{ id: 'event-standalone', entityType: 'event', action: 'sync' },
+			{ id: 'event-instance', entityType: 'event', action: 'sync' }
+		]);
+	});
+
+	it('should process a batch of items and update operation progress', async () => {
+		const configId = 'config-bulk-1';
+		const opId = 'op-123';
+
+		const mockOpRow = {
+			id: opId,
+			syncConfigId: configId,
+			status: 'pending',
+			results: {
+				total: 1,
+				processed: 0,
+				pushed: 0,
+				errors: [],
+				itemsToSync: [{ id: 'event-standalone', entityType: 'event', action: 'sync' }]
+			}
+		};
+
+		// 1. Operation lookup
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([mockOpRow])
+			})
+		});
+
+		// 2. Config lookup
+		const mockConfigRow = {
+			id: configId,
+			userId: 'user-1',
+			providerId: 'provider-1',
+			providerType: 'mock-provider',
+			direction: 'push',
+			enabled: true,
+			createdAt: new Date(),
+			updatedAt: new Date()
+		};
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([mockConfigRow])
+			})
+		});
+
+		// 3. executeSyncItem mocks:
+		// item lookup:
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([{
+					id: 'event-standalone',
+					summary: 'Standalone Event',
+					isPublic: true,
+					status: 'confirmed',
+					startDateTime: new Date('2026-09-01T10:00:00Z'),
+					endDateTime: new Date('2026-09-01T11:00:00Z')
+				}])
+			})
+		});
+		// mapping lookup:
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			})
+		});
+		// mapInternalToExternal mocks associations (innerJoin/where)
+		(db.select as any).mockReturnValue({
+			from: vi.fn().mockReturnValue({
+				innerJoin: vi.fn().mockReturnValue({
+					where: vi.fn().mockResolvedValue([])
+				}),
+				where: vi.fn().mockResolvedValue([])
+			})
+		});
+		// mapping insert
+		(db.insert as any).mockReturnValue({
+			values: vi.fn().mockResolvedValue({})
+		});
+		// operation update
+		(db.update as any).mockReturnValue({
+			set: vi.fn().mockReturnValue({
+				where: vi.fn().mockResolvedValue({})
+			})
+		});
+
+		const batchResult = await service.processBulkSyncBatch(configId, opId, 10);
+
+		expect(batchResult.done).toBe(true);
+		expect(batchResult.processed).toBe(1);
+		expect(batchResult.pushed).toBe(1);
+		expect(batchResult.errors).toHaveLength(0);
+	});
+});
+
 

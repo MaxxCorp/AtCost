@@ -44,3 +44,11 @@ export const getEmailCampaignsSchema = v.object({
     limit: v.optional(v.union([v.number(), v.string()])),
     offset: v.optional(v.union([v.number(), v.string()])),
 });
+
+export const processBulkSyncBatchSchema = v.object({
+    configId: v.pipe(v.string(), v.uuid()),
+    operationId: v.pipe(v.string(), v.uuid()),
+    batchSize: v.optional(v.number()),
+});
+export type ProcessBulkSyncBatchInput = v.InferOutput<typeof processBulkSyncBatchSchema>;
+

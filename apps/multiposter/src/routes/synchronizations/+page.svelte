@@ -2,6 +2,7 @@
 	import * as m from "$lib/paraglide/messages.js";
 	import { list } from "./list.remote";
 	import { removeBulk } from "./[id]/delete.remote";
+	import { startBulkSync, processBulkSyncBatch } from "./[id]/sync.remote";
 	import { getEmailCampaigns } from "./email-campaigns.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
@@ -289,6 +290,51 @@
 		sortOrder,
 	});
 
+	let syncingConfigId = $state<string | null>(null);
+	let syncProgress = $state<string | null>(null);
+
+	async function handleBulkSync(configId: string) {
+		if (syncingConfigId) return;
+		syncingConfigId = configId;
+		syncProgress = null;
+
+		try {
+			const startRes = await startBulkSync(configId);
+			if (startRes.done) {
+				toast.success(m.bulk_sync_completed({ pushed: 0, pulled: startRes.pulled || 0 }));
+				list(filterState).refresh();
+				return;
+			}
+
+			let done = false;
+			let lastResult: any = null;
+			while (!done) {
+				const batchRes = await processBulkSyncBatch({
+					configId,
+					operationId: startRes.operationId,
+					batchSize: 10
+				});
+				lastResult = batchRes;
+				done = batchRes.done;
+				syncProgress = m.bulk_sync_progress({
+					current: batchRes.processed,
+					total: batchRes.total
+				});
+			}
+
+			toast.success(m.bulk_sync_completed({
+				pushed: lastResult?.pushed ?? 0,
+				pulled: startRes.pulled ?? 0
+			}));
+			list(filterState).refresh();
+		} catch (e: any) {
+			toast.error(m.bulk_sync_failed() + ": " + (e.message || e));
+		} finally {
+			syncingConfigId = null;
+			syncProgress = null;
+		}
+	}
+
 	async function deleteItem(config: Synchronization) {
 		if (!window.confirm(m.delete_confirm({ item: m.feature_synchronizations_title() }))) return;
 		try {
@@ -544,6 +590,18 @@
 							</div>
 							
 							{#if isAdmin}
+								<AsyncButton
+									variant="outline"
+									size="sm"
+									class="flex-1 sm:flex-none"
+									loading={syncingConfigId === config.id}
+									loadingLabel={syncProgress || m.bulk_syncing()}
+									disabled={!config.enabled || (syncingConfigId !== null && syncingConfigId !== config.id)}
+									onclick={() => handleBulkSync(config.id)}
+								>
+									<RefreshCw class="w-4 h-4 mr-2 {syncingConfigId === config.id ? 'animate-spin' : ''}" />
+									{m.bulk_sync()}
+								</AsyncButton>
 								<Button
 									href={`/synchronizations/${config.id}`}
 									variant="outline"

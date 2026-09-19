@@ -8,7 +8,7 @@
 	import { updateSynchronization as update } from "./update.remote";
 	import { updateSynchronizationSchema, type UpdateSynchronizationInput as UpdateSyncInput } from "$lib/validations/synchronizations";
 	import { removeBulk } from "./delete.remote";
-	import { sync } from "./sync.remote";
+	import { startBulkSync, processBulkSyncBatch, sync } from "./sync.remote";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
 	import SynchronizationForm from "$lib/components/synchronizations/SynchronizationForm.svelte";
@@ -30,6 +30,7 @@
 	// Version tracker for re-fetching data after actions
 	let version = $state(0);
 	let isSyncing = $state(false);
+	let syncProgress = $state<string | null>(null);
 	let syncError = $state<string | null>(null);
 
 	let prevIssuesLength = $state(0);
@@ -52,18 +53,46 @@
 		return getOperations(configId);
 	});
 
-	async function triggerSync() {
+	async function triggerBulkSync() {
 		try {
 			isSyncing = true;
 			syncError = null;
-			await sync(configId);
-			version++; // Trigger re-fetch
-			toast.success(m.sync_completed_successfully());
+			syncProgress = null;
+
+			const startRes = await startBulkSync(configId);
+			if (startRes.done) {
+				version++;
+				toast.success(m.bulk_sync_completed({ pushed: 0, pulled: startRes.pulled || 0 }));
+				return;
+			}
+
+			let done = false;
+			let lastResult: any = null;
+			while (!done) {
+				const batchRes = await processBulkSyncBatch({
+					configId,
+					operationId: startRes.operationId,
+					batchSize: 10
+				});
+				lastResult = batchRes;
+				done = batchRes.done;
+				syncProgress = m.bulk_sync_progress({
+					current: batchRes.processed,
+					total: batchRes.total
+				});
+			}
+
+			version++;
+			toast.success(m.bulk_sync_completed({
+				pushed: lastResult?.pushed ?? 0,
+				pulled: startRes.pulled ?? 0
+			}));
 		} catch (e: any) {
 			syncError = e.message;
-			toast.error(m.sync_failed() + ": " + e.message);
+			toast.error(m.bulk_sync_failed() + ": " + (e.message || e));
 		} finally {
 			isSyncing = false;
+			syncProgress = null;
 		}
 	}
 
@@ -144,11 +173,11 @@
                                         <AsyncButton
                                             variant="default"
                                             loading={isSyncing}
-                                            loadingLabel={m.syncing()}
-                                            onclick={triggerSync}
+                                            loadingLabel={syncProgress || m.bulk_syncing()}
+                                            onclick={triggerBulkSync}
                                         >
                                             <RefreshCw class="h-4 w-4 mr-2 {isSyncing ? 'animate-spin' : ''}" />
-                                            {m.sync_now()}
+                                            {m.bulk_sync()}
                                         </AsyncButton>
                                         <AsyncButton
                                             variant={config.enabled ? "secondary" : "default"}

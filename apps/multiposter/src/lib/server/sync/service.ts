@@ -120,99 +120,385 @@ export class SyncService {
 	 * Sync events for a specific configuration
 	 * Handles bidirectional sync (pull from provider, push local changes)
 	 */
+	/**
+	 * Sync events for a specific configuration
+	 * Handles bidirectional sync (pull from provider, push local changes)
+	 */
 	async syncEvents(configId: string): Promise<SyncResult> {
-		const result: SyncResult = {
-			success: true,
-			pulled: 0,
-			pushed: 0,
-			errors: []
+		const startRes = await this.startBulkSync(configId);
+		let done = startRes.done;
+		let lastBatchRes: any = null;
+
+		while (!done) {
+			lastBatchRes = await this.processBulkSyncBatch(configId, startRes.operationId, 25);
+			done = lastBatchRes.done;
+		}
+
+		return {
+			success: (lastBatchRes?.errors?.length || 0) === 0,
+			pulled: startRes.pulled,
+			pushed: lastBatchRes?.pushed || 0,
+			errors: lastBatchRes?.errors || []
 		};
+	}
 
-		let operationId: string | undefined;
+	/**
+	 * Start a bulk sync process for a configuration.
+	 * Executes pull if applicable, compiles the full queue of eligible events (handling series and instances)
+	 * and announcements, and creates the operation record for chunked batch execution.
+	 */
+	async startBulkSync(configId: string): Promise<{ operationId: string; total: number; pulled: number; done: boolean }> {
+		const [configRow] = await db
+			.select()
+			.from(syncConfigTable)
+			.where(and(eq(syncConfigTable.id, configId), eq(syncConfigTable.enabled, true)));
 
-		try {
-			// Get sync config
-			const [configRow] = await db
-				.select()
-				.from(syncConfigTable)
-				.where(and(eq(syncConfigTable.id, configId), eq(syncConfigTable.enabled, true)));
+		if (!configRow) {
+			console.error(`[SyncService] Sync config not found or disabled: ${configId}`);
+			throw new Error(`Sync config not found or disabled: ${configId}`);
+		}
 
-			if (!configRow) {
-				console.error(`[SyncService] Sync config not found or disabled: ${configId}`);
-				throw new Error(`Sync config not found or disabled: ${configId}`);
+		const config = this.rowToConfig(configRow);
+		const provider = await this.getProviderInstance(config);
+
+		let pulled = 0;
+		const errors: any[] = [];
+
+		// Pull events from provider if applicable
+		if (config.direction === 'pull' || config.direction === 'bidirectional') {
+			try {
+				const pullResult = await this.pullFromProvider(config, provider);
+				pulled = pullResult.pulled;
+				errors.push(...pullResult.errors);
+			} catch (e: any) {
+				console.error(`[SyncService] Pull operation failed:`, e);
+				errors.push({ message: `Pull failed: ${e.message}` });
 			}
+		}
 
-			const config = this.rowToConfig(configRow);
-
-			// Create operation record
-			const [operationRow] = await db.insert(syncOperationTable).values({
+		// If direction is pull-only, no push is needed
+		if (config.direction === 'pull') {
+			const [op] = await db.insert(syncOperationTable).values({
 				syncConfigId: configId,
 				operation: 'pull',
-				status: 'pending',
+				status: errors.length > 0 ? 'failed' : 'completed',
 				entityType: 'event',
-				startedAt: new Date()
+				startedAt: new Date(),
+				completedAt: new Date(),
+				error: errors.length > 0 ? JSON.stringify(errors) : null,
+				results: { total: 0, processed: 0, pushed: 0, pulled, errors }
 			}).returning({ id: syncOperationTable.id });
 
-			operationId = operationRow.id;
+			await db.update(syncConfigTable).set({
+				lastSyncAt: new Date(),
+				nextSyncAt: this.calculateNextSync(config)
+			}).where(eq(syncConfigTable.id, configId));
 
-			// Initialize provider
-			const provider = await this.getProviderInstance(config);
-
-			// Pull events from provider
-			if (config.direction === 'pull' || config.direction === 'bidirectional') {
-				const pullResult = await this.pullFromProvider(config, provider);
-				result.pulled = pullResult.pulled;
-				result.errors.push(...pullResult.errors);
-			}
-
-			// Push local changes to provider
-			if (config.direction === 'push' || config.direction === 'bidirectional') {
-				const pushResult = await this.pushToProvider(config, provider);
-				result.pushed = pushResult.pushed;
-				result.errors.push(...pushResult.errors);
-			}
-
-			// Update operation status
-			await db
-				.update(syncOperationTable)
-				.set({
-					status: result.errors.length > 0 ? 'failed' : 'completed',
-					completedAt: new Date(),
-					error: result.errors.length > 0 ? JSON.stringify(result.errors) : null
-				})
-				.where(eq(syncOperationTable.id, operationId));
-
-			// Update sync config with last sync time
-			await db
-				.update(syncConfigTable)
-				.set({
-					lastSyncAt: new Date(),
-					nextSyncAt: this.calculateNextSync(config)
-				})
-				.where(eq(syncConfigTable.id, configId));
-
-			result.success = result.errors.length === 0;
-			return result;
-		} catch (error: any) {
-			console.error(`[SyncService] Sync failed with error:`, error);
-			console.error(`[SyncService] Error stack:`, error.stack);
-			result.success = false;
-			result.errors.push({ message: error.message });
-
-			// Update operation as failed if we created one
-			if (operationId) {
-				await db
-					.update(syncOperationTable)
-					.set({
-						status: 'failed',
-						completedAt: new Date(),
-						error: `${error.message}\n\nStack:\n${error.stack}`
-					})
-					.where(eq(syncOperationTable.id, operationId));
-			}
-
-			throw error;
+			return { operationId: op.id, total: 0, pulled, done: true };
 		}
+
+		// Fetch existing mappings for this config
+		const existingMappings = await db
+			.select()
+			.from(syncMappingTable)
+			.where(eq(syncMappingTable.syncConfigId, config.id));
+
+		const eventMappingMap = new Map<string, typeof syncMappingTable.$inferSelect>();
+		const announcementMappingMap = new Map<string, typeof syncMappingTable.$inferSelect>();
+		for (const m of existingMappings) {
+			if (m.eventId) eventMappingMap.set(m.eventId, m);
+			if (m.announcementId) announcementMappingMap.set(m.announcementId, m);
+		}
+
+		type SyncQueueItem = {
+			id: string;
+			entityType: 'event' | 'announcement';
+			action: 'sync' | 'unpublish';
+			mappingId?: string;
+			externalId?: string;
+		};
+
+		const itemsToSync: SyncQueueItem[] = [];
+
+		// 1. Process Events (if provider supports events)
+		const processedEventIds = new Set<string>();
+		if (provider.supportedEntityTypes.includes('event')) {
+			const allEventsWithCampaign = await db
+				.select({
+					event: eventTable,
+					campaign: campaignTable
+				})
+				.from(eventTable)
+				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id));
+
+			// Detect instances needing master event campaign (healing bit rot)
+			const instancesNeedingMaster = allEventsWithCampaign.filter(
+				r => !r.campaign && r.event.recurringEventId
+			);
+
+			const masterCampaignMap = new Map<string, typeof campaignTable.$inferSelect>();
+			if (instancesNeedingMaster.length > 0) {
+				const masterIds = Array.from(new Set(instancesNeedingMaster.map(r => r.event.recurringEventId!)));
+				const masterEvents = await db
+					.select({
+						event: eventTable,
+						campaign: campaignTable
+					})
+					.from(eventTable)
+					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+					.where(inArray(eventTable.id, masterIds));
+
+				for (const m of masterEvents) {
+					if (m.campaign) masterCampaignMap.set(m.event.id, m.campaign);
+				}
+			}
+
+			for (const r of allEventsWithCampaign) {
+				processedEventIds.add(r.event.id);
+				let eventCampaign = r.campaign;
+
+				// Heal instance bit rot if missing campaignId
+				if (!eventCampaign && r.event.recurringEventId && masterCampaignMap.has(r.event.recurringEventId)) {
+					eventCampaign = masterCampaignMap.get(r.event.recurringEventId)!;
+					// Heal in DB for future queries
+					await db.update(eventTable).set({ campaignId: eventCampaign.id }).where(eq(eventTable.id, r.event.id));
+				}
+
+				const syncIds = (eventCampaign?.content as any)?.syncIds || [];
+				let shouldBeSynced = syncIds.includes(config.id);
+
+				if (shouldBeSynced) {
+					if (provider.shouldSyncEvent) {
+						if (!provider.shouldSyncEvent(r.event)) shouldBeSynced = false;
+					} else {
+						if (r.event.status === 'tentative' || !r.event.isPublic) shouldBeSynced = false;
+					}
+				}
+
+				const existingMapping = eventMappingMap.get(r.event.id);
+
+				if (shouldBeSynced) {
+					itemsToSync.push({ id: r.event.id, entityType: 'event', action: 'sync' });
+				} else if (existingMapping) {
+					itemsToSync.push({
+						id: r.event.id,
+						entityType: 'event',
+						action: 'unpublish',
+						mappingId: existingMapping.id,
+						externalId: existingMapping.externalId
+					});
+				}
+			}
+		}
+
+		// Handle orphan event mappings (where event was deleted from DB)
+		for (const [eventId, mapping] of eventMappingMap.entries()) {
+			if (!processedEventIds.has(eventId)) {
+				itemsToSync.push({
+					id: eventId,
+					entityType: 'event',
+					action: 'unpublish',
+					mappingId: mapping.id,
+					externalId: mapping.externalId
+				});
+			}
+		}
+
+		// 2. Process Announcements (if provider supports announcements)
+		const processedAnnouncementIds = new Set<string>();
+		if (provider.supportedEntityTypes.includes('announcement')) {
+			const allAnnouncementsWithCampaign = await db
+				.select({
+					announcement: announcementTable,
+					campaign: campaignTable
+				})
+				.from(announcementTable)
+				.leftJoin(campaignTable, eq(announcementTable.campaignId, campaignTable.id));
+
+			for (const r of allAnnouncementsWithCampaign) {
+				processedAnnouncementIds.add(r.announcement.id);
+				const syncIds = (r.campaign?.content as any)?.syncIds || [];
+				const shouldBeSynced = syncIds.includes(config.id) &&
+					r.announcement.status === 'active' &&
+					r.announcement.isPublic === true;
+
+				const existingMapping = announcementMappingMap.get(r.announcement.id);
+
+				if (shouldBeSynced) {
+					itemsToSync.push({ id: r.announcement.id, entityType: 'announcement', action: 'sync' });
+				} else if (existingMapping) {
+					itemsToSync.push({
+						id: r.announcement.id,
+						entityType: 'announcement',
+						action: 'unpublish',
+						mappingId: existingMapping.id,
+						externalId: existingMapping.externalId
+					});
+				}
+			}
+		}
+
+		// Handle orphan announcement mappings or stale announcement mappings on non-announcement providers
+		for (const [announcementId, mapping] of announcementMappingMap.entries()) {
+			if (!processedAnnouncementIds.has(announcementId)) {
+				itemsToSync.push({
+					id: announcementId,
+					entityType: 'announcement',
+					action: 'unpublish',
+					mappingId: mapping.id,
+					externalId: mapping.externalId
+				});
+			}
+		}
+
+		// If queue is empty, finish immediately
+		if (itemsToSync.length === 0) {
+			const [op] = await db.insert(syncOperationTable).values({
+				syncConfigId: configId,
+				operation: 'push',
+				status: 'completed',
+				entityType: 'event',
+				startedAt: new Date(),
+				completedAt: new Date(),
+				results: { total: 0, processed: 0, pushed: 0, pulled, errors }
+			}).returning({ id: syncOperationTable.id });
+
+			await db.update(syncConfigTable).set({
+				lastSyncAt: new Date(),
+				nextSyncAt: this.calculateNextSync(config)
+			}).where(eq(syncConfigTable.id, configId));
+
+			return { operationId: op.id, total: 0, pulled, done: true };
+		}
+
+		// Create operation record with queue for chunked batch execution
+		const [operationRow] = await db.insert(syncOperationTable).values({
+			syncConfigId: configId,
+			operation: 'push',
+			status: 'pending',
+			entityType: 'event',
+			startedAt: new Date(),
+			results: {
+				total: itemsToSync.length,
+				processed: 0,
+				pushed: 0,
+				pulled,
+				errors,
+				itemsToSync
+			}
+		}).returning({ id: syncOperationTable.id });
+
+		return {
+			operationId: operationRow.id,
+			total: itemsToSync.length,
+			pulled,
+			done: false
+		};
+	}
+
+	/**
+	 * Process a batch of items for an ongoing bulk sync operation.
+	 * Runs within safe serverless execution limits (e.g. 10 items per batch).
+	 */
+	async processBulkSyncBatch(
+		configId: string,
+		operationId: string,
+		batchSize = 10
+	): Promise<{ done: boolean; processed: number; total: number; pushed: number; errors: any[] }> {
+		const [opRow] = await db
+			.select()
+			.from(syncOperationTable)
+			.where(eq(syncOperationTable.id, operationId));
+
+		if (!opRow) {
+			throw new Error(`Sync operation not found: ${operationId}`);
+		}
+
+		const results = (opRow.results as any) || {};
+		const itemsToSync = (results.itemsToSync as any[]) || [];
+		const total = Number(results.total || itemsToSync.length);
+		let processed = Number(results.processed || 0);
+		let pushed = Number(results.pushed || 0);
+		const pulled = Number(results.pulled || 0);
+		const errors = (results.errors as any[]) || [];
+
+		if (opRow.status === 'completed' || processed >= total) {
+			return { done: true, processed: total, total, pushed, errors };
+		}
+
+		const [configRow] = await db
+			.select()
+			.from(syncConfigTable)
+			.where(eq(syncConfigTable.id, configId));
+
+		if (!configRow) {
+			throw new Error(`Sync config not found: ${configId}`);
+		}
+
+		const config = this.rowToConfig(configRow);
+		const provider = await this.getProviderInstance(config);
+
+		const batch = itemsToSync.slice(processed, processed + batchSize);
+
+		for (const item of batch) {
+			try {
+				if (item.action === 'unpublish') {
+					if (item.externalId) {
+						try {
+							await provider.deleteEvent(item.externalId);
+						} catch (delErr: any) {
+							console.warn(`[BulkSync] Provider delete warning for ${item.externalId}:`, delErr);
+						}
+					}
+					if (item.mappingId) {
+						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, item.mappingId));
+					}
+				} else if (item.action === 'sync') {
+					await this.executeSyncItem(config, provider, item.id, item.entityType);
+					pushed++;
+				}
+			} catch (err: any) {
+				console.error(`[BulkSync] Failed to process ${item.entityType} ${item.id}:`, err);
+				errors.push({ id: item.id, message: err.message || String(err) });
+			}
+		}
+
+		processed += batch.length;
+		const done = processed >= total;
+
+		if (done) {
+			await db.update(syncOperationTable).set({
+				status: errors.length > 0 && pushed === 0 ? 'failed' : 'completed',
+				completedAt: new Date(),
+				error: errors.length > 0 ? JSON.stringify(errors) : null,
+				results: {
+					total,
+					processed,
+					pushed,
+					pulled,
+					errors,
+					itemsToSync: [] // clear queue to minimize storage
+				}
+			}).where(eq(syncOperationTable.id, operationId));
+
+			await db.update(syncConfigTable).set({
+				lastSyncAt: new Date(),
+				nextSyncAt: this.calculateNextSync(config)
+			}).where(eq(syncConfigTable.id, configId));
+		} else {
+			await db.update(syncOperationTable).set({
+				results: {
+					total,
+					processed,
+					pushed,
+					pulled,
+					errors,
+					itemsToSync
+				}
+			}).where(eq(syncOperationTable.id, operationId));
+		}
+
+		return { done, processed, total, pushed, errors };
 	}
 
 	/**
@@ -1185,7 +1471,9 @@ export class SyncService {
 			tags,
 			image,
 			metadata: {
-				eventId: internal.id,
+				entityType,
+				eventId: isEvent ? internal.id : undefined,
+				announcementId: !isEvent ? internal.id : undefined,
 				seriesId: (internal as any).seriesId ?? undefined,
 				app_event_id: internal.id,
 				organizerId: organizerId,
@@ -1299,6 +1587,11 @@ export class SyncService {
 		itemId: string,
 		entityType: 'event' | 'announcement'
 	): Promise<{ needsSync: boolean }> {
+		const provider = await this.getProviderInstance(config);
+		if (!provider.supportedEntityTypes.includes(entityType)) {
+			return { needsSync: false };
+		}
+
 		// Check for existing mapping
 		const mappingWhere = entityType === 'event'
 			? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
@@ -1325,12 +1618,26 @@ export class SyncService {
 			return { needsSync: !!mapping };
 		}
 
-		const syncIds = itemWithCampaign.campaign?.content ? ((itemWithCampaign.campaign.content as any).syncIds || []) : [];
+		let campaign = itemWithCampaign.campaign;
+		// Inherit campaign from master event for instances if missing
+		if (!campaign && entityType === 'event' && (itemWithCampaign.item as any)?.recurringEventId) {
+			const [master] = await db
+				.select({ campaign: campaignTable })
+				.from(eventTable)
+				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+				.where(eq(eventTable.id, (itemWithCampaign.item as any).recurringEventId))
+				.limit(1);
+			if (master?.campaign) {
+				campaign = master.campaign;
+				await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+			}
+		}
+
+		const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
 		let shouldBeSynced = syncIds.includes(config.id);
 
 		if (entityType === 'event' && shouldBeSynced) {
 			try {
-				const provider = await this.getProviderInstance(config);
 				const event = itemWithCampaign.item as any;
 				if (provider.shouldSyncEvent) {
 					if (!provider.shouldSyncEvent(event)) shouldBeSynced = false;
@@ -1342,6 +1649,11 @@ export class SyncService {
 				const event = itemWithCampaign.item as any;
 				if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
 			}
+		} else if (entityType === 'announcement' && shouldBeSynced) {
+			const announcement = itemWithCampaign.item as any;
+			if (announcement.status !== 'active' || !announcement.isPublic) {
+				shouldBeSynced = false;
+			}
 		}
 
 		return {
@@ -1349,9 +1661,74 @@ export class SyncService {
 		};
 	}
 
+	/**
+	 * Synchronize a single item (push new or update existing mapping)
+	 */
+	public async executeSyncItem(
+		config: SyncConfig,
+		provider: SyncProvider,
+		itemId: string,
+		entityType: 'event' | 'announcement'
+	): Promise<void> {
+		const table = entityType === 'event' ? eventTable : announcementTable;
+		const [itemRow] = await db.select().from(table).where(eq(table.id, itemId));
+
+		if (!itemRow) {
+			console.warn(`[SyncService] ${entityType} ${itemId} not found in database.`);
+			return;
+		}
+
+		const mappingWhere = entityType === 'event'
+			? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+			: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
+
+		const [mapping] = await db.select().from(syncMappingTable).where(mappingWhere);
+
+		const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
+
+		if (mapping) {
+			// Update existing item
+			try {
+				const { etag } = await provider.updateEvent(mapping.externalId, externalItem);
+				await db
+					.update(syncMappingTable)
+					.set({ etag: etag ?? null, lastSyncedAt: new Date() })
+					.where(eq(syncMappingTable.id, mapping.id));
+			} catch (err: any) {
+				if (err?.message?.includes('404')) {
+					console.warn(`[SyncService] External item ${mapping.externalId} returned 404 on update. Deleting mapping and re-pushing.`);
+					await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
+					const { externalId, etag } = await provider.pushEvent(externalItem);
+					await db.insert(syncMappingTable).values({
+						syncConfigId: config.id,
+						eventId: entityType === 'event' ? itemRow.id : null,
+						announcementId: entityType === 'announcement' ? itemRow.id : null,
+						externalId: externalId,
+						providerId: config.providerId,
+						etag: etag ?? null,
+						lastSyncedAt: new Date()
+					});
+				} else {
+					throw err;
+				}
+			}
+		} else {
+			// Create new item
+			const { externalId, etag } = await provider.pushEvent(externalItem);
+			await db.insert(syncMappingTable).values({
+				syncConfigId: config.id,
+				eventId: entityType === 'event' ? itemRow.id : null,
+				announcementId: entityType === 'announcement' ? itemRow.id : null,
+				externalId: externalId,
+				providerId: config.providerId,
+				etag: etag ?? null,
+				lastSyncedAt: new Date()
+			});
+		}
+	}
 
 	/**
-	 * Sync a single event to a provider (create, update, or delete)
+	 * Sync a single item to a provider (create, update, or delete)
 	 */
 	private async syncSingleItem(
 		config: SyncConfig,
@@ -1359,17 +1736,18 @@ export class SyncService {
 		itemId: string,
 		entityType: 'event' | 'announcement' = 'event'
 	): Promise<void> {
-
 		try {
-			// Check if item exists
+			if (!provider.supportedEntityTypes.includes(entityType)) {
+				console.log(`[SyncService] Provider ${config.providerType} does not support entityType ${entityType}. Skipping.`);
+				return;
+			}
+
 			const table = entityType === 'event' ? eventTable : announcementTable;
 			const [itemRow] = await db
 				.select()
 				.from(table)
 				.where(eq(table.id, itemId));
 
-			// Check for existing mapping
-			// The syncMappingTable has separate columns for eventId and announcementId
 			const mappingWhere = entityType === 'event'
 				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
 				: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
@@ -1379,7 +1757,6 @@ export class SyncService {
 				.from(syncMappingTable)
 				.where(mappingWhere);
 
-			// Check granular sync settings (campaign-based)
 			const [itemWithCampaign] = await db
 				.select({ campaign: campaignTable })
 				.from(table)
@@ -1387,7 +1764,21 @@ export class SyncService {
 				.where(eq(table.id, itemId))
 				.limit(1);
 
-			const syncIds = itemWithCampaign?.campaign?.content ? ((itemWithCampaign.campaign.content as any).syncIds || []) : [];
+			let campaign = itemWithCampaign?.campaign;
+			if (!campaign && entityType === 'event' && (itemRow as any)?.recurringEventId) {
+				const [master] = await db
+					.select({ campaign: campaignTable })
+					.from(eventTable)
+					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+					.where(eq(eventTable.id, (itemRow as any).recurringEventId))
+					.limit(1);
+				if (master?.campaign) {
+					campaign = master.campaign;
+					await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+				}
+			}
+
+			const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
 			let shouldBeSynced = syncIds.includes(config.id);
 
 			if (entityType === 'event' && shouldBeSynced) {
@@ -1397,20 +1788,20 @@ export class SyncService {
 					const event = itemRow as any;
 					if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
 				}
+			} else if (entityType === 'announcement' && shouldBeSynced) {
+				const ann = itemRow as any;
+				if (ann.status !== 'active' || !ann.isPublic) shouldBeSynced = false;
 			}
 
-
 			if (!shouldBeSynced && !mapping) {
-				// Not selected for this sync and no existing mapping to clean up
 				console.log(`[SyncService] Skipping ${entityType} ${itemId}: not selected for synchronization config ${config.id}`);
 				return;
 			}
 
 			if (!shouldBeSynced && mapping) {
-				// The item was previously mapped but has now been deselected
-				console.log(`[SyncService] Un-publishing ${entityType} ${itemId} from provider: has been deselected for config ${config.id}`);
+				console.log(`[SyncService] Un-publishing ${entityType} ${itemId} from provider: deselected for config ${config.id}`);
 				try {
-					await provider.deleteEvent(mapping.externalId); // Provider currently only has deleteEvent
+					await provider.deleteEvent(mapping.externalId);
 					await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
 				} catch (e: any) {
 					console.error(`[SyncService] Failed to un-publish ${entityType} ${itemId}:`, e);
@@ -1419,65 +1810,15 @@ export class SyncService {
 			}
 
 			if (!itemRow) {
-				console.warn(`[SyncService] ${entityType} ${itemId} not found in database at all.`);
+				console.warn(`[SyncService] ${entityType} ${itemId} not found in database.`);
 				return;
 			}
 
 			console.log(`[SyncService] Syncing ${entityType} ${itemId} ("${(itemRow as any).summary || (itemRow as any).title}") to provider: ${config.providerType}. Status: ${mapping ? 'update' : 'create'}`);
-
-			console.log(`[SyncService] Found ${entityType} ${itemId} (User: ${itemRow.userId}). Proceeding with sync to ${config.providerType} (${config.id}).`);
-
-			if (mapping) {
-				// Update existing item
-				const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
-				try {
-					const { etag } = await provider.updateEvent(mapping.externalId, externalItem);
-
-					await db
-						.update(syncMappingTable)
-						.set({ etag: etag ?? null, lastSyncedAt: new Date() })
-						.where(eq(syncMappingTable.id, mapping.id));
-				} catch (err: any) {
-					if (err?.message?.includes('404')) {
-						console.warn(`[SyncService] External item ${mapping.externalId} returned 404 on update. Deleting mapping and re-pushing.`);
-						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
-						const { externalId, etag } = await provider.pushEvent(externalItem);
-						await db.insert(syncMappingTable).values({
-							syncConfigId: config.id,
-							eventId: entityType === 'event' ? itemRow.id : null,
-							announcementId: entityType === 'announcement' ? itemRow.id : null,
-							externalId: externalId,
-							providerId: config.providerId,
-							etag: etag ?? null,
-							lastSyncedAt: new Date()
-						});
-					} else {
-						throw err;
-					}
-				}
-			} else {
-				// Create new item
-				const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
-				const { externalId, etag } = await provider.pushEvent(externalItem);
-
-				console.log(`[SyncService] Created mapping for ${entityType} ${itemId} â†’ external ${externalId}`);
-				// Create mapping immediately to prevent duplicates if webhook fires quickly
-				await db.insert(syncMappingTable).values({
-					syncConfigId: config.id,
-					eventId: entityType === 'event' ? itemRow.id : null,
-					announcementId: entityType === 'announcement' ? itemRow.id : null,
-					externalId: externalId,
-					providerId: config.providerId,
-					etag: etag ?? null,
-					lastSyncedAt: new Date()
-				});
-				console.log(`[SyncService] Successfully saved mapping to database for ${entityType} ${itemId}`);
-			}
-
+			await this.executeSyncItem(config, provider, itemId, entityType);
 
 		} catch (error: any) {
 			console.error(`[SyncService] Failed to sync ${entityType} ${itemId}:`, error);
-			// Log but don't throw - we want to continue with other items
 		}
 	}
 
