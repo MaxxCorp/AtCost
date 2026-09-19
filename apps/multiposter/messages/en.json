@@ -820,6 +820,17 @@
 	"compress_series": "Compress Series",
 	"compress_series_tooltip": "Group recurring events into a single entry with all dates and recurrence pattern",
 	"special_event_badge": "Highlight",
-	"special_event_tooltip": "Special event outside the regular schedule"
+	"special_event_tooltip": "Special event outside the regular schedule",
+	"series_mode_label": "Series",
+	"instance_mode_label": "Occurrence",
+	"editing_series_title": "Series (Master Template)",
+	"editing_series_desc": "Changes to common fields apply to all occurrences in this series.",
+	"editing_instance_title": "Single Occurrence",
+	"editing_instance_desc": "You are editing only this occurrence on {date}. Changes affect only this date.",
+	"entire_series": "Entire Series",
+	"entire_series_master": "Entire Series (Master)",
+	"switch_series_or_instance": "Select series or occurrence",
+	"unsaved_changes_switch_confirm": "You may have unsaved changes. Are you sure you want to switch?",
+	"all_instances_count": "Occurrences ({count})"
 }
 

@@ -119,11 +119,38 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		fallbackToFirst: true
 	});
 
-	// 3.5. Fetch instances if this is a series master
+	// 3.5. Fetch instances & series master info
 	let instances: any[] = [];
-	if (!result.recurringEventId && result.seriesId) {
+	let seriesMaster: any = null;
+
+	const masterId = result.recurringEventId || (!result.recurringEventId && (result.seriesId || (result.recurrence && (result.recurrence as string[]).length > 0)) ? result.id : null);
+
+	if (masterId) {
+		if (result.recurringEventId) {
+			const master = await db.query.event.findFirst({
+				where: eq(event.id, result.recurringEventId),
+			});
+			if (master) {
+				seriesMaster = {
+					id: master.id,
+					summary: master.summary,
+					startDateTime: master.startDateTime?.toISOString() ?? null,
+					endDateTime: master.endDateTime?.toISOString() ?? null,
+					recurrence: master.recurrence,
+				};
+			}
+		} else {
+			seriesMaster = {
+				id: result.id,
+				summary: result.summary,
+				startDateTime: result.startDateTime?.toISOString() ?? null,
+				endDateTime: result.endDateTime?.toISOString() ?? null,
+				recurrence: result.recurrence,
+			};
+		}
+
 		const fetchedInstances = await db.query.event.findMany({
-			where: eq(event.recurringEventId, result.id),
+			where: eq(event.recurringEventId, masterId),
 			orderBy: [asc(event.startDateTime)],
 		});
 		instances = fetchedInstances.map((inst: any) => ({
@@ -166,6 +193,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			resolvedContact,
 			contactIds: [],
 			syncIds: [],
+			seriesMaster: seriesMaster ?? undefined,
 			instances: instances.length > 0 ? instances : undefined,
 		} as any;
 	}
@@ -191,6 +219,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
 		syncIds: getCampaignTargetIds(result.campaign?.content),
 		resolvedContact,
+		seriesMaster: seriesMaster ?? undefined,
 		instances: instances.length > 0 ? instances : undefined,
 	} as any;
 });

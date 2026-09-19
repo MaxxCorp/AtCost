@@ -59,6 +59,7 @@
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
     import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
+    import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import {
         RefreshCw,
@@ -621,14 +622,11 @@
                 <span class="text-left">{recurrenceText}</span>
             </button>
 
-            {#if initialData?.recurringEventId}
-                <a href={`/events/${initialData.recurringEventId}`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
-                    {m.view_series()}
-                </a>
-            {:else if initialData?.seriesId && !initialData?.recurringEventId && initialData?.recurrence && initialData.recurrence.length > 0}
-                <a href={`/events/${initialData.id}/view`} class="text-sm text-blue-600 hover:underline hover:text-blue-800">
-                    {m.instances()}
-                </a>
+            {#if initialData}
+                <SeriesModeSelector
+                    event={initialData}
+                    variant="inline"
+                />
             {/if}
         </div>
     </div>

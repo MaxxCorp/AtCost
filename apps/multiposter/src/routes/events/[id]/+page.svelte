@@ -10,6 +10,7 @@
     import { deleteEvents as deleteEventAction } from "../delete.remote";
 	import { updateEventSchema } from "$lib/validations/events";
 	import EventForm from "$lib/components/events/EventForm.svelte";
+	import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
 		    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { Button } from "$lib/components/ui/button";
@@ -114,7 +115,9 @@
                 {/if}
             </div>
 
-                            <form
+            <SeriesModeSelector event={event} variant="banner" />
+
+            <form
                     {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
                         try {
                             const result: any = await submit();

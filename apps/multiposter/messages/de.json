@@ -820,6 +820,17 @@
 	"compress_series": "Serien komprimieren",
 	"compress_series_tooltip": "Wiederkehrende Termine zu einem Eintrag mit allen Daten und Wiederholungsmuster zusammenfassen",
 	"special_event_badge": "Highlight",
-	"special_event_tooltip": "Besonderer Termin außerhalb des regulären Programms"
+	"special_event_tooltip": "Besonderer Termin außerhalb des regulären Programms",
+	"series_mode_label": "Serie",
+	"instance_mode_label": "Termin",
+	"editing_series_title": "Serie (Hauptvorlage)",
+	"editing_series_desc": "Änderungen an allgemeinen Daten gelten für alle Termine dieser Serie.",
+	"editing_instance_title": "Einzelner Termin",
+	"editing_instance_desc": "Du bearbeitest nur diesen Termin am {date}. Änderungen betreffen nur diesen Tag.",
+	"entire_series": "Ganze Serie",
+	"entire_series_master": "Ganze Serie (Master)",
+	"switch_series_or_instance": "Serie oder Termin wählen",
+	"unsaved_changes_switch_confirm": "Du hast möglicherweise ungespeicherte Änderungen. Möchtest du wirklich wechseln?",
+	"all_instances_count": "Termine ({count})"
 }
 

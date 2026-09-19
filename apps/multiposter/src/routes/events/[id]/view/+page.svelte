@@ -42,6 +42,7 @@
 
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import * as Dialog from "$lib/components/ui/dialog";
+    import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
 
     const eventId = page.params.id || "";
     let dataPromise = $state(readEvent(eventId));
@@ -176,6 +177,10 @@
                 {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
 
                 <Breadcrumb feature="events" current={event.summary} />
+
+                <div class="mt-4">
+                    <SeriesModeSelector event={event} variant="banner" viewMode={true} />
+                </div>
 
                 <div
                     class="bg-white shadow-xl rounded-2xl p-5 md:p-8 mt-4 border border-gray-100 space-y-6"
@@ -399,59 +404,7 @@
 
                                             {#if event.recurringEventId || (event.seriesId && !event.recurringEventId && event.recurrence && (event.recurrence as string[]).length > 0)}
                                                 <div class="mt-2">
-                                                    {#if !event.recurringEventId && eventInstances.length > 0}
-                                                        <Dialog.Root>
-                                                            <Dialog.Trigger class="text-xs text-blue-600 hover:underline flex items-center gap-1 text-left font-medium">
-                                                                <RefreshCw size={13} class="flex-shrink-0" />
-                                                                {formatRecurrenceText((event.recurrence as string[])[0])} ({eventInstances.length} {m.instances()})
-                                                            </Dialog.Trigger>
-                                                            <Dialog.Content class="sm:max-w-[440px]">
-                                                                <Dialog.Header>
-                                                                    <Dialog.Title>{m.instances()}</Dialog.Title>
-                                                                    <Dialog.Description>
-                                                                        {event.recurrence ? formatRecurrenceText((event.recurrence as string[])[0]) : ''}
-                                                                    </Dialog.Description>
-                                                                </Dialog.Header>
-                                                                <div class="max-h-[60vh] overflow-y-auto pr-1 mt-4 space-y-2">
-                                                                    {#each eventInstances as instance (instance.id)}
-                                                                        <a href={`/events/${instance.id}/view`} class="block p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
-                                                                            <div class="flex items-center justify-between gap-2">
-                                                                                <div class="font-medium text-gray-900 text-sm">{instance.summary}</div>
-                                                                                {#if instance.status}
-                                                                                    <span
-                                                                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 {getStatusBadgeClass(
-                                                                                            instance.status,
-                                                                                        )}"
-                                                                                    >
-                                                                                        <span
-                                                                                            class="w-1.5 h-1.5 rounded-full {getStatusDotClass(
-                                                                                                instance.status,
-                                                                                            )}"
-                                                                                        ></span>
-                                                                                        {formatEventStatus(
-                                                                                            instance.status,
-                                                                                        )}
-                                                                                    </span>
-                                                                                {/if}
-                                                                            </div>
-                                                                            <div class="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
-                                                                                <Calendar size={13} />
-                                                                                {formatDate(instance.startDateTime)} 
-                                                                                {#if instance.startDateTime}
-                                                                                    {formatTime(instance.startDateTime)}
-                                                                                {/if}
-                                                                            </div>
-                                                                        </a>
-                                                                    {/each}
-                                                                </div>
-                                                            </Dialog.Content>
-                                                        </Dialog.Root>
-                                                    {:else if event.recurringEventId && event.recurrence && (event.recurrence as string[]).length > 0}
-                                                        <a href={`/events/${event.recurringEventId}/view`} class="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
-                                                            <RefreshCw size={13} class="flex-shrink-0" />
-                                                            {formatRecurrenceText((event.recurrence as string[])[0])}
-                                                        </a>
-                                                    {/if}
+                                                    <SeriesModeSelector event={event} variant="inline" viewMode={true} />
                                                 </div>
                                             {/if}
                                         </div>
