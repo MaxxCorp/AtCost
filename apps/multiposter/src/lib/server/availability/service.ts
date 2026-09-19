@@ -75,8 +75,10 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
 
         try {
             const endpoint = isUserToken
-                ? 'https://graph.microsoft.com/v1.0/me/getSchedule'
-                : 'https://graph.microsoft.com/v1.0/getSchedule';
+                ? 'https://graph.microsoft.com/v1.0/me/calendar/getSchedule'
+                : (emails.length > 0 ? `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(emails[0])}/calendar/getSchedule` : null);
+
+            if (!endpoint) return results;
 
             const response = await fetch(endpoint, {
                 method: 'POST',

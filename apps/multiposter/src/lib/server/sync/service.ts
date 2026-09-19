@@ -604,7 +604,7 @@ export class SyncService {
 
 			const unmappedEvents = unmappedEventsRaw.filter(({ campaign, event }) => {
 				if (!campaign || !campaign.content) return false;
-				const syncIds = (campaign.content as any).syncIds || [];
+				const syncIds = getCampaignTargetIds(campaign.content);
 				if (!syncIds.includes(config.id)) return false;
 
 				if (provider.shouldSyncEvent) {
@@ -651,7 +651,7 @@ export class SyncService {
 
 			for (const { event, mapping, campaign } of mappedEventsRaw) {
 				try {
-					const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
+					const syncIds = getCampaignTargetIds(campaign?.content);
 					let shouldBeSynced = syncIds.includes(config.id);
 
 					if (shouldBeSynced) {
@@ -1578,6 +1578,8 @@ export class SyncService {
 					}
 				}
 
+				console.log(`[SyncService] syncItems: Config ${config.id} (${config.providerType}) - ${itemsToProcess.length}/${itemIds.length} items to process`);
+
 				if (itemsToProcess.length === 0) {
 					// None of the items are selected for this config and no mappings exist to clean up
 					continue;
@@ -1676,20 +1678,34 @@ export class SyncService {
 
 		let campaign = itemWithCampaign.campaign;
 		// Inherit campaign from master event for instances if missing
-		if (!campaign && entityType === 'event' && (itemWithCampaign.item as any)?.recurringEventId) {
-			const [master] = await db
-				.select({ campaign: campaignTable })
-				.from(eventTable)
-				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-				.where(eq(eventTable.id, (itemWithCampaign.item as any).recurringEventId))
-				.limit(1);
-			if (master?.campaign) {
-				campaign = master.campaign;
-				await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+		if (!campaign && entityType === 'event') {
+			const masterId = (itemWithCampaign.item as any)?.recurringEventId;
+			if (masterId) {
+				const [master] = await db
+					.select({ campaign: campaignTable })
+					.from(eventTable)
+					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+					.where(eq(eventTable.id, masterId))
+					.limit(1);
+				if (master?.campaign) {
+					campaign = master.campaign;
+					await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+				}
+			} else if ((itemWithCampaign.item as any)?.seriesId) {
+				const [master] = await db
+					.select({ campaign: campaignTable })
+					.from(eventTable)
+					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+					.where(and(eq(eventTable.seriesId, (itemWithCampaign.item as any).seriesId), isNull(eventTable.recurringEventId)))
+					.limit(1);
+				if (master?.campaign) {
+					campaign = master.campaign;
+					await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+				}
 			}
 		}
 
-		const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
+		const syncIds = getCampaignTargetIds(campaign?.content);
 		let shouldBeSynced = syncIds.includes(config.id);
 
 		if (entityType === 'event' && shouldBeSynced) {
@@ -1740,12 +1756,27 @@ export class SyncService {
 		if (campaignId) {
 			[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
 		}
-		if (!campaignRow && entityType === 'event' && (itemRow as any).recurringEventId) {
-			const [master] = await db.select().from(eventTable).where(eq(eventTable.id, (itemRow as any).recurringEventId));
-			if (master?.campaignId) {
-				campaignId = master.campaignId;
-				[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
-				await db.update(table).set({ campaignId } as any).where(eq(table.id, itemId));
+		if (!campaignRow && entityType === 'event') {
+			const masterId = (itemRow as any).recurringEventId;
+			if (masterId) {
+				const [master] = await db.select().from(eventTable).where(eq(eventTable.id, masterId));
+				if (master?.campaignId) {
+					campaignId = master.campaignId;
+					[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
+					await db.update(table).set({ campaignId } as any).where(eq(table.id, itemId));
+				}
+			} else if ((itemRow as any).seriesId) {
+				const [master] = await db.select().from(eventTable).where(
+					and(
+						eq(eventTable.seriesId, (itemRow as any).seriesId),
+						isNull(eventTable.recurringEventId)
+					)
+				);
+				if (master?.campaignId) {
+					campaignId = master.campaignId;
+					[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
+					await db.update(table).set({ campaignId } as any).where(eq(table.id, itemId));
+				}
 			}
 		}
 
@@ -1864,20 +1895,34 @@ export class SyncService {
 				.limit(1);
 
 			let campaign = itemWithCampaign?.campaign;
-			if (!campaign && entityType === 'event' && (itemRow as any)?.recurringEventId) {
-				const [master] = await db
-					.select({ campaign: campaignTable })
-					.from(eventTable)
-					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-					.where(eq(eventTable.id, (itemRow as any).recurringEventId))
-					.limit(1);
-				if (master?.campaign) {
-					campaign = master.campaign;
-					await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+			if (!campaign && entityType === 'event') {
+				const masterId = (itemRow as any)?.recurringEventId;
+				if (masterId) {
+					const [master] = await db
+						.select({ campaign: campaignTable })
+						.from(eventTable)
+						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+						.where(eq(eventTable.id, masterId))
+						.limit(1);
+					if (master?.campaign) {
+						campaign = master.campaign;
+						await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+					}
+				} else if ((itemRow as any)?.seriesId) {
+					const [master] = await db
+						.select({ campaign: campaignTable })
+						.from(eventTable)
+						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+						.where(and(eq(eventTable.seriesId, (itemRow as any).seriesId), isNull(eventTable.recurringEventId)))
+						.limit(1);
+					if (master?.campaign) {
+						campaign = master.campaign;
+						await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+					}
 				}
 			}
 
-			const syncIds = campaign?.content ? ((campaign.content as any).syncIds || []) : [];
+			const syncIds = getCampaignTargetIds(campaign?.content);
 			let shouldBeSynced = syncIds.includes(config.id);
 
 			if (entityType === 'event' && shouldBeSynced) {

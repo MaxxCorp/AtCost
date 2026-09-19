@@ -208,6 +208,15 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						updatedEvent.campaignId = newCampaign.id;
 					}
 				}
+
+				// If master event, ensure existing recurring instances also have campaignId set
+				if (updatedEvent.campaignId && !updatedEvent.recurringEventId) {
+					const instanceCondition = or(
+						eq(event.recurringEventId, updatedEvent.id),
+						updatedEvent.seriesId ? and(eq(event.seriesId, updatedEvent.seriesId), ne(event.id, updatedEvent.id)) : undefined
+					);
+					await tx.update(event).set({ campaignId: updatedEvent.campaignId }).where(instanceCondition);
+				}
 			}
 
 			// Add Series tag if recurring
@@ -380,14 +389,19 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			} else {
 				// data.recurrence is undefined, meaning recurrence structure did not change.
 				// If the updated event is a master event and belongs to a series, propagate updates to instances.
-				if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
+				const isMasterEvent = !updatedEvent.recurringEventId && (!!updatedEvent.seriesId || (updatedEvent.recurrence && (updatedEvent.recurrence as string[]).length > 0));
+				if (isMasterEvent) {
 					console.log('Propagating common field updates to recurring instances...');
+					const instanceCondition = or(
+						eq(event.recurringEventId, updatedEvent.id),
+						updatedEvent.seriesId ? and(eq(event.seriesId, updatedEvent.seriesId), ne(event.id, updatedEvent.id)) : undefined
+					);
 					const affectedInstances = await tx
 						.select({ id: event.id })
 						.from(event)
 						.where(
 							and(
-								eq(event.recurringEventId, updatedEvent.id),
+								instanceCondition,
 								eq(event.isException, false)
 							)
 						);
@@ -420,7 +434,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							.set(instanceUpdatePayload)
 							.where(
 								and(
-									eq(event.recurringEventId, updatedEvent.id),
+									instanceCondition,
 									eq(event.isException, false)
 								)
 							);
@@ -450,13 +464,21 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		console.log('Regenerating assets after update...');
 		await generateEventAssets(data.id, origin);
 
-		if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
-			const instances = await db.query.event.findMany({
-				where: (e, { eq, and, ne }) => and(
-					eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),
-					ne(e.id, data.id)
-				)
-			});
+		const isMasterEvent = !updatedEvent.recurringEventId && (!!updatedEvent.seriesId || (updatedEvent.recurrence && (updatedEvent.recurrence as string[]).length > 0));
+		if (isMasterEvent) {
+			const instanceCondition = or(
+				eq(event.recurringEventId, updatedEvent.id),
+				updatedEvent.seriesId ? and(eq(event.seriesId, updatedEvent.seriesId), ne(event.id, updatedEvent.id)) : undefined
+			);
+			const instances = await db
+				.select({ id: event.id })
+				.from(event)
+				.where(
+					and(
+						instanceCondition,
+						ne(event.id, data.id)
+					)
+				);
 			for (const inst of instances) {
 				await generateEventAssets(inst.id, origin);
 			}
@@ -466,17 +488,24 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		if (updatedEvent) {
 			let allAffectedIds = [updatedEvent.id];
-			if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
-				const instances = await db.query.event.findMany({
-					where: (e, { eq, and, ne }) => and(
-						eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),
-						ne(e.id, data.id)
-					),
-					columns: { id: true }
-				});
+			if (isMasterEvent) {
+				const instanceCondition = or(
+					eq(event.recurringEventId, updatedEvent.id),
+					updatedEvent.seriesId ? and(eq(event.seriesId, updatedEvent.seriesId), ne(event.id, updatedEvent.id)) : undefined
+				);
+				const instances = await db
+					.select({ id: event.id })
+					.from(event)
+					.where(
+						and(
+							instanceCondition,
+							ne(event.id, data.id)
+						)
+					);
 				allAffectedIds = [updatedEvent.id, ...instances.map(i => i.id)];
 			}
 
+			console.log(`[Update Remote] Triggering sync for ${allAffectedIds.length} affected event(s)...`);
 			await publishEventChange('update', allAffectedIds);
 			// Trigger background sync to external providers for all affected instances
 			await syncService.syncItems(user.id, allAffectedIds, 'event');
