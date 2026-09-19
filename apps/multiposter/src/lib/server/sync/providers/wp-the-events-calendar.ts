@@ -6,9 +6,6 @@ import type {
 	SyncDirection
 } from '../types';
 import { env } from '$env/dynamic/private';
-import { db } from '@ac/db';
-import { syncMapping } from '@ac/db';
-import { eq, and } from '@ac/db';
 import crypto from 'crypto';
 import { parsePricing } from '../utils/pricing';
 
@@ -23,11 +20,15 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 
-
 	private config?: SyncConfig;
 	private baseUrl = '';
 	private username = '';
 	private applicationPassword = '';
+
+	// In-memory caches to prevent redundant REST API calls during sync runs
+	private venueCache = new Map<string, number>();
+	private organizerCache = new Map<string, number>();
+	private tagCache = new Map<string, number>();
 
 	async initialize(config: SyncConfig): Promise<void> {
 		this.config = config;
@@ -326,48 +327,13 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		if (!this.config) return undefined;
 
 		try {
-			// 1. Check mapping
-			if (internalId) {
-				const [mapping] = await db
-					.select()
-					.from(syncMapping)
-					.where(and(
-						eq(syncMapping.syncConfigId, this.config.id),
-						eq(syncMapping.locationId, internalId)
-					));
-
-				if (mapping) {
-					try {
-						const venueData: any = {
-							venue: venue.name,
-							address: venue.address,
-							city: venue.city,
-							country: venue.country,
-							province: venue.province,
-							zip: venue.zip,
-							phone: venue.phone,
-							website: venue.website,
-							show_map: 'true',
-							show_map_link: 'true',
-						};
-
-						await fetch(this.getApiUrl(`/tribe/events/v1/venues/${mapping.externalId}`), {
-							method: 'POST',
-							headers: {
-								'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
-								'Content-Type': 'application/json',
-							},
-							body: JSON.stringify(venueData),
-						});
-					} catch (e) {
-						console.error('[WP-Sync] Failed to update venue:', e);
-					}
-
-					return parseInt(mapping.externalId, 10);
-				}
+			// Check in-memory cache first
+			const cacheKey = internalId || venue.name;
+			if (this.venueCache.has(cacheKey)) {
+				return this.venueCache.get(cacheKey);
 			}
 
-			// 2. Search for existing venue by name
+			// 1. Search for existing venue by name
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', venue.name);
 
@@ -389,7 +355,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 3. Create new venue if not found
+			// 2. Create new venue if not found
 			if (!externalId) {
 				console.log(`[WP-Sync] Creating new venue: ${venue.name}`);
 				const venueData: any = {
@@ -424,25 +390,16 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 4. Save mapping
-			if (externalId && internalId) {
-				await db.insert(syncMapping).values({
-					id: crypto.randomUUID(),
-					syncConfigId: this.config.id,
-					externalId: externalId,
-					providerId: this.config.providerId,
-					locationId: internalId,
-					contactId: null,
-					eventId: null,
-					announcementId: null,
-					tagId: null,
-					etag: null,
-					metadata: null,
-					lastSyncedAt: new Date()
-				});
+			if (externalId) {
+				const parsedId = parseInt(externalId, 10);
+				this.venueCache.set(cacheKey, parsedId);
+				if (internalId && venue.name) {
+					this.venueCache.set(venue.name, parsedId);
+				}
+				return parsedId;
 			}
 
-			return externalId ? parseInt(externalId, 10) : undefined;
+			return undefined;
 
 		} catch (error) {
 			console.error('Error ensuring venue in WordPress:', error);
@@ -461,42 +418,13 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		if (!this.config) return undefined;
 
 		try {
-			// 1. Check mapping
-			if (internalId) {
-				const [mapping] = await db
-					.select()
-					.from(syncMapping)
-					.where(and(
-						eq(syncMapping.syncConfigId, this.config.id),
-						eq(syncMapping.contactId, internalId)
-					));
-
-				if (mapping) {
-					try {
-						const organizerData: any = {
-							organizer: organizer.name,
-							email: organizer.email,
-							phone: organizer.phone,
-							website: organizer.website,
-						};
-
-						await fetch(this.getApiUrl(`/tribe/events/v1/organizers/${mapping.externalId}`), {
-							method: 'POST',
-							headers: {
-								'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
-								'Content-Type': 'application/json',
-							},
-							body: JSON.stringify(organizerData),
-						});
-					} catch (e) {
-						console.error('[WP-Sync] Failed to update organizer:', e);
-					}
-
-					return parseInt(mapping.externalId, 10);
-				}
+			// Check in-memory cache first
+			const cacheKey = internalId || organizer.email || organizer.name;
+			if (this.organizerCache.has(cacheKey)) {
+				return this.organizerCache.get(cacheKey);
 			}
 
-			// 2. Search
+			// 1. Search
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', organizer.email || organizer.name);
 
@@ -525,7 +453,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 3. Create
+			// 2. Create
 			if (!externalId) {
 				const organizerData: any = {
 					organizer: organizer.name,
@@ -552,25 +480,15 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 4. Save mapping
-			if (externalId && internalId) {
-				await db.insert(syncMapping).values({
-					id: crypto.randomUUID(),
-					syncConfigId: this.config.id,
-					externalId: externalId,
-					providerId: this.config.providerId,
-					contactId: internalId,
-					locationId: null,
-					eventId: null,
-					announcementId: null,
-					tagId: null,
-					etag: null,
-					metadata: null,
-					lastSyncedAt: new Date()
-				});
+			if (externalId) {
+				const parsedId = parseInt(externalId, 10);
+				this.organizerCache.set(cacheKey, parsedId);
+				if (organizer.email) this.organizerCache.set(organizer.email, parsedId);
+				if (organizer.name) this.organizerCache.set(organizer.name, parsedId);
+				return parsedId;
 			}
 
-			return externalId ? parseInt(externalId, 10) : undefined;
+			return undefined;
 		} catch (error) {
 			console.error('Error ensuring organizer in WordPress:', error);
 		}
@@ -587,20 +505,13 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		if (!this.config) return undefined;
 
 		try {
-			// 1. Check mapping
-			const [mapping] = await db
-				.select()
-				.from(syncMapping)
-				.where(and(
-					eq(syncMapping.syncConfigId, this.config.id),
-					eq(syncMapping.tagId, tag.id)
-				));
-
-			if (mapping) {
-				return parseInt(mapping.externalId, 10);
+			// Check in-memory cache first
+			const cacheKey = tag.id || tag.name;
+			if (this.tagCache.has(cacheKey)) {
+				return this.tagCache.get(cacheKey);
 			}
 
-			// 2. Search
+			// 1. Search
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', tag.name);
 			const searchUrl = this.getApiUrl('/wp/v2/tags', searchParams);
@@ -622,7 +533,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 3. Create
+			// 2. Create
 			if (!externalId) {
 				const createResponse = await fetch(this.getApiUrl('/wp/v2/tags'), {
 					method: 'POST',
@@ -639,25 +550,14 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 4. Save mapping
 			if (externalId) {
-				await db.insert(syncMapping).values({
-					id: crypto.randomUUID(),
-					syncConfigId: this.config.id,
-					externalId: externalId,
-					providerId: this.config.providerId,
-					tagId: tag.id,
-					locationId: null,
-					contactId: null,
-					eventId: null,
-					announcementId: null,
-					etag: null,
-					metadata: null,
-					lastSyncedAt: new Date()
-				});
+				const parsedId = parseInt(externalId, 10);
+				this.tagCache.set(cacheKey, parsedId);
+				this.tagCache.set(tag.name, parsedId);
+				return parsedId;
 			}
 
-			return externalId ? parseInt(externalId, 10) : undefined;
+			return undefined;
 		} catch (error) {
 			console.error('Error ensuring tag in WordPress:', error);
 		}

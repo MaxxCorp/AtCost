@@ -16,7 +16,6 @@
 			totalItems: number;
 			counts: {
 				syncMappings: number;
-				emailCampaigns: number;
 				unlinkedInstances: number;
 				legacyCampaigns: number;
 			};
@@ -109,7 +108,6 @@
 				<div class="font-medium text-gray-700 dark:text-gray-300">Records to Migrate:</div>
 				<ul class="grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400">
 					<li>Sync Mappings: <strong class="text-gray-900 dark:text-gray-100">{statusData?.counts?.syncMappings ?? 0}</strong></li>
-					<li>Email Campaigns: <strong class="text-gray-900 dark:text-gray-100">{statusData?.counts?.emailCampaigns ?? 0}</strong></li>
 					<li>Legacy Campaigns: <strong class="text-gray-900 dark:text-gray-100">{statusData?.counts?.legacyCampaigns ?? 0}</strong></li>
 					<li>Unlinked Series Instances: <strong class="text-gray-900 dark:text-gray-100">{statusData?.counts?.unlinkedInstances ?? 0}</strong></li>
 				</ul>

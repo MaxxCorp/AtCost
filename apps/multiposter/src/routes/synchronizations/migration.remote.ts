@@ -8,8 +8,7 @@ import {
 	syncMapping as syncMappingTable,
 	event as eventTable,
 	announcement as announcementTable,
-	campaign as campaignTable,
-	emailCampaign as emailCampaignTable
+	campaign as campaignTable
 } from '@ac/db';
 import { eq, and, or, isNull, isNotNull, sql, inArray, count } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -28,12 +27,8 @@ export const checkMigrationStatus = query(async () => {
 
 	const [mappingRes] = await db
 		.select({ count: count() })
-		.from(syncMappingTable)
-		.where(or(isNotNull(syncMappingTable.eventId), isNotNull(syncMappingTable.announcementId)));
+		.from(syncMappingTable);
 	const syncMappings = Number(mappingRes?.count || 0);
-
-	const [emailRes] = await db.select({ count: count() }).from(emailCampaignTable);
-	const emailCampaigns = Number(emailRes?.count || 0);
 
 	const [unlinkedRes] = await db
 		.select({ count: count() })
@@ -50,14 +45,13 @@ export const checkMigrationStatus = query(async () => {
 		);
 	const legacyCampaigns = Number(legacyCampRes?.count || 0);
 
-	const totalItems = syncMappings + emailCampaigns + unlinkedInstances + legacyCampaigns;
+	const totalItems = syncMappings + unlinkedInstances + legacyCampaigns;
 	const hasLegacyData = totalItems > 0;
 
 	return {
 		hasLegacyData,
 		counts: {
 			syncMappings,
-			emailCampaigns,
 			unlinkedInstances,
 			legacyCampaigns
 		},
@@ -68,8 +62,7 @@ export const checkMigrationStatus = query(async () => {
 type MigrationTask =
 	| { type: 'link_instances'; ids: string[] }
 	| { type: 'migrate_campaign'; id: string }
-	| { type: 'migrate_mapping'; id: string }
-	| { type: 'migrate_email'; id: string };
+	| { type: 'migrate_mapping'; id: string };
 
 /**
  * Start a migration process.
@@ -117,19 +110,12 @@ export const startMigration = command(async () => {
 		queue.push({ type: 'migrate_campaign', id: camp.id });
 	}
 
-	// 3. Sync mappings (events and announcements only)
+	// 3. Sync mappings (all rows from syncMappingTable)
 	const mappings = await db
 		.select({ id: syncMappingTable.id })
-		.from(syncMappingTable)
-		.where(or(isNotNull(syncMappingTable.eventId), isNotNull(syncMappingTable.announcementId)));
+		.from(syncMappingTable);
 	for (const m of mappings) {
 		queue.push({ type: 'migrate_mapping', id: m.id });
-	}
-
-	// 4. Email campaigns
-	const emails = await db.select({ id: emailCampaignTable.id }).from(emailCampaignTable);
-	for (const e of emails) {
-		queue.push({ type: 'migrate_email', id: e.id });
 	}
 
 	if (queue.length === 0) {
@@ -358,63 +344,6 @@ export const processMigrationBatch = command(
 
 						// Delete migrated sync mapping
 						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
-					}
-				} else if (task.type === 'migrate_email') {
-					const [emailRow] = await db
-						.select()
-						.from(emailCampaignTable)
-						.where(eq(emailCampaignTable.id, task.id));
-
-					if (emailRow) {
-						const itemId = emailRow.eventId || emailRow.announcementId;
-						const entityType: 'event' | 'announcement' = emailRow.eventId ? 'event' : 'announcement';
-
-						if (itemId) {
-							const table = entityType === 'event' ? eventTable : announcementTable;
-							const [entityRow] = await db
-								.select({ id: table.id, campaignId: table.campaignId, userId: table.userId })
-								.from(table)
-								.where(eq(table.id, itemId));
-
-							if (entityRow && entityRow.campaignId) {
-								const [camp] = await db
-									.select()
-									.from(campaignTable)
-									.where(eq(campaignTable.id, entityRow.campaignId));
-
-								if (camp) {
-									const currentContent: CampaignContent =
-										(camp.content as any)?.version === 1
-											? (camp.content as any)
-											: createDefaultCampaignContent();
-
-									if (!currentContent.items) currentContent.items = {};
-									if (!currentContent.items[itemId]) {
-										currentContent.items[itemId] = { entityType, syncs: {} };
-									}
-									const existingSync = currentContent.items[itemId].syncs[emailRow.syncConfigId] || {
-										status: 'synced'
-									};
-									existingSync.metadata = {
-										...(existingSync.metadata || {}),
-										brevoCampaignId: emailRow.brevoCampaignId,
-										eventSummary: emailRow.eventSummary,
-										sentAt: emailRow.sentAt.toISOString(),
-										recipientCount: emailRow.recipientCount,
-										...(emailRow.metadata as any || {})
-									};
-									currentContent.items[itemId].syncs[emailRow.syncConfigId] = existingSync;
-
-									await db
-										.update(campaignTable)
-										.set({ content: currentContent, updatedAt: new Date() })
-										.where(eq(campaignTable.id, entityRow.campaignId));
-								}
-							}
-						}
-
-						// Delete migrated email campaign
-						await db.delete(emailCampaignTable).where(eq(emailCampaignTable.id, emailRow.id));
 					}
 				}
 			} catch (err: any) {
