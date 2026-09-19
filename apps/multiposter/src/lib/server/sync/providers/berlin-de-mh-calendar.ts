@@ -30,6 +30,22 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     shouldSyncEvent(event: any): boolean {
         if (event.status === 'cancelled') return false;
         if (event.status === 'tentative' || !event.isPublic) return false;
+
+        // Berlin.de restriction: dates in the past or > 365 days in the future are not allowed
+        if (event.startDateTime) {
+            const start = new Date(event.startDateTime);
+            const now = new Date();
+            const end = event.endDateTime ? new Date(event.endDateTime) : start;
+            if (end.getTime() < now.getTime()) {
+                return false;
+            }
+
+            const maxFuture = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+            if (start.getTime() > maxFuture.getTime()) {
+                return false;
+            }
+        }
+
         return true;
     }
 

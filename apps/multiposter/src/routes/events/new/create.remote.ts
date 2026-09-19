@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
@@ -305,8 +305,26 @@ export const createEvent = form(createEventSchema, async (data) => {
 
 		if (newEvent) {
 			await publishEventChange('create', allEventIds);
-			// Trigger background sync to external providers for all created instances
-			await syncService.syncItems(user.id, allEventIds, 'event');
+
+			const syncPromise = syncService.syncItems(user.id, allEventIds, 'event').catch((err) => {
+				console.error('[Create Remote] Background sync error:', err);
+			});
+
+			// For single items or small updates, wait for sync so UI shows immediate state.
+			// For large recurring batches, use platform background execution or bounded wait to prevent Vercel 60s timeout.
+			if (allEventIds.length <= 2) {
+				await syncPromise;
+			} else {
+				const requestEvent = getRequestEvent();
+				if ((requestEvent?.platform as any)?.context?.waitUntil) {
+					(requestEvent.platform as any).context.waitUntil(syncPromise);
+				} else {
+					await Promise.race([
+						syncPromise,
+						new Promise((resolve) => setTimeout(resolve, 8000))
+					]);
+				}
+			}
 		}
 
 		await listEvents().refresh();

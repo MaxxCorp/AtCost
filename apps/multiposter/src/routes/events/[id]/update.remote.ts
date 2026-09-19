@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, getRequestEvent } from '$app/server';
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
 import { eq, and, or, ne, inArray } from '@ac/db';
@@ -507,8 +507,26 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 			console.log(`[Update Remote] Triggering sync for ${allAffectedIds.length} affected event(s)...`);
 			await publishEventChange('update', allAffectedIds);
-			// Trigger background sync to external providers for all affected instances
-			await syncService.syncItems(user.id, allAffectedIds, 'event');
+
+			const syncPromise = syncService.syncItems(user.id, allAffectedIds, 'event').catch((err) => {
+				console.error('[Update Remote] Background sync error:', err);
+			});
+
+			// For single items or small updates, wait for sync so UI shows immediate state.
+			// For large recurring batches, use platform background execution or bounded wait to prevent Vercel 60s timeout.
+			if (allAffectedIds.length <= 2) {
+				await syncPromise;
+			} else {
+				const requestEvent = getRequestEvent();
+				if ((requestEvent?.platform as any)?.context?.waitUntil) {
+					(requestEvent.platform as any).context.waitUntil(syncPromise);
+				} else {
+					await Promise.race([
+						syncPromise,
+						new Promise((resolve) => setTimeout(resolve, 8000))
+					]);
+				}
+			}
 		}
 
 		// Refresh caches

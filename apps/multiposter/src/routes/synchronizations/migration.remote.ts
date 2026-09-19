@@ -11,7 +11,7 @@ import {
 	campaign as campaignTable,
 	emailCampaign as emailCampaignTable
 } from '@ac/db';
-import { eq, and, isNull, isNotNull, sql, inArray, count } from '@ac/db';
+import { eq, and, or, isNull, isNotNull, sql, inArray, count } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { processMigrationBatchSchema } from '$lib/validations/synchronizations';
 import {
@@ -26,7 +26,10 @@ export const checkMigrationStatus = query(async () => {
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'synchronizations');
 
-	const [mappingRes] = await db.select({ count: count() }).from(syncMappingTable);
+	const [mappingRes] = await db
+		.select({ count: count() })
+		.from(syncMappingTable)
+		.where(or(isNotNull(syncMappingTable.eventId), isNotNull(syncMappingTable.announcementId)));
 	const syncMappings = Number(mappingRes?.count || 0);
 
 	const [emailRes] = await db.select({ count: count() }).from(emailCampaignTable);
@@ -114,8 +117,11 @@ export const startMigration = command(async () => {
 		queue.push({ type: 'migrate_campaign', id: camp.id });
 	}
 
-	// 3. Sync mappings
-	const mappings = await db.select({ id: syncMappingTable.id }).from(syncMappingTable);
+	// 3. Sync mappings (events and announcements only)
+	const mappings = await db
+		.select({ id: syncMappingTable.id })
+		.from(syncMappingTable)
+		.where(or(isNotNull(syncMappingTable.eventId), isNotNull(syncMappingTable.announcementId)));
 	for (const m of mappings) {
 		queue.push({ type: 'migrate_mapping', id: m.id });
 	}

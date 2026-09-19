@@ -66,6 +66,7 @@ describe('SyncService - processExternalEvent deduplication', () => {
 
 	beforeEach(() => {
 		vi.resetAllMocks();
+		(db.delete as any).mockReturnValue({ where: vi.fn().mockResolvedValue({}) });
 		vi.mocked(getEntityContacts).mockResolvedValue([]);
 		service = new SyncService();
 	});
@@ -100,10 +101,15 @@ describe('SyncService - processExternalEvent deduplication', () => {
 			})
 		});
 
-		// 3. Mock idempotent mapping insertion
+		// 3. Mock campaign insertion and event update
 		(db.insert as any).mockReturnValueOnce({
 			values: vi.fn().mockReturnValueOnce({
-				onConflictDoUpdate: vi.fn().mockResolvedValueOnce({})
+				returning: vi.fn().mockResolvedValueOnce([{ id: 'camp-echo' }])
+			})
+		});
+		(db.update as any).mockReturnValueOnce({
+			set: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce({})
 			})
 		});
 
@@ -113,8 +119,9 @@ describe('SyncService - processExternalEvent deduplication', () => {
 		// Verify it tried to fetch the event by UUID
 		expect(db.select).toHaveBeenCalled();
 		
-		// Verify mapping was healed/created
-		expect(db.insert).toHaveBeenCalledWith(syncMappingTable);
+		// Verify campaign was created/updated instead of syncMappingTable
+		expect(db.insert).toHaveBeenCalledWith(campaignTable);
+		expect(db.insert).not.toHaveBeenCalledWith(syncMappingTable);
 	});
 
 	it('should handle partial updates and NOT overwrite existing fields with null/undefined', async () => {
@@ -211,10 +218,9 @@ describe('SyncService - processExternalEvent deduplication', () => {
 		const eventUpdateSet = (db.update(eventTable).set as any).mock.calls[0][0];
 		expect(eventUpdateSet.status).toBe('cancelled');
 
-		// Verify syncMappingTable was updated with etag
-		expect(db.update).toHaveBeenCalledWith(syncMappingTable);
-		const mappingUpdateSet = (db.update(syncMappingTable).set as any).mock.calls[1][0];
-		expect(mappingUpdateSet.etag).toBe('etag-123');
+		// Verify syncMappingTable legacy entry was deleted (migrated out)
+		expect(db.delete).toHaveBeenCalledWith(syncMappingTable);
+		expect(db.update).not.toHaveBeenCalledWith(syncMappingTable);
 
 		// Verify eventTable was NOT deleted
 		expect(db.delete).not.toHaveBeenCalledWith(eventTable);
