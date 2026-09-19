@@ -33,7 +33,13 @@ import {
 } from '@ac/db';
 import { getEntityContacts } from '../contacts';
 import { resolveEventContact, isEmployeeContact } from '../contact-resolution';
-import { eq, and, isNull, lt, gt, gte, lte, or, inArray, desc } from '@ac/db';
+import { eq, and, isNull, lt, gt, gte, lte, or, inArray, desc, sql } from '@ac/db';
+import {
+	getCampaignTargetIds,
+	getItemSyncState,
+	createDefaultCampaignContent,
+	type CampaignContent
+} from '@ac/validations';
 import { GoogleCalendarProvider } from './providers/google-calendar';
 import { MicrosoftCalendarProvider } from './providers/microsoft-calendar';
 import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
@@ -264,7 +270,7 @@ export class SyncService {
 					await db.update(eventTable).set({ campaignId: eventCampaign.id }).where(eq(eventTable.id, r.event.id));
 				}
 
-				const syncIds = (eventCampaign?.content as any)?.syncIds || [];
+				const syncIds = getCampaignTargetIds(eventCampaign?.content);
 				let shouldBeSynced = syncIds.includes(config.id);
 
 				if (shouldBeSynced) {
@@ -276,16 +282,18 @@ export class SyncService {
 				}
 
 				const existingMapping = eventMappingMap.get(r.event.id);
+				const itemSyncState = getItemSyncState(eventCampaign?.content, r.event.id, config.id);
+				const existingExternalId = itemSyncState?.externalId || existingMapping?.externalId;
 
 				if (shouldBeSynced) {
 					itemsToSync.push({ id: r.event.id, entityType: 'event', action: 'sync' });
-				} else if (existingMapping) {
+				} else if (existingExternalId) {
 					itemsToSync.push({
 						id: r.event.id,
 						entityType: 'event',
 						action: 'unpublish',
-						mappingId: existingMapping.id,
-						externalId: existingMapping.externalId
+						mappingId: existingMapping?.id,
+						externalId: existingExternalId
 					});
 				}
 			}
@@ -317,22 +325,24 @@ export class SyncService {
 
 			for (const r of allAnnouncementsWithCampaign) {
 				processedAnnouncementIds.add(r.announcement.id);
-				const syncIds = (r.campaign?.content as any)?.syncIds || [];
+				const syncIds = getCampaignTargetIds(r.campaign?.content);
 				const shouldBeSynced = syncIds.includes(config.id) &&
 					r.announcement.status === 'active' &&
 					r.announcement.isPublic === true;
 
 				const existingMapping = announcementMappingMap.get(r.announcement.id);
+				const itemSyncState = getItemSyncState(r.campaign?.content, r.announcement.id, config.id);
+				const existingExternalId = itemSyncState?.externalId || existingMapping?.externalId;
 
 				if (shouldBeSynced) {
 					itemsToSync.push({ id: r.announcement.id, entityType: 'announcement', action: 'sync' });
-				} else if (existingMapping) {
+				} else if (existingExternalId) {
 					itemsToSync.push({
 						id: r.announcement.id,
 						entityType: 'announcement',
 						action: 'unpublish',
-						mappingId: existingMapping.id,
-						externalId: existingMapping.externalId
+						mappingId: existingMapping?.id,
+						externalId: existingExternalId
 					});
 				}
 			}
@@ -452,6 +462,22 @@ export class SyncService {
 					}
 					if (item.mappingId) {
 						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, item.mappingId));
+					}
+					// Also clean up from campaign
+					const table = item.entityType === 'event' ? eventTable : announcementTable;
+					const [itemRow] = await db.select({ campaignId: table.campaignId }).from(table).where(eq(table.id, item.id));
+					if (itemRow?.campaignId) {
+						const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, itemRow.campaignId));
+						if (camp && (camp.content as any)?.version === 1) {
+							const cContent = camp.content as CampaignContent;
+							if (cContent.items?.[item.id]?.syncs?.[config.id]) {
+								delete cContent.items[item.id].syncs[config.id];
+							}
+							if (item.externalId && cContent.externalIds?.[item.externalId]) {
+								delete cContent.externalIds[item.externalId];
+							}
+							await db.update(campaignTable).set({ content: cContent, updatedAt: new Date() }).where(eq(campaignTable.id, camp.id));
+						}
 					}
 				} else if (item.action === 'sync') {
 					await this.executeSyncItem(config, provider, item.id, item.entityType);
@@ -683,8 +709,13 @@ export class SyncService {
 	 * Process an external event from a provider (create or update local event)
 	 */
 	private async processExternalEvent(config: SyncConfig, externalEvent: ExternalEvent): Promise<void> {
-		// First, check if we have a mapping for this external event
-		const [mapping] = await db
+		// First, check for mapping via campaign.content.externalIds, then legacy syncMappingTable
+		const [campWithExtId] = await db
+			.select()
+			.from(campaignTable)
+			.where(sql`(${campaignTable.content}->'externalIds' ? ${externalEvent.externalId})`);
+
+		const [legacyMapping] = await db
 			.select()
 			.from(syncMappingTable)
 			.where(
@@ -694,38 +725,52 @@ export class SyncService {
 				)
 			);
 
+		const mappedEventId = campWithExtId
+			? (campWithExtId.content as any)?.externalIds?.[externalEvent.externalId]?.itemId
+			: legacyMapping?.eventId;
+
 		if (externalEvent.status === 'cancelled') {
-			if (mapping && mapping.eventId) {
+			if (mappedEventId) {
 				await db
 					.update(eventTable)
 					.set({ status: 'cancelled', updatedAt: new Date() })
-					.where(eq(eventTable.id, mapping.eventId));
-				await db
-					.update(syncMappingTable)
-					.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
-					.where(eq(syncMappingTable.id, mapping.id));
-				await publishEventChange('update', [mapping.eventId]);
+					.where(eq(eventTable.id, mappedEventId));
+				if (legacyMapping) {
+					await db
+						.update(syncMappingTable)
+						.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
+						.where(eq(syncMappingTable.id, legacyMapping.id));
+				}
+				if (campWithExtId && (campWithExtId.content as any)?.version === 1) {
+					const cContent = campWithExtId.content as CampaignContent;
+					if (cContent.items?.[mappedEventId]?.syncs?.[config.id]) {
+						cContent.items[mappedEventId].syncs[config.id].status = 'idle';
+						cContent.items[mappedEventId].syncs[config.id].lastSyncedAt = new Date().toISOString();
+						await db.update(campaignTable).set({ content: cContent, updatedAt: new Date() }).where(eq(campaignTable.id, campWithExtId.id));
+					}
+				}
+				await publishEventChange('update', [mappedEventId]);
 			}
 			return;
 		}
 
-		if (mapping) {
-			if (!mapping.eventId) return;
+		if (mappedEventId) {
 			// Update existing event
-
 			const [currentEvent] = await db
 				.select()
 				.from(eventTable)
-				.where(eq(eventTable.id, mapping.eventId));
+				.where(eq(eventTable.id, mappedEventId));
 
 			if (currentEvent) {
 				// Skip update if we just modified it locally (within last 30 seconds)
 				const timeSinceUpdate = Date.now() - currentEvent.updatedAt.getTime();
 				if (timeSinceUpdate < 30000) {
-					await db
-						.update(syncMappingTable)
-						.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
-						.where(eq(syncMappingTable.id, mapping.id));
+					if (legacyMapping) {
+						await db
+							.update(syncMappingTable)
+							.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
+							.where(eq(syncMappingTable.id, legacyMapping.id));
+					}
 					return;
 				}
 			}
@@ -735,14 +780,25 @@ export class SyncService {
 			await db
 				.update(eventTable)
 				.set(updateParts)
-				.where(eq(eventTable.id, mapping.eventId));
+				.where(eq(eventTable.id, mappedEventId));
 
-			await db
-				.update(syncMappingTable)
-				.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
-				.where(eq(syncMappingTable.id, mapping.id));
+			if (legacyMapping) {
+				await db
+					.update(syncMappingTable)
+					.set({ etag: externalEvent.etag ?? null, lastSyncedAt: new Date() })
+					.where(eq(syncMappingTable.id, legacyMapping.id));
+			}
 
-			await publishEventChange('update', [mapping.eventId]);
+			if (campWithExtId && (campWithExtId.content as any)?.version === 1) {
+				const cContent = campWithExtId.content as CampaignContent;
+				if (cContent.items?.[mappedEventId]?.syncs?.[config.id]) {
+					cContent.items[mappedEventId].syncs[config.id].etag = externalEvent.etag ?? undefined;
+					cContent.items[mappedEventId].syncs[config.id].lastSyncedAt = new Date().toISOString();
+					await db.update(campaignTable).set({ content: cContent, updatedAt: new Date() }).where(eq(campaignTable.id, campWithExtId.id));
+				}
+			}
+
+			await publishEventChange('update', [mappedEventId]);
 
 			// Update event contacts status
 			if (externalEvent.attendees) {
@@ -760,7 +816,7 @@ export class SyncService {
 
 					if (contactRecord) {
 						await db.insert(eventContactTable).values({
-							eventId: mapping.eventId,
+							eventId: mappedEventId,
 							contactId: contactRecord.id,
 							participationStatus: attendee.responseStatus || 'needsAction'
 						}).onConflictDoUpdate({
@@ -1227,7 +1283,7 @@ export class SyncService {
 
 
 		// Fetch associated contacts
-		const associatedContacts = await getEntityContacts(entityType, internal.id);
+		const associatedContacts = (await getEntityContacts(entityType, internal.id)) || [];
 
 		// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
 		// External contacts are commented out for data privacy reasons until privacy flows are finalized.
@@ -1678,36 +1734,53 @@ export class SyncService {
 			return;
 		}
 
+		// Find campaign for this item
+		let campaignId = itemRow.campaignId;
+		let campaignRow: typeof campaignTable.$inferSelect | undefined;
+		if (campaignId) {
+			[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
+		}
+		if (!campaignRow && entityType === 'event' && (itemRow as any).recurringEventId) {
+			const [master] = await db.select().from(eventTable).where(eq(eventTable.id, (itemRow as any).recurringEventId));
+			if (master?.campaignId) {
+				campaignId = master.campaignId;
+				[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
+				await db.update(table).set({ campaignId } as any).where(eq(table.id, itemId));
+			}
+		}
+
 		const mappingWhere = entityType === 'event'
 			? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
 			: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
 
-		const [mapping] = await db.select().from(syncMappingTable).where(mappingWhere);
+		const [legacyMapping] = await db.select().from(syncMappingTable).where(mappingWhere);
+
+		let campContent: CampaignContent = (campaignRow?.content as any)?.version === 1
+			? (campaignRow?.content as any)
+			: createDefaultCampaignContent([config.id]);
+
+		const existingItemSync = campContent.items?.[itemId]?.syncs?.[config.id];
+		const existingExternalId = existingItemSync?.externalId || legacyMapping?.externalId;
 
 		const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
 
-		if (mapping) {
+		let finalExternalId = existingExternalId;
+		let finalEtag: string | null | undefined = existingItemSync?.etag || legacyMapping?.etag;
+
+		if (existingExternalId) {
 			// Update existing item
 			try {
-				const { etag } = await provider.updateEvent(mapping.externalId, externalItem);
-				await db
-					.update(syncMappingTable)
-					.set({ etag: etag ?? null, lastSyncedAt: new Date() })
-					.where(eq(syncMappingTable.id, mapping.id));
+				const { etag } = await provider.updateEvent(existingExternalId, externalItem);
+				finalEtag = etag;
 			} catch (err: any) {
 				if (err?.message?.includes('404')) {
-					console.warn(`[SyncService] External item ${mapping.externalId} returned 404 on update. Deleting mapping and re-pushing.`);
-					await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
+					console.warn(`[SyncService] External item ${existingExternalId} returned 404 on update. Deleting legacy mapping and re-pushing.`);
+					if (legacyMapping) {
+						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, legacyMapping.id));
+					}
 					const { externalId, etag } = await provider.pushEvent(externalItem);
-					await db.insert(syncMappingTable).values({
-						syncConfigId: config.id,
-						eventId: entityType === 'event' ? itemRow.id : null,
-						announcementId: entityType === 'announcement' ? itemRow.id : null,
-						externalId: externalId,
-						providerId: config.providerId,
-						etag: etag ?? null,
-						lastSyncedAt: new Date()
-					});
+					finalExternalId = externalId;
+					finalEtag = etag;
 				} else {
 					throw err;
 				}
@@ -1715,15 +1788,41 @@ export class SyncService {
 		} else {
 			// Create new item
 			const { externalId, etag } = await provider.pushEvent(externalItem);
-			await db.insert(syncMappingTable).values({
-				syncConfigId: config.id,
-				eventId: entityType === 'event' ? itemRow.id : null,
-				announcementId: entityType === 'announcement' ? itemRow.id : null,
-				externalId: externalId,
-				providerId: config.providerId,
-				etag: etag ?? null,
-				lastSyncedAt: new Date()
-			});
+			finalExternalId = externalId;
+			finalEtag = etag;
+		}
+
+		if (finalExternalId) {
+			campContent.targets[config.id] = { enabled: true };
+			if (!campContent.items) campContent.items = {};
+			if (!campContent.items[itemId]) campContent.items[itemId] = { entityType, syncs: {} };
+			campContent.items[itemId].syncs[config.id] = {
+				status: 'synced',
+				externalId: finalExternalId,
+				etag: finalEtag ?? undefined,
+				lastSyncedAt: new Date().toISOString()
+			};
+			if (!campContent.externalIds) campContent.externalIds = {};
+			campContent.externalIds[finalExternalId] = { itemId, configId: config.id };
+
+			if (campaignRow) {
+				await db.update(campaignTable).set({ content: campContent, updatedAt: new Date() }).where(eq(campaignTable.id, campaignRow.id));
+			}
+
+			// Also update legacy mapping for backwards compatibility during transition
+			if (legacyMapping) {
+				await db.update(syncMappingTable).set({ etag: finalEtag ?? null, lastSyncedAt: new Date() }).where(eq(syncMappingTable.id, legacyMapping.id));
+			} else {
+				await db.insert(syncMappingTable).values({
+					syncConfigId: config.id,
+					eventId: entityType === 'event' ? itemRow.id : null,
+					announcementId: entityType === 'announcement' ? itemRow.id : null,
+					externalId: finalExternalId,
+					providerId: config.providerId,
+					etag: finalEtag ?? null,
+					lastSyncedAt: new Date()
+				});
+			}
 		}
 	}
 
@@ -1827,18 +1926,61 @@ export class SyncService {
 	 * Delete event mappings for specific events (called after event deletion)
 	 */
 	async deleteEventMappings(userId: string, eventIds: string[]): Promise<void> {
-
-
 		try {
-			// Get all sync configs (Global sweep)
+			if (!eventIds || eventIds.length === 0) return;
+
+			// Get all sync configs
 			const configs = await db
 				.select()
 				.from(syncConfigTable);
 
+			const configMap = new Map(configs.map(c => [c.id, this.rowToConfig(c)]));
+
+			// 1. Find campaigns containing these events
+			const campaignsToUpdate = await db
+				.select()
+				.from(campaignTable)
+				.where(
+					sql`EXISTS (
+						SELECT 1 FROM jsonb_object_keys(COALESCE(${campaignTable.content}->'items', '{}'::jsonb)) AS k
+						WHERE k = ANY(${eventIds}::text[])
+					)`
+				);
+
+			for (const camp of campaignsToUpdate) {
+				const content = camp.content as CampaignContent;
+				if (!content || content.version !== 1 || !content.items) continue;
+
+				for (const eventId of eventIds) {
+					const item = content.items[eventId];
+					if (!item || !item.syncs) continue;
+
+					for (const [configId, syncState] of Object.entries(item.syncs)) {
+						if (syncState.externalId) {
+							const config = configMap.get(configId);
+							if (config && (config.direction === 'push' || config.direction === 'bidirectional')) {
+								try {
+									const provider = await this.getProviderInstance(config);
+									console.log(`[SyncService] Deleting event ${syncState.externalId} from provider ${config.providerType}`);
+									await provider.deleteEvent(syncState.externalId);
+								} catch (delErr) {
+									console.warn(`[SyncService] Delete error on provider for ${syncState.externalId}:`, delErr);
+								}
+							}
+							if (content.externalIds) {
+								delete content.externalIds[syncState.externalId];
+							}
+						}
+					}
+					delete content.items[eventId];
+				}
+
+				await db.update(campaignTable).set({ content, updatedAt: new Date() }).where(eq(campaignTable.id, camp.id));
+			}
+
+			// 2. Also delete legacy mappings from syncMappingTable
 			for (const configRow of configs) {
 				const config = this.rowToConfig(configRow);
-
-				// Get mappings for these events
 				const mappings = await db
 					.select()
 					.from(syncMappingTable)
@@ -1851,37 +1993,27 @@ export class SyncService {
 
 				if (mappings.length === 0) continue;
 
-				// Try to delete from provider if it supports push/bidirectional
 				if (config.direction === 'push' || config.direction === 'bidirectional') {
 					try {
 						const provider = await this.getProviderInstance(config);
-
 						for (const mapping of mappings) {
 							try {
-								console.log(`[SyncService] Deleting event from provider: ${mapping.externalId}`);
 								await provider.deleteEvent(mapping.externalId);
 							} catch (error: any) {
 								console.error(`[SyncService] Failed to delete event ${mapping.externalId} from provider:`, error);
-								// Continue with other events
 							}
 						}
 					} catch (error: any) {
 						console.error(`[SyncService] Failed to initialize provider for deletion:`, error);
 					}
 				}
-
 			}
 
-			// Delete ALL mappings from our database for these events unconditionally
-			// We do this outside the loop to ensure even orphaned mappings are destroyed
 			await db
 				.delete(syncMappingTable)
 				.where(inArray(syncMappingTable.eventId, eventIds));
-
-
 		} catch (error: any) {
 			console.error(`[SyncService] Error in deleteEventMappings:`, error);
-			// Don't throw - sync failures shouldn't break delete operations
 		}
 	}
 

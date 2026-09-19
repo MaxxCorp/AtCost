@@ -4,7 +4,7 @@ import { event, locationContact, inArray, eq, asc } from '@ac/db';
 import { getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
-import { type Event } from '@ac/validations';
+import { type Event, getCampaignTargetIds } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
 import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 
@@ -189,7 +189,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		contactIds: result.contacts.map(c => c.contactId),
 		locationIds: result.locations.map(l => l.locationId),
 		tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
-		syncIds: (result.campaign?.content as any)?.syncIds || [],
+		syncIds: getCampaignTargetIds(result.campaign?.content),
 		resolvedContact,
 		instances: instances.length > 0 ? instances : undefined,
 	} as any;

@@ -52,3 +52,9 @@ export const processBulkSyncBatchSchema = v.object({
 });
 export type ProcessBulkSyncBatchInput = v.InferOutput<typeof processBulkSyncBatchSchema>;
 
+export const processMigrationBatchSchema = v.object({
+    operationId: v.pipe(v.string(), v.uuid()),
+    batchSize: v.optional(v.number()),
+});
+export type ProcessMigrationBatchInput = v.InferOutput<typeof processMigrationBatchSchema>;
+

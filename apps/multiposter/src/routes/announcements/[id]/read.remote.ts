@@ -4,7 +4,7 @@ import { announcement, announcementTag, announcementContact, tag, announcementLo
 import { eq, and, inArray } from '@ac/db';
 import { getOptionalUser, hasAccess, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
-import { type Announcement } from '@ac/validations';
+import { type Announcement, getCampaignTargetIds } from '@ac/validations';
 
 import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 
@@ -119,7 +119,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         contactIds: result.contacts.map(c => c.contactId),
         locationIds: result.locations.map(l => l.locationId),
         locations: result.locations.map(l => l.location),
-        syncIds: (result.campaign?.content as any)?.syncIds || [],
+        syncIds: getCampaignTargetIds(result.campaign?.content),
         resolvedContact,
     } as any;
 });

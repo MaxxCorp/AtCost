@@ -11,6 +11,7 @@ import { generateEventAssets } from '$lib/server/events/assets';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
+import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {
@@ -175,15 +176,32 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
 				console.log(`[Update Remote] Parsed syncIds:`, syncIds);
 				if (updatedEvent.campaignId) {
+					const [camp] = await tx.select().from(campaign).where(eq(campaign.id, updatedEvent.campaignId));
+					const content: CampaignContent = (camp?.content as any)?.version === 1
+						? (camp?.content as any)
+						: createDefaultCampaignContent(syncIds);
+
+					// Update targets
+					content.targets = {};
+					for (const id of syncIds) {
+						content.targets[id] = { enabled: true };
+					}
+					if (!content.items) content.items = {};
+					if (!content.items[updatedEvent.id]) {
+						content.items[updatedEvent.id] = { entityType: 'event', syncs: {} };
+					}
+
 					await tx.update(campaign).set({
-						content: { syncIds },
+						content,
 						updatedAt: new Date()
 					}).where(eq(campaign.id, updatedEvent.campaignId));
 				} else {
+					const newContent = createDefaultCampaignContent(syncIds);
+					newContent.items[updatedEvent.id] = { entityType: 'event', syncs: {} };
 					const [newCampaign] = await tx.insert(campaign).values({
 						userId: user.id,
 						name: `Campaign for ${updatedEvent.summary}`,
-						content: { syncIds }
+						content: newContent
 					}).returning();
 					if (newCampaign) {
 						await tx.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, updatedEvent.id));

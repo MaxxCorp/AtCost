@@ -65,7 +65,8 @@ describe('SyncService - processExternalEvent deduplication', () => {
 	const mockConfig = { id: 'config-1', userId: 'user-1', providerId: 'provider-1' } as any;
 
 	beforeEach(() => {
-		vi.clearAllMocks();
+		vi.resetAllMocks();
+		vi.mocked(getEntityContacts).mockResolvedValue([]);
 		service = new SyncService();
 	});
 
@@ -78,7 +79,14 @@ describe('SyncService - processExternalEvent deduplication', () => {
 			status: 'confirmed'
 		} as any;
 
-		// 1. Mock mapping check (no mapping found)
+		// 1a. Mock campaign mapping check (no campaign mapping found)
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			})
+		});
+
+		// 1b. Mock legacy mapping check (no mapping found)
 		(db.select as any).mockReturnValueOnce({
 			from: vi.fn().mockReturnValueOnce({
 				where: vi.fn().mockResolvedValueOnce([])
@@ -118,7 +126,14 @@ describe('SyncService - processExternalEvent deduplication', () => {
 			status: 'confirmed'
 		} as any;
 
-		// 1. Mock mapping exists
+		// 1a. Mock campaign mapping check (no campaign mapping found)
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			})
+		});
+
+		// 1b. Mock legacy mapping exists
 		(db.select as any).mockReturnValueOnce({
 			from: vi.fn().mockReturnValueOnce({
 				where: vi.fn().mockResolvedValueOnce([{ id: 'map-1', eventId }])
@@ -166,7 +181,14 @@ describe('SyncService - processExternalEvent deduplication', () => {
 			etag: 'etag-123'
 		} as any;
 
-		// Mock mapping exists
+		// 1a. Mock campaign mapping check (no campaign mapping found)
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			})
+		});
+
+		// 1b. Mock legacy mapping exists
 		(db.select as any).mockReturnValueOnce({
 			from: vi.fn().mockReturnValueOnce({
 				where: vi.fn().mockResolvedValueOnce([{ id: 'map-456', eventId }])
@@ -204,6 +226,7 @@ describe('SyncService - mapInternalToExternal status mapping', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(getEntityContacts).mockResolvedValue([]);
 		service = new SyncService();
 
 		// Mock db.select for associations in mapInternalToExternal
@@ -314,7 +337,8 @@ describe('SyncService - Bulk Sync', () => {
 	}
 
 	beforeEach(() => {
-		vi.clearAllMocks();
+		vi.resetAllMocks();
+		vi.mocked(getEntityContacts).mockResolvedValue([]);
 		service = new SyncService();
 		service.registerProvider('mock-provider' as any, MockSyncProvider as any);
 	});

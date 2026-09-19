@@ -6,6 +6,8 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
 import { listAnnouncements } from '../list.remote';
 import { syncService } from '$lib/server/sync/service';
+import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { eq } from '@ac/db';
 
 
 /**
@@ -47,12 +49,14 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
             syncIds = typeof input.syncIds === 'string' ? JSON.parse(input.syncIds) : input.syncIds;
         }
 
+        const initialCampaignContent: CampaignContent = createDefaultCampaignContent(syncIds);
+
         await db.transaction(async (tx) => {
             // Create Campaign for the announcement
             const [newCampaign] = await tx.insert(campaign).values({
                 userId: user.id,
                 name: `Campaign for ${input.title}`,
-                content: { syncIds }
+                content: initialCampaignContent
             }).returning();
 
             // Insert Announcement
@@ -67,6 +71,10 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
             }).returning({ id: announcement.id });
 
             announcementId = newAnnouncement.id;
+            initialCampaignContent.items[announcementId] = { entityType: 'announcement', syncs: {} };
+            if (newCampaign) {
+                await tx.update(campaign).set({ content: initialCampaignContent }).where(eq(campaign.id, newCampaign.id));
+            }
 
             // Insert Tags
             const finalTagIds = new Set<string>(tagIds);

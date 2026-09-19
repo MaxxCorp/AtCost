@@ -10,6 +10,7 @@ import { generateEventAssets } from '$lib/server/events/assets';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
+import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 
 export const createEvent = form(createEventSchema, async (data) => {
 	console.log('--- createEvent START ---');
@@ -124,11 +125,14 @@ export const createEvent = form(createEventSchema, async (data) => {
             syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
         }
 
+        const initialCampaignContent: CampaignContent = createDefaultCampaignContent(syncIds);
+        initialCampaignContent.items[eventId] = { entityType: 'event', syncs: {} };
+
         // Create Campaign for the event
         const [newCampaign] = await db.insert(campaign).values({
             userId: user.id,
             name: `Campaign for ${data.summary}`,
-            content: { syncIds }
+            content: initialCampaignContent
         } as any).returning();
 
 		// Insert Master Event
@@ -237,6 +241,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 
 				for (const { date, end: instanceEnd } of instances) {
 					const instanceId = crypto.randomUUID();
+					initialCampaignContent.items[instanceId] = { entityType: 'event', syncs: {} };
 
 					await db.insert(event).values({
 						id: instanceId,
@@ -278,6 +283,10 @@ export const createEvent = form(createEventSchema, async (data) => {
 
 					// Generate assets for instance
 					await generateEventAssets(instanceId, origin);
+				}
+
+				if (newCampaign && instances.length > 0) {
+					await db.update(campaign).set({ content: initialCampaignContent }).where(eq(campaign.id, newCampaign.id));
 				}
 			} catch (e) {
 				console.error('Error expanding recurrence:', e);
