@@ -126,7 +126,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
     });
 
     const locationIdSet = new Set(locationIds);
-    const validEvents = locationIds.length > 0
+    let validEvents = locationIds.length > 0
         ? eventsResult.data.filter((e: any) => {
             const eLocIds = new Set<string>();
             for (const l of (e.locations || [])) {
@@ -143,6 +143,10 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             return Array.from(eLocIds).some(id => locationIdSet.has(id));
         })
         : eventsResult.data;
+
+    if (kioskData.excludeCancelled) {
+        validEvents = validEvents.filter((e: any) => e.status !== 'cancelled');
+    }
 
     const validAnnouncements = locationIds.length > 0
         ? announcementsResult.data.filter((a: any) => {

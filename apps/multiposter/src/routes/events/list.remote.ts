@@ -141,7 +141,22 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 	
 	if (excludeCancelled) {
-		conditionalFilters.push(ne(event.status, 'cancelled'));
+		conditionalFilters.push(
+			ne(event.status, 'cancelled'),
+			sql`NOT EXISTS (
+				SELECT 1 FROM ${event} master_evt
+				WHERE (
+					master_evt.id = ${event.recurringEventId}
+					OR (
+						${event.seriesId} IS NOT NULL
+						AND master_evt.series_id = ${event.seriesId}
+						AND master_evt.recurring_event_id IS NULL
+						AND master_evt.id != ${event.id}
+					)
+				)
+				AND master_evt.status = 'cancelled'
+			)`
+		);
 	}
 	
 	if (excludeNonPublic) {
@@ -479,13 +494,69 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 		if (masters.length > 0) {
 			const { expandRecurrence } = await import('$lib/server/events/recurrence');
-			const existingKeys = new Set(
-				rawResults.map((r: any) => {
-					const masterId = r.recurringEventId || r.id;
-					const time = r.startDateTime ? new Date(r.startDateTime).getTime() : 0;
-					return `${masterId}_${time}`;
-				})
-			);
+
+			const masterIds = masters.map(m => m.id);
+			const masterSeriesIds = masters.map(m => m.seriesId).filter((id): id is string => Boolean(id));
+
+			const seriesToMasterMap = new Map<string, typeof masters[0]>();
+			const idToMasterMap = new Map<string, typeof masters[0]>();
+			for (const m of masters) {
+				idToMasterMap.set(m.id, m);
+				if (m.seriesId) seriesToMasterMap.set(m.seriesId, m);
+			}
+
+			// Query all existing instances from the DB for these masters
+			const existingDbInstances = await db.query.event.findMany({
+				where: or(
+					inArray(event.recurringEventId, masterIds),
+					masterSeriesIds.length > 0 ? inArray(event.seriesId, masterSeriesIds) : sql`false`
+				),
+				columns: {
+					id: true,
+					recurringEventId: true,
+					seriesId: true,
+					startDateTime: true,
+					originalStartTime: true,
+					status: true,
+					isPublic: true
+				}
+			});
+
+			const existingKeys = new Set<string>();
+
+			// 1. Add all items currently in rawResults
+			for (const r of rawResults) {
+				const masterId = r.recurringEventId || r.id;
+				if (r.startDateTime) {
+					const time = new Date(r.startDateTime).getTime();
+					existingKeys.add(`${masterId}_${time}`);
+					if (r.seriesId) existingKeys.add(`${r.seriesId}_${time}`);
+				}
+			}
+
+			// 2. Also register all existing DB instances (including cancelled/tentative/etc.)
+			// This guarantees recurrence expansion NEVER synthesizes a virtual instance for a slot
+			// that already exists in the database (e.g., cancelled instances).
+			for (const dbInst of existingDbInstances) {
+				const m = (dbInst.recurringEventId ? idToMasterMap.get(dbInst.recurringEventId) : null)
+					|| (dbInst.seriesId ? seriesToMasterMap.get(dbInst.seriesId) : null);
+				if (!m) continue;
+
+				if (dbInst.startDateTime) {
+					const time = new Date(dbInst.startDateTime).getTime();
+					existingKeys.add(`${m.id}_${time}`);
+					if (m.seriesId) existingKeys.add(`${m.seriesId}_${time}`);
+					if (dbInst.seriesId) existingKeys.add(`${dbInst.seriesId}_${time}`);
+				}
+				if (dbInst.originalStartTime && typeof dbInst.originalStartTime === 'object' && 'dateTime' in dbInst.originalStartTime) {
+					const origTime = new Date((dbInst.originalStartTime as any).dateTime).getTime();
+					if (!isNaN(origTime)) {
+						existingKeys.add(`${m.id}_${origTime}`);
+						if (m.seriesId) existingKeys.add(`${m.seriesId}_${origTime}`);
+						if (dbInst.seriesId) existingKeys.add(`${dbInst.seriesId}_${origTime}`);
+					}
+				}
+			}
 
 			for (const master of masters) {
 				let rruleStr: string | null = null;
@@ -501,9 +572,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				const masterTime = new Date(master.startDateTime).getTime();
 				if (masterTime >= startD.getTime() && masterTime <= endD.getTime()) {
 					const key = `${master.id}_${masterTime}`;
-					if (!existingKeys.has(key)) {
+					const seriesKey = master.seriesId ? `${master.seriesId}_${masterTime}` : null;
+					if (!existingKeys.has(key) && (!seriesKey || !existingKeys.has(seriesKey))) {
 						rawResults.push(master);
 						existingKeys.add(key);
+						if (seriesKey) existingKeys.add(seriesKey);
 					}
 				}
 
@@ -520,7 +593,8 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					const instTime = inst.date.getTime();
 					if (instTime >= startD.getTime() && instTime <= endD.getTime()) {
 						const key = `${master.id}_${instTime}`;
-						if (!existingKeys.has(key)) {
+						const seriesKey = master.seriesId ? `${master.seriesId}_${instTime}` : null;
+						if (!existingKeys.has(key) && (!seriesKey || !existingKeys.has(seriesKey))) {
 							rawResults.push({
 								...master,
 								id: `${master.id}_inst_${inst.date.toISOString()}`,
@@ -529,6 +603,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 								endDateTime: inst.end || master.endDateTime
 							} as any);
 							existingKeys.add(key);
+							if (seriesKey) existingKeys.add(seriesKey);
 						}
 					}
 				}
@@ -587,6 +662,16 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			if (endD && s && s > endD) return false;
 			return true;
 		});
+	}
+
+	if (excludeCancelled) {
+		results = results.filter((e: any) => e.status !== 'cancelled');
+	}
+	if (excludeTentative) {
+		results = results.filter((e: any) => e.status !== 'tentative');
+	}
+	if (excludeNonPublic) {
+		results = results.filter((e: any) => e.isPublic);
 	}
 
 	if (locationId) {
