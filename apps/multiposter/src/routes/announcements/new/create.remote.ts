@@ -8,6 +8,7 @@ import { listAnnouncements } from '../list.remote';
 import { syncService } from '$lib/server/sync/service';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 import { eq } from '@ac/db';
+import { invalidateAnnouncement } from '$lib/server/cache';
 
 
 /**
@@ -136,6 +137,7 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
         // Notify listeners
         await publishAnnouncementChange('create', [announcementId]);
 
+        await invalidateAnnouncement(announcementId);
         // Refresh list cache if applicable
         await listAnnouncements().refresh();
 

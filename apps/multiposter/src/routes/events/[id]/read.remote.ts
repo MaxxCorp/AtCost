@@ -7,6 +7,7 @@ import * as v from 'valibot';
 import { type Event, getCampaignTargetIds } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
 import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
+import { getCache, setCache, cacheKeys } from '$lib/server/cache';
 
 /**
  * Query: Read an event by ID
@@ -16,6 +17,23 @@ import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-
  * - If event is private: only authenticated users with 'events' access can view
  */
 export const readEvent = query(v.string(), async (eventId: string): Promise<Event | null> => {
+	const user = getOptionalUser();
+	const isAuthorized = !!(user && hasAccess(user, 'events'));
+
+	// 0. Cache check for public viewers / robots
+	if (!isAuthorized) {
+		const cachedPayload = await getCache<{ isPrivate: boolean; data?: Event | null }>(cacheKeys.publicEvent(eventId));
+		if (cachedPayload !== null) {
+			if (cachedPayload.isPrivate) {
+				if (!user) {
+					error(403, 'Authentication required to view this event');
+				}
+				error(403, 'You do not have permission to view this event');
+			}
+			return (cachedPayload.data as any) ?? null;
+		}
+	}
+
 	// 1. Fetch event with relations using Drizzle Relational Queries
 	const result = await db.query.event.findFirst({
 		where: eq(event.id, eventId),
@@ -39,14 +57,17 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	});
 
 	if (!result) {
+		if (!isAuthorized) {
+			await setCache(cacheKeys.publicEvent(eventId), { isPrivate: false, data: null }, 30);
+		}
 		return null;
 	}
 
 	// 2. Check Access
-	const user = getOptionalUser();
-	const isAuthorized = user && hasAccess(user, 'events');
-
 	if (!result.isPublic) {
+		if (!isAuthorized) {
+			await setCache(cacheKeys.publicEvent(eventId), { isPrivate: true }, 300);
+		}
 		if (!user) {
 			error(403, 'Authentication required to view this event');
 		}
@@ -168,7 +189,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	// 4. Return Data
 	if (!isAuthorized) {
 		// Public safe object
-		return {
+		const publicSafeEvent = {
 			id: result.id,
 			summary: result.summary,
 			description: result.description,
@@ -195,6 +216,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			seriesMaster: seriesMaster ?? undefined,
 			instances: instances.length > 0 ? instances : undefined,
 		} as any;
+
+		await setCache(cacheKeys.publicEvent(eventId), { isPrivate: false, data: publicSafeEvent }, 3600);
+		return publicSafeEvent;
 	}
 
 	const allLocations = result.locations.map(l => l.location);

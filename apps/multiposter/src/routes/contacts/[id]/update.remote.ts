@@ -10,6 +10,7 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { generateContactAssets } from '$lib/server/contacts';
 import { listContacts } from '../list.remote';
 import { readContact } from './read.remote';
+import { invalidateContact } from '$lib/server/cache';
 
 export const updateContact = form(updateContactSchema, async (input) => {
     console.log('--- updateContact START ---');
@@ -258,6 +259,7 @@ export const updateContact = form(updateContactSchema, async (input) => {
         } as Contact;
 
         console.log('--- updateContact SUCCESS ---');
+        await invalidateContact(id);
         readContact(id).set(transformed);
         await listContacts().refresh();
         return { success: true, contact: transformed };

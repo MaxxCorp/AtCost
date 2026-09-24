@@ -6,6 +6,7 @@ import { listAnnouncements } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { publishAnnouncementChange } from '$lib/server/realtime';
 import * as v from 'valibot';
+import { invalidateAnnouncement } from '$lib/server/cache';
 
 /**
  * Command for bulk deleting announcements
@@ -25,6 +26,8 @@ export const deleteAnnouncements = command(v.array(v.string()), async (ids: stri
     // Notify listeners
     await publishAnnouncementChange('delete', ids);
 
+    await invalidateAnnouncement(ids);
     await listAnnouncements().refresh();
     return { success: true };
 });
+

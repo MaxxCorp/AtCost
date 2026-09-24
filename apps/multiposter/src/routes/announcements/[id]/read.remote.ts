@@ -5,8 +5,8 @@ import { eq, and, inArray } from '@ac/db';
 import { getOptionalUser, hasAccess, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { type Announcement, getCampaignTargetIds } from '@ac/validations';
-
 import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
+import { getCache, setCache, cacheKeys } from '$lib/server/cache';
 
 /**
  * Query: Read an announcement by ID
@@ -16,6 +16,20 @@ import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/c
  * - If announcement is private: only authenticated users with 'announcements' access can view
  */
 export const readAnnouncement = query(v.string(), async (announcementId: string): Promise<Announcement | null> => {
+    const user = getOptionalUser();
+    const isAuthorized = !!(user && hasAccess(user, 'announcements'));
+
+    // 0. Cache check for public viewers / robots
+    if (!isAuthorized) {
+        const cachedPayload = await getCache<{ isPrivate: boolean; data?: Announcement | null }>(cacheKeys.publicAnnouncement(announcementId));
+        if (cachedPayload !== null) {
+            if (cachedPayload.isPrivate) {
+                throw new Error('Unauthorized');
+            }
+            return (cachedPayload.data as any) ?? null;
+        }
+    }
+
 	// 1. Fetch using Relational Queries for "easier reasoning"
 	const result = await db.query.announcement.findFirst({
 		where: eq(announcement.id, announcementId),
@@ -37,13 +51,18 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 		}
 	});
 
-    if (!result) return null;
+    if (!result) {
+        if (!isAuthorized) {
+            await setCache(cacheKeys.publicAnnouncement(announcementId), { isPrivate: false, data: null }, 30);
+        }
+        return null;
+    }
 
     // 2. Check access
-    const user = getOptionalUser();
-    const isAuthorized = user && hasAccess(user, 'announcements');
-
     if (!result.isPublic) {
+        if (!isAuthorized) {
+            await setCache(cacheKeys.publicAnnouncement(announcementId), { isPrivate: true }, 300);
+        }
         if (!user || !isAuthorized) throw new Error('Unauthorized');
     }
 
@@ -95,7 +114,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 
     // 4. Return Data
     if (!isAuthorized) {
-        return {
+        const publicAnnouncement = {
             id: result.id,
             title: result.title,
             content: result.content,
@@ -109,6 +128,9 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
             locationIds: [],
             syncIds: [],
         } as any;
+
+        await setCache(cacheKeys.publicAnnouncement(announcementId), { isPrivate: false, data: publicAnnouncement }, 3600);
+        return publicAnnouncement;
     }
 
     return {

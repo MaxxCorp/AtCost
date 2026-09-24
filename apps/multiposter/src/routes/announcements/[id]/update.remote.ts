@@ -9,6 +9,8 @@ import { readAnnouncement } from './read.remote';
 import { eq } from '@ac/db';
 import { syncService } from '$lib/server/sync/service';
 import { type Announcement, createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { invalidateAnnouncement } from '$lib/server/cache';
+
 
 
 /**
@@ -180,6 +182,7 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
         await publishAnnouncementChange('update', [announcementId]);
 
         // Refresh caches
+        await invalidateAnnouncement(announcementId);
         await readAnnouncement(announcementId).refresh();
         await listAnnouncements().refresh();
 

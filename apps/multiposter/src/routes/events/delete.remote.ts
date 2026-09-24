@@ -8,6 +8,7 @@ import * as v from 'valibot';
 import { syncService } from '$lib/server/sync/service';
 import { publishEventChange } from '$lib/server/realtime';
 import { getStorageProvider } from '$lib/server/blob-storage';
+import { invalidateEvent } from '$lib/server/cache';
 
 export const deleteEvents = command(
 	v.object({
@@ -88,10 +89,12 @@ export const deleteEvents = command(
 		if (eventIdsToDelete.length > 0) {
 			await syncService.deleteEventMappings(user.id, eventIdsToDelete).catch(console.error);
 			await publishEventChange('delete', eventIdsToDelete).catch(console.error);
+			await invalidateEvent(eventIdsToDelete);
 		}
 
 		await listEvents().refresh();
 		return { success: true, deletedCount: eventIdsToDelete.length };
 	}
 );
+
 

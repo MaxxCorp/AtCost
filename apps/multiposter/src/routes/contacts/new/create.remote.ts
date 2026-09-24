@@ -8,6 +8,7 @@ import { createContactSchema, type Contact } from '$lib/validations/contacts';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { generateContactAssets } from '$lib/server/contacts';
 import { listContacts } from '../list.remote';
+import { invalidateContact } from '$lib/server/cache';
 
 export const createContact = form(createContactSchema, async (input) => {
     try {
@@ -191,6 +192,7 @@ export const createContact = form(createContactSchema, async (input) => {
             }))
         } as Contact;
 
+        await invalidateContact(contactId);
         await listContacts().refresh();
         return { success: true, id: contactId, contact: transformed };
 

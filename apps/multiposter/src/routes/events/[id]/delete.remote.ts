@@ -7,6 +7,7 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
+import { invalidateEvent } from '$lib/server/cache';
 
 /**
  * Command: Delete events by ID
@@ -51,7 +52,9 @@ export const deleteEvents = command(
 		// We assume all were deleted for notification purposes, or we could fetch existing before delete
 		await publishEventChange('delete', idsToDelete);
 
+		await invalidateEvent(idsToDelete);
 		await listEvents().refresh();
 		console.log(`[deleteEvents] Successfully deleted events.`);
 		return { success: true };
 	});
+

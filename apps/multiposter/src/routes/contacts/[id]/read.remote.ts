@@ -3,6 +3,7 @@ import { db } from '@ac/db';
 import { getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
+import { getCache, setCache, cacheKeys } from '$lib/server/cache';
 
 /**
  * Query: Read a contact by ID
@@ -17,6 +18,23 @@ import * as v from 'valibot';
  * - Show public versions of QR code and vCard
  */
 export const readContact = query(v.string(), async (id: string): Promise<any> => {
+    const user = getOptionalUser();
+    const isAuthorized = !!(user && hasAccess(user, 'contacts'));
+
+    // Cache check for public viewers / robots
+    if (!isAuthorized) {
+        const cachedPayload = await getCache<{ isPrivate: boolean; data?: any }>(cacheKeys.publicContact(id));
+        if (cachedPayload !== null) {
+            if (cachedPayload.isPrivate) {
+                if (!user) {
+                    error(403, 'Authentication required to view this contact');
+                }
+                error(403, 'You do not have permission to view this contact');
+            }
+            return cachedPayload.data ?? null;
+        }
+    }
+
     // First fetch the contact to check if it's public
     const result = await db.query.contact.findFirst({
         where: (table, { eq }) => eq(table.id, id),
@@ -42,14 +60,18 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
         }
     });
 
-    if (!result) return null;
+    if (!result) {
+        if (!isAuthorized) {
+            await setCache(cacheKeys.publicContact(id), { isPrivate: false, data: null }, 30);
+        }
+        return null;
+    }
 
     // Check access based on public flag
-    const user = getOptionalUser();
-    const isAuthorized = user && hasAccess(user, 'contacts');
-
     if (!result.isPublic) {
-        // Private contact: require authentication and authorization
+        if (!isAuthorized) {
+            await setCache(cacheKeys.publicContact(id), { isPrivate: true }, 300);
+        }
         if (!user) {
             error(403, 'Authentication required to view this contact');
         }
@@ -81,7 +103,7 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
             publicVCardPath += '?public';
         }
 
-        return {
+        const publicContact = {
             id: result.id,
             displayName: result.displayName,
             givenName: result.givenName,
@@ -106,6 +128,9 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
             qrCodePath: publicQrCodePath,
             vCardPath: publicVCardPath,
         };
+
+        await setCache(cacheKeys.publicContact(id), { isPrivate: false, data: publicContact }, 3600);
+        return publicContact;
     }
 
     return {

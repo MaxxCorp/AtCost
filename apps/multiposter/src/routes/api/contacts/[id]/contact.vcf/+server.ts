@@ -2,24 +2,26 @@ import { db } from '@ac/db';
 import ICAL from 'ical.js';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { cached, cacheKeys } from '$lib/server/cache';
 
 export const GET: RequestHandler = async ({ params, url }) => {
     const contactId = params.id;
     const isPublicRequested = url.searchParams.has('public');
 
-    const data = await db.query.contact.findFirst({
-        where: (table, { eq }) => eq(table.id, contactId),
-        with: {
-            emails: true,
-            phones: true,
-            addresses: true,
-            locationAssociations: { with: { location: true } }
-        }
-    });
+    const generateVCard = async () => {
+        const data = await db.query.contact.findFirst({
+            where: (table, { eq }) => eq(table.id, contactId),
+            with: {
+                emails: true,
+                phones: true,
+                addresses: true,
+                locationAssociations: { with: { location: true } }
+            }
+        });
 
-    if (!data) {
-        error(404, 'Contact not found');
-    }
+        if (!data) {
+            error(404, 'Contact not found');
+        }
 
     const card = new ICAL.Component(['vcard', [], []]);
     card.addPropertyWithValue('version', '4.0');
@@ -72,7 +74,13 @@ export const GET: RequestHandler = async ({ params, url }) => {
     });
 
     const fileName = `${fullName.replace(/\s+/g, '_')}${isPublicRequested ? '_public' : ''}.vcf`;
-    const vCardContent = card.toString();
+        const vCardContent = card.toString();
+        return { fileName, vCardContent };
+    };
+
+    const { fileName, vCardContent } = isPublicRequested
+        ? await cached(cacheKeys.contactVcf(contactId), 3600, generateVCard)
+        : await generateVCard();
 
     return new Response(new Uint8Array(Buffer.from(vCardContent)), {
         headers: {
@@ -82,3 +90,4 @@ export const GET: RequestHandler = async ({ params, url }) => {
         }
     });
 };
+

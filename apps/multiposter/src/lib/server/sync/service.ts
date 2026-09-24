@@ -54,6 +54,7 @@ import { NebenanDeProvider } from './providers/nebenan-de';
 import { InstagramProvider } from './providers/instagram';
 import { env } from '$env/dynamic/private';
 import { publishEventChange } from '../realtime';
+import { invalidateEvent } from '$lib/server/cache';
 
 /**
  * Central sync service orchestrator
@@ -948,6 +949,7 @@ export class SyncService {
 			await import('$lib/server/events/assets').then(m => m.generateEventAssets(newEvent.id));
 
 			await publishEventChange('create', [newEvent.id]);
+			await invalidateEvent(newEvent.id);
 
 			// Update event contacts associations and their status
 			if (externalEvent.attendees) {
@@ -2317,10 +2319,13 @@ export class SyncService {
 			await db
 				.delete(syncMappingTable)
 				.where(inArray(syncMappingTable.eventId, eventIds));
+
+			await invalidateEvent(eventIds);
 		} catch (error: any) {
 			console.error(`[SyncService] Error in deleteEventMappings:`, error);
 		}
 	}
+
 
 	/**
 	 * Triggered when a resource association to an event changes (link or unlink).

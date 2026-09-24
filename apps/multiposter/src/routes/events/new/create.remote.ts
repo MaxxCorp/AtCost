@@ -11,6 +11,7 @@ import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { invalidateEvent } from '$lib/server/cache';
 
 export const createEvent = form(createEventSchema, async (data) => {
 	console.log('--- createEvent START ---');
@@ -327,6 +328,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 			}
 		}
 
+		await invalidateEvent(allEventIds);
 		await listEvents().refresh();
 		console.log('--- createEvent DONE ---');
 		return { success: true };

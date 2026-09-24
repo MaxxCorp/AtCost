@@ -7,6 +7,9 @@ import { updateKioskSchema } from '$lib/validations/kiosks';
 import { getKiosk } from './read.remote';
 import { listKiosks } from '../list.remote';
 import { error } from '@sveltejs/kit';
+import { invalidateKiosk } from '$lib/server/cache';
+
+
 
 function parseSafeDate(val: string | null | undefined): Date | null {
     if (!val || typeof val !== 'string' || val.trim() === '') return null;
@@ -93,6 +96,7 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
         }
 
         // Refresh caches - Fetch the full state to ensure absolute consistency and avoid partial state wiping
+        await invalidateKiosk(id);
         getKiosk(id).set({ ...updated, locationIds });
         await listKiosks().refresh();
         return { success: true };

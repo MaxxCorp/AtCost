@@ -3,52 +3,63 @@ import { cmsBlock, cmsSlot, cmsContentVersion, cmsPage } from '@ac/db';
 import { eq, and, desc } from '@ac/db';
 import { error } from '@sveltejs/kit';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, invalidateCms } from '$lib/server/cache';
 
 /**
  * Get content for a specific page slot.
  * Falls back: `(lang, branch)` -> `('en', branch)` -> first available for branch.
  */
 export async function getContent(pageSlug: string, slotName: string, language: string, branch: string = 'published') {
-    // 1. Find active block for slot
-    // We strictly use the composite key logic: pageSlug + slotName
-    // Since our schema has (pageSlug, slotName) PK, there's only one row per slot.
-    const slot = await db.query.cmsSlot.findFirst({
-        where: and(
-            eq(cmsSlot.pageSlug, pageSlug),
-            eq(cmsSlot.slotName, slotName),
-            eq(cmsSlot.isActive, true)
-        ),
-        with: {
-            block: true
-        }
-    });
+    const fetchFromDb = async () => {
+        // 1. Find active block for slot
+        // We strictly use the composite key logic: pageSlug + slotName
+        // Since our schema has (pageSlug, slotName) PK, there's only one row per slot.
+        const slot = await db.query.cmsSlot.findFirst({
+            where: and(
+                eq(cmsSlot.pageSlug, pageSlug),
+                eq(cmsSlot.slotName, slotName),
+                eq(cmsSlot.isActive, true)
+            ),
+            with: {
+                block: true
+            }
+        });
 
-    if (!slot) return null;
+        if (!slot) return null;
 
-    const blockId = slot.blockId;
+        const blockId = slot.blockId;
 
-    // 2. Fetch versions for this block and branch
-    const versions = await db.query.cmsContentVersion.findMany({
-        where: and(
-            eq(cmsContentVersion.blockId, blockId),
-            eq(cmsContentVersion.branch, branch)
-        ),
-        orderBy: [desc(cmsContentVersion.createdAt)]
-    });
+        // 2. Fetch versions for this block and branch
+        const versions = await db.query.cmsContentVersion.findMany({
+            where: and(
+                eq(cmsContentVersion.blockId, blockId),
+                eq(cmsContentVersion.branch, branch)
+            ),
+            orderBy: [desc(cmsContentVersion.createdAt)]
+        });
 
-    if (versions.length === 0) return { block: slot.block, content: null };
+        if (versions.length === 0) return { block: slot.block, content: null };
 
-    // 3. Find best match
-    // Exact match
-    const exact = versions.find(v => v.language === language);
-    if (exact) return { block: slot.block, content: exact };
+        // 3. Find best match
+        // Exact match
+        const exact = versions.find(v => v.language === language);
+        if (exact) return { block: slot.block, content: exact };
 
-    // Fallback to 'en'
-    const fallbackEn = versions.find(v => v.language === 'en');
-    if (fallbackEn) return { block: slot.block, content: fallbackEn };
+        // Fallback to 'en'
+        const fallbackEn = versions.find(v => v.language === 'en');
+        if (fallbackEn) return { block: slot.block, content: fallbackEn };
 
-    // Fallback to whatever is first (latest)
-    return { block: slot.block, content: versions[0] };
+        // Fallback to whatever is first (latest)
+        return { block: slot.block, content: versions[0] };
+    };
+
+    if (branch === 'published') {
+        const version = await getNamespaceVersion(CACHE_NAMESPACES.CMS);
+        const key = cacheKeys.cmsContent(pageSlug, slotName, language, branch, version);
+        return cached(key, 86400, fetchFromDb);
+    }
+
+    return fetchFromDb();
 }
 
 /**
@@ -79,6 +90,8 @@ export async function linkBlock(pageSlug: string, slotName: string, blockId: str
         target: [cmsSlot.pageSlug, cmsSlot.slotName],
         set: { blockId, isActive: true }
     });
+
+    await invalidateCms();
 }
 
 /**
@@ -88,16 +101,6 @@ export async function saveContent(blockId: string, language: string, branch: str
     // We use `jsonb` for content, so wrap the string.
     // CKEditor returns HTML string.
     const contentJson = { html: content };
-
-    // Check if a version already exists for (block, lang, branch).
-    // If we want history, we insert new. If we want "latest draft" only, we update or upsert.
-    // The simplified requirement implies "versioning" but usually draft is a single mutable tip, or specific history.
-    // Let's implement "Overwrite current branch tip" for simplicity unless "history" is strictly requested.
-    // User said: "support versioning... e.g. for unpublished drafts".
-    // Schema has `uniqueIndex("cms_content_version_lookup_idx").on(table.blockId, table.language, table.branch)`.
-    // This enforces ONE row per (block, lang, branch).
-    // So "History" is NOT supported by this schema, only "Latest Draft" and "Latest Published".
-    // This matches "simplified CMS".
 
     const [saved] = await db.insert(cmsContentVersion).values({
         blockId,
@@ -114,12 +117,14 @@ export async function saveContent(blockId: string, language: string, branch: str
         }
     }).returning();
 
+    await invalidateCms();
     return saved;
 }
 
 export async function deleteBlock(blockId: string) {
     // Cascade should handle slots and versions
     await db.delete(cmsBlock).where(eq(cmsBlock.id, blockId));
+    await invalidateCms();
 }
 
 export async function getBlock(blockId: string) {
@@ -138,4 +143,6 @@ export async function renameBlock(blockId: string, newName: string) {
     await db.update(cmsBlock)
         .set({ name: newName })
         .where(eq(cmsBlock.id, blockId));
+    await invalidateCms();
 }
+

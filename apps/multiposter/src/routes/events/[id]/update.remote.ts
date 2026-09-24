@@ -12,6 +12,7 @@ import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { invalidateEvent } from '$lib/server/cache';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {
@@ -531,8 +532,9 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		console.log('Event updated successfully, refreshing list...');
 
+		let allAffectedIds: string[] = [data.id];
 		if (updatedEvent) {
-			let allAffectedIds = [updatedEvent.id];
+			allAffectedIds = [updatedEvent.id];
 			if (isMasterEvent) {
 				const instanceCondition = or(
 					eq(event.recurringEventId, updatedEvent.id),
@@ -575,6 +577,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		}
 
 		// Refresh caches
+		await invalidateEvent(allAffectedIds.length > 0 ? allAffectedIds : [data.id]);
 		await readEvent(data.id).refresh();
 		await listEvents().refresh();
 		console.log('--- updateEvent DONE ---');

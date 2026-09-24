@@ -6,6 +6,7 @@ import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { updateLocationSchema } from '@ac/validations';
+import { invalidateAllKioskViews } from '$lib/server/cache';
 
 export const updateLocation = form(updateLocationSchema, async (data) => {
     console.log('--- updateLocation START ---');
@@ -56,7 +57,8 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
 
         const updated = result[0];
         readLocation(data.id).set(updated);
-        await 
+        await invalidateAllKioskViews();
+        await listLocations().refresh();
 
         console.log('--- updateLocation SUCCESS ---');
         return { success: true, location: updated };

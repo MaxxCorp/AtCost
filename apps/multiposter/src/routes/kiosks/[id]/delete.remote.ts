@@ -5,6 +5,7 @@ import { eq, and, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { listKiosks } from '../list.remote';
+import { invalidateKiosk } from '$lib/server/cache';
 
 export const deleteKiosk = command(
     v.pipe(v.array(v.string()), v.minLength(1)),
@@ -17,7 +18,9 @@ export const deleteKiosk = command(
                 inArray(kiosk.id, ids)
             );
 
+        await Promise.all(ids.map(id => invalidateKiosk(id)));
         await listKiosks().refresh();
         return { success: true };
     }
 );
+

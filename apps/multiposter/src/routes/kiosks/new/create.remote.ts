@@ -5,6 +5,8 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createKioskSchema } from '$lib/validations/kiosks';
 import { listKiosks } from '../list.remote';
 import { error } from '@sveltejs/kit';
+import { invalidateKiosk } from '$lib/server/cache';
+
 
 function parseSafeDate(val: string | null | undefined): Date | null {
     if (!val || typeof val !== 'string' || val.trim() === '') return null;
@@ -80,6 +82,7 @@ export const createKiosk = form(createKioskSchema, async (data) => {
             );
         }
 
+        await invalidateKiosk(newKiosk.id);
         await listKiosks().refresh();
         return { success: true, id: newKiosk.id };
     } catch (e: any) {

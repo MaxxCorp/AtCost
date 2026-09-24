@@ -7,6 +7,7 @@ import { eq } from '@ac/db';
 import * as v from 'valibot';
 
 import { resolveLocationContactSync } from '$lib/server/contact-resolution';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys } from '$lib/server/cache';
 
 function toSafeIsoString(date: Date | string | null | undefined): string | null {
     if (!date) return null;
@@ -22,11 +23,15 @@ function toSafeIsoString(date: Date | string | null | undefined): string | null 
 }
 
 export const readKioskView = query(v.string(), async (kioskId) => {
-    const kioskData = await db.query.kiosk.findFirst({
-        where: eq(kiosk.id, kioskId),
-    });
+    const version = await getNamespaceVersion(CACHE_NAMESPACES.KIOSKS);
+    const key = cacheKeys.kioskView(kioskId, version);
 
-    if (!kioskData) return null;
+    return cached(key, 600, async () => {
+        const kioskData = await db.query.kiosk.findFirst({
+            where: eq(kiosk.id, kioskId),
+        });
+
+        if (!kioskData) return null;
 
     const kioskLocationsData = await db.query.kioskLocation.findMany({
         where: eq(kioskLocation.kioskId, kioskId),
@@ -188,4 +193,6 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         kiosk: kioskWithLocations,
         items
     };
+    });
 });
+

@@ -4,6 +4,7 @@ import { location } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createLocationSchema } from '@ac/validations';
+import { invalidateAllKioskViews } from '$lib/server/cache';
 
 export const createLocation = form(createLocationSchema, async (data) => {
     try {
@@ -41,9 +42,11 @@ export const createLocation = form(createLocationSchema, async (data) => {
         }
 
         const newLocation = result[0];
+        await invalidateAllKioskViews();
         await listLocations().refresh();
 
         return { success: true, location: newLocation };
+
 
     } catch (err: any) {
         return { success: false, error: { message: err.message || 'Creation failed' } };

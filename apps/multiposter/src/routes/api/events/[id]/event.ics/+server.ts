@@ -2,20 +2,23 @@ import { db } from '@ac/db';
 import ICAL from 'ical.js';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { cached, cacheKeys } from '$lib/server/cache';
 
 export const GET: RequestHandler = async ({ params }) => {
     const eventId = params.id;
-    const data = await db.query.event.findFirst({
-        where: (table, { eq }) => eq(table.id, eventId),
-        with: {
-            locations: { with: { location: true } },
-            contacts: { with: { contact: true } }
-        }
-    });
 
-    if (!data) {
-        error(404, 'Event not found');
-    }
+    const cachedResult = await cached(cacheKeys.eventIcs(eventId), 3600, async () => {
+        const data = await db.query.event.findFirst({
+            where: (table, { eq }) => eq(table.id, eventId),
+            with: {
+                locations: { with: { location: true } },
+                contacts: { with: { contact: true } }
+            }
+        });
+
+        if (!data) {
+            error(404, 'Event not found');
+        }
 
     const vcalendar = new ICAL.Component(['vcalendar', [], []]);
     vcalendar.addPropertyWithValue('prodid', '-//MaxxCorp//ac-multiposter//EN');
@@ -67,12 +70,18 @@ export const GET: RequestHandler = async ({ params }) => {
     vcalendar.addSubcomponent(vevent);
 
     const icsContent = vcalendar.toString();
+        return {
+            summary: data.summary,
+            icsContent
+        };
+    });
 
-    return new Response(new Uint8Array(Buffer.from(icsContent)), {
+    return new Response(new Uint8Array(Buffer.from(cachedResult.icsContent)), {
         headers: {
             'Content-Type': 'text/calendar',
-            'Content-Disposition': `attachment; filename="${data.summary.replace(/\s+/g, '_')}.ics"`,
+            'Content-Disposition': `attachment; filename="${cachedResult.summary.replace(/\s+/g, '_')}.ics"`,
             'Cache-Control': 'public, max-age=60'
         }
     });
 };
+

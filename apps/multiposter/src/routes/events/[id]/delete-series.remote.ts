@@ -8,6 +8,7 @@ import * as v from 'valibot';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { getStorageProvider } from '$lib/server/blob-storage';
+import { invalidateEvent } from '$lib/server/cache';
 
 /**
  * Command: Delete an entire recurring series.
@@ -116,11 +117,13 @@ export const deleteSeries = command(
         // Publish deletion events
         if (deletedEventIds.length > 0) {
             await publishEventChange('delete', deletedEventIds);
+            await invalidateEvent(deletedEventIds);
         }
 
-        await 
+        await listEvents().refresh();
 
         console.log('--- deleteSeries DONE ---');
         return { success: true, deletedCount: deletedEventIds.length };
     }
 );
+

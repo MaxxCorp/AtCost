@@ -5,6 +5,7 @@ import { eq, inArray } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { resolveLocationContactSync } from '$lib/server/contact-resolution';
+import { cached, cacheKeys } from '$lib/server/cache';
 
 function toSafeDate(date: Date | string | null | undefined): Date | null {
     if (!date) return null;
@@ -47,10 +48,10 @@ export const getKiosk = query(v.string(), async (id: string) => {
 
 export const getKioskForDisplay = query(v.string(), async (id: string) => {
     // Public access allowed for Kiosk display
+    return cached(cacheKeys.kioskDisplay(id), 600, async () => {
+        const [result] = await db.select().from(kiosk).where(eq(kiosk.id, id));
 
-    const [result] = await db.select().from(kiosk).where(eq(kiosk.id, id));
-
-    if (!result) return null;
+        if (!result) return null;
 
     const locations = await db.query.location.findMany({
         where: inArray(
@@ -78,19 +79,21 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
         }
     });
 
-    return {
-        ...result,
-        startDate: toSafeDate(result.startDate),
-        endDate: toSafeDate(result.endDate),
-        locations: locations.map((l: any) => ({
-            id: l.id,
-            name: l.name,
-            street: l.street,
-            houseNumber: l.houseNumber,
-            zip: l.zip,
-            city: l.city,
-            country: l.country,
-            contact: resolveLocationContactSync(l, { filterWorkOnly: true, fallbackToFirst: true })
-        })),
-    };
+        return {
+            ...result,
+            startDate: toSafeDate(result.startDate),
+            endDate: toSafeDate(result.endDate),
+            locations: locations.map((l: any) => ({
+                id: l.id,
+                name: l.name,
+                street: l.street,
+                houseNumber: l.houseNumber,
+                zip: l.zip,
+                city: l.city,
+                country: l.country,
+                contact: resolveLocationContactSync(l, { filterWorkOnly: true, fallbackToFirst: true })
+            })),
+        };
+    });
 });
+
