@@ -8,6 +8,19 @@ import * as v from 'valibot';
 
 import { resolveLocationContactSync } from '$lib/server/contact-resolution';
 
+function toSafeIsoString(date: Date | string | null | undefined): string | null {
+    if (!date) return null;
+    try {
+        const d = date instanceof Date ? date : new Date(date);
+        if (isNaN(d.getTime())) return null;
+        const year = d.getFullYear();
+        if (year < 1970 || year > 2100) return null;
+        return d.toISOString();
+    } catch {
+        return null;
+    }
+}
+
 export const readKioskView = query(v.string(), async (kioskId) => {
     const kioskData = await db.query.kiosk.findFirst({
         where: eq(kiosk.id, kioskId),
@@ -81,14 +94,15 @@ export const readKioskView = query(v.string(), async (kioskId) => {
     let endDate: string | undefined;
     
     if (kioskData.rangeMode === 'fixed') {
-        if (kioskData.startDate) startDate = kioskData.startDate.toISOString();
-        if (kioskData.endDate) endDate = kioskData.endDate.toISOString();
+        startDate = toSafeIsoString(kioskData.startDate) || undefined;
+        endDate = toSafeIsoString(kioskData.endDate) || undefined;
     } else {
-        let lookAheadSeconds = kioskData.lookAhead;
+        const lookPast = Math.max(0, Math.min(Number(kioskData.lookPast || 0), 315360000));
+        let lookAheadSeconds = Math.max(0, Math.min(Number(kioskData.lookAhead || 0), 315360000));
         if ((kioskData.uiMode === 'flat_list' || kioskData.uiMode === 'folded_flyer') && lookAheadSeconds <= 604800) {
             lookAheadSeconds = 2592000; // 30 days default for monthly listings
         }
-        startDate = new Date(now.getTime() - (kioskData.lookPast * 1000)).toISOString();
+        startDate = new Date(now.getTime() - (lookPast * 1000)).toISOString();
         endDate = new Date(now.getTime() + (lookAheadSeconds * 1000)).toISOString();
     }
 

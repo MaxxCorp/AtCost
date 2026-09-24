@@ -6,6 +6,20 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import * as v from 'valibot';
 import { resolveLocationContactSync } from '$lib/server/contact-resolution';
 
+function toSafeDate(date: Date | string | null | undefined): Date | null {
+    if (!date) return null;
+    try {
+        const d = date instanceof Date ? date : new Date(date);
+        if (isNaN(d.getTime())) return null;
+        const year = d.getFullYear();
+        if (year < 1970 || year > 2100) return null;
+        d.toISOString();
+        return d;
+    } catch {
+        return null;
+    }
+}
+
 export const getKiosk = query(v.string(), async (id: string) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'kiosks');
@@ -23,6 +37,8 @@ export const getKiosk = query(v.string(), async (id: string) => {
 
     const finalData = {
         ...result,
+        startDate: toSafeDate(result.startDate),
+        endDate: toSafeDate(result.endDate),
         locationIds: locations.map((l: any) => l.id),
     };
     console.log("getKiosk returning:", finalData);
@@ -64,6 +80,8 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
 
     return {
         ...result,
+        startDate: toSafeDate(result.startDate),
+        endDate: toSafeDate(result.endDate),
         locations: locations.map((l: any) => ({
             id: l.id,
             name: l.name,

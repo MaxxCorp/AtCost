@@ -45,8 +45,21 @@
     let lookPastDays = $state(untrack(() => initialData?.lookPast ? Math.round(initialData.lookPast / 86400) : 0));
     let uiMode = $state(untrack(() => initialData?.uiMode || "carousel"));
     let rangeMode = $state(untrack(() => initialData?.rangeMode || "rolling"));
-    let startDate = $state(untrack(() => initialData?.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : ""));
-    let endDate = $state(untrack(() => initialData?.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : ""));
+    function formatInitialDate(val: any): string {
+        if (!val) return "";
+        try {
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return "";
+            const year = d.getFullYear();
+            if (year < 1970 || year > 2100) return "";
+            return d.toISOString().slice(0, 16);
+        } catch {
+            return "";
+        }
+    }
+
+    let startDate = $state(untrack(() => formatInitialDate(initialData?.startDate)));
+    let endDate = $state(untrack(() => formatInitialDate(initialData?.endDate)));
  
     let excludeNonPublic = $state(untrack(() => initialData?.excludeNonPublic ?? true));
     let excludeTentative = $state(untrack(() => initialData?.excludeTentative ?? true));
@@ -106,6 +119,7 @@
  
         startDate = formatForInput(start);
         endDate = formatForInput(end);
+        rf.validate();
     }
  
     function setNextWeek() {
@@ -118,6 +132,7 @@
         
         startDate = formatForInput(nextMonday);
         endDate = formatForInput(nextSunday);
+        rf.validate();
     }
  
     function setNextMonth() {
@@ -127,12 +142,23 @@
         
         startDate = formatForInput(start);
         endDate = formatForInput(end);
+        rf.validate();
     }
 </script>
 
 <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
     <form
         {...rf.enhance(async ({ submit }: any) => {
+                if (rangeMode === "fixed") {
+                    if (!startDate || !endDate) {
+                        toast.error("Both start date and end date are required for fixed range mode");
+                        return;
+                    }
+                    if (new Date(startDate) > new Date(endDate)) {
+                        toast.error("Start date must be before or equal to end date");
+                        return;
+                    }
+                }
                 try {
                     const result: any = await submit();
                     if (result?.error) {
@@ -484,6 +510,8 @@
                     <input
                         {...rf.fields.startDate.as("datetime-local", startDate)}
                         value={startDate}
+                        min="1970-01-01T00:00"
+                        max="2099-12-31T23:59"
                         oninput={(e) => {
                             startDate = e.currentTarget.value;
                             rf.validate();
@@ -505,6 +533,8 @@
                     <input
                         {...rf.fields.endDate.as("datetime-local", endDate)}
                         value={endDate}
+                        min="1970-01-01T00:00"
+                        max="2099-12-31T23:59"
                         oninput={(e) => {
                             endDate = e.currentTarget.value;
                             rf.validate();
@@ -516,6 +546,14 @@
                         <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
+
+                {#if rangeMode === "fixed" && startDate && endDate && new Date(startDate) > new Date(endDate)}
+                    <div class="col-span-full">
+                        <p class="text-sm text-red-600 font-medium">
+                            {m.start_date()} must be before or equal to {m.end_date()}
+                        </p>
+                    </div>
+                {/if}
             {/if}
         </div>
 

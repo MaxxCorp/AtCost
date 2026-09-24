@@ -6,6 +6,19 @@ import { desc, asc, eq, inArray, and, or, not, ilike, sql, exists } from '@ac/db
 import { kioskPaginationSchema as PaginationSchema, parseFilterValue, type Kiosk, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 
+function toSafeIsoString(date: Date | string | null | undefined): string | null {
+    if (!date) return null;
+    try {
+        const d = date instanceof Date ? date : new Date(date);
+        if (isNaN(d.getTime())) return null;
+        const year = d.getFullYear();
+        if (year < 1970 || year > 2100) return null;
+        return d.toISOString();
+    } catch {
+        return null;
+    }
+}
+
 /**
  * List all Kiosks
  */
@@ -125,10 +138,10 @@ export const listKiosks = query(PaginationSchema, async (input: v.InferOutput<ty
 
         return {
             ...row,
-            createdAt: row.createdAt.toISOString(),
-            updatedAt: row.updatedAt.toISOString(),
-            startDate: row.startDate?.toISOString() || null,
-            endDate: row.endDate?.toISOString() || null,
+            createdAt: toSafeIsoString(row.createdAt) || new Date().toISOString(),
+            updatedAt: toSafeIsoString(row.updatedAt) || new Date().toISOString(),
+            startDate: toSafeIsoString(row.startDate),
+            endDate: toSafeIsoString(row.endDate),
             publicContactQrCodePath: primaryQrCode,
             locations
         };
