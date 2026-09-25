@@ -110,3 +110,70 @@ describe('Cache Service', () => {
         expect(v3).toBe(2);
     });
 });
+
+describe('Better Auth Secondary Storage', () => {
+    let mockStore: Map<string, string>;
+    let mockClient: any;
+
+    beforeEach(async () => {
+        const { getBetterAuthSecondaryStorage } = await import('./auth-storage');
+        mockStore = new Map();
+        mockClient = {
+            get: vi.fn(async (key: string) => mockStore.get(key) ?? null),
+            set: vi.fn(async (key: string, val: string) => {
+                mockStore.set(key, val);
+                return 'OK';
+            }),
+            del: vi.fn(async (...keys: string[]) => {
+                for (const k of keys) mockStore.delete(k);
+                return keys.length;
+            }),
+            getdel: vi.fn(async (key: string) => {
+                const val = mockStore.get(key) ?? null;
+                mockStore.delete(key);
+                return val;
+            }),
+        };
+
+        vi.spyOn(redisModule, 'getRedisClient').mockReturnValue(mockClient);
+        vi.spyOn(redisModule, 'isCircuitOpen').mockReturnValue(false);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('sets, gets, and deletes session data with ba: prefix', async () => {
+        const { getBetterAuthSecondaryStorage } = await import('./auth-storage');
+        const storage = getBetterAuthSecondaryStorage();
+        expect(storage).toBeDefined();
+
+        await storage!.set('session-token-123', JSON.stringify({ userId: 'u1' }), 3600);
+        expect(mockClient.set).toHaveBeenCalledWith('ba:session-token-123', JSON.stringify({ userId: 'u1' }), 'EX', 3600);
+
+        const fetched = await storage!.get('session-token-123');
+        expect(fetched).toEqual(JSON.stringify({ userId: 'u1' }));
+
+        await storage!.delete('session-token-123');
+        expect(mockClient.del).toHaveBeenCalledWith('ba:session-token-123');
+    });
+
+    it('implements getAndDelete using Redis getdel', async () => {
+        const { getBetterAuthSecondaryStorage } = await import('./auth-storage');
+        const storage = getBetterAuthSecondaryStorage();
+        expect(storage).toBeDefined();
+
+        mockStore.set('ba:verify-token', 'data-val');
+        const val = await storage!.getAndDelete!('verify-token');
+        expect(val).toBe('data-val');
+        expect(mockStore.has('ba:verify-token')).toBe(false);
+    });
+
+    it('returns undefined if Redis is not configured', async () => {
+        vi.spyOn(redisModule, 'getRedisClient').mockReturnValue(null);
+        const { getBetterAuthSecondaryStorage } = await import('./auth-storage');
+        const storage = getBetterAuthSecondaryStorage();
+        expect(storage).toBeUndefined();
+    });
+});
+

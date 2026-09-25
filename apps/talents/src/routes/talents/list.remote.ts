@@ -2,11 +2,16 @@ import { query } from '$app/server';
 import { db, talent, contact, eq, desc, inArray, notInArray, not, ilike, or, and, sql, exists, talentTimelineEntry, userContact, user } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { talentPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
 
 export const listTalents = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
+    const version = await getNamespaceVersion(CACHE_NAMESPACES.TALENTS);
+    const key = cacheKeys.talentsList(version, hashParams(input));
+
+    return cached(key, 300, async () => {
     const { page = 1, limit = 50, search = '', tagId, locationId, status } = input || {};
     const offset = (page - 1) * limit;
 
@@ -161,4 +166,5 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
     }));
 
     return { data, total };
+    });
 });

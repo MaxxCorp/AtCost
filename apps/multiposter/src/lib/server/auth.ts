@@ -5,29 +5,33 @@ import { getRequestEvent } from "$app/server";
 import { db, setConnectionString } from "@ac/db";
 import { env } from '$env/dynamic/private';
 
+import { getBetterAuthSecondaryStorage } from "$lib/server/cache";
+
 // Initialize DB connection string from SvelteKit environment
 if (env.DATABASE_URL) {
     setConnectionString(env.DATABASE_URL);
 }
 
+const secondaryStorage = getBetterAuthSecondaryStorage();
+
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
         provider: "pg",
     }),
+    ...(secondaryStorage ? { secondaryStorage } : {}),
     secret: env.BETTER_AUTH_SECRET || "development-secret-only-for-build",
     baseURL: env.BETTER_AUTH_URL || "http://localhost:5173",
     basePath: "/api/auth",
-    trustHost: true,
     onAPIError: {
         throw: true,
-        onError: (error) => {
+        onError: (error: unknown) => {
             console.error("[BetterAuth API Error]:", error);
         }
     },
     session: {
         cookieCache: {
             enabled: true,
-            maxAge: 30 * 60, // 30 minutes
+            maxAge: 24 * 60 * 60, // 24 hours
         },
     },
     user: {
@@ -76,20 +80,16 @@ export const auth = betterAuth({
                 "Calendars.ReadWrite",
                 "offline_access"
             ],
-            mapProfileToUser: (profile) => {
+            mapProfileToUser: (profile: any) => {
                 const email = (profile as any).email || (profile as any).mail || (profile as any).userPrincipalName || (profile as any).preferred_username;
                 return {
                     email: email,
                     name: profile.name || (profile as any).displayName || (profile as any).userPrincipalName,
                     image: profile.picture,
                     emailVerified: true,
-                    claims: {
-                        ...(profile as any),
-                        email: email
-                    }
                 };
             },
         }
     },
     plugins: [sveltekitCookies(getRequestEvent)],
-});
+} as any);

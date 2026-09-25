@@ -5,23 +5,27 @@ import { getRequestEvent } from "$app/server";
 import { db, setConnectionString } from "@ac/db";
 import { env } from '$env/dynamic/private';
 
+import { getBetterAuthSecondaryStorage } from "$lib/server/cache";
+
 // Initialize DB connection string from SvelteKit environment
 if (env.DATABASE_URL) {
     setConnectionString(env.DATABASE_URL);
 }
 
+const secondaryStorage = getBetterAuthSecondaryStorage();
+
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
         provider: "pg",
     }),
+    ...(secondaryStorage ? { secondaryStorage } : {}),
     secret: env.BETTER_AUTH_SECRET || "development-secret-only-for-build",
     baseURL: env.BETTER_AUTH_URL || "http://localhost:5175",
     basePath: "/api/auth",
-    trustHost: true,
     session: {
         cookieCache: {
             enabled: true,
-            maxAge: 30 * 60,
+            maxAge: 24 * 60 * 60, // 24 hours
         },
     },
     user: {
@@ -62,4 +66,4 @@ export const auth = betterAuth({
         }
     },
     plugins: [sveltekitCookies(getRequestEvent)],
-});
+} as any);

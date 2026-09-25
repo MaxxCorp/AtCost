@@ -5,7 +5,6 @@ export {
     setCache,
     delCache,
     cached,
-    cachedBinary,
     getNamespaceVersion,
     bumpNamespaceVersion,
 } from './service';
@@ -13,13 +12,6 @@ export {
     CACHE_NAMESPACES,
     cacheKeys,
     hashParams,
-    invalidateEvent,
-    invalidateContact,
-    invalidateAnnouncement,
-    invalidateLocation,
-    invalidateKiosk,
-    invalidateAllKioskViews,
-    invalidateCms,
+    invalidateTalent,
 } from './invalidation';
-
 

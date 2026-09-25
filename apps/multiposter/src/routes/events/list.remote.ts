@@ -5,6 +5,7 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult, type Event } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
 import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
 	let hasAccess = false;
@@ -16,6 +17,10 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		// unauthorized can only see public events
 	}
 
+	const version = await getNamespaceVersion(CACHE_NAMESPACES.EVENTS);
+	const key = cacheKeys.eventsList(hasAccess ? 'auth' : 'public', version, hashParams(input));
+
+	return cached(key, 300, async () => {
 	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, includeSeriesEntries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
 	const offset = (page - 1) * limit;
 
@@ -804,5 +809,6 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 
 	return { data, total: includeSeriesEntries ? data.length : total };
+	});
 });
 

@@ -10,7 +10,7 @@ import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
  * Location interface matching the database schema, with dates serialized to strings
  */
 import { LocationPaginationSchema as PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
-
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
 
 /**
  * Query: List all locations
@@ -19,6 +19,10 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'locations');
 
+	const version = await getNamespaceVersion(CACHE_NAMESPACES.LOCATIONS);
+	const key = cacheKeys.locationsList(version, hashParams(input));
+
+	return cached(key, 300, async () => {
 	const { page = 1, limit = 50, search = '', city, associatedWith, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
 	const offset = (page - 1) * limit;
 
@@ -113,4 +117,5 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	}));
 
 	return { data, total };
+	});
 });
