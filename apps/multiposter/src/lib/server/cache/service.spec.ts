@@ -128,11 +128,26 @@ describe('Better Auth Secondary Storage', () => {
                 for (const k of keys) mockStore.delete(k);
                 return keys.length;
             }),
-            getdel: vi.fn(async (key: string) => {
-                const val = mockStore.get(key) ?? null;
-                mockStore.delete(key);
-                return val;
+            call: vi.fn(async (cmd: string, ...args: string[]) => {
+                if (cmd.toUpperCase() === 'GETDEL') {
+                    const key = args[0];
+                    const val = mockStore.get(key) ?? null;
+                    mockStore.delete(key);
+                    return val;
+                }
+                throw new Error(`Unknown command ${cmd}`);
             }),
+            eval: vi.fn(async (_script: string, _numkeys: number, key: string, _arg: any) => {
+                const current = parseInt(mockStore.get(key) || '0', 10) + 1;
+                mockStore.set(key, String(current));
+                return current;
+            }),
+            incr: vi.fn(async (key: string) => {
+                const current = parseInt(mockStore.get(key) || '0', 10) + 1;
+                mockStore.set(key, String(current));
+                return current;
+            }),
+            expire: vi.fn(async () => 1),
         };
 
         vi.spyOn(redisModule, 'getRedisClient').mockReturnValue(mockClient);
@@ -167,6 +182,30 @@ describe('Better Auth Secondary Storage', () => {
         const val = await storage!.getAndDelete!('verify-token');
         expect(val).toBe('data-val');
         expect(mockStore.has('ba:verify-token')).toBe(false);
+    });
+
+    it('implements increment for Better Auth rate limiting', async () => {
+        const { getBetterAuthSecondaryStorage } = await import('./auth-storage');
+        const storage = getBetterAuthSecondaryStorage();
+        expect(storage).toBeDefined();
+
+        const count1 = await storage!.increment!('rate-limit:test-key', 60);
+        expect(count1).toBe(1);
+
+        const count2 = await storage!.increment!('rate-limit:test-key', 60);
+        expect(count2).toBe(2);
+    });
+
+    it('fails open on increment error without throwing', async () => {
+        const { getBetterAuthSecondaryStorage } = await import('./auth-storage');
+        const storage = getBetterAuthSecondaryStorage();
+        expect(storage).toBeDefined();
+
+        mockClient.eval.mockRejectedValueOnce(new Error('Connection failure'));
+        mockClient.incr.mockRejectedValueOnce(new Error('Connection failure'));
+
+        const count = await storage!.increment!('rate-limit:error-key', 60);
+        expect(count).toBe(0); // Fails open
     });
 
     it('returns undefined if Redis is not configured', async () => {
