@@ -11,7 +11,7 @@
 	import { updateEventSchema } from "$lib/validations/events";
 	import EventForm from "$lib/components/events/EventForm.svelte";
 	import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
-		    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
     import { Button } from "$lib/components/ui/button";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -21,9 +21,57 @@
         ChevronDown,
         RefreshCw,
     } from "@lucide/svelte";
+    import { authClient } from "$lib/auth";
+    import {
+        createCollaborationRoom,
+        CollaboratorAvatarStack,
+        RemoteChangeBanner,
+        type CollaborationRoom
+    } from "$lib/client/collaboration";
+
+    import { onMount } from "svelte";
 
 	const eventId = $derived(page.params.id || "");
     const eventRf = $derived(updateEvent.for(eventId));
+
+    let collab = $state<CollaborationRoom | null>(null);
+
+    onMount(() => {
+        if (!eventId) return;
+
+        let isCancelled = false;
+        let room: CollaborationRoom | null = null;
+
+        authClient.getSession().then((session) => {
+            if (isCancelled) return;
+            const user = session?.data?.user;
+            if (!user) return;
+
+            room = createCollaborationRoom({
+                entityType: 'event',
+                entityId: eventId,
+                currentUser: {
+                    id: user.id,
+                    name: user.name || user.email,
+                    email: user.email,
+                    avatar: user.image ?? undefined
+                },
+                onRemoteChange: (change) => {
+                    const name = change.updatedBy?.name || change.updatedBy?.email || 'A collaborator';
+                    toast.info(`${name} updated this event.`);
+                }
+            });
+            collab = room;
+        });
+
+        return () => {
+            isCancelled = true;
+            if (room) {
+                room.destroy();
+            }
+            collab = null;
+        };
+    });
 </script>
 
 {#if browser}
@@ -37,127 +85,143 @@
                 {#if event}
                 <div class="max-w-3xl mx-auto px-4 py-8 text-left">
                     <Breadcrumb
-                feature="events"
-                current={event.summary ??
-                    m.create_new({ item: m.feature_events_title() })}
-            />
+                        feature="events"
+                        current={event.summary ??
+                            m.create_new({ item: m.feature_events_title() })}
+                    />
 
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-3xl font-bold">
-                    {m.edit_item({ item: m.feature_events_title() })}
-                </h1>
-                
-                {#if event.recurrence && (event.recurrence).length > 0 || event.seriesId || event.recurringEventId}
-                    <DropdownMenu.Root>
-                        <DropdownMenu.Trigger>
-                            <Button
+                    <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <h1 class="text-3xl font-bold">
+                                {m.edit_item({ item: m.feature_events_title() })}
+                            </h1>
+                            {#if collab}
+                                <CollaboratorAvatarStack peers={collab.peers} connected={collab.connected} />
+                            {/if}
+                        </div>
+                        
+                        {#if event.recurrence && (event.recurrence).length > 0 || event.seriesId || event.recurringEventId}
+                            <DropdownMenu.Root>
+                                <DropdownMenu.Trigger>
+                                    <Button
+                                        variant="destructive"
+                                        class="flex items-center gap-2"
+                                    >
+                                        <Trash2 size={16} />
+                                        {m.delete()}
+                                        <ChevronDown size={14} />
+                                    </Button>
+                                </DropdownMenu.Trigger>
+                                <DropdownMenu.Content align="end">
+                                    <DropdownMenu.Item
+                                        onclick={async () => {
+                                            await handleDelete({
+                                                ids: [event.id],
+                                                deleteFn: async (ids) => await deleteEventAction({ ids }),
+                                                itemName: m.instance().toLowerCase(),
+                                            });
+                                            goto("/events");
+                                        }}
+                                    >
+                                        <Trash2 size={14} class="mr-2" />
+                                        {m.delete()}
+                                        {m.instance()}
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                        class="text-red-600"
+                                        onclick={async () => {
+                                            if (!confirm(m.delete_series_confirm())) return;
+                                            try {
+                                                await deleteEventAction({ ids: [event.id] });
+                                                toast.success(m.series_deleted());
+                                                goto("/events");
+                                            } catch (err: any) {
+                                                toast.error(
+                                                    err.message ||
+                                                        "Failed to delete series",
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        <RefreshCw size={14} class="mr-2" />
+                                        {m.delete()}
+                                        {m.series()}
+                                    </DropdownMenu.Item>
+                                </DropdownMenu.Content>
+                            </DropdownMenu.Root>
+                        {:else}
+                            <AsyncButton
+                                type="button"
                                 variant="destructive"
-                                class="flex items-center gap-2"
-                            >
-                                <Trash2 size={16} />
-                                {m.delete()}
-                                <ChevronDown size={14} />
-                            </Button>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Content align="end">
-                            <DropdownMenu.Item
+                                loading={deleteEventAction.pending}
                                 onclick={async () => {
                                     await handleDelete({
                                         ids: [event.id],
                                         deleteFn: async (ids) => await deleteEventAction({ ids }),
-                                        itemName: m.instance().toLowerCase(),
+                                        itemName: m.event_label(),
                                     });
                                     goto("/events");
                                 }}
                             >
-                                <Trash2 size={14} class="mr-2" />
                                 {m.delete()}
-                                {m.instance()}
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item
-                                class="text-red-600"
-                                onclick={async () => {
-                                    if (!confirm(m.delete_series_confirm())) return;
-                                    try {
-                                        await deleteEventAction({ ids: [event.id] });
-                                        toast.success(m.series_deleted());
-                                        goto("/events");
-                                    } catch (err: any) {
-                                        toast.error(
-                                            err.message ||
-                                                "Failed to delete series",
-                                        );
-                                    }
-                                }}
-                            >
-                                <RefreshCw size={14} class="mr-2" />
-                                {m.delete()}
-                                {m.series()}
-                            </DropdownMenu.Item>
-                        </DropdownMenu.Content>
-                    </DropdownMenu.Root>
-                {:else}
-                    <AsyncButton
-                        type="button"
-                        variant="destructive"
-                        loading={deleteEventAction.pending}
-                        onclick={async () => {
-                            await handleDelete({
-                                ids: [event.id],
-                                deleteFn: async (ids) => await deleteEventAction({ ids }),
-                                itemName: m.event_label(),
-                            });
-                            goto("/events");
-                        }}
-                    >
-                        {m.delete()}
-                    </AsyncButton>
-                {/if}
-            </div>
+                            </AsyncButton>
+                        {/if}
+                    </div>
 
-            <SeriesModeSelector event={event} variant="banner" />
+                    <SeriesModeSelector event={event} variant="banner" />
 
-            <form
-                    {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
-                        try {
-                            const result: any = await submit();
-                            if (result?.error) {
-                                toast.error(
-                                    result.error.message || m.something_went_wrong(),
-                                );
-                                return;
+                    {#if collab}
+                        <RemoteChangeBanner
+                            remoteChange={collab.remoteChange}
+                            onRefresh={async () => {
+                                await readEvent(eventId).refresh();
+                            }}
+                            onDismiss={() => collab?.dismissRemoteChange()}
+                        />
+                    {/if}
+
+                    <form
+                        {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
+                            try {
+                                const result: any = await submit();
+                                if (result?.error) {
+                                    toast.error(
+                                        result.error.message || m.something_went_wrong(),
+                                    );
+                                    return;
+                                }
+                                toast.success(m.successfully_saved());
+                                goto("/events");
+                            } catch (error: any) {
+                                toast.error(error?.message || m.something_went_wrong());
                             }
-                            toast.success(m.successfully_saved());
-                            goto("/events");
-                        } catch (error: any) {
-                            toast.error(error?.message || m.something_went_wrong());
-                        }
-                    })}
-                    class="space-y-6"
-                >
-                    <EventForm
-                        remoteFunction={eventRf}
-                        validationSchema={updateEventSchema}
-                        isUpdating={true}
-                        initialData={event}
-                    />
+                        })}
+                        class="space-y-6"
+                    >
+                        <EventForm
+                            remoteFunction={eventRf}
+                            validationSchema={updateEventSchema}
+                            isUpdating={true}
+                            initialData={event}
+                            {collab}
+                        />
 
-                    <div class="flex gap-3 pt-4">
-                        <AsyncButton
-                            type="submit"
-                            loadingLabel={m.saving()}
-                            loading={eventRf.pending}
-                            class="px-8"
-                        >
-                            {m.save_changes()}
-                        </AsyncButton>
-                        <Button variant="secondary" href="/events" size="default">
-                            {m.cancel()}
-                        </Button>
-                    </div>
-                </form>
-                    </div>
-        {/if}
+                        <div class="flex gap-3 pt-4">
+                            <AsyncButton
+                                type="submit"
+                                loadingLabel={m.saving()}
+                                loading={eventRf.pending}
+                                class="px-8"
+                            >
+                                {m.save_changes()}
+                            </AsyncButton>
+                            <Button variant="secondary" href="/events" size="default">
+                                {m.cancel()}
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+                {/if}
             {/await}
         </div>
         {#snippet failed(error: unknown)}

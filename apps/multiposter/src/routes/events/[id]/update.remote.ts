@@ -553,7 +553,11 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			}
 
 			console.log(`[Update Remote] Triggering sync for ${allAffectedIds.length} affected event(s)...`);
-			await publishEventChange('update', allAffectedIds);
+			await publishEventChange('update', allAffectedIds, {
+				id: user.id,
+				name: user.name || user.email,
+				email: user.email
+			});
 
 			const syncPromise = syncService.syncItems(user.id, allAffectedIds, 'event').catch((err) => {
 				console.error('[Update Remote] Background sync error:', err);

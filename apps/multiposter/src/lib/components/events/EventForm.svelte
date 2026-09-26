@@ -79,22 +79,37 @@
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
     import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import * as v from "valibot";
+    import { FieldCollaboratorBadge, type CollaborationRoom } from "$lib/client/collaboration";
 
     let {
         remoteFunction,
         validationSchema,
         isUpdating = false,
         initialData = null,
+        collab = null,
     }: {
         remoteFunction: any;
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: Event | null;
+        collab?: CollaborationRoom | null;
     } = $props();
 
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
     const type = "event";
+
+    function getCollaboratorStyle(fieldName: string) {
+        const peer = collab?.getFieldCollaborator(fieldName);
+        if (!peer) return undefined;
+        return `border-color: ${peer.color.border}; box-shadow: 0 0 0 2px ${peer.color.ring};`;
+    }
+
+    function getCollaboratorOutlineStyle(fieldName: string) {
+        const peer = collab?.getFieldCollaborator(fieldName);
+        if (!peer) return undefined;
+        return `outline: 2px solid ${peer.color.border}; box-shadow: 0 0 0 3px ${peer.color.ring};`;
+    }
     const BERLIN_DE_CATEGORIES = [
         "Ausstellung",
         "Berliner BÃ¼hnen",
@@ -445,20 +460,28 @@
     </h2>
 
     <div>
-        <label
-            for="summary"
-            class="block text-sm font-medium text-gray-700 mb-1"
-        >
-            {m.title()} <span class="text-red-500">*</span>
-        </label>
+        <div class="flex items-center justify-between mb-1">
+            <label
+                for="summary"
+                class="block text-sm font-medium text-gray-700"
+            >
+                {m.title()} <span class="text-red-500">*</span>
+            </label>
+            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('summary')} />
+        </div>
         <input
             {...rf.fields.summary.as("text", initialData?.summary ?? "")}
             required
             class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.summary.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
+            style={getCollaboratorStyle('summary')}
             placeholder={m.title()}
-            onblur={() => rf.validate()}
+            onfocus={() => collab?.setFocus('summary')}
+            onblur={() => {
+                collab?.setFocus(null);
+                rf.validate();
+            }}
         />
         {#each rf.fields.summary.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
@@ -505,37 +528,49 @@
             <!-- Start Block -->
             <div class="space-y-4">
                 <div>
-                    <label
-                        for="startDate"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >{m.start_date()}
-                        <span class="text-red-500">*</span></label
-                    >
+                    <div class="flex items-center justify-between mb-1">
+                        <label
+                            for="startDate"
+                            class="block text-sm font-medium text-gray-700"
+                            >{m.start_date()}
+                            <span class="text-red-500">*</span></label
+                        >
+                        <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startDate')} />
+                    </div>
                     <input
                         {...rf.fields.startDate.as(
                             "date",
                             startParsed.date || localNow.date,
                         )}
                         required
+                        onfocus={() => collab?.setFocus('startDate')}
+                        onblur={() => collab?.setFocus(null)}
                         oninput={(e) => updateEndDateTime(e, true)}
+                        style={getCollaboratorStyle('startDate')}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     />
                 </div>
                 {#if !isAllDay}
                     <div>
-                        <label
-                            for="startTime"
-                            class="block text-sm font-medium text-gray-700 mb-1"
-                            >{m.start_time()}
-                            <span class="text-red-500">*</span></label
-                        >
+                        <div class="flex items-center justify-between mb-1">
+                            <label
+                                for="startTime"
+                                class="block text-sm font-medium text-gray-700"
+                                >{m.start_time()}
+                                <span class="text-red-500">*</span></label
+                            >
+                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startTime')} />
+                        </div>
                         <input
                             {...rf.fields.startTime.as(
                                 "time",
                                 startParsed.time || localNow.time,
                             )}
                             required
+                            onfocus={() => collab?.setFocus('startTime')}
+                            onblur={() => collab?.setFocus(null)}
                             oninput={(e) => updateEndDateTime(e, false)}
+                            style={getCollaboratorStyle('startTime')}
                             class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                         />
                     </div>
@@ -561,31 +596,43 @@
             <!-- End Block -->
             <div class="space-y-4">
                 <div>
-                    <label
-                        for="endDate"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                        >{m.end_date()}
-                        <span class="text-red-500">*</span></label
-                    >
+                    <div class="flex items-center justify-between mb-1">
+                        <label
+                            for="endDate"
+                            class="block text-sm font-medium text-gray-700"
+                            >{m.end_date()}
+                            <span class="text-red-500">*</span></label
+                        >
+                        <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endDate')} />
+                    </div>
                     <input
                         {...rf.fields.endDate.as("date", initialEnd.date)}
                         placeholder={rf.fields.startDate.value()}
                         required
+                        onfocus={() => collab?.setFocus('endDate')}
+                        onblur={() => collab?.setFocus(null)}
+                        style={getCollaboratorStyle('endDate')}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     />
                 </div>
                 {#if !isAllDay}
                     <div>
-                        <label
-                            for="endTime"
-                            class="block text-sm font-medium text-gray-700 mb-1"
-                            >{m.end_time()}
-                            <span class="text-red-500">*</span></label
-                        >
+                        <div class="flex items-center justify-between mb-1">
+                            <label
+                                for="endTime"
+                                class="block text-sm font-medium text-gray-700"
+                                >{m.end_time()}
+                                <span class="text-red-500">*</span></label
+                            >
+                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endTime')} />
+                        </div>
                         <input
                             {...rf.fields.endTime.as("time", initialEnd.time)}
                             placeholder={getDefaultEndTime(rf)}
                             required
+                            onfocus={() => collab?.setFocus('endTime')}
+                            onblur={() => collab?.setFocus(null)}
+                            style={getCollaboratorStyle('endTime')}
                             class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                         />
                     </div>
@@ -658,12 +705,20 @@
     </div>
 
     <div>
-        <label
-            for="description"
-            class="block text-sm font-medium text-gray-700 mb-1"
-            >{m.description()}</label
+        <div class="flex items-center justify-between mb-1">
+            <label
+                for="description"
+                class="block text-sm font-medium text-gray-700"
+                >{m.description()}</label
+            >
+            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('description')} />
+        </div>
+        <div
+            class="prose max-w-none rounded-md transition-shadow"
+            style={getCollaboratorOutlineStyle('description')}
+            onfocusin={() => collab?.setFocus('description')}
+            onfocusout={() => collab?.setFocus(null)}
         >
-        <div class="prose max-w-none">
             <RichTextEditor 
                 value={rf.fields.description.value() ?? initialData?.description ?? ""} 
                 onchange={(v) => rf.fields.description.set(v)}

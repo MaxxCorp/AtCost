@@ -179,7 +179,11 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
         const { updatedAnnouncement, finalTags } = transactionResult as any;
 
         // Notify listeners
-        await publishAnnouncementChange('update', [announcementId]);
+        await publishAnnouncementChange('update', [announcementId], {
+            id: user.id,
+            name: user.name || user.email,
+            email: user.email
+        });
 
         // Refresh caches
         await invalidateAnnouncement(announcementId);

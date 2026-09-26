@@ -54,12 +54,20 @@
     import { MapPin, User } from "@lucide/svelte";
 
     import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
+    import { FieldCollaboratorBadge, type CollaborationRoom } from "$lib/client/collaboration";
 
     let {
         remoteFunction,
         validationSchema,
         isUpdating = false,
         initialData = null,
+        collab = null,
+    }: {
+        remoteFunction: any;
+        validationSchema: any;
+        isUpdating?: boolean;
+        initialData?: any;
+        collab?: CollaborationRoom | null;
     } = $props();
 
     // Initialize form state
@@ -67,6 +75,18 @@
     const rf = (remoteFunction as any).preflight(validationSchema);
 
     const type = "announcement";
+
+    function getCollaboratorStyle(fieldName: string) {
+        const peer = collab?.getFieldCollaborator(fieldName);
+        if (!peer) return undefined;
+        return `border-color: ${peer.color.border}; box-shadow: 0 0 0 2px ${peer.color.ring};`;
+    }
+
+    function getCollaboratorOutlineStyle(fieldName: string) {
+        const peer = collab?.getFieldCollaborator(fieldName);
+        if (!peer) return undefined;
+        return `outline: 2px solid ${peer.color.border}; box-shadow: 0 0 0 3px ${peer.color.ring};`;
+    }
 
 
     // svelte-ignore state_referenced_locally
@@ -178,15 +198,21 @@
             </h2>
 
             <div>
-                <label
-                    for="title"
-                    class="block text-sm font-medium text-gray-700 mb-1"
-                >
-                    {m.title()} <span class="text-red-500">*</span>
-                </label>
+                <div class="flex items-center justify-between mb-1">
+                    <label
+                        for="title"
+                        class="block text-sm font-medium text-gray-700"
+                    >
+                        {m.title()} <span class="text-red-500">*</span>
+                    </label>
+                    <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('title')} />
+                </div>
                 <input
                     {...rf.fields.title.as("text", initialData?.title ?? "")}
                     required
+                    onfocus={() => collab?.setFocus('title')}
+                    onblur={() => collab?.setFocus(null)}
+                    style={getCollaboratorStyle('title')}
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     placeholder={m.announcement_title_placeholder()}
                 />
@@ -196,13 +222,21 @@
             </div>
 
             <div>
-                <label
-                    for="content"
-                    class="block text-sm font-medium text-gray-700 mb-1"
+                <div class="flex items-center justify-between mb-1">
+                    <label
+                        for="content"
+                        class="block text-sm font-medium text-gray-700"
+                    >
+                        {m.content()} <span class="text-red-500">*</span>
+                    </label>
+                    <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('content')} />
+                </div>
+                <div
+                    class="prose max-w-none rounded-md transition-shadow"
+                    style={getCollaboratorOutlineStyle('content')}
+                    onfocusin={() => collab?.setFocus('content')}
+                    onfocusout={() => collab?.setFocus(null)}
                 >
-                    {m.content()} <span class="text-red-500">*</span>
-                </label>
-                <div class="prose max-w-none">
                     <RichTextEditor 
                         value={rf.fields.content.value() ?? initialData?.content ?? ""}
                         onchange={(v) => rf.fields.content.set(v)}
