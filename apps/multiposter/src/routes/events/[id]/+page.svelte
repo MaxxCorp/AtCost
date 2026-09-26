@@ -95,9 +95,12 @@
                             <h1 class="text-3xl font-bold">
                                 {m.edit_item({ item: m.feature_events_title() })}
                             </h1>
-                            {#if collab}
-                                <CollaboratorAvatarStack peers={collab.peers} connected={collab.connected} />
-                            {/if}
+                            <CollaboratorAvatarStack
+                                peers={collab?.peers ?? []}
+                                connected={collab?.connected ?? false}
+                                provider={collab?.provider ?? 'none'}
+                                offlineReason={collab?.offlineReason ?? null}
+                            />
                         </div>
                         
                         {#if event.recurrence && (event.recurrence).length > 0 || event.seriesId || event.recurringEventId}

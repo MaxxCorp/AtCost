@@ -2,10 +2,19 @@ import Ably from 'ably';
 import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { getRealtimeInfo } from '$lib/server/realtime';
 
 async function handleAuth(event: Parameters<RequestHandler>[0]) {
     if (!env.ABLY_API_KEY) {
-        return json({ error: 'Missing ABLY_API_KEY' }, { status: 500 });
+        const info = getRealtimeInfo();
+        return json(
+            {
+                error: 'Ably is not configured',
+                enabled: false,
+                fallbackProvider: info.provider
+            },
+            { status: 503 }
+        );
     }
 
     const client = new Ably.Rest(env.ABLY_API_KEY);
@@ -23,8 +32,8 @@ async function handleAuth(event: Parameters<RequestHandler>[0]) {
         const tokenRequestData = await client.auth.createTokenRequest(tokenParams);
         return json(tokenRequestData);
     } catch (err) {
-        console.error('Error creating Ably token request:', err);
-        return json({ error: 'Internal Server Error' }, { status: 500 });
+        console.warn('[Ably Auth] Error creating Ably token request:', err);
+        return json({ error: 'Ably token request failed' }, { status: 500 });
     }
 }
 

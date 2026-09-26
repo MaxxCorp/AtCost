@@ -1,21 +1,54 @@
 <script lang="ts">
     import type { Collaborator } from './types';
+    import type { CollaborationProvider } from './collaboration.svelte';
     import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
     let {
         peers = [],
         connected = false,
+        provider = 'none',
+        offlineReason = null,
         maxVisible = 4,
         class: className = ''
     }: {
         peers?: Collaborator[];
         connected?: boolean;
+        provider?: CollaborationProvider;
+        offlineReason?: string | null;
         maxVisible?: number;
         class?: string;
     } = $props();
 
     const visiblePeers = $derived(peers.slice(0, maxVisible));
     const overflowCount = $derived(Math.max(0, peers.length - maxVisible));
+
+    const statusLabel = $derived.by(() => {
+        if (peers.length > 0) return `${peers.length} active`;
+        if (connected) return provider === 'ably' ? 'Live (Cloud)' : 'Live (Direct)';
+        if (provider === 'polling') return 'Polling Mode';
+        return 'Offline';
+    });
+
+    const tooltipHeadline = $derived.by(() => {
+        if (connected) {
+            return provider === 'ably' ? 'Real-time Active (Cloud)' : 'Real-time Active (Direct Server)';
+        }
+        if (provider === 'polling') {
+            return 'Polling Fallback Active';
+        }
+        return 'Real-time Inactive';
+    });
+
+    const tooltipDescription = $derived.by(() => {
+        if (connected) {
+            const providerName = provider === 'ably' ? 'Ably cloud network' : 'persistent server stream (SSE)';
+            return `Collaborative presence and real-time updates are active via ${providerName}.`;
+        }
+        if (offlineReason) {
+            return offlineReason;
+        }
+        return 'Real-time presence is currently unavailable. Your form inputs and saves work normally.';
+    });
 
     function getInitials(name: string): string {
         if (!name) return '??';
@@ -28,20 +61,52 @@
 </script>
 
 <div class="flex items-center gap-3 {className}">
-    <!-- Connection Status Indicator -->
-    <div class="flex items-center gap-1.5 text-xs text-muted-foreground" title={connected ? "Connected to realtime room" : "Connecting..."}>
-        <span class="relative flex h-2 w-2">
-            {#if connected}
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            {:else}
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-400 animate-pulse"></span>
+    <!-- Connection Status Indicator with Unobtrusive Offline Tooltip -->
+    <Tooltip.Root>
+        <Tooltip.Trigger>
+            {#snippet child({ props })}
+                <button
+                    type="button"
+                    {...props}
+                    class="flex items-center gap-1.5 text-xs text-muted-foreground/80 hover:text-muted-foreground transition-colors cursor-help select-none bg-transparent border-0 p-0"
+                >
+                    <span class="relative flex h-2 w-2">
+                        {#if connected}
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        {:else if provider === 'polling'}
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-400/80"></span>
+                        {:else}
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-muted-foreground/40"></span>
+                        {/if}
+                    </span>
+                    <span class="hidden sm:inline text-[11px] font-medium tracking-tight">
+                        {statusLabel}
+                    </span>
+                </button>
+            {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content side="bottom" align="start" class="max-w-[260px] text-xs p-2.5 shadow-md">
+            <div class="font-semibold text-foreground flex items-center gap-1.5 mb-1">
+                <span
+                    class="size-1.5 rounded-full inline-block {connected
+                        ? 'bg-emerald-500'
+                        : provider === 'polling'
+                        ? 'bg-blue-400'
+                        : 'bg-muted-foreground/50'}"
+                ></span>
+                {tooltipHeadline}
+            </div>
+            <p class="text-muted-foreground text-[11px] leading-relaxed">
+                {tooltipDescription}
+            </p>
+            {#if !connected}
+                <div class="mt-1.5 pt-1.5 border-t border-border/50 text-[10px] text-muted-foreground/80">
+                    Form saving and validation are fully functional.
+                </div>
             {/if}
-        </span>
-        <span class="hidden sm:inline text-[11px] font-medium tracking-tight">
-            {peers.length > 0 ? `${peers.length} active` : "Live"}
-        </span>
-    </div>
+        </Tooltip.Content>
+    </Tooltip.Root>
 
     <!-- Active Collaborators Stack -->
     {#if peers.length > 0}

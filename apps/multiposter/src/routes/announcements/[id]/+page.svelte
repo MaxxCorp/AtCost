@@ -63,9 +63,12 @@
     <div class="max-w-3xl mx-auto px-4 py-8 text-left">
         <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
             <h1 class="text-3xl font-bold">Edit Announcement</h1>
-            {#if collab}
-                <CollaboratorAvatarStack peers={collab.peers} connected={collab.connected} />
-            {/if}
+            <CollaboratorAvatarStack
+                peers={collab?.peers ?? []}
+                connected={collab?.connected ?? false}
+                provider={collab?.provider ?? 'none'}
+                offlineReason={collab?.offlineReason ?? null}
+            />
         </div>
 
         {#if collab}
