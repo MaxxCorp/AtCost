@@ -1,8 +1,8 @@
 import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
-import { eq, and } from '@ac/db';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { eq, and, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createEventSchema } from '$lib/validations/events';
@@ -124,6 +124,20 @@ export const createEvent = form(createEventSchema, async (data) => {
         let syncIds: string[] = [];
         if (data.syncIds) {
             syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
+        }
+
+        // Auto-include default shared sync targets if syncIds was not explicitly provided
+        if (data.syncIds === undefined || data.syncIds === null) {
+            const defaultConfigs = await db
+                .select({ id: syncConfig.id })
+                .from(syncConfig)
+                .where(
+                    and(
+                        eq(syncConfig.enabled, true),
+                        sql`(${syncConfig.settings}->>'isDefault' = 'true')`
+                    )
+                );
+            syncIds = defaultConfigs.map(c => c.id);
         }
 
         const initialCampaignContent: CampaignContent = createDefaultCampaignContent(syncIds);

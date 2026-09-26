@@ -152,6 +152,12 @@
 	let direction = $state<"pull" | "push" | "bidirectional">(untrack(() => initialData?.direction || "bidirectional"));
 	let calendarId = $state(untrack(() => initialData?.settings?.calendarId || "primary"));
 	let syncIntervalMinutes = $state(untrack(() => initialData?.settings?.syncIntervalMinutes || 60));
+	let isDefault = $state<boolean>(
+		untrack(() => {
+			const val = initialData?.settings?.isDefault;
+			return val === true || val === "true" || val === 1;
+		})
+	);
 	let company = $state(untrack(() => initialData?.settings?.company || ""));
 	let wpBaseUrl = $state(untrack(() => initialData?.settings?.baseUrl || ""));
 	let wpUsername = $state(untrack(() => initialData?.settings?.username || ""));
@@ -366,11 +372,15 @@
 					{...fields.settings.calendarId.as("text")}
 					id="calendarId"
 					bind:value={calendarId}
-					placeholder="primary"
+					placeholder={selectedProvider === "microsoft-calendar" ? "shared-mailbox@company.com or primary" : "primary"}
 					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 				/>
 				<p class="text-xs text-gray-500 mt-1">
-					Use "primary" for your main calendar or specify a calendar ID
+					{#if selectedProvider === "microsoft-calendar"}
+						{m.shared_calendar_hint ? m.shared_calendar_hint() : "For shared mailbox calendars, enter the shared mailbox email address (e.g. team@company.com). Use 'primary' for your personal calendar."}
+					{:else}
+						Use "primary" for your main calendar or specify a calendar ID
+					{/if}
 				</p>
 			</div>
 		{/if}
@@ -697,6 +707,26 @@
 			<p class="text-xs text-gray-500 mt-1">
 				How often to sync (15 minutes to 24 hours)
 			</p>
+		</div>
+
+		<div class="border-t pt-4">
+			<label class="flex items-start gap-3 cursor-pointer">
+				<input
+					type="checkbox"
+					checked={isDefault}
+					onchange={(e) => (isDefault = e.currentTarget.checked)}
+					class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+				/>
+				<div class="flex-1">
+					<span class="text-sm font-medium text-gray-900 block">
+						{m.default_sync_target ? m.default_sync_target() : "Default Shared Sync Target"}
+					</span>
+					<span class="text-xs text-gray-500 block mt-0.5">
+						{m.default_sync_target_description ? m.default_sync_target_description() : "Automatically select this sync target for newly created events and announcements across all users."}
+					</span>
+				</div>
+			</label>
+			<input {...fields.settings.isDefault.as("hidden", isDefault ? "true" : "false")} />
 		</div>
 	</div>
 </div>

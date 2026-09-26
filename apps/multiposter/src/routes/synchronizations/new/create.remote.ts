@@ -56,6 +56,9 @@ export const create = form(createSynchronizationSchema, async (input) => {
 
 		// Create sync config
 		const settings = typeof input.settings === 'string' ? JSON.parse(input.settings) : (input.settings || {});
+		if (settings.isDefault !== undefined) {
+			settings.isDefault = settings.isDefault === true || settings.isDefault === 'true';
+		}
 
 		const insertData: any = {
 			userId: user.id,

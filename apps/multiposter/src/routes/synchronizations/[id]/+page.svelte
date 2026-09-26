@@ -163,9 +163,16 @@
                                             <Calendar class="h-8 w-8 text-blue-600" />
                                         </div>
                                         <div>
-                                            <h1 class="text-3xl font-bold">
-                                                {getProviderLabel(config.providerType)}
-                                            </h1>
+                                            <div class="flex items-center gap-3">
+                                                <h1 class="text-3xl font-bold">
+                                                    {getProviderLabel(config.providerType)}
+                                                </h1>
+                                                {#if (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                        {m.default_shared_target ? m.default_shared_target() : "Default Shared Target"}
+                                                    </span>
+                                                {/if}
+                                            </div>
                                             <p class="text-gray-600">{config.providerId}</p>
                                         </div>
                                     </div>

@@ -37,6 +37,10 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 			? (typeof input.settings === 'string' ? JSON.parse(input.settings) : { ...(existing.settings as any || {}), ...input.settings })
 			: existing.settings;
 
+		if (newSettings && newSettings.isDefault !== undefined) {
+			newSettings.isDefault = newSettings.isDefault === true || newSettings.isDefault === 'true';
+		}
+
 		const newCredentials = input.credentials !== undefined
 			? (typeof input.credentials === 'string' ? JSON.parse(input.credentials) : { ...(existing.credentials as any || {}), ...input.credentials })
 			: existing.credentials;

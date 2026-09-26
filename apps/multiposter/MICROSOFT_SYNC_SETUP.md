@@ -51,6 +51,7 @@ To enable Microsoft Calendar synchronization, you need to register an applicatio
    - `email`
    - `offline_access` (Required for background synchronization)
    - `Calendars.ReadWrite` (Required to sync calendar events)
+   - `Calendars.ReadWrite.Shared` (Required to sync to shared mailbox calendars)
 6. Click **Add permissions**
 
 ---

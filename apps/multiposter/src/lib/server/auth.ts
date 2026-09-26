@@ -78,6 +78,7 @@ export const auth = betterAuth({
                 "profile",
                 "email",
                 "Calendars.ReadWrite",
+                "Calendars.ReadWrite.Shared",
                 "offline_access"
             ],
             mapProfileToUser: (profile: any) => {

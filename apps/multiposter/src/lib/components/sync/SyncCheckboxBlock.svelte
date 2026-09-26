@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { list } from "../../../routes/synchronizations/list.remote";
     import RefreshCw from "$lib/components/icons/refresh-cw.svelte";
     import * as m from "$lib/paraglide/messages";
@@ -15,6 +16,24 @@
     // svelte-ignore state_referenced_locally
     let selectedIds = $state<string[]>(initialSelectedIds?.length ? [...initialSelectedIds] : []);
     let configsPromise = $derived(list());
+
+    onMount(async () => {
+        if (!initialSelectedIds || initialSelectedIds.length === 0) {
+            try {
+                const res = await configsPromise;
+                if (res?.data) {
+                    const defaultIds = res.data
+                        .filter((c: any) => c.enabled && (c.settings?.isDefault === true || c.settings?.isDefault === 'true' || c.settings?.isDefault === 1))
+                        .map((c: any) => c.id);
+                    if (defaultIds.length > 0) {
+                        selectedIds = Array.from(new Set([...selectedIds, ...defaultIds]));
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load default sync configurations:", err);
+            }
+        }
+    });
 
     function toggleConfig(id: string) {
         if (selectedIds.includes(id)) {
@@ -58,6 +77,7 @@
         {:else}
             <div class="space-y-2 border rounded-md p-4 bg-gray-50 max-h-64 overflow-y-auto">
                 {#each result.data as config (config.id)}
+                    {@const isDefaultTarget = (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
                     {#if config.enabled}
                         <label class="flex items-center gap-3 py-2 px-2 hover:bg-white border border-transparent hover:border-gray-200 rounded transition-colors cursor-pointer">
                             <input 
@@ -67,9 +87,16 @@
                                 onchange={() => toggleConfig(config.id)}
                             />
                             <div class="flex flex-col min-w-0 flex-1">
-                                <span class="text-sm font-medium text-gray-900 truncate">
-                                    {config.name || getProviderLabel(config.providerType)}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-medium text-gray-900 truncate">
+                                        {config.name || getProviderLabel(config.providerType)}
+                                    </span>
+                                    {#if isDefaultTarget}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                            {m.default_badge ? m.default_badge() : "Default"}
+                                        </span>
+                                    {/if}
+                                </div>
                                 <span class="text-xs text-gray-500 font-mono truncate">
                                     {getProviderLabel(config.providerType)}{config.providerId && config.providerId !== config.name ? ` • ${config.providerId}` : ''}
                                 </span>

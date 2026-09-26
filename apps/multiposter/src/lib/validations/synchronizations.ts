@@ -23,6 +23,7 @@ export const synchronizationBaseSchema = v.object({
         recipientContactIds: v.optional(v.union([v.array(v.string()), v.string()])),
         includeEventContacts: v.optional(v.union([v.boolean(), v.string()])),
         apiKey: v.optional(v.string()),
+        isDefault: v.optional(v.union([v.boolean(), v.string()])),
     })),
 });
 

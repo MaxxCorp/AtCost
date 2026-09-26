@@ -504,17 +504,24 @@
 							<div class="flex items-start justify-between gap-4 mb-2">
 								<div class="flex-1 min-w-0">
 									<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
-										<a
-											href={`/synchronizations/${config.id}`}
-											class="hover:underline text-blue-600 flex items-center gap-2"
-										>
-											<Icon class="h-5 w-5 flex-shrink-0" />
-											{#if config.name}
-												{config.name}
-											{:else}
-												{getProviderLabel(config.providerType)}
+										<div class="flex items-center gap-2 flex-wrap">
+											<a
+												href={`/synchronizations/${config.id}`}
+												class="hover:underline text-blue-600 flex items-center gap-2"
+											>
+												<Icon class="h-5 w-5 flex-shrink-0" />
+												{#if config.name}
+													{config.name}
+												{:else}
+													{getProviderLabel(config.providerType)}
+												{/if}
+											</a>
+											{#if (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
+												<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+													{m.default_badge ? m.default_badge() : "Default"}
+												</span>
 											{/if}
-										</a>
+										</div>
 									</h3>
 									<p class="text-sm text-gray-500 break-all mt-1">
 										{config.providerId}
