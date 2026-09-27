@@ -116,10 +116,10 @@
                 <Calendar class="w-4 h-4" />
                 <span>{displayDate}</span>
             </div>
-            {#if (event.recurrence && (event.recurrence as string[]).length > 0) || event.recurringEventId || event.seriesId}
+            {#if (event.recurrence && (Array.isArray(event.recurrence) ? event.recurrence.length > 0 : true)) || event.recurringEventId || event.seriesId}
                 <div class="flex items-center gap-1.5 text-xs sm:text-sm text-blue-200 mt-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/20">
                     <RefreshCw class="w-3.5 h-3.5" />
-                    <span>{formatRecurrenceText((event.recurrence as string[])?.[0])}</span>
+                    <span>{formatRecurrenceText(Array.isArray(event.recurrence) ? event.recurrence[0] : (typeof event.recurrence === 'string' ? event.recurrence : null))}</span>
                 </div>
             {/if}
         </div>

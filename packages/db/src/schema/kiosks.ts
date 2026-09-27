@@ -26,7 +26,7 @@ export const kiosk = pgTable("kiosk", {
     includedEventIds: jsonb("included_event_ids").$type<string[]>().default([]).notNull(),
     excludedAnnouncementIds: jsonb("excluded_announcement_ids").$type<string[]>().default([]).notNull(),
     includedAnnouncementIds: jsonb("included_announcement_ids").$type<string[]>().default([]).notNull(),
-    excludedTags: jsonb("excluded_tags").$type<string[]>().default(['Series']).notNull(),
+    excludedTags: jsonb("excluded_tags").$type<string[]>().default([]).notNull(),
     includedTags: jsonb("included_tags").$type<string[]>().default([]).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),

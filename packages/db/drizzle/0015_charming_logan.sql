@@ -1,0 +1,1 @@
+ALTER TABLE "event" ADD COLUMN "exdates" jsonb DEFAULT '[]'::jsonb NOT NULL;

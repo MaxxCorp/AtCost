@@ -1308,12 +1308,12 @@ export class SyncService {
 		const summary = internal.summary || internal.title || '';
 		const descriptionRaw = internal.description || internal.content || '';
 
-		// NOTE: Recurrence rules are intentionally NOT synced to external providers
-		// because the system expands recurrence locally and syncs individual 
-		// instances as standalone events. Syncing the rule would create duplicate series.
 		let recurrenceRules: string[] | undefined = undefined;
-		/*
-		if (internal.seriesId) {
+		if (internal.recurrence) {
+			recurrenceRules = Array.isArray(internal.recurrence)
+				? internal.recurrence.filter(Boolean)
+				: [internal.recurrence];
+		} else if (internal.seriesId) {
 			const [series] = await db
 				.select()
 				.from(recurringSeries)
@@ -1322,11 +1322,6 @@ export class SyncService {
 				recurrenceRules = [series.rrule];
 			}
 		}
-		// Fallback to legacy recurrence field if no series
-		if (!recurrenceRules && internal.recurrence) {
-			recurrenceRules = internal.recurrence as string[];
-		}
-		*/
 
 
 		// Fetch associated contacts

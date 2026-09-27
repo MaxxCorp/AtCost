@@ -27,11 +27,13 @@ export const deleteSeries = command(
         const user = getAuthenticatedUser();
         ensureAccess(user, 'events');
 
+        const realEventId = eventId.includes('_inst_') ? eventId.split('_inst_')[0] : eventId;
+
         // Find the event to get its series info
         const [targetEvent] = await db
             .select()
             .from(event)
-            .where(eq(event.id, eventId));
+            .where(eq(event.id, realEventId));
 
         if (!targetEvent) {
             throw new Error('Event not found');

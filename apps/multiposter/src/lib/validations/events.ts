@@ -71,5 +71,6 @@ export const createEventSchema = eventBaseSchema;
  */
 export const updateEventSchema = v.object({
     ...v.partial(eventBaseSchema).entries,
-    id: v.pipe(v.string(), v.uuid())
+    id: v.pipe(v.string(), v.minLength(1)),
+    seriesMode: v.optional(v.string()),
 });

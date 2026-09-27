@@ -22,6 +22,7 @@ export function isSeriesItem(item: any): boolean {
         item.seriesId ||
         item.recurringEventId ||
         (Array.isArray(item.recurrence) && item.recurrence.length > 0) ||
+        (typeof item.recurrence === "string" && item.recurrence.trim().length > 0) ||
         (Array.isArray(item.tags) && item.tags.some((t: any) => (typeof t === "string" ? t : t?.name) === "Series"))
     );
 }

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { listEvents } from "./list.remote";
+	import { checkSeriesMigrationStatus } from "./series-migration.remote";
 	import { listTags } from "../tags/list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { deleteEvents } from "./delete.remote";
+	import SeriesMigrationDialog from "$lib/components/events/SeriesMigrationDialog.svelte";
 	import * as m from "$lib/paraglide/messages.js";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
@@ -83,6 +85,7 @@
 	let onlySeries = $state(false);
 	let page = $state(1);
 	let limit = $state(50);
+	let showMigrationDialog = $state(false);
 
 	const filterGroups = $derived<FilterGroup[]>([
 		{
@@ -242,6 +245,50 @@
 				{m.new_item({ item: m.event_label() })}
 			</Button>
 		</div>
+
+		<!-- Series Migration Banner -->
+		{#await checkSeriesMigrationStatus() then migStatus}
+			{#if migStatus?.hasLegacyData}
+				<div
+					class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl shadow-sm mb-6"
+				>
+					<div class="flex items-center gap-3">
+						<div class="p-2.5 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-xl shrink-0">
+							<RefreshCw size={20} />
+						</div>
+						<div>
+							<h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+								Upgrade Event Series Architecture
+							</h3>
+							<p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+								{migStatus.totalItems} legacy record(s) detected. Migrate to the high-performance calendar engine to eliminate redundant instances and optimize sync.
+							</p>
+						</div>
+					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						class="bg-white dark:bg-gray-800 shadow-sm gap-2 shrink-0 self-end sm:self-center font-medium"
+						onclick={() => (showMigrationDialog = true)}
+					>
+						<RefreshCw size={14} />
+						Migrate Series
+					</Button>
+
+					{#if showMigrationDialog}
+						<SeriesMigrationDialog
+							bind:open={showMigrationDialog}
+							statusData={migStatus}
+							oncomplete={() => {
+								checkSeriesMigrationStatus().refresh();
+								listEvents(filterState).refresh();
+							}}
+							onclose={() => (showMigrationDialog = false)}
+						/>
+					{/if}
+				</div>
+			{/if}
+		{/await}
 
 		<!-- Action Bar -->
 		<div class="flex flex-col md:flex-row gap-3 mb-6">

@@ -1,0 +1,1 @@
+ALTER TABLE "kiosk" ALTER COLUMN "excluded_tags" SET DEFAULT '[]'::jsonb;

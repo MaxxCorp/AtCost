@@ -358,6 +358,8 @@
         seriesDates?: string[];
         recurrenceText?: string;
         instanceCount?: number;
+        qrCodePath?: string | null;
+        qrCodeDataUrl?: string | null;
     };
 
     function compressSeriesEvents(eventList: Event[]): FlyerDisplayItem[] {
@@ -412,6 +414,9 @@
                 if (g.recurrence && Array.isArray(g.recurrence) && g.recurrence[0]) {
                     rruleStr = g.recurrence[0];
                     break;
+                } else if (typeof (g as any).recurrence === 'string' && (g as any).recurrence.length > 0) {
+                    rruleStr = (g as any).recurrence;
+                    break;
                 }
             }
 
@@ -424,7 +429,9 @@
                     isCompressedSeries: true,
                     seriesDates: dates,
                     recurrenceText: recText,
-                    instanceCount: dates.length
+                    instanceCount: dates.length,
+                    qrCodePath: `/api/events/${sKey}/qr.png`,
+                    qrCodeDataUrl: undefined
                 });
             } else {
                 compressed.push({
@@ -1167,7 +1174,7 @@
                         {#if isSeries}
                             <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
                                 <RefreshCw class="w-2.5 h-2.5 text-indigo-500" />
-                                <span>{item.recurrenceText || m.series_badge()}</span>
+                                <span>{item.recurrenceText || ((item as any).recurrence ? formatRecurrenceText((item as any).recurrence, undefined, { omitLength: true }) : m.series_badge())}</span>
                             </span>
                         {/if}
                         <!-- Price Badge -->

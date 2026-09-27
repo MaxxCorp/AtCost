@@ -23,29 +23,52 @@ export const deleteEvents = command(
 
 		const storage = getStorageProvider();
 
+		// Handle virtual instances (e.g. `${masterId}_inst_${iso}`)
+		const virtualIds = ids.filter(id => id.includes('_inst_'));
+		const realIds = ids.filter(id => !id.includes('_inst_'));
+
+		for (const vId of virtualIds) {
+			const [masterId, isoDate] = vId.split('_inst_');
+			if (masterId && isoDate) {
+				const [master] = await db.select().from(event).where(eq(event.id, masterId));
+				if (master) {
+					const existingExdates: string[] = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+					if (!existingExdates.includes(isoDate)) {
+						await db.update(event).set({ exdates: [...existingExdates, isoDate] }).where(eq(event.id, masterId));
+					}
+					await invalidateEvent([masterId, vId]);
+				}
+			}
+		}
+
+		if (realIds.length === 0) {
+			await listEvents().refresh();
+			return { success: true, deletedCount: virtualIds.length };
+		}
+
 		// Fetch the initial events to determine if they belong to a series
 		const targetEvents = await db.query.event.findMany({
-			where: (table, { inArray }) => inArray(table.id, ids),
-			columns: { id: true, seriesId: true, recurringEventId: true }
+			where: (table, { inArray }) => inArray(table.id, realIds),
+			columns: { id: true, seriesId: true, recurringEventId: true, startDateTime: true, originalStartTime: true }
 		});
 
 		let eventIdsToDelete: string[] = [];
 
 		if (deleteSeries) {
-			// Find all series IDs and legacy master IDs
+			// Find all series IDs and master IDs
 			const seriesIds = [...new Set(targetEvents.map(e => e.seriesId).filter(Boolean) as string[])];
-			const legacyMasterIds = [...new Set(targetEvents.map(e => e.recurringEventId || e.id))];
+			const masterIds = [...new Set(targetEvents.map(e => e.recurringEventId || e.id))];
 
 			// Fetch ALL events that belong to these series or masters so we can clean up storage/sync
 			const allAffectedEvents = await db.query.event.findMany({
 				where: (table, { inArray, or }) => {
 					const conditions = [];
 					if (seriesIds.length > 0) conditions.push(inArray(table.seriesId, seriesIds));
-					if (legacyMasterIds.length > 0) {
-						conditions.push(inArray(table.id, legacyMasterIds));
-						conditions.push(inArray(table.recurringEventId, legacyMasterIds));
+					if (masterIds.length > 0) {
+						conditions.push(inArray(table.id, masterIds));
+						conditions.push(inArray(table.recurringEventId, masterIds));
 					}
-					return conditions.length > 0 ? or(...conditions) : eq(table.id, '00000000-0000-0000-0000-000000000000'); // dummy fallback
+					return conditions.length > 0 ? or(...conditions) : eq(table.id, '00000000-0000-0000-0000-000000000000');
 				},
 				columns: { id: true, qrCodePath: true, iCalPath: true }
 			});
@@ -59,30 +82,43 @@ export const deleteEvents = command(
 			}
 
 			// Delete from Database
-			// Note: Because of ON DELETE CASCADE, deleting recurringSeries deletes related events.
-			// However, to be safe and handle legacy data without seriesId, we explicitly delete the events too.
 			if (eventIdsToDelete.length > 0) {
 				await db.delete(event).where(inArray(event.id, eventIdsToDelete));
 			}
 			if (seriesIds.length > 0) {
 				await db.delete(recurringSeries).where(inArray(recurringSeries.id, seriesIds));
 			}
-
 		} else {
 			// Just delete the specific IDs requested
-			eventIdsToDelete = ids;
-			
+			eventIdsToDelete = realIds;
+
 			const eventsToDelete = await db.query.event.findMany({
-				where: (table, { inArray }) => inArray(table.id, ids),
-				columns: { id: true, qrCodePath: true, iCalPath: true }
+				where: (table, { inArray }) => inArray(table.id, realIds),
+				columns: { id: true, qrCodePath: true, iCalPath: true, recurringEventId: true, startDateTime: true, originalStartTime: true }
 			});
+
+			// If deleting an instance of a series, record its date in master's exdates so it doesn't resurrect
+			for (const e of eventsToDelete) {
+				if (e.recurringEventId && e.startDateTime) {
+					const [master] = await db.select().from(event).where(eq(event.id, e.recurringEventId));
+					if (master) {
+						const dateIso = e.originalStartTime && typeof e.originalStartTime === 'object' && 'dateTime' in (e.originalStartTime as any)
+							? (e.originalStartTime as any).dateTime
+							: e.startDateTime.toISOString();
+						const existingExdates: string[] = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+						if (!existingExdates.includes(dateIso)) {
+							await db.update(event).set({ exdates: [...existingExdates, dateIso] }).where(eq(event.id, master.id));
+						}
+					}
+				}
+			}
 
 			for (const e of eventsToDelete) {
 				if (e.qrCodePath?.startsWith('http')) await storage.delete(e.qrCodePath).catch(() => {});
 				if (e.iCalPath?.startsWith('http')) await storage.delete(e.iCalPath).catch(() => {});
 			}
 
-			await db.delete(event).where(inArray(event.id, ids));
+			await db.delete(event).where(inArray(event.id, realIds));
 		}
 
 		// Perform external cleanup for all deleted event IDs

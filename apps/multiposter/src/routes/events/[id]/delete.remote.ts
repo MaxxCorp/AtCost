@@ -24,17 +24,69 @@ export const deleteEvents = command(
 
 		console.log(`[deleteEvents] Starting deletion. ids=${ids}, deleteSeries=${deleteSeries}`);
 
-		// If deleteSeries is true, we should find all instances of the series and delete them
-		let idsToDelete = [...ids];
+		// Handle virtual instances (e.g. `${masterId}_inst_${iso}`)
+		const virtualIds = ids.filter(id => id.includes('_inst_'));
+		const realIds = ids.filter(id => !id.includes('_inst_'));
+
+		for (const vId of virtualIds) {
+			const [masterId, isoDate] = vId.split('_inst_');
+			if (masterId && isoDate) {
+				const [master] = await db.select().from(event).where(eq(event.id, masterId));
+				if (master) {
+					const existingExdates: string[] = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+					if (!existingExdates.includes(isoDate)) {
+						await db.update(event).set({ exdates: [...existingExdates, isoDate] }).where(eq(event.id, masterId));
+					}
+					await invalidateEvent([masterId, vId]);
+				}
+			}
+		}
+
+		if (realIds.length === 0) {
+			await listEvents().refresh();
+			return { success: true };
+		}
+
+		let idsToDelete = [...realIds];
 		let seriesIdsToDelete: string[] = [];
 		
 		if (deleteSeries) {
-			const events = await db.select({ id: event.id, seriesId: event.seriesId }).from(event).where(inArray(event.id, ids));
+			const events = await db.select({ id: event.id, seriesId: event.seriesId, recurringEventId: event.recurringEventId }).from(event).where(inArray(event.id, realIds));
 			const seriesIds = events.map(e => e.seriesId).filter((id): id is string => id !== null);
+			const masterIds = [...new Set(events.map(e => e.recurringEventId || e.id))];
+
 			if (seriesIds.length > 0) {
 				seriesIdsToDelete = seriesIds;
 				const seriesEvents = await db.select({ id: event.id }).from(event).where(inArray(event.seriesId, seriesIds));
 				idsToDelete = [...new Set([...idsToDelete, ...seriesEvents.map(e => e.id)])];
+			}
+
+			if (masterIds.length > 0) {
+				const childEvents = await db.select({ id: event.id }).from(event).where(inArray(event.recurringEventId, masterIds));
+				idsToDelete = [...new Set([...idsToDelete, ...masterIds, ...childEvents.map(e => e.id)])];
+			}
+		} else {
+			// Record exdates for any deleted instance rows so they do not resurrect
+			const events = await db.select({
+				id: event.id,
+				recurringEventId: event.recurringEventId,
+				startDateTime: event.startDateTime,
+				originalStartTime: event.originalStartTime
+			}).from(event).where(inArray(event.id, realIds));
+
+			for (const e of events) {
+				if (e.recurringEventId && e.startDateTime) {
+					const [master] = await db.select().from(event).where(eq(event.id, e.recurringEventId));
+					if (master) {
+						const dateIso = e.originalStartTime && typeof e.originalStartTime === 'object' && 'dateTime' in (e.originalStartTime as any)
+							? (e.originalStartTime as any).dateTime
+							: e.startDateTime.toISOString();
+						const existingExdates: string[] = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+						if (!existingExdates.includes(dateIso)) {
+							await db.update(event).set({ exdates: [...existingExdates, dateIso] }).where(eq(event.id, master.id));
+						}
+					}
+				}
 			}
 		}
 
@@ -49,9 +101,7 @@ export const deleteEvents = command(
 			await db.delete(recurringSeries).where(inArray(recurringSeries.id, seriesIdsToDelete));
 		}
 
-		// We assume all were deleted for notification purposes, or we could fetch existing before delete
 		await publishEventChange('delete', idsToDelete);
-
 		await invalidateEvent(idsToDelete);
 		await listEvents().refresh();
 		console.log(`[deleteEvents] Successfully deleted events.`);

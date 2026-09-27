@@ -32,6 +32,7 @@ export const event = pgTable("event", {
     isAllDay: boolean("is_all_day").default(false).notNull(),
     status: text("status").default("tentative").notNull(),
     recurrence: jsonb("recurrence").$type<string[]>(),
+    exdates: jsonb("exdates").$type<string[]>().default([]).notNull(),
     recurringEventId: uuid("recurring_event_id").references((): AnyPgColumn => event.id, { onDelete: "cascade" }),
     originalStartTime: jsonb("original_start_time"),
     isException: boolean("is_exception").default(false).notNull(),

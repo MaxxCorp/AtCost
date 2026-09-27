@@ -16,10 +16,21 @@ export const GET: RequestHandler = async ({ params, url }) => {
             });
 
             if (!data && eventId.includes('_inst_')) {
-                const masterId = eventId.split('_inst_')[0];
+                const [masterId, instIso] = eventId.split('_inst_');
                 data = await db.query.event.findFirst({
                     where: (table, { eq }) => eq(table.id, masterId),
                 });
+                if (data && instIso) {
+                    const masterExdates = Array.isArray(data.exdates) ? (data.exdates as string[]) : [];
+                    const targetDate = new Date(instIso);
+                    const isExcluded = masterExdates.some(ex => {
+                        const exTime = new Date(ex).getTime();
+                        return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+                    });
+                    if (isExcluded) {
+                        data = undefined;
+                    }
+                }
             }
 
             if (!data) {

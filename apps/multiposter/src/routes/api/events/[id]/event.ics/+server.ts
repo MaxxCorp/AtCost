@@ -8,13 +8,44 @@ export const GET: RequestHandler = async ({ params }) => {
     const eventId = params.id;
 
     const cachedResult = await cached(cacheKeys.eventIcs(eventId), 3600, async () => {
-        const data = await db.query.event.findFirst({
+        let data: any = await db.query.event.findFirst({
             where: (table, { eq }) => eq(table.id, eventId),
             with: {
                 locations: { with: { location: true } },
                 contacts: { with: { contact: true } }
             }
         });
+
+        if (!data && eventId.includes('_inst_')) {
+            const [masterId, instIso] = eventId.split('_inst_');
+            const master = await db.query.event.findFirst({
+                where: (table, { eq }) => eq(table.id, masterId),
+                with: {
+                    locations: { with: { location: true } },
+                    contacts: { with: { contact: true } }
+                }
+            });
+            if (master && instIso) {
+                const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+                const targetDate = new Date(instIso);
+                const isExcluded = masterExdates.some(ex => {
+                    const exTime = new Date(ex).getTime();
+                    return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+                });
+                if (!isExcluded) {
+                    const duration = (master.startDateTime && master.endDateTime)
+                        ? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+                        : 3600000;
+                    data = {
+                        ...master,
+                        id: eventId,
+                        startDateTime: targetDate,
+                        endDateTime: new Date(targetDate.getTime() + duration),
+                        recurrence: null
+                    };
+                }
+            }
+        }
 
         if (!data) {
             error(404, 'Event not found');
@@ -66,6 +97,24 @@ export const GET: RequestHandler = async ({ params }) => {
     if (data.startDateTime) vevent.addPropertyWithValue('dtstart', ICAL.Time.fromJSDate(data.startDateTime, true));
     if (data.endDateTime) vevent.addPropertyWithValue('dtend', ICAL.Time.fromJSDate(data.endDateTime, true));
     vevent.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(data.updatedAt, true));
+
+    if (data.recurrence && Array.isArray(data.recurrence) && data.recurrence[0]) {
+        try {
+            const cleanRule = data.recurrence[0].replace(/^RRULE:/i, '');
+            vevent.addPropertyWithValue('rrule', ICAL.Recur.fromString(cleanRule));
+        } catch (e) {
+            console.warn('Failed to parse RRULE for ICS:', e);
+        }
+    }
+
+    if (data.exdates && Array.isArray(data.exdates) && data.exdates.length > 0) {
+        for (const ex of data.exdates) {
+            const exD = new Date(ex);
+            if (!isNaN(exD.getTime())) {
+                vevent.addPropertyWithValue('exdate', ICAL.Time.fromJSDate(exD, true));
+            }
+        }
+    }
 
     vcalendar.addSubcomponent(vevent);
 

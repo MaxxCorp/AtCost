@@ -102,21 +102,6 @@ export const createEvent = form(createEventSchema, async (data) => {
 		// Deduplicate tags
 		tagNames = [...new Set(tagNames)];
 
-		// Create recurring_series record if recurrence rule exists
-		let seriesId: string | null = null;
-		if (recurrenceRule) {
-			const [newSeries] = await db.insert(recurringSeries).values({
-				rrule: recurrenceRule,
-				anchorDate: start,
-				anchorEndDate: end,
-				userId: user.id,
-			} as any).returning();
-			if (newSeries) {
-				seriesId = newSeries.id;
-				console.log('Created recurring_series:', seriesId);
-			}
-		}
-
 		const eventId = crypto.randomUUID();
 		console.log('Generated Event ID:', eventId);
 
@@ -169,11 +154,11 @@ export const createEvent = form(createEventSchema, async (data) => {
 			startTimeZone: data.startTimeZone || null,
 			endDateTime: end,
 			endTimeZone: data.endTimeZone || null,
-			// New series-based recurrence
-			seriesId: seriesId,
+			seriesId: null,
+			recurringEventId: null,
 			isException: false,
-			// Legacy fields (kept for backward compatibility)
 			recurrence: recurrenceRule ? [recurrenceRule] : null,
+			exdates: [],
 			attendees: (data.attendees as any) || null,
 			participantsCount,
 			reminders: reminders as any,
@@ -224,8 +209,6 @@ export const createEvent = form(createEventSchema, async (data) => {
 			// Tags
 			if (tagNames.length > 0) {
 				for (const name of tagNames) {
-					// Find or create tag
-					// Note: This is sequential to avoid race conditions on create, potentially slow but safe
 					let [existingTag] = await db.select().from(tag).where(eq(tag.name, name));
 					if (!existingTag) {
 						[existingTag] = await db.insert(tag).values({ name, userId: user.id }).returning();
@@ -240,109 +223,27 @@ export const createEvent = form(createEventSchema, async (data) => {
 		// Link associations for master event
 		await linkAssociations(newEvent.id);
 
-		// Determine origin for asset generation (shared by instances and master)
+		// Determine origin for asset generation
 		let origin: string | undefined;
 		try {
 			const { getRequestEvent } = await import('$app/server');
 			origin = getRequestEvent()?.url.origin;
 		} catch (e) { /* ignore */ }
 
-		// Handle Instances
-		const allEventIds = [newEvent.id];
-		if (recurrenceRule) {
-			try {
-				const { expandRecurrence } = await import('$lib/server/events/recurrence');
-				const instances = expandRecurrence(recurrenceRule, start, end, 50, true, data.startTimeZone || 'UTC');
-
-				for (const { date, end: instanceEnd } of instances) {
-					const instanceId = crypto.randomUUID();
-					initialCampaignContent.items[instanceId] = { entityType: 'event', syncs: {} };
-
-					await db.insert(event).values({
-						id: instanceId,
-						userId: user.id,
-                        campaignId: newCampaign?.id,
-						summary: data.summary,
-						description: data.description || null,
-						internalNotes: data.internalNotes || null,
-						categoryBerlinDotDe: data.categoryBerlinDotDe || null,
-                        ticketPriceUnknown: data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on',
-                        ticketPrice: (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on') ? "0" : (data.ticketPrice || null),
-                        isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
-                        status: data.status || 'confirmed',
-                        startDateTime: date,
-						startTimeZone: data.startTimeZone || null,
-						endDateTime: instanceEnd || end,
-						endTimeZone: data.endTimeZone || null,
-						// New series-based recurrence
-						seriesId: seriesId,
-						isException: false,
-						// Legacy fields (kept for backward compatibility)
-						recurrence: recurrenceRule ? [recurrenceRule] : null,
-						recurringEventId: newEvent.id, // Link to master (legacy)
-						originalStartTime: { dateTime: date.toISOString() }, // The date this instance represents
-						attendees: (data.attendees as any) || null,
-						participantsCount,
-						reminders: reminders as any,
-						isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
-						heroImage: data.heroImage || null,
-						guestsCanInviteOthers: data.guestsCanInviteOthers === 'true' || data.guestsCanInviteOthers === true || data.guestsCanInviteOthers === 'on',
-						guestsCanModify: data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on',
-						guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on',
-					} as any);
-
-					// Link associations for instance
-					await linkAssociations(instanceId);
-
-					allEventIds.push(instanceId);
-
-					// Generate assets for instance
-					await generateEventAssets(instanceId, origin);
-				}
-
-				if (newCampaign && instances.length > 0) {
-					await db.update(campaign).set({ content: initialCampaignContent }).where(eq(campaign.id, newCampaign.id));
-				}
-			} catch (e) {
-				console.error('Error expanding recurrence:', e);
-				// We don't fail the request, just log error. Master event is created.
-			}
-		}
-
 		console.log('Generating assets for master event via create.remote...');
 		await generateEventAssets(newEvent.id, origin);
 
-		// Note: We are not generating assets for all instances synchronously to avoid timeout.
-		// They will be generated on access or effectively we should trigger a background job.
-		// For now, we leave it.
+		console.log('Event created successfully, triggering sync and refreshing list...');
 
-		console.log('Event created successfully, refreshing list...');
+		await publishEventChange('create', [newEvent.id]);
 
-		if (newEvent) {
-			await publishEventChange('create', allEventIds);
-
-			const syncPromise = syncService.syncItems(user.id, allEventIds, 'event').catch((err) => {
-				console.error('[Create Remote] Background sync error:', err);
-			});
-
-			// For single items or small updates, wait for sync so UI shows immediate state.
-			// For large recurring batches, use platform background execution or bounded wait to prevent Vercel 60s timeout.
-			if (allEventIds.length <= 2) {
-				await syncPromise;
-			} else {
-				const requestEvent = getRequestEvent();
-				if ((requestEvent?.platform as any)?.context?.waitUntil) {
-					(requestEvent.platform as any).context.waitUntil(syncPromise);
-				} else {
-					await Promise.race([
-						syncPromise,
-						new Promise((resolve) => setTimeout(resolve, 8000))
-					]);
-				}
-			}
+		try {
+			await syncService.syncItems(user.id, [newEvent.id], 'event');
+		} catch (err) {
+			console.error('[Create Remote] Sync error:', err);
 		}
 
-		await invalidateEvent(allEventIds);
+		await invalidateEvent([newEvent.id]);
 		await listEvents().refresh();
 		console.log('--- createEvent DONE ---');
 		return { success: true };

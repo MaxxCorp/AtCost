@@ -225,7 +225,12 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const startD = new Date(startDate);
 		conditionalFilters.push(or(
 			gte(event.startDateTime, startD),
-			gte(event.endDateTime, startD)
+			gte(event.endDateTime, startD),
+			isNotNull(event.seriesId),
+			and(
+				isNotNull(event.recurrence),
+				sql`${event.recurrence} != '[]'::jsonb`
+			)
 		));
 	}
 	
@@ -585,31 +590,34 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					}
 				}
 
-				const instances = expandRecurrence(
+				const { expandRecurrenceRange } = await import('$lib/server/events/recurrence');
+				const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+
+				const instances = expandRecurrenceRange(
 					rruleStr,
 					new Date(master.startDateTime),
 					master.endDateTime ? new Date(master.endDateTime) : null,
-					100,
-					false,
-					master.startTimeZone
+					startD,
+					endD,
+					master.startTimeZone,
+					masterExdates,
+					false
 				);
 
 				for (const inst of instances) {
 					const instTime = inst.date.getTime();
-					if (instTime >= startD.getTime() && instTime <= endD.getTime()) {
-						const key = `${master.id}_${instTime}`;
-						const seriesKey = master.seriesId ? `${master.seriesId}_${instTime}` : null;
-						if (!existingKeys.has(key) && (!seriesKey || !existingKeys.has(seriesKey))) {
-							rawResults.push({
-								...master,
-								id: `${master.id}_inst_${inst.date.toISOString()}`,
-								recurringEventId: master.id,
-								startDateTime: inst.date,
-								endDateTime: inst.end || master.endDateTime
-							} as any);
-							existingKeys.add(key);
-							if (seriesKey) existingKeys.add(seriesKey);
-						}
+					const key = `${master.id}_${instTime}`;
+					const seriesKey = master.seriesId ? `${master.seriesId}_${instTime}` : null;
+					if (!existingKeys.has(key) && (!seriesKey || !existingKeys.has(seriesKey))) {
+						rawResults.push({
+							...master,
+							id: `${master.id}_inst_${inst.date.toISOString()}`,
+							recurringEventId: master.id,
+							startDateTime: inst.date,
+							endDateTime: inst.end || master.endDateTime
+						} as any);
+						existingKeys.add(key);
+						if (seriesKey) existingKeys.add(seriesKey);
 					}
 				}
 			}
@@ -785,7 +793,8 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		return {
 			...e,
 			isSeries,
-			qrCodePath: e.qrCodePath?.includes('/api/') ? e.qrCodePath : `/api/events/${e.id}/qr.png`,
+			qrCodePath: e.id.includes('_inst_') ? `/api/events/${e.id}/qr.png` : (e.qrCodePath?.includes('/api/') ? e.qrCodePath : `/api/events/${e.id}/qr.png`),
+			iCalPath: e.id.includes('_inst_') ? `/api/events/${e.id}/event.ics` : (e.iCalPath?.includes('/api/') ? e.iCalPath : `/api/events/${e.id}/event.ics`),
 			startDateTime: e.startDateTime ? (e.startDateTime instanceof Date ? e.startDateTime.toISOString() : new Date(e.startDateTime).toISOString()) : null,
 			endDateTime: e.endDateTime ? (e.endDateTime instanceof Date ? e.endDateTime.toISOString() : new Date(e.endDateTime).toISOString()) : null,
 			createdAt: e.createdAt ? (e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString()) : null,

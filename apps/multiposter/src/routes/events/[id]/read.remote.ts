@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { event, locationContact, inArray, eq, asc } from '@ac/db';
+import { event, locationContact, inArray, eq, asc, or, and, sql } from '@ac/db';
 import { getOptionalUser, hasAccess } from '$lib/server/authorization';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
@@ -34,9 +34,21 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		}
 	}
 
+	const isVirtual = eventId.includes('_inst_');
+	const instMasterId = isVirtual ? eventId.split('_inst_')[0] : null;
+	const instIso = isVirtual ? eventId.split('_inst_')[1] : null;
+
 	// 1. Fetch event with relations using Drizzle Relational Queries
-	const result = await db.query.event.findFirst({
-		where: eq(event.id, eventId),
+	let result = await db.query.event.findFirst({
+		where: isVirtual && instMasterId && instIso
+			? or(
+				eq(event.id, eventId),
+				and(
+					eq(event.recurringEventId, instMasterId),
+					sql`${event.originalStartTime}->>'dateTime' = ${instIso}`
+				)
+			)
+			: eq(event.id, eventId),
 		with: {
 			locations: { with: { location: true } },
 			contacts: {
@@ -55,6 +67,51 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			campaign: true,
 		},
 	});
+
+	if (!result && isVirtual && instMasterId && instIso) {
+		const master = await db.query.event.findFirst({
+			where: eq(event.id, instMasterId),
+			with: {
+				locations: { with: { location: true } },
+				contacts: {
+					with: {
+						contact: {
+							with: {
+								emails: true,
+								phones: true,
+								tags: { with: { tag: true } }
+							}
+						}
+					}
+				},
+				resources: { with: { resource: true } },
+				tags: { with: { tag: true } },
+				campaign: true,
+			},
+		});
+
+		if (master) {
+			const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+			const targetDate = new Date(instIso);
+			const isExcluded = masterExdates.some(ex => {
+				const exTime = new Date(ex).getTime();
+				return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+			});
+
+			if (!isExcluded) {
+				const duration = (master.startDateTime && master.endDateTime)
+					? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+					: 3600000;
+				result = {
+					...master,
+					id: eventId,
+					recurringEventId: master.id,
+					startDateTime: targetDate,
+					endDateTime: new Date(targetDate.getTime() + duration),
+				} as any;
+			}
+		}
+	}
 
 	if (!result) {
 		if (!isAuthorized) {
@@ -181,6 +238,39 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			endDateTime: inst.endDateTime?.toISOString() ?? null,
 			status: inst.status,
 		}));
+
+		if (seriesMaster?.recurrence && Array.isArray(seriesMaster.recurrence) && seriesMaster.recurrence[0] && seriesMaster.startDateTime) {
+			const { expandRecurrence } = await import('$lib/server/events/recurrence');
+			const masterRecord = result.recurringEventId
+				? await db.query.event.findFirst({ where: eq(event.id, result.recurringEventId), columns: { exdates: true, startTimeZone: true } })
+				: result;
+			const exdates = Array.isArray((masterRecord as any)?.exdates) ? ((masterRecord as any).exdates as string[]) : [];
+			const projected = expandRecurrence(
+				seriesMaster.recurrence[0],
+				new Date(seriesMaster.startDateTime),
+				seriesMaster.endDateTime ? new Date(seriesMaster.endDateTime) : null,
+				20,
+				true,
+				(masterRecord as any)?.startTimeZone || undefined,
+				exdates
+			);
+
+			const existingTimes = new Set(instances.map(i => i.startDateTime ? new Date(i.startDateTime).getTime() : 0));
+			for (const p of projected) {
+				const pTime = p.date.getTime();
+				if (!existingTimes.has(pTime)) {
+					instances.push({
+						id: `${masterId}_inst_${p.date.toISOString()}`,
+						summary: seriesMaster.summary,
+						startDateTime: p.date.toISOString(),
+						endDateTime: p.end ? p.end.toISOString() : null,
+						status: 'published'
+					});
+					existingTimes.add(pTime);
+				}
+			}
+			instances.sort((a, b) => new Date(a.startDateTime || 0).getTime() - new Date(b.startDateTime || 0).getTime());
+		}
 	}
 
 	const publicLocations = result.locations.filter(l => l.location.isPublic).map(l => l.location);
@@ -227,8 +317,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	// Full object
 	return {
 		...result,
-		iCalPath: result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`,
-		qrCodePath: result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`,
+		iCalPath: result.id.includes('_inst_') ? `/api/events/${result.id}/event.ics` : (result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`),
+		qrCodePath: result.id.includes('_inst_') ? `/api/events/${result.id}/qr.png` : (result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`),
 		createdAt: result.createdAt.toISOString(),
 		updatedAt: result.updatedAt.toISOString(),
 		startDateTime: result.startDateTime?.toISOString() ?? null,

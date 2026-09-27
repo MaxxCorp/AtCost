@@ -38,13 +38,53 @@ function getWallClockComponents(date: Date, timeZone?: string | null) {
 	}
 }
 
+export function rruleDateToZoned(d: Date, tz?: string | null): Date {
+	const resolvedTz = tz || 'UTC';
+	if (resolvedTz !== 'UTC') {
+		const yearStr = String(d.getUTCFullYear()).padStart(4, '0');
+		const monthStr = String(d.getUTCMonth() + 1).padStart(2, '0');
+		const dayStr = String(d.getUTCDate()).padStart(2, '0');
+		const hourStr = String(d.getUTCHours()).padStart(2, '0');
+		const minStr = String(d.getUTCMinutes()).padStart(2, '0');
+		const secStr = String(d.getUTCSeconds()).padStart(2, '0');
+		try {
+			const wallClockIso = `${yearStr}-${monthStr}-${dayStr}T${hourStr}:${minStr}:${secStr}`;
+			const calendarDate = parseDateTime(wallClockIso);
+			const zonedDate = toZoned(calendarDate, resolvedTz);
+			return zonedDate.toDate();
+		} catch {
+			return new Date(
+				Date.UTC(
+					d.getUTCFullYear(),
+					d.getUTCMonth(),
+					d.getUTCDate(),
+					d.getUTCHours(),
+					d.getUTCMinutes(),
+					d.getUTCSeconds()
+				)
+			);
+		}
+	}
+	return new Date(
+		Date.UTC(
+			d.getUTCFullYear(),
+			d.getUTCMonth(),
+			d.getUTCDate(),
+			d.getUTCHours(),
+			d.getUTCMinutes(),
+			d.getUTCSeconds()
+		)
+	);
+}
+
 export function expandRecurrence(
 	recurrenceRule: string,
 	start: Date,
 	end: Date | null,
 	limitCount: number = 50,
 	limitYear: boolean = true,
-	startTimeZone?: string | null
+	startTimeZone?: string | null,
+	exdates?: string[]
 ): { date: Date; end: Date | null }[] {
 	try {
 		const ruleOptions = RRule.parseString(recurrenceRule);
@@ -82,50 +122,34 @@ export function expandRecurrence(
 		// Duration for end time calculation
 		const durationMs = end ? end.getTime() - start.getTime() : 0;
 
+		const exdateSet = new Set<string>();
+		if (exdates && Array.isArray(exdates)) {
+			for (const ex of exdates) {
+				const exD = new Date(ex);
+				if (!isNaN(exD.getTime())) {
+					exdateSet.add(exD.toISOString());
+					exdateSet.add(String(exD.getTime()));
+					exdateSet.add(exD.toISOString().split('T')[0]);
+				}
+			}
+		}
+
 		const instances: { date: Date; end: Date | null }[] = [];
 
 		for (const d of allDates) {
-			const yearStr = String(d.getUTCFullYear()).padStart(4, '0');
-			const monthStr = String(d.getUTCMonth() + 1).padStart(2, '0');
-			const dayStr = String(d.getUTCDate()).padStart(2, '0');
-			const hourStr = String(d.getUTCHours()).padStart(2, '0');
-			const minStr = String(d.getUTCMinutes()).padStart(2, '0');
-			const secStr = String(d.getUTCSeconds()).padStart(2, '0');
-
-			let instanceStart: Date;
-			if (tz && tz !== 'UTC') {
-				try {
-					const wallClockIso = `${yearStr}-${monthStr}-${dayStr}T${hourStr}:${minStr}:${secStr}`;
-					const calendarDate = parseDateTime(wallClockIso);
-					const zonedDate = toZoned(calendarDate, tz);
-					instanceStart = zonedDate.toDate();
-				} catch {
-					instanceStart = new Date(
-						Date.UTC(
-							d.getUTCFullYear(),
-							d.getUTCMonth(),
-							d.getUTCDate(),
-							d.getUTCHours(),
-							d.getUTCMinutes(),
-							d.getUTCSeconds()
-						)
-					);
-				}
-			} else {
-				instanceStart = new Date(
-					Date.UTC(
-						d.getUTCFullYear(),
-						d.getUTCMonth(),
-						d.getUTCDate(),
-						d.getUTCHours(),
-						d.getUTCMinutes(),
-						d.getUTCSeconds()
-					)
-				);
-			}
+			const instanceStart = rruleDateToZoned(d, tz);
 
 			// Skip the master event instance (same start time)
 			if (instanceStart.getTime() === start.getTime()) continue;
+
+			// Skip exdates
+			if (
+				exdateSet.has(instanceStart.toISOString()) ||
+				exdateSet.has(String(instanceStart.getTime())) ||
+				exdateSet.has(instanceStart.toISOString().split('T')[0])
+			) {
+				continue;
+			}
 
 			const instanceEnd = end ? new Date(instanceStart.getTime() + durationMs) : null;
 			instances.push({ date: instanceStart, end: instanceEnd });
@@ -136,6 +160,102 @@ export function expandRecurrence(
 		return instances;
 	} catch (e) {
 		console.error('Error expanding recurrence:', e);
+		return [];
+	}
+}
+
+export function expandRecurrenceRange(
+	recurrenceRule: string,
+	start: Date,
+	end: Date | null,
+	rangeStart: Date,
+	rangeEnd: Date,
+	startTimeZone?: string | null,
+	exdates?: string[],
+	includeMaster: boolean = true
+): { date: Date; end: Date | null }[] {
+	try {
+		const ruleOptions = RRule.parseString(recurrenceRule);
+		const tz = startTimeZone || 'UTC';
+		const wallClock = getWallClockComponents(start, tz);
+
+		ruleOptions.dtstart = new Date(
+			Date.UTC(
+				wallClock.year,
+				wallClock.month - 1,
+				wallClock.day,
+				wallClock.hour,
+				wallClock.minute,
+				wallClock.second
+			)
+		);
+
+		const rruleObj = new RRule(ruleOptions);
+
+		const rangeStartWall = getWallClockComponents(rangeStart, tz);
+		const rangeEndWall = getWallClockComponents(rangeEnd, tz);
+
+		const rruleRangeStart = new Date(
+			Date.UTC(
+				rangeStartWall.year,
+				rangeStartWall.month - 1,
+				rangeStartWall.day,
+				rangeStartWall.hour,
+				rangeStartWall.minute,
+				rangeStartWall.second
+			)
+		);
+		const rruleRangeEnd = new Date(
+			Date.UTC(
+				rangeEndWall.year,
+				rangeEndWall.month - 1,
+				rangeEndWall.day,
+				rangeEndWall.hour,
+				rangeEndWall.minute,
+				rangeEndWall.second
+			)
+		);
+
+		const allDates = rruleObj.between(rruleRangeStart, rruleRangeEnd, true);
+		const durationMs = end ? end.getTime() - start.getTime() : 0;
+
+		const exdateSet = new Set<string>();
+		if (exdates && Array.isArray(exdates)) {
+			for (const ex of exdates) {
+				const exD = new Date(ex);
+				if (!isNaN(exD.getTime())) {
+					exdateSet.add(exD.toISOString());
+					exdateSet.add(String(exD.getTime()));
+					exdateSet.add(exD.toISOString().split('T')[0]);
+				}
+			}
+		}
+
+		const instances: { date: Date; end: Date | null }[] = [];
+
+		for (const d of allDates) {
+			const instanceStart = rruleDateToZoned(d, tz);
+
+			if (!includeMaster && instanceStart.getTime() === start.getTime()) {
+				continue;
+			}
+
+			// Skip exdates
+			if (
+				exdateSet.has(instanceStart.toISOString()) ||
+				exdateSet.has(String(instanceStart.getTime())) ||
+				exdateSet.has(instanceStart.toISOString().split('T')[0])
+			) {
+				continue;
+			}
+
+			const instanceEnd = end ? new Date(instanceStart.getTime() + durationMs) : null;
+			instances.push({ date: instanceStart, end: instanceEnd });
+		}
+
+		return instances;
+	} catch (e) {
+		console.error('Error expanding recurrence range:', e);
 		return [];
 	}
 }

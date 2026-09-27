@@ -39,9 +39,8 @@ export const cacheKeys = {
 /**
  * Invalidate all cached data for one or more events, and invalidate kiosk views and event lists.
  */
-export async function invalidateEvent(eventIds: string | string[]): Promise<void> {
-    const ids = Array.isArray(eventIds) ? eventIds : [eventIds];
-    if (ids.length === 0) return;
+export async function invalidateEvent(eventIds?: string | string[]): Promise<void> {
+    const ids = eventIds ? (Array.isArray(eventIds) ? eventIds : [eventIds]) : [];
 
     const keys: string[] = [];
     for (const id of ids) {
@@ -53,7 +52,7 @@ export async function invalidateEvent(eventIds: string | string[]): Promise<void
     }
 
     await Promise.all([
-        delCache(keys),
+        keys.length > 0 ? delCache(keys) : Promise.resolve(),
         bumpNamespaceVersion(CACHE_NAMESPACES.EVENTS),
         bumpNamespaceVersion(CACHE_NAMESPACES.KIOSKS)
     ]);
