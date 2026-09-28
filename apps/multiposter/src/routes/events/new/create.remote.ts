@@ -2,7 +2,7 @@ import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign, syncConfig } from '@ac/db';
-import { eq, and, sql } from '@ac/db';
+import { eq, and, or, sql, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
 import { createEventSchema } from '$lib/validations/events';
@@ -12,6 +12,7 @@ import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '$lib/server/cache';
+import * as m from '$lib/paraglide/messages.js';
 
 export const createEvent = form(createEventSchema, async (data) => {
 	console.log('--- createEvent START ---');
@@ -123,6 +124,34 @@ export const createEvent = form(createEventSchema, async (data) => {
                     )
                 );
             syncIds = defaultConfigs.map(c => c.id);
+        }
+
+        if (recurrenceRule && syncIds.length > 0) {
+            const berlinConfigs = await db
+                .select({ id: syncConfig.id, providerType: syncConfig.providerType })
+                .from(syncConfig)
+                .where(
+                    and(
+                        inArray(syncConfig.id, syncIds),
+                        or(
+                            eq(syncConfig.providerType, 'berlin-de-mh-calendar'),
+                            eq(syncConfig.providerType, 'berlin-de-main-calendar')
+                        )
+                    )
+                );
+            if (berlinConfigs.length > 0) {
+                const hasMain = berlinConfigs.some(c => c.providerType === 'berlin-de-main-calendar');
+                const hasMh = berlinConfigs.some(c => c.providerType === 'berlin-de-mh-calendar');
+                const errorMsg = (hasMain && hasMh)
+                    ? m.berlin_de_series_sync_not_allowed()
+                    : hasMain
+                        ? m.berlin_de_main_series_sync_not_allowed()
+                        : m.berlin_de_mh_series_sync_not_allowed();
+                return {
+                    success: false,
+                    error: errorMsg
+                };
+            }
         }
 
         const initialCampaignContent: CampaignContent = createDefaultCampaignContent(syncIds);

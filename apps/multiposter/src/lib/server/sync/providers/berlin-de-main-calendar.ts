@@ -12,6 +12,7 @@ import { resolveEventContact } from '$lib/server/contact-resolution';
 import { parsePricing } from '../utils/pricing';
 import { env } from '$env/dynamic/private';
 import { htmlToPlainText } from '../utils/html';
+import { isSeriesItem } from '$lib/utils/event-series';
 
 /**
  * Berlin.de Main Calendar sync provider implementation
@@ -23,10 +24,16 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 	readonly supportsWebhooks = false;
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeRecurrence = false;
 
 	shouldSyncEvent(event: any): boolean {
 		if (event.status === 'cancelled') return false;
 		if (event.status === 'tentative' || !event.isPublic) return false;
+
+		// Berlin.de restriction: recurring event series must never be synced due to the approval system
+		if (isSeriesItem(event)) {
+			return false;
+		}
 
 		// Berlin.de restriction: dates in the past or > 365 days in the future are not allowed
 		if (event.startDateTime) {

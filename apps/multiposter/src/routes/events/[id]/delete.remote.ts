@@ -36,9 +36,11 @@ export const deleteEvents = command(
 				}
 			}
 		} else {
+			const affectedMasterIds = new Set<string>();
 			for (const vId of virtualIds) {
 				const [masterId, isoDate] = vId.split('_inst_');
 				if (masterId && isoDate) {
+					affectedMasterIds.add(masterId);
 					const decodedIso = decodeURIComponent(isoDate);
 					const [master] = await db.select().from(event).where(eq(event.id, masterId));
 					if (master) {
@@ -51,6 +53,13 @@ export const deleteEvents = command(
 				}
 			}
 
+			if (virtualIds.length > 0) {
+				await syncService.deleteEventMappings(user.id, virtualIds).catch(console.error);
+				for (const mId of affectedMasterIds) {
+					await syncService.syncItems(user.id, [mId], 'event').catch(console.error);
+				}
+			}
+
 			if (realIds.length === 0) {
 				await listEvents().refresh();
 				return { success: true };
@@ -59,6 +68,7 @@ export const deleteEvents = command(
 
 		let idsToDelete = [...realIds];
 		let seriesIdsToDelete: string[] = [];
+		const affectedMasterIds = new Set<string>();
 		
 		if (deleteSeries) {
 			const events = await db.select({ id: event.id, seriesId: event.seriesId, recurringEventId: event.recurringEventId }).from(event).where(inArray(event.id, realIds));
@@ -86,6 +96,7 @@ export const deleteEvents = command(
 
 			for (const e of events) {
 				if (e.recurringEventId && e.startDateTime) {
+					affectedMasterIds.add(e.recurringEventId);
 					const [master] = await db.select().from(event).where(eq(event.id, e.recurringEventId));
 					if (master) {
 						const dateIso = e.originalStartTime && typeof e.originalStartTime === 'object' && 'dateTime' in (e.originalStartTime as any)
@@ -109,6 +120,10 @@ export const deleteEvents = command(
 
 		if (seriesIdsToDelete.length > 0) {
 			await db.delete(recurringSeries).where(inArray(recurringSeries.id, seriesIdsToDelete));
+		}
+
+		for (const mId of affectedMasterIds) {
+			await syncService.syncItems(user.id, [mId], 'event').catch(console.error);
 		}
 
 		await publishEventChange('delete', idsToDelete);

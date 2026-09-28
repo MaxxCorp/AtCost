@@ -1,6 +1,6 @@
 import { form, getRequestEvent } from '$app/server';
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
@@ -14,6 +14,8 @@ import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '$lib/server/cache';
 import { hasVirtualInstanceChanged } from '$lib/server/events/exceptions';
+import { isSeriesItem } from '$lib/utils/event-series';
+import * as m from '$lib/paraglide/messages.js';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {
@@ -303,6 +305,43 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			if (data.syncIds !== undefined) {
 				const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
 				console.log(`[Update Remote] Parsed syncIds:`, syncIds);
+
+				const isSeries = Boolean(
+					isVirtualInstance ||
+					isSeriesItem(targetRecord) ||
+					(Array.isArray(targetRecord.recurrence) && targetRecord.recurrence.length > 0 && targetRecord.recurrence[0]) ||
+					(typeof targetRecord.recurrence === 'string' && targetRecord.recurrence.trim().length > 0) ||
+					targetRecord.seriesId ||
+					targetRecord.recurringEventId
+				);
+				if (isSeries && syncIds.length > 0) {
+					const berlinConfigs = await tx
+						.select({ id: syncConfig.id, providerType: syncConfig.providerType })
+						.from(syncConfig)
+						.where(
+							and(
+								inArray(syncConfig.id, syncIds),
+								or(
+									eq(syncConfig.providerType, 'berlin-de-mh-calendar'),
+									eq(syncConfig.providerType, 'berlin-de-main-calendar')
+								)
+							)
+						);
+					if (berlinConfigs.length > 0) {
+						const hasMain = berlinConfigs.some(c => c.providerType === 'berlin-de-main-calendar');
+						const hasMh = berlinConfigs.some(c => c.providerType === 'berlin-de-mh-calendar');
+						const errorMsg = (hasMain && hasMh)
+							? m.berlin_de_series_sync_not_allowed()
+							: hasMain
+								? m.berlin_de_main_series_sync_not_allowed()
+								: m.berlin_de_mh_series_sync_not_allowed();
+						return {
+							success: false,
+							error: errorMsg
+						};
+					}
+				}
+
 				if (targetRecord.campaignId) {
 					const [camp] = await tx.select().from(campaign).where(eq(campaign.id, targetRecord.campaignId));
 					const content: CampaignContent = (camp?.content as any)?.version === 1

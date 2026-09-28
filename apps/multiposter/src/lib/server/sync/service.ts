@@ -55,6 +55,8 @@ import { InstagramProvider } from './providers/instagram';
 import { env } from '$env/dynamic/private';
 import { publishEventChange } from '../realtime';
 import { invalidateEvent } from '$lib/server/cache';
+import { expandRecurrence } from '$lib/server/events/recurrence';
+import { isSeriesItem } from '$lib/utils/event-series';
 
 /**
  * Central sync service orchestrator
@@ -124,9 +126,157 @@ export class SyncService {
 	}
 
 	/**
-	 * Sync events for a specific configuration
-	 * Handles bidirectional sync (pull from provider, push local changes)
+	 * Helper to safely retrieve an event record whether it is a real DB row (UUID)
+	 * or a virtual recurrence instance (masterId_inst_iso).
 	 */
+	public async getEventRecord(itemId: string): Promise<typeof eventTable.$inferSelect | null> {
+		if (itemId.includes('_inst_')) {
+			const [masterId, rawIso] = itemId.split('_inst_');
+			const decodedIso = decodeURIComponent(rawIso);
+
+			// 1. Check for materialized exception
+			const [exception] = await db
+				.select()
+				.from(eventTable)
+				.where(
+					and(
+						eq(eventTable.recurringEventId, masterId),
+						or(
+							sql`${eventTable.originalStartTime}->>'dateTime' = ${rawIso}`,
+							sql`${eventTable.originalStartTime}->>'dateTime' = ${decodedIso}`
+						)
+					)
+				)
+				.limit(1);
+
+			if (exception) {
+				return exception;
+			}
+
+			// 2. Synthesize from master
+			const [master] = await db
+				.select()
+				.from(eventTable)
+				.where(eq(eventTable.id, masterId));
+
+			if (!master) return null;
+
+			const targetDate = new Date(decodedIso);
+			const durationMs = (master.startDateTime && master.endDateTime)
+				? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+				: 3600000;
+
+			return {
+				...master,
+				id: itemId,
+				recurringEventId: master.id,
+				isException: false,
+				recurrence: null,
+				startDateTime: targetDate,
+				endDateTime: new Date(targetDate.getTime() + durationMs),
+			} as typeof eventTable.$inferSelect;
+		}
+
+		const [itemRow] = await db
+			.select()
+			.from(eventTable)
+			.where(eq(eventTable.id, itemId));
+
+		return itemRow || null;
+	}
+
+	/**
+	 * Check if an event record represents a series master (has recurrence rule and is not an exception).
+	 */
+	public isSeriesMaster(event: any): boolean {
+		if (!event) return false;
+		if (event.isException || event.recurringEventId) return false;
+		if (typeof event.id === 'string' && event.id.includes('_inst_')) return false;
+
+		const hasRecurrenceArray = Array.isArray(event.recurrence) && event.recurrence.length > 0 && Boolean(event.recurrence[0]);
+		const hasRecurrenceString = typeof event.recurrence === 'string' && event.recurrence.trim().length > 0;
+		const hasSeriesId = Boolean(event.seriesId);
+
+		return hasRecurrenceArray || hasRecurrenceString || hasSeriesId;
+	}
+
+	/**
+	 * For a series master event, expand its occurrences (master + virtual occurrences + materialized exceptions)
+	 * for providers that do not natively support recurrence rules (like WP The Events Calendar).
+	 */
+	public async getMasterOccurrenceIds(master: typeof eventTable.$inferSelect): Promise<string[]> {
+		let rruleStr: string | null = null;
+		const rec = master.recurrence as unknown;
+		if (Array.isArray(rec) && rec[0] && typeof rec[0] === 'string') {
+			rruleStr = rec[0];
+		} else if (typeof rec === 'string' && rec.trim().length > 0) {
+			rruleStr = rec;
+		} else if (master.seriesId) {
+			const [series] = await db
+				.select()
+				.from(recurringSeries)
+				.where(eq(recurringSeries.id, master.seriesId));
+			if (series?.rrule) rruleStr = series.rrule;
+		}
+
+		if (!rruleStr || !master.startDateTime) {
+			return [master.id];
+		}
+
+		const exdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+		const instances = expandRecurrence(
+			rruleStr,
+			new Date(master.startDateTime),
+			master.endDateTime ? new Date(master.endDateTime) : null,
+			50,
+			true,
+			master.startTimeZone,
+			exdates
+		);
+
+		const exceptions = await db
+			.select({
+				id: eventTable.id,
+				originalStartTime: eventTable.originalStartTime,
+				status: eventTable.status
+			})
+			.from(eventTable)
+			.where(eq(eventTable.recurringEventId, master.id));
+
+		const exceptionMap = new Map<string, typeof exceptions[0]>();
+		for (const ex of exceptions) {
+			if (ex.originalStartTime && typeof ex.originalStartTime === 'object' && 'dateTime' in (ex.originalStartTime as any)) {
+				const iso = (ex.originalStartTime as any).dateTime;
+				exceptionMap.set(iso, ex);
+				try {
+					exceptionMap.set(new Date(iso).toISOString(), ex);
+				} catch { /* ignore */ }
+			}
+		}
+
+		const occurrenceIds: string[] = [];
+
+		// Occurrence #0: Master event itself
+		if (master.status !== 'cancelled') {
+			occurrenceIds.push(master.id);
+		}
+
+		// Subsequent occurrences
+		for (const inst of instances) {
+			const instIso = inst.date.toISOString();
+			const ex = exceptionMap.get(instIso);
+			if (ex) {
+				if (ex.status !== 'cancelled') {
+					occurrenceIds.push(ex.id);
+				}
+			} else {
+				occurrenceIds.push(`${master.id}_inst_${instIso}`);
+			}
+		}
+
+		return occurrenceIds;
+	}
+
 	/**
 	 * Sync events for a specific configuration
 	 * Handles bidirectional sync (pull from provider, push local changes)
@@ -311,6 +461,58 @@ export class SyncService {
 					} else {
 						if (r.event.status === 'tentative' || !r.event.isPublic) shouldBeSynced = false;
 					}
+				}
+
+				if (provider.supportsNativeRecurrence !== true && this.isSeriesMaster(r.event)) {
+					const occIds = await this.getMasterOccurrenceIds(r.event);
+					for (const occId of occIds) {
+						processedEventIds.add(occId);
+						const itemSyncState = getItemSyncState(eventCampaign?.content, occId, config.id);
+						const existingExternalId = itemSyncState?.externalId;
+
+						if (shouldBeSynced) {
+							let priority = 2; // Default: brand new / unsynced
+							if (existingExternalId) {
+								const lastSyncedAt = itemSyncState?.lastSyncedAt ? new Date(itemSyncState.lastSyncedAt) : null;
+								const isModified = r.event.updatedAt && lastSyncedAt && new Date(r.event.updatedAt) > lastSyncedAt;
+								priority = isModified ? 3 : 4;
+							}
+							itemsToSync.push({ id: occId, entityType: 'event', action: 'sync', _priority: priority } as any);
+						} else if (existingExternalId) {
+							itemsToSync.push({
+								id: occId,
+								entityType: 'event',
+								action: 'unpublish',
+								externalId: existingExternalId,
+								_priority: 1
+							} as any);
+						}
+					}
+
+					// Also check for previously synced occurrences in campaign content that are no longer active
+					if (eventCampaign?.content) {
+						const cItems = (eventCampaign.content as CampaignContent).items || {};
+						for (const k of Object.keys(cItems)) {
+							if ((k.startsWith(`${r.event.id}_inst_`) || k === r.event.id) && !occIds.includes(k)) {
+								const syncEntry = cItems[k]?.syncs?.[config.id];
+								if (syncEntry?.externalId) {
+									itemsToSync.push({
+										id: k,
+										entityType: 'event',
+										action: 'unpublish',
+										externalId: syncEntry.externalId,
+										_priority: 1
+									} as any);
+								}
+							}
+						}
+					}
+					continue;
+				}
+
+				// If it's an exception of a master event and was already queued, don't duplicate it
+				if (provider.supportsNativeRecurrence !== true && r.event.recurringEventId && itemsToSync.some(item => item.id === r.event.id)) {
+					continue;
 				}
 
 				const existingMapping = eventMappingMap.get(r.event.id);
@@ -518,10 +720,19 @@ export class SyncService {
 						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, item.mappingId));
 					}
 					// Also clean up from campaign
-					const table = item.entityType === 'event' ? eventTable : announcementTable;
-					const [itemRow] = await db.select({ campaignId: table.campaignId }).from(table).where(eq(table.id, item.id));
-					if (itemRow?.campaignId) {
-						const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, itemRow.campaignId));
+					let campaignId: string | null = null;
+					if (item.entityType === 'event' && item.id.includes('_inst_')) {
+						const [masterId] = item.id.split('_inst_');
+						const [mRow] = await db.select({ campaignId: eventTable.campaignId }).from(eventTable).where(eq(eventTable.id, masterId));
+						campaignId = mRow?.campaignId || null;
+					} else {
+						const table = item.entityType === 'event' ? eventTable : announcementTable;
+						const [itemRow] = await db.select({ campaignId: table.campaignId }).from(table).where(eq(table.id, item.id));
+						campaignId = itemRow?.campaignId || null;
+					}
+
+					if (campaignId) {
+						const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
 						if (camp && (camp.content as any)?.version === 1) {
 							const cContent = camp.content as CampaignContent;
 							if (cContent.items?.[item.id]?.syncs?.[config.id]) {
@@ -1309,23 +1520,29 @@ export class SyncService {
 		const descriptionRaw = internal.description || internal.content || '';
 
 		let recurrenceRules: string[] | undefined = undefined;
-		if (internal.recurrence) {
-			recurrenceRules = Array.isArray(internal.recurrence)
-				? internal.recurrence.filter(Boolean)
-				: [internal.recurrence];
-		} else if (internal.seriesId) {
-			const [series] = await db
-				.select()
-				.from(recurringSeries)
-				.where(eq(recurringSeries.id, internal.seriesId));
-			if (series?.rrule) {
-				recurrenceRules = [series.rrule];
+		const isVirtual = typeof internal.id === 'string' && internal.id.includes('_inst_');
+		const isException = Boolean(internal.isException || internal.recurringEventId);
+
+		if (providerId !== 'wp-the-events-calendar' && !isVirtual && !isException) {
+			if (internal.recurrence) {
+				recurrenceRules = Array.isArray(internal.recurrence)
+					? internal.recurrence.filter(Boolean)
+					: [internal.recurrence];
+			} else if (internal.seriesId) {
+				const [series] = await db
+					.select()
+					.from(recurringSeries)
+					.where(eq(recurringSeries.id, internal.seriesId));
+				if (series?.rrule) {
+					recurrenceRules = [series.rrule];
+				}
 			}
 		}
 
+		const associationEventId = (internal.recurringEventId || (isVirtual ? internal.id.split('_inst_')[0] : internal.id)) as string;
 
 		// Fetch associated contacts
-		const associatedContacts = (await getEntityContacts(entityType, internal.id)) || [];
+		const associatedContacts = (await getEntityContacts(entityType, associationEventId)) || [];
 
 		// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
 		// External contacts are commented out for data privacy reasons until privacy flows are finalized.
@@ -1347,7 +1564,7 @@ export class SyncService {
 							.select()
 							.from(eventContactTable)
 							.where(and(
-								eq(eventContactTable.eventId, internal.id),
+								eq(eventContactTable.eventId, associationEventId),
 								eq(eventContactTable.contactId, contact.id)
 							))
 							.limit(1);
@@ -1375,7 +1592,7 @@ export class SyncService {
 				.select({ resource: resourceTable })
 				.from(eventResourceTable)
 				.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
-				.where(eq(eventResourceTable.eventId, internal.id));
+				.where(eq(eventResourceTable.eventId, associationEventId));
 
 			for (const { resource: res } of linkedResources) {
 				let calendars: any[] = [];
@@ -1409,7 +1626,7 @@ export class SyncService {
 
 		// Try to find structured location data first
 		const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
-		const whereClause = isEvent ? eq(eventLocationTable.eventId, internal.id) : eq(announcementLocation.announcementId, internal.id);
+		const whereClause = isEvent ? eq(eventLocationTable.eventId, associationEventId) : eq(announcementLocation.announcementId, internal.id);
 
 		const locations = await db
 			.select({ location: locationTable })
@@ -1480,7 +1697,7 @@ export class SyncService {
 		// Resolve Tags
 		const tags: Array<{ id: string; name: string }> = [];
 		const tagTableToUse = isEvent ? eventTag : announcementTag;
-		const tagWhereClause = isEvent ? eq(eventTag.eventId, internal.id) : eq(announcementTag.announcementId, internal.id);
+		const tagWhereClause = isEvent ? eq(eventTag.eventId, associationEventId) : eq(announcementTag.announcementId, internal.id);
 
 		const entityTags = await db
 			.select({ tag: tagTable })
@@ -1629,16 +1846,27 @@ export class SyncService {
 
 			// 1. Identify relevant sync config IDs for these items to avoid evaluating irrelevant providers
 			const relevantConfigIds = new Set<string>();
+			const eventRowMap = new Map<string, typeof eventTable.$inferSelect>();
+			const campaignRowMap = new Map<string, typeof campaignTable.$inferSelect>();
 
 			if (entityType === 'event') {
-				const items = await db
+				const realItemIds = itemIds.filter(id => !id.includes('_inst_'));
+				const virtualMasterIds = itemIds.filter(id => id.includes('_inst_')).map(id => id.split('_inst_')[0]);
+				const lookupIds = Array.from(new Set([...realItemIds, ...virtualMasterIds]));
+
+				const items = lookupIds.length > 0 ? await db
 					.select({
 						event: eventTable,
 						campaign: campaignTable
 					})
 					.from(eventTable)
 					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-					.where(inArray(eventTable.id, itemIds));
+					.where(inArray(eventTable.id, lookupIds)) : [];
+
+				for (const r of items) {
+					eventRowMap.set(r.event.id, r.event);
+					if (r.campaign) campaignRowMap.set(r.event.id, r.campaign);
+				}
 
 				// Handle any instances needing master/series campaign inheritance
 				const masterIds = Array.from(new Set(
@@ -1694,10 +1922,10 @@ export class SyncService {
 					}
 				}
 
-				const mappings = await db
+				const mappings = realItemIds.length > 0 ? await db
 					.select({ syncConfigId: syncMappingTable.syncConfigId })
 					.from(syncMappingTable)
-					.where(inArray(syncMappingTable.eventId, itemIds));
+					.where(inArray(syncMappingTable.eventId, realItemIds)) : [];
 				for (const m of mappings) {
 					relevantConfigIds.add(m.syncConfigId);
 				}
@@ -1787,15 +2015,43 @@ export class SyncService {
 				}
 
 				// Pre-flight check: see if ANY of the items need sync for THIS config
-				const itemsToProcess: string[] = [];
+				// If provider does NOT support native recurrence, expand any series master into occurrences
+				const expandedItemIds: string[] = [];
 				for (const itemId of itemIds) {
+					if (entityType === 'event' && provider.supportsNativeRecurrence !== true) {
+						const evtRow = eventRowMap.get(itemId);
+						if (this.isSeriesMaster(evtRow)) {
+							const occIds = await this.getMasterOccurrenceIds(evtRow!);
+							expandedItemIds.push(...occIds);
+
+							// Also unpublish any removed/stale occurrences from campaign
+							const camp = campaignRowMap.get(itemId);
+							if (camp?.content) {
+								const cItems = (camp.content as CampaignContent).items || {};
+								for (const k of Object.keys(cItems)) {
+									if ((k.startsWith(`${evtRow!.id}_inst_`) || k === evtRow!.id) && !occIds.includes(k)) {
+										const syncEntry = cItems[k]?.syncs?.[config.id];
+										if (syncEntry?.externalId) {
+											expandedItemIds.push(k);
+										}
+									}
+								}
+							}
+							continue;
+						}
+					}
+					expandedItemIds.push(itemId);
+				}
+
+				const itemsToProcess: string[] = [];
+				for (const itemId of expandedItemIds) {
 					const { needsSync } = await this.checkSyncRequirement(config, itemId, entityType, provider);
 					if (needsSync) {
 						itemsToProcess.push(itemId);
 					}
 				}
 
-				console.log(`[SyncService] syncItems: Config ${config.id} (${config.providerType}) - ${itemsToProcess.length}/${itemIds.length} items to process (Budget: ${Math.round(configBudgetMs / 1000)}s)`);
+				console.log(`[SyncService] syncItems: Config ${config.id} (${config.providerType}) - ${itemsToProcess.length}/${expandedItemIds.length} items to process (Budget: ${Math.round(configBudgetMs / 1000)}s)`);
 
 				if (itemsToProcess.length === 0) {
 					continue;
@@ -1877,59 +2133,64 @@ export class SyncService {
 			return { needsSync: false };
 		}
 
-		// Check for existing mapping
-		const mappingWhere = entityType === 'event'
-			? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
-			: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
+		const isVirtual = itemId.includes('_inst_');
 
-		const [mapping] = await db
-			.select()
-			.from(syncMappingTable)
-			.where(mappingWhere);
+		// Check for existing mapping in legacy table (only if real UUID)
+		let mapping: typeof syncMappingTable.$inferSelect | undefined;
+		if (!isVirtual) {
+			const mappingWhere = entityType === 'event'
+				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+				: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
 
-		// Check granular sync settings (campaign-based)
-		const table = entityType === 'event' ? eventTable : announcementTable;
-		const [itemWithCampaign] = await db
-			.select({
-				item: table,
-				campaign: campaignTable
-			})
-			.from(table)
-			.leftJoin(campaignTable, eq(table.campaignId, campaignTable.id))
-			.where(eq(table.id, itemId))
-			.limit(1);
-
-		if (!itemWithCampaign) {
-			return { needsSync: !!mapping };
+			const [m] = await db
+				.select()
+				.from(syncMappingTable)
+				.where(mappingWhere);
+			mapping = m;
 		}
 
-		let campaign = itemWithCampaign.campaign;
-		// Inherit campaign from master event for instances if missing
-		if (!campaign && entityType === 'event') {
-			const masterId = (itemWithCampaign.item as any)?.recurringEventId;
-			if (masterId) {
-				const [master] = await db
-					.select({ campaign: campaignTable })
-					.from(eventTable)
-					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-					.where(eq(eventTable.id, masterId))
-					.limit(1);
-				if (master?.campaign) {
-					campaign = master.campaign;
-					await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
-				}
-			} else if ((itemWithCampaign.item as any)?.seriesId) {
-				const [master] = await db
-					.select({ campaign: campaignTable })
-					.from(eventTable)
-					.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-					.where(and(eq(eventTable.seriesId, (itemWithCampaign.item as any).seriesId), isNull(eventTable.recurringEventId)))
-					.limit(1);
-				if (master?.campaign) {
-					campaign = master.campaign;
-					await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+		// Check granular sync settings (campaign-based)
+		let itemRow: any = null;
+		let campaign: typeof campaignTable.$inferSelect | null = null;
+
+		if (entityType === 'event') {
+			itemRow = await this.getEventRecord(itemId);
+			if (itemRow?.campaignId) {
+				const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, itemRow.campaignId));
+				campaign = camp || null;
+			} else if (itemRow) {
+				const masterId = itemRow.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
+				if (masterId) {
+					const [master] = await db
+						.select({ campaign: campaignTable })
+						.from(eventTable)
+						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+						.where(eq(eventTable.id, masterId))
+						.limit(1);
+					if (master?.campaign) {
+						campaign = master.campaign;
+						if (!isVirtual) {
+							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+						}
+					}
 				}
 			}
+		} else {
+			const [annWithCamp] = await db
+				.select({
+					item: announcementTable,
+					campaign: campaignTable
+				})
+				.from(announcementTable)
+				.leftJoin(campaignTable, eq(announcementTable.campaignId, campaignTable.id))
+				.where(eq(announcementTable.id, itemId))
+				.limit(1);
+			itemRow = annWithCamp?.item;
+			campaign = annWithCamp?.campaign || null;
+		}
+
+		if (!itemRow) {
+			return { needsSync: !!mapping };
 		}
 
 		const syncIds = getCampaignTargetIds(campaign?.content);
@@ -1937,20 +2198,16 @@ export class SyncService {
 
 		if (entityType === 'event' && shouldBeSynced) {
 			try {
-				const event = itemWithCampaign.item as any;
 				if (provider.shouldSyncEvent) {
-					if (!provider.shouldSyncEvent(event)) shouldBeSynced = false;
+					if (!provider.shouldSyncEvent(itemRow)) shouldBeSynced = false;
 				} else {
-					if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
+					if (itemRow.status === 'tentative' || !itemRow.isPublic) shouldBeSynced = false;
 				}
 			} catch (e) {
-				// Fallback if provider cannot be instantiated
-				const event = itemWithCampaign.item as any;
-				if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
+				if (itemRow.status === 'tentative' || !itemRow.isPublic) shouldBeSynced = false;
 			}
 		} else if (entityType === 'announcement' && shouldBeSynced) {
-			const announcement = itemWithCampaign.item as any;
-			if (announcement.status !== 'active' || !announcement.isPublic) {
+			if (itemRow.status !== 'active' || !itemRow.isPublic) {
 				shouldBeSynced = false;
 			}
 		}
@@ -1979,8 +2236,14 @@ export class SyncService {
 		itemId: string,
 		entityType: 'event' | 'announcement'
 	): Promise<void> {
-		const table = entityType === 'event' ? eventTable : announcementTable;
-		const [itemRow] = await db.select().from(table).where(eq(table.id, itemId));
+		const isVirtual = itemId.includes('_inst_');
+		let itemRow: any = null;
+		if (entityType === 'event') {
+			itemRow = await this.getEventRecord(itemId);
+		} else {
+			const [ann] = await db.select().from(announcementTable).where(eq(announcementTable.id, itemId));
+			itemRow = ann;
+		}
 
 		if (!itemRow) {
 			console.warn(`[SyncService] ${entityType} ${itemId} not found in database.`);
@@ -1994,34 +2257,42 @@ export class SyncService {
 			[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
 		}
 		if (!campaignRow && entityType === 'event') {
-			const masterId = (itemRow as any).recurringEventId;
+			const masterId = itemRow.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
 			if (masterId) {
 				const [master] = await db.select().from(eventTable).where(eq(eventTable.id, masterId));
 				if (master?.campaignId) {
 					campaignId = master.campaignId;
 					[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
-					await db.update(table).set({ campaignId } as any).where(eq(table.id, itemId));
+					if (!isVirtual) {
+						await db.update(eventTable).set({ campaignId }).where(eq(eventTable.id, itemId));
+					}
 				}
-			} else if ((itemRow as any).seriesId) {
+			} else if (itemRow.seriesId) {
 				const [master] = await db.select().from(eventTable).where(
 					and(
-						eq(eventTable.seriesId, (itemRow as any).seriesId),
+						eq(eventTable.seriesId, itemRow.seriesId),
 						isNull(eventTable.recurringEventId)
 					)
 				);
 				if (master?.campaignId) {
 					campaignId = master.campaignId;
 					[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
-					await db.update(table).set({ campaignId } as any).where(eq(table.id, itemId));
+					if (!isVirtual) {
+						await db.update(eventTable).set({ campaignId }).where(eq(eventTable.id, itemId));
+					}
 				}
 			}
 		}
 
-		const mappingWhere = entityType === 'event'
-			? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
-			: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
+		let legacyMapping: typeof syncMappingTable.$inferSelect | undefined;
+		if (!isVirtual) {
+			const mappingWhere = entityType === 'event'
+				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+				: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
 
-		const [legacyMapping] = await db.select().from(syncMappingTable).where(mappingWhere);
+			const [lm] = await db.select().from(syncMappingTable).where(mappingWhere);
+			legacyMapping = lm;
+		}
 
 		let campContent: CampaignContent = (campaignRow?.content as any)?.version === 1
 			? (campaignRow?.content as any)
@@ -2030,7 +2301,7 @@ export class SyncService {
 		const existingItemSync = campContent.items?.[itemId]?.syncs?.[config.id];
 		const existingExternalId = existingItemSync?.externalId || legacyMapping?.externalId;
 
-		const externalItem = await this.mapInternalToExternal(itemRow as any, config.providerType);
+		const externalItem = await this.mapInternalToExternal(itemRow, config.providerType);
 
 		let finalExternalId = existingExternalId;
 		let finalEtag: string | null | undefined = existingItemSync?.etag || legacyMapping?.etag;
@@ -2078,15 +2349,15 @@ export class SyncService {
 			} else {
 				const [newCamp] = await db.insert(campaignTable).values({
 					userId: itemRow.userId || config.userId,
-					name: `Campaign for ${(itemRow as any).summary || (itemRow as any).title || itemId}`,
+					name: `Campaign for ${itemRow.summary || itemRow.title || itemId}`,
 					content: campContent
 				}).returning();
-				if (newCamp) {
+				if (newCamp && !isVirtual) {
+					const table = entityType === 'event' ? eventTable : announcementTable;
 					await db.update(table).set({ campaignId: newCamp.id } as any).where(eq(table.id, itemId));
 				}
 			}
 
-			// Clean up legacy mapping if one existed, as it is now migrated into campaign
 			if (legacyMapping) {
 				await db.delete(syncMappingTable).where(eq(syncMappingTable.id, legacyMapping.id));
 			}
@@ -2108,31 +2379,34 @@ export class SyncService {
 				return;
 			}
 
-			const table = entityType === 'event' ? eventTable : announcementTable;
-			const [itemRow] = await db
-				.select()
-				.from(table)
-				.where(eq(table.id, itemId));
+			const isVirtual = itemId.includes('_inst_');
+			let itemRow: any = null;
+			if (entityType === 'event') {
+				itemRow = await this.getEventRecord(itemId);
+			} else {
+				const [ann] = await db.select().from(announcementTable).where(eq(announcementTable.id, itemId));
+				itemRow = ann;
+			}
 
-			const mappingWhere = entityType === 'event'
-				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
-				: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
+			let mapping: typeof syncMappingTable.$inferSelect | undefined;
+			if (!isVirtual) {
+				const mappingWhere = entityType === 'event'
+					? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+					: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
 
-			const [mapping] = await db
-				.select()
-				.from(syncMappingTable)
-				.where(mappingWhere);
+				const [m] = await db
+					.select()
+					.from(syncMappingTable)
+					.where(mappingWhere);
+				mapping = m;
+			}
 
-			const [itemWithCampaign] = await db
-				.select({ campaign: campaignTable })
-				.from(table)
-				.leftJoin(campaignTable, eq(table.campaignId, campaignTable.id))
-				.where(eq(table.id, itemId))
-				.limit(1);
-
-			let campaign = itemWithCampaign?.campaign;
-			if (!campaign && entityType === 'event') {
-				const masterId = (itemRow as any)?.recurringEventId;
+			let campaign: typeof campaignTable.$inferSelect | null = null;
+			if (itemRow?.campaignId) {
+				const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, itemRow.campaignId));
+				campaign = camp || null;
+			} else if (itemRow && entityType === 'event') {
+				const masterId = itemRow.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
 				if (masterId) {
 					const [master] = await db
 						.select({ campaign: campaignTable })
@@ -2142,18 +2416,22 @@ export class SyncService {
 						.limit(1);
 					if (master?.campaign) {
 						campaign = master.campaign;
-						await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+						if (!isVirtual) {
+							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+						}
 					}
-				} else if ((itemRow as any)?.seriesId) {
+				} else if (itemRow.seriesId) {
 					const [master] = await db
 						.select({ campaign: campaignTable })
 						.from(eventTable)
 						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-						.where(and(eq(eventTable.seriesId, (itemRow as any).seriesId), isNull(eventTable.recurringEventId)))
+						.where(and(eq(eventTable.seriesId, itemRow.seriesId), isNull(eventTable.recurringEventId)))
 						.limit(1);
 					if (master?.campaign) {
 						campaign = master.campaign;
-						await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+						if (!isVirtual) {
+							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+						}
 					}
 				}
 			}
@@ -2166,11 +2444,11 @@ export class SyncService {
 				if (provider.shouldSyncEvent) {
 					if (!provider.shouldSyncEvent(itemRow)) shouldBeSynced = false;
 				} else {
-					const event = itemRow as any;
+					const event = itemRow;
 					if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
 				}
 			} else if (entityType === 'announcement' && shouldBeSynced) {
-				const ann = itemRow as any;
+				const ann = itemRow;
 				if (ann.status !== 'active' || !ann.isPublic) shouldBeSynced = false;
 			}
 
@@ -2184,7 +2462,7 @@ export class SyncService {
 			}
 
 			// Only un-publish if explicitly deselected from campaign targets, or if cancelled
-			const isCancelled = (itemRow as any)?.status === 'cancelled';
+			const isCancelled = itemRow?.status === 'cancelled';
 			if ((!isTargetConfig || isCancelled) && existingExternalId) {
 				console.log(`[SyncService] Un-publishing ${entityType} ${itemId} from provider: deselected or cancelled for config ${config.id}`);
 				try {
@@ -2215,7 +2493,7 @@ export class SyncService {
 				return;
 			}
 
-			console.log(`[SyncService] Syncing ${entityType} ${itemId} ("${(itemRow as any).summary || (itemRow as any).title}") to provider: ${config.providerType}. Status: ${mapping ? 'update' : 'create'}`);
+			console.log(`[SyncService] Syncing ${entityType} ${itemId} ("${itemRow.summary || itemRow.title}") to provider: ${config.providerType}. Status: ${existingExternalId ? 'update' : 'create'}`);
 			await this.executeSyncItem(config, provider, itemId, entityType);
 
 		} catch (error: any) {
@@ -2238,14 +2516,14 @@ export class SyncService {
 
 			const configMap = new Map(configs.map(c => [c.id, this.rowToConfig(c)]));
 
-			// 1. Find campaigns containing these events
+			// 1. Find campaigns containing these events or their virtual instances
 			const campaignsToUpdate = await db
 				.select()
 				.from(campaignTable)
 				.where(
 					sql`EXISTS (
 						SELECT 1 FROM jsonb_object_keys(COALESCE(${campaignTable.content}->'items', '{}'::jsonb)) AS k
-						WHERE k = ANY(${eventIds}::text[])
+						WHERE k = ANY(${eventIds}::text[]) OR split_part(k, '_inst_', 1) = ANY(${eventIds}::text[])
 					)`
 				);
 
@@ -2253,8 +2531,12 @@ export class SyncService {
 				const content = camp.content as CampaignContent;
 				if (!content || content.version !== 1 || !content.items) continue;
 
-				for (const eventId of eventIds) {
-					const item = content.items[eventId];
+				const keysToDelete = Object.keys(content.items).filter(k => 
+					eventIds.includes(k) || eventIds.includes(k.split('_inst_')[0])
+				);
+
+				for (const itemKey of keysToDelete) {
+					const item = content.items[itemKey];
 					if (!item || !item.syncs) continue;
 
 					for (const [configId, syncState] of Object.entries(item.syncs)) {
@@ -2274,48 +2556,51 @@ export class SyncService {
 							}
 						}
 					}
-					delete content.items[eventId];
+					delete content.items[itemKey];
 				}
 
 				await db.update(campaignTable).set({ content, updatedAt: new Date() }).where(eq(campaignTable.id, camp.id));
 			}
 
-			// 2. Also delete legacy mappings from syncMappingTable
-			for (const configRow of configs) {
-				const config = this.rowToConfig(configRow);
-				const mappings = await db
-					.select()
-					.from(syncMappingTable)
-					.where(
-						and(
-							eq(syncMappingTable.syncConfigId, config.id),
-							inArray(syncMappingTable.eventId, eventIds)
-						)
-					);
+			// 2. Also delete legacy mappings from syncMappingTable (only for real UUIDs)
+			const realEventIds = eventIds.filter(id => !id.includes('_inst_'));
+			if (realEventIds.length > 0) {
+				for (const configRow of configs) {
+					const config = this.rowToConfig(configRow);
+					const mappings = await db
+						.select()
+						.from(syncMappingTable)
+						.where(
+							and(
+								eq(syncMappingTable.syncConfigId, config.id),
+								inArray(syncMappingTable.eventId, realEventIds)
+							)
+						);
 
-				if (mappings.length === 0) continue;
+					if (mappings.length === 0) continue;
 
-				if (config.direction === 'push' || config.direction === 'bidirectional') {
-					try {
-						const provider = await this.getProviderInstance(config);
-						for (const mapping of mappings) {
-							try {
-								await provider.deleteEvent(mapping.externalId);
-							} catch (error: any) {
-								console.error(`[SyncService] Failed to delete event ${mapping.externalId} from provider:`, error);
+					if (config.direction === 'push' || config.direction === 'bidirectional') {
+						try {
+							const provider = await this.getProviderInstance(config);
+							for (const mapping of mappings) {
+								try {
+									await provider.deleteEvent(mapping.externalId);
+								} catch (error: any) {
+									console.error(`[SyncService] Failed to delete event ${mapping.externalId} from provider:`, error);
+								}
 							}
+						} catch (error: any) {
+							console.error(`[SyncService] Failed to initialize provider for deletion:`, error);
 						}
-					} catch (error: any) {
-						console.error(`[SyncService] Failed to initialize provider for deletion:`, error);
 					}
 				}
+
+				await db
+					.delete(syncMappingTable)
+					.where(inArray(syncMappingTable.eventId, realEventIds));
 			}
 
-			await db
-				.delete(syncMappingTable)
-				.where(inArray(syncMappingTable.eventId, eventIds));
-
-			await invalidateEvent(eventIds);
+			await invalidateEvent(realEventIds.length > 0 ? realEventIds : eventIds);
 		} catch (error: any) {
 			console.error(`[SyncService] Error in deleteEventMappings:`, error);
 		}

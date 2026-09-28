@@ -9,6 +9,7 @@ import { parsePricing } from '../utils/pricing';
 import { resolveContactForEventId } from '$lib/server/contact-resolution';
 import { env } from '$env/dynamic/private';
 import { htmlToPlainText } from '../utils/html';
+import { isSeriesItem } from '$lib/utils/event-series';
 
 /**
  * Berlin.de Marzahn-Hellersdorf Calendar sync provider
@@ -26,10 +27,16 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     readonly supportsWebhooks = false;
     readonly supportedDirections: SyncDirection[] = ['push'];
     readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+    readonly supportsNativeRecurrence = false;
 
     shouldSyncEvent(event: any): boolean {
         if (event.status === 'cancelled') return false;
         if (event.status === 'tentative' || !event.isPublic) return false;
+
+        // Berlin.de MH restriction: recurring event series must never be synced due to the district approval system
+        if (isSeriesItem(event)) {
+            return false;
+        }
 
         // Berlin.de restriction: dates in the past or > 365 days in the future are not allowed
         if (event.startDateTime) {

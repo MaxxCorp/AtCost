@@ -22,6 +22,7 @@ export class GoogleCalendarProvider implements SyncProvider {
 	readonly supportsWebhooks = true;
 	readonly supportedDirections: SyncDirection[] = ['pull', 'push', 'bidirectional'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeRecurrence = true;
 
 	shouldSyncEvent(event: any): boolean {
 		// Google Calendar allows syncing of all events (including tentative and non-public)

@@ -5,17 +5,39 @@
     import * as m from "$lib/paraglide/messages";
     import { translateIssue } from "@ac/ui";
     
+    import { toast } from "svelte-sonner";
+    
     let {
         syncFieldConfig,
-        initialSelectedIds = []
+        initialSelectedIds = [],
+        isSeries = false
     }: {
         syncFieldConfig: any; // Remote Function field object
         initialSelectedIds?: string[];
+        isSeries?: boolean;
     } = $props();
 
     // svelte-ignore state_referenced_locally
     let selectedIds = $state<string[]>(initialSelectedIds?.length ? [...initialSelectedIds] : []);
     let configsPromise = $derived(list());
+
+    let prevIsSeries = false;
+    $effect(() => {
+        if (isSeries && !prevIsSeries) {
+            configsPromise.then(res => {
+                if (res?.data) {
+                    const berlinConfigs = res.data.filter((c: any) => c.providerType === 'berlin-de-mh-calendar' || c.providerType === 'berlin-de-main-calendar');
+                    const berlinIds = berlinConfigs.map((c: any) => c.id);
+                    const hasBerlinSelected = selectedIds.some(id => berlinIds.includes(id));
+                    if (hasBerlinSelected) {
+                        selectedIds = selectedIds.filter(id => !berlinIds.includes(id));
+                        toast.error(m.berlin_de_series_sync_not_allowed());
+                    }
+                }
+            });
+        }
+        prevIsSeries = isSeries;
+    });
 
     onMount(async () => {
         if (!initialSelectedIds || initialSelectedIds.length === 0) {
@@ -23,7 +45,7 @@
                 const res = await configsPromise;
                 if (res?.data) {
                     const defaultIds = res.data
-                        .filter((c: any) => c.enabled && (c.settings?.isDefault === true || c.settings?.isDefault === 'true' || c.settings?.isDefault === 1))
+                        .filter((c: any) => c.enabled && (c.settings?.isDefault === true || c.settings?.isDefault === 'true' || c.settings?.isDefault === 1) && (!isSeries || (c.providerType !== 'berlin-de-mh-calendar' && c.providerType !== 'berlin-de-main-calendar')))
                         .map((c: any) => c.id);
                     if (defaultIds.length > 0) {
                         selectedIds = Array.from(new Set([...selectedIds, ...defaultIds]));
@@ -35,11 +57,19 @@
         }
     });
 
-    function toggleConfig(id: string) {
-        if (selectedIds.includes(id)) {
-            selectedIds = selectedIds.filter(x => x !== id);
+    function toggleConfig(config: any) {
+        if (selectedIds.includes(config.id)) {
+            selectedIds = selectedIds.filter(x => x !== config.id);
         } else {
-            selectedIds = [...selectedIds, id];
+            if (isSeries && (config.providerType === 'berlin-de-mh-calendar' || config.providerType === 'berlin-de-main-calendar')) {
+                if (config.providerType === 'berlin-de-main-calendar') {
+                    toast.error(m.berlin_de_main_series_sync_not_allowed());
+                } else {
+                    toast.error(m.berlin_de_mh_series_sync_not_allowed());
+                }
+                return;
+            }
+            selectedIds = [...selectedIds, config.id];
         }
     }
 
@@ -78,13 +108,14 @@
             <div class="space-y-2 border rounded-md p-4 bg-gray-50 max-h-64 overflow-y-auto">
                 {#each result.data as config (config.id)}
                     {@const isDefaultTarget = (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
+                    {@const isBlockedSeries = isSeries && (config.providerType === 'berlin-de-mh-calendar' || config.providerType === 'berlin-de-main-calendar')}
                     {#if config.enabled}
-                        <label class="flex items-center gap-3 py-2 px-2 hover:bg-white border border-transparent hover:border-gray-200 rounded transition-colors cursor-pointer">
+                        <label class="flex items-center gap-3 py-2 px-2 hover:bg-white border border-transparent hover:border-gray-200 rounded transition-colors cursor-pointer {isBlockedSeries ? 'opacity-60' : ''}">
                             <input 
                                 type="checkbox"
                                 class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-2"
                                 checked={selectedIds.includes(config.id)}
-                                onchange={() => toggleConfig(config.id)}
+                                onchange={() => toggleConfig(config)}
                             />
                             <div class="flex flex-col min-w-0 flex-1">
                                 <div class="flex items-center gap-2">

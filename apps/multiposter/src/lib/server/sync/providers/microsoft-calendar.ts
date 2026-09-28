@@ -17,6 +17,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	readonly supportsWebhooks = true;
 	readonly supportedDirections: SyncDirection[] = ['pull', 'push', 'bidirectional'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeRecurrence = true;
 
 	shouldSyncEvent(event: any): boolean {
 		// Microsoft Calendar allows syncing of all events (including tentative and non-public)

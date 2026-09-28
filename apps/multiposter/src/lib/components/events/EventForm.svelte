@@ -61,6 +61,7 @@
     import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
     import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import { isSeriesItem } from "$lib/utils/event-series";
     import {
         RefreshCw,
         CalendarClock,
@@ -293,6 +294,15 @@
         rf.fields.recurrence.value()
             ? formatRecurrenceText(rf.fields.recurrence.value() as string)
             : m.recurrence(),
+    );
+
+    let isSeries = $derived(
+        Boolean(
+            (rf.fields.recurrence.value() && String(rf.fields.recurrence.value()).trim() !== "") ||
+            (initialData?.recurrence && initialData.recurrence.length > 0) ||
+            initialData?.seriesId ||
+            isSeriesItem(initialData)
+        )
     );
 
     let isAllDay = $derived(
@@ -1709,5 +1719,6 @@
     <SyncCheckboxBlock
         syncFieldConfig={rf.fields.syncIds}
         initialSelectedIds={initialData?.syncIds || []}
+        {isSeries}
     />
 </div>

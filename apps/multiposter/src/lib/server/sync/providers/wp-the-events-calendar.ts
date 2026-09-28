@@ -19,6 +19,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	readonly supportsWebhooks = false;
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeRecurrence = false;
 
 	private config?: SyncConfig;
 	private baseUrl = '';

@@ -35,9 +35,11 @@ export const deleteEvents = command(
 				}
 			}
 		} else {
+			const affectedMasterIds = new Set<string>();
 			for (const vId of virtualIds) {
 				const [masterId, isoDate] = vId.split('_inst_');
 				if (masterId && isoDate) {
+					affectedMasterIds.add(masterId);
 					const decodedIso = decodeURIComponent(isoDate);
 					const [master] = await db.select().from(event).where(eq(event.id, masterId));
 					if (master) {
@@ -47,6 +49,13 @@ export const deleteEvents = command(
 						}
 						await invalidateEvent([masterId, vId]);
 					}
+				}
+			}
+
+			if (virtualIds.length > 0) {
+				await syncService.deleteEventMappings(user.id, virtualIds).catch(console.error);
+				for (const mId of affectedMasterIds) {
+					await syncService.syncItems(user.id, [mId], 'event').catch(console.error);
 				}
 			}
 
@@ -108,8 +117,10 @@ export const deleteEvents = command(
 			});
 
 			// If deleting an instance of a series, record its date in master's exdates so it doesn't resurrect
+			const affectedMasterIds = new Set<string>();
 			for (const e of eventsToDelete) {
 				if (e.recurringEventId && e.startDateTime) {
+					affectedMasterIds.add(e.recurringEventId);
 					const [master] = await db.select().from(event).where(eq(event.id, e.recurringEventId));
 					if (master) {
 						const dateIso = e.originalStartTime && typeof e.originalStartTime === 'object' && 'dateTime' in (e.originalStartTime as any)
@@ -129,6 +140,10 @@ export const deleteEvents = command(
 			}
 
 			await db.delete(event).where(inArray(event.id, realIds));
+
+			for (const mId of affectedMasterIds) {
+				await syncService.syncItems(user.id, [mId], 'event').catch(console.error);
+			}
 		}
 
 		// Perform external cleanup for all deleted event IDs

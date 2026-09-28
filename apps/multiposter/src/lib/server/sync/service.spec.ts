@@ -12,6 +12,9 @@ import {
 } from '@ac/db';
 import { eq, and } from '@ac/db';
 import { getEntityContacts } from '../contacts';
+import { WpTheEventsCalendarProvider } from './providers/wp-the-events-calendar';
+import { BerlinDeMhCalendarProvider } from './providers/berlin-de-mh-calendar';
+import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
 
 // Mock the database
 vi.mock('@ac/db', async (importOriginal) => {
@@ -628,6 +631,156 @@ describe('SyncService - Bulk Sync', () => {
 					delete process.env.SYNC_MAX_DURATION_SECONDS;
 				}
 			}
+		});
+	});
+
+	describe('Series Sync & Recurrence Handling', () => {
+		it('identifies series master correctly with isSeriesMaster', () => {
+			const service = new SyncService();
+
+			expect(service.isSeriesMaster({
+				id: 'master-1',
+				recurrence: ['RRULE:FREQ=WEEKLY;COUNT=5'],
+				isException: false
+			})).toBe(true);
+
+			// Single event
+			expect(service.isSeriesMaster({
+				id: 'single-1',
+				recurrence: null,
+				isException: false
+			})).toBe(false);
+
+			// Exception event
+			expect(service.isSeriesMaster({
+				id: 'exception-1',
+				recurrence: null,
+				recurringEventId: 'master-1',
+				isException: true
+			})).toBe(false);
+
+			// Virtual occurrence
+			expect(service.isSeriesMaster({
+				id: 'master-1_inst_2026-09-01T10:00:00.000Z',
+				recurrence: null
+			})).toBe(false);
+		});
+
+		it('marks WpTheEventsCalendarProvider as supportsNativeRecurrence = false', () => {
+			const wpProvider = new WpTheEventsCalendarProvider();
+			expect(wpProvider.supportsNativeRecurrence).toBe(false);
+		});
+
+		it('marks BerlinDeMhCalendarProvider as supportsNativeRecurrence = false and rejects series sync', () => {
+			const mhProvider = new BerlinDeMhCalendarProvider();
+			expect(mhProvider.supportsNativeRecurrence).toBe(false);
+
+			// Series master should NOT be synced to Berlin.de MH
+			const seriesMaster = {
+				id: 'series-master-1',
+				recurrence: ['RRULE:FREQ=WEEKLY'],
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mhProvider.shouldSyncEvent(seriesMaster)).toBe(false);
+
+			// Virtual occurrence should NOT be synced to Berlin.de MH
+			const virtualInst = {
+				id: 'series-master-1_inst_2026-09-01T10:00:00.000Z',
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mhProvider.shouldSyncEvent(virtualInst)).toBe(false);
+
+			// Materialized exception should NOT be synced to Berlin.de MH
+			const exceptionItem = {
+				id: 'exc-1',
+				recurringEventId: 'series-master-1',
+				isException: true,
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mhProvider.shouldSyncEvent(exceptionItem)).toBe(false);
+
+			// Regular single event SHOULD be synced
+			const standaloneEvent = {
+				id: 'standalone-1',
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mhProvider.shouldSyncEvent(standaloneEvent)).toBe(true);
+		});
+
+		it('marks BerlinDeMainCalendarProvider as supportsNativeRecurrence = false and rejects series sync', () => {
+			const mainProvider = new BerlinDeMainCalendarProvider();
+			expect(mainProvider.supportsNativeRecurrence).toBe(false);
+
+			// Series master should NOT be synced to Berlin.de Main
+			const seriesMaster = {
+				id: 'series-master-1',
+				recurrence: ['RRULE:FREQ=WEEKLY'],
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mainProvider.shouldSyncEvent(seriesMaster)).toBe(false);
+
+			// Virtual occurrence should NOT be synced to Berlin.de Main
+			const virtualInst = {
+				id: 'series-master-1_inst_2026-09-01T10:00:00.000Z',
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mainProvider.shouldSyncEvent(virtualInst)).toBe(false);
+
+			// Materialized exception should NOT be synced to Berlin.de Main
+			const exceptionItem = {
+				id: 'exc-1',
+				recurringEventId: 'series-master-1',
+				isException: true,
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mainProvider.shouldSyncEvent(exceptionItem)).toBe(false);
+
+			// Regular single event SHOULD be synced
+			const standaloneEvent = {
+				id: 'standalone-1',
+				isPublic: true,
+				status: 'confirmed',
+				startDateTime: new Date(Date.now() + 86400000)
+			};
+			expect(mainProvider.shouldSyncEvent(standaloneEvent)).toBe(true);
+		});
+
+		it('expands master occurrence IDs for providers without native recurrence', async () => {
+			const service = new SyncService();
+
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([])
+				})
+			});
+
+			const masterEvent: any = {
+				id: 'master-uuid',
+				startDateTime: new Date('2026-10-01T10:00:00.000Z'),
+				endDateTime: new Date('2026-10-01T11:00:00.000Z'),
+				recurrence: ['RRULE:FREQ=DAILY;COUNT=3'],
+				status: 'confirmed'
+			};
+
+			const occIds = await service.getMasterOccurrenceIds(masterEvent);
+			expect(occIds).toHaveLength(3);
+			expect(occIds[0]).toBe('master-uuid');
+			expect(occIds[1]).toContain('master-uuid_inst_');
+			expect(occIds[2]).toContain('master-uuid_inst_');
 		});
 	});
 });
