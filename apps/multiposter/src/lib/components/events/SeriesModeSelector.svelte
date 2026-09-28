@@ -5,7 +5,7 @@
     import { Button } from "$lib/components/ui/button";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { RefreshCw, Calendar, ChevronDown, Check } from "@lucide/svelte";
+    import { RefreshCw, Calendar, ChevronDown, Check, Eye, Trash2 } from "@lucide/svelte";
 
     interface Props {
         event: any;
@@ -13,6 +13,7 @@
         viewMode?: boolean;
         isDirty?: boolean;
         onnavigate?: (targetId: string) => void;
+        ondelete?: (inst: any) => void;
     }
 
     let {
@@ -21,11 +22,13 @@
         viewMode = false,
         isDirty = false,
         onnavigate,
+        ondelete,
     }: Props = $props();
 
     // Determine if this event is part of a series
     const isSeries = $derived(
         Boolean(
+            event?.isSeries ||
             event?.recurringEventId ||
             event?.seriesId ||
             (event?.recurrence && event.recurrence.length > 0) ||
@@ -159,11 +162,15 @@
                             <Button
                                 variant="outline"
                                 class="w-full sm:w-auto flex items-center justify-between gap-2.5 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 shadow-sm text-sm font-medium"
+                                aria-label="{isMaster ? m.entire_series_master() : formatDate(event.startDateTime)}{instances.length > 0 ? ` - ${instances.length} ${m.instances()}` : ''}"
                             >
                                 <div class="flex items-center gap-2 truncate">
                                     {#if isMaster}
                                         <RefreshCw size={14} class="text-blue-600 shrink-0" />
                                         <span>{m.entire_series_master()}</span>
+                                        {#if instances.length > 0}
+                                            <span class="text-gray-500 font-normal">({instances.length} {m.instances()})</span>
+                                        {/if}
                                     {:else}
                                         <Calendar size={14} class="text-amber-600 shrink-0" />
                                         <span>{formatDate(event.startDateTime)}</span>
@@ -173,7 +180,7 @@
                             </Button>
                         </DropdownMenu.Trigger>
 
-                        <DropdownMenu.Content align="end" class="w-72 sm:w-80 p-1.5">
+                        <DropdownMenu.Content align="end" class="w-80 sm:w-96 p-1.5">
                             <DropdownMenu.Group>
                                 <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
                                     {m.switch_series_or_instance()}
@@ -209,22 +216,25 @@
                                         {m.all_instances_count({ count: instances.length })}
                                     </DropdownMenu.GroupHeading>
 
-                                    <div class="max-h-60 overflow-y-auto space-y-0.5 pr-1">
+                                    <div class="max-h-64 overflow-y-auto space-y-0.5 pr-1">
                                         {#each instances as inst (inst.id)}
                                             {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && Boolean(inst.startDateTime) && Boolean(event.startDateTime) && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
-                                            <DropdownMenu.Item
-                                                onclick={() => handleSwitch(inst.id)}
-                                                class="flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
+                                            <div
+                                                class="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
                                                     ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-medium'
                                                     : ''}"
                                             >
-                                                <div class="flex items-center gap-2 min-w-0">
+                                                <button
+                                                    type="button"
+                                                    onclick={() => handleSwitch(inst.id)}
+                                                    class="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer p-1 rounded focus:outline-none"
+                                                >
                                                     <Calendar size={14} class="text-gray-400 shrink-0" />
-                                                    <div class="min-w-0">
+                                                    <div class="min-w-0 flex-1">
                                                         <div class="text-xs font-medium truncate">
                                                             {formatDate(inst.startDateTime)}
                                                         </div>
-                                                        <div class="text-[11px] text-gray-500 flex items-center gap-1.5">
+                                                        <div class="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
                                                             <span>
                                                                 {formatTime(inst.startDateTime)}{inst.endDateTime ? ` – ${formatTime(inst.endDateTime)}` : ''}
                                                             </span>
@@ -235,11 +245,37 @@
                                                             {/if}
                                                         </div>
                                                     </div>
+                                                    {#if isCurrent}
+                                                        <Check size={14} class="text-amber-600 shrink-0 ml-1" />
+                                                    {/if}
+                                                </button>
+
+                                                <div class="flex items-center gap-1 shrink-0 ml-2">
+                                                    {#if !viewMode}
+                                                        <a
+                                                            href="/events/{inst.id}/view"
+                                                            class="p-1 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded transition-colors"
+                                                            title={m.view ? m.view() : 'View'}
+                                                            onclick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <Eye size={13} />
+                                                        </a>
+                                                    {/if}
+                                                    {#if ondelete}
+                                                        <button
+                                                            type="button"
+                                                            class="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                                                            title={m.delete()}
+                                                            onclick={(e) => {
+                                                                e.stopPropagation();
+                                                                ondelete?.(inst);
+                                                            }}
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    {/if}
                                                 </div>
-                                                {#if isCurrent}
-                                                    <Check size={14} class="text-amber-600 shrink-0 ml-2" />
-                                                {/if}
-                                            </DropdownMenu.Item>
+                                            </div>
                                         {/each}
                                     </div>
                                 </DropdownMenu.Group>
@@ -250,7 +286,7 @@
             </div>
         </div>
     {:else}
-        <!-- Inline variant for Recurrence Row -->
+        <!-- Inline variant for Recurrence Row / Listing Card -->
         <div class="flex items-center gap-2.5 flex-wrap">
             <span
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium {isMaster
@@ -272,12 +308,13 @@
                         variant="outline"
                         size="sm"
                         class="h-8 gap-1.5 text-xs font-medium bg-white dark:bg-gray-800"
+                        aria-label="{isMaster ? m.entire_series_master() : formatDate(event.startDateTime)}{instances.length > 0 ? ` - ${instances.length} ${m.instances()}` : ''}"
                     >
                         {#if isMaster}
                             <RefreshCw size={13} class="text-blue-600 shrink-0" />
                             <span>{m.entire_series_master()}</span>
                             {#if instances.length > 0}
-                                <span class="text-gray-500 font-normal">({instances.length})</span>
+                                <span class="text-gray-500 font-normal">({instances.length} {m.instances()})</span>
                             {/if}
                         {:else}
                             <Calendar size={13} class="text-amber-600 shrink-0" />
@@ -287,7 +324,7 @@
                     </Button>
                 </DropdownMenu.Trigger>
 
-                <DropdownMenu.Content align="end" class="w-72 sm:w-80 p-1.5">
+                <DropdownMenu.Content align="end" class="w-80 sm:w-96 p-1.5">
                     <DropdownMenu.Group>
                         <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
                             {m.switch_series_or_instance()}
@@ -323,22 +360,25 @@
                                 {m.all_instances_count({ count: instances.length })}
                             </DropdownMenu.GroupHeading>
 
-                            <div class="max-h-60 overflow-y-auto space-y-0.5 pr-1">
+                            <div class="max-h-64 overflow-y-auto space-y-0.5 pr-1">
                                 {#each instances as inst (inst.id)}
                                     {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && Boolean(inst.startDateTime) && Boolean(event.startDateTime) && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
-                                    <DropdownMenu.Item
-                                        onclick={() => handleSwitch(inst.id)}
-                                        class="flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
+                                    <div
+                                        class="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
                                             ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-medium'
                                             : ''}"
                                     >
-                                        <div class="flex items-center gap-2 min-w-0">
+                                        <button
+                                            type="button"
+                                            onclick={() => handleSwitch(inst.id)}
+                                            class="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer p-1 rounded focus:outline-none"
+                                        >
                                             <Calendar size={14} class="text-gray-400 shrink-0" />
-                                            <div class="min-w-0">
+                                            <div class="min-w-0 flex-1">
                                                 <div class="text-xs font-medium truncate">
                                                     {formatDate(inst.startDateTime)}
                                                 </div>
-                                                <div class="text-[11px] text-gray-500 flex items-center gap-1.5">
+                                                <div class="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
                                                     <span>
                                                         {formatTime(inst.startDateTime)}{inst.endDateTime ? ` – ${formatTime(inst.endDateTime)}` : ''}
                                                     </span>
@@ -349,11 +389,37 @@
                                                     {/if}
                                                 </div>
                                             </div>
+                                            {#if isCurrent}
+                                                <Check size={14} class="text-amber-600 shrink-0 ml-1" />
+                                            {/if}
+                                        </button>
+
+                                        <div class="flex items-center gap-1 shrink-0 ml-2">
+                                            {#if !viewMode}
+                                                <a
+                                                    href="/events/{inst.id}/view"
+                                                    class="p-1 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded transition-colors"
+                                                    title={m.view ? m.view() : 'View'}
+                                                    onclick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Eye size={13} />
+                                                </a>
+                                            {/if}
+                                            {#if ondelete}
+                                                <button
+                                                    type="button"
+                                                    class="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                                                    title={m.delete()}
+                                                    onclick={(e) => {
+                                                        e.stopPropagation();
+                                                        ondelete?.(inst);
+                                                    }}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            {/if}
                                         </div>
-                                        {#if isCurrent}
-                                            <Check size={14} class="text-amber-600 shrink-0 ml-2" />
-                                        {/if}
-                                    </DropdownMenu.Item>
+                                    </div>
                                 {/each}
                             </div>
                         </DropdownMenu.Group>

@@ -8,6 +8,7 @@ import { type Event, getCampaignTargetIds } from '@ac/validations';
 import { getEventRooms } from '$lib/utils/format-rooms';
 import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 import { getCache, setCache, cacheKeys } from '$lib/server/cache';
+import { getSeriesInstances } from '$lib/server/events/instances';
 
 /**
  * Query: Read an event by ID
@@ -243,20 +244,22 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	const masterId = result.recurringEventId || (!result.recurringEventId && (result.seriesId || (result.recurrence && (result.recurrence as string[]).length > 0)) ? result.id : null);
 
 	if (masterId) {
+		let masterRecord: any = null;
 		if (result.recurringEventId) {
-			const master = await db.query.event.findFirst({
+			masterRecord = await db.query.event.findFirst({
 				where: eq(event.id, result.recurringEventId),
 			});
-			if (master) {
+			if (masterRecord) {
 				seriesMaster = {
-					id: master.id,
-					summary: master.summary,
-					startDateTime: master.startDateTime?.toISOString() ?? null,
-					endDateTime: master.endDateTime?.toISOString() ?? null,
-					recurrence: master.recurrence,
+					id: masterRecord.id,
+					summary: masterRecord.summary,
+					startDateTime: masterRecord.startDateTime?.toISOString() ?? null,
+					endDateTime: masterRecord.endDateTime?.toISOString() ?? null,
+					recurrence: masterRecord.recurrence,
 				};
 			}
 		} else {
+			masterRecord = result;
 			seriesMaster = {
 				id: result.id,
 				summary: result.summary,
@@ -266,58 +269,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			};
 		}
 
-		const fetchedInstances = await db.query.event.findMany({
-			where: eq(event.recurringEventId, masterId),
-			orderBy: [asc(event.startDateTime)],
-		});
-		instances = fetchedInstances.map((inst: any) => ({
-			id: inst.id,
-			summary: inst.summary,
-			startDateTime: inst.startDateTime?.toISOString() ?? null,
-			endDateTime: inst.endDateTime?.toISOString() ?? null,
-			status: inst.status,
-		}));
-
-		if (seriesMaster?.recurrence && Array.isArray(seriesMaster.recurrence) && seriesMaster.recurrence[0] && seriesMaster.startDateTime) {
-			const { expandRecurrence } = await import('$lib/server/events/recurrence');
-			const masterRecord = result.recurringEventId
-				? await db.query.event.findFirst({ where: eq(event.id, result.recurringEventId), columns: { exdates: true, startTimeZone: true } })
-				: result;
-			const exdates = Array.isArray((masterRecord as any)?.exdates) ? ((masterRecord as any).exdates as string[]) : [];
-			const projected = expandRecurrence(
-				seriesMaster.recurrence[0],
-				new Date(seriesMaster.startDateTime),
-				seriesMaster.endDateTime ? new Date(seriesMaster.endDateTime) : null,
-				20,
-				true,
-				(masterRecord as any)?.startTimeZone || undefined,
-				exdates
-			);
-
-			const existingTimes = new Set(instances.map(i => i.startDateTime ? new Date(i.startDateTime).getTime() : 0));
-			for (const inst of fetchedInstances) {
-				if (inst.originalStartTime && typeof inst.originalStartTime === 'object' && 'dateTime' in (inst.originalStartTime as any)) {
-					const origTime = new Date((inst.originalStartTime as any).dateTime).getTime();
-					if (!isNaN(origTime)) {
-						existingTimes.add(origTime);
-					}
-				}
-			}
-
-			for (const p of projected) {
-				const pTime = p.date.getTime();
-				if (!existingTimes.has(pTime)) {
-					instances.push({
-						id: `${masterId}_inst_${p.date.toISOString()}`,
-						summary: seriesMaster.summary,
-						startDateTime: p.date.toISOString(),
-						endDateTime: p.end ? p.end.toISOString() : null,
-						status: 'published'
-					});
-					existingTimes.add(pTime);
-				}
-			}
-			instances.sort((a, b) => new Date(a.startDateTime || 0).getTime() - new Date(b.startDateTime || 0).getTime());
+		if (masterRecord) {
+			instances = await getSeriesInstances(masterRecord);
 		}
 	}
 

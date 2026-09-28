@@ -5,6 +5,7 @@
 	import { listLocations } from "../locations/list.remote";
 	import { deleteEvents } from "./delete.remote";
 	import SeriesMigrationDialog from "$lib/components/events/SeriesMigrationDialog.svelte";
+	import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
 	import * as m from "$lib/paraglide/messages.js";
 	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
 	import Button from "$lib/components/ui/button/button.svelte";
@@ -30,6 +31,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
+	import { SvelteSet } from "svelte/reactivity";
 	import { getPreference, setPreference } from "$lib/utils/idb";
 	import { formatRecurrenceText } from "$lib/utils/format-recurrence";
 	import { getEventRooms } from "$lib/utils/format-rooms";
@@ -183,10 +185,6 @@
 		onlySeries: onlySeries || undefined,
 	});
 
-	function toggleSeries(id: string) {
-		expandedSeries[id] = !expandedSeries[id];
-	}
-
 	async function handleDelete(event: any, isSeriesMaster: boolean) {
 		try {
 			if (isSeriesMaster) {
@@ -210,14 +208,23 @@
 		return rawEvents
 			.filter((e: any) => !e.recurringEventId)
 			.map((master: any) => {
-				const instances = rawEvents
-					.filter((e: any) => e.recurringEventId === master.id)
-					.sort((a: any, b: any) => {
-						const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-						const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
-						return dateA - dateB;
-					});
-				return { ...master, instances };
+				const existingInstances = master.instances || [];
+				const rawChildInstances = rawEvents
+					.filter((e: any) => e.recurringEventId === master.id);
+				const combined = [...existingInstances];
+				const existingIds = new SvelteSet(combined.map((i: any) => i.id));
+				for (const child of rawChildInstances) {
+					if (!existingIds.has(child.id)) {
+						combined.push(child);
+						existingIds.add(child.id);
+					}
+				}
+				combined.sort((a: any, b: any) => {
+					const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+					const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+					return dateA - dateB;
+				});
+				return { ...master, instances: combined };
 			});
 	}
 </script>
@@ -483,101 +490,22 @@
 								</div>
 							{/if}
 
-							{#if event.recurrence && event.recurrence.length > 0}
-								<div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
-									<RefreshCw class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
-									<span class="truncate">{formatRecurrenceText(event.recurrence)}</span>
-								</div>
-							{/if}
-
-							{#if event.instances && event.instances.length > 0}
-								<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-									<button
-										class="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-										onclick={() => toggleSeries(event.id)}
-									>
-										<CalendarDays class="w-4 h-4 mr-2 text-primary-500" />
-										{event.instances.length} {m.instances()}
-										{#if expandedSeries[event.id]}
-											<ChevronDown class="w-4 h-4 ml-1" />
-										{:else}
-											<ChevronRight class="w-4 h-4 ml-1" />
-										{/if}
-									</button>
-								</div>
-
-								<!-- Instances List -->
-								{#if expandedSeries[event.id]}
-									<div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg p-4 space-y-3">
-										<h4
-										class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3"
-									>
-										{m.instances()}
-									</h4>
-									{#each event.instances as instance (instance.id)}
-										<div
-											class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-700"
-										>
-											<div
-												class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 flex-wrap"
-											>
-												<Clock
-													class="w-3.5 h-3.5 mr-2 text-primary-400 shrink-0"
-												/>
-												<span
-													>{formatEventTime(
-														instance,
-													)}</span
-												>
-												{#if instance.status}
-													<span
-														class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 {getStatusBadgeClass(
-															instance.status,
-														)}"
-													>
-														<span
-															class="w-1.5 h-1.5 rounded-full {getStatusDotClass(
-																instance.status,
-															)}"
-														></span>
-														{formatEventStatus(
-															instance.status,
-														)}
-													</span>
-												{/if}
-											</div>
-											<div
-												class="flex gap-2 w-full sm:w-auto"
-											>
-												<Button
-													variant="outline"
-													size="sm"
-													href="/events/{instance.id}"
-													class="flex-1 sm:flex-none h-8 px-2 text-xs"
-												>
-													<Pencil
-														class="w-3.5 h-3.5 mr-1"
-													/>
-													{m.edit()}
-												</Button>
-												<button
-													class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-8 px-2 text-red-500"
-													onclick={() =>
-														handleDelete(
-															instance,
-															false,
-														)}
-												>
-													<Trash2
-														class="w-3.5 h-3.5 mr-1"
-													/>
-													{m.delete()}
-												</button>
-											</div>
+							{#if event.isSeries || (event.recurrence && event.recurrence.length > 0) || event.seriesId || (event.instances && event.instances.length > 0)}
+								<div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
+									{#if event.recurrence && event.recurrence.length > 0}
+										<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+											<RefreshCw class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
+											<span class="truncate">{formatRecurrenceText(event.recurrence)}</span>
 										</div>
-									{/each}
+									{:else}
+										<div></div>
+									{/if}
+									<SeriesModeSelector
+										event={event}
+										variant="inline"
+										ondelete={(inst) => handleDelete(inst, false)}
+									/>
 								</div>
-							{/if}
 							{/if}
 						</div>
 
@@ -595,7 +523,7 @@
 							</Button>
 							<button
 								class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-								onclick={() => handleDelete(event, event.instances && event.instances.length > 0)}
+								onclick={() => handleDelete(event, event.isSeries || (event.instances && event.instances.length > 0))}
 							>
 								<Trash2 class="w-4 h-4 mr-2" />
 								{m.delete()}

@@ -6,6 +6,7 @@ import { eventPaginationSchema as PaginationSchema, parseFilterValue, type Pagin
 import { getEventRooms } from '$lib/utils/format-rooms';
 import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
+import { populateSeriesInstances } from '$lib/server/events/instances';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
 	let hasAccess = false;
@@ -808,6 +809,8 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			resolvedContact,
 		};
 	});
+
+	await populateSeriesInstances(data);
 
 	if (sortField === 'startDateTime' || includeSeriesEntries) {
 		data.sort((a: any, b: any) => {
