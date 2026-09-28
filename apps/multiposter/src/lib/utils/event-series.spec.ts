@@ -106,6 +106,32 @@ describe("event-series helper", () => {
         expect(isNonSeriesEvent(announcement)).toBe(false);
     });
 
+    it("identifies virtual instance events as series events", () => {
+        const virtualInstance = {
+            id: "master-uuid-123_inst_2026-10-01T10:00:00.000Z",
+            summary: "Weekly Practice",
+            startDateTime: "2026-10-01T10:00:00.000Z",
+            endDateTime: "2026-10-01T11:00:00.000Z"
+        };
+
+        expect(isSeriesItem(virtualInstance)).toBe(true);
+        expect(isNonSeriesEvent(virtualInstance)).toBe(false);
+    });
+
+    it("identifies materialized exception events as series events", () => {
+        const exceptionEvent = {
+            id: "exception-uuid-456",
+            summary: "Weekly Practice (Rescheduled)",
+            startDateTime: "2026-10-01T14:00:00.000Z",
+            endDateTime: "2026-10-01T15:00:00.000Z",
+            isException: true,
+            originalStartTime: { dateTime: "2026-10-01T10:00:00.000Z" }
+        };
+
+        expect(isSeriesItem(exceptionEvent)).toBe(true);
+        expect(isNonSeriesEvent(exceptionEvent)).toBe(false);
+    });
+
     it("safely handles null or undefined values", () => {
         expect(isSeriesItem(null)).toBe(false);
         expect(isSeriesItem(undefined)).toBe(false);

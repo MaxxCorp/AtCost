@@ -39,38 +39,19 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	const instIso = isVirtual ? eventId.split('_inst_')[1] : null;
 
 	// 1. Fetch event with relations using Drizzle Relational Queries
-	let result = await db.query.event.findFirst({
-		where: isVirtual && instMasterId && instIso
-			? or(
-				eq(event.id, eventId),
-				and(
-					eq(event.recurringEventId, instMasterId),
-					sql`${event.originalStartTime}->>'dateTime' = ${instIso}`
-				)
-			)
-			: eq(event.id, eventId),
-		with: {
-			locations: { with: { location: true } },
-			contacts: {
-				with: {
-					contact: {
-						with: {
-							emails: true,
-							phones: true,
-							tags: { with: { tag: true } }
-						}
-					}
-				}
-			},
-			resources: { with: { resource: true } },
-			tags: { with: { tag: true } },
-			campaign: true,
-		},
-	});
+	let result: any = null;
 
-	if (!result && isVirtual && instMasterId && instIso) {
-		const master = await db.query.event.findFirst({
-			where: eq(event.id, instMasterId),
+	if (isVirtual && instMasterId && instIso) {
+		const decodedIso = decodeURIComponent(instIso);
+		// Check if a saved exception already exists for this instance
+		result = await db.query.event.findFirst({
+			where: and(
+				eq(event.recurringEventId, instMasterId),
+				or(
+					sql`${event.originalStartTime}->>'dateTime' = ${instIso}`,
+					sql`${event.originalStartTime}->>'dateTime' = ${decodedIso}`
+				)
+			),
 			with: {
 				locations: { with: { location: true } },
 				contacts: {
@@ -90,27 +71,85 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			},
 		});
 
-		if (master) {
-			const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
-			const targetDate = new Date(instIso);
-			const isExcluded = masterExdates.some(ex => {
-				const exTime = new Date(ex).getTime();
-				return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+		// If no exception exists yet, synthesize the virtual instance from the master
+		if (!result) {
+			const master = await db.query.event.findFirst({
+				where: eq(event.id, instMasterId),
+				with: {
+					locations: { with: { location: true } },
+					contacts: {
+						with: {
+							contact: {
+								with: {
+									emails: true,
+									phones: true,
+									tags: { with: { tag: true } }
+								}
+							}
+						}
+					},
+					resources: { with: { resource: true } },
+					tags: { with: { tag: true } },
+					campaign: true,
+				},
 			});
 
-			if (!isExcluded) {
-				const duration = (master.startDateTime && master.endDateTime)
-					? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
-					: 3600000;
-				result = {
-					...master,
-					id: eventId,
-					recurringEventId: master.id,
-					startDateTime: targetDate,
-					endDateTime: new Date(targetDate.getTime() + duration),
-				} as any;
+			if (master) {
+				const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+				const targetDate = new Date(decodedIso);
+				if (!isNaN(targetDate.getTime())) {
+					const isExcluded = masterExdates.some(ex => {
+						const exTime = new Date(ex).getTime();
+						return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+					});
+
+					if (!isExcluded) {
+						const duration = (master.startDateTime && master.endDateTime)
+							? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+							: 3600000;
+						result = {
+							...master,
+							id: eventId,
+							recurringEventId: master.id,
+							isException: false,
+							recurrence: null,
+							startDateTime: targetDate,
+							endDateTime: new Date(targetDate.getTime() + duration),
+						} as any;
+					}
+				}
 			}
 		}
+	} else {
+		// Non-virtual event ID. Ensure it matches UUID format before querying Postgres
+		const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
+		if (!isUuid) {
+			if (!isAuthorized) {
+				await setCache(cacheKeys.publicEvent(eventId), { isPrivate: false, data: null }, 30);
+			}
+			return null;
+		}
+
+		result = await db.query.event.findFirst({
+			where: eq(event.id, eventId),
+			with: {
+				locations: { with: { location: true } },
+				contacts: {
+					with: {
+						contact: {
+							with: {
+								emails: true,
+								phones: true,
+								tags: { with: { tag: true } }
+							}
+						}
+					}
+				},
+				resources: { with: { resource: true } },
+				tags: { with: { tag: true } },
+				campaign: true,
+			},
+		});
 	}
 
 	if (!result) {
@@ -256,6 +295,15 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			);
 
 			const existingTimes = new Set(instances.map(i => i.startDateTime ? new Date(i.startDateTime).getTime() : 0));
+			for (const inst of fetchedInstances) {
+				if (inst.originalStartTime && typeof inst.originalStartTime === 'object' && 'dateTime' in (inst.originalStartTime as any)) {
+					const origTime = new Date((inst.originalStartTime as any).dateTime).getTime();
+					if (!isNaN(origTime)) {
+						existingTimes.add(origTime);
+					}
+				}
+			}
+
 			for (const p of projected) {
 				const pTime = p.date.getTime();
 				if (!existingTimes.has(pTime)) {
@@ -273,8 +321,15 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		}
 	}
 
-	const publicLocations = result.locations.filter(l => l.location.isPublic).map(l => l.location);
-	const publicResources = result.resources.filter(r => r.resource).map(r => r.resource);
+	const publicLocations = result.locations.filter((l: any) => l.location.isPublic).map((l: any) => l.location);
+	const publicResources = result.resources.filter((r: any) => r.resource).map((r: any) => r.resource);
+
+	const toIsoSafe = (d: any) => {
+		if (!d) return null;
+		if (d instanceof Date) return d.toISOString();
+		const parsed = new Date(d);
+		return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+	};
 
 	// 4. Return Data
 	if (!isAuthorized) {
@@ -284,22 +339,22 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			summary: result.summary,
 			description: result.description,
 			status: result.status,
-			startDateTime: result.startDateTime?.toISOString() ?? null,
-			endDateTime: result.endDateTime?.toISOString() ?? null,
+			startDateTime: toIsoSafe(result.startDateTime),
+			endDateTime: toIsoSafe(result.endDateTime),
 			isAllDay: result.isAllDay,
 			isPublic: result.isPublic,
 			heroImage: result.heroImage,
 			ticketPrice: result.ticketPrice,
 			ticketPriceUnknown: result.ticketPriceUnknown,
 			categoryBerlinDotDe: result.categoryBerlinDotDe,
-			createdAt: result.createdAt.toISOString(),
-			updatedAt: result.updatedAt.toISOString(),
+			createdAt: toIsoSafe(result.createdAt) ?? new Date().toISOString(),
+			updatedAt: toIsoSafe(result.updatedAt) ?? new Date().toISOString(),
 			locations: publicLocations,
 			resources: publicResources,
 			rooms: getEventRooms({ locations: publicLocations, resources: publicResources }),
-			locationIds: publicLocations.map(l => l.id),
-			resourceIds: publicResources.map(r => r.id),
-			tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
+			locationIds: publicLocations.map((l: any) => l.id),
+			resourceIds: publicResources.map((r: any) => r.id),
+			tags: result.tags.map((t: any) => ({ id: t.tag.id, name: t.tag.name })),
 			resolvedContact,
 			contactIds: [],
 			syncIds: [],
@@ -311,25 +366,25 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		return publicSafeEvent;
 	}
 
-	const allLocations = result.locations.map(l => l.location);
-	const allResources = result.resources.map(r => r.resource).filter(Boolean);
+	const allLocations = result.locations.map((l: any) => l.location);
+	const allResources = result.resources.map((r: any) => r.resource).filter(Boolean);
 
 	// Full object
 	return {
 		...result,
 		iCalPath: result.id.includes('_inst_') ? `/api/events/${result.id}/event.ics` : (result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`),
 		qrCodePath: result.id.includes('_inst_') ? `/api/events/${result.id}/qr.png` : (result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`),
-		createdAt: result.createdAt.toISOString(),
-		updatedAt: result.updatedAt.toISOString(),
-		startDateTime: result.startDateTime?.toISOString() ?? null,
-		endDateTime: result.endDateTime?.toISOString() ?? null,
+		createdAt: toIsoSafe(result.createdAt) ?? new Date().toISOString(),
+		updatedAt: toIsoSafe(result.updatedAt) ?? new Date().toISOString(),
+		startDateTime: toIsoSafe(result.startDateTime),
+		endDateTime: toIsoSafe(result.endDateTime),
 		locations: allLocations,
 		resources: allResources,
 		rooms: getEventRooms({ locations: allLocations, resources: allResources }),
-		resourceIds: result.resources.map(r => r.resourceId),
-		contactIds: result.contacts.map(c => c.contactId),
-		locationIds: result.locations.map(l => l.locationId),
-		tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
+		resourceIds: result.resources.map((r: any) => r.resourceId),
+		contactIds: result.contacts.map((c: any) => c.contactId),
+		locationIds: result.locations.map((l: any) => l.locationId),
+		tags: result.tags.map((t: any) => ({ id: t.tag.id, name: t.tag.name })),
 		syncIds: getCampaignTargetIds(result.campaign?.content),
 		resolvedContact,
 		seriesMaster: seriesMaster ?? undefined,

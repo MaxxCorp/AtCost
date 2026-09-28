@@ -1,4 +1,4 @@
-import { db } from '@ac/db';
+import { db, sql } from '@ac/db';
 import ICAL from 'ical.js';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -8,42 +8,67 @@ export const GET: RequestHandler = async ({ params }) => {
     const eventId = params.id;
 
     const cachedResult = await cached(cacheKeys.eventIcs(eventId), 3600, async () => {
-        let data: any = await db.query.event.findFirst({
-            where: (table, { eq }) => eq(table.id, eventId),
-            with: {
-                locations: { with: { location: true } },
-                contacts: { with: { contact: true } }
-            }
-        });
+        let data: any = null;
+        const isVirtual = eventId.includes('_inst_');
 
-        if (!data && eventId.includes('_inst_')) {
+        if (isVirtual) {
             const [masterId, instIso] = eventId.split('_inst_');
-            const master = await db.query.event.findFirst({
-                where: (table, { eq }) => eq(table.id, masterId),
+            const decodedIso = decodeURIComponent(instIso);
+            data = await db.query.event.findFirst({
+                where: (table, { and, eq, or }) => and(
+                    eq(table.recurringEventId, masterId),
+                    or(
+                        sql`${table.originalStartTime}->>'dateTime' = ${instIso}`,
+                        sql`${table.originalStartTime}->>'dateTime' = ${decodedIso}`
+                    )
+                ),
                 with: {
                     locations: { with: { location: true } },
                     contacts: { with: { contact: true } }
                 }
             });
-            if (master && instIso) {
-                const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
-                const targetDate = new Date(instIso);
-                const isExcluded = masterExdates.some(ex => {
-                    const exTime = new Date(ex).getTime();
-                    return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+
+            if (!data) {
+                const master = await db.query.event.findFirst({
+                    where: (table, { eq }) => eq(table.id, masterId),
+                    with: {
+                        locations: { with: { location: true } },
+                        contacts: { with: { contact: true } }
+                    }
                 });
-                if (!isExcluded) {
-                    const duration = (master.startDateTime && master.endDateTime)
-                        ? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
-                        : 3600000;
-                    data = {
-                        ...master,
-                        id: eventId,
-                        startDateTime: targetDate,
-                        endDateTime: new Date(targetDate.getTime() + duration),
-                        recurrence: null
-                    };
+                if (master && instIso) {
+                    const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+                    const targetDate = new Date(decodedIso);
+                    if (!isNaN(targetDate.getTime())) {
+                        const isExcluded = masterExdates.some(ex => {
+                            const exTime = new Date(ex).getTime();
+                            return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+                        });
+                        if (!isExcluded) {
+                            const duration = (master.startDateTime && master.endDateTime)
+                                ? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+                                : 3600000;
+                            data = {
+                                ...master,
+                                id: eventId,
+                                startDateTime: targetDate,
+                                endDateTime: new Date(targetDate.getTime() + duration),
+                                recurrence: null
+                            };
+                        }
+                    }
                 }
+            }
+        } else {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
+            if (isUuid) {
+                data = await db.query.event.findFirst({
+                    where: (table, { eq }) => eq(table.id, eventId),
+                    with: {
+                        locations: { with: { location: true } },
+                        contacts: { with: { contact: true } }
+                    }
+                });
             }
         }
 

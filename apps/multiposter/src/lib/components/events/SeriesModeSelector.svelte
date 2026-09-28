@@ -211,7 +211,7 @@
 
                                     <div class="max-h-60 overflow-y-auto space-y-0.5 pr-1">
                                         {#each instances as inst (inst.id)}
-                                            {@const isCurrent = inst.id === event.id}
+                                            {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && Boolean(inst.startDateTime) && Boolean(event.startDateTime) && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
                                             <DropdownMenu.Item
                                                 onclick={() => handleSwitch(inst.id)}
                                                 class="flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
@@ -325,7 +325,7 @@
 
                             <div class="max-h-60 overflow-y-auto space-y-0.5 pr-1">
                                 {#each instances as inst (inst.id)}
-                                    {@const isCurrent = inst.id === event.id}
+                                    {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && Boolean(inst.startDateTime) && Boolean(event.startDateTime) && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
                                     <DropdownMenu.Item
                                         onclick={() => handleSwitch(inst.id)}
                                         class="flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent

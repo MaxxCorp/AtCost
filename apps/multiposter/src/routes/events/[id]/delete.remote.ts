@@ -28,23 +28,33 @@ export const deleteEvents = command(
 		const virtualIds = ids.filter(id => id.includes('_inst_'));
 		const realIds = ids.filter(id => !id.includes('_inst_'));
 
-		for (const vId of virtualIds) {
-			const [masterId, isoDate] = vId.split('_inst_');
-			if (masterId && isoDate) {
-				const [master] = await db.select().from(event).where(eq(event.id, masterId));
-				if (master) {
-					const existingExdates: string[] = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
-					if (!existingExdates.includes(isoDate)) {
-						await db.update(event).set({ exdates: [...existingExdates, isoDate] }).where(eq(event.id, masterId));
-					}
-					await invalidateEvent([masterId, vId]);
+		if (deleteSeries) {
+			for (const vId of virtualIds) {
+				const [masterId] = vId.split('_inst_');
+				if (masterId && !realIds.includes(masterId)) {
+					realIds.push(masterId);
 				}
 			}
-		}
+		} else {
+			for (const vId of virtualIds) {
+				const [masterId, isoDate] = vId.split('_inst_');
+				if (masterId && isoDate) {
+					const decodedIso = decodeURIComponent(isoDate);
+					const [master] = await db.select().from(event).where(eq(event.id, masterId));
+					if (master) {
+						const existingExdates: string[] = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+						if (!existingExdates.includes(decodedIso)) {
+							await db.update(event).set({ exdates: [...existingExdates, decodedIso] }).where(eq(event.id, masterId));
+						}
+						await invalidateEvent([masterId, vId]);
+					}
+				}
+			}
 
-		if (realIds.length === 0) {
-			await listEvents().refresh();
-			return { success: true };
+			if (realIds.length === 0) {
+				await listEvents().refresh();
+				return { success: true };
+			}
 		}
 
 		let idsToDelete = [...realIds];

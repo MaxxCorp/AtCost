@@ -11,8 +11,9 @@ import { generateEventAssets } from '$lib/server/events/assets';
 import { publishEventChange } from '$lib/server/realtime';
 import { syncService } from '$lib/server/sync/service';
 import { parseDateTime, toZoned } from '@internationalized/date';
-import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '$lib/server/cache';
+import { hasVirtualInstanceChanged } from '$lib/server/events/exceptions';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {
@@ -27,15 +28,23 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		const isVirtualInstance = data.id.includes('_inst_');
 		const [instMasterId, instIso] = isVirtualInstance ? data.id.split('_inst_') : [null, null];
 
-		let [oldEvent] = await db.select().from(event).where(eq(event.id, data.id));
-		if (!oldEvent && isVirtualInstance && instMasterId) {
+		let oldEvent: any = null;
+		if (isVirtualInstance && instMasterId) {
 			const [masterEvent] = await db.select().from(event).where(eq(event.id, instMasterId));
 			if (!masterEvent) {
-				error(404, 'Event not found');
+				error(404, 'Master event not found');
 			}
 			oldEvent = masterEvent;
-		} else if (!oldEvent) {
-			error(404, 'Event not found');
+		} else {
+			const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id);
+			if (!isUuid) {
+				error(400, 'Invalid event ID');
+			}
+			const [found] = await db.select().from(event).where(eq(event.id, data.id));
+			if (!found) {
+				error(404, 'Event not found');
+			}
+			oldEvent = found;
 		}
 
 		// Handle reminders
@@ -142,7 +151,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		let effectiveTargetId = data.id;
 
-		const updatedEvent = await db.transaction(async (tx) => {
+		const txResult = await db.transaction(async (tx) => {
 			let targetId = data.id;
 			let isNewException = false;
 
@@ -150,12 +159,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				if (data.seriesMode === 'series') {
 					targetId = instMasterId;
 				} else {
+					const decodedIso = decodeURIComponent(instIso);
 					const [existingException] = await tx.select().from(event).where(
-						or(
-							eq(event.id, data.id),
-							and(
-								eq(event.recurringEventId, instMasterId),
-								sql`${event.originalStartTime}->>'dateTime' = ${instIso}`
+						and(
+							eq(event.recurringEventId, instMasterId),
+							or(
+								sql`${event.originalStartTime}->>'dateTime' = ${instIso}`,
+								sql`${event.originalStartTime}->>'dateTime' = ${decodedIso}`
 							)
 						)
 					);
@@ -168,12 +178,95 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							error(404, 'Master event not found');
 						}
 
+						// Protection against unnecessary exception creation:
+						// If the user opened the instance in edit mode and saved without changing anything,
+						// do NOT create a new exception row in the database.
+						const targetStart = new Date(decodedIso);
+						const duration = (master.startDateTime && master.endDateTime)
+							? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+							: 3600000;
+						const targetEnd = new Date(targetStart.getTime() + duration);
+
+						let masterLocationIds: string[] | undefined;
+						if (locationIds !== undefined) {
+							const masterLocs = await tx.select({ id: eventLocation.locationId }).from(eventLocation).where(eq(eventLocation.eventId, instMasterId));
+							masterLocationIds = masterLocs.map(l => l.id);
+						}
+
+						let masterResourceIds: string[] | undefined;
+						if (resourceIds !== undefined) {
+							const masterRes = await tx.select({ id: eventResource.resourceId }).from(eventResource).where(eq(eventResource.eventId, instMasterId));
+							masterResourceIds = masterRes.map(r => r.id);
+						}
+
+						let masterContactIds: string[] | undefined;
+						if (contactIds !== undefined) {
+							const masterCtc = await tx.select({ id: eventContact.contactId }).from(eventContact).where(eq(eventContact.eventId, instMasterId));
+							masterContactIds = masterCtc.map(c => c.id);
+						}
+
+						let masterTags: string[] | undefined;
+						if (tagNames !== undefined) {
+							const masterTagsData = await tx.select({ name: tag.name }).from(eventTag).innerJoin(tag, eq(eventTag.tagId, tag.id)).where(eq(eventTag.eventId, instMasterId));
+							masterTags = masterTagsData.map(t => t.name);
+						}
+
+						let masterSyncIds: string[] | undefined;
+						let submittedSyncIds: string[] | undefined;
+						if (data.syncIds !== undefined) {
+							const [camp] = master.campaignId ? await tx.select().from(campaign).where(eq(campaign.id, master.campaignId)) : [null];
+							masterSyncIds = camp ? getCampaignTargetIds(camp.content) : [];
+							submittedSyncIds = Array.isArray(data.syncIds) ? data.syncIds : (typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : []);
+						}
+
+						const hasChanges = hasVirtualInstanceChanged({
+							master,
+							submitted: {
+								summary: data.summary,
+								description: data.description,
+								internalNotes: data.internalNotes,
+								status: data.status,
+								categoryBerlinDotDe: data.categoryBerlinDotDe,
+								heroImage: data.heroImage,
+								ticketPrice: updateData.ticketPrice,
+								ticketPriceUnknown: updateData.ticketPriceUnknown,
+								isAllDay: updateData.isAllDay,
+								isPublic: updateData.isPublic,
+								guestsCanInviteOthers: updateData.guestsCanInviteOthers,
+								guestsCanModify: updateData.guestsCanModify,
+								guestsCanSeeOtherGuests: updateData.guestsCanSeeOtherGuests,
+								participantsCount: data.participantsCount,
+								reminders
+							},
+							targetStart,
+							targetEnd,
+							submittedStart: updateData.startDateTime,
+							submittedEnd: updateData.endDateTime,
+							associations: {
+								masterLocationIds,
+								submittedLocationIds: locationIds,
+								masterResourceIds,
+								submittedResourceIds: resourceIds,
+								masterContactIds,
+								submittedContactIds: contactIds,
+								masterTags,
+								submittedTags: tagNames,
+								masterSyncIds,
+								submittedSyncIds
+							}
+						});
+
+						if (!hasChanges) {
+							console.log(`[Update Remote] No changes detected for virtual instance ${data.id}. Skipping exception creation.`);
+							return { isUnchanged: true };
+						}
+
 						const { id: _, createdAt: _c, updatedAt: _u, ...masterRest } = master;
 						const [createdException] = await tx.insert(event).values({
 							...masterRest,
-							id: data.id,
 							recurringEventId: instMasterId,
-							originalStartTime: { dateTime: instIso },
+							originalStartTime: { dateTime: decodedIso },
+							isException: true,
 							recurrence: null,
 							seriesId: null,
 							...updateData,
@@ -188,20 +281,20 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 			effectiveTargetId = targetId;
 
-			let updatedEvent: any;
+			let targetRecord: any;
 			if (isNewException) {
 				const [fetched] = await tx.select().from(event).where(eq(event.id, targetId));
-				updatedEvent = fetched;
+				targetRecord = fetched;
 			} else {
 				const [updated] = await tx
 					.update(event)
 					.set(updateData)
 					.where(eq(event.id, targetId))
 					.returning();
-				updatedEvent = updated;
+				targetRecord = updated;
 			}
 
-			if (!updatedEvent) {
+			if (!targetRecord) {
 				error(404, 'Event not found');
 			}
 
@@ -210,8 +303,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			if (data.syncIds !== undefined) {
 				const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
 				console.log(`[Update Remote] Parsed syncIds:`, syncIds);
-				if (updatedEvent.campaignId) {
-					const [camp] = await tx.select().from(campaign).where(eq(campaign.id, updatedEvent.campaignId));
+				if (targetRecord.campaignId) {
+					const [camp] = await tx.select().from(campaign).where(eq(campaign.id, targetRecord.campaignId));
 					const content: CampaignContent = (camp?.content as any)?.version === 1
 						? (camp?.content as any)
 						: createDefaultCampaignContent(syncIds);
@@ -222,41 +315,41 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						content.targets[id] = { enabled: true };
 					}
 					if (!content.items) content.items = {};
-					if (!content.items[updatedEvent.id]) {
-						content.items[updatedEvent.id] = { entityType: 'event', syncs: {} };
+					if (!content.items[targetRecord.id]) {
+						content.items[targetRecord.id] = { entityType: 'event', syncs: {} };
 					}
 
 					await tx.update(campaign).set({
 						content,
 						updatedAt: new Date()
-					}).where(eq(campaign.id, updatedEvent.campaignId));
+					}).where(eq(campaign.id, targetRecord.campaignId));
 				} else {
 					const newContent = createDefaultCampaignContent(syncIds);
-					newContent.items[updatedEvent.id] = { entityType: 'event', syncs: {} };
+					newContent.items[targetRecord.id] = { entityType: 'event', syncs: {} };
 					const [newCampaign] = await tx.insert(campaign).values({
 						userId: user.id,
-						name: `Campaign for ${updatedEvent.summary}`,
+						name: `Campaign for ${targetRecord.summary}`,
 						content: newContent
 					}).returning();
 					if (newCampaign) {
-						await tx.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, updatedEvent.id));
-						updatedEvent.campaignId = newCampaign.id;
+						await tx.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, targetRecord.id));
+						targetRecord.campaignId = newCampaign.id;
 					}
 				}
 
 				// If master event, ensure existing recurring instances also have campaignId set
-				if (updatedEvent.campaignId && !updatedEvent.recurringEventId) {
+				if (targetRecord.campaignId && !targetRecord.recurringEventId) {
 					const instanceCondition = or(
-						eq(event.recurringEventId, updatedEvent.id),
-						updatedEvent.seriesId ? and(eq(event.seriesId, updatedEvent.seriesId), ne(event.id, updatedEvent.id)) : undefined
+						eq(event.recurringEventId, targetRecord.id),
+						targetRecord.seriesId ? and(eq(event.seriesId, targetRecord.seriesId), ne(event.id, targetRecord.id)) : undefined
 					);
-					await tx.update(event).set({ campaignId: updatedEvent.campaignId }).where(instanceCondition);
+					await tx.update(event).set({ campaignId: targetRecord.campaignId }).where(instanceCondition);
 				}
 			}
 
 			// Add Series tag if recurring
 			if (tagNames !== undefined) {
-				if (updatedEvent.seriesId || (updatedEvent.recurrence && (updatedEvent.recurrence as string[]).length > 0) || updatedEvent.recurringEventId) {
+				if (targetRecord.seriesId || (targetRecord.recurrence && (targetRecord.recurrence as string[]).length > 0) || targetRecord.recurringEventId) {
 					if (!tagNames.includes('Series')) {
 						tagNames.push('Series');
 					}
@@ -318,15 +411,22 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 			// Clean up legacy series record if recurrence was explicitly cleared
 			if (data.recurrence === null || (Array.isArray(data.recurrence) && data.recurrence.length === 0)) {
-				if (updatedEvent.seriesId) {
-					await tx.delete(recurringSeries).where(eq(recurringSeries.id, updatedEvent.seriesId));
+				if (targetRecord.seriesId) {
+					await tx.delete(recurringSeries).where(eq(recurringSeries.id, targetRecord.seriesId));
 					await tx.update(event).set({ seriesId: null }).where(eq(event.id, targetId));
-					updatedEvent.seriesId = null;
+					targetRecord.seriesId = null;
 				}
 			}
 
-			return updatedEvent;
+			return targetRecord;
 		});
+
+		if ((txResult as any)?.isUnchanged) {
+			console.log(`[Update Remote] Virtual instance ${data.id} had no changes. Skipping asset/sync/exception creation.`);
+			return { success: true };
+		}
+
+		const updatedEvent = txResult;
 
 		// Determine origin for asset generation
 		let origin: string | undefined;

@@ -1,5 +1,4 @@
-import { db } from '@ac/db';
-import { eq } from '@ac/db';
+import { db, eq, sql } from '@ac/db';
 import QRCode from 'qrcode';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -11,25 +10,46 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
     try {
         const qrBytes = await cachedBinary(cacheKeys.eventQr(eventId), 86400, async () => {
-            let data = await db.query.event.findFirst({
-                where: (table, { eq }) => eq(table.id, eventId),
-            });
+            let data: any = null;
+            const isVirtual = eventId.includes('_inst_');
 
-            if (!data && eventId.includes('_inst_')) {
+            if (isVirtual) {
                 const [masterId, instIso] = eventId.split('_inst_');
+                const decodedIso = decodeURIComponent(instIso);
                 data = await db.query.event.findFirst({
-                    where: (table, { eq }) => eq(table.id, masterId),
+                    where: (table, { and, eq, or }) => and(
+                        eq(table.recurringEventId, masterId),
+                        or(
+                            sql`${table.originalStartTime}->>'dateTime' = ${instIso}`,
+                            sql`${table.originalStartTime}->>'dateTime' = ${decodedIso}`
+                        )
+                    ),
                 });
-                if (data && instIso) {
-                    const masterExdates = Array.isArray(data.exdates) ? (data.exdates as string[]) : [];
-                    const targetDate = new Date(instIso);
-                    const isExcluded = masterExdates.some(ex => {
-                        const exTime = new Date(ex).getTime();
-                        return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+
+                if (!data) {
+                    data = await db.query.event.findFirst({
+                        where: (table, { eq }) => eq(table.id, masterId),
                     });
-                    if (isExcluded) {
-                        data = undefined;
+                    if (data && instIso) {
+                        const masterExdates = Array.isArray(data.exdates) ? (data.exdates as string[]) : [];
+                        const targetDate = new Date(decodedIso);
+                        if (!isNaN(targetDate.getTime())) {
+                            const isExcluded = masterExdates.some(ex => {
+                                const exTime = new Date(ex).getTime();
+                                return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+                            });
+                            if (isExcluded) {
+                                data = undefined;
+                            }
+                        }
                     }
+                }
+            } else {
+                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
+                if (isUuid) {
+                    data = await db.query.event.findFirst({
+                        where: (table, { eq }) => eq(table.id, eventId),
+                    });
                 }
             }
 

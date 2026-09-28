@@ -44,8 +44,8 @@
     import * as Dialog from "$lib/components/ui/dialog";
     import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
 
-    const eventId = page.params.id || "";
-    let dataPromise = $state(readEvent(eventId));
+    const eventId = $derived(page.params.id || "");
+    const dataPromise = $derived(readEvent(eventId));
 
     const session = authClient.useSession();
     // Check if the user is authorized to edit
@@ -170,6 +170,7 @@
             <LoadingSection message={m.loading_event_data()} />
         {:then event}
             {#if event}
+                {#key event.id}
                 {@const hasDescription = !!(event.description && event.description.trim().length > 0)}
                 {@const eventInstances = event.instances || []}
                 {@const hasContact = !!event.resolvedContact}
@@ -229,7 +230,7 @@
                                     </span>
                                 {/if}
                                 {#if event.tags && event.tags.length > 0}
-                                    {#each event.tags as tag}
+                                    {#each event.tags as tag (tag.id || tag.name)}
                                         <span
                                             class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100 flex items-center gap-1"
                                         >
@@ -405,7 +406,7 @@
 
                                     <!-- Locations -->
                                     {#if event.locations && event.locations.length > 0}
-                                        {#each event.locations as loc}
+                                        {#each event.locations as loc (loc.id || loc.name)}
                                             <li
                                                 class="flex items-start gap-3 text-gray-700"
                                             >
@@ -621,6 +622,7 @@
                         {/if}
                     </div>
                 </div>
+                {/key}
             {:else}
                 <ErrorSection
                     headline={m.event_not_found()}

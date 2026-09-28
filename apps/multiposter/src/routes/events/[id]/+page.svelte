@@ -135,7 +135,7 @@
                                         onclick={async () => {
                                             if (!confirm(m.delete_series_confirm())) return;
                                             try {
-                                                await deleteEventAction({ ids: [event.id] });
+                                                await deleteEventAction({ ids: [event.id], deleteSeries: true });
                                                 toast.success(m.series_deleted());
                                                 goto("/events");
                                             } catch (err: any) {
@@ -201,13 +201,15 @@
                         })}
                         class="space-y-6"
                     >
-                        <EventForm
-                            remoteFunction={eventRf}
-                            validationSchema={updateEventSchema}
-                            isUpdating={true}
-                            initialData={event}
-                            {collab}
-                        />
+                        {#key event.id}
+                            <EventForm
+                                remoteFunction={eventRf}
+                                validationSchema={updateEventSchema}
+                                isUpdating={true}
+                                initialData={event}
+                                {collab}
+                            />
+                        {/key}
 
                         <div class="flex gap-3 pt-4">
                             <AsyncButton
@@ -224,6 +226,13 @@
                         </div>
                     </form>
                 </div>
+                {:else}
+                    <ErrorSection
+                        headline={m.event_not_found()}
+                        message={m.event_not_found_message()}
+                        href="/events"
+                        button={m.back_to_events()}
+                    />
                 {/if}
             {/await}
         </div>
