@@ -100,6 +100,11 @@ export const deleteEvents = command(
 				if (e.iCalPath?.startsWith('http')) await storage.delete(e.iCalPath).catch(() => {});
 			}
 
+			// Trigger sync deletion FIRST (before local events and relations like rooms/resources are gone)
+			if (eventIdsToDelete.length > 0) {
+				await syncService.deleteEventMappings(user.id, eventIdsToDelete).catch(console.error);
+			}
+
 			// Delete from Database
 			if (eventIdsToDelete.length > 0) {
 				await db.delete(event).where(inArray(event.id, eventIdsToDelete));
@@ -139,6 +144,11 @@ export const deleteEvents = command(
 				if (e.iCalPath?.startsWith('http')) await storage.delete(e.iCalPath).catch(() => {});
 			}
 
+			// Trigger sync deletion FIRST (before local events and relations like rooms/resources are gone)
+			if (eventIdsToDelete.length > 0) {
+				await syncService.deleteEventMappings(user.id, eventIdsToDelete).catch(console.error);
+			}
+
 			await db.delete(event).where(inArray(event.id, realIds));
 
 			for (const mId of affectedMasterIds) {
@@ -146,9 +156,8 @@ export const deleteEvents = command(
 			}
 		}
 
-		// Perform external cleanup for all deleted event IDs
+		// Perform notification and cache invalidation for all deleted event IDs
 		if (eventIdsToDelete.length > 0) {
-			await syncService.deleteEventMappings(user.id, eventIdsToDelete).catch(console.error);
 			await publishEventChange('delete', eventIdsToDelete).catch(console.error);
 			await invalidateEvent(eventIdsToDelete);
 		}

@@ -202,4 +202,51 @@ describe('MicrosoftCalendarProvider', () => {
 			expect(result.etag).toBe('etag-confirmed');
 		});
 	});
+
+	describe('deleteEvent', () => {
+		it('should attempt POST /cancel to free up room mailboxes and then DELETE the event', async () => {
+			const makeRequestMock = vi.fn().mockResolvedValue({});
+			(provider as any).makeRequest = makeRequestMock;
+
+			await provider.deleteEvent('ext-meeting-room');
+
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				1,
+				'https://graph.microsoft.com/v1.0/me/calendar/events/ext-meeting-room/cancel',
+				expect.objectContaining({ method: 'POST' })
+			);
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				2,
+				'https://graph.microsoft.com/v1.0/me/calendar/events/ext-meeting-room',
+				expect.objectContaining({ method: 'DELETE' })
+			);
+		});
+
+		it('should still execute DELETE if POST /cancel fails (e.g. non-meeting event)', async () => {
+			const makeRequestMock = vi
+				.fn()
+				.mockRejectedValueOnce(new Error('Cannot cancel non-meeting'))
+				.mockResolvedValueOnce({});
+			(provider as any).makeRequest = makeRequestMock;
+
+			await provider.deleteEvent('ext-non-meeting');
+
+			expect(makeRequestMock).toHaveBeenCalledTimes(2);
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				2,
+				'https://graph.microsoft.com/v1.0/me/calendar/events/ext-non-meeting',
+				expect.objectContaining({ method: 'DELETE' })
+			);
+		});
+
+		it('should not throw if DELETE returns 404/ResourceNotFound (already deleted)', async () => {
+			const makeRequestMock = vi
+				.fn()
+				.mockRejectedValueOnce(new Error('ResourceNotFound 404'))
+				.mockRejectedValueOnce(new Error('ResourceNotFound: 404'));
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.deleteEvent('ext-already-deleted')).resolves.toBeUndefined();
+		});
+	});
 });

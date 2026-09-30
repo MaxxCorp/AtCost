@@ -1,4 +1,5 @@
-import { db, event, eventResource, eventContact, resource, account, eq, and, ne, inArray, lte, gte } from '@ac/db';
+import { db, event, eventResource, eventContact, resource, account, recurringSeries, eq, and, ne, or, inArray, lte, gte, isNotNull } from '@ac/db';
+import { expandRecurrenceRange } from '$lib/server/events/recurrence';
 import { env } from '$env/dynamic/private';
 
 export interface AvailabilityResult {
@@ -221,6 +222,66 @@ export class AvailabilityService {
                     eventTitle: c.eventTitle || undefined
                 };
             }
+
+            // Check recurring events linked to resources for occurrence collisions within the requested range
+            const unflaggedResourceIds = resourceIds.filter(id => !resourceAvailability[id] || resourceAvailability[id].available !== false);
+            if (unflaggedResourceIds.length > 0) {
+                const recurringEvents = await db
+                    .select({
+                        resourceId: eventResource.resourceId,
+                        eventId: event.id,
+                        eventTitle: event.summary,
+                        startDateTime: event.startDateTime,
+                        endDateTime: event.endDateTime,
+                        recurrence: event.recurrence,
+                        seriesId: event.seriesId,
+                        exdates: event.exdates,
+                        startTimeZone: event.startTimeZone
+                    })
+                    .from(eventResource)
+                    .innerJoin(event, eq(eventResource.eventId, event.id))
+                    .where(and(
+                        inArray(eventResource.resourceId, unflaggedResourceIds),
+                        ne(event.status, 'cancelled'),
+                        params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                        or(isNotNull(event.recurrence), isNotNull(event.seriesId))
+                    ));
+
+                for (const r of recurringEvents) {
+                    if (resourceAvailability[r.resourceId] && !resourceAvailability[r.resourceId].available) continue;
+                    if (!r.startDateTime) continue;
+
+                    let rrule: string | null = null;
+                    if (Array.isArray(r.recurrence) && r.recurrence[0]) {
+                        rrule = r.recurrence[0];
+                    } else if (r.seriesId) {
+                        const [seriesRow] = await db.select({ rrule: recurringSeries.rrule }).from(recurringSeries).where(eq(recurringSeries.id, r.seriesId));
+                        if (seriesRow?.rrule) rrule = seriesRow.rrule;
+                    }
+
+                    if (rrule) {
+                        const exdates = Array.isArray(r.exdates) ? (r.exdates as string[]) : [];
+                        const occurrences = expandRecurrenceRange(
+                            rrule,
+                            new Date(r.startDateTime),
+                            r.endDateTime ? new Date(r.endDateTime) : null,
+                            params.startDateTime,
+                            params.endDateTime,
+                            r.startTimeZone,
+                            exdates
+                        );
+
+                        if (occurrences.length > 0) {
+                            resourceAvailability[r.resourceId] = {
+                                available: false,
+                                reason: `Booked in "${r.eventTitle || 'another event'}"`,
+                                eventId: r.eventId,
+                                eventTitle: r.eventTitle || undefined
+                            };
+                        }
+                    }
+                }
+            }
         }
 
         // 2. Local DB Collision Check for Contacts
@@ -248,6 +309,66 @@ export class AvailabilityService {
                     eventId: c.eventId,
                     eventTitle: c.eventTitle || undefined
                 };
+            }
+
+            // Check recurring events for contacts
+            const unflaggedContactIds = contactIds.filter(id => !contactAvailability[id] || contactAvailability[id].available !== false);
+            if (unflaggedContactIds.length > 0) {
+                const recurringContactEvents = await db
+                    .select({
+                        contactId: eventContact.contactId,
+                        eventId: event.id,
+                        eventTitle: event.summary,
+                        startDateTime: event.startDateTime,
+                        endDateTime: event.endDateTime,
+                        recurrence: event.recurrence,
+                        seriesId: event.seriesId,
+                        exdates: event.exdates,
+                        startTimeZone: event.startTimeZone
+                    })
+                    .from(eventContact)
+                    .innerJoin(event, eq(eventContact.eventId, event.id))
+                    .where(and(
+                        inArray(eventContact.contactId, unflaggedContactIds),
+                        ne(event.status, 'cancelled'),
+                        params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                        or(isNotNull(event.recurrence), isNotNull(event.seriesId))
+                    ));
+
+                for (const r of recurringContactEvents) {
+                    if (contactAvailability[r.contactId] && !contactAvailability[r.contactId].available) continue;
+                    if (!r.startDateTime) continue;
+
+                    let rrule: string | null = null;
+                    if (Array.isArray(r.recurrence) && r.recurrence[0]) {
+                        rrule = r.recurrence[0];
+                    } else if (r.seriesId) {
+                        const [seriesRow] = await db.select({ rrule: recurringSeries.rrule }).from(recurringSeries).where(eq(recurringSeries.id, r.seriesId));
+                        if (seriesRow?.rrule) rrule = seriesRow.rrule;
+                    }
+
+                    if (rrule) {
+                        const exdates = Array.isArray(r.exdates) ? (r.exdates as string[]) : [];
+                        const occurrences = expandRecurrenceRange(
+                            rrule,
+                            new Date(r.startDateTime),
+                            r.endDateTime ? new Date(r.endDateTime) : null,
+                            params.startDateTime,
+                            params.endDateTime,
+                            r.startTimeZone,
+                            exdates
+                        );
+
+                        if (occurrences.length > 0) {
+                            contactAvailability[r.contactId] = {
+                                available: false,
+                                reason: `Assigned to "${r.eventTitle || 'another event'}"`,
+                                eventId: r.eventId,
+                                eventTitle: r.eventTitle || undefined
+                            };
+                        }
+                    }
+                }
             }
         }
 

@@ -69,4 +69,83 @@ describe('AvailabilityService', () => {
         expect(result.resourceAvailability['res-free'].available).toBe(true);
         expect(result.resourceAvailability['res-free'].eventId).toBeUndefined();
     });
+
+    it('should detect collision from recurring event occurrence for a room resource', async () => {
+        // Query 1: non-recurring collisions (empty)
+        // Query 2: recurring events (has 1 weekly recurring event starting in the past)
+        const mockRecurringEvent = {
+            resourceId: 'room-1',
+            eventId: 'series-event-1',
+            eventTitle: 'Weekly Team Standup',
+            startDateTime: new Date('2026-09-01T10:00:00Z'),
+            endDateTime: new Date('2026-09-01T11:00:00Z'),
+            recurrence: ['RRULE:FREQ=WEEKLY;COUNT=10'],
+            seriesId: null,
+            exdates: [],
+            startTimeZone: 'UTC'
+        };
+
+        const mockWhere1 = vi.fn().mockResolvedValue([]);
+        const mockInnerJoin1 = vi.fn().mockReturnValue({ where: mockWhere1 });
+        const mockFrom1 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin1 });
+
+        const mockWhere2 = vi.fn().mockResolvedValue([mockRecurringEvent]);
+        const mockInnerJoin2 = vi.fn().mockReturnValue({ where: mockWhere2 });
+        const mockFrom2 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin2 });
+
+        (db.select as any)
+            .mockReturnValueOnce({ from: mockFrom1 })
+            .mockReturnValueOnce({ from: mockFrom2 });
+
+        // Query occurrence for next Tuesday: 2026-09-08
+        const result = await service.checkAvailability({
+            startDateTime: new Date('2026-09-08T10:00:00Z'),
+            endDateTime: new Date('2026-09-08T11:00:00Z'),
+            resources: [{ id: 'room-1', allocationCalendars: [] }],
+            contacts: []
+        });
+
+        expect(result.resourceAvailability['room-1']).toBeDefined();
+        expect(result.resourceAvailability['room-1'].available).toBe(false);
+        expect(result.resourceAvailability['room-1'].eventId).toBe('series-event-1');
+        expect(result.resourceAvailability['room-1'].eventTitle).toBe('Weekly Team Standup');
+    });
+
+    it('should free up room for occurrence when occurrence date is in exdates', async () => {
+        // Occurrence for 2026-09-08 was deleted (placed in exdates)
+        const mockRecurringEvent = {
+            resourceId: 'room-1',
+            eventId: 'series-event-1',
+            eventTitle: 'Weekly Team Standup',
+            startDateTime: new Date('2026-09-01T10:00:00Z'),
+            endDateTime: new Date('2026-09-01T11:00:00Z'),
+            recurrence: ['RRULE:FREQ=WEEKLY;COUNT=10'],
+            seriesId: null,
+            exdates: ['2026-09-08T10:00:00.000Z'],
+            startTimeZone: 'UTC'
+        };
+
+        const mockWhere1 = vi.fn().mockResolvedValue([]);
+        const mockInnerJoin1 = vi.fn().mockReturnValue({ where: mockWhere1 });
+        const mockFrom1 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin1 });
+
+        const mockWhere2 = vi.fn().mockResolvedValue([mockRecurringEvent]);
+        const mockInnerJoin2 = vi.fn().mockReturnValue({ where: mockWhere2 });
+        const mockFrom2 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin2 });
+
+        (db.select as any)
+            .mockReturnValueOnce({ from: mockFrom1 })
+            .mockReturnValueOnce({ from: mockFrom2 });
+
+        const result = await service.checkAvailability({
+            startDateTime: new Date('2026-09-08T10:00:00Z'),
+            endDateTime: new Date('2026-09-08T11:00:00Z'),
+            resources: [{ id: 'room-1', allocationCalendars: [] }],
+            contacts: []
+        });
+
+        expect(result.resourceAvailability['room-1']).toBeDefined();
+        // Since 2026-09-08 is in exdates, it was deleted, so the room is free!
+        expect(result.resourceAvailability['room-1'].available).toBe(true);
+    });
 });

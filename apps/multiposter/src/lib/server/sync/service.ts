@@ -2515,16 +2515,24 @@ export class SyncService {
 				.from(syncConfigTable);
 
 			const configMap = new Map(configs.map(c => [c.id, this.rowToConfig(c)]));
+			const deletedExternalKeys = new Set<string>();
 
 			// 1. Find campaigns containing these events or their virtual instances
+			const idList = sql.join(eventIds.map(id => sql`${id}`), sql`, `);
 			const campaignsToUpdate = await db
 				.select()
 				.from(campaignTable)
 				.where(
-					sql`EXISTS (
-						SELECT 1 FROM jsonb_object_keys(COALESCE(${campaignTable.content}->'items', '{}'::jsonb)) AS k
-						WHERE k = ANY(${eventIds}::text[]) OR split_part(k, '_inst_', 1) = ANY(${eventIds}::text[])
-					)`
+					or(
+						sql`EXISTS (
+							SELECT 1 FROM jsonb_object_keys(COALESCE(${campaignTable.content}->'items', '{}'::jsonb)) AS k
+							WHERE k IN (${idList}) OR split_part(k, '_inst_', 1) IN (${idList})
+						)`,
+						sql`${campaignTable.id} IN (
+							SELECT ${eventTable.campaignId} FROM ${eventTable}
+							WHERE ${eventTable.id} IN (${idList}) AND ${eventTable.campaignId} IS NOT NULL
+						)`
+					)
 				);
 
 			for (const camp of campaignsToUpdate) {
@@ -2541,14 +2549,18 @@ export class SyncService {
 
 					for (const [configId, syncState] of Object.entries(item.syncs)) {
 						if (syncState.externalId) {
+							const dedupeKey = `${configId}:${syncState.externalId}`;
 							const config = configMap.get(configId);
 							if (config && (config.direction === 'push' || config.direction === 'bidirectional')) {
-								try {
-									const provider = await this.getProviderInstance(config);
-									console.log(`[SyncService] Deleting event ${syncState.externalId} from provider ${config.providerType}`);
-									await provider.deleteEvent(syncState.externalId);
-								} catch (delErr) {
-									console.warn(`[SyncService] Delete error on provider for ${syncState.externalId}:`, delErr);
+								if (!deletedExternalKeys.has(dedupeKey)) {
+									deletedExternalKeys.add(dedupeKey);
+									try {
+										const provider = await this.getProviderInstance(config);
+										console.log(`[SyncService] Deleting event ${syncState.externalId} from provider ${config.providerType}`);
+										await provider.deleteEvent(syncState.externalId);
+									} catch (delErr) {
+										console.warn(`[SyncService] Delete error on provider for ${syncState.externalId}:`, delErr);
+									}
 								}
 							}
 							if (content.externalIds) {
@@ -2583,10 +2595,14 @@ export class SyncService {
 						try {
 							const provider = await this.getProviderInstance(config);
 							for (const mapping of mappings) {
-								try {
-									await provider.deleteEvent(mapping.externalId);
-								} catch (error: any) {
-									console.error(`[SyncService] Failed to delete event ${mapping.externalId} from provider:`, error);
+								const dedupeKey = `${config.id}:${mapping.externalId}`;
+								if (!deletedExternalKeys.has(dedupeKey)) {
+									deletedExternalKeys.add(dedupeKey);
+									try {
+										await provider.deleteEvent(mapping.externalId);
+									} catch (error: any) {
+										console.error(`[SyncService] Failed to delete event ${mapping.externalId} from provider:`, error);
+									}
 								}
 							}
 						} catch (error: any) {

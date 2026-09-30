@@ -783,6 +783,125 @@ describe('SyncService - Bulk Sync', () => {
 			expect(occIds[2]).toContain('master-uuid_inst_');
 		});
 	});
+
+	describe('deleteEventMappings', () => {
+		it('should delete synced events and virtual instances from providers and clean campaign items', async () => {
+			const service = new SyncService();
+			const mockProviderInstance = new MockSyncProvider();
+			service.registerProvider('mock-provider' as any, class extends MockSyncProvider {
+				constructor() {
+					super();
+					return mockProviderInstance;
+				}
+			} as any);
+
+			const configId = 'cfg-test-1';
+			const mockConfigRow = {
+				id: configId,
+				userId: 'user-1',
+				providerId: 'prov-1',
+				providerType: 'mock-provider',
+				direction: 'push',
+				enabled: true,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			const mockCampaign = {
+				id: 'camp-1',
+				userId: 'user-1',
+				name: 'Test Campaign',
+				content: {
+					version: 1,
+					targets: { [configId]: { enabled: true } },
+					items: {
+						'event-master-1': {
+							entityType: 'event',
+							syncs: {
+								[configId]: { status: 'synced', externalId: 'ext-master-1' }
+							}
+						},
+						'event-master-1_inst_2026-10-01T10:00:00.000Z': {
+							entityType: 'event',
+							syncs: {
+								[configId]: { status: 'synced', externalId: 'ext-virtual-1' }
+							}
+						},
+						'other-event': {
+							entityType: 'event',
+							syncs: {
+								[configId]: { status: 'synced', externalId: 'ext-other-1' }
+							}
+						}
+					},
+					externalIds: {
+						'ext-master-1': { itemId: 'event-master-1', configId },
+						'ext-virtual-1': { itemId: 'event-master-1_inst_2026-10-01T10:00:00.000Z', configId },
+						'ext-other-1': { itemId: 'other-event', configId }
+					}
+				},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			// 1. Fetch configs
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockResolvedValueOnce([mockConfigRow])
+			});
+
+			// 2. Fetch campaigns containing event-master-1 or virtual instances
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([mockCampaign])
+				})
+			});
+
+			// 3. Update campaign
+			const mockUpdateSet = vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			});
+			(db.update as any).mockReturnValueOnce({
+				set: mockUpdateSet
+			});
+
+			// 4. Fetch legacy mappings from syncMappingTable
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([
+						{ id: 'map-1', syncConfigId: configId, eventId: 'event-master-1', externalId: 'ext-master-1' }
+					])
+				})
+			});
+
+			// 5. Delete legacy sync mappings
+			(db.delete as any).mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([])
+			});
+
+			await service.deleteEventMappings('user-1', ['event-master-1']);
+
+			// Both the master event and the virtual instance occurrence must be deleted from provider
+			expect(mockProviderInstance.deleteEvent).toHaveBeenCalledWith('ext-master-1');
+			expect(mockProviderInstance.deleteEvent).toHaveBeenCalledWith('ext-virtual-1');
+
+			// ext-master-1 should NOT be deleted twice (deduplicated against legacy mapping)
+			expect(mockProviderInstance.deleteEvent).toHaveBeenCalledTimes(2);
+
+			// Check campaign content was cleaned
+			expect(mockUpdateSet).toHaveBeenCalledWith(
+				expect.objectContaining({
+					content: expect.objectContaining({
+						items: {
+							'other-event': expect.any(Object)
+						},
+						externalIds: {
+							'ext-other-1': expect.any(Object)
+						}
+					})
+				})
+			);
+		});
+	});
 });
 
 

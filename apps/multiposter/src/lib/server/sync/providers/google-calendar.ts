@@ -295,10 +295,18 @@ export class GoogleCalendarProvider implements SyncProvider {
 
 		const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(this.calendarId)}/events/${encodeURIComponent(externalId)}?sendUpdates=all`;
 
-		await this.makeRequest({
-			url,
-			method: 'DELETE'
-		});
+		try {
+			await this.makeRequest({
+				url,
+				method: 'DELETE'
+			});
+		} catch (error: any) {
+			if (error?.code === 404 || error?.code === 410 || error?.status === 404 || error?.status === 410) {
+				console.log(`[GoogleCalendarProvider] Event ${externalId} already deleted from Google Calendar`);
+				return;
+			}
+			throw error;
+		}
 	}
 
 	async setupWebhook(callbackUrl: string): Promise<WebhookSubscription> {

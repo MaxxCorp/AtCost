@@ -309,10 +309,18 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			});
 
 			if (!response.ok) {
+				if (response.status === 404) {
+					console.log(`[WP-Provider] Event ${externalId} already deleted from WordPress Events Calendar`);
+					return;
+				}
 				const errorText = await response.text();
 				throw new Error(`WordPress API error: ${response.status} ${response.statusText} - ${errorText}`);
 			}
-		} catch (error) {
+		} catch (error: any) {
+			if (error?.message?.includes('404')) {
+				console.log(`[WP-Provider] Event ${externalId} already deleted from WordPress Events Calendar`);
+				return;
+			}
 			console.error('Failed to delete event from WordPress Events Calendar:', error);
 			throw error;
 		}

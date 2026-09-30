@@ -194,9 +194,30 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	async deleteEvent(externalId: string): Promise<void> {
 		if (!this.accessToken) throw new Error('Provider not initialized');
 
+		// First try to cancel the event so room attendees / resources are freed up in Exchange/365
+		try {
+			const cancelUrl = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}/cancel`;
+			await this.makeRequest(cancelUrl, {
+				method: 'POST',
+				body: JSON.stringify({
+					comment: 'Event deleted'
+				})
+			});
+		} catch (cancelError: any) {
+			// If not an organizer meeting with attendees or already cancelled/deleted, ignore
+		}
+
 		const url = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}`;
 
-		await this.makeRequest(url, { method: 'DELETE' });
+		try {
+			await this.makeRequest(url, { method: 'DELETE' });
+		} catch (error: any) {
+			if (error?.message?.includes('404') || error?.message?.includes('ResourceNotFound') || error?.status === 404) {
+				console.log(`[MicrosoftCalendarProvider] Event ${externalId} already deleted from Microsoft Calendar`);
+				return;
+			}
+			throw error;
+		}
 	}
 
 	async setupWebhook(callbackUrl: string): Promise<WebhookSubscription> {
