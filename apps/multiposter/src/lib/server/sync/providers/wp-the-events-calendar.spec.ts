@@ -72,4 +72,110 @@ describe('WpTheEventsCalendarProvider', () => {
 			await expect(provider.deleteEvent('12345')).rejects.toThrow(/WordPress API error: 500/);
 		});
 	});
+
+	describe('description handling and invisible string fallback', () => {
+		it('should use invisible string (\\u200B) when description is missing or empty', () => {
+			const format = (provider as any).mapEventToWpFormat.bind(provider);
+
+			const withUndefined = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event'
+			});
+			expect(withUndefined.description).toBe('\u200B');
+
+			const withEmpty = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: ''
+			});
+			expect(withEmpty.description).toBe('\u200B');
+
+			const withWhitespace = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: '   \n\t  '
+			});
+			expect(withWhitespace.description).toBe('\u200B');
+
+			const withEmptyHtml = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: '<p></p>'
+			});
+			expect(withEmptyHtml.description).toBe('\u200B');
+
+			const withEmptyHtmlBreak = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: '<p><br></p>'
+			});
+			expect(withEmptyHtmlBreak.description).toBe('\u200B');
+
+			const withNbspOnly = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: '<p>&nbsp;</p>'
+			});
+			expect(withNbspOnly.description).toBe('\u200B');
+		});
+
+		it('should keep description when meaningful content is present', () => {
+			const format = (provider as any).mapEventToWpFormat.bind(provider);
+
+			const withText = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: 'A great concert'
+			});
+			expect(withText.description).toBe('A great concert');
+
+			const withHtmlText = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: '<p>A great concert</p>'
+			});
+			expect(withHtmlText.description).toBe('<p>A great concert</p>');
+
+			const withMediaOnly = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Test Event',
+				description: '<p><img src="https://example.com/poster.jpg" /></p>'
+			});
+			expect(withMediaOnly.description).toBe('<p><img src="https://example.com/poster.jpg" /></p>');
+		});
+
+		it('should push event with invisible string in description when description is empty', async () => {
+			const mockFetch = vi.fn().mockResolvedValue({
+				ok: true,
+				status: 201,
+				json: vi.fn().mockResolvedValue({ id: 999, modified_gmt: '2026-10-01T12:00:00Z' })
+			});
+			global.fetch = mockFetch;
+
+			const result = await provider.pushEvent({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Event without description',
+				description: '',
+				startDateTime: new Date('2026-10-01T10:00:00Z'),
+				endDateTime: new Date('2026-10-01T12:00:00Z')
+			});
+
+			expect(result.externalId).toBe('999');
+			expect(mockFetch).toHaveBeenCalled();
+			const postCall = mockFetch.mock.calls.find((call) => call[1]?.method === 'POST');
+			expect(postCall).toBeDefined();
+			const body = JSON.parse(postCall![1].body);
+			expect(body.description).toBe('\u200B');
+		});
+	});
 });

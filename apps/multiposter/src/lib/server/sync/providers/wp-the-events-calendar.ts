@@ -650,10 +650,23 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	}
 
 	private mapEventToWpFormat(event: ExternalEvent): any {
+		// If description is empty or contains no meaningful content, use an invisible string
+		// (zero-width space) so the sync will not be rejected by The Events Calendar WP plugin API.
+		const hasContent = Boolean(
+			event.description &&
+				(event.description
+					.replace(/<[^>]*>/g, '')
+					.replace(/&nbsp;/g, ' ')
+					.replace(/[\s\u200B\uFEFF]/g, '')
+					.length > 0 ||
+					/<(img|iframe|svg|video|audio|figure)\b/i.test(event.description))
+		);
+		const description = hasContent ? event.description! : '\u200B';
+
 		// Map our internal event format to WordPress Events Calendar REST API format
 		const wpEvent: any = {
 			title: event.summary,
-			description: event.description || '',
+			description,
 			status: 'publish', // Publish immediately
 			hide_from_listings: false,
 			show_map: 'true',
