@@ -249,4 +249,241 @@ describe('MicrosoftCalendarProvider', () => {
 			await expect(provider.deleteEvent('ext-already-deleted')).resolves.toBeUndefined();
 		});
 	});
+
+	describe('recurrence mapping', () => {
+		it('should map weekly RRULE to Microsoft Graph patternedRecurrence with noEnd', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-1',
+				providerId: 'microsoft-calendar',
+				summary: 'Weekly Team Sync',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-05T09:00:00Z'),
+				endDateTime: new Date('2026-10-05T10:00:00Z'),
+				startTimeZone: 'UTC',
+				recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR']
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeDefined();
+			expect(mapped.recurrence.pattern).toEqual({
+				type: 'weekly',
+				interval: 1,
+				daysOfWeek: ['monday', 'wednesday', 'friday'],
+				firstDayOfWeek: 'sunday'
+			});
+			expect(mapped.recurrence.range).toEqual({
+				type: 'noEnd',
+				startDate: '2026-10-05',
+				recurrenceTimeZone: 'UTC'
+			});
+		});
+
+		it('should map weekly RRULE with interval and UNTIL date to endDate range', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-2',
+				providerId: 'microsoft-calendar',
+				summary: 'Bi-weekly Sprint Review',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-06T14:00:00Z'),
+				endDateTime: new Date('2026-10-06T15:00:00Z'),
+				startTimeZone: 'UTC',
+				recurrence: ['RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU;UNTIL=20261231T235959Z']
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeDefined();
+			expect(mapped.recurrence.pattern.type).toBe('weekly');
+			expect(mapped.recurrence.pattern.interval).toBe(2);
+			expect(mapped.recurrence.pattern.daysOfWeek).toEqual(['tuesday']);
+			expect(mapped.recurrence.range.type).toBe('endDate');
+			expect(mapped.recurrence.range.startDate).toBe('2026-10-06');
+			expect(mapped.recurrence.range.endDate).toBe('2026-12-31');
+		});
+
+		it('should map daily RRULE with COUNT to numbered range', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-3',
+				providerId: 'microsoft-calendar',
+				summary: 'Daily Standup',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-01T08:00:00Z'),
+				endDateTime: new Date('2026-10-01T08:30:00Z'),
+				startTimeZone: 'UTC',
+				recurrence: ['RRULE:FREQ=DAILY;COUNT=10']
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeDefined();
+			expect(mapped.recurrence.pattern).toEqual({
+				type: 'daily',
+				interval: 1
+			});
+			expect(mapped.recurrence.range).toEqual({
+				type: 'numbered',
+				numberOfOccurrences: 10,
+				startDate: '2026-10-01',
+				recurrenceTimeZone: 'UTC'
+			});
+		});
+
+		it('should map absolute monthly RRULE to absoluteMonthly pattern', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-4',
+				providerId: 'microsoft-calendar',
+				summary: 'Monthly Retrospective',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-15T16:00:00Z'),
+				startTimeZone: 'UTC',
+				recurrence: ['RRULE:FREQ=MONTHLY;BYMONTHDAY=15']
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeDefined();
+			expect(mapped.recurrence.pattern).toEqual({
+				type: 'absoluteMonthly',
+				interval: 1,
+				dayOfMonth: 15
+			});
+			expect(mapped.recurrence.range.type).toBe('noEnd');
+		});
+
+		it('should map relative monthly RRULE (e.g. 2nd Monday) to relativeMonthly pattern', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-5',
+				providerId: 'microsoft-calendar',
+				summary: 'All Hands',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-12T10:00:00Z'),
+				startTimeZone: 'UTC',
+				recurrence: ['RRULE:FREQ=MONTHLY;BYDAY=2MO']
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeDefined();
+			expect(mapped.recurrence.pattern).toEqual({
+				type: 'relativeMonthly',
+				interval: 1,
+				daysOfWeek: ['monday'],
+				index: 'second'
+			});
+		});
+
+		it('should map relative monthly with negative index (e.g. last Sunday) to last index', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-6',
+				providerId: 'microsoft-calendar',
+				summary: 'Community Meetup',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-25T11:00:00Z'),
+				startTimeZone: 'UTC',
+				recurrence: ['RRULE:FREQ=MONTHLY;BYDAY=-1SU']
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeDefined();
+			expect(mapped.recurrence.pattern).toEqual({
+				type: 'relativeMonthly',
+				interval: 1,
+				daysOfWeek: ['sunday'],
+				index: 'last'
+			});
+		});
+
+		it('should set recurrence to null when recurrence is an empty array', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-7',
+				providerId: 'microsoft-calendar',
+				summary: 'Demoted Series',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-01T10:00:00Z'),
+				recurrence: []
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeNull();
+		});
+
+		it('should leave recurrence undefined when recurrence is undefined', () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-rec-8',
+				providerId: 'microsoft-calendar',
+				summary: 'Single Event',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-01T10:00:00Z')
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.recurrence).toBeUndefined();
+		});
+
+		it('should include recurrence payload when calling pushEvent for a recurring event', async () => {
+			const event: ExternalEvent = {
+				externalId: 'ext-series-master',
+				providerId: 'microsoft-calendar',
+				summary: 'Recurring Workshop',
+				status: 'confirmed',
+				startDateTime: new Date('2026-10-07T13:00:00Z'),
+				endDateTime: new Date('2026-10-07T14:00:00Z'),
+				startTimeZone: 'UTC',
+				recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=WE']
+			};
+
+			const makeRequestMock = vi.fn().mockResolvedValue({ id: 'graph-ms-id-123', '@odata.etag': 'W/"rec-etag"' });
+			(provider as any).makeRequest = makeRequestMock;
+
+			const result = await provider.pushEvent(event);
+
+			expect(result.externalId).toBe('graph-ms-id-123');
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/me/calendar/events',
+				expect.objectContaining({
+					method: 'POST',
+					body: expect.stringContaining('"recurrence":{')
+				})
+			);
+
+			const parsedBody = JSON.parse(makeRequestMock.mock.calls[0][1].body);
+			expect(parsedBody.recurrence.pattern.type).toBe('weekly');
+			expect(parsedBody.recurrence.pattern.daysOfWeek).toEqual(['wednesday']);
+		});
+
+		it('should include recurrence in mapToExternalEvent when msEvent has recurrence object', () => {
+			const msEvent = {
+				id: 'ms-rec-event-1',
+				subject: 'Weekly Design Review',
+				showAs: 'busy',
+				start: { dateTime: '2026-10-05T10:00:00', timeZone: 'UTC' },
+				end: { dateTime: '2026-10-05T11:00:00', timeZone: 'UTC' },
+				recurrence: {
+					pattern: {
+						type: 'weekly',
+						interval: 1,
+						daysOfWeek: ['monday', 'friday'],
+						firstDayOfWeek: 'sunday'
+					},
+					range: {
+						type: 'endDate',
+						startDate: '2026-10-05',
+						endDate: '2026-12-31'
+					}
+				}
+			};
+
+			const external = (provider as any).mapToExternalEvent(msEvent);
+
+			expect(external.recurrence).toBeDefined();
+			expect(external.recurrence).toHaveLength(1);
+			expect(external.recurrence![0]).toContain('FREQ=WEEKLY');
+			expect(external.recurrence![0]).toContain('BYDAY=MO,FR');
+			expect(external.recurrence![0]).toContain('UNTIL=20261231T235959Z');
+		});
+	});
 });
