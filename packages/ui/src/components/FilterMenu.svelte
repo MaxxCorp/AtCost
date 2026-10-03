@@ -240,11 +240,11 @@
 						<DropdownMenu.RadioItem
 							value={opt.value}
 							closeOnSelect={false}
-							class="rounded-xl py-2 px-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+							class="rounded-xl py-2 ps-8 pe-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
 						>
 							{#if opt.icon}
 								{@const OptIcon = opt.icon}
-								<OptIcon size={14} class="mr-2 text-gray-500" />
+								<OptIcon size={14} class="text-gray-500 shrink-0" />
 							{/if}
 							<div class="flex flex-col min-w-0">
 								<span class="truncate font-medium">{opt.label}</span>
@@ -272,7 +272,7 @@
 					checked={bf.checked}
 					onCheckedChange={(val) => bf.onchange(!!val)}
 					closeOnSelect={false}
-					class="rounded-xl py-2 px-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+					class="rounded-xl py-2 ps-8 pe-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
 				>
 					<span class="truncate block w-full font-medium">{bf.label}</span>
 				</DropdownMenu.CheckboxItem>

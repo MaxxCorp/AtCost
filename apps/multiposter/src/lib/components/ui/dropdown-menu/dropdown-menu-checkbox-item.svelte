@@ -30,7 +30,7 @@
 >
 	{#snippet children({ checked, indeterminate })}
 		<span
-			class="pointer-events-none absolute start-2 flex size-3.5 items-center justify-center"
+			class="pointer-events-none absolute start-2 top-1/2 -translate-y-1/2 flex size-3.5 items-center justify-center"
 		>
 			{#if indeterminate}
 				<MinusIcon class="size-4" />
