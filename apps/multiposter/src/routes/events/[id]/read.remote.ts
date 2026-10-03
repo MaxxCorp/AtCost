@@ -321,6 +321,10 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 
 	const allLocations = result.locations.map((l: any) => l.location);
 	const allResources = result.resources.map((r: any) => r.resource).filter(Boolean);
+	const allContacts = (result.contacts || []).map((c: any) => ({
+		...(c.contact || c),
+		participationStatus: c.participationStatus || 'needsAction'
+	})).filter((c: any) => c && c.id);
 
 	// Full object
 	return {
@@ -333,6 +337,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		endDateTime: toIsoSafe(result.endDateTime),
 		locations: allLocations,
 		resources: allResources,
+		contacts: allContacts,
 		rooms: getEventRooms({ locations: allLocations, resources: allResources }),
 		resourceIds: result.resources.map((r: any) => r.resourceId),
 		contactIds: result.contacts.map((c: any) => c.contactId),

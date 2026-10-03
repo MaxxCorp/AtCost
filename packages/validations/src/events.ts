@@ -32,6 +32,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	}[];
 	rooms?: string[];
 	tags?: Tag[];
+	contacts?: any[];
 	syncIds?: string[];
 	participationStatuses?: Record<string, string>;
 	maxOccupancy?: number | null;

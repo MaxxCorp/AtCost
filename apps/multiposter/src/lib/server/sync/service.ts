@@ -1539,10 +1539,14 @@ export class SyncService {
 			}
 		}
 
-		const associationEventId = (internal.recurringEventId || (isVirtual ? internal.id.split('_inst_')[0] : internal.id)) as string;
+		const directEventId = (isVirtual ? internal.id.split('_inst_')[0] : internal.id) as string;
+		const fallbackMasterId = (internal.recurringEventId || (isVirtual ? internal.id.split('_inst_')[0] : null)) as string | null;
 
-		// Fetch associated contacts
-		const associatedContacts = (await getEntityContacts(entityType, associationEventId)) || [];
+		// Fetch associated contacts (check direct event first, fallback to master if exception has no contacts linked)
+		let associatedContacts = (await getEntityContacts(entityType, directEventId)) || [];
+		if (associatedContacts.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
+			associatedContacts = (await getEntityContacts(entityType, fallbackMasterId)) || [];
+		}
 
 		// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
 		// External contacts are commented out for data privacy reasons until privacy flows are finalized.
@@ -1560,14 +1564,25 @@ export class SyncService {
 					let participationStatus: string | null = null;
 
 					if (isEvent) {
-						const [assoc] = await db
+						let [assoc] = await db
 							.select()
 							.from(eventContactTable)
 							.where(and(
-								eq(eventContactTable.eventId, associationEventId),
+								eq(eventContactTable.eventId, directEventId),
 								eq(eventContactTable.contactId, contact.id)
 							))
 							.limit(1);
+
+						if (!assoc && fallbackMasterId && fallbackMasterId !== directEventId) {
+							[assoc] = await db
+								.select()
+								.from(eventContactTable)
+								.where(and(
+									eq(eventContactTable.eventId, fallbackMasterId),
+									eq(eventContactTable.contactId, contact.id)
+								))
+								.limit(1);
+						}
 						participationStatus = assoc?.participationStatus || null;
 					}
 
@@ -1588,11 +1603,19 @@ export class SyncService {
 
 		// Resolve Attached Resources
 		if (isEvent) {
-			const linkedResources = await db
+			let linkedResources = await db
 				.select({ resource: resourceTable })
 				.from(eventResourceTable)
 				.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
-				.where(eq(eventResourceTable.eventId, associationEventId));
+				.where(eq(eventResourceTable.eventId, directEventId));
+
+			if (linkedResources.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
+				linkedResources = await db
+					.select({ resource: resourceTable })
+					.from(eventResourceTable)
+					.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
+					.where(eq(eventResourceTable.eventId, fallbackMasterId));
+			}
 
 			for (const { resource: res } of linkedResources) {
 				let calendars: any[] = [];
@@ -1626,13 +1649,21 @@ export class SyncService {
 
 		// Try to find structured location data first
 		const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
-		const whereClause = isEvent ? eq(eventLocationTable.eventId, associationEventId) : eq(announcementLocation.announcementId, internal.id);
+		const whereClause = isEvent ? eq(eventLocationTable.eventId, directEventId) : eq(announcementLocation.announcementId, internal.id);
 
-		const locations = await db
+		let locations = await db
 			.select({ location: locationTable })
 			.from(locationTableToUse as any)
 			.innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id))
 			.where(whereClause as any);
+
+		if (locations.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
+			locations = await db
+				.select({ location: locationTable })
+				.from(eventLocationTable as any)
+				.innerJoin(locationTable, eq(eventLocationTable.locationId, locationTable.id))
+				.where(eq(eventLocationTable.eventId, fallbackMasterId));
+		}
 
 		if (locations.length > 0) {
 			venues = locations.map(l => ({
@@ -1697,13 +1728,21 @@ export class SyncService {
 		// Resolve Tags
 		const tags: Array<{ id: string; name: string }> = [];
 		const tagTableToUse = isEvent ? eventTag : announcementTag;
-		const tagWhereClause = isEvent ? eq(eventTag.eventId, associationEventId) : eq(announcementTag.announcementId, internal.id);
+		const tagWhereClause = isEvent ? eq(eventTag.eventId, directEventId) : eq(announcementTag.announcementId, internal.id);
 
-		const entityTags = await db
+		let entityTags = await db
 			.select({ tag: tagTable })
 			.from(tagTableToUse as any)
 			.innerJoin(tagTable, eq((tagTableToUse as any).tagId, tagTable.id))
 			.where(tagWhereClause as any);
+
+		if (entityTags.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
+			entityTags = await db
+				.select({ tag: tagTable })
+				.from(eventTag as any)
+				.innerJoin(tagTable, eq(eventTag.tagId, tagTable.id))
+				.where(eq(eventTag.eventId, fallbackMasterId));
+		}
 
 		if (entityTags.length > 0) {
 			tags.push(...entityTags.map((t: { tag: { id: string, name: string } }) => ({ id: t.tag.id, name: t.tag.name })));

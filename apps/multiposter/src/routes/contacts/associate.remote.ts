@@ -9,6 +9,7 @@ import { getAuthenticatedUser, hasAccess } from '$lib/server/authorization';
 import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '$lib/validations/contacts';
 import { getEntityContacts } from '$lib/server/contacts';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
+import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
 
 const tableMap = {
     user: userContact,
@@ -48,7 +49,8 @@ export const addAssociation = command(associationSchema, async (data) => {
         itemId: contactId,
         tableMap,
         fieldMap,
-        itemField: 'contactId'
+        itemField: 'contactId',
+        userId: user?.id
     });
 
     await fetchEntityContacts({ type, entityId }).refresh();
@@ -77,7 +79,8 @@ export const removeAssociation = command(associationSchema, async (data) => {
         itemId: contactId,
         tableMap,
         fieldMap,
-        itemField: 'contactId'
+        itemField: 'contactId',
+        userId: user?.id
     });
 
     await fetchEntityContacts({ type, entityId }).refresh();
@@ -96,16 +99,22 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
         throw new Error('Only event associations support participation status');
     }
 
+    let targetEntityId = entityId;
+    if (type === 'event' && entityId.includes('_inst_')) {
+        targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: true, userId: user?.id });
+    }
+
     await db.update(eventContactTable)
         .set({ participationStatus: status })
         .where(and(
-            eq(eventContactTable.eventId, entityId),
+            eq(eventContactTable.eventId, targetEntityId),
             eq(eventContactTable.contactId, contactId)
         ));
 
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
 });
+
 
 export const fetchEntityContacts = query(getAssociationsSchema, async (data): Promise<Contact[]> => {
     const { type, entityId } = data;

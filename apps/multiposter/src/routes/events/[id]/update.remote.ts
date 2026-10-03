@@ -405,6 +405,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							locationIds.map((id: string) => ({ eventId: targetEventId, locationId: id }))
 						);
 					}
+				} else if (isNewException && instMasterId) {
+					const masterLocs = await client.select().from(eventLocation).where(eq(eventLocation.eventId, instMasterId));
+					if (masterLocs.length > 0) {
+						await client.insert(eventLocation).values(
+							masterLocs.map((l: any) => ({ eventId: targetEventId, locationId: l.locationId }))
+						);
+					}
 				}
 
 				// Resources
@@ -415,6 +422,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							resourceIds.map((id: string) => ({ eventId: targetEventId, resourceId: id }))
 						);
 					}
+				} else if (isNewException && instMasterId) {
+					const masterRess = await client.select().from(eventResource).where(eq(eventResource.eventId, instMasterId));
+					if (masterRess.length > 0) {
+						await client.insert(eventResource).values(
+							masterRess.map((r: any) => ({ eventId: targetEventId, resourceId: r.resourceId }))
+						);
+					}
 				}
 
 				// Contacts
@@ -423,6 +437,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					if (contactIds.length > 0) {
 						await client.insert(eventContact).values(
 							contactIds.map((id: string) => ({ eventId: targetEventId, contactId: id }))
+						);
+					}
+				} else if (isNewException && instMasterId) {
+					const masterCtcs = await client.select().from(eventContact).where(eq(eventContact.eventId, instMasterId));
+					if (masterCtcs.length > 0) {
+						await client.insert(eventContact).values(
+							masterCtcs.map((c: any) => ({ eventId: targetEventId, contactId: c.contactId, participationStatus: c.participationStatus }))
 						);
 					}
 				}
@@ -441,6 +462,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								await client.insert(eventTag).values({ eventId: targetEventId, tagId: existingTag.id }).onConflictDoNothing();
 							}
 						}
+					}
+				} else if (isNewException && instMasterId) {
+					const masterTags = await client.select().from(eventTag).where(eq(eventTag.eventId, instMasterId));
+					if (masterTags.length > 0) {
+						await client.insert(eventTag).values(
+							masterTags.map((t: any) => ({ eventId: targetEventId, tagId: t.tagId }))
+						);
 					}
 				}
 			};

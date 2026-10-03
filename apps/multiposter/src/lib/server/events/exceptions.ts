@@ -149,3 +149,112 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 
 	return false;
 }
+
+import { db, event, eventLocation, eventResource, eventContact, eventTag, eq, and, or, sql } from '@ac/db';
+import { parseVirtualInstanceId } from '$lib/utils/event-series';
+
+/**
+ * Resolves an event entityId for associations.
+ * If entityId is a virtual instance (${masterId}_inst_${iso}):
+ * - Checks if an exception row already exists in Postgres. If so, returns the exception's UUID.
+ * - If not, and materializeIfVirtual is false (e.g. for queries), returns the master's UUID so associations are read.
+ * - If not, and materializeIfVirtual is true (e.g. for mutations), materializes an exception row, copies all master associations, and returns the new exception's UUID.
+ */
+export async function resolveEventIdForAssociations(
+	eventId: string,
+	options?: { materializeIfVirtual?: boolean; userId?: string }
+): Promise<string> {
+	if (!eventId.includes('_inst_')) {
+		return eventId;
+	}
+
+	const parsed = parseVirtualInstanceId(eventId);
+	if (!parsed) {
+		return eventId;
+	}
+
+	const { masterId, iso } = parsed;
+	const occurrenceTime = new Date(iso);
+	const instIso = eventId.split('_inst_')[1];
+	const decodedIso = iso;
+
+	// Look for existing exception
+	const existing = await db.query.event.findFirst({
+		where: and(
+			eq(event.recurringEventId, masterId),
+			or(
+				sql`${event.originalStartTime}->>'dateTime' = ${instIso}`,
+				sql`${event.originalStartTime}->>'dateTime' = ${decodedIso}`
+			)
+		)
+	});
+
+	if (existing) {
+		return existing.id;
+	}
+
+	if (!options?.materializeIfVirtual) {
+		// Just querying associations, inherit from master ID
+		return masterId;
+	}
+
+	// Materialize exception in Postgres
+	const master = await db.query.event.findFirst({
+		where: eq(event.id, masterId)
+	});
+
+	if (!master) {
+		throw new Error('Master event not found');
+	}
+
+	const targetStart = occurrenceTime;
+	const duration = (master.startDateTime && master.endDateTime)
+		? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+		: 3600000;
+	const targetEnd = new Date(targetStart.getTime() + duration);
+
+	const { id: _, createdAt: _c, updatedAt: _u, ...masterRest } = master;
+	const [created] = await db.insert(event).values({
+		...masterRest,
+		recurringEventId: masterId,
+		originalStartTime: { dateTime: decodedIso },
+		isException: true,
+		recurrence: null,
+		seriesId: null,
+		startDateTime: targetStart,
+		endDateTime: targetEnd,
+		userId: options?.userId || master.userId
+	}).returning();
+
+	// Copy master's associations to the new exception
+	const masterLocs = await db.select().from(eventLocation).where(eq(eventLocation.eventId, masterId));
+	if (masterLocs.length > 0) {
+		await db.insert(eventLocation).values(
+			masterLocs.map(l => ({ eventId: created.id, locationId: l.locationId }))
+		);
+	}
+
+	const masterRess = await db.select().from(eventResource).where(eq(eventResource.eventId, masterId));
+	if (masterRess.length > 0) {
+		await db.insert(eventResource).values(
+			masterRess.map(r => ({ eventId: created.id, resourceId: r.resourceId }))
+		);
+	}
+
+	const masterCtcs = await db.select().from(eventContact).where(eq(eventContact.eventId, masterId));
+	if (masterCtcs.length > 0) {
+		await db.insert(eventContact).values(
+			masterCtcs.map(c => ({ eventId: created.id, contactId: c.contactId, participationStatus: c.participationStatus }))
+		);
+	}
+
+	const masterTags = await db.select().from(eventTag).where(eq(eventTag.eventId, masterId));
+	if (masterTags.length > 0) {
+		await db.insert(eventTag).values(
+			masterTags.map(t => ({ eventId: created.id, tagId: t.tagId }))
+		);
+	}
+
+	return created.id;
+}
+

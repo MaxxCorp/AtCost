@@ -417,10 +417,10 @@
     const associationsPromise = $derived(
         entityId && type
             ? fetchAssociationsRemote
-                ? invokeRemote(fetchAssociationsRemote, { type, entityId })
+                ? invokeRemote(fetchAssociationsRemote, { type, entityId }).catch(() => localAssociatedItems)
                 : invokeRemote(listItemsRemote, {
                       associatedWith: { type, id: entityId },
-                  })
+                  }).catch(() => localAssociatedItems)
             : Promise.resolve(localAssociatedItems)
     );
 
@@ -695,6 +695,30 @@
                 {:then res}
                     {@const { data: currentAssociations } = normalize(res)}
                     {#if !singleSelect || currentAssociations.length === 0}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onclick={toggleSelector}
+                            class="h-9 px-3 rounded-xl {showSelector
+                                ? 'bg-blue-50 text-blue-600'
+                                : 'text-gray-500 hover:bg-gray-100'}"
+                        >
+                            {#if showSelector}
+                                <X size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{i18n.closeSearchLabel}</span
+                                >
+                            {:else}
+                                <Link size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{i18n.linkItemLabel}</span
+                                >
+                            {/if}
+                        </Button>
+                    {/if}
+                {:catch}
+                    {#if !singleSelect || localAssociatedItems.length === 0}
                         <Button
                             type="button"
                             variant="ghost"

@@ -193,6 +193,12 @@ export class AvailabilityService {
         const resourceAvailability: Record<string, AvailabilityResult> = {};
         const contactAvailability: Record<string, AvailabilityResult> = {};
 
+        const isVirtual = Boolean(params.currentEventId && params.currentEventId.includes('_inst_'));
+        const currentMasterId = isVirtual ? params.currentEventId!.split('_inst_')[0] : null;
+        const currentInstIso = isVirtual ? decodeURIComponent(params.currentEventId!.split('_inst_')[1]) : null;
+        const isUuid = Boolean(params.currentEventId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.currentEventId));
+        const dbCurrentEventId = isUuid ? params.currentEventId : null;
+
         const resourceIds = params.resources.map(r => r.id);
         const contactIds = params.contacts.map(c => c.id);
 
@@ -209,7 +215,7 @@ export class AvailabilityService {
                 .where(and(
                     inArray(eventResource.resourceId, resourceIds),
                     ne(event.status, 'cancelled'),
-                    params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                    dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
                     lte(event.startDateTime, params.endDateTime),
                     gte(event.endDateTime, params.startDateTime)
                 ));
@@ -243,7 +249,7 @@ export class AvailabilityService {
                     .where(and(
                         inArray(eventResource.resourceId, unflaggedResourceIds),
                         ne(event.status, 'cancelled'),
-                        params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                        dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
                         or(isNotNull(event.recurrence), isNotNull(event.seriesId))
                     ));
 
@@ -271,7 +277,17 @@ export class AvailabilityService {
                             exdates
                         );
 
-                        if (occurrences.length > 0) {
+                        // If checking an instance belonging to this master event, exclude the instance itself
+                        const conflictingOccurrences = occurrences.filter(occ => {
+                            if (r.eventId === currentMasterId && currentInstIso) {
+                                const occTime = (occ.date || (occ as any).start).getTime();
+                                const targetTime = new Date(currentInstIso).getTime();
+                                if (Math.abs(occTime - targetTime) < 60000) return false;
+                            }
+                            return true;
+                        });
+
+                        if (conflictingOccurrences.length > 0) {
                             resourceAvailability[r.resourceId] = {
                                 available: false,
                                 reason: `Booked in "${r.eventTitle || 'another event'}"`,
@@ -297,7 +313,7 @@ export class AvailabilityService {
                 .where(and(
                     inArray(eventContact.contactId, contactIds),
                     ne(event.status, 'cancelled'),
-                    params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                    dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
                     lte(event.startDateTime, params.endDateTime),
                     gte(event.endDateTime, params.startDateTime)
                 ));
@@ -331,7 +347,7 @@ export class AvailabilityService {
                     .where(and(
                         inArray(eventContact.contactId, unflaggedContactIds),
                         ne(event.status, 'cancelled'),
-                        params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                        dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
                         or(isNotNull(event.recurrence), isNotNull(event.seriesId))
                     ));
 
@@ -359,7 +375,17 @@ export class AvailabilityService {
                             exdates
                         );
 
-                        if (occurrences.length > 0) {
+                        // If checking an instance belonging to this master event, exclude the instance itself
+                        const conflictingOccurrences = occurrences.filter(occ => {
+                            if (r.eventId === currentMasterId && currentInstIso) {
+                                const occTime = (occ.date || (occ as any).start).getTime();
+                                const targetTime = new Date(currentInstIso).getTime();
+                                if (Math.abs(occTime - targetTime) < 60000) return false;
+                            }
+                            return true;
+                        });
+
+                        if (conflictingOccurrences.length > 0) {
                             contactAvailability[r.contactId] = {
                                 available: false,
                                 reason: `Assigned to "${r.eventTitle || 'another event'}"`,
@@ -442,7 +468,7 @@ export class AvailabilityService {
                             .from(event)
                             .where(and(
                                 ne(event.status, 'cancelled'),
-                                params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                                dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
                                 lte(event.startDateTime, params.endDateTime),
                                 gte(event.endDateTime, params.startDateTime)
                             ));

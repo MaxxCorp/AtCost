@@ -148,4 +148,45 @@ describe('AvailabilityService', () => {
         // Since 2026-09-08 is in exdates, it was deleted, so the room is free!
         expect(result.resourceAvailability['room-1'].available).toBe(true);
     });
+
+    it('should not flag conflict when checking availability for an instance of the recurring series itself', async () => {
+        // Occurrence for 2026-09-08 is being edited by the instance itself
+        const mockRecurringEvent = {
+            resourceId: 'room-1',
+            eventId: 'series-event-1',
+            eventTitle: 'Weekly Team Standup',
+            startDateTime: new Date('2026-09-01T10:00:00Z'),
+            endDateTime: new Date('2026-09-01T11:00:00Z'),
+            recurrence: ['RRULE:FREQ=WEEKLY;COUNT=10'],
+            seriesId: null,
+            exdates: [],
+            startTimeZone: 'UTC'
+        };
+
+        const mockWhere1 = vi.fn().mockResolvedValue([]);
+        const mockInnerJoin1 = vi.fn().mockReturnValue({ where: mockWhere1 });
+        const mockFrom1 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin1 });
+
+        const mockWhere2 = vi.fn().mockResolvedValue([mockRecurringEvent]);
+        const mockInnerJoin2 = vi.fn().mockReturnValue({ where: mockWhere2 });
+        const mockFrom2 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin2 });
+
+        (db.select as any)
+            .mockReturnValueOnce({ from: mockFrom1 })
+            .mockReturnValueOnce({ from: mockFrom2 });
+
+        // Query occurrence for 2026-09-08 with currentEventId being that virtual instance
+        const result = await service.checkAvailability({
+            currentEventId: 'series-event-1_inst_2026-09-08T10:00:00.000Z',
+            startDateTime: new Date('2026-09-08T10:00:00Z'),
+            endDateTime: new Date('2026-09-08T11:00:00Z'),
+            resources: [{ id: 'room-1', allocationCalendars: [] }],
+            contacts: []
+        });
+
+        expect(result.resourceAvailability['room-1']).toBeDefined();
+        // Since this occurrence is the instance being edited, it must NOT collide with itself!
+        expect(result.resourceAvailability['room-1'].available).toBe(true);
+    });
 });
+

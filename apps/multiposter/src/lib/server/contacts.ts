@@ -5,6 +5,8 @@ import {
 import { getRequestEvent } from '$app/server';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';
+import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
+
 
 /**
  * Backend logic for managing contacts and their associations.
@@ -213,8 +215,13 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         contact: true
     };
 
+    let targetEntityId = entityId;
+    if (type === 'event' && entityId.includes('_inst_')) {
+        targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: false });
+    }
+
     const associations = await (db.query as any)[tableName].findMany({
-        where: (t: any, { eq }: any) => eq(t[entityField], entityId),
+        where: (t: any, { eq }: any) => eq(t[entityField], targetEntityId),
         with: withOptions
     });
 

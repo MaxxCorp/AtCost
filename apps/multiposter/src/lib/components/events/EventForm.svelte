@@ -850,6 +850,7 @@
                 mode="embedded"
                 type="event"
                 entityId={initialData?.id}
+                initialItems={initialData?.resources || []}
                 listItemsRemote={listResourcesWithHierarchy as any}
                 fetchAssociationsRemote={fetchEntityResources as any}
                 selectorGroupBy={(r: any) => (r.locationNames?.length ? r.locationNames : (r.locationName || m.no_location?.() || "No Location"))}
@@ -1086,6 +1087,7 @@
                 mode="embedded"
                 {type}
                 entityId={initialData?.id}
+                initialItems={initialData?.locations || []}
                 listItemsRemote={listLocations as any}
                 fetchAssociationsRemote={fetchEntityLocations as any}
                 addAssociationRemote={async (p: any) =>
@@ -1390,6 +1392,7 @@
         mode="embedded"
         type="event"
         entityId={initialData?.id}
+        initialItems={initialData?.contacts || []}
         onchange={(ids: string[]) => {
             currentContactIds = ids;
             rf.fields.contactIds.set(JSON.stringify(ids));

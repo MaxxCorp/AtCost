@@ -4,6 +4,7 @@ import { announcementLocation, eventLocation, kioskLocation, location, resourceL
 import { eq } from '@ac/db';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
+import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
 
 const tableMap = {
     announcement: announcementLocation,
@@ -63,10 +64,15 @@ export const fetchEntityLocations = query(getLocationAssociationsSchema, async (
         throw new Error(`Unsupported entity type: ${type}`);
     }
 
+    let targetEntityId = entityId;
+    if (type === 'event' && entityId.includes('_inst_')) {
+        targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: false });
+    }
+
     const results = await db.select({ location: location })
         .from(table as any)
         .innerJoin(location, eq((table as any).locationId, location.id))
-        .where(eq((table as any)[entityField], entityId));
+        .where(eq((table as any)[entityField], targetEntityId));
     
     return results.map(r => ({
         ...r.location,
@@ -74,3 +80,4 @@ export const fetchEntityLocations = query(getLocationAssociationsSchema, async (
         updatedAt: r.location.updatedAt.toISOString(),
     }));
 });
+

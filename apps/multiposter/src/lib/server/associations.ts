@@ -1,5 +1,6 @@
 import { db } from '@ac/db';
 import { and, eq } from '@ac/db';
+import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
 
 export interface AssociationOptions {
     type: string;
@@ -8,18 +9,23 @@ export interface AssociationOptions {
     tableMap: Record<string, any>;
     fieldMap: Record<string, string>;
     itemField: string;
+    userId?: string;
 }
 
 /**
  * Shared logic for adding an association between an entity and an item (e.g. contact, location, resource)
  */
 export async function addAssociation(options: AssociationOptions) {
-    const { type, entityId, itemId, tableMap, fieldMap, itemField } = options;
+    let { type, entityId, itemId, tableMap, fieldMap, itemField, userId } = options;
     const table = tableMap[type];
     const entityField = fieldMap[type];
 
     if (!table || !entityField) {
         throw new Error(`Unsupported entity type for association: ${type}`);
+    }
+
+    if (type === 'event' && entityId.includes('_inst_')) {
+        entityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: true, userId });
     }
 
     await (db.insert(table as any) as any).values({
@@ -32,7 +38,7 @@ export async function addAssociation(options: AssociationOptions) {
  * Shared logic for removing an association
  */
 export async function removeAssociation(options: AssociationOptions) {
-    const { type, entityId, itemId, tableMap, fieldMap, itemField } = options;
+    let { type, entityId, itemId, tableMap, fieldMap, itemField, userId } = options;
     const table = tableMap[type];
     const entityField = fieldMap[type];
 
@@ -40,8 +46,13 @@ export async function removeAssociation(options: AssociationOptions) {
         throw new Error(`Unsupported entity type for association: ${type}`);
     }
 
+    if (type === 'event' && entityId.includes('_inst_')) {
+        entityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: true, userId });
+    }
+
     await db.delete(table as any).where(and(
         eq((table as any)[entityField], entityId),
         eq((table as any)[itemField], itemId)
     ));
 }
+

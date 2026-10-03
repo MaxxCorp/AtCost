@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSeriesItem, isNonSeriesEvent } from "./event-series";
+import { isSeriesItem, isNonSeriesEvent, isVirtualInstanceId, parseVirtualInstanceId, isSeriesMaster, isSeriesInstance, getSeriesRootId } from "./event-series";
 
 describe("event-series helper", () => {
     it("identifies standard single one-off events as non-series events", () => {
@@ -138,4 +138,46 @@ describe("event-series helper", () => {
         expect(isNonSeriesEvent(null)).toBe(false);
         expect(isNonSeriesEvent(undefined)).toBe(false);
     });
+
+    it("parses and identifies virtual instance IDs correctly", () => {
+        expect(isVirtualInstanceId("master-123_inst_2026-10-15T14%3A00%3A00.000Z")).toBe(true);
+        expect(isVirtualInstanceId("regular-uuid-456")).toBe(false);
+        expect(isVirtualInstanceId(null)).toBe(false);
+
+        const parsed = parseVirtualInstanceId("master-123_inst_2026-10-15T14%3A00%3A00.000Z");
+        expect(parsed).toEqual({
+            masterId: "master-123",
+            iso: "2026-10-15T14:00:00.000Z"
+        });
+        expect(parseVirtualInstanceId("not-a-virtual-id")).toBeNull();
+    });
+
+    it("correctly identifies series masters, instances, and resolves root series ID", () => {
+        const master = {
+            id: "master-123",
+            recurrence: ["RRULE:FREQ=WEEKLY"]
+        };
+        const virtual = {
+            id: "master-123_inst_2026-10-15T14:00:00.000Z"
+        };
+        const exception = {
+            id: "exception-789",
+            recurringEventId: "master-123",
+            isException: true
+        };
+
+        expect(isSeriesMaster(master)).toBe(true);
+        expect(isSeriesMaster(virtual)).toBe(false);
+        expect(isSeriesMaster(exception)).toBe(false);
+
+        expect(isSeriesInstance(master)).toBe(false);
+        expect(isSeriesInstance(virtual)).toBe(true);
+        expect(isSeriesInstance(exception)).toBe(true);
+
+        expect(getSeriesRootId(master)).toBe("master-123");
+        expect(getSeriesRootId(virtual)).toBe("master-123");
+        expect(getSeriesRootId(exception)).toBe("master-123");
+        expect(getSeriesRootId("master-123_inst_2026-10-15T14:00:00.000Z")).toBe("master-123");
+    });
 });
+
