@@ -253,6 +253,15 @@ export class AvailabilityService {
                         or(isNotNull(event.recurrence), isNotNull(event.seriesId))
                     ));
 
+                const resourceSeriesIds = Array.from(new Set(recurringEvents.map(r => r.seriesId).filter((id): id is string => Boolean(id))));
+                const resourceSeriesMap = new Map<string, string>();
+                if (resourceSeriesIds.length > 0) {
+                    const seriesRows = await db.select({ id: recurringSeries.id, rrule: recurringSeries.rrule }).from(recurringSeries).where(inArray(recurringSeries.id, resourceSeriesIds));
+                    for (const s of seriesRows) {
+                        if (s.rrule) resourceSeriesMap.set(s.id, s.rrule);
+                    }
+                }
+
                 for (const r of recurringEvents) {
                     if (resourceAvailability[r.resourceId] && !resourceAvailability[r.resourceId].available) continue;
                     if (!r.startDateTime) continue;
@@ -261,8 +270,7 @@ export class AvailabilityService {
                     if (Array.isArray(r.recurrence) && r.recurrence[0]) {
                         rrule = r.recurrence[0];
                     } else if (r.seriesId) {
-                        const [seriesRow] = await db.select({ rrule: recurringSeries.rrule }).from(recurringSeries).where(eq(recurringSeries.id, r.seriesId));
-                        if (seriesRow?.rrule) rrule = seriesRow.rrule;
+                        rrule = resourceSeriesMap.get(r.seriesId) || null;
                     }
 
                     if (rrule) {
@@ -351,6 +359,15 @@ export class AvailabilityService {
                         or(isNotNull(event.recurrence), isNotNull(event.seriesId))
                     ));
 
+                const contactSeriesIds = Array.from(new Set(recurringContactEvents.map(r => r.seriesId).filter((id): id is string => Boolean(id))));
+                const contactSeriesMap = new Map<string, string>();
+                if (contactSeriesIds.length > 0) {
+                    const seriesRows = await db.select({ id: recurringSeries.id, rrule: recurringSeries.rrule }).from(recurringSeries).where(inArray(recurringSeries.id, contactSeriesIds));
+                    for (const s of seriesRows) {
+                        if (s.rrule) contactSeriesMap.set(s.id, s.rrule);
+                    }
+                }
+
                 for (const r of recurringContactEvents) {
                     if (contactAvailability[r.contactId] && !contactAvailability[r.contactId].available) continue;
                     if (!r.startDateTime) continue;
@@ -359,8 +376,7 @@ export class AvailabilityService {
                     if (Array.isArray(r.recurrence) && r.recurrence[0]) {
                         rrule = r.recurrence[0];
                     } else if (r.seriesId) {
-                        const [seriesRow] = await db.select({ rrule: recurringSeries.rrule }).from(recurringSeries).where(eq(recurringSeries.id, r.seriesId));
-                        if (seriesRow?.rrule) rrule = seriesRow.rrule;
+                        rrule = contactSeriesMap.get(r.seriesId) || null;
                     }
 
                     if (rrule) {

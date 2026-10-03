@@ -58,6 +58,12 @@ import { invalidateEvent } from '$lib/server/cache';
 import { expandRecurrence } from '$lib/server/events/recurrence';
 import { isSeriesItem } from '$lib/utils/event-series';
 
+export interface SyncBatchContext {
+	eventRecords?: Map<string, typeof eventTable.$inferSelect>;
+	campaigns?: Map<string, typeof campaignTable.$inferSelect>;
+	associations?: Map<string, any>;
+}
+
 /**
  * Central sync service orchestrator
  * Manages provider instances and coordinates sync operations
@@ -129,7 +135,13 @@ export class SyncService {
 	 * Helper to safely retrieve an event record whether it is a real DB row (UUID)
 	 * or a virtual recurrence instance (masterId_inst_iso).
 	 */
-	public async getEventRecord(itemId: string): Promise<typeof eventTable.$inferSelect | null> {
+	public async getEventRecord(itemId: string, batchContext?: SyncBatchContext): Promise<typeof eventTable.$inferSelect | null> {
+		if (batchContext?.eventRecords?.has(itemId)) {
+			return batchContext.eventRecords.get(itemId)!;
+		}
+
+		let result: typeof eventTable.$inferSelect | null = null;
+
 		if (itemId.includes('_inst_')) {
 			const [masterId, rawIso] = itemId.split('_inst_');
 			const decodedIso = decodeURIComponent(rawIso);
@@ -150,39 +162,44 @@ export class SyncService {
 				.limit(1);
 
 			if (exception) {
-				return exception;
-			}
+				result = exception;
+			} else {
+				// 2. Synthesize from master
+				const master = batchContext?.eventRecords?.get(masterId) || (await db
+					.select()
+					.from(eventTable)
+					.where(eq(eventTable.id, masterId)))[0];
 
-			// 2. Synthesize from master
-			const [master] = await db
+				if (!master) return null;
+
+				const targetDate = new Date(decodedIso);
+				const durationMs = (master.startDateTime && master.endDateTime)
+					? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+					: 3600000;
+
+				result = {
+					...master,
+					id: itemId,
+					recurringEventId: master.id,
+					isException: false,
+					recurrence: null,
+					startDateTime: targetDate,
+					endDateTime: new Date(targetDate.getTime() + durationMs),
+				} as typeof eventTable.$inferSelect;
+			}
+		} else {
+			const [itemRow] = await db
 				.select()
 				.from(eventTable)
-				.where(eq(eventTable.id, masterId));
+				.where(eq(eventTable.id, itemId));
 
-			if (!master) return null;
-
-			const targetDate = new Date(decodedIso);
-			const durationMs = (master.startDateTime && master.endDateTime)
-				? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
-				: 3600000;
-
-			return {
-				...master,
-				id: itemId,
-				recurringEventId: master.id,
-				isException: false,
-				recurrence: null,
-				startDateTime: targetDate,
-				endDateTime: new Date(targetDate.getTime() + durationMs),
-			} as typeof eventTable.$inferSelect;
+			result = itemRow || null;
 		}
 
-		const [itemRow] = await db
-			.select()
-			.from(eventTable)
-			.where(eq(eventTable.id, itemId));
-
-		return itemRow || null;
+		if (result && batchContext?.eventRecords) {
+			batchContext.eventRecords.set(itemId, result);
+		}
+		return result;
 	}
 
 	/**
@@ -1510,7 +1527,8 @@ export class SyncService {
 	 */
 	private async mapInternalToExternal(
 		internal: any,
-		providerId: ProviderType
+		providerId: ProviderType,
+		batchContext?: SyncBatchContext
 	): Promise<ExternalEvent> {
 
 		const isEvent = 'summary' in internal;
@@ -1542,210 +1560,225 @@ export class SyncService {
 		const directEventId = (isVirtual ? internal.id.split('_inst_')[0] : internal.id) as string;
 		const fallbackMasterId = (internal.recurringEventId || (isVirtual ? internal.id.split('_inst_')[0] : null)) as string | null;
 
-		// Fetch associated contacts (check direct event first, fallback to master if exception has no contacts linked)
-		let associatedContacts = (await getEntityContacts(entityType, directEventId)) || [];
-		if (associatedContacts.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
-			associatedContacts = (await getEntityContacts(entityType, fallbackMasterId)) || [];
-		}
+		let attendees: NonNullable<ExternalEvent['attendees']> = [];
+		let venues: ExternalEvent['venues'] | undefined;
+		let venue: ExternalEvent['venue'] | undefined;
+		let venueId: string | undefined;
+		let organizer: ExternalEvent['organizer'] | undefined;
+		let organizerId: string | undefined;
+		let locationHeroImage: string | null | undefined = undefined;
+		const tags: Array<{ id: string; name: string }> = [];
 
-		// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
-		// External contacts are commented out for data privacy reasons until privacy flows are finalized.
-		const attendees: NonNullable<ExternalEvent['attendees']> = [];
-		for (const contact of associatedContacts) {
-			const isEmployee = isEmployeeContact(contact);
+		const cachedAssoc = batchContext?.associations?.get(directEventId);
+		if (cachedAssoc) {
+			attendees = [...cachedAssoc.attendees];
+			venues = cachedAssoc.venues;
+			venue = cachedAssoc.venue;
+			venueId = cachedAssoc.venueId;
+			organizer = cachedAssoc.organizer;
+			organizerId = cachedAssoc.organizerId;
+			locationHeroImage = cachedAssoc.locationHeroImage;
+			tags.push(...cachedAssoc.tags);
+		} else {
+			// Fetch associated contacts (check direct event first, fallback to master if exception has no contacts linked)
+			let associatedContacts = (await getEntityContacts(entityType, directEventId)) || [];
+			if (associatedContacts.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
+				associatedContacts = (await getEntityContacts(entityType, fallbackMasterId)) || [];
+			}
 
-			if (isEmployee) {
-				// Get primary email
-				const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
-					(contact as any).emails?.[0]?.value;
+			// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
+			// External contacts are commented out for data privacy reasons until privacy flows are finalized.
+			for (const contact of associatedContacts) {
+				const isEmployee = isEmployeeContact(contact);
 
-				if (email) {
-					// Find the association to get participation status
-					let participationStatus: string | null = null;
+				if (isEmployee) {
+					// Get primary email
+					const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
+						(contact as any).emails?.[0]?.value;
 
-					if (isEvent) {
-						let [assoc] = await db
-							.select()
-							.from(eventContactTable)
-							.where(and(
-								eq(eventContactTable.eventId, directEventId),
-								eq(eventContactTable.contactId, contact.id)
-							))
-							.limit(1);
+					if (email) {
+						// Find the association to get participation status
+						let participationStatus: string | null = null;
 
-						if (!assoc && fallbackMasterId && fallbackMasterId !== directEventId) {
-							[assoc] = await db
+						if (isEvent) {
+							let [assoc] = await db
 								.select()
 								.from(eventContactTable)
 								.where(and(
-									eq(eventContactTable.eventId, fallbackMasterId),
+									eq(eventContactTable.eventId, directEventId),
 									eq(eventContactTable.contactId, contact.id)
 								))
 								.limit(1);
+
+							if (!assoc && fallbackMasterId && fallbackMasterId !== directEventId) {
+								[assoc] = await db
+									.select()
+									.from(eventContactTable)
+									.where(and(
+										eq(eventContactTable.eventId, fallbackMasterId),
+										eq(eventContactTable.contactId, contact.id)
+									))
+									.limit(1);
+							}
+							participationStatus = assoc?.participationStatus || null;
 						}
-						participationStatus = assoc?.participationStatus || null;
-					}
 
-					attendees.push({
-						email,
-						displayName: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
-						responseStatus: participationStatus || 'needsAction'
-					});
-				}
-			}
-			/*
-			// External contacts excluded until data privacy flows are finalized:
-			else {
-				// Do not sync external contacts as attendees
-			}
-			*/
-		}
-
-		// Resolve Attached Resources
-		if (isEvent) {
-			let linkedResources = await db
-				.select({ resource: resourceTable })
-				.from(eventResourceTable)
-				.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
-				.where(eq(eventResourceTable.eventId, directEventId));
-
-			if (linkedResources.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
-				linkedResources = await db
-					.select({ resource: resourceTable })
-					.from(eventResourceTable)
-					.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
-					.where(eq(eventResourceTable.eventId, fallbackMasterId));
-			}
-
-			for (const { resource: res } of linkedResources) {
-				let calendars: any[] = [];
-				if (typeof res.allocationCalendars === 'string') {
-					try { calendars = JSON.parse(res.allocationCalendars); } catch { calendars = []; }
-				} else if (Array.isArray(res.allocationCalendars)) {
-					calendars = res.allocationCalendars;
-				}
-
-				for (const cal of calendars) {
-					const email = cal.calendarId || cal.email;
-					if (email && typeof email === 'string' && email.includes('@')) {
 						attendees.push({
-							email: email,
-							displayName: res.name || cal.name || 'Resource',
-							responseStatus: 'accepted',
-							type: 'resource',
-							resourceId: res.id
+							email,
+							displayName: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
+							responseStatus: participationStatus || 'needsAction'
 						});
 					}
 				}
 			}
-		}
 
+			// Resolve Attached Resources
+			if (isEvent) {
+				let linkedResources = await db
+					.select({ resource: resourceTable })
+					.from(eventResourceTable)
+					.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
+					.where(eq(eventResourceTable.eventId, directEventId));
 
+				if (linkedResources.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
+					linkedResources = await db
+						.select({ resource: resourceTable })
+						.from(eventResourceTable)
+						.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
+						.where(eq(eventResourceTable.eventId, fallbackMasterId));
+				}
 
-		// Resolve Venues (Locations)
-		let venues: ExternalEvent['venues'] | undefined;
-		let venue: ExternalEvent['venue'] | undefined;
-		let venueId: string | undefined;
+				for (const { resource: res } of linkedResources) {
+					let calendars: any[] = [];
+					if (typeof res.allocationCalendars === 'string') {
+						try { calendars = JSON.parse(res.allocationCalendars); } catch { calendars = []; }
+					} else if (Array.isArray(res.allocationCalendars)) {
+						calendars = res.allocationCalendars;
+					}
 
-		// Try to find structured location data first
-		const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
-		const whereClause = isEvent ? eq(eventLocationTable.eventId, directEventId) : eq(announcementLocation.announcementId, internal.id);
-
-		let locations = await db
-			.select({ location: locationTable })
-			.from(locationTableToUse as any)
-			.innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id))
-			.where(whereClause as any);
-
-		if (locations.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
-			locations = await db
-				.select({ location: locationTable })
-				.from(eventLocationTable as any)
-				.innerJoin(locationTable, eq(eventLocationTable.locationId, locationTable.id))
-				.where(eq(eventLocationTable.eventId, fallbackMasterId));
-		}
-
-		if (locations.length > 0) {
-			venues = locations.map(l => ({
-				id: l.location.id,
-				name: l.location.name,
-				address: l.location.street ? `${l.location.street} ${l.location.houseNumber || ''}`.trim() : undefined,
-				city: l.location.city ?? undefined,
-				country: l.location.country ?? undefined,
-				zip: l.location.zip ?? undefined,
-				province: l.location.state ?? undefined,
-			}));
-
-			// For backward compatibility, pick the first one as primary
-			const primary = locations[0].location;
-			venueId = primary.id;
-			venue = {
-				name: primary.name,
-				address: primary.street ? `${primary.street} ${primary.houseNumber || ''}`.trim() : undefined,
-				city: primary.city ?? undefined,
-				country: primary.country ?? undefined,
-				zip: primary.zip ?? undefined,
-				province: primary.state ?? undefined,
-			};
-		} else if (internal.location) {
-			// Fallback to text location if no structured location is linked
-			venue = {
-				name: internal.location
-			};
-			venues = [venue];
-		}
-
-		// Resolve Organizer (Contact with "Employee" tag)
-		let organizer: ExternalEvent['organizer'] | undefined;
-		let organizerId: string | undefined;
-
-		// Find associated contacts who are employees
-		for (const contact of associatedContacts) {
-			const contactTags = (contact as any).tags || [];
-			const isEmployee = contactTags.some((ct: any) => {
-				const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
-				return tagName === 'employee' || tagName === 'employees';
-			});
-
-			if (isEmployee) {
-				// Use the first employee found as organizer
-				organizerId = contact.id;
-				const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
-					(contact as any).emails?.[0]?.value;
-				const phone = (contact as any).phones?.find((p: any) => p.primary)?.value ||
-					(contact as any).phones?.[0]?.value;
-
-				organizer = {
-					name: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
-					email: email,
-					phone: phone
-				};
-				break; // Only one organizer
+					for (const cal of calendars) {
+						const email = cal.calendarId || cal.email;
+						if (email && typeof email === 'string' && email.includes('@')) {
+							attendees.push({
+								email: email,
+								displayName: res.name || cal.name || 'Resource',
+								responseStatus: 'accepted',
+								type: 'resource',
+								resourceId: res.id
+							});
+						}
+					}
+				}
 			}
-		}
 
+			// Resolve Venues (Locations)
+			const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
+			const whereClause = isEvent ? eq(eventLocationTable.eventId, directEventId) : eq(announcementLocation.announcementId, internal.id);
 
-		// Resolve Tags
-		const tags: Array<{ id: string; name: string }> = [];
-		const tagTableToUse = isEvent ? eventTag : announcementTag;
-		const tagWhereClause = isEvent ? eq(eventTag.eventId, directEventId) : eq(announcementTag.announcementId, internal.id);
+			let locations = await db
+				.select({ location: locationTable })
+				.from(locationTableToUse as any)
+				.innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id))
+				.where(whereClause as any);
 
-		let entityTags = await db
-			.select({ tag: tagTable })
-			.from(tagTableToUse as any)
-			.innerJoin(tagTable, eq((tagTableToUse as any).tagId, tagTable.id))
-			.where(tagWhereClause as any);
+			if (locations.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
+				locations = await db
+					.select({ location: locationTable })
+					.from(eventLocationTable as any)
+					.innerJoin(locationTable, eq(eventLocationTable.locationId, locationTable.id))
+					.where(eq(eventLocationTable.eventId, fallbackMasterId));
+			}
 
-		if (entityTags.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
-			entityTags = await db
+			if (locations.length > 0) {
+				venues = locations.map(l => ({
+					id: l.location.id,
+					name: l.location.name,
+					address: l.location.street ? `${l.location.street} ${l.location.houseNumber || ''}`.trim() : undefined,
+					city: l.location.city ?? undefined,
+					country: l.location.country ?? undefined,
+					zip: l.location.zip ?? undefined,
+					province: l.location.state ?? undefined,
+				}));
+
+				// For backward compatibility, pick the first one as primary
+				const primary = locations[0].location;
+				venueId = primary.id;
+				locationHeroImage = primary.heroImage;
+				venue = {
+					name: primary.name,
+					address: primary.street ? `${primary.street} ${primary.houseNumber || ''}`.trim() : undefined,
+					city: primary.city ?? undefined,
+					country: primary.country ?? undefined,
+					zip: primary.zip ?? undefined,
+					province: primary.state ?? undefined,
+				};
+			} else if (internal.location) {
+				// Fallback to text location if no structured location is linked
+				venue = {
+					name: internal.location
+				};
+				venues = [venue];
+			}
+
+			// Resolve Organizer (Contact with "Employee" tag)
+			for (const contact of associatedContacts) {
+				const contactTags = (contact as any).tags || [];
+				const isEmployee = contactTags.some((ct: any) => {
+					const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
+					return tagName === 'employee' || tagName === 'employees';
+				});
+
+				if (isEmployee) {
+					// Use the first employee found as organizer
+					organizerId = contact.id;
+					const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
+						(contact as any).emails?.[0]?.value;
+					const phone = (contact as any).phones?.find((p: any) => p.primary)?.value ||
+						(contact as any).phones?.[0]?.value;
+
+					organizer = {
+						name: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
+						email: email,
+						phone: phone
+					};
+					break; // Only one organizer
+				}
+			}
+
+			// Resolve Tags
+			const tagTableToUse = isEvent ? eventTag : announcementTag;
+			const tagWhereClause = isEvent ? eq(eventTag.eventId, directEventId) : eq(announcementTag.announcementId, internal.id);
+
+			let entityTags = await db
 				.select({ tag: tagTable })
-				.from(eventTag as any)
-				.innerJoin(tagTable, eq(eventTag.tagId, tagTable.id))
-				.where(eq(eventTag.eventId, fallbackMasterId));
-		}
+				.from(tagTableToUse as any)
+				.innerJoin(tagTable, eq((tagTableToUse as any).tagId, tagTable.id))
+				.where(tagWhereClause as any);
 
-		if (entityTags.length > 0) {
-			tags.push(...entityTags.map((t: { tag: { id: string, name: string } }) => ({ id: t.tag.id, name: t.tag.name })));
+			if (entityTags.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
+				entityTags = await db
+					.select({ tag: tagTable })
+					.from(eventTag as any)
+					.innerJoin(tagTable, eq(eventTag.tagId, tagTable.id))
+					.where(eq(eventTag.eventId, fallbackMasterId));
+			}
+
+			if (entityTags.length > 0) {
+				tags.push(...entityTags.map((t: { tag: { id: string, name: string } }) => ({ id: t.tag.id, name: t.tag.name })));
+			}
+
+			if (batchContext?.associations) {
+				batchContext.associations.set(directEventId, {
+					attendees,
+					venues,
+					venue,
+					venueId,
+					organizer,
+					organizerId,
+					locationHeroImage,
+					tags: [...tags]
+				});
+			}
 		}
 
 		// Helper to resolve absolute URLs
@@ -1784,10 +1817,9 @@ export class SyncService {
 		}
 
 		// 3. Fall back to the hero image of the associated location
-		const primaryLocation = locations?.[0]?.location;
-		if (!image && primaryLocation?.heroImage) {
+		if (!image && locationHeroImage) {
 			image = {
-				url: resolveUrl(primaryLocation.heroImage)!,
+				url: resolveUrl(locationHeroImage)!,
 				title: summary
 			};
 		}
@@ -2020,6 +2052,43 @@ export class SyncService {
 				.map(row => this.rowToConfig(row))
 				.filter(config => config.direction === 'push' || config.direction === 'bidirectional');
 
+			// Prepare batch context to share master events, campaigns, and associations across occurrences
+			const batchEventRecords = new Map<string, typeof eventTable.$inferSelect>(eventRowMap);
+			const batchCampaigns = new Map<string, typeof campaignTable.$inferSelect>();
+			const batchAssociations = new Map<string, any>();
+
+			const batchContext: SyncBatchContext = {
+				eventRecords: batchEventRecords,
+				campaigns: batchCampaigns,
+				associations: batchAssociations
+			};
+
+			for (const [key, camp] of campaignRowMap) {
+				batchCampaigns.set(key, camp);
+				if (camp.id) batchCampaigns.set(camp.id, camp);
+			}
+
+			// Pre-fetch any existing exceptions for series masters in this batch
+			if (entityType === 'event') {
+				const seriesMasterIds = Array.from(eventRowMap.values())
+					.filter(row => this.isSeriesMaster(row))
+					.map(row => row.id);
+
+				if (seriesMasterIds.length > 0) {
+					const existingExceptions = await db
+						.select()
+						.from(eventTable)
+						.where(inArray(eventTable.recurringEventId, seriesMasterIds));
+					for (const exc of existingExceptions) {
+						const origTime = (exc.originalStartTime as any)?.dateTime;
+						if (origTime) {
+							batchEventRecords.set(`${exc.recurringEventId}_inst_${origTime}`, exc);
+						}
+						batchEventRecords.set(exc.id, exc);
+					}
+				}
+			}
+
 			for (let i = 0; i < candidateConfigs.length; i++) {
 				const config = candidateConfigs[i];
 				const elapsedTotal = Date.now() - syncStartTime;
@@ -2084,7 +2153,7 @@ export class SyncService {
 
 				const itemsToProcess: string[] = [];
 				for (const itemId of expandedItemIds) {
-					const { needsSync } = await this.checkSyncRequirement(config, itemId, entityType, provider);
+					const { needsSync } = await this.checkSyncRequirement(config, itemId, entityType, provider, batchContext);
 					if (needsSync) {
 						itemsToProcess.push(itemId);
 					}
@@ -2121,7 +2190,7 @@ export class SyncService {
 							break;
 						}
 
-						await this.syncSingleItem(config, provider, itemId, entityType);
+						await this.syncSingleItem(config, provider, itemId, entityType, batchContext);
 						processedCount++;
 					}
 
@@ -2165,7 +2234,8 @@ export class SyncService {
 		config: SyncConfig,
 		itemId: string,
 		entityType: 'event' | 'announcement',
-		providerInstance?: SyncProvider
+		providerInstance?: SyncProvider,
+		batchContext?: SyncBatchContext
 	): Promise<{ needsSync: boolean }> {
 		const provider = providerInstance || await this.getProviderInstance(config);
 		if (!provider.supportedEntityTypes.includes(entityType)) {
@@ -2193,12 +2263,20 @@ export class SyncService {
 		let campaign: typeof campaignTable.$inferSelect | null = null;
 
 		if (entityType === 'event') {
-			itemRow = await this.getEventRecord(itemId);
-			if (itemRow?.campaignId) {
+			itemRow = await this.getEventRecord(itemId, batchContext);
+			const masterId = itemRow?.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
+
+			if (itemRow?.campaignId && batchContext?.campaigns?.has(itemRow.campaignId)) {
+				campaign = batchContext.campaigns.get(itemRow.campaignId) || null;
+			} else if (masterId && batchContext?.campaigns?.has(masterId)) {
+				campaign = batchContext.campaigns.get(masterId) || null;
+			} else if (itemRow?.campaignId) {
 				const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, itemRow.campaignId));
 				campaign = camp || null;
+				if (campaign && batchContext?.campaigns) {
+					batchContext.campaigns.set(itemRow.campaignId, campaign);
+				}
 			} else if (itemRow) {
-				const masterId = itemRow.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
 				if (masterId) {
 					const [master] = await db
 						.select({ campaign: campaignTable })
@@ -2208,6 +2286,9 @@ export class SyncService {
 						.limit(1);
 					if (master?.campaign) {
 						campaign = master.campaign;
+						if (batchContext?.campaigns) {
+							batchContext.campaigns.set(masterId, master.campaign);
+						}
 						if (!isVirtual) {
 							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
 						}
@@ -2273,12 +2354,13 @@ export class SyncService {
 		config: SyncConfig,
 		provider: SyncProvider,
 		itemId: string,
-		entityType: 'event' | 'announcement'
+		entityType: 'event' | 'announcement',
+		batchContext?: SyncBatchContext
 	): Promise<void> {
 		const isVirtual = itemId.includes('_inst_');
 		let itemRow: any = null;
 		if (entityType === 'event') {
-			itemRow = await this.getEventRecord(itemId);
+			itemRow = await this.getEventRecord(itemId, batchContext);
 		} else {
 			const [ann] = await db.select().from(announcementTable).where(eq(announcementTable.id, itemId));
 			itemRow = ann;
@@ -2292,16 +2374,27 @@ export class SyncService {
 		// Find campaign for this item
 		let campaignId = itemRow.campaignId;
 		let campaignRow: typeof campaignTable.$inferSelect | undefined;
-		if (campaignId) {
+		const masterId = itemRow.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
+
+		if (campaignId && batchContext?.campaigns?.has(campaignId)) {
+			campaignRow = batchContext.campaigns.get(campaignId);
+		} else if (masterId && batchContext?.campaigns?.has(masterId)) {
+			campaignRow = batchContext.campaigns.get(masterId);
+		} else if (campaignId) {
 			[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
+			if (campaignRow && batchContext?.campaigns) {
+				batchContext.campaigns.set(campaignId, campaignRow);
+			}
 		}
 		if (!campaignRow && entityType === 'event') {
-			const masterId = itemRow.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
 			if (masterId) {
 				const [master] = await db.select().from(eventTable).where(eq(eventTable.id, masterId));
 				if (master?.campaignId) {
 					campaignId = master.campaignId;
 					[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
+					if (campaignRow && batchContext?.campaigns) {
+						batchContext.campaigns.set(masterId, campaignRow);
+					}
 					if (!isVirtual) {
 						await db.update(eventTable).set({ campaignId }).where(eq(eventTable.id, itemId));
 					}
@@ -2316,6 +2409,9 @@ export class SyncService {
 				if (master?.campaignId) {
 					campaignId = master.campaignId;
 					[campaignRow] = await db.select().from(campaignTable).where(eq(campaignTable.id, campaignId));
+					if (campaignRow && batchContext?.campaigns) {
+						batchContext.campaigns.set(itemRow.seriesId, campaignRow);
+					}
 					if (!isVirtual) {
 						await db.update(eventTable).set({ campaignId }).where(eq(eventTable.id, itemId));
 					}
@@ -2340,7 +2436,7 @@ export class SyncService {
 		const existingItemSync = campContent.items?.[itemId]?.syncs?.[config.id];
 		const existingExternalId = existingItemSync?.externalId || legacyMapping?.externalId;
 
-		const externalItem = await this.mapInternalToExternal(itemRow, config.providerType);
+		const externalItem = await this.mapInternalToExternal(itemRow, config.providerType, batchContext);
 
 		let finalExternalId = existingExternalId;
 		let finalEtag: string | null | undefined = existingItemSync?.etag || legacyMapping?.etag;
@@ -2410,7 +2506,8 @@ export class SyncService {
 		config: SyncConfig,
 		provider: SyncProvider,
 		itemId: string,
-		entityType: 'event' | 'announcement' = 'event'
+		entityType: 'event' | 'announcement' = 'event',
+		batchContext?: SyncBatchContext
 	): Promise<void> {
 		try {
 			if (!provider.supportedEntityTypes.includes(entityType)) {
@@ -2421,7 +2518,7 @@ export class SyncService {
 			const isVirtual = itemId.includes('_inst_');
 			let itemRow: any = null;
 			if (entityType === 'event') {
-				itemRow = await this.getEventRecord(itemId);
+				itemRow = await this.getEventRecord(itemId, batchContext);
 			} else {
 				const [ann] = await db.select().from(announcementTable).where(eq(announcementTable.id, itemId));
 				itemRow = ann;
@@ -2441,12 +2538,19 @@ export class SyncService {
 			}
 
 			let campaign: typeof campaignTable.$inferSelect | null = null;
-			if (itemRow?.campaignId) {
+			if (itemRow?.campaignId && batchContext?.campaigns?.has(itemRow.campaignId)) {
+				campaign = batchContext.campaigns.get(itemRow.campaignId) || null;
+			} else if (itemRow?.campaignId) {
 				const [camp] = await db.select().from(campaignTable).where(eq(campaignTable.id, itemRow.campaignId));
 				campaign = camp || null;
+				if (campaign && batchContext?.campaigns) {
+					batchContext.campaigns.set(itemRow.campaignId, campaign);
+				}
 			} else if (itemRow && entityType === 'event') {
 				const masterId = itemRow.recurringEventId || (isVirtual ? itemId.split('_inst_')[0] : null);
-				if (masterId) {
+				if (masterId && batchContext?.campaigns?.has(masterId)) {
+					campaign = batchContext.campaigns.get(masterId) || null;
+				} else if (masterId) {
 					const [master] = await db
 						.select({ campaign: campaignTable })
 						.from(eventTable)
@@ -2455,21 +2559,31 @@ export class SyncService {
 						.limit(1);
 					if (master?.campaign) {
 						campaign = master.campaign;
+						if (batchContext?.campaigns) {
+							batchContext.campaigns.set(masterId, master.campaign);
+						}
 						if (!isVirtual) {
 							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
 						}
 					}
 				} else if (itemRow.seriesId) {
-					const [master] = await db
-						.select({ campaign: campaignTable })
-						.from(eventTable)
-						.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
-						.where(and(eq(eventTable.seriesId, itemRow.seriesId), isNull(eventTable.recurringEventId)))
-						.limit(1);
-					if (master?.campaign) {
-						campaign = master.campaign;
-						if (!isVirtual) {
-							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+					if (batchContext?.campaigns?.has(itemRow.seriesId)) {
+						campaign = batchContext.campaigns.get(itemRow.seriesId) || null;
+					} else {
+						const [master] = await db
+							.select({ campaign: campaignTable })
+							.from(eventTable)
+							.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id))
+							.where(and(eq(eventTable.seriesId, itemRow.seriesId), isNull(eventTable.recurringEventId)))
+							.limit(1);
+						if (master?.campaign) {
+							campaign = master.campaign;
+							if (batchContext?.campaigns) {
+								batchContext.campaigns.set(itemRow.seriesId, master.campaign);
+							}
+							if (!isVirtual) {
+								await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+							}
 						}
 					}
 				}
@@ -2533,7 +2647,7 @@ export class SyncService {
 			}
 
 			console.log(`[SyncService] Syncing ${entityType} ${itemId} ("${itemRow.summary || itemRow.title}") to provider: ${config.providerType}. Status: ${existingExternalId ? 'update' : 'create'}`);
-			await this.executeSyncItem(config, provider, itemId, entityType);
+			await this.executeSyncItem(config, provider, itemId, entityType, batchContext);
 
 		} catch (error: any) {
 			console.error(`[SyncService] Failed to sync ${entityType} ${itemId}:`, error);

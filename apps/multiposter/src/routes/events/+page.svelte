@@ -31,7 +31,7 @@
 	} from "@lucide/svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { toast } from "svelte-sonner";
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { SvelteSet } from "svelte/reactivity";
 	import { getPreference, setPreference } from "$lib/utils/idb";
 	import { formatRecurrenceText } from "$lib/utils/format-recurrence";
@@ -75,6 +75,20 @@
 	);
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
+	let searchInput = $state("");
+	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let isInitialized = $state(false);
+
+	function handleSearchInput(e: Event) {
+		const val = (e.currentTarget as HTMLInputElement).value;
+		searchInput = val;
+		clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = setTimeout(() => {
+			searchQuery = val;
+			page = 1;
+		}, 300);
+	}
+
 	let filterValues = $state<FilterStateMap>({});
 	let excludePast = $state(false);
 	let excludeSeries = $state(false);
@@ -85,10 +99,10 @@
 
 	let displayMode = $state<DisplayMode>("compacted");
 	let displayModeOverrides = $state<Record<string, DisplayMode>>({});
-	let modeSettings = $state<Record<DisplayMode, ModeFilterSettings>>({
+	let modeSettings: Record<DisplayMode, ModeFilterSettings> = {
 		compacted: {},
 		unrolled: {},
-	});
+	};
 
 	function setDisplayMode(newMode: DisplayMode, isExplicit = false) {
 		displayMode = newMode;
@@ -237,35 +251,49 @@
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
+		} finally {
+			isInitialized = true;
 		}
 	});
 
 	$effect(() => {
-		// Keep current view mode settings in sync
-		modeSettings[displayMode] = {
-			filterValues,
-			excludePast,
-			excludeSeries,
-			onlySeries,
-			sortOrder,
-			limit,
-		};
+		// Capture reactive dependencies to track
+		const currentMode = displayMode;
+		const currentFilterValues = filterValues;
+		const currentExcludePast = excludePast;
+		const currentExcludeSeries = excludeSeries;
+		const currentOnlySeries = onlySeries;
+		const currentSortOrder = sortOrder;
+		const currentLimit = limit;
+		const currentSortField = sortField;
+		const currentOverrides = displayModeOverrides;
 
-		const prefsToSave = {
-			displayMode,
-			displayModeOverrides,
-			modeSettings,
-			sortField,
-			sortOrder,
-			filterValues,
-			excludePast,
-			excludeSeries,
-			onlySeries,
-			limit,
-		};
-		setPreference("eventsFilters", JSON.stringify(prefsToSave)).catch(
-			console.error,
-		);
+		untrack(() => {
+			modeSettings[currentMode] = {
+				filterValues: currentFilterValues,
+				excludePast: currentExcludePast,
+				excludeSeries: currentExcludeSeries,
+				onlySeries: currentOnlySeries,
+				sortOrder: currentSortOrder,
+				limit: currentLimit,
+			};
+
+			const prefsToSave = {
+				displayMode: currentMode,
+				displayModeOverrides: currentOverrides,
+				modeSettings,
+				sortField: currentSortField,
+				sortOrder: currentSortOrder,
+				filterValues: currentFilterValues,
+				excludePast: currentExcludePast,
+				excludeSeries: currentExcludeSeries,
+				onlySeries: currentOnlySeries,
+				limit: currentLimit,
+			};
+			setPreference("eventsFilters", JSON.stringify(prefsToSave)).catch(
+				console.error,
+			);
+		});
 	});
 
 	const filterState = $derived({
@@ -463,8 +491,8 @@
 				<input
 					type="text"
 					placeholder={m.search_events()}
-					bind:value={searchQuery}
-					oninput={() => (page = 1)}
+					value={searchInput}
+					oninput={handleSearchInput}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
@@ -537,13 +565,22 @@
 				excludePast = false;
 				excludeSeries = false;
 				onlySeries = false;
+				searchInput = "";
+				searchQuery = "";
 				page = 1;
 			}}
 		/>
 
-		<div class="grid grid-cols-1 gap-5">
-			{#await listEvents(filterState) then eventsRes}
+		{#if isInitialized}
+			{#await listEvents(filterState)}
+				<div class="grid grid-cols-1 gap-5">
+					<div class="p-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+						<RefreshCw class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+					</div>
+				</div>
+			{:then eventsRes}
 				{@const displayedEvents = displayMode === "unrolled" ? unrollEvents(eventsRes?.data || [], excludePast) : groupEvents(eventsRes?.data || [])}
+				<div class="grid grid-cols-1 gap-5">
 				{#each displayedEvents as event (event.id)}
 					<div
 						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow {event.isSeriesInstance ? 'border-l-4 border-l-indigo-500 pl-4 sm:pl-5' : ''}"
@@ -776,18 +813,16 @@
 						</p>
 					</div>
 				{/each}
-			{/await}
-		</div>
+				</div>
 
-		<!-- Pagination -->
-		{#await listEvents(filterState) then res}
-			{#if res && res.total > limit}
-				{@const totalPages = Math.ceil(res.total / limit)}
-				<div
-					class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
-				>
-					<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, res.total)} of {res.total}</span>
+				<!-- Pagination -->
+				{#if eventsRes && eventsRes.total > limit}
+					{@const totalPages = Math.ceil(eventsRes.total / limit)}
+					<div
+						class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
+					>
+						<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+							<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, eventsRes.total)} of {eventsRes.total}</span>
 						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 							<select
 								bind:value={limit}
@@ -857,7 +892,18 @@
 						</Button>
 					</div>
 				</div>
-			{/if}
-		{/await}
+				{/if}
+			{:catch err}
+				<div class="p-8 text-center bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900">
+					<p class="text-sm text-red-500">{err?.message || m.something_went_wrong()}</p>
+				</div>
+			{/await}
+		{:else}
+			<div class="grid grid-cols-1 gap-5">
+				<div class="p-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+					<RefreshCw class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+				</div>
+			</div>
+		{/if}
 	</div>
 </div>

@@ -79,8 +79,11 @@ export async function delCache(keys: string | string[]): Promise<void> {
     }
 }
 
+// In-flight promise map to coalesce concurrent requests for the same cache key
+const inFlightRequests = new Map<string, Promise<any>>();
+
 /**
- * Wraps any async fetcher function with Redis read-through caching.
+ * Wraps any async fetcher function with Redis read-through caching and in-flight request coalescing.
  * If Redis is unavailable or fails, gracefully falls back to direct execution of fetcher.
  *
  * @param key The Redis cache key
@@ -99,16 +102,25 @@ export async function cached<T>(
         return cachedData;
     }
 
-    const freshData = await fetcher();
-
-    // Cache the result
-    if (freshData !== undefined) {
-        const effectiveTtl = freshData === null ? negativeTtlSeconds : ttlSeconds;
-        // Non-blocking write to cache so response is fast
-        setCache(key, freshData, effectiveTtl).catch(() => {});
+    // Coalesce concurrent in-flight requests for the same key
+    let inFlight = inFlightRequests.get(key);
+    if (!inFlight) {
+        inFlight = (async () => {
+            try {
+                const freshData = await fetcher();
+                if (freshData !== undefined) {
+                    const effectiveTtl = freshData === null ? negativeTtlSeconds : ttlSeconds;
+                    setCache(key, freshData, effectiveTtl).catch(() => {});
+                }
+                return freshData;
+            } finally {
+                inFlightRequests.delete(key);
+            }
+        })();
+        inFlightRequests.set(key, inFlight);
     }
 
-    return freshData;
+    return inFlight as Promise<T>;
 }
 
 /**
@@ -136,17 +148,28 @@ export async function cachedBinary(
         recordFailure(err);
     }
 
-    const raw = await fetcher();
-    const uint8 = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
-
-    try {
-        const base64 = Buffer.from(uint8).toString('base64');
-        client.set(key, base64, 'EX', ttlSeconds).catch(() => {});
-    } catch {
-        // Ignore cache write errors
+    // Coalesce concurrent binary generation for the same key
+    let inFlight = inFlightRequests.get(key);
+    if (!inFlight) {
+        inFlight = (async () => {
+            try {
+                const raw = await fetcher();
+                const uint8 = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+                try {
+                    const base64 = Buffer.from(uint8).toString('base64');
+                    client.set(key, base64, 'EX', ttlSeconds).catch(() => {});
+                } catch {
+                    // Ignore cache write errors
+                }
+                return uint8;
+            } finally {
+                inFlightRequests.delete(key);
+            }
+        })();
+        inFlightRequests.set(key, inFlight);
     }
 
-    return uint8;
+    return inFlight as Promise<Uint8Array>;
 }
 
 /**

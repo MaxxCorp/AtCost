@@ -148,6 +148,25 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 		}
 	}
 
+	// Batch fetch all recurringSeries records for masters that have seriesId
+	const seriesIds = Array.from(
+		new Set(
+			seriesMasters
+				.map((m) => m.seriesId)
+				.filter((id): id is string => Boolean(id))
+		)
+	);
+	const seriesMap = new Map<string, string>();
+	if (seriesIds.length > 0) {
+		const seriesRecords = await db
+			.select({ id: recurringSeries.id, rrule: recurringSeries.rrule })
+			.from(recurringSeries)
+			.where(inArray(recurringSeries.id, seriesIds));
+		for (const s of seriesRecords) {
+			if (s.rrule) seriesMap.set(s.id, s.rrule);
+		}
+	}
+
 	// For each master event, build the instances list
 	for (const master of seriesMasters) {
 		const fetchedInstances = dbInstancesByMaster.get(master.id) || [];
@@ -163,8 +182,7 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 		if (master.recurrence && Array.isArray(master.recurrence) && master.recurrence[0]) {
 			rruleStr = master.recurrence[0];
 		} else if (master.seriesId) {
-			const [seriesRecord] = await db.select().from(recurringSeries).where(eq(recurringSeries.id, master.seriesId));
-			if (seriesRecord?.rrule) rruleStr = seriesRecord.rrule;
+			rruleStr = seriesMap.get(master.seriesId) || null;
 		}
 
 		if (rruleStr && master.startDateTime) {

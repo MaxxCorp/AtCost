@@ -569,13 +569,23 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				}
 			}
 
+			const seriesIdToRruleMap = new Map<string, string>();
+			if (masterSeriesIds.length > 0) {
+				const seriesRecords = await db
+					.select({ id: recurringSeries.id, rrule: recurringSeries.rrule })
+					.from(recurringSeries)
+					.where(inArray(recurringSeries.id, masterSeriesIds));
+				for (const s of seriesRecords) {
+					if (s.rrule) seriesIdToRruleMap.set(s.id, s.rrule);
+				}
+			}
+
 			for (const master of masters) {
 				let rruleStr: string | null = null;
 				if (master.recurrence && Array.isArray(master.recurrence) && master.recurrence[0]) {
 					rruleStr = master.recurrence[0];
 				} else if (master.seriesId) {
-					const [seriesRecord] = await db.select().from(recurringSeries).where(eq(recurringSeries.id, master.seriesId));
-					if (seriesRecord?.rrule) rruleStr = seriesRecord.rrule;
+					rruleStr = seriesIdToRruleMap.get(master.seriesId) || null;
 				}
 
 				if (!rruleStr || !master.startDateTime) continue;
