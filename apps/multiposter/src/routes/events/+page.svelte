@@ -41,13 +41,53 @@
 		getStatusBadgeClass,
 		getStatusDotClass,
 	} from "$lib/utils/format-event-status";
+	import { goto } from "$app/navigation";
 	import {
-		isMultiDayEvent,
-		getEventDurationDays,
 		formatFriendlyEventTime,
+		getEventDurationDays,
+		isMultiDayEvent,
 	} from "$lib/utils/format-event-date";
 
-	let expandedSeries = $state<Record<string, boolean>>({});
+	function formatDate(dateStr: string | null | undefined) {
+		if (!dateStr) return "";
+		return new Date(dateStr).toLocaleDateString(undefined, {
+			weekday: "short",
+			day: "numeric",
+			month: "short",
+			year: "numeric",
+		});
+	}
+
+	function formatTime(dateTimeStr: string | null | undefined) {
+		if (!dateTimeStr) return "";
+		return new Date(dateTimeStr).toLocaleTimeString(undefined, {
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	}
+
+	function getUpcomingInstance(event: any) {
+		if (!event.instances || event.instances.length === 0) return null;
+		const now = Date.now();
+		const upcoming = event.instances.find((inst: any) => {
+			const time = inst.endDateTime
+				? new Date(inst.endDateTime).getTime()
+				: (inst.startDateTime ? new Date(inst.startDateTime).getTime() : 0);
+			return time >= now;
+		});
+		return upcoming || event.instances[0] || null;
+	}
+
+	function isSeriesEvent(event: any): boolean {
+		return Boolean(
+			event.isSeriesInstance ||
+			event.isSeries ||
+			event.recurringEventId ||
+			event.seriesId ||
+			(event.recurrence && event.recurrence.length > 0) ||
+			(event.instances && event.instances.length > 0)
+		);
+	}
 
 	import {
 		FilterMenu,
@@ -380,7 +420,9 @@
 						status: inst.status || master.status,
 						isSeriesInstance: true,
 						isSeriesMaster: false,
+						recurringEventId: master.id,
 						seriesMaster: master,
+						instances: master.instances,
 						locations: master.locations,
 						resources: master.resources,
 						rooms: master.rooms,
@@ -582,6 +624,12 @@
 				{@const displayedEvents = displayMode === "unrolled" ? unrollEvents(eventsRes?.data || [], excludePast) : groupEvents(eventsRes?.data || [])}
 				<div class="grid grid-cols-1 gap-5">
 				{#each displayedEvents as event (event.id)}
+					{@const upcomingInst = getUpcomingInstance(event)}
+					{@const displayDateEvent = (upcomingInst && !event.isSeriesInstance) ? {
+						...event,
+						startDateTime: upcomingInst.startDateTime,
+						endDateTime: upcomingInst.endDateTime,
+					} : event}
 					<div
 						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow {event.isSeriesInstance ? 'border-l-4 border-l-indigo-500 pl-4 sm:pl-5' : ''}"
 					>
@@ -603,8 +651,8 @@
 										>
 											{event.summary || m.untitled_event()}
 										</h3>
-										{#if isMultiDayEvent(event)}
-											{@const durationDays = getEventDurationDays(event)}
+										{#if isMultiDayEvent(displayDateEvent)}
+											{@const durationDays = getEventDurationDays(displayDateEvent)}
 											<span
 												class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 shrink-0 shadow-2xs"
 												title={m.multi_day_event()}
@@ -657,9 +705,9 @@
 							</a>
 
 							<div
-								class="flex items-center text-sm {isMultiDayEvent(event) ? 'text-purple-900 dark:text-purple-200 font-semibold bg-purple-50/70 dark:bg-purple-950/30 px-3 py-1.5 rounded-lg border border-purple-100 dark:border-purple-900/40 w-fit my-1' : 'text-gray-500 dark:text-gray-400'}"
+								class="flex items-center text-sm {isMultiDayEvent(displayDateEvent) ? 'text-purple-900 dark:text-purple-200 font-semibold bg-purple-50/70 dark:bg-purple-950/30 px-3 py-1.5 rounded-lg border border-purple-100 dark:border-purple-900/40 w-fit my-1' : 'text-gray-500 dark:text-gray-400'}"
 							>
-								{#if isMultiDayEvent(event)}
+								{#if isMultiDayEvent(displayDateEvent)}
 									<CalendarDays
 										class="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400 shrink-0"
 									/>
@@ -669,7 +717,7 @@
 									/>
 								{/if}
 								<span class="truncate font-medium">
-									{formatFriendlyEventTime(event, {
+									{formatFriendlyEventTime(displayDateEvent, {
 										all_day: m.all_day(),
 										on: m.on(),
 										to: m.to(),
@@ -678,6 +726,15 @@
 										loading: m.loading(),
 									})}
 								</span>
+								{#if upcomingInst && !event.isSeriesInstance}
+									<span
+										class="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 shrink-0"
+										title={m.series_occurrence()}
+									>
+										<Calendar class="w-3 h-3 text-blue-500 shrink-0" />
+										{m.next ? m.next() : "Next"}
+									</span>
+								{/if}
 							</div>
 							{#if event.locations && event.locations.length > 0}
 								<div
@@ -723,14 +780,11 @@
 										<RefreshCw class="w-3.5 h-3.5 mr-1.5 text-indigo-500 shrink-0" />
 										<span>{m.part_of_series({ title: event.seriesMaster?.summary || event.summary || '' })}</span>
 									</div>
-									<Button
-										variant="ghost"
-										size="sm"
-										href="/events/{event.seriesMaster?.id || event.recurringEventId}"
-										class="h-7 text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
-									>
-										{m.entire_series_master()}
-									</Button>
+									<SeriesModeSelector
+										event={event}
+										variant="inline"
+										ondelete={(inst) => handleDelete(inst, false)}
+									/>
 								</div>
 							{:else if event.isSeries || (event.recurrence && event.recurrence.length > 0) || event.seriesId || (event.instances && event.instances.length > 0)}
 								<div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
@@ -752,17 +806,123 @@
 						</div>
 
 						<div
-							class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto"
+							class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto flex-wrap"
 						>
-							<Button
-								variant="outline"
-								size="sm"
-								href="/events/{event.id}"
-								class="flex-1 sm:flex-none"
-							>
-								<Pencil class="w-4 h-4 mr-2" />
-								{m.edit()}
-							</Button>
+							{#if isSeriesEvent(event)}
+								{@const isInstance = Boolean(event.isSeriesInstance)}
+								{@const masterId = event.seriesMaster?.id || event.recurringEventId || event.id}
+								{@const defaultHref = isInstance ? `/events/${event.id}` : `/events/${masterId}`}
+								{@const defaultLabel = isInstance ? m.edit_instance() : m.edit_series()}
+								{@const otherHref = isInstance ? `/events/${masterId}` : `/events/${upcomingInst?.id || masterId}`}
+								{@const otherLabel = isInstance ? m.edit_series() : m.edit_instance()}
+
+								<div class="flex-1 sm:flex-none inline-flex rounded-md shadow-2xs isolate">
+									<Button
+										variant="outline"
+										size="sm"
+										href={defaultHref}
+										class="flex-1 sm:flex-none rounded-r-none border-r-0 focus:z-10 flex items-center justify-center h-9 px-3 text-xs sm:text-sm font-medium"
+									>
+										<Pencil class="w-3.5 h-3.5 mr-1.5" />
+										<span>{defaultLabel}</span>
+									</Button>
+									<DropdownMenu.Root>
+										<DropdownMenu.Trigger>
+											<Button
+												variant="outline"
+												size="sm"
+												class="rounded-l-none px-2 focus:z-10 h-9 border-l border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+												aria-label={m.switch_series_or_instance ? m.switch_series_or_instance() : "Options"}
+											>
+												<ChevronDown size={14} class="opacity-70" />
+											</Button>
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Content align="end" class="w-64 sm:w-72 p-1.5 z-50">
+											<DropdownMenu.Item
+												onclick={() => goto(otherHref)}
+												class="flex items-center gap-2.5 p-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+											>
+												{#if isInstance}
+													<RefreshCw size={15} class="text-blue-600 dark:text-blue-400 shrink-0" />
+													<div class="min-w-0">
+														<div class="text-xs font-medium">{otherLabel}</div>
+														{#if event.seriesMaster?.summary}
+															<div class="text-[11px] text-gray-500 truncate">{event.seriesMaster.summary}</div>
+														{/if}
+													</div>
+												{:else}
+													<Calendar size={15} class="text-amber-600 dark:text-amber-400 shrink-0" />
+													<div class="min-w-0">
+														<div class="text-xs font-medium">{otherLabel}</div>
+														{#if upcomingInst?.startDateTime}
+															<div class="text-[11px] text-gray-500 truncate">{formatDate(upcomingInst.startDateTime)} {formatTime(upcomingInst.startDateTime)}</div>
+														{/if}
+													</div>
+												{/if}
+											</DropdownMenu.Item>
+
+											{#if !isInstance && event.instances && event.instances.length > 0}
+												<DropdownMenu.Separator class="my-1" />
+												<DropdownMenu.Group>
+													<DropdownMenu.GroupHeading class="text-[10px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
+														{m.all_instances_count({ count: event.instances.length })}
+													</DropdownMenu.GroupHeading>
+													<div class="max-h-48 overflow-y-auto space-y-0.5 pr-1">
+														{#each event.instances as inst (inst.id)}
+															<DropdownMenu.Item
+																onclick={() => goto(`/events/${inst.id}`)}
+																class="flex items-center justify-between p-1.5 text-xs rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 {inst.id === upcomingInst?.id ? 'bg-amber-50 dark:bg-amber-950/30 font-medium' : ''}"
+															>
+																<div class="flex items-center gap-2 truncate min-w-0">
+																	<Calendar size={13} class="text-gray-400 shrink-0" />
+																	<span class="truncate">{formatDate(inst.startDateTime)} {formatTime(inst.startDateTime)}</span>
+																</div>
+																{#if inst.id === upcomingInst?.id}
+																	<span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-medium shrink-0 ml-1">
+																		{m.next ? m.next() : "Next"}
+																	</span>
+																{/if}
+															</DropdownMenu.Item>
+														{/each}
+													</div>
+												</DropdownMenu.Group>
+											{:else if isInstance && event.instances && event.instances.length > 1}
+												<DropdownMenu.Separator class="my-1" />
+												<DropdownMenu.Group>
+													<DropdownMenu.GroupHeading class="text-[10px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
+														{m.all_instances_count({ count: event.instances.length })}
+													</DropdownMenu.GroupHeading>
+													<div class="max-h-48 overflow-y-auto space-y-0.5 pr-1">
+														{#each event.instances as inst (inst.id)}
+															{#if inst.id !== event.id}
+																<DropdownMenu.Item
+																	onclick={() => goto(`/events/${inst.id}`)}
+																	class="flex items-center justify-between p-1.5 text-xs rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+																>
+																	<div class="flex items-center gap-2 truncate min-w-0">
+																		<Calendar size={13} class="text-gray-400 shrink-0" />
+																		<span class="truncate">{formatDate(inst.startDateTime)} {formatTime(inst.startDateTime)}</span>
+																	</div>
+																</DropdownMenu.Item>
+															{/if}
+														{/each}
+													</div>
+												</DropdownMenu.Group>
+											{/if}
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
+								</div>
+							{:else}
+								<Button
+									variant="outline"
+									size="sm"
+									href="/events/{event.id}"
+									class="flex-1 sm:flex-none h-9 px-3"
+								>
+									<Pencil class="w-4 h-4 mr-2" />
+									{m.edit()}
+								</Button>
+							{/if}
 							<button
 								class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
 								onclick={() => handleDelete(event, !event.isSeriesInstance && (event.isSeries || (event.instances && event.instances.length > 0)))}

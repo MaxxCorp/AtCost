@@ -38,7 +38,9 @@
 
     const isMaster = $derived(!event?.recurringEventId);
     const masterId = $derived(event?.recurringEventId || event?.id || "");
-    const instances = $derived<any[]>(event?.instances || []);
+    const instances = $derived<any[]>(
+        event?.instances || event?.seriesMaster?.instances || []
+    );
     const recurrenceRule = $derived<string | null>(
         (event?.recurrence?.[0] || event?.seriesMaster?.recurrence?.[0]) ?? null
     );
