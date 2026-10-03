@@ -18,6 +18,7 @@
     import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import { isNonSeriesEvent } from "$lib/utils/event-series";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "$lib/utils/format-event-date";
     import * as m from "$lib/paraglide/messages";
     import { resolve } from "$app/paths";
 
@@ -449,37 +450,72 @@
                                     {@const eventRooms = getEventRooms(event)}
                                     {@const displayPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
                                     {@const isSpecialNonSeries = isNonSeriesEvent(event)}
+                                    {@const multiDay = isMultiDayEvent(event)}
+                                    {@const durationDays = multiDay ? getEventDurationDays(event) : 1}
+                                    {@const dateParts = getEventDateParts(event)}
                                     <article class="{density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid transition-all {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 pl-3 sm:pl-4 bg-linear-to-r from-amber-50/60 via-amber-50/20 to-transparent print:bg-slate-50/60 rounded-r-xl my-1.5' : ''}">
                                         <!-- Left Date & Time Column -->
                                         <div class="flex items-center gap-3 shrink-0 min-w-[130px]">
                                             <!-- Date Badge -->
-                                            <div class="flex flex-col items-center justify-center w-12 h-12 {isSpecialNonSeries ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/40' : 'bg-slate-100 print:bg-slate-50 border-slate-200'} border rounded-xl text-center shadow-xs">
-                                                <span class="text-[10px] font-bold {isSpecialNonSeries ? 'text-amber-700 font-extrabold' : 'text-blue-600 print:text-black'} leading-none uppercase">
-                                                    {formatDateMonth(event.startDateTime)}
-                                                </span>
-                                                <span class="text-lg font-black {isSpecialNonSeries ? 'text-amber-950' : 'text-slate-900'} leading-tight">
-                                                    {formatDateDay(event.startDateTime)}
-                                                </span>
-                                                <span class="text-[9px] {isSpecialNonSeries ? 'text-amber-700/80 font-semibold' : 'text-slate-500'} leading-none uppercase">
-                                                    {formatDateWeekday(event.startDateTime)}
-                                                </span>
-                                            </div>
+                                            {#if multiDay}
+                                                <div class="flex flex-col items-center justify-center min-w-[56px] px-1.5 h-12 bg-indigo-50/90 print:bg-slate-50 border-indigo-200 print:border-slate-300 border rounded-xl text-center shadow-xs">
+                                                    <span class="text-[9px] font-extrabold text-indigo-700 print:text-black leading-none uppercase tracking-tight">
+                                                        {dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? `/${dateParts.endMonth}` : ''}
+                                                    </span>
+                                                    <span class="text-sm font-black text-indigo-950 print:text-black leading-tight tracking-tight">
+                                                        {dateParts.startDay}–{dateParts.endDay}
+                                                    </span>
+                                                    <span class="text-[8px] font-bold text-indigo-600 print:text-slate-700 leading-none uppercase">
+                                                        {durationDays} {m.days_count({ count: durationDays })}
+                                                    </span>
+                                                </div>
+                                            {:else}
+                                                <div class="flex flex-col items-center justify-center w-12 h-12 {isSpecialNonSeries ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-400/40' : 'bg-slate-100 print:bg-slate-50 border-slate-200'} border rounded-xl text-center shadow-xs">
+                                                    <span class="text-[10px] font-bold {isSpecialNonSeries ? 'text-amber-700 font-extrabold' : 'text-blue-600 print:text-black'} leading-none uppercase">
+                                                        {formatDateMonth(event.startDateTime)}
+                                                    </span>
+                                                    <span class="text-lg font-black {isSpecialNonSeries ? 'text-amber-950' : 'text-slate-900'} leading-tight">
+                                                        {formatDateDay(event.startDateTime)}
+                                                    </span>
+                                                    <span class="text-[9px] {isSpecialNonSeries ? 'text-amber-700/80 font-semibold' : 'text-slate-500'} leading-none uppercase">
+                                                        {formatDateWeekday(event.startDateTime)}
+                                                    </span>
+                                                </div>
+                                            {/if}
 
                                             <!-- Time Details -->
                                             <div class="text-xs font-semibold text-slate-700">
-                                                {#if event.isAllDay}
-                                                    <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 print:bg-slate-100 print:text-black rounded text-[11px] font-bold">
-                                                        {m.all_day_label()}
-                                                    </span>
-                                                {:else}
-                                                    <div class="flex items-center gap-1 font-bold text-slate-900">
-                                                        <Clock class="w-3 h-3 text-slate-400" />
-                                                        <span>{formatTime(event.startDateTime)}</span>
-                                                    </div>
-                                                    {#if event.endDateTime}
-                                                        <div class="text-slate-500 pl-4 text-[11px]">
-                                                            – {formatTime(event.endDateTime)}
+                                                {#if multiDay}
+                                                    {#if event.isAllDay}
+                                                        <span class="inline-block px-1.5 py-0.5 bg-indigo-100/80 text-indigo-800 print:bg-slate-100 print:text-black rounded text-[11px] font-bold">
+                                                            {m.all_day_label()} • {durationDays} {m.days_count({ count: durationDays })}
+                                                        </span>
+                                                    {:else}
+                                                        <div class="flex items-center gap-1 font-bold text-slate-900">
+                                                            <Clock class="w-3 h-3 text-slate-400" />
+                                                            <span>{formatTime(event.startDateTime)}</span>
                                                         </div>
+                                                        {#if event.endDateTime}
+                                                            <div class="text-slate-500 pl-4 text-[11px]">
+                                                                – {dateParts.endWeekday} {formatTime(event.endDateTime)}
+                                                            </div>
+                                                        {/if}
+                                                    {/if}
+                                                {:else}
+                                                    {#if event.isAllDay}
+                                                        <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 print:bg-slate-100 print:text-black rounded text-[11px] font-bold">
+                                                            {m.all_day_label()}
+                                                        </span>
+                                                    {:else}
+                                                        <div class="flex items-center gap-1 font-bold text-slate-900">
+                                                            <Clock class="w-3 h-3 text-slate-400" />
+                                                            <span>{formatTime(event.startDateTime)}</span>
+                                                        </div>
+                                                        {#if event.endDateTime}
+                                                            <div class="text-slate-500 pl-4 text-[11px]">
+                                                                – {formatTime(event.endDateTime)}
+                                                            </div>
+                                                        {/if}
                                                     {/if}
                                                 {/if}
                                             </div>
@@ -488,6 +524,12 @@
                                         <!-- Center Event Details -->
                                         <div class="flex-1 space-y-1 min-w-0">
                                             <div class="flex flex-wrap items-center gap-2">
+                                                {#if multiDay}
+                                                    <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 print:bg-slate-100 print:text-black text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                                                        <Calendar class="w-2.5 h-2.5" />
+                                                        {m.multi_day_badge()}
+                                                    </span>
+                                                {/if}
                                                 {#if event.status === 'cancelled'}
                                                     <span class="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
                                                         {m.cancelled()}

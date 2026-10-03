@@ -5,11 +5,12 @@
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { RefreshCw, Ticket } from "@lucide/svelte";
+    import { RefreshCw, Ticket, Calendar } from "@lucide/svelte";
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import { isNonSeriesEvent } from "$lib/utils/event-series";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "$lib/utils/format-event-date";
     import * as m from "$lib/paraglide/messages";
 
     interface LocationInfo {
@@ -186,19 +187,48 @@
                             {@const eventRooms = getEventRooms(item)}
                             {@const displayPrice = formatTicketPrice((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
                             {@const isSpecialNonSeries = isNonSeriesEvent(item)}
+                            {@const multiDay = isMultiDayEvent(item)}
+                            {@const durationDays = multiDay ? getEventDurationDays(item) : 1}
+                            {@const dateParts = getEventDateParts(item)}
                             <tr 
                                 class="border-b border-gray-900/30 hover:bg-blue-500/5 transition-all duration-300 h-[12vh] min-h-[100px] {isSpecialNonSeries ? 'bg-amber-500/10 border-l-4 border-l-amber-400' : ''}"
                                 in:fly={{ x: 20, duration: 600, delay: i * 80 }}
                             >
                                 <td class="py-4 px-6 align-middle">
-                                    <div class="text-3xl font-black whitespace-nowrap {isSpecialNonSeries ? 'text-amber-400' : ''}">{formatDate(item.startDateTime)}</div>
+                                    {#if multiDay}
+                                        <div class="text-2xl lg:text-3xl font-black whitespace-nowrap text-indigo-400">
+                                            {dateParts.startDay}.–{dateParts.endDay}.
+                                        </div>
+                                        <div class="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                                            {dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? ` / ${dateParts.endMonth}` : ''} • {durationDays} {m.days_count({ count: durationDays })}
+                                        </div>
+                                    {:else}
+                                        <div class="text-3xl font-black whitespace-nowrap {isSpecialNonSeries ? 'text-amber-400' : ''}">{formatDate(item.startDateTime)}</div>
+                                    {/if}
                                 </td>
                                 <td class="py-4 px-6 align-middle">
-                                    <div class="text-2xl font-bold text-gray-400 whitespace-nowrap">{formatTime(item.startDateTime)}</div>
+                                    {#if multiDay}
+                                        {#if (item as any).isAllDay}
+                                            <div class="text-xl font-bold text-indigo-300 whitespace-nowrap uppercase tracking-wider">{m.all_day_label()}</div>
+                                        {:else}
+                                            <div class="text-xl font-bold text-gray-300 whitespace-nowrap">{formatTime(item.startDateTime)}</div>
+                                            {#if item.endDateTime}
+                                                <div class="text-xs font-semibold text-gray-400 whitespace-nowrap">→ {formatTime(item.endDateTime)}</div>
+                                            {/if}
+                                        {/if}
+                                    {:else}
+                                        <div class="text-2xl font-bold text-gray-400 whitespace-nowrap">{formatTime(item.startDateTime)}</div>
+                                    {/if}
                                 </td>
                                 <td class="py-4 px-6 align-middle">
                                     <div class="space-y-1.5 overflow-hidden">
-                                        <div class="text-3xl font-black leading-tight line-clamp-2 flex items-center gap-3">
+                                        <div class="text-3xl font-black leading-tight line-clamp-2 flex flex-wrap items-center gap-3">
+                                            {#if multiDay}
+                                                <span class="inline-flex items-center gap-1.5 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 self-center">
+                                                    <Calendar class="w-3.5 h-3.5" />
+                                                    {m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})
+                                                </span>
+                                            {/if}
                                             {#if (item as any).status === 'cancelled'}
                                                 <span class="inline-block bg-red-600/80 text-white text-sm font-black px-3 py-1 rounded-full uppercase tracking-widest self-center shrink-0">{m.cancelled()}</span>
                                             {/if}

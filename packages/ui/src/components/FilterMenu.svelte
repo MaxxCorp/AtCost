@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from "svelte";
-	import type { FilterGroup, FilterStateMap, BooleanFilter } from "./EntityManager.types";
+	import type { FilterGroup, FilterStateMap, BooleanFilter, RadioFilterGroup } from "./EntityManager.types";
+	import type { Snippet } from "svelte";
 	import { normalizeOption, registerGroupOptions } from "../utils/filterOptionsCache.svelte";
 	import * as DropdownMenu from "./dropdown-menu";
 	import Button from "./button/button.svelte";
@@ -19,6 +20,8 @@
 		groups?: FilterGroup[];
 		filters?: FilterStateMap;
 		booleanFilters?: BooleanFilter[];
+		radioGroups?: RadioFilterGroup[];
+		children?: Snippet;
 		buttonLabel?: string;
 		buttonVariant?: "outline" | "ghost" | "secondary" | "default";
 		buttonClass?: string;
@@ -44,6 +47,8 @@
 		groups = [],
 		filters = $bindable({}),
 		booleanFilters = [],
+		radioGroups = [],
+		children,
 		buttonLabel = "Filters",
 		buttonVariant = "outline",
 		buttonClass = "",
@@ -215,6 +220,45 @@
 		{align}
 		class="min-w-[240px] max-w-[320px] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 p-1.5 bg-white dark:bg-gray-900 z-50 animate-in fade-in zoom-in-95 duration-150"
 	>
+		<!-- Radio Filter Groups (e.g. Display Modes) -->
+		{#if radioGroups && radioGroups.length > 0}
+			{#each radioGroups as rg (rg.id)}
+				{#if rg.label}
+					<DropdownMenu.Label
+						class="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 px-3 py-1.5"
+					>
+						{rg.label}
+					</DropdownMenu.Label>
+				{/if}
+				<DropdownMenu.RadioGroup
+					value={rg.value}
+					onValueChange={(val) => {
+						if (val) rg.onchange(val);
+					}}
+				>
+					{#each rg.options as opt (opt.value)}
+						<DropdownMenu.RadioItem
+							value={opt.value}
+							closeOnSelect={false}
+							class="rounded-xl py-2 px-3 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+						>
+							{#if opt.icon}
+								{@const OptIcon = opt.icon}
+								<OptIcon size={14} class="mr-2 text-gray-500" />
+							{/if}
+							<div class="flex flex-col min-w-0">
+								<span class="truncate font-medium">{opt.label}</span>
+								{#if opt.description}
+									<span class="text-[11px] text-gray-400 font-normal leading-tight">{opt.description}</span>
+								{/if}
+							</div>
+						</DropdownMenu.RadioItem>
+					{/each}
+				</DropdownMenu.RadioGroup>
+				<DropdownMenu.Separator class="bg-gray-100 dark:bg-gray-800 my-1" />
+			{/each}
+		{/if}
+
 		<!-- System / Boolean Flags Section -->
 		{#if booleanFilters.length > 0}
 			<DropdownMenu.Label
@@ -476,6 +520,11 @@
 					</DropdownMenu.SubContent>
 				</DropdownMenu.Sub>
 			{/each}
+		{/if}
+
+		{#if children}
+			<DropdownMenu.Separator class="bg-gray-100 dark:bg-gray-800 my-1" />
+			{@render children()}
 		{/if}
 
 		<!-- Global Clear All Action -->

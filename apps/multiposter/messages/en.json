@@ -840,6 +840,18 @@
 	"switch_series_or_instance": "Select series or occurrence",
 	"unsaved_changes_switch_confirm": "You may have unsaved changes. Are you sure you want to switch?",
 	"all_instances_count": "Occurrences ({count})",
-	"no_location": "No Location"
+	"no_location": "No Location",
+	"display_mode": "Display Mode",
+	"series_display": "Series Display",
+	"series_compacted": "Compacted (Series grouped)",
+	"series_compacted_desc": "Show recurring events grouped under a single master card",
+	"series_unrolled": "Unrolled (Individual occurrences)",
+	"series_unrolled_desc": "List each individual series instance separately",
+	"multi_day": "Multi-day",
+	"multi_day_badge": "Multi-day",
+	"multi_day_event": "Multi-day Event",
+	"days_count": "{count} days",
+	"series_occurrence": "Series Occurrence",
+	"part_of_series": "Part of series: {title}"
 }
 

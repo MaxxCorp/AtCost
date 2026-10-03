@@ -32,6 +32,7 @@
     import { formatTicketPrice } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
     import { isSeriesItem, isNonSeriesEvent } from "$lib/utils/event-series";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "$lib/utils/format-event-date";
     import * as m from "$lib/paraglide/messages";
     import { resolve } from "$app/paths";
     import { toast } from "svelte-sonner";
@@ -1160,11 +1161,24 @@
             <div class="flex items-center justify-between gap-1.5">
                 {#if isEvent}
                     {@const isSeries = isSeriesItem(item)}
+                    {@const multiDay = isMultiDayEvent(item as Event)}
+                    {@const durationDays = multiDay ? getEventDurationDays(item as Event) : 1}
+                    {@const dateParts = getEventDateParts(item as Event)}
                     <div class="flex items-center gap-1.5 flex-wrap">
                         <!-- Date badge -->
-                        <div class="{isSpecialNonSeries ? 'bg-amber-600 text-white shadow-2xs font-black' : 'bg-slate-900 text-white'} px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">
-                            {formatDay((item as Event).startDateTime)} {formatMonth((item as Event).startDateTime)}
-                        </div>
+                        {#if multiDay}
+                            <div class="bg-indigo-950 text-white px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight inline-flex items-center gap-1">
+                                <span>{dateParts.startDay}{dateParts.startMonth !== dateParts.endMonth ? ` ${dateParts.startMonth}` : ''}–{dateParts.endDay} {dateParts.endMonth}</span>
+                            </div>
+                            <span class="text-[8.5px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
+                                <Calendar class="w-2.5 h-2.5 text-indigo-600" />
+                                <span>{durationDays} {m.days_count({ count: durationDays })}</span>
+                            </span>
+                        {:else}
+                            <div class="{isSpecialNonSeries ? 'bg-amber-600 text-white shadow-2xs font-black' : 'bg-slate-900 text-white'} px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">
+                                {formatDay((item as Event).startDateTime)} {formatMonth((item as Event).startDateTime)}
+                            </div>
+                        {/if}
                         <!-- Time -->
                         <div class="text-[9.5px] text-slate-600 font-medium flex items-center gap-0.5">
                             <Clock class="w-2.5 h-2.5 text-slate-400" />

@@ -20,6 +20,7 @@
     import { formatRecurrenceText } from "$lib/utils/format-recurrence";
     import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
     import { getEventRooms } from "$lib/utils/format-rooms";
+    import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from "$lib/utils/format-event-date";
 
     let { event }: { event: Event } = $props();
 
@@ -46,12 +47,28 @@
         });
     }
 
+    const multiDay = $derived(isMultiDayEvent(event));
+    const durationDays = $derived(multiDay ? getEventDurationDays(event) : 1);
+
     const displayDate = $derived(
-        event.isAllDay && event.startDateTime
-            ? formatDate(event.startDateTime)
-            : event.startDateTime
-              ? formatDateTime(event.startDateTime)
-              : "",
+        multiDay
+            ? formatFriendlyEventTime(
+                event,
+                {
+                    all_day: m.all_day?.() || "All Day",
+                    on: m.on?.() || "on",
+                    to: m.to?.() || "to",
+                    until: m.until?.() || "until",
+                    days_count: (c) => m.days_count({ count: c }),
+                    loading: m.loading?.() || "Loading...",
+                },
+                getLocale()
+            )
+            : event.isAllDay && event.startDateTime
+                ? formatDate(event.startDateTime)
+                : event.startDateTime
+                  ? formatDateTime(event.startDateTime)
+                  : ""
     );
 
     let imageLoadError = $state(false);
@@ -91,6 +108,12 @@
             <h1 class="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
                 {event.summary}
             </h1>
+            {#if multiDay}
+                <span class="bg-white/20 text-white text-xs sm:text-sm font-semibold px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs flex items-center gap-1 shadow-xs">
+                    <Calendar class="w-3.5 h-3.5 text-blue-200" />
+                    <span>{m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})</span>
+                </span>
+            {/if}
             {#if event.status === 'cancelled'}
                 <span class="bg-rose-600 text-white text-xs sm:text-sm font-bold px-3 py-1 rounded-full border border-white/20 uppercase tracking-widest shadow-sm">
                     {m.cancelled?.() || 'Cancelled'}

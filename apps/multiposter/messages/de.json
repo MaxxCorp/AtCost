@@ -840,6 +840,18 @@
 	"switch_series_or_instance": "Serie oder Termin wählen",
 	"unsaved_changes_switch_confirm": "Du hast möglicherweise ungespeicherte Änderungen. Möchtest du wirklich wechseln?",
 	"all_instances_count": "Termine ({count})",
-	"no_location": "Kein Standort"
+	"no_location": "Kein Standort",
+	"display_mode": "Anzeigemodus",
+	"series_display": "Serienanzeige",
+	"series_compacted": "Kompakt (Serien gruppiert)",
+	"series_compacted_desc": "Wiederkehrende Termine unter einer übergeordneten Karte gruppieren",
+	"series_unrolled": "Entrollt (Einzelne Termine)",
+	"series_unrolled_desc": "Jeden einzelnen Termin der Serie separat auflisten",
+	"multi_day": "Mehrtägig",
+	"multi_day_badge": "Mehrtägig",
+	"multi_day_event": "Mehrtägige Veranstaltung",
+	"days_count": "{count} Tage",
+	"series_occurrence": "Serientermin",
+	"part_of_series": "Teil der Serie: {title}"
 }
 

@@ -32,6 +32,21 @@ export interface BooleanFilter {
     onchange: (checked: boolean) => void;
 }
 
+export interface RadioFilterOption {
+    value: string;
+    label: string;
+    description?: string;
+    icon?: Component<any>;
+}
+
+export interface RadioFilterGroup {
+    id: string;
+    label?: string;
+    value: string;
+    options: RadioFilterOption[];
+    onchange: (value: string) => void;
+}
+
 export type FilterDefinition = FilterGroup;
 export type FilterAssociation = FilterGroup;
 

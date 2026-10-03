@@ -18,6 +18,7 @@
 		ChevronDown,
 		ChevronRight,
 		CalendarDays,
+		Calendar,
 		Filter as FilterIcon,
 		Search,
 		ArrowLeft,
@@ -40,40 +41,33 @@
 		getStatusBadgeClass,
 		getStatusDotClass,
 	} from "$lib/utils/format-event-status";
-
-	// Simple date formatter function
-	function formatEventTime(event: any): string {
-		if (!event.startDateTime) return m.loading();
-		const start = new Date(event.startDateTime);
-		const startDateStr = start.toLocaleDateString();
-		if (event.isAllDay) {
-			if (event.endDateTime) {
-				const endDateStr = new Date(
-					event.endDateTime,
-				).toLocaleDateString();
-				if (startDateStr !== endDateStr)
-					return `${m.all_day()}: ${startDateStr} - ${endDateStr}`;
-			}
-			return `${m.all_day()} ${m.on()} ${startDateStr}`;
-		}
-		const startTime = start.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-		if (event.endDateTime) {
-			const end = new Date(event.endDateTime);
-			const endTime = end.toLocaleTimeString([], {
-				hour: "2-digit",
-				minute: "2-digit",
-			});
-			return `${startDateStr}, ${startTime} - ${endTime}`;
-		}
-		return `${startDateStr}, ${startTime}`;
-	}
+	import {
+		isMultiDayEvent,
+		getEventDurationDays,
+		formatFriendlyEventTime,
+	} from "$lib/utils/format-event-date";
 
 	let expandedSeries = $state<Record<string, boolean>>({});
 
-	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+	import {
+		FilterMenu,
+		ActiveFilterChips,
+		type FilterGroup,
+		type FilterStateMap,
+		type RadioFilterGroup,
+	} from "@ac/ui";
+
+	// View Mode / Display Mode types & state
+	type DisplayMode = "compacted" | "unrolled";
+
+	interface ModeFilterSettings {
+		filterValues?: FilterStateMap;
+		excludePast?: boolean;
+		excludeSeries?: boolean;
+		onlySeries?: boolean;
+		sortOrder?: "asc" | "desc";
+		limit?: number;
+	}
 
 	// Filter state
 	let sortField = $state<"updatedAt" | "startDateTime" | "createdAt">(
@@ -88,6 +82,72 @@
 	let page = $state(1);
 	let limit = $state(50);
 	let showMigrationDialog = $state(false);
+
+	let displayMode = $state<DisplayMode>("compacted");
+	let displayModeOverrides = $state<Record<string, DisplayMode>>({});
+	let modeSettings = $state<Record<DisplayMode, ModeFilterSettings>>({
+		compacted: {},
+		unrolled: {},
+	});
+
+	function setDisplayMode(newMode: DisplayMode, isExplicit = false) {
+		displayMode = newMode;
+		if (isExplicit) {
+			displayModeOverrides[sortField] = newMode;
+		}
+
+		// Restore settings saved for this view mode
+		const saved = modeSettings[newMode];
+		if (saved) {
+			if (saved.filterValues) filterValues = saved.filterValues;
+			if (saved.excludePast !== undefined) excludePast = saved.excludePast;
+			if (saved.excludeSeries !== undefined) excludeSeries = saved.excludeSeries;
+			if (saved.onlySeries !== undefined) onlySeries = saved.onlySeries;
+			if (saved.sortOrder) sortOrder = saved.sortOrder;
+			if (saved.limit) limit = saved.limit;
+		} else if (newMode === "unrolled" && sortField === "startDateTime") {
+			sortOrder = "asc";
+		}
+		page = 1;
+	}
+
+	function handleSortFieldChange(newSortField: "updatedAt" | "startDateTime" | "createdAt") {
+		sortField = newSortField;
+		const override = displayModeOverrides[newSortField];
+		if (override) {
+			setDisplayMode(override, false);
+		} else if (newSortField === "startDateTime") {
+			setDisplayMode("unrolled", false);
+		} else {
+			setDisplayMode("compacted", false);
+		}
+		page = 1;
+	}
+
+	const radioGroups = $derived<RadioFilterGroup[]>([
+		{
+			id: "displayMode",
+			label: m.series_display(),
+			value: displayMode,
+			options: [
+				{
+					value: "compacted",
+					label: m.series_compacted(),
+					description: m.series_compacted_desc(),
+					icon: RefreshCw,
+				},
+				{
+					value: "unrolled",
+					label: m.series_unrolled(),
+					description: m.series_unrolled_desc(),
+					icon: CalendarDays,
+				},
+			],
+			onchange: (val: string) => {
+				setDisplayMode(val as DisplayMode, true);
+			},
+		},
+	]);
 
 	const filterGroups = $derived<FilterGroup[]>([
 		{
@@ -143,15 +203,37 @@
 			const savedPrefs = await getPreference("eventsFilters", null);
 			if (savedPrefs) {
 				const prefs = JSON.parse(savedPrefs as string);
-				if (prefs.sortField) sortField = prefs.sortField;
-				if (prefs.sortOrder) sortOrder = prefs.sortOrder;
-				if (prefs.filterValues) filterValues = prefs.filterValues;
-				if (prefs.excludePast !== undefined)
-					excludePast = prefs.excludePast;
-				if (prefs.excludeSeries !== undefined)
-					excludeSeries = prefs.excludeSeries;
-				if (prefs.onlySeries !== undefined)
-					onlySeries = prefs.onlySeries;
+				if (prefs.displayModeOverrides) displayModeOverrides = prefs.displayModeOverrides;
+				if (prefs.modeSettings) modeSettings = prefs.modeSettings;
+
+				const initialSort = prefs.sortField || "updatedAt";
+				sortField = initialSort;
+
+				const initialMode: DisplayMode =
+					prefs.displayMode ||
+					displayModeOverrides[initialSort] ||
+					(initialSort === "startDateTime" ? "unrolled" : "compacted");
+				displayMode = initialMode;
+
+				const saved = modeSettings[initialMode] || {};
+				if (saved.filterValues) filterValues = saved.filterValues;
+				else if (prefs.filterValues) filterValues = prefs.filterValues;
+
+				if (saved.excludePast !== undefined) excludePast = saved.excludePast;
+				else if (prefs.excludePast !== undefined) excludePast = prefs.excludePast;
+
+				if (saved.excludeSeries !== undefined) excludeSeries = saved.excludeSeries;
+				else if (prefs.excludeSeries !== undefined) excludeSeries = prefs.excludeSeries;
+
+				if (saved.onlySeries !== undefined) onlySeries = saved.onlySeries;
+				else if (prefs.onlySeries !== undefined) onlySeries = prefs.onlySeries;
+
+				if (saved.sortOrder) sortOrder = saved.sortOrder;
+				else if (prefs.sortOrder) sortOrder = prefs.sortOrder;
+				else if (initialSort === "startDateTime") sortOrder = "asc";
+
+				if (saved.limit) limit = saved.limit;
+				else if (prefs.limit) limit = prefs.limit;
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
@@ -159,13 +241,27 @@
 	});
 
 	$effect(() => {
+		// Keep current view mode settings in sync
+		modeSettings[displayMode] = {
+			filterValues,
+			excludePast,
+			excludeSeries,
+			onlySeries,
+			sortOrder,
+			limit,
+		};
+
 		const prefsToSave = {
+			displayMode,
+			displayModeOverrides,
+			modeSettings,
 			sortField,
 			sortOrder,
 			filterValues,
 			excludePast,
 			excludeSeries,
 			onlySeries,
+			limit,
 		};
 		setPreference("eventsFilters", JSON.stringify(prefsToSave)).catch(
 			console.error,
@@ -226,6 +322,66 @@
 				});
 				return { ...master, instances: combined };
 			});
+	}
+
+	function unrollEvents(rawEvents: any[], isExcludePast: boolean) {
+		const grouped = groupEvents(rawEvents);
+		const unrolled: any[] = [];
+		const now = new Date();
+		now.setHours(0, 0, 0, 0);
+
+		for (const master of grouped) {
+			const hasInstances = master.instances && master.instances.length > 0;
+			if (!hasInstances) {
+				unrolled.push(master);
+			} else {
+				for (const inst of master.instances) {
+					if (isExcludePast) {
+						const iStart = inst.startDateTime ? new Date(inst.startDateTime) : null;
+						const iEnd = inst.endDateTime ? new Date(inst.endDateTime) : null;
+						const isFuture = (iStart ? iStart >= now : false) || (iEnd ? iEnd >= now : false);
+						if (!isFuture) continue;
+					}
+					unrolled.push({
+						...master,
+						...inst,
+						id: inst.id,
+						summary: inst.summary || master.summary,
+						startDateTime: inst.startDateTime,
+						endDateTime: inst.endDateTime,
+						status: inst.status || master.status,
+						isSeriesInstance: true,
+						isSeriesMaster: false,
+						seriesMaster: master,
+						locations: master.locations,
+						resources: master.resources,
+						rooms: master.rooms,
+						tags: master.tags,
+						user: master.user,
+						updatedAt: master.updatedAt,
+						createdAt: master.createdAt,
+					});
+				}
+			}
+		}
+
+		unrolled.sort((a: any, b: any) => {
+			if (sortField === "startDateTime") {
+				const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+				const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+			} else if (sortField === "createdAt") {
+				const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+				const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+			} else {
+				const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+				const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+			}
+		});
+
+		return unrolled;
 	}
 </script>
 
@@ -316,6 +472,7 @@
 				<FilterMenu
 					groups={filterGroups}
 					booleanFilters={booleanFilters}
+					radioGroups={radioGroups}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
 					onchange={() => (page = 1)}
@@ -325,7 +482,8 @@
 					class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1"
 				>
 					<select
-						bind:value={sortField}
+						value={sortField}
+						onchange={(e) => handleSortFieldChange(e.currentTarget.value as any)}
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
 						<option value="updatedAt">{m.sort_last_updated()}</option>
@@ -385,9 +543,10 @@
 
 		<div class="grid grid-cols-1 gap-5">
 			{#await listEvents(filterState) then eventsRes}
-				{#each groupEvents(eventsRes?.data || []) as event (event.id)}
+				{@const displayedEvents = displayMode === "unrolled" ? unrollEvents(eventsRes?.data || [], excludePast) : groupEvents(eventsRes?.data || [])}
+				{#each displayedEvents as event (event.id)}
 					<div
-						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow {event.isSeriesInstance ? 'border-l-4 border-l-indigo-500 pl-4 sm:pl-5' : ''}"
 					>
 						<div class="flex-1 mb-5">
 							<a
@@ -407,6 +566,24 @@
 										>
 											{event.summary || m.untitled_event()}
 										</h3>
+										{#if isMultiDayEvent(event)}
+											{@const durationDays = getEventDurationDays(event)}
+											<span
+												class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 shrink-0 shadow-2xs"
+												title={m.multi_day_event()}
+											>
+												<CalendarDays class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+												<span>{m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})</span>
+											</span>
+										{/if}
+										{#if event.isSeriesInstance}
+											<span
+												class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 shrink-0"
+											>
+												<Calendar class="w-3 h-3 text-indigo-500 shrink-0" />
+												<span>{m.series_occurrence()}</span>
+											</span>
+										{/if}
 										{#if event.status}
 											<span
 												data-testid="event-status-{event.id}"
@@ -443,14 +620,27 @@
 							</a>
 
 							<div
-								class="flex items-center text-sm text-gray-500 dark:text-gray-400"
+								class="flex items-center text-sm {isMultiDayEvent(event) ? 'text-purple-900 dark:text-purple-200 font-semibold bg-purple-50/70 dark:bg-purple-950/30 px-3 py-1.5 rounded-lg border border-purple-100 dark:border-purple-900/40 w-fit my-1' : 'text-gray-500 dark:text-gray-400'}"
 							>
-								<Clock
-									class="w-4 h-4 mr-2 text-primary-500 shrink-0"
-								/>
-								<span class="truncate font-medium"
-									>{formatEventTime(event)}</span
-								>
+								{#if isMultiDayEvent(event)}
+									<CalendarDays
+										class="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400 shrink-0"
+									/>
+								{:else}
+									<Clock
+										class="w-4 h-4 mr-2 text-primary-500 shrink-0"
+									/>
+								{/if}
+								<span class="truncate font-medium">
+									{formatFriendlyEventTime(event, {
+										all_day: m.all_day(),
+										on: m.on(),
+										to: m.to(),
+										until: m.until(),
+										days_count: (c) => m.days_count({ count: c }),
+										loading: m.loading(),
+									})}
+								</span>
 							</div>
 							{#if event.locations && event.locations.length > 0}
 								<div
@@ -490,7 +680,22 @@
 								</div>
 							{/if}
 
-							{#if event.isSeries || (event.recurrence && event.recurrence.length > 0) || event.seriesId || (event.instances && event.instances.length > 0)}
+							{#if event.isSeriesInstance}
+								<div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
+									<div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
+										<RefreshCw class="w-3.5 h-3.5 mr-1.5 text-indigo-500 shrink-0" />
+										<span>{m.part_of_series({ title: event.seriesMaster?.summary || event.summary || '' })}</span>
+									</div>
+									<Button
+										variant="ghost"
+										size="sm"
+										href="/events/{event.seriesMaster?.id || event.recurringEventId}"
+										class="h-7 text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
+									>
+										{m.entire_series_master()}
+									</Button>
+								</div>
+							{:else if event.isSeries || (event.recurrence && event.recurrence.length > 0) || event.seriesId || (event.instances && event.instances.length > 0)}
 								<div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
 									{#if event.recurrence && event.recurrence.length > 0}
 										<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
@@ -523,7 +728,7 @@
 							</Button>
 							<button
 								class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-								onclick={() => handleDelete(event, event.isSeries || (event.instances && event.instances.length > 0))}
+								onclick={() => handleDelete(event, !event.isSeriesInstance && (event.isSeries || (event.instances && event.instances.length > 0)))}
 							>
 								<Trash2 class="w-4 h-4 mr-2" />
 								{m.delete()}
