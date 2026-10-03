@@ -32,7 +32,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { toast } from "svelte-sonner";
 	import { onMount, untrack } from "svelte";
-	import { SvelteSet } from "svelte/reactivity";
+	import { SvelteDate, SvelteSet } from "svelte/reactivity";
 	import { getPreference, setPreference } from "$lib/utils/idb";
 	import { formatRecurrenceText } from "$lib/utils/format-recurrence";
 	import { getEventRooms } from "$lib/utils/format-rooms";
@@ -395,7 +395,7 @@
 	function unrollEvents(rawEvents: any[], isExcludePast: boolean) {
 		const grouped = groupEvents(rawEvents);
 		const unrolled: any[] = [];
-		const now = new Date();
+		const now = new SvelteDate();
 		now.setHours(0, 0, 0, 0);
 
 		for (const master of grouped) {
@@ -774,28 +774,18 @@
 								</div>
 							{/if}
 
-							{#if event.isSeriesInstance}
+							{#if isSeriesEvent(event)}
 								<div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
-									<div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
+									<div class="flex items-center text-xs text-gray-500 dark:text-gray-400 min-w-0">
 										<RefreshCw class="w-3.5 h-3.5 mr-1.5 text-indigo-500 shrink-0" />
-										<span>{m.part_of_series({ title: event.seriesMaster?.summary || event.summary || '' })}</span>
+										<span class="truncate">
+											{event.isSeriesInstance
+												? m.part_of_series({ title: event.seriesMaster?.summary || event.summary || '' })
+												: (event.recurrence && event.recurrence.length > 0
+													? formatRecurrenceText(event.recurrence)
+													: m.series_mode_label())}
+										</span>
 									</div>
-									<SeriesModeSelector
-										event={event}
-										variant="inline"
-										ondelete={(inst) => handleDelete(inst, false)}
-									/>
-								</div>
-							{:else if event.isSeries || (event.recurrence && event.recurrence.length > 0) || event.seriesId || (event.instances && event.instances.length > 0)}
-								<div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 flex-wrap">
-									{#if event.recurrence && event.recurrence.length > 0}
-										<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-											<RefreshCw class="w-4 h-4 mr-2 text-primary-500 shrink-0" />
-											<span class="truncate">{formatRecurrenceText(event.recurrence)}</span>
-										</div>
-									{:else}
-										<div></div>
-									{/if}
 									<SeriesModeSelector
 										event={event}
 										variant="inline"
@@ -815,6 +805,7 @@
 								{@const defaultLabel = isInstance ? m.edit_instance() : m.edit_series()}
 								{@const otherHref = isInstance ? `/events/${masterId}` : `/events/${upcomingInst?.id || masterId}`}
 								{@const otherLabel = isInstance ? m.edit_series() : m.edit_instance()}
+								{@const allInstances = event.instances || event.seriesMaster?.instances || []}
 
 								<div class="flex-1 sm:flex-none inline-flex rounded-md shadow-2xs isolate">
 									<Button
@@ -861,50 +852,29 @@
 												{/if}
 											</DropdownMenu.Item>
 
-											{#if !isInstance && event.instances && event.instances.length > 0}
+											{#if allInstances.length > 0}
 												<DropdownMenu.Separator class="my-1" />
 												<DropdownMenu.Group>
 													<DropdownMenu.GroupHeading class="text-[10px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
-														{m.all_instances_count({ count: event.instances.length })}
+														{m.all_instances_count({ count: allInstances.length })}
 													</DropdownMenu.GroupHeading>
 													<div class="max-h-48 overflow-y-auto space-y-0.5 pr-1">
-														{#each event.instances as inst (inst.id)}
+														{#each allInstances as inst (inst.id)}
+															{@const isSelected = isInstance ? inst.id === event.id : inst.id === upcomingInst?.id}
 															<DropdownMenu.Item
 																onclick={() => goto(`/events/${inst.id}`)}
-																class="flex items-center justify-between p-1.5 text-xs rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 {inst.id === upcomingInst?.id ? 'bg-amber-50 dark:bg-amber-950/30 font-medium' : ''}"
+																class="flex items-center justify-between p-1.5 text-xs rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 {isSelected ? 'bg-amber-50 dark:bg-amber-950/30 font-medium' : ''}"
 															>
 																<div class="flex items-center gap-2 truncate min-w-0">
 																	<Calendar size={13} class="text-gray-400 shrink-0" />
 																	<span class="truncate">{formatDate(inst.startDateTime)} {formatTime(inst.startDateTime)}</span>
 																</div>
-																{#if inst.id === upcomingInst?.id}
+																{#if isSelected}
 																	<span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-medium shrink-0 ml-1">
-																		{m.next ? m.next() : "Next"}
+																		{isInstance ? (m.series_occurrence ? m.series_occurrence() : "Current") : (m.next ? m.next() : "Next")}
 																	</span>
 																{/if}
 															</DropdownMenu.Item>
-														{/each}
-													</div>
-												</DropdownMenu.Group>
-											{:else if isInstance && event.instances && event.instances.length > 1}
-												<DropdownMenu.Separator class="my-1" />
-												<DropdownMenu.Group>
-													<DropdownMenu.GroupHeading class="text-[10px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
-														{m.all_instances_count({ count: event.instances.length })}
-													</DropdownMenu.GroupHeading>
-													<div class="max-h-48 overflow-y-auto space-y-0.5 pr-1">
-														{#each event.instances as inst (inst.id)}
-															{#if inst.id !== event.id}
-																<DropdownMenu.Item
-																	onclick={() => goto(`/events/${inst.id}`)}
-																	class="flex items-center justify-between p-1.5 text-xs rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-																>
-																	<div class="flex items-center gap-2 truncate min-w-0">
-																		<Calendar size={13} class="text-gray-400 shrink-0" />
-																		<span class="truncate">{formatDate(inst.startDateTime)} {formatTime(inst.startDateTime)}</span>
-																	</div>
-																</DropdownMenu.Item>
-															{/if}
 														{/each}
 													</div>
 												</DropdownMenu.Group>
@@ -925,7 +895,7 @@
 							{/if}
 							<button
 								class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-								onclick={() => handleDelete(event, !event.isSeriesInstance && (event.isSeries || (event.instances && event.instances.length > 0)))}
+								onclick={() => handleDelete(event, !event.isSeriesInstance && isSeriesEvent(event))}
 							>
 								<Trash2 class="w-4 h-4 mr-2" />
 								{m.delete()}

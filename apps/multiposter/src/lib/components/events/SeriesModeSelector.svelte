@@ -94,7 +94,12 @@
     }
 
     function handleSwitch(targetId: string) {
-        if (!targetId || targetId === event?.id) return;
+        if (!targetId) return;
+
+        const targetUrl = viewMode ? `/events/${targetId}/view` : `/events/${targetId}`;
+        if (typeof window !== "undefined" && window.location.pathname === targetUrl) {
+            return;
+        }
 
         if (isDirty) {
             const confirmed = confirm(m.unsaved_changes_switch_confirm());
@@ -102,10 +107,113 @@
         }
 
         onnavigate?.(targetId);
-        const targetUrl = viewMode ? `/events/${targetId}/view` : `/events/${targetId}`;
         goto(resolve(targetUrl as any));
     }
 </script>
+
+{#snippet dropdownMenuContent()}
+    <DropdownMenu.Content align="end" class="w-80 sm:w-96 p-1.5">
+        <DropdownMenu.Group>
+            <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
+                {m.switch_series_or_instance()}
+            </DropdownMenu.GroupHeading>
+
+            <!-- Option: Ganze Serie -->
+            <DropdownMenu.Item
+                onclick={() => handleSwitch(masterId)}
+                class="flex items-center justify-between p-2.5 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isMaster
+                    ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 font-medium'
+                    : ''}"
+            >
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <RefreshCw size={15} class="text-blue-600 shrink-0" />
+                    <div class="min-w-0">
+                        <div class="text-xs font-medium truncate">{m.entire_series_master()}</div>
+                        {#if recurrenceDescription}
+                            <div class="text-[11px] text-gray-500 truncate">{recurrenceDescription}</div>
+                        {/if}
+                    </div>
+                </div>
+                {#if isMaster}
+                    <Check size={15} class="text-blue-600 shrink-0 ml-2" />
+                {/if}
+            </DropdownMenu.Item>
+        </DropdownMenu.Group>
+
+        {#if instances.length > 0}
+            <DropdownMenu.Separator class="my-1.5" />
+
+            <DropdownMenu.Group>
+                <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
+                    {m.all_instances_count({ count: instances.length })}
+                </DropdownMenu.GroupHeading>
+
+                <div class="max-h-64 overflow-y-auto space-y-0.5 pr-1">
+                    {#each instances as inst (inst.id)}
+                        {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && Boolean(inst.startDateTime) && Boolean(event.startDateTime) && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
+                        <div
+                            class="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
+                                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-medium'
+                                : ''}"
+                        >
+                            <button
+                                type="button"
+                                onclick={() => handleSwitch(inst.id)}
+                                class="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer p-1 rounded focus:outline-none"
+                            >
+                                <Calendar size={14} class="text-gray-400 shrink-0" />
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-xs font-medium truncate">
+                                        {formatDate(inst.startDateTime)}
+                                    </div>
+                                    <div class="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
+                                        <span>
+                                            {formatTime(inst.startDateTime)}{inst.endDateTime ? ` – ${formatTime(inst.endDateTime)}` : ''}
+                                        </span>
+                                        {#if inst.status}
+                                            <span class="inline-block px-1.5 py-0.2 rounded text-[10px] font-normal {getStatusBadgeClass(inst.status)}">
+                                                {formatEventStatus(inst.status)}
+                                            </span>
+                                        {/if}
+                                    </div>
+                                </div>
+                                {#if isCurrent}
+                                    <Check size={14} class="text-amber-600 shrink-0 ml-1" />
+                                {/if}
+                            </button>
+
+                            <div class="flex items-center gap-1 shrink-0 ml-2">
+                                {#if !viewMode}
+                                    <a
+                                        href="/events/{inst.id}/view"
+                                        class="p-1 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded transition-colors"
+                                        title={m.view ? m.view() : 'View'}
+                                        onclick={(e) => e.stopPropagation()}
+                                    >
+                                        <Eye size={13} />
+                                    </a>
+                                {/if}
+                                {#if ondelete}
+                                    <button
+                                        type="button"
+                                        class="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                                        title={m.delete()}
+                                        onclick={(e) => {
+                                            e.stopPropagation();
+                                            ondelete?.(inst);
+                                        }}
+                                    >
+                                        <Trash2 size={13} />
+                                    </button>
+                                {/if}
+                            </div>
+                        </div>
+                    {/each}
+                </div>
+            </DropdownMenu.Group>
+        {/if}
+    </DropdownMenu.Content>
+{/snippet}
 
 {#if isSeries}
     {#if variant === "banner"}
@@ -176,113 +284,16 @@
                                     {:else}
                                         <Calendar size={14} class="text-amber-600 shrink-0" />
                                         <span>{formatDate(event.startDateTime)}</span>
+                                        {#if instances.length > 0}
+                                            <span class="text-gray-500 font-normal">({instances.length} {m.instances()})</span>
+                                        {/if}
                                     {/if}
                                 </div>
                                 <ChevronDown size={14} class="text-gray-500 shrink-0 opacity-70" />
                             </Button>
                         </DropdownMenu.Trigger>
 
-                        <DropdownMenu.Content align="end" class="w-80 sm:w-96 p-1.5">
-                            <DropdownMenu.Group>
-                                <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
-                                    {m.switch_series_or_instance()}
-                                </DropdownMenu.GroupHeading>
-
-                                <!-- Option: Ganze Serie -->
-                                <DropdownMenu.Item
-                                    onclick={() => handleSwitch(masterId)}
-                                    class="flex items-center justify-between p-2.5 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isMaster
-                                        ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 font-medium'
-                                        : ''}"
-                                >
-                                    <div class="flex items-center gap-2.5 min-w-0">
-                                        <RefreshCw size={15} class="text-blue-600 shrink-0" />
-                                        <div class="min-w-0">
-                                            <div class="text-xs font-medium truncate">{m.entire_series_master()}</div>
-                                            {#if recurrenceDescription}
-                                                <div class="text-[11px] text-gray-500 truncate">{recurrenceDescription}</div>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                    {#if isMaster}
-                                        <Check size={15} class="text-blue-600 shrink-0 ml-2" />
-                                    {/if}
-                                </DropdownMenu.Item>
-                            </DropdownMenu.Group>
-
-                            {#if instances.length > 0}
-                                <DropdownMenu.Separator class="my-1.5" />
-
-                                <DropdownMenu.Group>
-                                    <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
-                                        {m.all_instances_count({ count: instances.length })}
-                                    </DropdownMenu.GroupHeading>
-
-                                    <div class="max-h-64 overflow-y-auto space-y-0.5 pr-1">
-                                        {#each instances as inst (inst.id)}
-                                            {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && Boolean(inst.startDateTime) && Boolean(event.startDateTime) && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
-                                            <div
-                                                class="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
-                                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-medium'
-                                                    : ''}"
-                                            >
-                                                <button
-                                                    type="button"
-                                                    onclick={() => handleSwitch(inst.id)}
-                                                    class="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer p-1 rounded focus:outline-none"
-                                                >
-                                                    <Calendar size={14} class="text-gray-400 shrink-0" />
-                                                    <div class="min-w-0 flex-1">
-                                                        <div class="text-xs font-medium truncate">
-                                                            {formatDate(inst.startDateTime)}
-                                                        </div>
-                                                        <div class="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
-                                                            <span>
-                                                                {formatTime(inst.startDateTime)}{inst.endDateTime ? ` – ${formatTime(inst.endDateTime)}` : ''}
-                                                            </span>
-                                                            {#if inst.status}
-                                                                <span class="inline-block px-1.5 py-0.2 rounded text-[10px] font-normal {getStatusBadgeClass(inst.status)}">
-                                                                    {formatEventStatus(inst.status)}
-                                                                </span>
-                                                            {/if}
-                                                        </div>
-                                                    </div>
-                                                    {#if isCurrent}
-                                                        <Check size={14} class="text-amber-600 shrink-0 ml-1" />
-                                                    {/if}
-                                                </button>
-
-                                                <div class="flex items-center gap-1 shrink-0 ml-2">
-                                                    {#if !viewMode}
-                                                        <a
-                                                            href="/events/{inst.id}/view"
-                                                            class="p-1 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded transition-colors"
-                                                            title={m.view ? m.view() : 'View'}
-                                                            onclick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <Eye size={13} />
-                                                        </a>
-                                                    {/if}
-                                                    {#if ondelete}
-                                                        <button
-                                                            type="button"
-                                                            class="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
-                                                            title={m.delete()}
-                                                            onclick={(e) => {
-                                                                e.stopPropagation();
-                                                                ondelete?.(inst);
-                                                            }}
-                                                        >
-                                                            <Trash2 size={13} />
-                                                        </button>
-                                                    {/if}
-                                                </div>
-                                            </div>
-                                        {/each}
-                                    </div>
-                                </DropdownMenu.Group>
-                            {/if}
-                        </DropdownMenu.Content>
+                        {@render dropdownMenuContent()}
                     </DropdownMenu.Root>
                 </div>
             </div>
@@ -321,112 +332,15 @@
                         {:else}
                             <Calendar size={13} class="text-amber-600 shrink-0" />
                             <span>{formatDate(event.startDateTime)}</span>
+                            {#if instances.length > 0}
+                                <span class="text-gray-500 font-normal">({instances.length} {m.instances()})</span>
+                            {/if}
                         {/if}
                         <ChevronDown size={13} class="text-gray-500 opacity-70 ml-0.5" />
                     </Button>
                 </DropdownMenu.Trigger>
 
-                <DropdownMenu.Content align="end" class="w-80 sm:w-96 p-1.5">
-                    <DropdownMenu.Group>
-                        <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
-                            {m.switch_series_or_instance()}
-                        </DropdownMenu.GroupHeading>
-
-                        <!-- Option: Ganze Serie -->
-                        <DropdownMenu.Item
-                            onclick={() => handleSwitch(masterId)}
-                            class="flex items-center justify-between p-2.5 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isMaster
-                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 font-medium'
-                                : ''}"
-                        >
-                            <div class="flex items-center gap-2.5 min-w-0">
-                                <RefreshCw size={15} class="text-blue-600 shrink-0" />
-                                <div class="min-w-0">
-                                    <div class="text-xs font-medium truncate">{m.entire_series_master()}</div>
-                                    {#if recurrenceDescription}
-                                        <div class="text-[11px] text-gray-500 truncate">{recurrenceDescription}</div>
-                                    {/if}
-                                </div>
-                            </div>
-                            {#if isMaster}
-                                <Check size={15} class="text-blue-600 shrink-0 ml-2" />
-                            {/if}
-                        </DropdownMenu.Item>
-                    </DropdownMenu.Group>
-
-                    {#if instances.length > 0}
-                        <DropdownMenu.Separator class="my-1.5" />
-
-                        <DropdownMenu.Group>
-                            <DropdownMenu.GroupHeading class="text-[11px] font-semibold text-gray-500 px-2 py-1 uppercase tracking-wider">
-                                {m.all_instances_count({ count: instances.length })}
-                            </DropdownMenu.GroupHeading>
-
-                            <div class="max-h-64 overflow-y-auto space-y-0.5 pr-1">
-                                {#each instances as inst (inst.id)}
-                                    {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && Boolean(inst.startDateTime) && Boolean(event.startDateTime) && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
-                                    <div
-                                        class="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors {isCurrent
-                                            ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-medium'
-                                            : ''}"
-                                    >
-                                        <button
-                                            type="button"
-                                            onclick={() => handleSwitch(inst.id)}
-                                            class="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer p-1 rounded focus:outline-none"
-                                        >
-                                            <Calendar size={14} class="text-gray-400 shrink-0" />
-                                            <div class="min-w-0 flex-1">
-                                                <div class="text-xs font-medium truncate">
-                                                    {formatDate(inst.startDateTime)}
-                                                </div>
-                                                <div class="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
-                                                    <span>
-                                                        {formatTime(inst.startDateTime)}{inst.endDateTime ? ` – ${formatTime(inst.endDateTime)}` : ''}
-                                                    </span>
-                                                    {#if inst.status}
-                                                        <span class="inline-block px-1.5 py-0.2 rounded text-[10px] font-normal {getStatusBadgeClass(inst.status)}">
-                                                            {formatEventStatus(inst.status)}
-                                                        </span>
-                                                    {/if}
-                                                </div>
-                                            </div>
-                                            {#if isCurrent}
-                                                <Check size={14} class="text-amber-600 shrink-0 ml-1" />
-                                            {/if}
-                                        </button>
-
-                                        <div class="flex items-center gap-1 shrink-0 ml-2">
-                                            {#if !viewMode}
-                                                <a
-                                                    href="/events/{inst.id}/view"
-                                                    class="p-1 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded transition-colors"
-                                                    title={m.view ? m.view() : 'View'}
-                                                    onclick={(e) => e.stopPropagation()}
-                                                >
-                                                    <Eye size={13} />
-                                                </a>
-                                            {/if}
-                                            {#if ondelete}
-                                                <button
-                                                    type="button"
-                                                    class="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
-                                                    title={m.delete()}
-                                                    onclick={(e) => {
-                                                        e.stopPropagation();
-                                                        ondelete?.(inst);
-                                                    }}
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                {/each}
-                            </div>
-                        </DropdownMenu.Group>
-                    {/if}
-                </DropdownMenu.Content>
+                {@render dropdownMenuContent()}
             </DropdownMenu.Root>
         </div>
     {/if}
