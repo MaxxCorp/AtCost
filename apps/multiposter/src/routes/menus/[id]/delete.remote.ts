@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, menu, inArray } from '@ac/db';
 import { listMenus } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -12,6 +12,15 @@ export const deleteMenus = command(v.array(v.string()), async (ids: string[]) =>
         .delete(menu)
         .where(inArray(menu.id, ids));
 
-    await listMenus().refresh();
+    try {
+        await requested(listMenus, 10).refreshAll();
+    } catch (e) {
+        console.warn('[deleteMenus] requested refresh warning:', e);
+    }
+    try {
+        await listMenus().refresh();
+    } catch (e) {
+        console.warn('[deleteMenus] listMenus().refresh() warning:', e);
+    }
     return { success: true };
 });
