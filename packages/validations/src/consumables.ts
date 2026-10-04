@@ -20,6 +20,7 @@ export const consumablePaginationSchema = v.optional(v.object({
     storageLocation: v.optional(v.string()),
     sortField: v.optional(v.union([
         v.literal('name'),
+        v.literal('displayName'),
         v.literal('purchasePrice'),
         v.literal('amount'),
         v.literal('storageLocation'),

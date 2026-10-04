@@ -34,6 +34,7 @@ export const listMenus = query(PaginationSchema, async (input: v.InferOutput<typ
     if (sortField === 'isTemplate') orderColumn = menu.isTemplate;
     else if (sortField === 'createdAt') orderColumn = menu.createdAt;
     else if (sortField === 'updatedAt') orderColumn = menu.updatedAt;
+    else if (sortField === 'displayName' || sortField === 'name') orderColumn = menu.name;
 
     const orderFn = sortOrder === 'desc' ? desc : asc;
 

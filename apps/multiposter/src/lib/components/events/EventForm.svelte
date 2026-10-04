@@ -1748,6 +1748,8 @@
                 type="event"
                 entityId={initialData?.id}
                 initialItems={initialData?.menus || []}
+                sortField="name"
+                selectorSortField="name"
                 listItemsRemote={listMenus as any}
                 fetchAssociationsRemote={fetchEntityMenus as any}
                 addAssociationRemote={async (p: any) =>

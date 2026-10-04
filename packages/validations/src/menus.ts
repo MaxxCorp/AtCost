@@ -30,6 +30,7 @@ export const menuPaginationSchema = v.optional(v.object({
     isTemplate: v.optional(v.union([v.boolean(), v.string()])),
     sortField: v.optional(v.union([
         v.literal('name'),
+        v.literal('displayName'),
         v.literal('isTemplate'),
         v.literal('createdAt'),
         v.literal('updatedAt')

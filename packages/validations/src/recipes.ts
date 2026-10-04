@@ -29,6 +29,7 @@ export const recipePaginationSchema = v.optional(v.object({
     search: v.optional(v.string()),
     sortField: v.optional(v.union([
         v.literal('name'),
+        v.literal('displayName'),
         v.literal('portions'),
         v.literal('createdAt'),
         v.literal('updatedAt')
