@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, consumable, eq } from '@ac/db';
 import { listConsumables } from '../list.remote';
 import { readConsumable } from './read.remote';
@@ -45,6 +45,11 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
             throw new Error('Consumable not found');
         }
 
+        try {
+            await requested(listConsumables, 20).refreshAll();
+        } catch (e) {
+            console.warn('--- updateConsumable requested refresh warning ---', e);
+        }
         try {
             await listConsumables().refresh();
             await readConsumable(data.id).refresh();

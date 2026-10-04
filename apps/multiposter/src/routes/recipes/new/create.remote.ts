@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, recipe, recipeConsumable } from '@ac/db';
 import { listRecipes } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -40,7 +40,16 @@ export const createRecipe = form(createRecipeSchema, async (data) => {
             return newRecipe;
         });
 
-        await listRecipes().refresh();
+        try {
+            await requested(listRecipes, 20).refreshAll();
+        } catch (e) {
+            console.warn('--- createRecipe requested refresh warning ---', e);
+        }
+        try {
+            await listRecipes().refresh();
+        } catch (refreshErr) {
+            console.warn('--- createRecipe refresh warning ---', refreshErr);
+        }
         console.log('--- createRecipe SUCCESS ---', result.id);
 
         return {

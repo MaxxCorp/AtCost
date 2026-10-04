@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { inArray, or, eq } from '@ac/db';
@@ -162,7 +162,16 @@ export const deleteEvents = command(
 			await invalidateEvent(eventIdsToDelete);
 		}
 
-		await listEvents().refresh();
+		try {
+			await requested(listEvents, 20).refreshAll();
+		} catch (e) {
+			console.warn('[deleteEvents] requested refresh warning:', e);
+		}
+		try {
+			await listEvents().refresh();
+		} catch (e) {
+			console.warn('[deleteEvents] listEvents refresh warning:', e);
+		}
 		return { success: true, deletedCount: eventIdsToDelete.length };
 	}
 );

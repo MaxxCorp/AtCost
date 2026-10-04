@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, menu, menuItem } from '@ac/db';
 import { listMenus } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -47,7 +47,16 @@ export const createMenu = form(createMenuSchema, async (data) => {
             return newMenu;
         });
 
-        await listMenus().refresh();
+        try {
+            await requested(listMenus, 20).refreshAll();
+        } catch (e) {
+            console.warn('--- createMenu requested refresh warning ---', e);
+        }
+        try {
+            await listMenus().refresh();
+        } catch (refreshErr) {
+            console.warn('--- createMenu refresh warning ---', refreshErr);
+        }
         console.log('--- createMenu SUCCESS ---', result.id);
 
         return {

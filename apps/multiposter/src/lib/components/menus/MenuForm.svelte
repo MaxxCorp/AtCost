@@ -4,7 +4,7 @@
     import * as m from "$lib/paraglide/messages";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
-    import { goto } from "$app/navigation";
+    import { goto, invalidateAll } from "$app/navigation";
     import {
         Utensils,
         ChefHat,
@@ -361,7 +361,7 @@
     {...rf.enhance(async ({ submit }: any) => {
         try {
             const res = await submit();
-            if (res?.success) {
+            if (res === true || res?.success || (rf as any).result?.success) {
                 toast.success(
                     isUpdating
                         ? (m.item_updated?.({ item: m.menu?.() || 'Menu' }) || 'Menu updated successfully')
@@ -370,12 +370,14 @@
                 if (onSuccess) {
                     onSuccess(res);
                 } else {
+                    await invalidateAll();
                     await goto(cancelHref);
                 }
             } else if (res === false) {
                 toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
-                const errorMsg = typeof res?.error === 'string' ? res.error : (res?.error?.message || 'Action failed');
+                const err = res?.error || (rf as any).result?.error;
+                const errorMsg = typeof err === 'string' ? err : (err?.message || 'Action failed');
                 toast.error(errorMsg);
             }
         } catch (err: any) {
@@ -413,7 +415,7 @@
                     placeholder="e.g., Wedding Catering Dinner, Coffee Break, BBQ Package"
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
-                {#each rf.fields.name.issues() as issue}
+                {#each rf.fields.name.issues() as issue (issue.message)}
                     <p class="text-xs text-red-500 mt-1">{issue.message}</p>
                 {/each}
             </div>
@@ -477,7 +479,7 @@
                         class="w-14 px-1.5 py-0.5 text-xs text-center font-bold bg-white rounded border border-violet-200 focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                     />
                     <div class="hidden sm:flex items-center gap-1 ml-1">
-                        {#each [1.5, 2.0, 2.5, 3.0] as preset}
+                        {#each [1.5, 2.0, 2.5, 3.0] as preset (preset)}
                             <button
                                 type="button"
                                 onclick={() => defaultFactor = preset}
@@ -690,7 +692,7 @@
                                             <span class="absolute right-2.5 top-2 text-indigo-400 text-xs font-bold">×</span>
                                         </div>
                                         <div class="flex items-center gap-1">
-                                            {#each [1.5, 2.0, 2.5, 3.0] as preset}
+                                            {#each [1.5, 2.0, 2.5, 3.0] as preset (preset)}
                                                 <button
                                                     type="button"
                                                     onclick={() => updateFactor(index, preset)}

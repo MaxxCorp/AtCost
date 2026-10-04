@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, recipe, recipeConsumable, eq } from '@ac/db';
 import { listRecipes } from '../list.remote';
 import { readRecipe } from './read.remote';
@@ -49,8 +49,17 @@ export const updateRecipe = form(updateRecipeSchema, async (data) => {
         return updatedRecipe;
     });
 
-    await listRecipes().refresh();
-    await readRecipe(data.id).refresh();
+    try {
+        await requested(listRecipes, 20).refreshAll();
+    } catch (e) {
+        console.warn('--- updateRecipe requested refresh warning ---', e);
+    }
+    try {
+        await listRecipes().refresh();
+        await readRecipe(data.id).refresh();
+    } catch (refreshErr) {
+        console.warn('--- updateRecipe refresh warning ---', refreshErr);
+    }
 
     return {
         success: true,

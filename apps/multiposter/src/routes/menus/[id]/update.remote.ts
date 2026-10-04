@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, menu, menuItem, eq } from '@ac/db';
 import { listMenus } from '../list.remote';
 import { readMenu } from './read.remote';
@@ -56,8 +56,17 @@ export const updateMenu = form(updateMenuSchema, async (data) => {
         return updatedMenu;
     });
 
-    await listMenus().refresh();
-    await readMenu(data.id).refresh();
+    try {
+        await requested(listMenus, 20).refreshAll();
+    } catch (e) {
+        console.warn('--- updateMenu requested refresh warning ---', e);
+    }
+    try {
+        await listMenus().refresh();
+        await readMenu(data.id).refresh();
+    } catch (refreshErr) {
+        console.warn('--- updateMenu refresh warning ---', refreshErr);
+    }
 
     return {
         success: true,

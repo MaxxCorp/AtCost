@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, consumable } from '@ac/db';
 import { listConsumables } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -41,6 +41,11 @@ export const createConsumable = form(createConsumableSchema, async (data) => {
             throw new Error('Database insert returned no record');
         }
 
+        try {
+            await requested(listConsumables, 20).refreshAll();
+        } catch (e) {
+            console.warn('--- createConsumable requested refresh warning ---', e);
+        }
         try {
             await listConsumables().refresh();
         } catch (refreshErr) {

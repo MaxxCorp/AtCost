@@ -4,7 +4,7 @@
     import * as m from "$lib/paraglide/messages";
     import { toast } from "svelte-sonner";
     import { Button } from "$lib/components/ui/button";
-    import { goto } from "$app/navigation";
+    import { goto, invalidateAll } from "$app/navigation";
     import { Euro, Calendar, MapPin, Package, Scale } from "@lucide/svelte";
 
     let {
@@ -64,7 +64,7 @@
     {...rf.enhance(async ({ submit }: any) => {
         try {
             const res = await submit();
-            if (res?.success) {
+            if (res === true || res?.success || (rf as any).result?.success) {
                 toast.success(
                     isUpdating
                         ? (m.item_updated?.({ item: m.consumable?.() || 'Consumable' }) || 'Consumable updated successfully')
@@ -73,12 +73,14 @@
                 if (onSuccess) {
                     onSuccess(res);
                 } else {
+                    await invalidateAll();
                     await goto(cancelHref);
                 }
             } else if (res === false) {
                 toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
-                const errorMsg = typeof res?.error === 'string' ? res.error : (res?.error?.message || 'Action failed');
+                const err = res?.error || (rf as any).result?.error;
+                const errorMsg = typeof err === 'string' ? err : (err?.message || 'Action failed');
                 toast.error(errorMsg);
             }
         } catch (err: any) {
@@ -103,7 +105,7 @@
                 placeholder="e.g., Organic Milk 1L, Coffee Beans, Red Wine Bottle"
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
-            {#each rf.fields.name.issues() as issue}
+            {#each rf.fields.name.issues() as issue (issue.message)}
                 <p class="text-xs text-red-500 mt-1">{issue.message}</p>
             {/each}
         </div>
@@ -136,7 +138,7 @@
                     oninput={(e: any) => purchasePrice = parseFloat(e.target.value) || 0}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
-                {#each rf.fields.purchasePrice.issues() as issue}
+                {#each rf.fields.purchasePrice.issues() as issue (issue.message)}
                     <p class="text-xs text-red-500 mt-1">{issue.message}</p>
                 {/each}
             </div>
@@ -155,7 +157,7 @@
                     oninput={(e: any) => amount = parseFloat(e.target.value) || 1}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
-                {#each rf.fields.amount.issues() as issue}
+                {#each rf.fields.amount.issues() as issue (issue.message)}
                     <p class="text-xs text-red-500 mt-1">{issue.message}</p>
                 {/each}
             </div>
@@ -172,7 +174,7 @@
                     placeholder="e.g. kg, g, l, ml, piece, bottle, pack"
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
-                {#each rf.fields.unit.issues() as issue}
+                {#each rf.fields.unit.issues() as issue (issue.message)}
                     <p class="text-xs text-red-500 mt-1">{issue.message}</p>
                 {/each}
             </div>

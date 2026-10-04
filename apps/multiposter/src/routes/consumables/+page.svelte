@@ -142,6 +142,7 @@
 
     <!-- Content Table -->
     <svelte:boundary>
+        {@const result = await listConsumables(filterState)}
         {#if $effect.pending()}
             <div class="py-12 text-center text-gray-500 flex items-center justify-center gap-2">
                 <RefreshCw size={18} class="animate-spin text-amber-600" />
@@ -149,22 +150,19 @@
             </div>
         {/if}
         <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-            {#await listConsumables(filterState)}
-                <LoadingSection message={m.loading?.() || 'Loading consumables...'} />
-            {:then result}
-                {#if !result?.data || result.data.length === 0}
-                    <div class="bg-white p-12 text-center rounded-2xl border border-gray-100 shadow-xs space-y-3">
-                        <Package size={40} class="mx-auto text-gray-300" />
-                        <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.consumables?.() || 'Consumables' }) || 'No consumables found'}</h3>
-                        <p class="text-sm text-gray-500 max-w-md mx-auto">
-                            Get started by adding items you purchase for events and catering recipes.
-                        </p>
-                        <Button href="/consumables/new" class="bg-amber-600 hover:bg-amber-700 text-white mt-2">
-                            <Plus size={16} class="mr-1.5" />
-                            {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
-                        </Button>
-                    </div>
-                {:else}
+            {#if !result?.data || result.data.length === 0}
+                <div class="bg-white p-12 text-center rounded-2xl border border-gray-100 shadow-xs space-y-3">
+                    <Package size={40} class="mx-auto text-gray-300" />
+                    <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.consumables?.() || 'Consumables' }) || 'No consumables found'}</h3>
+                    <p class="text-sm text-gray-500 max-w-md mx-auto">
+                        Get started by adding items you purchase for events and catering recipes.
+                    </p>
+                    <Button href="/consumables/new" class="bg-amber-600 hover:bg-amber-700 text-white mt-2">
+                        <Plus size={16} class="mr-1.5" />
+                        {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+                    </Button>
+                </div>
+            {:else}
                     <div class="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm text-left border-collapse">
@@ -284,14 +282,14 @@
                         {/if}
                     </div>
                 {/if}
-            {:catch error}
+            </div>
+            {#snippet failed(error: unknown, reset: () => void)}
                 <ErrorSection
                     headline={m.error?.() || 'Error'}
-                    message={error.message || 'Failed to load consumables'}
+                    message={error instanceof Error ? error.message : 'Failed to load consumables'}
                     href="/consumables"
                     button={m.try_again?.() || 'Try Again'}
                 />
-            {/await}
-        </div>
-    </svelte:boundary>
+            {/snippet}
+        </svelte:boundary>
 </div>

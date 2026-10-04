@@ -362,7 +362,7 @@
 				await deleteEvents({ ids: [event.id] });
 			}
 			toast.success(m.delete_successful());
-			listEvents(filterState).refresh();
+			await listEvents(filterState).refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
@@ -614,15 +614,18 @@
 		/>
 
 		{#if isInitialized}
-			{#await listEvents(filterState)}
-				<div class="grid grid-cols-1 gap-5">
-					<div class="p-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-						<RefreshCw class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
-					</div>
-				</div>
-			{:then eventsRes}
+			<svelte:boundary>
+				{@const eventsRes = await listEvents(filterState)}
 				{@const displayedEvents = displayMode === "unrolled" ? unrollEvents(eventsRes?.data || [], excludePast) : groupEvents(eventsRes?.data || [])}
-				<div class="grid grid-cols-1 gap-5">
+				{#if $effect.pending()}
+					<div class="grid grid-cols-1 gap-5">
+						<div class="p-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+							<RefreshCw class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+						</div>
+					</div>
+				{/if}
+				<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+					<div class="grid grid-cols-1 gap-5">
 				{#each displayedEvents as event (event.id)}
 					{@const upcomingInst = getUpcomingInstance(event)}
 					{@const displayDateEvent = (upcomingInst && !event.isSeriesInstance) ? {
@@ -1023,11 +1026,13 @@
 					</div>
 				</div>
 				{/if}
-			{:catch err}
-				<div class="p-8 text-center bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900">
-					<p class="text-sm text-red-500">{err?.message || m.something_went_wrong()}</p>
 				</div>
-			{/await}
+				{#snippet failed(err: unknown, reset: () => void)}
+					<div class="p-8 text-center bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900">
+						<p class="text-sm text-red-500">{err instanceof Error ? err.message : m.something_went_wrong()}</p>
+					</div>
+				{/snippet}
+			</svelte:boundary>
 		{:else}
 			<div class="grid grid-cols-1 gap-5">
 				<div class="p-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">

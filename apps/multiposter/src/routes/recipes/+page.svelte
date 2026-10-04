@@ -121,6 +121,7 @@
 
     <!-- Content Cards -->
     <svelte:boundary>
+        {@const result = await listRecipes(filterState)}
         {#if $effect.pending()}
             <div class="py-12 text-center text-gray-500 flex items-center justify-center gap-2">
                 <RefreshCw size={18} class="animate-spin text-emerald-600" />
@@ -128,22 +129,19 @@
             </div>
         {/if}
         <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-            {#await listRecipes(filterState)}
-                <LoadingSection message={m.loading?.() || 'Loading recipes...'} />
-            {:then result}
-                {#if !result?.data || result.data.length === 0}
-                    <div class="bg-white p-12 text-center rounded-2xl border border-gray-100 shadow-xs space-y-3">
-                        <ChefHat size={40} class="mx-auto text-gray-300" />
-                        <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.recipes?.() || 'Recipes' }) || 'No recipes found'}</h3>
-                        <p class="text-sm text-gray-500 max-w-md mx-auto">
-                            Create your first recipe by combining consumables into prepared items with cost per portion calculations.
-                        </p>
-                        <Button href="/recipes/new" class="bg-emerald-600 hover:bg-emerald-700 text-white mt-2">
-                            <Plus size={16} class="mr-1.5" />
-                            {m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}
-                        </Button>
-                    </div>
-                {:else}
+            {#if !result?.data || result.data.length === 0}
+                <div class="bg-white p-12 text-center rounded-2xl border border-gray-100 shadow-xs space-y-3">
+                    <ChefHat size={40} class="mx-auto text-gray-300" />
+                    <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.recipes?.() || 'Recipes' }) || 'No recipes found'}</h3>
+                    <p class="text-sm text-gray-500 max-w-md mx-auto">
+                        Create your first recipe by combining consumables into prepared items with cost per portion calculations.
+                    </p>
+                    <Button href="/recipes/new" class="bg-emerald-600 hover:bg-emerald-700 text-white mt-2">
+                        <Plus size={16} class="mr-1.5" />
+                        {m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}
+                    </Button>
+                </div>
+            {:else}
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {#each result.data as item (item.id)}
                             <div class="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-shadow p-5 flex flex-col justify-between space-y-4">
@@ -225,15 +223,15 @@
                             </div>
                         </div>
                     {/if}
-                {/if}
-            {:catch error}
-                <ErrorSection
-                    headline={m.error?.() || 'Error'}
-                    message={error.message || 'Failed to load recipes'}
-                    href="/recipes"
-                    button={m.try_again?.() || 'Try Again'}
-                />
-            {/await}
+            {/if}
         </div>
+        {#snippet failed(error: unknown, reset: () => void)}
+            <ErrorSection
+                headline={m.error?.() || 'Error'}
+                message={error instanceof Error ? error.message : 'Failed to load recipes'}
+                href="/recipes"
+                button={m.try_again?.() || 'Try Again'}
+            />
+        {/snippet}
     </svelte:boundary>
 </div>
