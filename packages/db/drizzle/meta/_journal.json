@@ -120,6 +120,20 @@
       "when": 1790514811375,
       "tag": "0016_amazing_thaddeus_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791100987247,
+      "tag": "0017_legal_wolf_cub",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791104130557,
+      "tag": "0018_freezing_mephistopheles",
+      "breakpoints": true
     }
   ]
 }

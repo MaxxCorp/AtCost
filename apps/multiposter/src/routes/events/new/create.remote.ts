@@ -1,7 +1,7 @@
 import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, sql, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
@@ -246,6 +246,21 @@ export const createEvent = form(createEventSchema, async (data) => {
 						await db.insert(eventTag).values({ eventId: targetEventId, tagId: existingTag.id }).onConflictDoNothing();
 					}
 				}
+			}
+
+			// Menus
+			let menuIds = [];
+			if (typeof data.menuIds === 'string') {
+				try { menuIds = JSON.parse(data.menuIds); } catch { menuIds = []; }
+			} else if (Array.isArray(data.menuIds)) {
+				menuIds = data.menuIds;
+			}
+			if (menuIds.length > 0) {
+				const associations = (menuIds as string[]).map((menuId: string) => ({
+					eventId: targetEventId,
+					menuId,
+				}));
+				await db.insert(eventMenu).values(associations);
 			}
 		};
 

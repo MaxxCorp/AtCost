@@ -74,11 +74,25 @@
         Database,
         Loader2,
         ExternalLink,
+        Utensils,
+        Calculator,
     } from "@lucide/svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
     import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
+    import { listMenus } from "../../../routes/menus/list.remote";
+    import {
+        addMenuAssociation,
+        removeMenuAssociation,
+        fetchEntityMenus,
+    } from "../../../routes/menus/associate.remote";
+    import { createMenu } from "../../../routes/menus/new/create.remote";
+    import { updateMenu } from "../../../routes/menus/[id]/update.remote";
+    import { readMenu } from "../../../routes/menus/[id]/read.remote";
+    import { deleteMenus } from "../../../routes/menus/[id]/delete.remote";
+    import { createMenuSchema, updateMenuSchema } from "@ac/validations";
+    import MenuForm from "$lib/components/menus/MenuForm.svelte";
     import * as v from "valibot";
     import { FieldCollaboratorBadge, type CollaborationRoom } from "$lib/client/collaboration";
 
@@ -430,6 +444,8 @@
     );
 
     let totalParticipants = $derived(baseline + currentContactIds.length);
+    // svelte-ignore state_referenced_locally
+    let currentMenus = $state<any[]>(initialData?.menus || []);
 
     function updateBaseline(delta: number) {
         baseline = Math.max(0, baseline + delta);
@@ -1718,6 +1734,154 @@
         )}
         class="hidden"
     />
+
+    <div class="pt-4 border-t border-gray-100">
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <Utensils size={18} class="text-blue-600" />
+            {m.feature_menus_title?.() || 'Menus & Catering'} ({m.optional?.() || 'optional'})
+        </h3>
+        {#key initialData?.id || "new"}
+            <EntityManager {m}
+                title={m.feature_menus_title?.() || 'Menus & Catering'}
+                icon={Utensils}
+                mode="embedded"
+                type="event"
+                entityId={initialData?.id}
+                initialItems={initialData?.menus || []}
+                listItemsRemote={listMenus as any}
+                fetchAssociationsRemote={fetchEntityMenus as any}
+                addAssociationRemote={async (p: any) =>
+                    addMenuAssociation({ ...p, menuId: p.itemId } as any)}
+                removeAssociationRemote={async (p: any) =>
+                    removeMenuAssociation({ ...p, menuId: p.itemId } as any)}
+                onchange={(ids: string[], items: any[]) => {
+                    currentMenus = items;
+                    rf.fields.menuIds.set(JSON.stringify(ids));
+                }}
+                deleteItemRemote={async (ids: string[]) => {
+                    return await handleDelete({
+                        ids,
+                        deleteFn: deleteMenus,
+                        itemName: m.menu?.() || 'menu',
+                    });
+                }}
+                createRemote={createMenu}
+                createSchema={createMenuSchema}
+                updateRemote={updateMenu}
+                updateSchema={updateMenuSchema}
+                readItemRemote={readMenu}
+                searchPredicate={(menuItem: any, q: string) => {
+                    const qLower = q.toLowerCase();
+                    return (
+                        menuItem.name?.toLowerCase().includes(qLower) ||
+                        menuItem.description?.toLowerCase().includes(qLower)
+                    );
+                }}
+                loadingLabel={m.loading_item?.({ item: m.menus?.() || 'Menus' }) || 'Loading menus...'}
+                noItemsLabel={m.no_items_associated_label?.({ item: m.menus?.() || 'Menus' }) || 'No menus associated'}
+                noItemsFoundLabel={m.no_items_found?.({ item: m.menus?.() || 'Menus' }) || 'No menus found'}
+                searchPlaceholder={m.search_placeholder?.({ item: m.menus?.() || 'Menus' }) || 'Search menus...'}
+                linkItemLabel={m.link_item_label?.({ item: m.menu?.() || 'Menu' }) || 'Link Menu'}
+                associatedItemLabel={m.associated_item_label?.({ item: m.menus?.() || 'Menus' }) || 'Associated Menus'}
+                quickCreateLabel={m.quick_create?.() || 'Quick Create'}
+                closeSearchLabel={m.close_search?.() || 'Close'}
+                editLabel={m.edit?.() || 'Edit'}
+                deleteLabel={m.delete?.() || 'Delete'}
+                unlinkLabel={m.unlink?.() || 'Unlink'}
+                deleteForeverLabel={m.delete_forever?.({ item: m.menu?.() || 'Menu' }) || 'Delete Menu'}
+                confirmUnlinkLabel={m.confirm_unlink_label?.({ item: m.menu?.() || 'Menu' }) || 'Unlink Menu'}
+                selectAllLabel={m.select_all?.() || 'Select All'}
+                deselectAllLabel={m.deselect_all?.() || 'Deselect All'}
+            >
+                {#snippet renderItemLabel(item: any)}
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold text-gray-900">{item.name}</span>
+                        {#if item.isTemplate}
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                {m.template?.() || 'Template'}
+                            </span>
+                        {:else}
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                {m.event_menu?.() || 'Event'}
+                            </span>
+                        {/if}
+                    </div>
+                {/snippet}
+
+                {#snippet renderItemBadge(item: any)}
+                    <span class="text-xs text-gray-500">
+                        {item.items?.length || 0} {item.items?.length === 1 ? 'item' : 'items'}
+                    </span>
+                {/snippet}
+
+                {#snippet renderItemDetail(item: any)}
+                    <div class="flex items-center gap-1.5 text-xs text-gray-600 font-mono">
+                        <span>€{(Number(item.totalPricePerPortion) || 0).toFixed(2)} / {m.portion?.() || 'portion'}</span>
+                    </div>
+                {/snippet}
+
+                {#snippet participationSnippet(item: any)}
+                    <div class="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs font-medium shrink-0">
+                        <Calculator size={13} class="text-emerald-600" />
+                        <span>
+                            €{((Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1)).toFixed(2)}
+                            <span class="text-emerald-600 text-[11px] font-normal">({totalParticipants} {m.participants?.() || 'participants'})</span>
+                        </span>
+                    </div>
+                {/snippet}
+
+                {#snippet renderForm({
+                    remoteFunction: rfMenu,
+                    schema: menuSchema,
+                    id: menuId,
+                    initialData: menuFormData = null,
+                    onSuccess: menuSuccess,
+                    onCancel: menuCancel,
+                }: any)}
+                    <MenuForm
+                        remoteFunction={rfMenu}
+                        validationSchema={menuSchema}
+                        isUpdating={!!menuId}
+                        initialData={menuFormData}
+                        participantsCount={totalParticipants}
+                        onSuccess={menuSuccess}
+                        onCancel={menuCancel}
+                    />
+                {/snippet}
+            </EntityManager>
+        {/key}
+
+        <input
+            {...rf.fields.menuIds.as(
+                "text",
+                JSON.stringify(initialData?.menuIds || []),
+            )}
+            class="hidden"
+        />
+
+        {#if currentMenus.length > 0}
+            {@const cateringTotal = currentMenus.reduce((sum, item) => sum + (Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1), 0)}
+            {@const cateringCost = currentMenus.reduce((sum, item) => sum + (Number(item.totalCostPerPortion) || 0) * (totalParticipants || 1), 0)}
+            {@const cateringProfit = cateringTotal - cateringCost}
+            <div class="mt-3 p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-sm">
+                <div class="flex items-center gap-2">
+                    <Utensils size={18} class="text-emerald-600" />
+                    <span class="font-semibold text-gray-800">{m.catering_calculation?.() || 'Total Catering Calculation'}:</span>
+                    <span class="text-xs text-gray-600">({currentMenus.length} {currentMenus.length === 1 ? (m.menu?.() || 'menu') : (m.menus?.() || 'menus')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
+                </div>
+                <div class="flex items-center gap-3 text-right">
+                    {#if cateringCost > 0}
+                        <div class="text-xs text-gray-600">
+                            Cost: <span class="font-mono text-gray-800">€{cateringCost.toFixed(2)}</span> • Profit: <span class="font-mono font-semibold text-emerald-700">+€{cateringProfit.toFixed(2)}</span>
+                        </div>
+                    {/if}
+                    <div class="font-bold text-base text-emerald-900 font-mono">
+                        €{cateringTotal.toFixed(2)}
+                    </div>
+                </div>
+            </div>
+        {/if}
+    </div>
 
     <SyncCheckboxBlock
         syncFieldConfig={rf.fields.syncIds}

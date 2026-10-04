@@ -69,6 +69,20 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				resources: { with: { resource: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
+				menus: {
+					with: {
+						menu: {
+							with: {
+								items: {
+									with: {
+										consumable: true,
+										recipe: true,
+									}
+								}
+							}
+						}
+					}
+				},
 			},
 		});
 
@@ -92,6 +106,20 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 					resources: { with: { resource: true } },
 					tags: { with: { tag: true } },
 					campaign: true,
+					menus: {
+						with: {
+							menu: {
+								with: {
+									items: {
+										with: {
+											consumable: true,
+											recipe: true,
+										}
+									}
+								}
+							}
+						}
+					},
 				},
 			});
 
@@ -149,6 +177,20 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				resources: { with: { resource: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
+				menus: {
+					with: {
+						menu: {
+							with: {
+								items: {
+									with: {
+										consumable: true,
+										recipe: true,
+									}
+								}
+							}
+						}
+					}
+				},
 			},
 		});
 	}
@@ -284,6 +326,35 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		return isNaN(parsed.getTime()) ? null : parsed.toISOString();
 	};
 
+	const eventMenus = (result.menus || []).map((em: any) => {
+		const m = em.menu;
+		if (!m) return null;
+		let totalPricePerPortion = 0;
+		let totalCostPerPortion = 0;
+		const items = (m.items || []).map((it: any) => {
+			const linePrice = (it.unitPrice || 0) * (it.portionAmount || 1);
+			const lineCost = (it.costPrice || 0) * (it.portionAmount || 1);
+			totalPricePerPortion += linePrice;
+			totalCostPerPortion += lineCost;
+			return {
+				...it,
+				createdAt: it.createdAt ? toIsoSafe(it.createdAt) : undefined,
+				updatedAt: it.updatedAt ? toIsoSafe(it.updatedAt) : undefined,
+			};
+		});
+		return {
+			...m,
+			createdAt: toIsoSafe(m.createdAt),
+			updatedAt: toIsoSafe(m.updatedAt),
+			items,
+			totalPricePerPortion: Math.round(totalPricePerPortion * 100) / 100,
+			totalCostPerPortion: Math.round(totalCostPerPortion * 100) / 100,
+		};
+	}).filter(Boolean);
+
+	const iCalPath = result.id.includes('_inst_') ? `/api/events/${result.id}/event.ics` : (result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`);
+	const qrCodePath = result.id.includes('_inst_') ? `/api/events/${result.id}/qr.png` : (result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`);
+
 	// 4. Return Data
 	if (!isAuthorized) {
 		// Public safe object
@@ -311,6 +382,10 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			resolvedContact,
 			contactIds: [],
 			syncIds: [],
+			menus: eventMenus,
+			menuIds: (result.menus || []).map((m: any) => m.menuId),
+			iCalPath,
+			qrCodePath,
 			seriesMaster: seriesMaster ?? undefined,
 			instances: instances.length > 0 ? instances : undefined,
 		} as any;
@@ -329,8 +404,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	// Full object
 	return {
 		...result,
-		iCalPath: result.id.includes('_inst_') ? `/api/events/${result.id}/event.ics` : (result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`),
-		qrCodePath: result.id.includes('_inst_') ? `/api/events/${result.id}/qr.png` : (result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`),
+		iCalPath,
+		qrCodePath,
 		createdAt: toIsoSafe(result.createdAt) ?? new Date().toISOString(),
 		updatedAt: toIsoSafe(result.updatedAt) ?? new Date().toISOString(),
 		startDateTime: toIsoSafe(result.startDateTime),
@@ -338,6 +413,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		locations: allLocations,
 		resources: allResources,
 		contacts: allContacts,
+		menus: eventMenus,
+		menuIds: (result.menus || []).map((m: any) => m.menuId),
 		rooms: getEventRooms({ locations: allLocations, resources: allResources }),
 		resourceIds: result.resources.map((r: any) => r.resourceId),
 		contactIds: result.contacts.map((c: any) => c.contactId),

@@ -36,5 +36,17 @@ export const ICONS = {
   megaphone: {
     path: 'M3 11l8-5v12l-8-5v-2zm18 0a5 5 0 00-5-5v10a5 5 0 005-5zM15 6.09v11.82a9 9 0 0 0 0-11.82z',
     strokeWidth: 2
+  } satisfies IconDef,
+  utensils: {
+    path: 'M18 2v20M21 15a3 3 0 0 1-3 3M18 2a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3M6 2v20M9 2v6a3 3 0 0 1-6 0V2',
+    strokeWidth: 2
+  } satisfies IconDef,
+  chefHat: {
+    path: 'M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z M6 17h12',
+    strokeWidth: 2
+  } satisfies IconDef,
+  cart: {
+    path: 'M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0',
+    strokeWidth: 2
   } satisfies IconDef
 } as const;

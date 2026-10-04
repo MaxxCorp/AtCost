@@ -58,6 +58,7 @@ export const eventBaseSchema = v.object({
 	status: v.optional(v.string()),
 	heroImage: v.optional(v.string()),
 	participantsCount: v.optional(v.union([v.number(), v.string()])),
+	menuIds: v.optional(v.union([v.array(v.string()), v.string()])),
 });
 
 /**

@@ -48,6 +48,8 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	isSeries?: boolean;
 	instanceCount?: number;
 	instances?: Event[];
+	menus?: any[];
+	menuIds?: string[];
 };
 
 

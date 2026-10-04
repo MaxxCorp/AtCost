@@ -50,6 +50,8 @@ export interface VirtualInstanceDiffInput {
 		submittedTags?: string[];
 		masterSyncIds?: string[];
 		submittedSyncIds?: string[];
+		masterMenuIds?: string[];
+		submittedMenuIds?: string[];
 	};
 }
 
@@ -114,6 +116,8 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			submittedTags,
 			masterSyncIds,
 			submittedSyncIds,
+			masterMenuIds,
+			submittedMenuIds,
 		} = associations;
 
 		if (submittedLocationIds !== undefined && masterLocationIds !== undefined) {
@@ -145,12 +149,18 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			const sSet = new Set(submittedSyncIds);
 			if (mSet.size !== sSet.size || [...mSet].some(id => !sSet.has(id))) return true;
 		}
+
+		if (submittedMenuIds !== undefined && masterMenuIds !== undefined) {
+			const mSet = new Set(masterMenuIds);
+			const sSet = new Set(submittedMenuIds);
+			if (mSet.size !== sSet.size || [...mSet].some(id => !sSet.has(id))) return true;
+		}
 	}
 
 	return false;
 }
 
-import { db, event, eventLocation, eventResource, eventContact, eventTag, eq, and, or, sql } from '@ac/db';
+import { db, event, eventLocation, eventResource, eventContact, eventTag, eventMenu, eq, and, or, sql } from '@ac/db';
 import { parseVirtualInstanceId } from '$lib/utils/event-series';
 
 /**
@@ -252,6 +262,13 @@ export async function resolveEventIdForAssociations(
 	if (masterTags.length > 0) {
 		await db.insert(eventTag).values(
 			masterTags.map(t => ({ eventId: created.id, tagId: t.tagId }))
+		);
+	}
+
+	const masterMenus = await db.select().from(eventMenu).where(eq(eventMenu.eventId, masterId));
+	if (masterMenus.length > 0) {
+		await db.insert(eventMenu).values(
+			masterMenus.map(m => ({ eventId: created.id, menuId: m.menuId }))
 		);
 	}
 

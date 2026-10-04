@@ -10,6 +10,9 @@ import { kiosk, kioskLocation } from "./kiosks";
 import { syncConfig, syncOperation, syncMapping, webhookSubscription } from "./sync";
 import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion, cmsMedia } from "./cms";
 import { contract, contractFramework, contractFrameworkContract } from "./contracts";
+import { consumable } from "./consumables";
+import { recipe, recipeConsumable } from "./recipes";
+import { menu, menuItem, eventMenu } from "./menus";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -27,6 +30,9 @@ export const userRelations = relations(user, ({ many }) => ({
     userTalents: many(userTalent),
     accounts: many(account),
     sessions: many(session),
+    consumables: many(consumable),
+    recipes: many(recipe),
+    menus: many(menu),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -87,6 +93,7 @@ export const eventRelations = relations(event, ({ many, one }) => ({
     contacts: many(eventContact),
     locations: many(eventLocation),
     tags: many(eventTag),
+    menus: many(eventMenu),
     series: one(recurringSeries, { fields: [event.seriesId], references: [recurringSeries.id] }),
     user: one(user, { fields: [event.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [event.campaignId], references: [campaign.id] }),
@@ -339,5 +346,39 @@ export const contractFrameworkRelations = relations(contractFramework, ({ many }
 export const contractFrameworkContractRelations = relations(contractFrameworkContract, ({ one }) => ({
     contract: one(contract, { fields: [contractFrameworkContract.contractId], references: [contract.id] }),
     framework: one(contractFramework, { fields: [contractFrameworkContract.frameworkId], references: [contractFramework.id] }),
+}));
+
+export const consumableRelations = relations(consumable, ({ one, many }) => ({
+    user: one(user, { fields: [consumable.userId], references: [user.id] }),
+    recipeConsumables: many(recipeConsumable),
+    menuItems: many(menuItem),
+}));
+
+export const recipeRelations = relations(recipe, ({ one, many }) => ({
+    user: one(user, { fields: [recipe.userId], references: [user.id] }),
+    consumables: many(recipeConsumable),
+    menuItems: many(menuItem),
+}));
+
+export const recipeConsumableRelations = relations(recipeConsumable, ({ one }) => ({
+    recipe: one(recipe, { fields: [recipeConsumable.recipeId], references: [recipe.id] }),
+    consumable: one(consumable, { fields: [recipeConsumable.consumableId], references: [consumable.id] }),
+}));
+
+export const menuRelations = relations(menu, ({ one, many }) => ({
+    user: one(user, { fields: [menu.userId], references: [user.id] }),
+    items: many(menuItem),
+    events: many(eventMenu),
+}));
+
+export const menuItemRelations = relations(menuItem, ({ one }) => ({
+    menu: one(menu, { fields: [menuItem.menuId], references: [menu.id] }),
+    consumable: one(consumable, { fields: [menuItem.consumableId], references: [consumable.id] }),
+    recipe: one(recipe, { fields: [menuItem.recipeId], references: [recipe.id] }),
+}));
+
+export const eventMenuRelations = relations(eventMenu, ({ one }) => ({
+    event: one(event, { fields: [eventMenu.eventId], references: [event.id] }),
+    menu: one(menu, { fields: [eventMenu.menuId], references: [menu.id] }),
 }));
 

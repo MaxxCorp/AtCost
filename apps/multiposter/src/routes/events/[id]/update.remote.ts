@@ -1,6 +1,6 @@
 import { form, getRequestEvent } from '$app/server';
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
@@ -143,6 +143,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
 		const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
 		const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
+		const menuIds = data.menuIds ? (typeof data.menuIds === 'string' ? JSON.parse(data.menuIds) : data.menuIds) : undefined;
 
 		let tagNames: string[] | undefined = undefined;
 		if (data.tags !== undefined) {
@@ -221,6 +222,12 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							submittedSyncIds = Array.isArray(data.syncIds) ? data.syncIds : (typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : []);
 						}
 
+						let masterMenuIds: string[] | undefined;
+						if (menuIds !== undefined) {
+							const masterMenus = await tx.select({ id: eventMenu.menuId }).from(eventMenu).where(eq(eventMenu.eventId, instMasterId));
+							masterMenuIds = masterMenus.map(m => m.id);
+						}
+
 						const hasChanges = hasVirtualInstanceChanged({
 							master,
 							submitted: {
@@ -254,7 +261,9 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								masterTags,
 								submittedTags: tagNames,
 								masterSyncIds,
-								submittedSyncIds
+								submittedSyncIds,
+								masterMenuIds,
+								submittedMenuIds: menuIds,
 							}
 						});
 
@@ -468,6 +477,23 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					if (masterTags.length > 0) {
 						await client.insert(eventTag).values(
 							masterTags.map((t: any) => ({ eventId: targetEventId, tagId: t.tagId }))
+						);
+					}
+				}
+
+				// Menus
+				if (menuIds !== undefined) {
+					await client.delete(eventMenu).where(eq(eventMenu.eventId, targetEventId));
+					if (menuIds.length > 0) {
+						await client.insert(eventMenu).values(
+							menuIds.map((id: string) => ({ eventId: targetEventId, menuId: id }))
+						);
+					}
+				} else if (isNewException && instMasterId) {
+					const masterMenus = await client.select().from(eventMenu).where(eq(eventMenu.eventId, instMasterId));
+					if (masterMenus.length > 0) {
+						await client.insert(eventMenu).values(
+							masterMenus.map((m: any) => ({ eventId: targetEventId, menuId: m.menuId }))
 						);
 					}
 				}
