@@ -136,8 +136,11 @@
                 } else {
                     await goto(cancelHref);
                 }
+            } else if (res === false) {
+                toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
-                toast.error(res?.error?.message || 'Action failed');
+                const errorMsg = typeof res?.error === 'string' ? res.error : (res?.error?.message || 'Action failed');
+                toast.error(errorMsg);
             }
         } catch (err: any) {
             console.error('Error submitting recipe form:', err);
@@ -147,10 +150,10 @@
     class="space-y-6"
 >
     {#if isUpdating && initialData?.id}
-        <input type="hidden" name="id" value={initialData.id} />
+        <input {...rf.fields.id.as('hidden', initialData.id)} />
     {/if}
 
-    <input type="hidden" {...rf.fields.ingredients.as('text')} value={ingredientsJson} />
+    <input {...rf.fields.ingredients.as('hidden', ingredientsJson)} />
 
     <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -160,8 +163,7 @@
                 </label>
                 <input
                     id="name"
-                    {...rf.fields.name.as('text')}
-                    value={initialData?.name ?? ''}
+                    {...rf.fields.name.as('text', initialData?.name ?? '')}
                     placeholder="e.g., Spaghetti Bolognese, Caesar Salad, Fruit Punch"
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
@@ -180,8 +182,7 @@
                     type="number"
                     step="1"
                     min="1"
-                    {...rf.fields.portions.as('number')}
-                    value={initialData?.portions ?? 1}
+                    {...rf.fields.portions.as('number', initialData?.portions ?? 1)}
                     oninput={(e: any) => portions = parseFloat(e.target.value) || 1}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
@@ -197,8 +198,7 @@
             </label>
             <input
                 id="description"
-                {...rf.fields.description.as('text')}
-                value={initialData?.description ?? ''}
+                {...rf.fields.description.as('text', initialData?.description ?? '')}
                 placeholder="Short summary or dietary note (e.g. Vegetarian, Gluten-free)"
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
@@ -210,8 +210,7 @@
             </label>
             <textarea
                 id="instructions"
-                {...rf.fields.instructions.as('text')}
-                value={initialData?.instructions ?? ''}
+                {...rf.fields.instructions.as('text', initialData?.instructions ?? '')}
                 rows="4"
                 placeholder="Step 1: Chop vegetables...&#10;Step 2: Sauté in pan...&#10;Step 3: Simmer for 20 minutes..."
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"

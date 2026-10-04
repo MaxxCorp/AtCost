@@ -33,9 +33,9 @@ export const consumablePaginationSchema = v.optional(v.object({
 export const createConsumableSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
     description: v.optional(v.string()),
-    purchasePrice: v.union([v.number(), v.string()]),
-    unit: v.pipe(v.string(), v.minLength(1, 'Unit is required')),
-    amount: v.optional(v.union([v.number(), v.string()])),
+    purchasePrice: v.optional(v.union([v.number(), v.string()]), 0),
+    unit: v.optional(v.pipe(v.string(), v.minLength(1, 'Unit is required')), 'piece'),
+    amount: v.optional(v.union([v.number(), v.string()]), 1),
     storageLocation: v.optional(v.string()),
     expirationDate: v.optional(v.string()),
 });
@@ -44,9 +44,9 @@ export const updateConsumableSchema = v.object({
     id: v.pipe(v.string(), v.minLength(1)),
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
     description: v.optional(v.string()),
-    purchasePrice: v.union([v.number(), v.string()]),
-    unit: v.pipe(v.string(), v.minLength(1, 'Unit is required')),
-    amount: v.optional(v.union([v.number(), v.string()])),
+    purchasePrice: v.optional(v.union([v.number(), v.string()]), 0),
+    unit: v.optional(v.pipe(v.string(), v.minLength(1, 'Unit is required')), 'piece'),
+    amount: v.optional(v.union([v.number(), v.string()]), 1),
     storageLocation: v.optional(v.string()),
     expirationDate: v.optional(v.string()),
 });

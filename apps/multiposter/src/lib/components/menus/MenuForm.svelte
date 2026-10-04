@@ -372,8 +372,11 @@
                 } else {
                     await goto(cancelHref);
                 }
+            } else if (res === false) {
+                toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
-                toast.error(res?.error?.message || 'Action failed');
+                const errorMsg = typeof res?.error === 'string' ? res.error : (res?.error?.message || 'Action failed');
+                toast.error(errorMsg);
             }
         } catch (err: any) {
             console.error('Error submitting menu form:', err);
@@ -383,11 +386,11 @@
     class="space-y-6"
 >
     {#if isUpdating && initialData?.id}
-        <input type="hidden" name="id" value={initialData.id} />
+        <input {...rf.fields.id.as('hidden', initialData.id)} />
     {/if}
 
-    <input type="hidden" {...rf.fields.items.as('text')} value={itemsJson} />
-    <input type="hidden" {...rf.fields.isTemplate.as('text')} value={isTemplate ? 'true' : 'false'} />
+    <input {...rf.fields.items.as('hidden', itemsJson)} />
+    <input {...rf.fields.isTemplate.as('hidden', isTemplate ? 'true' : 'false')} />
 
     <!-- Shared Template Notice (when editing template from an event context) -->
     {#if isUpdating && initialData?.isTemplate && onSuccess}
@@ -406,8 +409,7 @@
                 </label>
                 <input
                     id="name"
-                    {...rf.fields.name.as('text')}
-                    value={initialData?.name ?? ''}
+                    {...rf.fields.name.as('text', initialData?.name ?? '')}
                     placeholder="e.g., Wedding Catering Dinner, Coffee Break, BBQ Package"
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
@@ -441,8 +443,7 @@
             </label>
             <input
                 id="description"
-                {...rf.fields.description.as('text')}
-                value={initialData?.description ?? ''}
+                {...rf.fields.description.as('text', initialData?.description ?? '')}
                 placeholder="Optional description of the menu / catering package"
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />

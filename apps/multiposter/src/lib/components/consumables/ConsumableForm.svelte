@@ -75,8 +75,11 @@
                 } else {
                     await goto(cancelHref);
                 }
+            } else if (res === false) {
+                toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
-                toast.error(res?.error?.message || 'Action failed');
+                const errorMsg = typeof res?.error === 'string' ? res.error : (res?.error?.message || 'Action failed');
+                toast.error(errorMsg);
             }
         } catch (err: any) {
             console.error('Error submitting consumable form:', err);
@@ -86,7 +89,7 @@
     class="space-y-6"
 >
     {#if isUpdating && initialData?.id}
-        <input type="hidden" name="id" value={initialData.id} />
+        <input {...rf.fields.id.as('hidden', initialData.id)} />
     {/if}
 
     <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
@@ -96,8 +99,7 @@
             </label>
             <input
                 id="name"
-                {...rf.fields.name.as('text')}
-                value={initialData?.name ?? ''}
+                {...rf.fields.name.as('text', initialData?.name ?? '')}
                 placeholder="e.g., Organic Milk 1L, Coffee Beans, Red Wine Bottle"
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
@@ -112,8 +114,7 @@
             </label>
             <textarea
                 id="description"
-                {...rf.fields.description.as('text')}
-                value={initialData?.description ?? ''}
+                {...rf.fields.description.as('text', initialData?.description ?? '')}
                 rows="2"
                 placeholder="Optional details, brand, packaging notes..."
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
@@ -131,8 +132,7 @@
                     type="number"
                     step="0.01"
                     min="0"
-                    {...rf.fields.purchasePrice.as('number')}
-                    value={initialData?.purchasePrice ?? 0}
+                    {...rf.fields.purchasePrice.as('number', initialData?.purchasePrice ?? 0)}
                     oninput={(e: any) => purchasePrice = parseFloat(e.target.value) || 0}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
@@ -151,8 +151,7 @@
                     type="number"
                     step="any"
                     min="0.0001"
-                    {...rf.fields.amount.as('number')}
-                    value={initialData?.amount ?? 1}
+                    {...rf.fields.amount.as('number', initialData?.amount ?? 1)}
                     oninput={(e: any) => amount = parseFloat(e.target.value) || 1}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
@@ -168,8 +167,7 @@
                 </label>
                 <input
                     id="unit"
-                    {...rf.fields.unit.as('text')}
-                    value={initialData?.unit ?? 'piece'}
+                    {...rf.fields.unit.as('text', initialData?.unit ?? 'piece')}
                     oninput={(e: any) => unit = e.target.value}
                     placeholder="e.g. kg, g, l, ml, piece, bottle, pack"
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
@@ -199,8 +197,7 @@
                 </label>
                 <input
                     id="storageLocation"
-                    {...rf.fields.storageLocation.as('text')}
-                    value={initialData?.storageLocation ?? ''}
+                    {...rf.fields.storageLocation.as('text', initialData?.storageLocation ?? '')}
                     placeholder="e.g., Pantry Shelf A3, Bar Cooler, Cold Storage"
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
@@ -214,8 +211,7 @@
                 <input
                     id="expirationDate"
                     type="date"
-                    {...rf.fields.expirationDate.as('text')}
-                    value={formatForInput(initialData?.expirationDate)}
+                    {...rf.fields.expirationDate.as('text', formatForInput(initialData?.expirationDate))}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
             </div>
