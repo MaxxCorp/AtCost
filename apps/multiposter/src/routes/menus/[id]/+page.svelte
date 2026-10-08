@@ -1,7 +1,7 @@
 <script lang="ts">
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import * as m from "$lib/paraglide/messages";
-    import MenuForm from "$lib/components/menus/MenuForm.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import * as m from "#lib/paraglide/messages.js";
+    import MenuForm from "#lib/components/menus/MenuForm.svelte";
     import { readMenu } from "./read.remote";
     import { updateMenu } from "./update.remote";
     import { listConsumables } from "../../consumables/list.remote";

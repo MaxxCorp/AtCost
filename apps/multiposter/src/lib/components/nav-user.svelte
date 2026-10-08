@@ -1,14 +1,14 @@
 <script lang="ts">
-	import * as Avatar from "$lib/components/ui/avatar/index.js";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import { useSidebar } from "$lib/components/ui/sidebar/index.js";
-	import ChevronsUpDownIcon from "$lib/components/icons/chevrons-up-down.svelte";
-	import LogOutIcon from "$lib/components/icons/log-out.svelte";
-	import GlobeIcon from "$lib/components/icons/globe.svelte";
-	import { authClient } from "$lib/auth";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime";
-	import * as m from "$lib/paraglide/messages";
+	import * as Avatar from "#lib/components/ui/avatar/index.js";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
+	import * as Sidebar from "#lib/components/ui/sidebar/index.js";
+	import { useSidebar } from "#lib/components/ui/sidebar/index.js";
+	import ChevronsUpDownIcon from "#lib/components/icons/chevrons-up-down.svelte";
+	import LogOutIcon from "#lib/components/icons/log-out.svelte";
+	import GlobeIcon from "#lib/components/icons/globe.svelte";
+	import { authClient } from "#lib/auth.js";
+	import { setLocale, getLocale } from "#lib/paraglide/runtime.js";
+	import * as m from "#lib/paraglide/messages.js";
 
 	let { user }: { user: { name: string; email: string; avatar?: string } } =
 		$props();

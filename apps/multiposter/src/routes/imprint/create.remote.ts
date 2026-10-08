@@ -1,7 +1,7 @@
 import { command } from '$app/server';
-import { createBlockSchema } from '$lib/validations/cms';
-import { createBlock, linkBlock } from '$lib/server/cms/operations';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { createBlockSchema } from '#lib/validations/cms.js';
+import { createBlock, linkBlock } from '#lib/server/cms/operations.js';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 
 export const createBlockFunction = command(createBlockSchema, async (data) => {
     const user = getAuthenticatedUser();

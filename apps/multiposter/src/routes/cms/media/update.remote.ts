@@ -1,7 +1,7 @@
 import { command } from '$app/server';
 import { error } from '@sveltejs/kit';
-import { getAuthenticatedUser } from '$lib/server/authorization';
-import { updateImageSchema } from '$lib/validations/cms';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
+import { updateImageSchema } from '#lib/validations/cms.js';
 import { db } from '@ac/db';
 import { cmsMedia } from '@ac/db';
 import { eq } from '@ac/db';

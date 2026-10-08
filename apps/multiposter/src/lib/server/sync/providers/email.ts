@@ -12,7 +12,7 @@ import { db } from '@ac/db';
 import { contact, emailCampaign, emailEvent } from '@ac/db';
 import { inArray } from '@ac/db';
 import { renderEmailTemplate, type EmailTemplateData } from '../../email-templates';
-import { env } from '$env/dynamic/private';
+import { BREVO_API_KEY } from '$app/env/private';
 import fs from 'fs';
 import path from 'path';
 
@@ -38,8 +38,7 @@ export class EmailProvider implements SyncProvider {
 		this.config = config;
 
 		// Get Brevo API key from credentials, settings or environment
-		this.brevoApiKey =
-			config.credentials?.apiKey || config.settings?.apiKey || env.BREVO_API_KEY;
+		this.brevoApiKey = config.credentials?.apiKey || config.settings?.apiKey || BREVO_API_KEY;
 
 		this.selectedTemplate = config.settings?.selectedTemplate || 'standard';
 		
@@ -93,7 +92,7 @@ export class EmailProvider implements SyncProvider {
 
 		try {
 			const userRecord = await db.query.user.findFirst({
-				where: (u: any, { eq }: any) => eq(u.id, this.config!.userId)
+				where: (u: any, { eq }: any) => eq(u.id, (this.config!).userId)
 			});
 			if (userRecord) {
 				senderInfo = {
@@ -119,8 +118,14 @@ export class EmailProvider implements SyncProvider {
 		const attachments = await this.generateAttachments(event);
 
 		const isAnnouncement = event.metadata?.entityType === 'announcement';
-		const eventId = isAnnouncement ? undefined : (event.metadata?.eventId || event.externalId);
-		const announcementId = isAnnouncement ? (event.metadata?.announcementId || event.externalId) : undefined;
+
+		const eventId = isAnnouncement
+			? undefined
+			: event.metadata?.eventId || event.externalId;
+
+		const announcementId = isAnnouncement
+			? event.metadata?.announcementId || event.externalId
+			: undefined;
 
 		if (this.brevoApiKey) {
 			// Create Brevo campaign
@@ -326,14 +331,14 @@ export class EmailProvider implements SyncProvider {
 		};
 
 		// 1. Add configured single recipient email
-		const recipientEmail = this.config!.settings?.recipientEmail;
+		const recipientEmail = (this.config!).settings?.recipientEmail;
 		if (recipientEmail) {
 			addRecipient(recipientEmail);
 		}
 
 		// 2. Add contacts from synchronization configuration settings
 		let contactIds: string[] = [];
-		const rawContactIds = this.config!.settings?.recipientContactIds;
+		const rawContactIds = (this.config!).settings?.recipientContactIds;
 		if (Array.isArray(rawContactIds)) {
 			contactIds = rawContactIds.filter(Boolean);
 		} else if (typeof rawContactIds === 'string' && rawContactIds.trim()) {

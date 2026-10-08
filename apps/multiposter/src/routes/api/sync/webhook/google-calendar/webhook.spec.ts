@@ -3,7 +3,7 @@ import { POST } from './+server';
 import type { RequestEvent } from '@sveltejs/kit';
 
 // Mock the sync service
-vi.mock('$lib/server/sync/service', () => ({
+vi.mock('#lib/server/sync/service.js', () => ({
 	syncService: {
 		handleWebhook: vi.fn().mockResolvedValue({ configId: 'test-config-id', processed: true })
 	}
@@ -85,7 +85,7 @@ describe('Google Calendar Webhook Handler', () => {
 		});
 
 		it('should handle errors gracefully', async () => {
-			const { syncService } = await import('$lib/server/sync/service');
+			const { syncService } = await import('#lib/server/sync/service.js');
 			vi.mocked(syncService.handleWebhook).mockRejectedValueOnce(new Error('Database error'));
 
 			// Suppress expected error logs for cleaner test output

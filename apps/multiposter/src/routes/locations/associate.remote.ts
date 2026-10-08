@@ -3,8 +3,8 @@ import { db } from '@ac/db';
 import { announcementLocation, eventLocation, kioskLocation, location, resourceLocation, locationContact } from '@ac/db';
 import { eq } from '@ac/db';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '@ac/validations';
-import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
-import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
+import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
+import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
 const tableMap = {
     announcement: announcementLocation,

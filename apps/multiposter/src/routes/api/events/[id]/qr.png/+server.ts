@@ -2,8 +2,8 @@ import { db, eq, sql } from '@ac/db';
 import QRCode from 'qrcode';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
-import { cachedBinary, cacheKeys } from '$lib/server/cache';
+import { PUBLIC_BASE_URL, BETTER_AUTH_URL } from '$app/env/private';
+import { cachedBinary, cacheKeys } from '#lib/server/cache/index.js';
 
 export const GET: RequestHandler = async ({ params, url }) => {
     const eventId = params.id;
@@ -31,10 +31,10 @@ export const GET: RequestHandler = async ({ params, url }) => {
                         where: (table, { eq }) => eq(table.id, masterId),
                     });
                     if (data && instIso) {
-                        const masterExdates = Array.isArray(data.exdates) ? (data.exdates as string[]) : [];
+                        const masterExdates = Array.isArray(data.exdates) ? data.exdates as string[] : [];
                         const targetDate = new Date(decodedIso);
                         if (!isNaN(targetDate.getTime())) {
-                            const isExcluded = masterExdates.some(ex => {
+                            const isExcluded = masterExdates.some((ex) => {
                                 const exTime = new Date(ex).getTime();
                                 return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
                             });
@@ -45,7 +45,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
                     }
                 }
             } else {
-                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
+                const isUuid = (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).test(eventId);
                 if (isUuid) {
                     data = await db.query.event.findFirst({
                         where: (table, { eq }) => eq(table.id, eventId),
@@ -57,7 +57,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
                 error(404, 'Event not found');
             }
 
-            const baseUrl = env.PUBLIC_BASE_URL || url.origin || env.BETTER_AUTH_URL || "";
+            const baseUrl = PUBLIC_BASE_URL || url.origin || BETTER_AUTH_URL || "";
             const eventUrl = `${baseUrl}/events/${eventId}/view`;
 
             const qrBuffer = await QRCode.toBuffer(eventUrl, {

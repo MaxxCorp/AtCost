@@ -1,7 +1,7 @@
 import { command, requested } from '$app/server';
 import { db, menu, inArray } from '@ac/db';
 import { listMenus } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 
 export const deleteMenus = command(v.array(v.string()), async (ids: string[]) => {

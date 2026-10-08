@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { formatRecurrenceText } from "./format-recurrence";
-import { setLocale } from "$lib/paraglide/runtime.js";
+import { setLocale } from "#lib/paraglide/runtime.js";
 
 describe("formatRecurrenceText", () => {
     describe("English locale", () => {

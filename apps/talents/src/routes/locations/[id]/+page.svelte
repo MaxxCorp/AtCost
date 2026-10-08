@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { Users } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
-    import TalentForm from "$lib/components/talent/TalentForm.svelte";
+    import TalentForm from "#lib/components/talent/TalentForm.svelte";
     import { page } from "$app/state";
     import LocationForm from "@ac/ui/components/forms/LocationForm.svelte";
         import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { updateLocationSchema } from "@ac/validations/locations";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { listTalents } from "../../talents/list.remote";
     import { getEntityTalents, associateTalent, dissociateTalent } from "../../talents/associate.remote";
     import { deleteTalent } from "../../talents/[id]/delete.remote";

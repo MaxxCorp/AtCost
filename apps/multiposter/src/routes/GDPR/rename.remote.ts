@@ -1,7 +1,7 @@
 import { command } from '$app/server';
-import { renameBlockSchema } from '$lib/validations/cms';
-import { renameBlock } from '$lib/server/cms/operations';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { renameBlockSchema } from '#lib/validations/cms.js';
+import { renameBlock } from '#lib/server/cms/operations.js';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 
 export const renameBlockFunction = command(renameBlockSchema, async (data) => {
     const user = getAuthenticatedUser();

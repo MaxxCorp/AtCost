@@ -1,6 +1,6 @@
 import { db } from '@ac/db';
 import { and, eq } from '@ac/db';
-import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
+import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
 export interface AssociationOptions {
     type: string;

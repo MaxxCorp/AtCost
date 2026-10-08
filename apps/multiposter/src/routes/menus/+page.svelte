@@ -1,9 +1,9 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { listMenus } from "./list.remote";
     import { deleteMenus } from "./[id]/delete.remote";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import Button from "#lib/components/ui/button/button.svelte";
     import { LoadingSection, ErrorSection } from "@ac/ui";
     import {
         Utensils,

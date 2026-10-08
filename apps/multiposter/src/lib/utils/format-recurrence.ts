@@ -1,7 +1,7 @@
 import { RRule } from "rrule";
 import ENGLISH from "rrule/dist/esm/nlp/i18n.js";
-import * as m from "$lib/paraglide/messages";
-import { getLocale } from "$lib/paraglide/runtime";
+import * as m from "#lib/paraglide/messages.js";
+import { getLocale } from "#lib/paraglide/runtime.js";
 
 export interface FormatRecurrenceOptions {
     omitLength?: boolean;

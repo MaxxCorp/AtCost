@@ -1,7 +1,7 @@
 import { form, requested } from '$app/server';
 import { db, menu, menuItem } from '@ac/db';
 import { listMenus } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createMenuSchema } from '@ac/validations';
 
 export const createMenu = form(createMenuSchema, async (data) => {

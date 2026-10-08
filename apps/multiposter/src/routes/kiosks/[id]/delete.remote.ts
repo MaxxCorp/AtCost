@@ -2,10 +2,10 @@ import { command } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { listKiosks } from '../list.remote';
-import { invalidateKiosk } from '$lib/server/cache';
+import { invalidateKiosk } from '#lib/server/cache/index.js';
 
 export const deleteKiosk = command(
     v.pipe(v.array(v.string()), v.minLength(1)),

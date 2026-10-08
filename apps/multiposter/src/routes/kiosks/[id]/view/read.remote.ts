@@ -6,8 +6,8 @@ import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq } from '@ac/db';
 import * as v from 'valibot';
 
-import { resolveLocationContactSync } from '$lib/server/contact-resolution';
-import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys } from '$lib/server/cache';
+import { resolveLocationContactSync } from '#lib/server/contact-resolution.js';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys } from '#lib/server/cache/index.js';
 
 function toSafeIsoString(date: Date | string | null | undefined): string | null {
     if (!date) return null;

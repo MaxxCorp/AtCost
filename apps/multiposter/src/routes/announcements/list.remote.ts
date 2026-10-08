@@ -2,12 +2,12 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, campaign, announcementLocation, announcementTag, tag, announcementResource, resource, locationContact } from '@ac/db';
 import { eq, desc, inArray, notInArray, and, or, not, ilike, sql, exists } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import type { Announcement as DbAnnouncement } from '@ac/db';
 import { announcementPaginationSchema as PaginationSchema, parseFilterValue, type Announcement, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
-import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
-import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
+import { resolveAnnouncementContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
 /**
  * List all announcements for the authenticated user

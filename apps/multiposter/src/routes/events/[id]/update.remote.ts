@@ -4,18 +4,18 @@ import { event, eventResource, eventContact, eventLocation, tag, eventTag, event
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { updateEventSchema } from '$lib/validations/events';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { updateEventSchema } from '#lib/validations/events.js';
 import { error } from '@sveltejs/kit';
-import { generateEventAssets } from '$lib/server/events/assets';
-import { publishEventChange } from '$lib/server/realtime';
-import { syncService } from '$lib/server/sync/service';
+import { generateEventAssets } from '#lib/server/events/assets.js';
+import { publishEventChange } from '#lib/server/realtime.js';
+import { syncService } from '#lib/server/sync/service.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
-import { invalidateEvent } from '$lib/server/cache';
-import { hasVirtualInstanceChanged } from '$lib/server/events/exceptions';
-import { isSeriesItem } from '$lib/utils/event-series';
-import * as m from '$lib/paraglide/messages.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import { hasVirtualInstanceChanged } from '#lib/server/events/exceptions.js';
+import { isSeriesItem } from '#lib/utils/event-series.js';
+import * as m from '#lib/paraglide/messages.js';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {

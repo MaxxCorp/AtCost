@@ -1,9 +1,9 @@
 import { form, requested } from '$app/server';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { syncConfig } from '@ac/db';
 import { eq, and } from '@ac/db';
-import { updateSynchronizationSchema } from '$lib/validations/synchronizations';
+import { updateSynchronizationSchema } from '#lib/validations/synchronizations.js';
 import { list as listSynchronizations } from '../list.remote';
 import { readSynchronization as read } from './read.remote';
 

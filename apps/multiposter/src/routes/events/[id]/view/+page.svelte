@@ -1,11 +1,11 @@
 <script lang="ts">
     import { LoadingSection, ErrorSection } from "@ac/ui";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { readEvent } from "../read.remote";
-    import { authClient } from "$lib/auth";
+    import { authClient } from "#lib/auth.js";
     import { deleteEvents } from "../../delete.remote";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import { toast } from "svelte-sonner";
@@ -31,19 +31,19 @@
         Lock,
         Utensils,
     } from "@lucide/svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
-    import { getEventRooms } from "$lib/utils/format-rooms";
+    import Button from "#lib/components/ui/button/button.svelte";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
     import {
         formatEventStatus,
         getStatusBadgeClass,
         getStatusDotClass,
-    } from "$lib/utils/format-event-status";
+    } from "#lib/utils/format-event-status.js";
 
-    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import * as Dialog from "$lib/components/ui/dialog";
-    import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
+    import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
+    import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
 
     const eventId = $derived(page.params.id || "");
     const dataPromise = $derived(readEvent(eventId));

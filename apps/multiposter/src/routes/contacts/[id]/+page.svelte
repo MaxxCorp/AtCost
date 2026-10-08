@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
     import { page } from "$app/state";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { readContact } from "./read.remote";
     import { updateContact } from "./update.remote";
     import { deleteContact } from "./delete.remote";
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import ScanNamecardButton from "$lib/components/contacts/ScanNamecardButton.svelte";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-            import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
+    import ScanNamecardButton from "#lib/components/contacts/ScanNamecardButton.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+            import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { goto } from "$app/navigation";
 
-    import { updateContactSchema } from "$lib/validations/contacts";
+    import { updateContactSchema } from "#lib/validations/contacts.js";
     import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
     import { listLocations } from "../../locations/list.remote";
@@ -73,7 +73,7 @@
                         <div class="flex justify-between items-center mb-6 mt-2">
                             <h1 class="text-3xl font-bold">{m.edit_contact()}</h1>
                             <div class="flex items-center gap-2">
-                                <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
+                                <ScanNamecardButton onScanned={(data: any) => formComponent?.fillData(data)} />
                                 <AsyncButton
                                     type="button"
                                     loadingLabel={m.deleting()}
@@ -112,7 +112,7 @@
                                     ).map((la: any) => la.locationId),
                                 }}
                             >
-                                {#snippet children({ onLocationsChange })}
+                                {#snippet children({ onLocationsChange }: any)}
                                     <div class="mt-8 border-t pt-8">
                                         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
                                             <MapPin size={18} class="text-blue-600" />

@@ -4,9 +4,9 @@ import { contact, locationContact, contactTag, tag } from '@ac/db';
 import type { Contact as DbContact } from '@ac/db';
 import { db } from '@ac/db';
 import { desc, eq, inArray, and, or, not, ilike, sql, exists } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { contactPaginationSchema as PaginationSchema, parseFilterValue, type Contact, type PaginatedResult } from '@ac/validations';
-import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
 /**
  * Query: List all contacts

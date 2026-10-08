@@ -1,7 +1,7 @@
 import { form, requested } from '$app/server';
 import { db, recipe, recipeConsumable } from '@ac/db';
 import { listRecipes } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createRecipeSchema } from '@ac/validations';
 
 export const createRecipe = form(createRecipeSchema, async (data) => {

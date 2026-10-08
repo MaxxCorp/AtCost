@@ -1,7 +1,7 @@
 import { command } from '$app/server';
 import { db, user, session, account, inArray } from '@ac/db';
 import { listUsers } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess, parseRoles } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess, parseRoles } from '#lib/server/authorization.js';
 import { deleteUserSchema } from '@ac/validations';
 
 export const deleteUser = command(deleteUserSchema, async (userIds: string[]) => {

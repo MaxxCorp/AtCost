@@ -1,28 +1,28 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { goto } from "$app/navigation";
     import { readUser } from "./read.remote";
     import { updateUser } from "./update.remote";
     import { deleteUser } from "./delete.remote";
-    import { updateUserSchema } from "$lib/validations/users";
+    import { updateUserSchema } from "#lib/validations/users.js";
 
     import { UserForm, EntityManager, ErrorSection, LoadingSection, AsyncButton, handleDelete, matchContactSearch } from "@ac/ui";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import { FEATURES } from "$lib/features";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import { FEATURES } from "#lib/features.js";
 
     import { listContacts } from "../../contacts/list.remote";
     import { addAssociation, removeAssociation, fetchEntityContacts } from "../../contacts/associate.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
     import { readContact } from "../../contacts/[id]/read.remote";
-    import { createContactSchema, updateContactSchema } from "$lib/validations/contacts";
+    import { createContactSchema, updateContactSchema } from "#lib/validations/contacts.js";
     import { deleteContact } from "../../contacts/[id]/delete.remote";
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { User as UserIcon } from "@lucide/svelte";
-    import { parseRoles } from "$lib/authorization";
-    import { browser } from "$app/environment";
-    import { authClient } from "$lib/auth";
+    import { parseRoles } from "#lib/authorization.js";
+    import { browser } from '$app/env';
+    import { authClient } from "#lib/auth.js";
 
     const userId = $derived(page.params.id || "");
 
@@ -85,14 +85,17 @@
                                     validationSchema={updateUserSchema}
                                     isUpdating={true}
                                     initialData={user}
-                                    {m}
-                                    {appConfigList}
-                                    canEditRoles={session?.data?.user ? parseRoles(session.data.user).includes("admin") : false}
+                                    m={m}
+                                    appConfigList={appConfigList}
+                                    canEditRoles={session?.data?.user
+                                        ? parseRoles(session.data.user).includes("admin")
+                                        : false}
                                     onSuccess={() => goto("/users")}
                                     onCancel={() => goto("/users")}
                                 >
                                     {#snippet extraEntities(data: any)}
-                                        <EntityManager {m}
+                                        <EntityManager
+                                            m={m}
                                             title={m.feature_contacts_title()}
                                             icon={UserIcon}
 
@@ -106,7 +109,7 @@
                                                 removeAssociation({ ...p, contactId: p.itemId } as any)}
                                             deleteItemRemote={async (ids: string[]) => {
                                                 return await handleDelete({
-                                                    ids: ids,
+                                                    ids,
                                                     deleteFn: async (ids: string[]) => deleteContact(ids),
                                                     itemName: m.feature_contacts_title(),
                                                 });

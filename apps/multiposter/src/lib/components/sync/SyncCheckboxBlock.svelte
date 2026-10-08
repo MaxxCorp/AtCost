@@ -1,8 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { list } from "../../../routes/synchronizations/list.remote";
-    import RefreshCw from "$lib/components/icons/refresh-cw.svelte";
-    import * as m from "$lib/paraglide/messages";
+    import RefreshCw from "#lib/components/icons/refresh-cw.svelte";
+    import * as m from "#lib/paraglide/messages.js";
     import { translateIssue } from "@ac/ui";
     
     import { toast } from "svelte-sonner";

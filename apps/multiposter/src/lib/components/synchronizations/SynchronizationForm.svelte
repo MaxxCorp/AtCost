@@ -12,7 +12,7 @@
 		Camera
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
-	import * as m from "$lib/paraglide/messages";
+	import * as m from "#lib/paraglide/messages.js";
 	import { translateIssue, EntityManager, handleDelete, matchContactSearch } from "@ac/ui";
 	import TemplateSelector from "./TemplateSelector.svelte";
 	import ContactForm from "../contacts/ContactForm.svelte";

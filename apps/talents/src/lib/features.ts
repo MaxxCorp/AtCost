@@ -1,5 +1,5 @@
 import { ICONS } from '@ac/ui';
-import type { TalentFeature } from '$lib/authorization';
+import type { TalentFeature } from '#lib/authorization.js';
 
 export interface FeatureMeta {
     key: TalentFeature;

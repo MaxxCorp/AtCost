@@ -4,13 +4,13 @@ import { location } from '@ac/db';
 import type { Location as DbLocation } from '@ac/db';
 import { db } from '@ac/db';
 import { desc } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 
 /**
  * Location interface matching the database schema, with dates serialized to strings
  */
 import { LocationPaginationSchema as PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
-import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
 /**
  * Query: List all locations

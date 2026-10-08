@@ -6,9 +6,9 @@
     import { listAnnouncements } from "../../../routes/announcements/list.remote";
     import { listTags } from "../../../routes/tags/list.remote";
 
-    import * as m from "$lib/paraglide/messages";
-    import Button from "$lib/components/ui/button/button.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import * as m from "#lib/paraglide/messages.js";
+    import Button from "#lib/components/ui/button/button.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { EntityManager, LocationForm, handleDelete, translateIssue } from "@ac/ui";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
@@ -34,8 +34,8 @@
         validationSchema: any;
         initialData?: any;
         isUpdating?: boolean;
-    } = $props();
- 
+     } = $props();
+
     const type = "kiosk";
  
  
@@ -73,7 +73,7 @@
     let includedAnnouncementIds = $state<string[]>(untrack(() => initialData?.includedAnnouncementIds || []));
     let excludedTags = $state<string[]>(untrack(() => initialData?.excludedTags || ['Series']));
     let includedTags = $state<string[]>(untrack(() => initialData?.includedTags || []));
- 
+
 
 
  
@@ -149,32 +149,29 @@
 <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
     <form
         {...rf.enhance(async ({ submit }: any) => {
-                if (rangeMode === "fixed") {
-                    if (!startDate || !endDate) {
-                        toast.error("Both start date and end date are required for fixed range mode");
-                        return;
-                    }
-                    if (new Date(startDate) > new Date(endDate)) {
-                        toast.error("Start date must be before or equal to end date");
-                        return;
-                    }
+            if (rangeMode === "fixed") {
+                if (!startDate || !endDate) {
+                    toast.error("Both start date and end date are required for fixed range mode");
+                    return;
                 }
-                try {
-                    const result: any = await submit();
-                    if (result?.error) {
-                        toast.error(result.error);
-                        return;
-                    }
-                    toast.success(
-                        isUpdating ? m.kiosk_updated() : m.kiosk_created(),
-                    );
-                    goto(resolve("/kiosks"));
-                } catch (error: any) {
-                    toast.error(
-                        error?.message || m.something_went_wrong(),
-                    );
+                if (new Date(startDate) > new Date(endDate)) {
+                    toast.error("Start date must be before or equal to end date");
+                    return;
                 }
-            })}
+            }
+            try {
+                const result: any = await submit();
+                if (result?.error) {
+                    toast.error(result.error);
+                    return;
+                }
+
+                toast.success(isUpdating ? m.kiosk_updated() : m.kiosk_created());
+                goto(resolve('kiosks'));
+            } catch(error: any) {
+                toast.error(error?.message || m.something_went_wrong());
+            }
+        })}
         class="space-y-6"
     >
         {#if isUpdating && initialData?.id}
@@ -191,7 +188,7 @@
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 onblur={() => rf.validate()}
             />
-            {#each (rf.fields.name.issues() ?? []) as issue (issue.message)}
+            {#each rf.fields.name.issues() ?? [] as issue (issue.message)}
                 <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </div>
@@ -220,15 +217,13 @@
                     {m.feature_locations_title()}
                 </h3>
                 {#key initialData?.id || "new"}
-                    <EntityManager {m}
+                    <EntityManager
+                        m={m}
                         title={m.feature_locations_title()}
                         icon={MapPin}
                         mode="embedded"
-                        initialItems={locs.data.filter((l: any) =>
-                            selectedLocationIds.includes(l.id),
-                        )}
-                        onchange={(ids: string[]) =>
-                            (selectedLocationIds = ids)}
+                        initialItems={locs.data.filter((l: any) => selectedLocationIds.includes(l.id))}
+                        onchange={(ids: string[]) => selectedLocationIds = ids}
                         listItemsRemote={listLocations as any}
                         deleteItemRemote={async (ids: string[]) => {
                             return await handleDelete({
@@ -243,15 +238,7 @@
                         updateSchema={updateLocationSchema}
                         readItemRemote={readLocation}
                         searchPredicate={(l: Location, q: string) => {
-                            return (
-                                l.name
-                                    .toLowerCase()
-                                    .includes(q.toLowerCase()) ||
-                                (l.roomId
-                                    ?.toLowerCase()
-                                    .includes(q.toLowerCase()) ??
-                                    false)
-                            );
+                            return l.name.toLowerCase().includes(q.toLowerCase()) || (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false);
                         }}
                         loadingLabel={m.loading_item({
                             item: m.feature_locations_title(),
@@ -303,8 +290,8 @@
                                 validationSchema={schema}
                                 isUpdating={!!id}
                                 initialData={formData}
-                                {onSuccess}
-                                {onCancel}
+                                onSuccess={onSuccess}
+                                onCancel={onCancel}
                                 labels={{
                                     name: m.location_name(),
                                     street: m.street(),
@@ -361,7 +348,7 @@
                     )}
                     class="hidden"
                 />
-                {#each (rf.fields.locationIds.issues() ?? []) as issue (issue.message)}
+                {#each rf.fields.locationIds.issues() ?? [] as issue (issue.message)}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             {:catch error}
@@ -433,7 +420,7 @@
                     onblur={() => rf.validate()}
                 />
                 <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
-                {#each (rf.fields.loopDuration.issues() ?? []) as issue (issue.message)}
+                {#each rf.fields.loopDuration.issues() ?? [] as issue (issue.message)}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -452,10 +439,9 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         onblur={() => rf.validate()}
                     />
-                    {#each (rf.fields.lookAheadDays.issues() ?? []) as issue (issue.message)}
-                        <p class="mt-1 text-sm text-red-600">
-                            {translateIssue(issue.message, m)}
-                        </p>
+
+                    {#each rf.fields.lookAheadDays.issues() ?? [] as issue (issue.message)}
+                        <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
 
@@ -472,10 +458,9 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         onblur={() => rf.validate()}
                     />
-                    {#each (rf.fields.lookPastDays.issues() ?? []) as issue (issue.message)}
-                        <p class="mt-1 text-sm text-red-600">
-                            {translateIssue(issue.message, m)}
-                        </p>
+
+                    {#each rf.fields.lookPastDays.issues() ?? [] as issue (issue.message)}
+                        <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
             {:else}
@@ -519,7 +504,7 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each (rf.fields.startDate.issues() ?? []) as issue (issue.message)}
+                    {#each rf.fields.startDate.issues() ?? [] as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
@@ -542,7 +527,7 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each (rf.fields.endDate.issues() ?? []) as issue (issue.message)}
+                    {#each rf.fields.endDate.issues() ?? [] as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>

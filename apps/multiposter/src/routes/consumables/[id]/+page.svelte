@@ -1,7 +1,7 @@
 <script lang="ts">
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import * as m from "$lib/paraglide/messages";
-    import ConsumableForm from "$lib/components/consumables/ConsumableForm.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import * as m from "#lib/paraglide/messages.js";
+    import ConsumableForm from "#lib/components/consumables/ConsumableForm.svelte";
     import { readConsumable } from "./read.remote";
     import { updateConsumable } from "./update.remote";
     import { updateConsumableSchema } from "@ac/validations";

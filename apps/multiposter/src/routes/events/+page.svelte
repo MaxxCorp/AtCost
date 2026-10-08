@@ -4,11 +4,11 @@
 	import { listTags } from "../tags/list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { deleteEvents } from "./delete.remote";
-	import SeriesMigrationDialog from "$lib/components/events/SeriesMigrationDialog.svelte";
-	import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
-	import * as m from "$lib/paraglide/messages.js";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import SeriesMigrationDialog from "#lib/components/events/SeriesMigrationDialog.svelte";
+	import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
+	import * as m from "#lib/paraglide/messages.js";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		Pencil,
 		Trash2,
@@ -29,24 +29,24 @@
 		RefreshCw,
 		Tag as TagIcon,
 	} from "@lucide/svelte";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import { toast } from "svelte-sonner";
 	import { onMount, untrack } from "svelte";
 	import { SvelteDate, SvelteSet } from "svelte/reactivity";
-	import { getPreference, setPreference } from "$lib/utils/idb";
-	import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-	import { getEventRooms } from "$lib/utils/format-rooms";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
+	import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+	import { getEventRooms } from "#lib/utils/format-rooms.js";
 	import {
 		formatEventStatus,
 		getStatusBadgeClass,
 		getStatusDotClass,
-	} from "$lib/utils/format-event-status";
+	} from "#lib/utils/format-event-status.js";
 	import { goto } from "$app/navigation";
 	import {
 		formatFriendlyEventTime,
 		getEventDurationDays,
 		isMultiDayEvent,
-	} from "$lib/utils/format-event-date";
+	} from "#lib/utils/format-event-date.js";
 
 	function formatDate(dateStr: string | null | undefined) {
 		if (!dateStr) return "";
@@ -792,7 +792,7 @@
 									<SeriesModeSelector
 										event={event}
 										variant="inline"
-										ondelete={(inst) => handleDelete(inst, false)}
+										ondelete={(inst: any) => handleDelete(inst, false)}
 									/>
 								</div>
 							{/if}

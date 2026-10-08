@@ -1,15 +1,15 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '@ac/db';
-import { updateAnnouncementSchema } from '$lib/validations/announcements';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { publishAnnouncementChange } from '$lib/server/realtime';
+import { updateAnnouncementSchema } from '#lib/validations/announcements.js';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { publishAnnouncementChange } from '#lib/server/realtime.js';
 import { listAnnouncements } from '../list.remote';
 import { readAnnouncement } from './read.remote';
 import { eq } from '@ac/db';
-import { syncService } from '$lib/server/sync/service';
+import { syncService } from '#lib/server/sync/service.js';
 import { type Announcement, createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
-import { invalidateAnnouncement } from '$lib/server/cache';
+import { invalidateAnnouncement } from '#lib/server/cache/index.js';
 
 
 

@@ -2,7 +2,7 @@ import { db, sql } from '@ac/db';
 import ICAL from 'ical.js';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { cached, cacheKeys } from '$lib/server/cache';
+import { cached, cacheKeys } from '#lib/server/cache/index.js';
 
 export const GET: RequestHandler = async ({ params }) => {
     const eventId = params.id;

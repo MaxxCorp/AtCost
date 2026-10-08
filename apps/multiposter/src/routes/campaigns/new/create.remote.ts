@@ -3,8 +3,8 @@ import { form } from '$app/server';
 import { db } from '@ac/db';
 import { campaign } from '@ac/db';
 import { listCampaigns } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { createCampaignSchema } from '$lib/validations/campaigns';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { createCampaignSchema } from '#lib/validations/campaigns.js';
 
 export const createCampaign = form(createCampaignSchema, async (data) => {
 	try {

@@ -1,4 +1,4 @@
-import { RRule } from '$lib/utils/rrule-compat';
+import { RRule } from '#lib/utils/rrule-compat.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
 
 function getWallClockComponents(date: Date, timeZone?: string | null) {

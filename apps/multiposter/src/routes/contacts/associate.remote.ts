@@ -5,11 +5,11 @@ import {
     eventContact as eventContactTable
 } from '@ac/db';
 import { eq, and } from '@ac/db';
-import { getAuthenticatedUser, hasAccess } from '$lib/server/authorization';
-import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '$lib/validations/contacts';
-import { getEntityContacts } from '$lib/server/contacts';
-import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
-import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
+import { getAuthenticatedUser, hasAccess } from '#lib/server/authorization.js';
+import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '#lib/validations/contacts.js';
+import { getEntityContacts } from '#lib/server/contacts.js';
+import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
+import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
 const tableMap = {
     user: userContact,

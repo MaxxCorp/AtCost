@@ -1,7 +1,7 @@
 <script lang="ts">
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "#lib/components/ui/button/index.js";
     import {
         Upload,
         Camera,
@@ -10,7 +10,7 @@
         Loader2,
         Trash2,
     } from "@lucide/svelte";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
 
     let { 
         value = $bindable(""), 

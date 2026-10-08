@@ -1,7 +1,7 @@
 import { command } from '$app/server';
-import { updateContentSchema } from '$lib/validations/cms';
-import { saveContent } from '$lib/server/cms/operations';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { updateContentSchema } from '#lib/validations/cms.js';
+import { saveContent } from '#lib/server/cms/operations.js';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 
 export const updateContent = command(updateContentSchema, async (data) => {
     const user = getAuthenticatedUser();

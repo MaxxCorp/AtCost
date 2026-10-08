@@ -10,9 +10,9 @@ import {
 	kiosk as kioskTable
 } from '@ac/db';
 import { eq, and, isNotNull, inArray, count, sql } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { processSeriesMigrationBatchSchema } from '$lib/validations/series-migration';
-import { invalidateEvent, invalidateAllKioskViews } from '$lib/server/cache';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { processSeriesMigrationBatchSchema } from '#lib/validations/series-migration.js';
+import { invalidateEvent, invalidateAllKioskViews } from '#lib/server/cache/index.js';
 import { listEvents } from './list.remote';
 
 type MigrationTask =

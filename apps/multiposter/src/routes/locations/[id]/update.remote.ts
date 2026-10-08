@@ -4,9 +4,9 @@ import { location } from '@ac/db';
 import { eq, and } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateLocationSchema } from '@ac/validations';
-import { invalidateAllKioskViews } from '$lib/server/cache';
+import { invalidateAllKioskViews } from '#lib/server/cache/index.js';
 
 export const updateLocation = form(updateLocationSchema, async (data) => {
     console.log('--- updateLocation START ---');

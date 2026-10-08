@@ -2,9 +2,9 @@ import { form } from '$app/server';
 import { db } from '@ac/db';
 import { location } from '@ac/db';
 import { listLocations } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createLocationSchema } from '@ac/validations';
-import { invalidateAllKioskViews } from '$lib/server/cache';
+import { invalidateAllKioskViews } from '#lib/server/cache/index.js';
 
 export const createLocation = form(createLocationSchema, async (data) => {
     try {

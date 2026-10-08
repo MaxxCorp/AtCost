@@ -1,10 +1,10 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import * as m from "$lib/paraglide/messages.js";
-    import { Button } from "$lib/components/ui/button";
-    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import * as m from "#lib/paraglide/messages.js";
+    import { Button } from "#lib/components/ui/button/index.js";
+    import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { RefreshCw, Calendar, ChevronDown, Check, Eye, Trash2 } from "@lucide/svelte";
 
     interface Props {

@@ -8,7 +8,14 @@ import type {
 } from '../types';
 import { calendar, type calendar_v3 } from '@googleapis/calendar';
 import { OAuth2Client, type Credentials } from 'google-auth-library';
-import { env } from '$env/dynamic/private';
+
+import {
+	GOOGLE_CLIENT_ID,
+	GOOGLE_CLIENT_SECRET,
+	BETTER_AUTH_URL,
+	SYNC_WEBHOOK_URL
+} from '$app/env/private';
+
 import { db } from '@ac/db';
 import { account } from '@ac/db';
 import { eq, and } from '@ac/db';
@@ -43,9 +50,10 @@ export class GoogleCalendarProvider implements SyncProvider {
 		}
 
 		// Check environment variables
-		const clientId = env.GOOGLE_CLIENT_ID;
-		const clientSecret = env.GOOGLE_CLIENT_SECRET;
-		const authUrl = env.BETTER_AUTH_URL || 'http://localhost:5173';
+		const clientId = GOOGLE_CLIENT_ID;
+
+		const clientSecret = GOOGLE_CLIENT_SECRET;
+		const authUrl = BETTER_AUTH_URL || 'http://localhost:5173';
 
 		if (!clientId || !clientSecret) {
 			console.error(`[GoogleCalendarProvider] Missing OAuth credentials:`, {
@@ -201,10 +209,8 @@ export class GoogleCalendarProvider implements SyncProvider {
 				url,
 				method: 'GET'
 			});
-
-			const events: ExternalEvent[] = (response.data.items || [])
-				// .filter((e: calendar_v3.Schema$Event) => e.status !== 'cancelled') // Don't skip cancelled events, we need to sync deletions
-				.map((e: calendar_v3.Schema$Event) => this.mapToExternalEvent(e));
+			const events: ExternalEvent[] = (response.data.items || []).// .filter((e: calendar_v3.Schema$Event) => e.status !== 'cancelled') // Don't skip cancelled events, we need to sync deletions
+			map((e: calendar_v3.Schema$Event) => this.mapToExternalEvent(e));
 
 			return {
 				events,
@@ -274,18 +280,9 @@ export class GoogleCalendarProvider implements SyncProvider {
 		const gcalEvent = this.mapToGoogleEvent(event);
 
 		const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(this.calendarId)}/events/${encodeURIComponent(externalId)}?sendUpdates=all`;
+		const response = await this.makeRequest<{ etag?: string }>({ url, method: 'PUT', data: gcalEvent });
 
-		const response = await this.makeRequest<{
-			etag?: string;
-		}>({
-			url,
-			method: 'PUT',
-			data: gcalEvent
-		});
-
-		return {
-			etag: response.data.etag ?? undefined
-		};
+		return { etag: response.data.etag ?? undefined };
 	}
 
 	async deleteEvent(externalId: string): Promise<void> {
@@ -352,7 +349,7 @@ export class GoogleCalendarProvider implements SyncProvider {
 		await this.cancelWebhook(subscription);
 
 		// Reconstruct callback URL from environment
-		const baseUrl = env.SYNC_WEBHOOK_URL || env.BETTER_AUTH_URL || 'https://localhost:5173';
+		const baseUrl = SYNC_WEBHOOK_URL || BETTER_AUTH_URL || 'https://localhost:5173';
 		const callbackUrl = `${baseUrl}/api/sync/webhook/google-calendar`;
 
 		return this.setupWebhook(callbackUrl);
@@ -459,15 +456,23 @@ export class GoogleCalendarProvider implements SyncProvider {
 	private mapToExternalEvent(gcalEvent: calendar_v3.Schema$Event): ExternalEvent {
 		return {
 			externalId: gcalEvent.id!,
-			providerId: this.config!.providerId,
+			providerId: (this.config!).providerId,
 			summary: gcalEvent.summary || 'Untitled Event',
-			status: (gcalEvent.status as 'confirmed' | 'tentative' | 'cancelled') ?? undefined,
+			status: gcalEvent.status as 'confirmed' | 'tentative' | 'cancelled' ?? undefined,
 			description: gcalEvent.description ?? undefined,
 			location: gcalEvent.location ?? undefined,
 			isAllDay: !!gcalEvent.start?.date,
-			startDateTime: gcalEvent.start?.dateTime ? new Date(gcalEvent.start.dateTime) : (gcalEvent.start?.date ? new Date(`${gcalEvent.start.date}T00:00:00Z`) : undefined),
+			startDateTime: gcalEvent.start?.dateTime
+				? new Date(gcalEvent.start.dateTime)
+				: gcalEvent.start?.date
+					? new Date(`${gcalEvent.start.date}T00:00:00Z`)
+					: undefined,
 			startTimeZone: gcalEvent.start?.timeZone ?? undefined,
-			endDateTime: gcalEvent.end?.dateTime ? new Date(gcalEvent.end.dateTime) : (gcalEvent.end?.date ? new Date(`${gcalEvent.end.date}T00:00:00Z`) : undefined),
+			endDateTime: gcalEvent.end?.dateTime
+				? new Date(gcalEvent.end.dateTime)
+				: gcalEvent.end?.date
+					? new Date(`${gcalEvent.end.date}T00:00:00Z`)
+					: undefined,
 			endTimeZone: gcalEvent.end?.timeZone ?? undefined,
 			attendees: gcalEvent.attendees?.map((a: calendar_v3.Schema$EventAttendee) => ({
 				email: a.email!,
@@ -516,18 +521,18 @@ export class GoogleCalendarProvider implements SyncProvider {
 		// Handle start time
 		if (event.isAllDay && event.startDateTime) {
 			// For all-day events, Google expects YYYY-MM-DD
-			gcalEvent.start!.date = event.startDateTime.toISOString().split('T')[0];
+			(gcalEvent.start!).date = event.startDateTime.toISOString().split('T')[0];
 		} else if (event.startDateTime) {
-			gcalEvent.start!.dateTime = event.startDateTime.toISOString();
-			gcalEvent.start!.timeZone = event.startTimeZone;
+			(gcalEvent.start!).dateTime = event.startDateTime.toISOString();
+			(gcalEvent.start!).timeZone = event.startTimeZone;
 		}
 
 		// Handle end time
 		if (event.isAllDay && event.endDateTime) {
-			gcalEvent.end!.date = event.endDateTime.toISOString().split('T')[0];
+			(gcalEvent.end!).date = event.endDateTime.toISOString().split('T')[0];
 		} else if (event.endDateTime) {
-			gcalEvent.end!.dateTime = event.endDateTime.toISOString();
-			gcalEvent.end!.timeZone = event.endTimeZone;
+			(gcalEvent.end!).dateTime = event.endDateTime.toISOString();
+			(gcalEvent.end!).timeZone = event.endTimeZone;
 		}
 
 		// Apply metadata if available

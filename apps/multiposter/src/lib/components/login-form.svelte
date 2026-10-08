@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { authClient } from "$lib/auth";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { cn, type WithElementRef } from "$lib/utils.js";
+	import { authClient } from "#lib/auth.js";
+	import { Button } from "#lib/components/ui/button/index.js";
+	import { cn, type WithElementRef } from "#lib/utils.js";
 	import type { HTMLAttributes } from "svelte/elements";
-	import * as m from "$lib/paraglide/messages";
+	import * as m from "#lib/paraglide/messages.js";
 
 	let {
 		ref = $bindable(null),

@@ -1,12 +1,12 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "#lib/paraglide/messages.js";
     import { FileText } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
     import ContractForm from "./ContractForm.svelte";
     import { listContracts, readContract, createContract, updateContract, deleteContract } from "./contracts.remote";
     import { listTalents } from "../talents/list.remote";
     import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { contractSchema } from "@ac/validations/contracts";
 
     breadcrumbState.set({ feature: "contracts" });

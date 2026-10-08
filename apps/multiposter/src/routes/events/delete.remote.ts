@@ -3,12 +3,12 @@ import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { inArray, or, eq } from '@ac/db';
 import { listEvents } from './list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import { syncService } from '$lib/server/sync/service';
-import { publishEventChange } from '$lib/server/realtime';
-import { getStorageProvider } from '$lib/server/blob-storage';
-import { invalidateEvent } from '$lib/server/cache';
+import { syncService } from '#lib/server/sync/service.js';
+import { publishEventChange } from '#lib/server/realtime.js';
+import { getStorageProvider } from '#lib/server/blob-storage/index.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
 
 export const deleteEvents = command(
 	v.object({

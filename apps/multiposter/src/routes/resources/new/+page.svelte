@@ -2,9 +2,9 @@
     import { createResource } from "./create.remote";
     import { listLocations } from "../../locations/list.remote";
     import { listResources } from "../list.remote";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import { createResourceSchema } from "$lib/validations/resources";
-    import ResourceForm from "$lib/components/resources/ResourceForm.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import { createResourceSchema } from "#lib/validations/resources.js";
+    import ResourceForm from "#lib/components/resources/ResourceForm.svelte";
 
     let locationsPromise = listLocations();
     let resourcesPromise = listResources();

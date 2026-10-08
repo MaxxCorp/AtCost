@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, menu, eq } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import type { Menu } from '@ac/validations';
 

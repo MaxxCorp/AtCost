@@ -1,10 +1,10 @@
 <script lang="ts">
     import { untrack } from "svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import * as m from "$lib/paraglide/messages";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
-    import { goto, invalidateAll } from "$app/navigation";
+    import { Button } from "#lib/components/ui/button/index.js";
+    import { goto, refreshAll } from "$app/navigation";
     import { Euro, ChefHat, Plus, Trash2, Scale } from "@lucide/svelte";
     import type { Consumable } from "@ac/validations";
 
@@ -134,7 +134,7 @@
                 if (onSuccess) {
                     onSuccess(res);
                 } else {
-                    await invalidateAll();
+                    await refreshAll();
                     await goto(cancelHref);
                 }
             } else if (res === false) {

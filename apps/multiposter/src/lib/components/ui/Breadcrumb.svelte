@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
-	import type { Feature } from "$lib/authorization";
+	import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
+	import type { Feature } from "#lib/authorization.js";
 
 	interface Props {
 		feature?: Feature;

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "#lib/paraglide/messages.js";
     import { 
         User, 
         UserPlus as UserPlusIcon, 
@@ -29,7 +29,7 @@
     import { toast } from "svelte-sonner";
     import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { onMount } from "svelte";
 
     breadcrumbState.set({ feature: "talents" });

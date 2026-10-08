@@ -1,11 +1,11 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { createKioskSchema } from '$lib/validations/kiosks';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { createKioskSchema } from '#lib/validations/kiosks.js';
 import { listKiosks } from '../list.remote';
 import { error } from '@sveltejs/kit';
-import { invalidateKiosk } from '$lib/server/cache';
+import { invalidateKiosk } from '#lib/server/cache/index.js';
 
 
 function parseSafeDate(val: string | null | undefined): Date | null {

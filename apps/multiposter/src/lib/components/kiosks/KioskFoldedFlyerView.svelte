@@ -27,16 +27,16 @@
         Ticket
     } from "@lucide/svelte";
     import { summarizeFlyerItems } from "../../../routes/kiosks/[id]/view/summarize.remote";
-    import type { FlyerItemSummary, FlyerDensity } from "$lib/validations/flyer";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice } from "$lib/utils/format-ticket-price";
-    import { getEventRooms } from "$lib/utils/format-rooms";
-    import { isSeriesItem, isNonSeriesEvent } from "$lib/utils/event-series";
-    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "$lib/utils/format-event-date";
-    import * as m from "$lib/paraglide/messages";
-    import { resolve } from "$app/paths";
+    import type { FlyerItemSummary, FlyerDensity } from "#lib/validations/flyer.js";
+    import { resolve } from '$app/paths';
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import { isSeriesItem, isNonSeriesEvent } from "#lib/utils/event-series.js";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
+    import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
-    import { browser } from "$app/environment";
+    import { browser } from '$app/env';
 
     interface LocationContact {
         name: string;
@@ -67,17 +67,12 @@
         contact?: LocationContact | null;
     }
 
-    type EnrichedEvent = Event & {
-        qrCodeDataUrl?: string;
-    };
+    type EnrichedEvent = Event & { qrCodeDataUrl?: string };
+    type EnrichedAnnouncement = Announcement & { qrCodeDataUrl?: string };
 
-    type EnrichedAnnouncement = Announcement & {
-        qrCodeDataUrl?: string;
-    };
-
-    let { items = [], kiosk }: {
+    let { items = [], kiosk }: { 
         items: (Event | Announcement)[],
-        kiosk: {
+        kiosk: { 
             id?: string;
             name?: string;
             description?: string;
@@ -135,9 +130,8 @@
     // Determine displayed flyers based on activeLocationId
     let displayedLocations = $derived(
         activeLocationId === "all"
-            ? flyerLocations
-            : flyerLocations.filter(l => l.id === activeLocationId)
-    );
+        ? flyerLocations
+        : flyerLocations.filter((l) => l.id === activeLocationId));
 
     // Helper to get all location IDs associated with an item (events & announcements)
     function getItemLocationIds(item: Event | Announcement): SvelteSet<string> {
@@ -214,7 +208,7 @@
         if (isSummarizing || !kiosk.id || items.length === 0) return;
         isSummarizing = true;
         try {
-            const flyerInputItems = items.map(item => {
+            const flyerInputItems = items.map((item) => {
                 const isEvt = "startDateTime" in item;
                 const title = isEvt ? (item as Event).summary : (item as Announcement).title;
                 const desc = isEvt ? (item as Event).description : (item as Announcement).content;
@@ -227,11 +221,11 @@
                     id: item.id,
                     title: title || "Untitled",
                     description: desc || null,
-                    startDateTime: isEvt ? ((item as Event).startDateTime || null) : null,
-                    endDateTime: isEvt ? ((item as Event).endDateTime || null) : null,
-                    type: isEvt ? ("event" as const) : ("announcement" as const),
+                    startDateTime: isEvt ? (item as Event).startDateTime || null : null,
+                    endDateTime: isEvt ? (item as Event).endDateTime || null : null,
+                    type: isEvt ? "event" as const : "announcement" as const,
                     locationNames: locNames,
-                    roomNames: roomNames
+                    roomNames
                 };
             });
 
@@ -465,8 +459,8 @@
     // Sheet 1: Flap (Left: Events), Back (Center: Announcements or Events)
     // Sheet 2: Inside 1 (Left), Inside 2 (Center), Inside 3 (Right)
     function distributeItemsForFlyer(locationItems: (Event | Announcement)[]): DistributedFlyerPanels {
-        const announcements = locationItems.filter(i => !("startDateTime" in i)) as Announcement[];
-        const rawEvents = (locationItems.filter(i => "startDateTime" in i) as Event[]).sort((a, b) => {
+        const announcements = locationItems.filter((i) => !("startDateTime" in i)) as Announcement[];
+        const rawEvents = (locationItems.filter((i) => "startDateTime" in i) as Event[]).sort((a, b) => {
             const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
             const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
             return timeA - timeB;
@@ -529,7 +523,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <a
-                        href={resolve('/kiosks')}
+                        href={resolve('kiosks')}
                         class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors inline-flex items-center gap-1.5 text-sm font-medium"
                         title={m.back_to_kiosks_btn()}
                     >
@@ -697,10 +691,21 @@
     <!-- FLYER PRINT CANVAS CONTAINER -->
     <main class="max-w-6xl mx-auto flex flex-col items-center gap-10 print:m-0 print:p-0 print:gap-0 print:max-w-none print:w-auto">
         {#each displayedLocations as loc, locIdx (loc.id)}
-            {@const locItems = items.filter(it => itemBelongsToLocation(it, loc.id))}
-            {@const { flapItems, backAnnouncements, backEvents, inside1, inside2, inside3, total: totalItems } = distributeItemsForFlyer(locItems)}
+            {@const locItems = items.filter((it) => itemBelongsToLocation(it, loc.id))}
 
-            <div class="flyer-document-pair w-full flex flex-col items-center gap-8 print:gap-0 print:m-0">
+            {@const {
+                flapItems,
+                backAnnouncements,
+                backEvents,
+                inside1,
+                inside2,
+                inside3,
+                total: totalItems
+            } = distributeItemsForFlyer(locItems)}
+
+            <div
+                class="flyer-document-pair w-full flex flex-col items-center gap-8 print:gap-0 print:m-0"
+            >
                 <!-- Location Divider Label (Screen Only) -->
                 {#if displayedLocations.length > 1}
                     <div class="print:hidden w-full max-w-[297mm] flex items-center justify-between px-2 pt-2 border-t border-slate-300 dark:border-slate-700">
@@ -1110,10 +1115,20 @@
     {@const summary = getItemSummary(item)}
     {@const highlight = getItemHighlight(item)}
     {@const rooms = isEvent ? getEventRooms(item as Event) : []}
-    {@const eventQr = isEvent ? ((item as any).qrCodeDataUrl || (item as any).qrCodePath || `/api/events/${item.id}/qr.png`) : null}
-    {@const displayPrice = isEvent ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown) : null}
 
-    <article class="event-item-card p-2 rounded-lg transition-all space-y-1 print:break-inside-avoid {isSpecialNonSeries ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30' : 'border border-slate-200/90 bg-white hover:border-slate-300'}">
+    {@const eventQr = isEvent
+        ? (item as any).qrCodeDataUrl || (item as any).qrCodePath || `/api/events/${item.id}/qr.png`
+        : null}
+
+    {@const displayPrice = isEvent
+        ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown)
+        : null}
+
+    <article
+        class="event-item-card p-2 rounded-lg transition-all space-y-1 print:break-inside-avoid {isSpecialNonSeries
+            ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30'
+            : 'border border-slate-200/90 bg-white hover:border-slate-300'}"
+    >
         <!-- Date Badge & Meta Row -->
         {#if isEvent && item.isCompressedSeries && item.seriesDates && item.seriesDates.length > 1}
             <!-- Compressed Series View: Recurrence pattern + multiple date tags -->

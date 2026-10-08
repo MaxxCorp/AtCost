@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/svelte";
-import { PUBLIC_BASE_URL } from "$env/static/public";
+import { PUBLIC_BASE_URL } from "$app/env/public";
 
 interface CachedSessionResponse {
 	body: string;
@@ -103,7 +103,9 @@ const deduplicatedAuthFetch = async (
 };
 
 export const authClient = createAuthClient({
-	baseURL: typeof window !== "undefined" ? window.location.origin : (PUBLIC_BASE_URL || "http://localhost:5175"),
+	baseURL: typeof window !== "undefined"
+		? window.location.origin
+		: PUBLIC_BASE_URL || "http://localhost:5175",
 	basePath: "/api/auth",
 	fetchOptions: {
 		customFetchImpl: deduplicatedAuthFetch,

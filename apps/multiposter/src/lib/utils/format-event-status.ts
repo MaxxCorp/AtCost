@@ -1,4 +1,4 @@
-import * as m from '$lib/paraglide/messages';
+import * as m from '#lib/paraglide/messages.js';
 
 export function formatEventStatus(status: string | undefined | null): string {
 	if (!status) return '';

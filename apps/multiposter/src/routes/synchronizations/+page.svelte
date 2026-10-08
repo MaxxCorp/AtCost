@@ -1,12 +1,12 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { list } from "./list.remote";
 	import { removeBulk } from "./[id]/delete.remote";
 	import { startBulkSync, processBulkSyncBatch } from "./[id]/sync.remote";
 	import { getEmailCampaigns } from "./email-campaigns.remote";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
-	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
+	import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
 	import {
 		Calendar,
 		CircleCheck,
@@ -34,15 +34,15 @@
 		Database
 	} from "@lucide/svelte";
 	import { checkMigrationStatus } from "./migration.remote";
-	import MigrationDialog from "$lib/components/sync/MigrationDialog.svelte";
+	import MigrationDialog from "#lib/components/sync/MigrationDialog.svelte";
 
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-	import WebhookToggleButton from "$lib/components/synchronizations/WebhookToggleButton.svelte";
-	import { authClient } from "$lib/auth";
-	import { hasAccess } from "$lib/authorization";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
+	import WebhookToggleButton from "#lib/components/synchronizations/WebhookToggleButton.svelte";
+	import { authClient } from "#lib/auth.js";
+	import { hasAccess } from "#lib/authorization.js";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	const session = authClient.useSession();
 	const user = $derived($session.data?.user);

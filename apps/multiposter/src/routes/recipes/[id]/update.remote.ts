@@ -2,7 +2,7 @@ import { form, requested } from '$app/server';
 import { db, recipe, recipeConsumable, eq } from '@ac/db';
 import { listRecipes } from '../list.remote';
 import { readRecipe } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateRecipeSchema } from '@ac/validations';
 
 export const updateRecipe = form(updateRecipeSchema, async (data) => {

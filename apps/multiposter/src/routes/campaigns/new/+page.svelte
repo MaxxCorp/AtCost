@@ -1,7 +1,7 @@
 <script lang="ts">
-	import CampaignForm from "$lib/components/campaigns/CampaignForm.svelte";
+	import CampaignForm from "#lib/components/campaigns/CampaignForm.svelte";
 	import { createCampaign } from "./create.remote";
-	import { createCampaignSchema } from "$lib/validations/campaigns";
+	import { createCampaignSchema } from "#lib/validations/campaigns.js";
 
     const formId = crypto.randomUUID();
     const rf = createCampaign.for(formId);

@@ -1,14 +1,14 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listAnnouncements } from "./list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { listTags } from "../tags/list.remote";
 	import { deleteAnnouncements } from "./[id]/delete.remote";
 
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 	import { Button } from "@ac/ui/components/button";
 	import { LoadingSection, ErrorSection, EmptyState, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import {
 		Megaphone,
 		Pencil,
@@ -30,7 +30,7 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "title">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");

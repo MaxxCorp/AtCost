@@ -1,12 +1,12 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
 import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult, type Event } from '@ac/validations';
-import { getEventRooms } from '$lib/utils/format-rooms';
-import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
-import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
-import { populateSeriesInstances } from '$lib/server/events/instances';
+import { getEventRooms } from '#lib/utils/format-rooms.js';
+import { resolveEventContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
+import { populateSeriesInstances } from '#lib/server/events/instances.js';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
 	let hasAccess = false;
@@ -504,7 +504,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		});
 
 		if (masters.length > 0) {
-			const { expandRecurrence } = await import('$lib/server/events/recurrence');
+			const { expandRecurrence } = await import('#lib/server/events/recurrence.js');
 
 			const masterIds = masters.map(m => m.id);
 			const masterSeriesIds = masters.map(m => m.seriesId).filter((id): id is string => Boolean(id));
@@ -601,7 +601,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					}
 				}
 
-				const { expandRecurrenceRange } = await import('$lib/server/events/recurrence');
+				const { expandRecurrenceRange } = await import('#lib/server/events/recurrence.js');
 				const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
 
 				const instances = expandRecurrenceRange(

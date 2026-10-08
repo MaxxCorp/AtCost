@@ -4,8 +4,8 @@ import { resource } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { syncService } from '$lib/server/sync/service';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { syncService } from '#lib/server/sync/service.js';
 import * as v from 'valibot';
 
 export const deleteResource = command(v.array(v.string()), async (ids: string[]) => {

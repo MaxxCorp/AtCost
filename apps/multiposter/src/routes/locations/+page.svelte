@@ -1,9 +1,9 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listLocations } from "./list.remote";
 	import { deleteLocation } from "./[id]/delete.remote";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		MapPin,
 		Pencil,
@@ -23,8 +23,8 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 

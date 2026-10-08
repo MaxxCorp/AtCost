@@ -1,11 +1,11 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "#lib/paraglide/messages.js";
     import { listShiftplans } from "./list.remote";
     import { deleteShiftplans } from "./[id]/delete.remote";
     import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     
     import { listLocations } from "../locations/list.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { 
         Calendar, 
         MapPin, 

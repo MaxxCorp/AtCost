@@ -1,7 +1,6 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getRealtimeInfo } from '$lib/server/realtime';
+import { getRealtimeInfo } from '#lib/server/realtime.js';
 
 export const GET: RequestHandler = async () => {
-    return json(getRealtimeInfo());
+    return Response.json(getRealtimeInfo());
 };

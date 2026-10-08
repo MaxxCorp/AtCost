@@ -1,5 +1,5 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { Calendar, MapPin } from "@lucide/svelte";
     import { type Announcement } from "@ac/validations";
 

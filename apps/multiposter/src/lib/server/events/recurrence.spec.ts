@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { expandRecurrence } from './recurrence';
-import { RRule } from '$lib/utils/rrule-compat';
+import { RRule } from '#lib/utils/rrule-compat.js';
 
 describe('Recurrence Expansion', () => {
     const start = new Date('2024-03-01T10:00:00Z');

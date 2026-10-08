@@ -1,19 +1,19 @@
 <script lang="ts">
 	import NavMain from "./nav-main.svelte";
 	import NavUser from "./nav-user.svelte";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import * as Sidebar from "#lib/components/ui/sidebar/index.js";
 	import type { ComponentProps } from "svelte";
-	import { getVisibleFeatures } from "$lib/features";
-	import { hasAccess } from "$lib/authorization";
-	import { authClient } from "$lib/auth";
+	import { getVisibleFeatures } from "#lib/features.js";
+	import { hasAccess } from "#lib/authorization.js";
+	import { authClient } from "#lib/auth.js";
 	import { onMount } from "svelte";
-	import { ICONS } from "$lib/icons";
-	import FileTextIcon from "$lib/components/icons/file-text.svelte";
-	import LayersIcon from "$lib/components/icons/layers.svelte";
-	import LogInIcon from "$lib/components/icons/log-in.svelte";
-	import UserPlusIcon from "$lib/components/icons/user-plus.svelte";
-	import * as m from "$lib/paraglide/messages";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime";
+	import { ICONS } from "#lib/icons.js";
+	import FileTextIcon from "#lib/components/icons/file-text.svelte";
+	import LayersIcon from "#lib/components/icons/layers.svelte";
+	import LogInIcon from "#lib/components/icons/log-in.svelte";
+	import UserPlusIcon from "#lib/components/icons/user-plus.svelte";
+	import * as m from "#lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "#lib/paraglide/runtime.js";
 
 	let {
 		ref = $bindable(null),

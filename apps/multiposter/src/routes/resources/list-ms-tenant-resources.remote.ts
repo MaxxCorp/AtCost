@@ -1,7 +1,13 @@
 import { query } from '$app/server';
 import * as v from 'valibot';
-import { env } from '$env/dynamic/private';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+
+import {
+    MICROSOFT_TENANT_ID,
+    MICROSOFT_CLIENT_ID,
+    MICROSOFT_CLIENT_SECRET
+} from '$app/env/private';
+
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import { db, account, eq, and } from '@ac/db';
 
 const querySchema = v.optional(
@@ -20,9 +26,9 @@ export const listMsTenantResources = query(querySchema, async (params) => {
 
         const requestedType = (params?.type || 'room').toLowerCase();
 
-        const tenantId = env.MICROSOFT_TENANT_ID;
-        const clientId = env.MICROSOFT_CLIENT_ID;
-        const clientSecret = env.MICROSOFT_CLIENT_SECRET;
+        const tenantId = MICROSOFT_TENANT_ID;
+        const clientId = MICROSOFT_CLIENT_ID;
+        const clientSecret = MICROSOFT_CLIENT_SECRET;
 
         let accessToken: string | null = null;
         let tokenType: 'app' | 'user' = 'app';

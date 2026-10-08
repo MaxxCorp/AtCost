@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, consumable } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { desc, asc, and, ilike, count, sql } from '@ac/db';
 import { consumablePaginationSchema as PaginationSchema, type Consumable, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';

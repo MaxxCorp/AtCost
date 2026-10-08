@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import { db, user } from '@ac/db';
 import { eq } from '@ac/db';
 import type { User } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 
 /**

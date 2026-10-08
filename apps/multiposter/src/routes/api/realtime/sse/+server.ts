@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { getEntityChannelName, localRealtimeHub, isServerlessEnvironment } from '$lib/server/realtime';
+import { getEntityChannelName, localRealtimeHub, isServerlessEnvironment } from '#lib/server/realtime.js';
 
 export const GET: RequestHandler = async (event) => {
     // If in serverless environment, long-lived SSE connections are not supported

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { authClient } from "$lib/auth";
+	import { authClient } from "#lib/auth.js";
 	import { onMount } from "svelte";
-	import * as m from "$lib/paraglide/messages";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime";
+	import * as m from "#lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "#lib/paraglide/runtime.js";
 
 	let sessionPromise = $state(authClient.getSession());
 	let isOpen = $state(false);

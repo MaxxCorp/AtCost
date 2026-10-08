@@ -6,10 +6,10 @@ import type {
     SyncDirection
 } from '../types';
 import { parsePricing } from '../utils/pricing';
-import { resolveContactForEventId } from '$lib/server/contact-resolution';
-import { env } from '$env/dynamic/private';
+import { resolveContactForEventId } from '#lib/server/contact-resolution.js';
+import { BERLIN_DE_MH_API_URL, ORG_NAME, ORG_WWW } from '$app/env/private';
 import { htmlToPlainText } from '../utils/html';
-import { isSeriesItem } from '$lib/utils/event-series';
+import { isSeriesItem } from '#lib/utils/event-series.js';
 
 /**
  * Berlin.de Marzahn-Hellersdorf Calendar sync provider
@@ -60,7 +60,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     private sessionCookie?: string;
 
     private get baseUrl(): string {
-        return env.BERLIN_DE_MH_API_URL || 'https://www.berlin.de/land/kalender/admin/index.php';
+        return BERLIN_DE_MH_API_URL || 'https://www.berlin.de/land/kalender/admin/index.php';
     }
 
     /**
@@ -244,7 +244,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
 
         // Parse existing cookies
         if (this.sessionCookie) {
-            this.sessionCookie.split(';').forEach(c => {
+            this.sessionCookie.split(';').forEach((c) => {
                 const parts = c.split('=');
                 if (parts.length >= 2) {
                     const key = parts[0].trim();
@@ -528,7 +528,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         try {
             const detailsRes = await this.authedFetch(editUrl);
             const detailsHtml = await detailsRes.text();
-            const existingKats = [...detailsHtml.matchAll(/remkat=(\d+)/gi)].map(m => m[1]);
+            const existingKats = [...detailsHtml.matchAll(/remkat=(\d+)/gi)].map((m) => m[1]);
             for (const katId of existingKats) {
                 await this.authedFetch(`${editUrl}&remkat=${katId}`);
                 await this.delay(200);
@@ -558,7 +558,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
      *   6. Save the veranstalter block
      */
     private async submitDetailsOrganizer(editId: string, event: ExternalEvent): Promise<void> {
-        const orgName = env.ORG_NAME;
+        const orgName = ORG_NAME;
         if (!orgName) return;
 
         const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstalter=0`;
@@ -658,7 +658,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
      *   6. Save the veranstaltungsort block
      */
     private async submitDetailsVenue(editId: string, event: ExternalEvent): Promise<void> {
-        const orgName = env.ORG_NAME;
+        const orgName = ORG_NAME;
         if (!orgName) return;
 
         const resetUrl = `${this.baseUrl}?modul=veranstaltungen&action=edit&editid=${editId}&edit_action=details&set_veranstaltungsort=0`;
@@ -783,9 +783,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         const html = await response.text();
 
         // Check for the system restriction message in the HTML
-        if (html.includes('Es wurden keine gültigen Termine ausgewählt') ||
-            (html.includes('Vergangenheit') && html.includes('gelöscht')) ||
-            (html.includes('365 Tage') && html.includes('Zukunft'))) {
+        if (html.includes('Es wurden keine gültigen Termine ausgewählt') || html.includes('Vergangenheit') && html.includes('gelöscht') || html.includes('365 Tage') && html.includes('Zukunft')) {
             throw new Error('Berlin.de restriction: Es wurden keine gültigen Termine ausgewählt. Termine in der Vergangenheit oder mehr als 365 Tage in der Zukunft sind nicht zulässig.');
         }
     }
@@ -804,7 +802,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
         }
 
         // Homepage from ORG_WWW env variable
-        const orgWww = env.ORG_WWW;
+        const orgWww = ORG_WWW;
         if (orgWww) {
             data.update_homepage = orgWww;
         }
@@ -897,7 +895,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     // ----------------------------------------------------------------
 
     private async delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     /**
@@ -928,7 +926,7 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
             });
 
             const parts = berlinFormatter.formatToParts(date);
-            const get = (type: string) => parts.find(p => p.type === type)?.value || '0';
+            const get = (type: string) => parts.find((p) => p.type === type)?.value || '0';
 
             return new Date(
                 parseInt(get('year')),

@@ -2,9 +2,9 @@ import { command, query } from '$app/server';
 import { db } from '@ac/db';
 import { talent, userTalent } from '@ac/db';
 import { eq } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { talentAssociationSchema, getTalentAssociationsSchema } from '@ac/validations';
-import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
+import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 
 const tableMap = {
     user: userTalent

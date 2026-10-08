@@ -1,15 +1,15 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import {
         checkStatus,
         register,
         unregister,
     } from "../../../routes/synchronizations/[id]/webhook.remote";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import Bell from "$lib/components/icons/bell.svelte";
-    import BellOff from "$lib/components/icons/bell-off.svelte";
-    import { invalidateAll } from "$app/navigation";
+    import Bell from "#lib/components/icons/bell.svelte";
+    import BellOff from "#lib/components/icons/bell-off.svelte";
+    import { refreshAll } from "$app/navigation";
 
     let { configId, providerType, direction, disabled = false } = $props<{
         configId: string;
@@ -65,7 +65,7 @@
             }
 
             // Refresh parent page data if on a synchronization page
-            await invalidateAll();
+            await refreshAll();
         } catch (error: any) {
             // Revert on error
             status = previousStatus;

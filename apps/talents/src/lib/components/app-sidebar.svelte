@@ -3,11 +3,11 @@
 	import NavUser from "./nav-user.svelte";
 	import * as Sidebar from "@ac/ui/components/sidebar";
 	import type { ComponentProps } from "svelte";
-	import { getVisibleFeatures } from "$lib/features";
-	import { hasAccess } from "$lib/authorization";
-	import { authClient } from "$lib/auth";
+	import { getVisibleFeatures } from "#lib/features.js";
+	import { hasAccess } from "#lib/authorization.js";
+	import { authClient } from "#lib/auth.js";
 	import { onMount } from "svelte";
-	import { ICONS } from "$lib/icons";
+	import { ICONS } from "#lib/icons.js";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import LogInIcon from "@lucide/svelte/icons/log-in";
 	import UserPlusIcon from "@lucide/svelte/icons/user-plus";

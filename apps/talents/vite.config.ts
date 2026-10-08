@@ -1,3 +1,5 @@
+import adapter from '@sveltejs/adapter-auto';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
@@ -13,11 +15,20 @@ const sveltePath = path.dirname(require.resolve('svelte/package.json'));
 export default defineConfig({
     plugins: [
         tailwindcss(),
-        sveltekit(),
-        paraglideVitePlugin({
-            project: './project.inlang',
-            outdir: './src/lib/paraglide'
-        })
+        sveltekit({
+            preprocess: vitePreprocess(),
+            compilerOptions: { experimental: { async: true } },
+            adapter: adapter(),
+            csrf: {},
+            // trustedOrigins: []
+            experimental: { remoteFunctions: true },
+            onwarn: (warning, handler) => {
+                if (warning.code === 'state_referenced_locally') return;
+
+                handler(warning);
+            }
+        }),
+        paraglideVitePlugin({ project: './project.inlang', outdir: './src/lib/paraglide' })
     ] as any,
     ssr: {
         noExternal: ['@ac/ui', '@ac/validations', '@ac/db']

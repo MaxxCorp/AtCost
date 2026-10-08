@@ -1,6 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager } from "@ac/ui";
     import { Calendar, ArrowLeft, ExternalLink, FileText } from "@lucide/svelte";
     import { 
@@ -14,8 +14,8 @@
     import ContractForm from '../../contracts/ContractForm.svelte';
 
     import { contractSchema } from "@ac/validations/contracts";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
-    import TalentForm from "$lib/components/talent/TalentForm.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
+    import TalentForm from "#lib/components/talent/TalentForm.svelte";
 
     const talentIdParam = $derived(page.params.id as string);
     

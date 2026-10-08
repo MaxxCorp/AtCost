@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { getCollaboratorColor } from './colors';
 import type {
     Collaborator,
@@ -48,7 +48,7 @@ async function getRealtimeCapability(): Promise<RealtimeCapability> {
             try {
                 const res = await fetch('/api/realtime/info');
                 if (res.ok) {
-                    return (await res.json()) as RealtimeCapability;
+                    return await res.json() as RealtimeCapability;
                 }
             } catch (err) {
                 console.warn('[Collaboration] Capability check failed, defaulting to unavailable mode:', err);

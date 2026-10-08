@@ -5,7 +5,7 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { env } from '$env/dynamic/private';
+import { EVENTBRITE_CLIENT_ID, EVENTBRITE_CLIENT_SECRET } from '$app/env/private';
 import { db } from '@ac/db';
 import { account } from '@ac/db';
 import { eq, and } from '@ac/db';
@@ -29,8 +29,9 @@ export class EventbriteProvider implements SyncProvider {
 		this.config = config;
 
 		// Check environment variables
-		const clientId = env.EVENTBRITE_CLIENT_ID;
-		const clientSecret = env.EVENTBRITE_CLIENT_SECRET;
+		const clientId = EVENTBRITE_CLIENT_ID;
+
+		const clientSecret = EVENTBRITE_CLIENT_SECRET;
 
 		if (!clientId || !clientSecret) {
 			console.error(`[EventbriteProvider] Missing OAuth credentials:`, {

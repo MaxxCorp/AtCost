@@ -1,8 +1,8 @@
 <script lang="ts">
     import { type Event } from "@ac/validations";
 
-    import { m } from "$lib/paraglide/messages";
-    import { getLocale } from "$lib/paraglide/runtime";
+    import { m } from "#lib/paraglide/messages.js";
+    import { getLocale } from "#lib/paraglide/runtime.js";
     import {
         Calendar,
         Clock,
@@ -17,10 +17,10 @@
         Info,
         Ticket,
     } from "@lucide/svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
-    import { getEventRooms } from "$lib/utils/format-rooms";
-    import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from "$lib/utils/format-event-date";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from "#lib/utils/format-event-date.js";
 
     let { event }: { event: Event } = $props();
 

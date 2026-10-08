@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { listPendingApprovals, invokeManageTimesheets } from '../timesheets.remote';
-    import { breadcrumbState } from '$lib/stores/breadcrumb.svelte';
+    import { breadcrumbState } from '#lib/stores/breadcrumb.svelte.js';
     import { LoadingSection, AsyncButton } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { format, differenceInMinutes, parseISO } from 'date-fns';

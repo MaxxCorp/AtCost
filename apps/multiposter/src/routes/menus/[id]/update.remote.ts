@@ -2,7 +2,7 @@ import { form, requested } from '$app/server';
 import { db, menu, menuItem, eq } from '@ac/db';
 import { listMenus } from '../list.remote';
 import { readMenu } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateMenuSchema } from '@ac/validations';
 
 export const updateMenu = form(updateMenuSchema, async (data) => {

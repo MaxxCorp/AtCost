@@ -6,12 +6,12 @@
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
     import { RefreshCw, Ticket, Calendar } from "@lucide/svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
-    import { getEventRooms } from "$lib/utils/format-rooms";
-    import { isNonSeriesEvent } from "$lib/utils/event-series";
-    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "$lib/utils/format-event-date";
-    import * as m from "$lib/paraglide/messages";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import { isNonSeriesEvent } from "#lib/utils/event-series.js";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
+    import * as m from "#lib/paraglide/messages.js";
 
     interface LocationInfo {
         id: string;

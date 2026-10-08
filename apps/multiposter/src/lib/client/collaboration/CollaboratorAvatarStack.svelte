@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Collaborator } from './types';
     import type { CollaborationProvider } from './collaboration.svelte';
-    import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+    import * as Tooltip from '#lib/components/ui/tooltip/index.js';
 
     let {
         peers = [],

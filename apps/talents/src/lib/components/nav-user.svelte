@@ -9,7 +9,7 @@ import UserIcon from "@lucide/svelte/icons/user";
 import ClockIcon from "@lucide/svelte/icons/clock";
 
 
-	import { authClient } from "$lib/auth";
+	import { authClient } from "#lib/auth.js";
 
 	let {
 		user,

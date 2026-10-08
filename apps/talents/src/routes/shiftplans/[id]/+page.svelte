@@ -1,13 +1,13 @@
 <script lang="ts">
-    import { page } from "$app/stores";
-    import ShiftplanTemplateForm from "$lib/components/shiftplans/ShiftplanTemplateForm.svelte";
+    import { page } from '$app/state';
+    import ShiftplanTemplateForm from "#lib/components/shiftplans/ShiftplanTemplateForm.svelte";
     import { updateShiftplan } from "./update.remote";
     import { getShiftplan } from "../list.remote";
     import { updateShiftplanSchema } from "@ac/validations";
     import { LoadingSection, ErrorSection } from "@ac/ui";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
-    const id = $derived($page.params.id as string);
+    const id = $derived(page.params.id as string);
     const query = $derived(getShiftplan(id));
 
     $effect(() => {

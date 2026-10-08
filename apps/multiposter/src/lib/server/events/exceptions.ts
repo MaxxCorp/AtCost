@@ -161,7 +161,7 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 }
 
 import { db, event, eventLocation, eventResource, eventContact, eventTag, eventMenu, eq, and, or, sql } from '@ac/db';
-import { parseVirtualInstanceId } from '$lib/utils/event-series';
+import { parseVirtualInstanceId } from '#lib/utils/event-series.js';
 
 /**
  * Resolves an event entityId for associations.

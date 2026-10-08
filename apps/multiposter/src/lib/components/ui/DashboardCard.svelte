@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ICONS } from "$lib/icons";
+  import { ICONS } from "#lib/icons.js";
   import { goto } from "$app/navigation";
   let {
     title,

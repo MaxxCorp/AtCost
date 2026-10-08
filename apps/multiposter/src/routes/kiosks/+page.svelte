@@ -2,9 +2,9 @@
 	import { listKiosks } from "./list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { deleteKiosk } from "./[id]/delete.remote";
-	import * as m from "$lib/paraglide/messages.js";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import * as m from "#lib/paraglide/messages.js";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		Pencil,
 		Trash2,
@@ -19,10 +19,10 @@
 		X,
 		Clock,
 	} from "@lucide/svelte";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 

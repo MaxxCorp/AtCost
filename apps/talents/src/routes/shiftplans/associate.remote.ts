@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, shiftPlanTemplateTalent, talent, contact, contactEmail } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { eq, and } from '@ac/db';
 import * as v from 'valibot';
 

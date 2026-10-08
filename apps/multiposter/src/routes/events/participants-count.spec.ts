@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as v from 'valibot';
-import { eventBaseSchema, createEventSchema, updateEventSchema } from '$lib/validations/events';
+import { eventBaseSchema, createEventSchema, updateEventSchema } from '#lib/validations/events.js';
 
 describe('Participants count calculation and synchronization algorithm', () => {
 	function createParticipantState(initialParticipants?: number, initialContactIds: string[] = []) {

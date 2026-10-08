@@ -1,7 +1,7 @@
 <script lang="ts">
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import * as m from "$lib/paraglide/messages";
-    import RecipeForm from "$lib/components/recipes/RecipeForm.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import * as m from "#lib/paraglide/messages.js";
+    import RecipeForm from "#lib/components/recipes/RecipeForm.svelte";
     import { readRecipe } from "./read.remote";
     import { updateRecipe } from "./update.remote";
     import { listConsumables } from "../../consumables/list.remote";

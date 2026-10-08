@@ -11,8 +11,8 @@ import {
 	campaign as campaignTable
 } from '@ac/db';
 import { eq, and, or, isNull, isNotNull, sql, inArray, count } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { processMigrationBatchSchema } from '$lib/validations/synchronizations';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { processMigrationBatchSchema } from '#lib/validations/synchronizations.js';
 import {
 	createDefaultCampaignContent,
 	type CampaignContent

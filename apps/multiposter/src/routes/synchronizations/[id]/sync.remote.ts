@@ -1,8 +1,8 @@
 import { command } from '$app/server';
 import * as v from 'valibot';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { syncService } from '$lib/server/sync/service';
-import { processBulkSyncBatchSchema } from '$lib/validations/synchronizations';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { syncService } from '#lib/server/sync/service.js';
+import { processBulkSyncBatchSchema } from '#lib/validations/synchronizations.js';
 import { readSynchronization as viewSyncConfig } from './read.remote';
 
 /**

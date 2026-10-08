@@ -2,8 +2,8 @@ import { db } from '@ac/db';
 import { cmsBlock, cmsSlot, cmsContentVersion, cmsPage } from '@ac/db';
 import { eq, and, desc } from '@ac/db';
 import { error } from '@sveltejs/kit';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, invalidateCms } from '$lib/server/cache';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, invalidateCms } from '#lib/server/cache/index.js';
 
 /**
  * Get content for a specific page slot.

@@ -4,23 +4,18 @@
     import { AsyncButton } from '@ac/ui';
     import { format } from 'date-fns';
     import { toast } from 'svelte-sonner';
-    import { browser } from "$app/environment";
-    import * as m from "$lib/paraglide/messages";
+    import { browser } from '$app/env';
+    import * as m from "#lib/paraglide/messages.js";
 
     /**
      * DASHBOARD COMPONENT - Dedicated Handle Pattern
      * Uses a specific handle (manageTimesheetsDashboard) to avoid collisions
      * with other timesheet forms on the same page.
      */
-
-    let { status, talentId, onRefresh } = $props<{ 
-        status: any, 
-        talentId: string, 
-        onRefresh: () => void 
-    }>();
+    let { status, talentId, onRefresh } = $props<{ status: any; talentId: string; onRefresh: () => void }>();
 
     // Reactive Form Proxy (initialized only in browser)
-    const rf = $derived(browser ? (manageTimesheets as any) : null);
+    const rf = $derived(browser ? manageTimesheets as any : null);
 
     // Local form state
     let formAction = $state<'clock_in' | 'clock_out'>('clock_in');
@@ -51,8 +46,22 @@
     <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden h-full flex flex-col">
         <div class="p-6 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div
+                    class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center"
+                >
+                    <svg
+                        class="w-5 h-5 text-indigo-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        ></path>
+                    </svg>
                 </div>
                 <div>
                     <h3 class="font-bold text-gray-900 leading-tight">{m.time_tracking()}</h3>
@@ -71,9 +80,26 @@
                 {@const isActive = !!status.activeEntry}
                 <div class="text-center space-y-4">
                     <div class="relative inline-block">
-                        <div class="absolute -inset-2 rounded-full blur-xl opacity-20 {isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-200'}"></div>
-                        <div class="relative h-20 w-20 rounded-full flex items-center justify-center border-4 border-white shadow-xl {isActive ? 'bg-emerald-500' : 'bg-gray-100'}">
-                            <svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <div
+                            class="absolute -inset-2 rounded-full blur-xl opacity-20 {isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-200'}"
+                        ></div>
+
+                        <div
+                            class="relative h-20 w-20 rounded-full flex items-center justify-center border-4 border-white shadow-xl {isActive ? 'bg-emerald-500' : 'bg-gray-100'}"
+                        >
+                            <svg
+                                class="h-10 w-10 text-white"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                ></path>
+                            </svg>
                         </div>
                     </div>
                     

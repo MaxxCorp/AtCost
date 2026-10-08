@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { expandRecurrence } from '$lib/server/events/recurrence';
+import { expandRecurrence } from '#lib/server/events/recurrence.js';
 
 describe('Series Cancellation and Recurrence Filtering', () => {
 	it('skips synthesizing virtual instances for slots that already have DB instances (e.g. cancelled)', () => {

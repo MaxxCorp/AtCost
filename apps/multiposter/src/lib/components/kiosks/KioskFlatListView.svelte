@@ -14,13 +14,13 @@
         Mail,
         Ticket
     } from "@lucide/svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { formatTicketPrice, isEventFree } from "$lib/utils/format-ticket-price";
-    import { getEventRooms } from "$lib/utils/format-rooms";
-    import { isNonSeriesEvent } from "$lib/utils/event-series";
-    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "$lib/utils/format-event-date";
-    import * as m from "$lib/paraglide/messages";
-    import { resolve } from "$app/paths";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import { isNonSeriesEvent } from "#lib/utils/event-series.js";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
+    import * as m from "#lib/paraglide/messages.js";
+    import { resolve } from '$app/paths';
 
     interface LocationInfo {
         id: string;
@@ -39,17 +39,12 @@
         } | null;
     }
 
-    type EnrichedEvent = Event & {
-        qrCodeDataUrl?: string;
-    };
+    type EnrichedEvent = Event & { qrCodeDataUrl?: string };
+    type EnrichedAnnouncement = Announcement & { qrCodeDataUrl?: string };
 
-    type EnrichedAnnouncement = Announcement & {
-        qrCodeDataUrl?: string;
-    };
-
-    let { items = [], kiosk }: {
+    let { items = [], kiosk }: { 
         items: (Event | Announcement)[],
-        kiosk: {
+        kiosk: { 
             name?: string;
             description?: string;
             locations?: LocationInfo[];
@@ -66,13 +61,9 @@
     let activeFilter = $state<"all" | "events" | "news">("all");
 
     // Separate Announcements (News) from Scheduled Events
-    let announcements = $derived(
-        items.filter(item => !("startDateTime" in item) && "content" in item) as EnrichedAnnouncement[]
-    );
+    let announcements = $derived(items.filter((item) => !("startDateTime" in item) && "content" in item) as EnrichedAnnouncement[]);
 
-    let events = $derived(
-        items.filter(item => "startDateTime" in item) as EnrichedEvent[]
-    );
+    let events = $derived(items.filter((item) => "startDateTime" in item) as EnrichedEvent[]);
 
     // Group events chronologically by Month & Year
     let groupedEvents = $derived.by(() => {
@@ -99,7 +90,7 @@
 
         const sortedKeys = Object.keys(monthMap).sort((a, b) => a.localeCompare(b));
 
-        return sortedKeys.map(key => {
+        return sortedKeys.map((key) => {
             monthMap[key].items.sort((a, b) => {
                 const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
                 const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
@@ -164,8 +155,8 @@
     <header class="max-w-5xl mx-auto mb-6 print:hidden">
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-                <a 
-                    href={resolve('/kiosks')} 
+                <a
+                    href={resolve('kiosks')}
                     class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors inline-flex items-center gap-1.5 text-sm font-medium"
                     title={m.back_to_kiosks_btn()}
                 >
@@ -306,8 +297,8 @@
                 </div>
 
                 <!-- Location / Kiosk Contact Information Box -->
-                {#if kiosk?.locations && kiosk.locations.some(l => l.contact)}
-                    {@const primaryLoc = kiosk.locations.find(l => l.contact)}
+                {#if kiosk?.locations && kiosk.locations.some((l) => l.contact)}
+                    {@const primaryLoc = kiosk.locations.find((l) => l.contact)}
                     {@const contact = primaryLoc?.contact}
                     {#if contact}
                         <div class="shrink-0 bg-slate-50 print:bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 text-xs space-y-1.5 min-w-[220px]">
@@ -578,7 +569,7 @@
                                             {/if}
 
                                             <!-- Tags & Free Pill -->
-                                            {#if (event.tags && event.tags.length > 0) || isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
+                                            {#if event.tags && event.tags.length > 0 || isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                                                 <div class="flex flex-wrap gap-1.5 pt-1">
                                                     {#if isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                                                         <span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold inline-flex items-center gap-1">
@@ -600,10 +591,10 @@
                                         <!-- Right Scannable QR Code -->
                                         {#if showQrCodes && (event.qrCodeDataUrl || event.qrCodePath)}
                                             <div class="shrink-0 flex flex-col items-center justify-center p-1.5 bg-white border border-slate-200 rounded-xl self-end sm:self-center">
-                                                <img 
-                                                    src={event.qrCodeDataUrl || event.qrCodePath} 
-                                                    alt="Event QR" 
-                                                    class="{density === 'standard' ? 'w-14 h-14' : 'w-10 h-10'}" 
+                                                <img
+                                                    src={event.qrCodeDataUrl || event.qrCodePath}
+                                                    alt="Event QR"
+                                                    class={density === 'standard' ? 'w-14 h-14' : 'w-10 h-10'}
                                                 />
                                                 <span class="text-[8px] font-semibold text-slate-500 mt-0.5 uppercase tracking-tight">
                                                     {m.scan_event_qr()}

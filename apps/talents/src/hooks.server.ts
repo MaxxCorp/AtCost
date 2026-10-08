@@ -1,16 +1,15 @@
-import { sequence } from '@sveltejs/kit/hooks';
-import { type Handle } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import { sequence, type Handle } from '@sveltejs/kit/hooks';
+import { DATABASE_URL } from '$app/env/private';
 
 // Ensure legacy dependencies see the database URL
-if (env.DATABASE_URL) {
-    process.env.DATABASE_URL = env.DATABASE_URL.replace(/^"|"$/g, '');
+if (DATABASE_URL) {
+    process.env.DATABASE_URL = DATABASE_URL.replace(/^"|"$/g, '');
 }
 
-import { auth } from "$lib/server/auth";
+import { auth } from "#lib/server/auth.js";
 import { svelteKitHandler } from "better-auth/svelte-kit";
-import { building, dev } from '$app/environment';
-import { paraglideMiddleware } from '$lib/paraglide/server';
+import { building, dev } from '$app/env';
+import { paraglideMiddleware } from '#lib/paraglide/server.js';
 
 const handleBetterAuth: Handle = async ({ event, resolve }) => {
     const result = await auth.api.getSession({ headers: event.request.headers });
@@ -50,9 +49,7 @@ const handleMockAuth: Handle = async ({ event, resolve }) => {
     return resolve(event);
 };
 
-const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(event.request, ({ request, locale }) => {
-    event.request = request;
-
+const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(event.request, ({ locale }) => {
     return resolve(event, {
         transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale)
     });

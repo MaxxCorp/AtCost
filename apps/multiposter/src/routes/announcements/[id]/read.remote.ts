@@ -2,11 +2,11 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation, location, contact, contactEmail, contactPhone, contactTag, locationContact, campaign } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
-import { getOptionalUser, hasAccess, ensureAccess } from '$lib/server/authorization';
+import { getOptionalUser, hasAccess, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { type Announcement, getCampaignTargetIds } from '@ac/validations';
-import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
-import { getCache, setCache, cacheKeys } from '$lib/server/cache';
+import { resolveAnnouncementContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
 
 /**
  * Query: Read an announcement by ID

@@ -2,7 +2,7 @@ import { command } from '$app/server';
 import { db } from '@ac/db';
 import { tag } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { listTags } from '../list.remote';
 

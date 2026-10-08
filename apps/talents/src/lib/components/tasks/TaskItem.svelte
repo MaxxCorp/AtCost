@@ -4,7 +4,7 @@
     import { completeTask } from '../../../routes/tasks.remote';
     import { manageTimesheets } from '../../../routes/my-timesheet/timesheets.remote';
     import { toast } from 'svelte-sonner';
-    import { invalidateAll } from '$app/navigation';
+    import { refreshAll } from '$app/navigation';
 
     let { task } = $props<{ task: any }>();
 
@@ -65,7 +65,7 @@
                         const ok = await submit() as any;
                         if (ok) {
                             toast.success('Timesheet approved');
-                            await invalidateAll();
+                            await refreshAll();
                         }
                     })}
                 >
@@ -85,7 +85,7 @@
                         const ok = await submit() as any;
                         if (ok) {
                             toast.success('Timesheet rejected');
-                            await invalidateAll();
+                            await refreshAll();
                         }
                     })}
                 >
@@ -106,7 +106,7 @@
                         const ok = await submit() as any;
                         if (ok) {
                             toast.success('Task completed');
-                            await invalidateAll();
+                            await refreshAll();
                         }
                     })}
                 >

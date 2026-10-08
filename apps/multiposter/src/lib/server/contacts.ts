@@ -5,7 +5,7 @@ import {
 import { getRequestEvent } from '$app/server';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';
-import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
+import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
 
 /**

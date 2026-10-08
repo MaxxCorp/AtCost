@@ -1,4 +1,4 @@
-import type { Feature } from '$lib/authorization';
+import type { Feature } from '#lib/authorization.js';
 
 export class BreadcrumbStore {
     feature = $state<Feature | undefined>();

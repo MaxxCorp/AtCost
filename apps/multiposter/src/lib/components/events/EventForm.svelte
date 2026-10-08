@@ -1,26 +1,26 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { type Event, type Tag } from "@ac/validations";
 
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "#lib/components/ui/button/index.js";
     import { handleDelete, EntityManager, LocationForm, translateIssue, matchContactSearch } from "@ac/ui";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
-    import ResourceForm from "$lib/components/resources/ResourceForm.svelte";
+    import ResourceForm from "#lib/components/resources/ResourceForm.svelte";
     import { createResource } from "../../../routes/resources/new/create.remote";
     import { updateResource } from "../../../routes/resources/[id]/update.remote";
     import { readResource } from "../../../routes/resources/[id]/read.remote";
     import { deleteResource as deleteResourceRemote } from "../../../routes/resources/[id]/delete.remote";
     import { listResources } from "../../../routes/resources/list.remote";
-    import { createResourceSchema, updateResourceSchema } from "$lib/validations/resources";
+    import { createResourceSchema, updateResourceSchema } from "#lib/validations/resources.js";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { type Location } from "@ac/validations";
 
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { onMount, type Snippet, untrack } from "svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
@@ -56,12 +56,12 @@
         removeResourceAssociation,
         fetchEntityResources,
     } from "../../../routes/resources/associate.remote";
-    import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
-    import ImageUploader from "$lib/components/cms/ImageUploader.svelte";
-    import RecurrenceDialog from "$lib/components/events/RecurrenceDialog.svelte";
-    import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { isSeriesItem } from "$lib/utils/event-series";
+    import RichTextEditor from "#lib/components/cms/RichTextEditor.svelte";
+    import ImageUploader from "#lib/components/cms/ImageUploader.svelte";
+    import RecurrenceDialog from "#lib/components/events/RecurrenceDialog.svelte";
+    import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { isSeriesItem } from "#lib/utils/event-series.js";
     import {
         RefreshCw,
         CalendarClock,
@@ -92,9 +92,9 @@
     import { readMenu } from "../../../routes/menus/[id]/read.remote";
     import { deleteMenus } from "../../../routes/menus/[id]/delete.remote";
     import { createMenuSchema, updateMenuSchema } from "@ac/validations";
-    import MenuForm from "$lib/components/menus/MenuForm.svelte";
+    import MenuForm from "#lib/components/menus/MenuForm.svelte";
     import * as v from "valibot";
-    import { FieldCollaboratorBadge, type CollaborationRoom } from "$lib/client/collaboration";
+    import { FieldCollaboratorBadge, type CollaborationRoom } from "#lib/client/collaboration/index.js";
 
     let {
         remoteFunction,
@@ -707,7 +707,7 @@
     <RecurrenceDialog
         bind:open={showRecurrenceDialog}
         value={rf.fields.recurrence.value() ?? initialData?.recurrence?.[0] ?? ""}
-        onchange={(val) => rf.fields.recurrence.set(val)}
+        onchange={(val: string) => rf.fields.recurrence.set(val)}
     />
     {#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
         <input
@@ -719,7 +719,7 @@
     <div>
         <ImageUploader
             value={rf.fields.heroImage.value() ?? initialData?.heroImage ?? ""}
-            onchange={(val) => rf.fields.heroImage.set(val)}
+            onchange={(val: string) => rf.fields.heroImage.set(val)}
             label={m.hero_image()}
         />
         {#if (rf.fields.heroImage.value() ?? initialData?.heroImage) !== undefined && (rf.fields.heroImage.value() ?? initialData?.heroImage) !== null}
@@ -747,7 +747,7 @@
         >
             <RichTextEditor 
                 value={rf.fields.description.value() ?? initialData?.description ?? ""} 
-                onchange={(v) => rf.fields.description.set(v)}
+                onchange={(v: string) => rf.fields.description.set(v)}
             />
             {#if (rf.fields.description.value() ?? initialData?.description) !== undefined && (rf.fields.description.value() ?? initialData?.description) !== null}
                 <input
@@ -767,7 +767,7 @@
         <div class="prose max-w-none">
             <RichTextEditor 
                 value={rf.fields.internalNotes.value() ?? initialData?.internalNotes ?? ""} 
-                onchange={(v) => rf.fields.internalNotes.set(v)}
+                onchange={(v: string) => rf.fields.internalNotes.set(v)}
             />
             {#if (rf.fields.internalNotes.value() ?? initialData?.internalNotes) !== undefined && (rf.fields.internalNotes.value() ?? initialData?.internalNotes) !== null}
                 <input

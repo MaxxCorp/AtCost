@@ -2,10 +2,10 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq, inArray } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import { resolveLocationContactSync } from '$lib/server/contact-resolution';
-import { cached, cacheKeys } from '$lib/server/cache';
+import { resolveLocationContactSync } from '#lib/server/contact-resolution.js';
+import { cached, cacheKeys } from '#lib/server/cache/index.js';
 
 function toSafeDate(date: Date | string | null | undefined): Date | null {
     if (!date) return null;

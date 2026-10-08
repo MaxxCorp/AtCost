@@ -1,9 +1,9 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { getOptionalUser, hasAccess } from '$lib/server/authorization';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
-import { getCache, setCache, cacheKeys } from '$lib/server/cache';
+import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
 
 /**
  * Query: Read a contact by ID

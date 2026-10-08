@@ -1,8 +1,8 @@
 import { command } from '$app/server';
-import { env } from '$env/dynamic/private';
+import { GEMINI_API_KEY } from '$app/env/private';
 import { GoogleGenAI, Type } from '@google/genai';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { summarizeFlyerSchema, type SummarizeFlyerResult, type FlyerItemSummary } from '$lib/validations/flyer';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { summarizeFlyerSchema, type SummarizeFlyerResult, type FlyerItemSummary } from '#lib/validations/flyer.js';
 
 function stripFormatting(text?: string | null): string {
     if (!text) return '';
@@ -87,7 +87,7 @@ export const summarizeFlyerItems = command(summarizeFlyerSchema, async (data): P
         detailed: 'Detailed brochure blurb (target up to 90 words per item). Highlights benefits, atmosphere, and special details.'
     };
 
-    if (!env.GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY) {
         const fallbackSummaries = generateFallbackSummaries(items, targetDensity);
         return {
             success: true,
@@ -97,8 +97,8 @@ export const summarizeFlyerItems = command(summarizeFlyerSchema, async (data): P
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-        
+        const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
         const prompt = `You are an expert editorial designer and copywriter for physical tri-fold printed brochures and community calendars.
 Your task is to summarize the following ${items.length} events and announcements so they fit cleanly onto the inside panels of an A4 tri-fold print flyer without spilling over.
 
@@ -113,14 +113,14 @@ Rules:
 5. Ensure dates, times, and essential facts remain accurate.
 
 Items to summarize:
-${JSON.stringify(items.map(i => ({
-    id: i.id,
-    type: i.type,
-    title: i.title,
-    description: stripFormatting(i.description),
-    locations: i.locationNames,
-    rooms: i.roomNames
-})))}`;
+${JSON.stringify(items.map((i) => ({
+            id: i.id,
+            type: i.type,
+            title: i.title,
+            description: stripFormatting(i.description),
+            locations: i.locationNames,
+            rooms: i.roomNames
+        })))}`;
 
         const candidateModels = ['gemini-3.5-flash', 'gemini-3.6-flash'];
         let rawText: string | undefined;

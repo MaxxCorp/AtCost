@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { page } from "$app/state";
 	import { readCampaign } from "./read.remote";
 	import { updateCampaign } from "./update.remote";
-	import { updateCampaignSchema } from "$lib/validations/campaigns";
-	import CampaignForm from "$lib/components/campaigns/CampaignForm.svelte";
+	import { updateCampaignSchema } from "#lib/validations/campaigns.js";
+	import CampaignForm from "#lib/components/campaigns/CampaignForm.svelte";
 	import { LoadingSection, ErrorSection } from "@ac/ui";
 	const campaignId = $derived(page.params.id || "");
 </script>

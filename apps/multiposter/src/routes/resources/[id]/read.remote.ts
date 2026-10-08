@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { resource, location, resourceRelation, resourceLocation, resourceContact } from '@ac/db';
 import { eq, and, getTableColumns } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 
 export const readResource = query(v.string(), async (id: string) => {

@@ -3,11 +3,11 @@ import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import { publishEventChange } from '$lib/server/realtime';
-import { syncService } from '$lib/server/sync/service';
-import { invalidateEvent } from '$lib/server/cache';
+import { publishEventChange } from '#lib/server/realtime.js';
+import { syncService } from '#lib/server/sync/service.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
 
 /**
  * Command: Delete events by ID

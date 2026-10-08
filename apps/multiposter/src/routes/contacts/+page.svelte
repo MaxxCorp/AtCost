@@ -1,13 +1,13 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listContacts } from "./list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { listTags } from "../tags/list.remote";
 	import { deleteContact } from "./[id]/delete.remote";
 
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import {
 		User,
 		Pencil,
@@ -29,7 +29,7 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 

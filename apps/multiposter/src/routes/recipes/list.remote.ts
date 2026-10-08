@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, recipe } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { desc, asc, and, ilike, count } from '@ac/db';
 import { recipePaginationSchema as PaginationSchema, type Recipe, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';

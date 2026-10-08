@@ -1,14 +1,14 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { goto } from "$app/navigation";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
-    import SyncCheckboxBlock from "$lib/components/sync/SyncCheckboxBlock.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import Button from "#lib/components/ui/button/button.svelte";
+    import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
     import { EntityManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
@@ -53,8 +53,8 @@
     import { onMount, untrack } from "svelte";
     import { MapPin, User } from "@lucide/svelte";
 
-    import RichTextEditor from "$lib/components/cms/RichTextEditor.svelte";
-    import { FieldCollaboratorBadge, type CollaborationRoom } from "$lib/client/collaboration";
+    import RichTextEditor from "#lib/components/cms/RichTextEditor.svelte";
+    import { FieldCollaboratorBadge, type CollaborationRoom } from "#lib/client/collaboration/index.js";
 
     let {
         remoteFunction,
@@ -239,7 +239,7 @@
                 >
                     <RichTextEditor 
                         value={rf.fields.content.value() ?? initialData?.content ?? ""}
-                        onchange={(v) => rf.fields.content.set(v)}
+                        onchange={(v: string) => rf.fields.content.set(v)}
                     />
                     {#if (rf.fields.content.value() ?? initialData?.content) !== undefined && (rf.fields.content.value() ?? initialData?.content) !== null}
                         <input

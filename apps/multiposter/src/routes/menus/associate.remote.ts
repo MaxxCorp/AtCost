@@ -1,9 +1,9 @@
 import { command, query } from '$app/server';
 import { db, eventMenu, menu, eq } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { menuAssociationSchema, getMenuAssociationsSchema } from '@ac/validations';
-import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
-import { resolveEventIdForAssociations } from '$lib/server/events/exceptions';
+import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
+import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
 const tableMap = {
     event: eventMenu,

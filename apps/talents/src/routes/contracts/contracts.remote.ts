@@ -1,7 +1,7 @@
 import { query, form, command } from '$app/server';
 import { db, desc, and, or, not, ilike, sql, eq, inArray, notInArray, exists } from '@ac/db';
 import { contract, contractFrameworkContract } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations/pagination';
 import { contractPaginationSchema, contractSchema } from '@ac/validations/contracts';
 import * as v from 'valibot';

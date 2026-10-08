@@ -1,33 +1,33 @@
 <script lang="ts">
-	import { LoadingSection, ErrorSection } from "@ac/ui";
-	import * as m from "$lib/paraglide/messages.js";
-	import { page } from "$app/state";
-	import { browser } from "$app/environment";
+    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import * as m from "#lib/paraglide/messages.js";
+    import { page } from "$app/state";
+    import { browser } from '$app/env';
     import { goto } from "$app/navigation";
     import { toast } from "svelte-sonner";
 	import { readEvent } from "./read.remote";
 	import { updateEvent } from "./update.remote";
     import { deleteEvents as deleteEventAction } from "../delete.remote";
-	import { updateEventSchema } from "$lib/validations/events";
-	import EventForm from "$lib/components/events/EventForm.svelte";
-	import SeriesModeSelector from "$lib/components/events/SeriesModeSelector.svelte";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import { Button } from "$lib/components/ui/button";
-    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import { updateEventSchema } from "#lib/validations/events.js";
+	import EventForm from "#lib/components/events/EventForm.svelte";
+	import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import { Button } from "#lib/components/ui/button/index.js";
+    import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
     import { handleDelete } from "@ac/ui";
     import {
         Trash2,
         ChevronDown,
         RefreshCw,
     } from "@lucide/svelte";
-    import { authClient } from "$lib/auth";
+    import { authClient } from "#lib/auth.js";
     import {
         createCollaborationRoom,
         CollaboratorAvatarStack,
         RemoteChangeBanner,
         type CollaborationRoom
-    } from "$lib/client/collaboration";
+    } from "#lib/client/collaboration/index.js";
 
     import { onMount } from "svelte";
 
@@ -91,125 +91,125 @@
                     />
 
                     <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
-                        <div class="flex items-center gap-4 flex-wrap">
+                            <div class="flex items-center gap-4 flex-wrap">
                             <h1 class="text-3xl font-bold">
                                 {m.edit_item({ item: m.feature_events_title() })}
                             </h1>
-                            <CollaboratorAvatarStack
-                                peers={collab?.peers ?? []}
-                                connected={collab?.connected ?? false}
-                                provider={collab?.provider ?? 'none'}
-                                offlineReason={collab?.offlineReason ?? null}
-                            />
-                        </div>
-                        
-                        {#if event.recurrence && (event.recurrence).length > 0 || event.seriesId || event.recurringEventId}
-                            <DropdownMenu.Root>
-                                <DropdownMenu.Trigger>
-                                    <Button
-                                        variant="destructive"
-                                        class="flex items-center gap-2"
-                                    >
-                                        <Trash2 size={16} />
-                                        {m.delete()}
-                                        <ChevronDown size={14} />
-                                    </Button>
-                                </DropdownMenu.Trigger>
-                                <DropdownMenu.Content align="end">
-                                    <DropdownMenu.Item
-                                        onclick={async () => {
-                                            await handleDelete({
-                                                ids: [event.id],
-                                                deleteFn: async (ids) => await deleteEventAction({ ids }),
+                                <CollaboratorAvatarStack
+                                    peers={collab?.peers ?? []}
+                                    connected={collab?.connected ?? false}
+                                    provider={collab?.provider ?? 'none'}
+                                    offlineReason={collab?.offlineReason ?? null}
+                                />
+                            </div>
+
+                            {#if event.recurrence && event.recurrence.length > 0 || event.seriesId || event.recurringEventId}
+                                <DropdownMenu.Root>
+                                    <DropdownMenu.Trigger>
+                                        <Button
+                                            variant="destructive"
+                                            class="flex items-center gap-2"
+                                        >
+                                            <Trash2 size={16} />
+                                            {m.delete()} 
+                                            <ChevronDown size={14} />
+                                        </Button>
+                                    </DropdownMenu.Trigger>
+                                    <DropdownMenu.Content align="end">
+                                        <DropdownMenu.Item
+                                            onclick={async () => {
+                                                await handleDelete({
+                                                    ids: [event.id],
+                                                    deleteFn: async (ids) => await deleteEventAction({ ids }),
                                                 itemName: m.instance().toLowerCase(),
-                                            });
-                                            goto("/events");
-                                        }}
-                                    >
-                                        <Trash2 size={14} class="mr-2" />
+                                                });
+                                                goto("/events");
+                                            }}
+                                        >
+                                            <Trash2 size={14} class="mr-2" />
                                         {m.delete()}
                                         {m.instance()}
-                                    </DropdownMenu.Item>
-                                    <DropdownMenu.Item
-                                        class="text-red-600"
-                                        onclick={async () => {
-                                            if (!confirm(m.delete_series_confirm())) return;
-                                            try {
-                                                await deleteEventAction({ ids: [event.id], deleteSeries: true });
-                                                toast.success(m.series_deleted());
-                                                goto("/events");
+                                        </DropdownMenu.Item>
+                                        <DropdownMenu.Item
+                                            class="text-red-600"
+                                            onclick={async () => {
+                                                if (!confirm(m.delete_series_confirm())) return;
+                                                try {
+                                                    await deleteEventAction({ ids: [event.id], deleteSeries: true });
+                                                    toast.success(m.series_deleted());
+                                                    goto("/events");
                                             } catch (err: any) {
                                                 toast.error(
                                                     err.message ||
                                                         "Failed to delete series",
                                                 );
-                                            }
-                                        }}
-                                    >
-                                        <RefreshCw size={14} class="mr-2" />
+                                                }
+                                            }}
+                                        >
+                                            <RefreshCw size={14} class="mr-2" />
                                         {m.delete()}
                                         {m.series()}
-                                    </DropdownMenu.Item>
-                                </DropdownMenu.Content>
-                            </DropdownMenu.Root>
-                        {:else}
-                            <AsyncButton
-                                type="button"
-                                variant="destructive"
-                                loading={deleteEventAction.pending}
-                                onclick={async () => {
-                                    await handleDelete({
-                                        ids: [event.id],
-                                        deleteFn: async (ids) => await deleteEventAction({ ids }),
+                                        </DropdownMenu.Item>
+                                    </DropdownMenu.Content>
+                                </DropdownMenu.Root>
+                            {:else}
+                                <AsyncButton
+                                    type="button"
+                                    variant="destructive"
+                                    loading={deleteEventAction.pending}
+                                    onclick={async () => {
+                                        await handleDelete({
+                                            ids: [event.id],
+                                            deleteFn: async (ids) => await deleteEventAction({ ids }),
                                         itemName: m.event_label(),
-                                    });
-                                    goto("/events");
-                                }}
+                                        });
+                                        goto("/events");
+                                    }}
                             >
                                 {m.delete()}
                             </AsyncButton>
+                            {/if}
+                        </div>
+
+                        <SeriesModeSelector event={event} variant="banner" />
+
+                        {#if collab}
+                            <RemoteChangeBanner
+                                remoteChange={collab.remoteChange}
+                                onRefresh={async () => {
+                                    await readEvent(eventId).refresh();
+                                }}
+                                onDismiss={() => collab?.dismissRemoteChange()}
+                            />
                         {/if}
-                    </div>
 
-                    <SeriesModeSelector event={event} variant="banner" />
-
-                    {#if collab}
-                        <RemoteChangeBanner
-                            remoteChange={collab.remoteChange}
-                            onRefresh={async () => {
-                                await readEvent(eventId).refresh();
-                            }}
-                            onDismiss={() => collab?.dismissRemoteChange()}
-                        />
-                    {/if}
-
-                    <form
-                        {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
-                            try {
-                                const result: any = await submit();
-                                if (result?.error) {
+                        <form
+                            {...eventRf.preflight(updateEventSchema).enhance(async ({ submit }: any) => {
+                                try {
+                                    const result: any = await submit();
+                                    if (result?.error) {
                                     toast.error(
                                         result.error.message || m.something_went_wrong(),
                                     );
-                                    return;
-                                }
-                                toast.success(m.successfully_saved());
-                                goto("/events");
+                                        return;
+                                    }
+                                    toast.success(m.successfully_saved());
+                                    goto("/events");
                             } catch (error: any) {
-                                toast.error(error?.message || m.something_went_wrong());
-                            }
-                        })}
-                        class="space-y-6"
-                    >
-                        {#key event.id}
-                            <EventForm
-                                remoteFunction={eventRf}
-                                validationSchema={updateEventSchema}
-                                isUpdating={true}
-                                initialData={event}
-                                {collab}
-                            />
-                        {/key}
+                                    toast.error(error?.message || m.something_went_wrong());
+                                }
+                            })}
+                            class="space-y-6"
+                        >
+                            {#key event.id}
+                                <EventForm
+                                    remoteFunction={eventRf}
+                                    validationSchema={updateEventSchema}
+                                    isUpdating={true}
+                                    initialData={event}
+                                    collab={collab}
+                                />
+                            {/key}
 
                         <div class="flex gap-3 pt-4">
                             <AsyncButton

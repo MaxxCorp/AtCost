@@ -15,8 +15,8 @@ import {
 	webhookSubscription as webhookSubscriptionTable,
 	event as eventTable,
 	announcement as announcementTable,
-	announcementLocation as announcementLocation,
-	announcementTag as announcementTag,
+	announcementLocation,
+	announcementTag,
 	eventContact as eventContactTable,
 	tag as tagTable,
 	contactTag as contactTagTable,
@@ -24,8 +24,8 @@ import {
 	contactEmail as contactEmailTable,
 	location as locationTable,
 	eventLocation as eventLocationTable,
-	eventTag as eventTag,
-	recurringSeries as recurringSeries,
+	eventTag,
+	recurringSeries,
 	campaign as campaignTable,
 	emailCampaign as emailCampaignTable,
 	eventResource as eventResourceTable,
@@ -52,11 +52,18 @@ import { BewegungsatlasBerlinProvider } from './providers/bewegungsatlas-berlin'
 import { EmailProvider } from './providers/email';
 import { NebenanDeProvider } from './providers/nebenan-de';
 import { InstagramProvider } from './providers/instagram';
-import { env } from '$env/dynamic/private';
+
+import {
+	SYNC_WEBHOOK_URL,
+	BETTER_AUTH_URL,
+	SYNC_MAX_DURATION_SECONDS,
+	MAX_DURATION
+} from '$app/env/private';
+
 import { publishEventChange } from '../realtime';
-import { invalidateEvent } from '$lib/server/cache';
-import { expandRecurrence } from '$lib/server/events/recurrence';
-import { isSeriesItem } from '$lib/utils/event-series';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import { expandRecurrence } from '#lib/server/events/recurrence.js';
+import { isSeriesItem } from '#lib/utils/event-series.js';
 
 export interface SyncBatchContext {
 	eventRecords?: Map<string, typeof eventTable.$inferSelect>;
@@ -173,8 +180,8 @@ export class SyncService {
 				if (!master) return null;
 
 				const targetDate = new Date(decodedIso);
-				const durationMs = (master.startDateTime && master.endDateTime)
-					? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+				const durationMs = master.startDateTime && master.endDateTime
+					? new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime()
 					: 3600000;
 
 				result = {
@@ -240,16 +247,8 @@ export class SyncService {
 			return [master.id];
 		}
 
-		const exdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
-		const instances = expandRecurrence(
-			rruleStr,
-			new Date(master.startDateTime),
-			master.endDateTime ? new Date(master.endDateTime) : null,
-			50,
-			true,
-			master.startTimeZone,
-			exdates
-		);
+		const exdates = Array.isArray(master.exdates) ? master.exdates as string[] : [];
+		const instances = expandRecurrence(rruleStr, new Date(master.startDateTime), master.endDateTime ? new Date(master.endDateTime) : null, 50, true, master.startTimeZone, exdates);
 
 		const exceptions = await db
 			.select({
@@ -406,20 +405,14 @@ export class SyncService {
 				.leftJoin(campaignTable, eq(eventTable.campaignId, campaignTable.id));
 
 			// Detect instances needing master event campaign (healing bit rot)
-			const instancesNeedingMaster = allEventsWithCampaign.filter(
-				r => !r.campaign && (r.event.recurringEventId || r.event.seriesId)
-			);
+			const instancesNeedingMaster = allEventsWithCampaign.filter((r) => !r.campaign && (r.event.recurringEventId || r.event.seriesId));
 
 			const masterCampaignMap = new Map<string, typeof campaignTable.$inferSelect>();
 			const seriesCampaignMap = new Map<string, typeof campaignTable.$inferSelect>();
 
 			if (instancesNeedingMaster.length > 0) {
-				const masterIds = Array.from(new Set(
-					instancesNeedingMaster.map(r => r.event.recurringEventId).filter(Boolean) as string[]
-				));
-				const seriesIds = Array.from(new Set(
-					instancesNeedingMaster.map(r => r.event.seriesId).filter(Boolean) as string[]
-				));
+				const masterIds = Array.from(new Set(instancesNeedingMaster.map((r) => r.event.recurringEventId).filter(Boolean) as string[]));
+				const seriesIds = Array.from(new Set(instancesNeedingMaster.map((r) => r.event.seriesId).filter(Boolean) as string[]));
 
 				if (masterIds.length > 0) {
 					const masterEvents = await db
@@ -528,7 +521,7 @@ export class SyncService {
 				}
 
 				// If it's an exception of a master event and was already queued, don't duplicate it
-				if (provider.supportsNativeRecurrence !== true && r.event.recurringEventId && itemsToSync.some(item => item.id === r.event.id)) {
+				if (provider.supportsNativeRecurrence !== true && r.event.recurringEventId && itemsToSync.some((item) => item.id === r.event.id)) {
 					continue;
 				}
 
@@ -539,7 +532,10 @@ export class SyncService {
 				if (shouldBeSynced) {
 					let priority = 2; // Default: brand new / unsynced
 					if (existingExternalId) {
-						const lastSyncedAt = itemSyncState?.lastSyncedAt ? new Date(itemSyncState.lastSyncedAt) : (existingMapping?.lastSyncedAt ? new Date(existingMapping.lastSyncedAt) : null);
+						const lastSyncedAt = itemSyncState?.lastSyncedAt
+							? new Date(itemSyncState.lastSyncedAt)
+							: existingMapping?.lastSyncedAt ? new Date(existingMapping.lastSyncedAt) : null;
+
 						const isModified = r.event.updatedAt && lastSyncedAt && new Date(r.event.updatedAt) > lastSyncedAt;
 						priority = isModified ? 3 : 4;
 					}
@@ -596,7 +592,10 @@ export class SyncService {
 				if (shouldBeSynced) {
 					let priority = 2; // Default: brand new / unsynced
 					if (existingExternalId) {
-						const lastSyncedAt = itemSyncState?.lastSyncedAt ? new Date(itemSyncState.lastSyncedAt) : (existingMapping?.lastSyncedAt ? new Date(existingMapping.lastSyncedAt) : null);
+						const lastSyncedAt = itemSyncState?.lastSyncedAt
+							? new Date(itemSyncState.lastSyncedAt)
+							: existingMapping?.lastSyncedAt ? new Date(existingMapping.lastSyncedAt) : null;
+
 						const isModified = r.announcement.updatedAt && lastSyncedAt && new Date(r.announcement.updatedAt) > lastSyncedAt;
 						priority = isModified ? 3 : 4;
 					}
@@ -697,13 +696,13 @@ export class SyncService {
 			throw new Error(`Sync operation not found: ${operationId}`);
 		}
 
-		const results = (opRow.results as any) || {};
-		const itemsToSync = (results.itemsToSync as any[]) || [];
+		const results = opRow.results as any || {};
+		const itemsToSync = results.itemsToSync as any[] || [];
 		const total = Number(results.total || itemsToSync.length);
 		let processed = Number(results.processed || 0);
 		let pushed = Number(results.pushed || 0);
 		const pulled = Number(results.pulled || 0);
-		const errors = (results.errors as any[]) || [];
+		const errors = results.errors as any[] || [];
 
 		if (opRow.status === 'completed' || processed >= total) {
 			return { done: true, processed: total, total, pushed, errors };
@@ -912,7 +911,7 @@ export class SyncService {
 			await db.update(eventTable).set({ campaignId: newCamp.id }).where(eq(eventTable.id, event.id));
 		} else {
 			let content: CampaignContent = (campaignRow.content as any)?.version === 1
-				? (campaignRow.content as CampaignContent)
+				? campaignRow.content as CampaignContent
 				: createDefaultCampaignContent(getCampaignTargetIds(campaignRow.content));
 
 			content.targets[config.id] = { enabled: true };
@@ -1174,7 +1173,7 @@ export class SyncService {
 			await db.update(eventTable).set({ campaignId: newCamp.id }).where(eq(eventTable.id, newEvent.id));
 
 			// Generate assets for the new event
-			await import('$lib/server/events/assets').then(m => m.generateEventAssets(newEvent.id));
+			await import('#lib/server/events/assets.js').then((m) => m.generateEventAssets(newEvent.id));
 
 			await publishEventChange('create', [newEvent.id]);
 			await invalidateEvent(newEvent.id);
@@ -1289,7 +1288,7 @@ export class SyncService {
 
 		// Construct callback URL
 		// Microsoft Graph requires a publicly accessible HTTPS URL.
-		const baseUrl = (env.SYNC_WEBHOOK_URL || env.BETTER_AUTH_URL || 'https://localhost:5173').replace(/\/$/, '');
+		const baseUrl = (SYNC_WEBHOOK_URL || BETTER_AUTH_URL || 'https://localhost:5173').replace(/\/$/, '');
 		let callbackUrl = `${baseUrl}/api/sync/webhook/${config.providerType}`;
 		
 		// Ensure it uses https if it's the default localhost fallback
@@ -1581,9 +1580,9 @@ export class SyncService {
 			tags.push(...cachedAssoc.tags);
 		} else {
 			// Fetch associated contacts (check direct event first, fallback to master if exception has no contacts linked)
-			let associatedContacts = (await getEntityContacts(entityType, directEventId)) || [];
+			let associatedContacts = await getEntityContacts(entityType, directEventId) || [];
 			if (associatedContacts.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
-				associatedContacts = (await getEntityContacts(entityType, fallbackMasterId)) || [];
+				associatedContacts = await getEntityContacts(entityType, fallbackMasterId) || [];
 			}
 
 			// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
@@ -1660,7 +1659,7 @@ export class SyncService {
 						const email = cal.calendarId || cal.email;
 						if (email && typeof email === 'string' && email.includes('@')) {
 							attendees.push({
-								email: email,
+								email,
 								displayName: res.name || cal.name || 'Resource',
 								responseStatus: 'accepted',
 								type: 'resource',
@@ -1673,13 +1672,12 @@ export class SyncService {
 
 			// Resolve Venues (Locations)
 			const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
-			const whereClause = isEvent ? eq(eventLocationTable.eventId, directEventId) : eq(announcementLocation.announcementId, internal.id);
 
-			let locations = await db
-				.select({ location: locationTable })
-				.from(locationTableToUse as any)
-				.innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id))
-				.where(whereClause as any);
+			const whereClause = isEvent
+				? eq(eventLocationTable.eventId, directEventId)
+				: eq(announcementLocation.announcementId, internal.id);
+
+			let locations = await db.select({ location: locationTable }).from(locationTableToUse as any).innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id)).where(whereClause as any);
 
 			if (locations.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
 				locations = await db
@@ -1690,7 +1688,7 @@ export class SyncService {
 			}
 
 			if (locations.length > 0) {
-				venues = locations.map(l => ({
+				venues = locations.map((l) => ({
 					id: l.location.id,
 					name: l.location.name,
 					address: l.location.street ? `${l.location.street} ${l.location.houseNumber || ''}`.trim() : undefined,
@@ -1738,8 +1736,8 @@ export class SyncService {
 
 					organizer = {
 						name: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
-						email: email,
-						phone: phone
+						email,
+						phone
 					};
 					break; // Only one organizer
 				}
@@ -1747,13 +1745,12 @@ export class SyncService {
 
 			// Resolve Tags
 			const tagTableToUse = isEvent ? eventTag : announcementTag;
-			const tagWhereClause = isEvent ? eq(eventTag.eventId, directEventId) : eq(announcementTag.announcementId, internal.id);
 
-			let entityTags = await db
-				.select({ tag: tagTable })
-				.from(tagTableToUse as any)
-				.innerJoin(tagTable, eq((tagTableToUse as any).tagId, tagTable.id))
-				.where(tagWhereClause as any);
+			const tagWhereClause = isEvent
+				? eq(eventTag.eventId, directEventId)
+				: eq(announcementTag.announcementId, internal.id);
+
+			let entityTags = await db.select({ tag: tagTable }).from(tagTableToUse as any).innerJoin(tagTable, eq((tagTableToUse as any).tagId, tagTable.id)).where(tagWhereClause as any);
 
 			if (entityTags.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
 				entityTags = await db
@@ -1764,7 +1761,7 @@ export class SyncService {
 			}
 
 			if (entityTags.length > 0) {
-				tags.push(...entityTags.map((t: { tag: { id: string, name: string } }) => ({ id: t.tag.id, name: t.tag.name })));
+				tags.push(...entityTags.map((t: { tag: { id: string; name: string } }) => ({ id: t.tag.id, name: t.tag.name })));
 			}
 
 			if (batchContext?.associations) {
@@ -1785,10 +1782,8 @@ export class SyncService {
 		const resolveUrl = (url: string | null | undefined) => {
 			if (!url) return undefined;
 			if (url.startsWith('http')) return url;
-			// Use env.BETTER_AUTH_URL if available (from imports)
-			const authUrl = (typeof env !== 'undefined' && (env as any).BETTER_AUTH_URL) ||
-				(typeof process !== 'undefined' && process.env?.BETTER_AUTH_URL) ||
-				'http://localhost:5173';
+			const authUrl = BETTER_AUTH_URL || (typeof process !== 'undefined' && process.env?.BETTER_AUTH_URL) || 'http://localhost:5173';
+
 			return `${authUrl}${url.startsWith('/') ? '' : '/'}${url}`;
 		};
 
@@ -1847,8 +1842,8 @@ export class SyncService {
 			endTimeZone: internal.endTimeZone || 'UTC',
 			attendees: attendees.length > 0 ? attendees : undefined,
 			recurrence: recurrenceRules,
-			reminders: (internal.reminders as any) ?? undefined,
-			source: (internal.source as any) ?? undefined,
+			reminders: internal.reminders as any ?? undefined,
+			source: internal.source as any ?? undefined,
 			ticketPrice: internal.ticketPrice ?? undefined,
 			venue,
 			venues,
@@ -1862,7 +1857,7 @@ export class SyncService {
 				announcementId: !isEvent ? internal.id : undefined,
 				seriesId: (internal as any).seriesId ?? undefined,
 				app_event_id: internal.id,
-				organizerId: organizerId,
+				organizerId,
 				locationId: venueId,
 				categoryBerlinDotDe: internal.categoryBerlinDotDe ?? undefined
 			}
@@ -1882,8 +1877,9 @@ export class SyncService {
 			}
 		}
 
-		const envVal = (typeof env !== 'undefined' && env ? (env.SYNC_MAX_DURATION_SECONDS || env.MAX_DURATION) : undefined)
-			|| (typeof process !== 'undefined' && process.env ? (process.env.SYNC_MAX_DURATION_SECONDS || process.env.MAX_DURATION) : undefined);
+		const envVal = SYNC_MAX_DURATION_SECONDS || MAX_DURATION || (typeof process !== 'undefined' && process.env
+			? process.env.SYNC_MAX_DURATION_SECONDS || process.env.MAX_DURATION
+			: undefined);
 
 		if (envVal) {
 			const parsed = Number(envVal);
@@ -1901,7 +1897,7 @@ export class SyncService {
 	 */
 	private calculateNextSync(config: SyncConfig): Date {
 		const now = new Date();
-		const intervalMinutes = (config.settings?.syncIntervalMinutes as number) || 60;
+		const intervalMinutes = config.settings?.syncIntervalMinutes as number || 60;
 		now.setMinutes(now.getMinutes() + intervalMinutes);
 		return now;
 	}
@@ -1921,8 +1917,8 @@ export class SyncService {
 			const campaignRowMap = new Map<string, typeof campaignTable.$inferSelect>();
 
 			if (entityType === 'event') {
-				const realItemIds = itemIds.filter(id => !id.includes('_inst_'));
-				const virtualMasterIds = itemIds.filter(id => id.includes('_inst_')).map(id => id.split('_inst_')[0]);
+				const realItemIds = itemIds.filter((id) => !id.includes('_inst_'));
+				const virtualMasterIds = itemIds.filter((id) => id.includes('_inst_')).map((id) => id.split('_inst_')[0]);
 				const lookupIds = Array.from(new Set([...realItemIds, ...virtualMasterIds]));
 
 				const items = lookupIds.length > 0 ? await db
@@ -1940,17 +1936,9 @@ export class SyncService {
 				}
 
 				// Handle any instances needing master/series campaign inheritance
-				const masterIds = Array.from(new Set(
-					items
-						.filter(r => !r.campaign && r.event.recurringEventId)
-						.map(r => r.event.recurringEventId as string)
-				));
-				const seriesIds = Array.from(new Set(
-					items
-						.filter(r => !r.campaign && r.event.seriesId)
-						.map(r => r.event.seriesId as string)
-				));
+				const masterIds = Array.from(new Set(items.filter((r) => !r.campaign && r.event.recurringEventId).map((r) => r.event.recurringEventId as string)));
 
+				const seriesIds = Array.from(new Set(items.filter((r) => !r.campaign && r.event.seriesId).map((r) => r.event.seriesId as string)));
 				const inheritedCampaigns: (typeof campaignTable.$inferSelect | null)[] = [];
 				if (masterIds.length > 0) {
 					const masters = await db
@@ -2048,9 +2036,7 @@ export class SyncService {
 					)
 				);
 
-			const candidateConfigs = syncConfigs
-				.map(row => this.rowToConfig(row))
-				.filter(config => config.direction === 'push' || config.direction === 'bidirectional');
+			const candidateConfigs = syncConfigs.map((row) => this.rowToConfig(row)).filter((config) => config.direction === 'push' || config.direction === 'bidirectional');
 
 			// Prepare batch context to share master events, campaigns, and associations across occurrences
 			const batchEventRecords = new Map<string, typeof eventTable.$inferSelect>(eventRowMap);
@@ -2070,9 +2056,7 @@ export class SyncService {
 
 			// Pre-fetch any existing exceptions for series masters in this batch
 			if (entityType === 'event') {
-				const seriesMasterIds = Array.from(eventRowMap.values())
-					.filter(row => this.isSeriesMaster(row))
-					.map(row => row.id);
+				const seriesMasterIds = Array.from(eventRowMap.values()).filter((row) => this.isSeriesMaster(row)).map((row) => row.id);
 
 				if (seriesMasterIds.length > 0) {
 					const existingExceptions = await db
@@ -2101,7 +2085,7 @@ export class SyncService {
 						operation: 'push',
 						status: 'failed',
 						errorMessage: `Sync skipped: Serverless execution budget (${totalMaxDurationMs / 1000}s) reached before this provider could run.`,
-						entityType: entityType,
+						entityType,
 						startedAt: new Date(),
 						completedAt: new Date()
 					});
@@ -2137,7 +2121,7 @@ export class SyncService {
 							if (camp?.content) {
 								const cItems = (camp.content as CampaignContent).items || {};
 								for (const k of Object.keys(cItems)) {
-									if ((k.startsWith(`${evtRow!.id}_inst_`) || k === evtRow!.id) && !occIds.includes(k)) {
+									if ((k.startsWith(`${(evtRow!).id}_inst_`) || k === (evtRow!).id) && !occIds.includes(k)) {
 										const syncEntry = cItems[k]?.syncs?.[config.id];
 										if (syncEntry?.externalId) {
 											expandedItemIds.push(k);
@@ -2170,7 +2154,7 @@ export class SyncService {
 					syncConfigId: config.id,
 					operation: 'push',
 					status: 'pending',
-					entityType: entityType,
+					entityType,
 					startedAt: new Date(),
 					entityId: itemsToProcess.length === 1 ? itemsToProcess[0] : null,
 				}).returning({ id: syncOperationTable.id });
@@ -2184,7 +2168,7 @@ export class SyncService {
 						const configElapsed = Date.now() - configStartTime;
 						const overallElapsed = Date.now() - syncStartTime;
 
-						if (configElapsed > configBudgetMs || (totalMaxDurationMs - overallElapsed) <= 3000) {
+						if (configElapsed > configBudgetMs || totalMaxDurationMs - overallElapsed <= 3000) {
 							console.warn(`[SyncService] Execution budget reached for config ${config.id} (${config.providerType}) after ${Math.round(configElapsed / 1000)}s (${processedCount}/${itemsToProcess.length} items synced). Yielding to next config.`);
 							timedOut = true;
 							break;
@@ -2332,11 +2316,7 @@ export class SyncService {
 			}
 		}
 
-		const hasCampaignSync = !!(
-			(campaign?.content as any)?.version === 1 &&
-			(campaign!.content as CampaignContent).items?.[itemId]?.syncs?.[config.id]?.externalId
-		);
-
+		const hasCampaignSync = !!((campaign?.content as any)?.version === 1 && ((campaign!).content as CampaignContent).items?.[itemId]?.syncs?.[config.id]?.externalId);
 		const needsSync = shouldBeSynced || !!mapping || hasCampaignSync;
 		if (!needsSync) {
 			console.log(`[SyncService] Item ${itemId} checkSync skipped: shouldBeSynced=${shouldBeSynced} (targets: [${syncIds.join(', ')}]), hasMapping=${!!mapping}, hasCampaignSync=${hasCampaignSync} for config ${config.id} (${config.providerType})`);
@@ -2430,7 +2410,7 @@ export class SyncService {
 		}
 
 		let campContent: CampaignContent = (campaignRow?.content as any)?.version === 1
-			? (campaignRow?.content as any)
+			? campaignRow?.content as any
 			: createDefaultCampaignContent([config.id]);
 
 		const existingItemSync = campContent.items?.[itemId]?.syncs?.[config.id];
@@ -2605,7 +2585,7 @@ export class SyncService {
 				if (ann.status !== 'active' || !ann.isPublic) shouldBeSynced = false;
 			}
 
-			const campContent = (campaign?.content as any)?.version === 1 ? (campaign!.content as CampaignContent) : null;
+			const campContent = (campaign?.content as any)?.version === 1 ? (campaign!).content as CampaignContent : null;
 			const existingItemSync = campContent?.items?.[itemId]?.syncs?.[config.id];
 			const existingExternalId = existingItemSync?.externalId || mapping?.externalId;
 
@@ -2628,7 +2608,7 @@ export class SyncService {
 						if (campContent.externalIds?.[existingExternalId]) {
 							delete campContent.externalIds[existingExternalId];
 						}
-						await db.update(campaignTable).set({ content: campContent, updatedAt: new Date() }).where(eq(campaignTable.id, campaign!.id));
+						await db.update(campaignTable).set({ content: campContent, updatedAt: new Date() }).where(eq(campaignTable.id, (campaign!).id));
 					}
 				} catch (e: any) {
 					console.error(`[SyncService] Failed to un-publish ${entityType} ${itemId}:`, e);
@@ -2667,17 +2647,14 @@ export class SyncService {
 				.select()
 				.from(syncConfigTable);
 
-			const configMap = new Map(configs.map(c => [c.id, this.rowToConfig(c)]));
+			const configMap = new Map(configs.map((c) => [c.id, this.rowToConfig(c)]));
 			const deletedExternalKeys = new Set<string>();
 
 			// 1. Find campaigns containing these events or their virtual instances
-			const idList = sql.join(eventIds.map(id => sql`${id}`), sql`, `);
-			const campaignsToUpdate = await db
-				.select()
-				.from(campaignTable)
-				.where(
-					or(
-						sql`EXISTS (
+			const idList = sql.join(eventIds.map((id) => sql`${id}`), sql`, `);
+
+			const campaignsToUpdate = await db.select().from(campaignTable).where(or(
+				sql`EXISTS (
 							SELECT 1 FROM jsonb_object_keys(COALESCE(${campaignTable.content}->'items', '{}'::jsonb)) AS k
 							WHERE k IN (${idList}) OR split_part(k, '_inst_', 1) IN (${idList})
 						)`,
@@ -2692,9 +2669,7 @@ export class SyncService {
 				const content = camp.content as CampaignContent;
 				if (!content || content.version !== 1 || !content.items) continue;
 
-				const keysToDelete = Object.keys(content.items).filter(k => 
-					eventIds.includes(k) || eventIds.includes(k.split('_inst_')[0])
-				);
+				const keysToDelete = Object.keys(content.items).filter((k) => eventIds.includes(k) || eventIds.includes(k.split('_inst_')[0]));
 
 				for (const itemKey of keysToDelete) {
 					const item = content.items[itemKey];
@@ -2728,7 +2703,7 @@ export class SyncService {
 			}
 
 			// 2. Also delete legacy mappings from syncMappingTable (only for real UUIDs)
-			const realEventIds = eventIds.filter(id => !id.includes('_inst_'));
+			const realEventIds = eventIds.filter((id) => !id.includes('_inst_'));
 			if (realEventIds.length > 0) {
 				for (const configRow of configs) {
 					const config = this.rowToConfig(configRow);
@@ -2815,7 +2790,7 @@ export class SyncService {
 				.from(eventResourceTable)
 				.where(eq(eventResourceTable.resourceId, resourceId));
 
-			const eventIds = Array.from(new Set(linkedEvents.map(e => e.eventId)));
+			const eventIds = Array.from(new Set(linkedEvents.map((e) => e.eventId)));
 			if (eventIds.length > 0) {
 				console.log(`[SyncService] Re-syncing ${eventIds.length} events affected by resource ${resourceId} configuration change.`);
 				await this.syncItems(userId, eventIds, 'event');
@@ -2921,12 +2896,9 @@ export class SyncService {
 				.select()
 				.from(emailCampaignTable)
 				.where(eq(emailCampaignTable.syncConfigId, configId));
-			
-			return campaigns.map(c => ({
-				...c,
-				sentAt: c.sentAt.toISOString()
-			}));
-		} catch (error) {
+
+			return campaigns.map((c) => ({ ...c, sentAt: c.sentAt.toISOString() }));
+		} catch(error) {
 			console.error(`[SyncService] Failed to get email campaigns for config ${configId}:`, error);
 			return [];
 		}

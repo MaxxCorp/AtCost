@@ -1,7 +1,7 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { desc, asc, eq, inArray, and, or, not, ilike, sql, exists } from '@ac/db';
 import { kioskPaginationSchema as PaginationSchema, parseFilterValue, type Kiosk, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';

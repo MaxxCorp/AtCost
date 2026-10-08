@@ -5,7 +5,7 @@ import type {
     ProviderType,
     SyncDirection
 } from '../types';
-import { env } from '$env/dynamic/private';
+import { NEBENAN_DE_API_URL } from '$app/env/private';
 import { htmlToPlainText } from '../utils/html';
 
 /**
@@ -26,7 +26,7 @@ export class NebenanDeProvider implements SyncProvider {
     private sessionToken?: string;
 
     private get baseUrl(): string {
-        return env.NEBENAN_DE_API_URL || 'https://biz-nbn.nebenan.de/api';
+        return NEBENAN_DE_API_URL || 'https://biz-nbn.nebenan.de/api';
     }
 
     private static readonly NOPE_CLIENT = 'nope-web-v129.45.1';
@@ -51,7 +51,7 @@ export class NebenanDeProvider implements SyncProvider {
         'Show': 19, // Kunst, Kultur & Musik
         'Sport': 27, // Sport & Bewegung
         'Theater': 19, // Kunst, Kultur & Musik
-        'Vermischtes': 32, // Sonstiges
+        'Vermischtes': 32 // Sonstiges
     };
 
     async initialize(config: SyncConfig): Promise<void> {

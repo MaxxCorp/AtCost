@@ -1,17 +1,17 @@
 <script lang="ts">
-    import AnnouncementForm from "$lib/components/announcements/AnnouncementForm.svelte";
+    import AnnouncementForm from "#lib/components/announcements/AnnouncementForm.svelte";
     import { updateAnnouncement } from "./update.remote";
-    import { updateAnnouncementSchema } from "$lib/validations/announcements";
+    import { updateAnnouncementSchema } from "#lib/validations/announcements.js";
     import { readAnnouncement } from "./read.remote";
     import { page } from "$app/state";
-    import { browser } from "$app/environment";
-    import { authClient } from "$lib/auth";
+    import { browser } from '$app/env';
+    import { authClient } from "#lib/auth.js";
     import {
         createCollaborationRoom,
         CollaboratorAvatarStack,
         RemoteChangeBanner,
         type CollaborationRoom
-    } from "$lib/client/collaboration";
+    } from "#lib/client/collaboration/index.js";
     import { toast } from "svelte-sonner";
 
     import { onMount } from "svelte";
@@ -86,7 +86,7 @@
             validationSchema={updateAnnouncementSchema}
             isUpdating={true}
             initialData={announcement}
-            {collab}
+            collab={collab}
         />
     </div>
 {:catch}

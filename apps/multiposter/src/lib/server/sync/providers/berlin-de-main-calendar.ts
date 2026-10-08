@@ -8,11 +8,10 @@ import type {
 import { db } from '@ac/db';
 import { user, eventResource } from '@ac/db';
 import { eq } from '@ac/db';
-import { resolveEventContact } from '$lib/server/contact-resolution';
+import { resolveEventContact } from '#lib/server/contact-resolution.js';
 import { parsePricing } from '../utils/pricing';
-import { env } from '$env/dynamic/private';
 import { htmlToPlainText } from '../utils/html';
-import { isSeriesItem } from '$lib/utils/event-series';
+import { isSeriesItem } from '#lib/utils/event-series.js';
 
 /**
  * Berlin.de Main Calendar sync provider implementation

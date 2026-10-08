@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { readTalent } from "../read.remote";
-import TaskList from "$lib/components/tasks/TaskList.svelte";
+import TaskList from "#lib/components/tasks/TaskList.svelte";
 
     import { LoadingSection, ErrorSection, Button } from "@ac/ui";
     import {
@@ -16,7 +16,7 @@ import TaskList from "$lib/components/tasks/TaskList.svelte";
         Clock,
         Plane,
     } from "@lucide/svelte";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
     const id = $derived(page.params.id as string);
 

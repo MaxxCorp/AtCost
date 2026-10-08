@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { deleteLocation } from "./delete.remote";
     import { LocationForm, handleDelete, EntityManager, matchContactSearch } from "@ac/ui";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
             import { updateLocationSchema, type Location, type Contact } from "@ac/validations";
     import { User } from "@lucide/svelte";
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { listContacts } from "../../contacts/list.remote";
     import { fetchEntityContacts, addAssociation, removeAssociation } from "../../contacts/associate.remote";
     import { deleteContact } from "../../contacts/[id]/delete.remote";

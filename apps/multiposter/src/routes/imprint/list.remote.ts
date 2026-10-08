@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { listBlocks } from '$lib/server/cms/operations';
+import { listBlocks } from '#lib/server/cms/operations.js';
 
 export const listBlocksFunction = query(async () => {
     // Only admins usually list blocks, but keeping it open for read if needed isn't terrible.

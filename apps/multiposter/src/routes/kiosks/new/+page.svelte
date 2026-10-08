@@ -1,8 +1,8 @@
 <script lang="ts">
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import KioskForm from "$lib/components/kiosks/KioskForm.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import KioskForm from "#lib/components/kiosks/KioskForm.svelte";
     import { createKiosk } from "./create.remote";
-    import { createKioskSchema } from "$lib/validations/kiosks";
+    import { createKioskSchema } from "#lib/validations/kiosks.js";
 
     const formId = crypto.randomUUID();
     const rf = createKiosk.for(formId);

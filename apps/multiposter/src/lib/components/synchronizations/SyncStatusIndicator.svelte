@@ -1,8 +1,8 @@
 <script lang="ts">
-	import CircleCheck from "$lib/components/icons/circle-check.svelte";
-	import Clock from "$lib/components/icons/clock.svelte";
-	import CircleAlert from "$lib/components/icons/circle-alert.svelte";
-	import RefreshCw from "$lib/components/icons/refresh-cw.svelte";
+	import CircleCheck from "#lib/components/icons/circle-check.svelte";
+	import Clock from "#lib/components/icons/clock.svelte";
+	import CircleAlert from "#lib/components/icons/circle-alert.svelte";
+	import RefreshCw from "#lib/components/icons/refresh-cw.svelte";
 
 	interface Props {
 		enabled: boolean;

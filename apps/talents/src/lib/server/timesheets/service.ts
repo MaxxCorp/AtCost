@@ -1,5 +1,5 @@
 import { db, timesheetEntry, timesheetAuditTrail, shiftPlan, talent, userTalent, userContact, task, getSuperior, eq, and, isNull, desc } from "@ac/db";
-import { getAuthenticatedUser, ensureAccess, getOptionalUser } from "$lib/server/authorization";
+import { getAuthenticatedUser, ensureAccess, getOptionalUser } from "#lib/server/authorization.js";
 
 export interface ClockInData {
     talentId: string;

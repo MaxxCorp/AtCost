@@ -2,7 +2,7 @@ import { form, requested } from '$app/server';
 import { db, consumable, eq } from '@ac/db';
 import { listConsumables } from '../list.remote';
 import { readConsumable } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateConsumableSchema } from '@ac/validations';
 
 export const updateConsumable = form(updateConsumableSchema, async (data) => {

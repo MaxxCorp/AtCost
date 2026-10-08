@@ -1,6 +1,6 @@
 import { command, query } from '$app/server';
 import { db, userTalent, userContact, talent, locationContact, eq, and, inArray } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { talentAssociationSchema, getTalentAssociationsSchema } from '@ac/validations';
 
 export const associateTalent = command(talentAssociationSchema, async (data): Promise<{ success: boolean }> => {

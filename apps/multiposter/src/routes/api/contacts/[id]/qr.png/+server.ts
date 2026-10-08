@@ -2,8 +2,8 @@ import { db } from '@ac/db';
 import QRCode from 'qrcode';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
-import { cachedBinary, cacheKeys } from '$lib/server/cache';
+import { PUBLIC_BASE_URL, BETTER_AUTH_URL } from '$app/env/private';
+import { cachedBinary, cacheKeys } from '#lib/server/cache/index.js';
 
 export const GET: RequestHandler = async ({ params, url }) => {
     const contactId = params.id;
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
                 error(404, 'Contact not found');
             }
 
-            const baseUrl = env.PUBLIC_BASE_URL || url.origin || env.BETTER_AUTH_URL || "";
+            const baseUrl = PUBLIC_BASE_URL || url.origin || BETTER_AUTH_URL || "";
             const contactUrl = `${baseUrl}/contacts/${contactId}/view`;
 
             const qrBuffer = await QRCode.toBuffer(contactUrl, {

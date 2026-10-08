@@ -3,9 +3,9 @@ import { error } from '@sveltejs/kit';
 import { db } from '@ac/db';
 import { eq, inArray } from '@ac/db';
 import { campaign } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { listCampaigns } from '../list.remote';
-import { deleteCampaignSchema } from '$lib/validations/campaigns';
+import { deleteCampaignSchema } from '#lib/validations/campaigns.js';
 
 /**
  * Command: Delete one or more campaigns

@@ -1,10 +1,10 @@
 import { command } from '$app/server';
 import * as v from 'valibot';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { syncConfig } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
-import { syncService } from '$lib/server/sync/service';
+import { syncService } from '#lib/server/sync/service.js';
 import { list as listSynchronizations } from '../list.remote';
 
 /**

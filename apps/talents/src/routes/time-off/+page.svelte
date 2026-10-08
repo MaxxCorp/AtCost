@@ -1,13 +1,13 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "#lib/paraglide/messages.js";
     import { listTimeOffRequests, requestTimeOff } from "./time-off.remote";
     import { listTalents } from "../talents/list.remote";
     import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     import * as Dialog from "@ac/ui/components/dialog";
     import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, HelpCircle } from "@lucide/svelte";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { timeOffRequestSchema } from "@ac/validations";
-    import { authClient } from "$lib/auth";
+    import { authClient } from "#lib/auth.js";
     import { onMount } from "svelte";
     import { toast } from "svelte-sonner";
 

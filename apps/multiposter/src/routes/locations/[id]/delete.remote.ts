@@ -3,9 +3,9 @@ import { db } from '@ac/db';
 import { location } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
 import { listLocations } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import { invalidateAllKioskViews } from '$lib/server/cache';
+import { invalidateAllKioskViews } from '#lib/server/cache/index.js';
 
 export const deleteLocation = command(v.array(v.string()), async (ids: string[]) => {
     const user = getAuthenticatedUser();

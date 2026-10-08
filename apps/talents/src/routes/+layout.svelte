@@ -1,14 +1,14 @@
 <script lang="ts">
 	import "../app.css";
-	import AppSidebar from "$lib/components/app-sidebar.svelte";
+	import AppSidebar from "#lib/components/app-sidebar.svelte";
 	import { Toaster } from "@ac/ui/components/sonner";
 	import * as Sidebar from "@ac/ui/components/sidebar";
 	import * as Breadcrumb from "@ac/ui/components/breadcrumb";
 	import { onMount } from "svelte";
-	import { browser } from "$app/environment";
+	import { browser } from '$app/env';
 	import { page } from "$app/state";
-	import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
-	import { FEATURES } from "$lib/features";
+	import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
+	import { FEATURES } from "#lib/features.js";
 
 	let { children } = $props();
 

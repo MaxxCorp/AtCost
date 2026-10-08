@@ -1,7 +1,7 @@
 import { type InferSelectModel, eq, getTableColumns, inArray, and } from '@ac/db';
 import { query } from '$app/server';
 import { resource, resourceRelation, location, resourceLocation } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { PaginationSchema } from '@ac/validations';
 

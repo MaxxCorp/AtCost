@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as Dialog from "$lib/components/ui/dialog";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import * as Dialog from "#lib/components/ui/dialog/index.js";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		startSeriesMigration,
 		processSeriesMigrationBatch

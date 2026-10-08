@@ -1,14 +1,14 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
 import { event, locationContact, inArray, eq, asc, or, and, sql } from '@ac/db';
-import { getOptionalUser, hasAccess } from '$lib/server/authorization';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { type Event, getCampaignTargetIds } from '@ac/validations';
-import { getEventRooms } from '$lib/utils/format-rooms';
-import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
-import { getCache, setCache, cacheKeys } from '$lib/server/cache';
-import { getSeriesInstances } from '$lib/server/events/instances';
+import { getEventRooms } from '#lib/utils/format-rooms.js';
+import { resolveEventContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
+import { getSeriesInstances } from '#lib/server/events/instances.js';
 
 /**
  * Query: Read an event by ID

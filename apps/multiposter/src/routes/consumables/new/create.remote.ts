@@ -1,7 +1,7 @@
 import { form, requested } from '$app/server';
 import { db, consumable } from '@ac/db';
 import { listConsumables } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createConsumableSchema } from '@ac/validations';
 
 export const createConsumable = form(createConsumableSchema, async (data) => {

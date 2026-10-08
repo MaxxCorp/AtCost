@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { EntityManager, Button, AsyncButton, translateIssue } from "@ac/ui";
     import {
         MapPin,

@@ -3,7 +3,7 @@
     import { EntityManager } from "@ac/ui";
     import ContractFrameworkForm from "./ContractFrameworkForm.svelte";
     import { listContractFrameworks, readContractFramework, createContractFramework, updateContractFramework, deleteContractFramework } from "./frameworks.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { contractFrameworkSchema } from "@ac/validations/contracts";
 
     breadcrumbState.set({ feature: "contract-frameworks" });

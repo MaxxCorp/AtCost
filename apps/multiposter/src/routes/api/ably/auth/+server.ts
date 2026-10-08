@@ -1,13 +1,12 @@
 import Ably from 'ably';
-import { env } from '$env/dynamic/private';
-import { json } from '@sveltejs/kit';
+import { ABLY_API_KEY } from '$app/env/private';
 import type { RequestHandler } from './$types';
-import { getRealtimeInfo } from '$lib/server/realtime';
+import { getRealtimeInfo } from '#lib/server/realtime.js';
 
 async function handleAuth(event: Parameters<RequestHandler>[0]) {
-    if (!env.ABLY_API_KEY) {
+    if (!ABLY_API_KEY) {
         const info = getRealtimeInfo();
-        return json(
+        return Response.json(
             {
                 error: 'Ably is not configured',
                 enabled: false,
@@ -17,7 +16,7 @@ async function handleAuth(event: Parameters<RequestHandler>[0]) {
         );
     }
 
-    const client = new Ably.Rest(env.ABLY_API_KEY);
+    const client = new Ably.Rest(ABLY_API_KEY);
     try {
         const user = event.locals.user;
         const requestedClientId = event.url.searchParams.get('clientId');
@@ -30,10 +29,10 @@ async function handleAuth(event: Parameters<RequestHandler>[0]) {
         };
 
         const tokenRequestData = await client.auth.createTokenRequest(tokenParams);
-        return json(tokenRequestData);
+        return Response.json(tokenRequestData);
     } catch (err) {
         console.warn('[Ably Auth] Error creating Ably token request:', err);
-        return json({ error: 'Ably token request failed' }, { status: 500 });
+        return Response.json({ error: 'Ably token request failed' }, { status: 500 });
     }
 }
 

@@ -1,14 +1,14 @@
 <script lang="ts">
     import { untrack } from "svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import * as m from "$lib/paraglide/messages";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "#lib/components/ui/button/index.js";
     import { goto } from "$app/navigation";
     import type { createResource } from "../../../routes/resources/new/create.remote";
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
-    import type { AllocationCalendar } from "$lib/validations/resources";
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import type { AllocationCalendar } from "#lib/validations/resources.js";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";

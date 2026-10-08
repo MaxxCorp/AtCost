@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { tag } from '@ac/db';
 import { eq, desc } from '@ac/db';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import { PaginationSchema } from '@ac/validations';
 
 export const listTags = query(PaginationSchema, async (input) => {

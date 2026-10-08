@@ -4,7 +4,7 @@ import { campaign } from '@ac/db';
 import type { Campaign as DbCampaign } from '@ac/db';
 import { db } from '@ac/db';
 import { desc } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 
 /**
  * Campaign interface matching the database schema, with dates serialized to strings

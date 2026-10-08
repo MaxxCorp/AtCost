@@ -1,8 +1,8 @@
 <script lang="ts">
-    import ShiftplanTemplateForm from "$lib/components/shiftplans/ShiftplanTemplateForm.svelte";
+    import ShiftplanTemplateForm from "#lib/components/shiftplans/ShiftplanTemplateForm.svelte";
     import { createShiftplan } from "./create.remote";
     import { createShiftplanSchema } from "@ac/validations";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
     breadcrumbState.set({ 
         feature: "shiftplans",

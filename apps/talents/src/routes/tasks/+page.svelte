@@ -1,6 +1,6 @@
 <script lang="ts">
-    import TaskList from "$lib/components/tasks/TaskList.svelte";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import TaskList from "#lib/components/tasks/TaskList.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
     breadcrumbState.set({ feature: "talents", current: 'Objective Center' });
 

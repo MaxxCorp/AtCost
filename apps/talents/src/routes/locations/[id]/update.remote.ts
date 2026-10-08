@@ -2,7 +2,7 @@ import { form } from '$app/server';
 import { db, location, eq } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateLocationSchema } from '@ac/validations/locations';
 
 export const updateLocation = form(updateLocationSchema, async (data): Promise<{ success: boolean; location?: any; error?: { message: string } }> => {

@@ -4,7 +4,7 @@ import { syncConfig } from '@ac/db';
 import type { SyncConfig as DbSyncConfig } from '@ac/db';
 import { db } from '@ac/db';
 import { desc, and, or, not, ilike, sql, inArray, notInArray } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 
 import { synchronizationPaginationSchema as PaginationSchema, parseFilterValue, type Synchronization, type PaginatedResult } from '@ac/validations';
 

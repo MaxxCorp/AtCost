@@ -4,11 +4,11 @@ import {
     contact, contactEmail, contactPhone, contactAddress,
     contactRelation, tag, contactTag, locationContact
 } from '@ac/db';
-import { createContactSchema, type Contact } from '$lib/validations/contacts';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { generateContactAssets } from '$lib/server/contacts';
+import { createContactSchema, type Contact } from '#lib/validations/contacts.js';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { generateContactAssets } from '#lib/server/contacts.js';
 import { listContacts } from '../list.remote';
-import { invalidateContact } from '$lib/server/cache';
+import { invalidateContact } from '#lib/server/cache/index.js';
 
 export const createContact = form(createContactSchema, async (input) => {
     try {

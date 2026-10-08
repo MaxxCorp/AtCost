@@ -5,7 +5,14 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { env } from '$env/dynamic/private';
+
+import {
+	WP_EVENTS_CALENDAR_BASE_URL,
+	WP_EVENTS_CALENDAR_USERNAME,
+	WP_EVENTS_CALENDAR_APP_PASSWORD,
+	BETTER_AUTH_URL
+} from '$app/env/private';
+
 import crypto from 'crypto';
 import { parsePricing } from '../utils/pricing';
 
@@ -35,9 +42,10 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		this.config = config;
 
 		// Get WordPress credentials from environment variables
-		this.baseUrl = env.WP_EVENTS_CALENDAR_BASE_URL || '';
-		this.username = env.WP_EVENTS_CALENDAR_USERNAME || '';
-		this.applicationPassword = env.WP_EVENTS_CALENDAR_APP_PASSWORD || '';
+		this.baseUrl = WP_EVENTS_CALENDAR_BASE_URL || '';
+
+		this.username = WP_EVENTS_CALENDAR_USERNAME || '';
+		this.applicationPassword = WP_EVENTS_CALENDAR_APP_PASSWORD || '';
 
 		if (!this.baseUrl) {
 			throw new Error('WP_EVENTS_CALENDAR_BASE_URL environment variable is required');
@@ -109,7 +117,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			// Ensure venues exist
 			const venueIds: number[] = [];
-			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
+			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : event.venue ? [event.venue] : [];
 
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
@@ -211,7 +219,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		try {
 			// Ensure venues exist
 			const venueIds: number[] = [];
-			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
+			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : event.venue ? [event.venue] : [];
 
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
@@ -378,7 +386,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					website: venue.website,
 					show_map: 'true',
 					show_map_link: 'true',
-					status: 'publish', // Ensure it's available immediately
+					status: 'publish' // Ensure it's available immediately
 				};
 
 				const createResponse = await fetch(this.getApiUrl('/tribe/events/v1/venues'), {
@@ -469,7 +477,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					email: organizer.email,
 					phone: organizer.phone,
 					website: organizer.website,
-					status: 'publish', // Ensure it's available immediately
+					status: 'publish' // Ensure it's available immediately
 				};
 
 				const createResponse = await fetch(this.getApiUrl('/tribe/events/v1/organizers'), {
@@ -652,15 +660,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	private mapEventToWpFormat(event: ExternalEvent): any {
 		// If description is empty or contains no meaningful content, use an invisible string
 		// (zero-width space) so the sync will not be rejected by The Events Calendar WP plugin API.
-		const hasContent = Boolean(
-			event.description &&
-				(event.description
-					.replace(/<[^>]*>/g, '')
-					.replace(/&nbsp;/g, ' ')
-					.replace(/[\s\u200B\uFEFF]/g, '')
-					.length > 0 ||
-					/<(img|iframe|svg|video|audio|figure)\b/i.test(event.description))
-		);
+		const hasContent = Boolean(event.description && (event.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/[\s\u200B\uFEFF]/g, '').length > 0 || (/<(img|iframe|svg|video|audio|figure)\b/i).test(event.description)));
+
 		const description = hasContent ? event.description! : '\u200B';
 
 		// Map our internal event format to WordPress Events Calendar REST API format
@@ -677,7 +678,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		const resolvedTz = event.startTimeZone || process.env.TZ || 'Europe/Berlin';
 
 		// Format date helper
-		const formatDate = (date: Date, timeZone: string): { date: string, time: string } => {
+		const formatDate = (date: Date, timeZone: string): { date: string; time: string } => {
 			const tz = timeZone;
 
 			// Format date part (YYYY-MM-DD)
@@ -762,8 +763,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		}
 
 		// Map Website URL
-		if (event.metadata?.eventId && env.BETTER_AUTH_URL) {
-			wpEvent.website = `${env.BETTER_AUTH_URL}/events/${event.metadata.eventId}/view`;
+		if (event.metadata?.eventId && BETTER_AUTH_URL) {
+			wpEvent.website = `${BETTER_AUTH_URL}/events/${event.metadata.eventId}/view`;
 		} else if (event.source?.url) {
 			// Fallback to source URL
 			wpEvent.website = event.source.url;

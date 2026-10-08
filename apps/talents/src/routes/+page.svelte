@@ -1,12 +1,12 @@
 <script lang="ts">
     import { DashboardCard, LoadingSection, ErrorSection } from "@ac/ui";
-    import { hasAccess } from "$lib/authorization";
-    import { getVisibleFeatures } from "$lib/features";
-    import DashboardTalentCard from "$lib/components/dashboard/DashboardTalentCard.svelte";
-    import DashboardTimeTrackingCard from "$lib/components/dashboard/DashboardTimeTrackingCard.svelte";
-    import DashboardTimeOffCard from "$lib/components/dashboard/DashboardTimeOffCard.svelte";
-import DashboardTaskCard from "$lib/components/dashboard/DashboardTaskCard.svelte";
-    import { authClient } from "$lib/auth";
+    import { hasAccess } from "#lib/authorization.js";
+    import { getVisibleFeatures } from "#lib/features.js";
+    import DashboardTalentCard from "#lib/components/dashboard/DashboardTalentCard.svelte";
+    import DashboardTimeTrackingCard from "#lib/components/dashboard/DashboardTimeTrackingCard.svelte";
+    import DashboardTimeOffCard from "#lib/components/dashboard/DashboardTimeOffCard.svelte";
+import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelte";
+    import { authClient } from "#lib/auth.js";
     
     import { getMyTalentProfile } from "./talents/talents.remote";
     import { getMyStatus } from "./my-timesheet/timesheets.remote";

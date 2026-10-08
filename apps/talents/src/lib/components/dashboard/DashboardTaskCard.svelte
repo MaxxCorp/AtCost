@@ -2,7 +2,7 @@
     import { listTasks } from '../../../routes/tasks.remote';
     import { LoadingSection } from '@ac/ui';
     import { format } from 'date-fns';
-    import { browser } from "$app/environment";
+    import { browser } from '$app/env';
 
     /**
      * DASHBOARD TASK CARD
@@ -15,8 +15,22 @@
 <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden h-full flex flex-col group">
     <div class="p-6 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
-                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+            <div
+                class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors"
+            >
+                <svg
+                    class="w-5 h-5 text-amber-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                    ></path>
+                </svg>
             </div>
             <div>
                 <h3 class="font-bold text-gray-900 leading-tight">Objectives</h3>
@@ -32,10 +46,27 @@
             {#await tasksPromise}
                 <LoadingSection message="Retrieving queue..." />
             {:then data}
-                {#if !data || (data.self.length === 0 && data.direct.length === 0)}
-                    <div class="h-full flex flex-col items-center justify-center text-center py-8 opacity-40">
-                        <svg class="w-12 h-12 text-gray-200 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">All clear</p>
+                {#if !data || data.self.length === 0 && data.direct.length === 0}
+                    <div
+                        class="h-full flex flex-col items-center justify-center text-center py-8 opacity-40"
+                    >
+                        <svg
+                            class="w-12 h-12 text-gray-200 mb-2"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"
+                            ></path>
+                        </svg>
+
+                        <p
+                            class="text-[10px] font-black uppercase tracking-widest text-gray-400"
+                        >All clear</p>
                     </div>
                 {:else}
                     <div class="space-y-4">
@@ -48,8 +79,25 @@
                                         {format(new Date(task.createdAt), 'MMM d, HH:mm')}
                                     </div>
                                 </div>
-                                <a href="/tasks" aria-label="View task details" class="p-2 hover:bg-white rounded-lg text-gray-400 hover:text-indigo-600 transition-all">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+
+                                <a
+                                    href="/tasks"
+                                    aria-label="View task details"
+                                    class="p-2 hover:bg-white rounded-lg text-gray-400 hover:text-indigo-600 transition-all"
+                                >
+                                    <svg
+                                        class="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M9 5l7 7-7 7"
+                                        ></path>
+                                    </svg>
                                 </a>
                             </div>
                         {/each}

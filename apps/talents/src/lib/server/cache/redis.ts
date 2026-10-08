@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { env } from '$env/dynamic/private';
+import { REDIS_URL } from '$app/env/private';
 
 declare global {
     // eslint-disable-next-line no-var
@@ -62,7 +62,7 @@ export function getRedisClient(): Redis | null {
         return globalThis.__ac_talents_redis_client;
     }
 
-    const redisUrl = env.REDIS_URL;
+    const redisUrl = REDIS_URL;
     if (!redisUrl || redisUrl.trim() === '') {
         if (!loggedInit) {
             console.log('[Cache] REDIS_URL not configured. Read caching is disabled (fallback to DB).');

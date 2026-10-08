@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, menu, eventMenu, and, eq, ilike, desc, asc, count } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { menuPaginationSchema as PaginationSchema, type Menu, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
 

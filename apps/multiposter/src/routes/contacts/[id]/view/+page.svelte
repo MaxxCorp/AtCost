@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
-    import { authClient } from "$lib/auth";
+    import { authClient } from "#lib/auth.js";
     import { readContact } from "../read.remote";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
             import { goto } from "$app/navigation";
     import {
         Mail,
@@ -16,9 +16,9 @@
         Earth,
         Share2,
     } from "@lucide/svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
+    import Button from "#lib/components/ui/button/button.svelte";
     import { onMount } from "svelte";
-    import { parseRoles } from "$lib/authorization";
+    import { parseRoles } from "#lib/authorization.js";
 
     const contactId = page.params.id || "";
     let itemsPromise = $state(readContact(contactId));

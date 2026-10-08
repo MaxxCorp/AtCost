@@ -2,12 +2,12 @@ import { form } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
 import { eq, and } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { updateKioskSchema } from '$lib/validations/kiosks';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { updateKioskSchema } from '#lib/validations/kiosks.js';
 import { getKiosk } from './read.remote';
 import { listKiosks } from '../list.remote';
 import { error } from '@sveltejs/kit';
-import { invalidateKiosk } from '$lib/server/cache';
+import { invalidateKiosk } from '#lib/server/cache/index.js';
 
 
 

@@ -1,17 +1,24 @@
 // import Ably from 'ably'; // Removed for dynamic import
-import { env } from '$env/dynamic/private';
+import {
+    ABLY_API_KEY,
+    VERCEL,
+    CF_PAGES,
+    ENABLE_REALTIME_POLLING,
+    FORCE_ABLY
+} from '$app/env/private';
+
 import { EventEmitter } from 'events';
 
 // Lazy initialization to avoid connecting if not configured or during build
 let restClient: any = null; // using any to avoid type issues with dynamic import
 
 export async function getClient() {
-    if (!restClient && env.ABLY_API_KEY) {
+    if (!restClient && ABLY_API_KEY) {
         try {
             // @ts-ignore
             const Ably = (await import('ably')).default;
-            restClient = new Ably.Rest(env.ABLY_API_KEY);
-        } catch (e) {
+            restClient = new Ably.Rest(ABLY_API_KEY);
+        } catch(e) {
             console.error('Failed to load Ably module', e);
         }
     }
@@ -68,8 +75,8 @@ export interface RealtimeInfo {
  * (e.g. Vercel Serverless Functions, Cloudflare Pages/Workers, AWS Lambda, Netlify)
  */
 export function isServerlessEnvironment(): boolean {
-    if (env.VERCEL === '1' || process.env.VERCEL === '1') return true;
-    if (env.CF_PAGES === '1' || process.env.CF_PAGES === '1') return true;
+    if (VERCEL === '1' || process.env.VERCEL === '1') return true;
+    if (CF_PAGES === '1' || process.env.CF_PAGES === '1') return true;
     if (process.env.AWS_LAMBDA_FUNCTION_NAME) return true;
     if (process.env.NETLIFY === 'true') return true;
     return false;
@@ -84,12 +91,12 @@ export function isServerlessEnvironment(): boolean {
  */
 export function getRealtimeInfo(): RealtimeInfo {
     const isPermanent = !isServerlessEnvironment();
-    const ablyConfigured = !!env.ABLY_API_KEY;
-    const pollingEnabled = env.ENABLE_REALTIME_POLLING === 'true' || process.env.ENABLE_REALTIME_POLLING === 'true';
+    const ablyConfigured = !!ABLY_API_KEY;
+    const pollingEnabled = ENABLE_REALTIME_POLLING === 'true' || process.env.ENABLE_REALTIME_POLLING === 'true';
 
     // Priority 1: Full / Permanent server (Cost: $0 - uses built-in server memory & SSE)
     // Only use Ably on permanent server if FORCE_ABLY is explicitly set
-    if (isPermanent && env.FORCE_ABLY !== 'true') {
+    if (isPermanent && FORCE_ABLY !== 'true') {
         return {
             provider: 'sse',
             ablyConfigured,
@@ -161,7 +168,7 @@ class LocalRealtimeHub {
         this.emitter.emit(`${channel}:presence`, {
             action: 'enter',
             member,
-            members: Array.from(room.values()).map(r => r.member)
+            members: Array.from(room.values()).map((r) => r.member)
         });
     }
 
@@ -175,7 +182,7 @@ class LocalRealtimeHub {
             this.emitter.emit(`${channel}:presence`, {
                 action: 'update',
                 member: existing.member,
-                members: Array.from(room.values()).map(r => r.member)
+                members: Array.from(room.values()).map((r) => r.member)
             });
         }
     }
@@ -189,7 +196,7 @@ class LocalRealtimeHub {
             this.emitter.emit(`${channel}:presence`, {
                 action: 'leave',
                 member: existing.member,
-                members: Array.from(room.values()).map(r => r.member)
+                members: Array.from(room.values()).map((r) => r.member)
             });
         }
         if (room.size === 0) {
@@ -200,7 +207,7 @@ class LocalRealtimeHub {
     getPresenceMembers(channel: string) {
         const room = this.rooms.get(channel);
         if (!room) return [];
-        return Array.from(room.values()).map(r => r.member);
+        return Array.from(room.values()).map((r) => r.member);
     }
 }
 

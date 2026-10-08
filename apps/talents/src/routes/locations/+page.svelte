@@ -7,7 +7,7 @@
     import { updateLocation } from "./[id]/update.remote";
     import { readLocation } from "./[id]/read.remote";
     import { deleteLocation } from "./[id]/delete.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import {
         createLocationSchema,
         updateLocationSchema,

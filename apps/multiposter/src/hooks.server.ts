@@ -1,15 +1,13 @@
-import { sequence } from '@sveltejs/kit/hooks';
-import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
-
-import { auth } from "$lib/server/auth";
+import { sequence, type Handle } from '@sveltejs/kit/hooks';
+import { auth } from "#lib/server/auth.js";
 import { svelteKitHandler } from "better-auth/svelte-kit";
-import { building, dev } from '$app/environment';
-import { env } from '$env/dynamic/private';
+import { building, dev } from '$app/env';
+import { DATABASE_URL, PLAYWRIGHT_TEST } from '$app/env/private';
 import { db, user, eq, setConnectionString } from '@ac/db';
 
-if (env.DATABASE_URL) {
-	setConnectionString(env.DATABASE_URL);
+if (DATABASE_URL) {
+	setConnectionString(DATABASE_URL);
 }
 
 const handleWebhook: Handle = async ({ event, resolve }) => {
@@ -77,7 +75,7 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 
 	const path = event.url.pathname;
 	
-	const isProtectedRoute = protectedRoots.some(root => path === root || path.startsWith(`${root}/`));
+	const isProtectedRoute = protectedRoots.some((root) => path === root || path.startsWith(`${root}/`));
 	const isPublicViewRoute = path.endsWith('/view');
 
 	if (isProtectedRoute && !isPublicViewRoute) {
@@ -93,7 +91,7 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 };
 
 const handleE2EAuth: Handle = async ({ event, resolve }) => {
-	if (env.PLAYWRIGHT_TEST === 'true' && !event.locals.user) {
+	if (PLAYWRIGHT_TEST === 'true' && !event.locals.user) {
 		const mockUserId = 'playwright-test-user';
 		
 		// Ensure user exists in the database using onConflictDoNothing to handle concurrent requests gracefully
@@ -107,7 +105,7 @@ const handleE2EAuth: Handle = async ({ event, resolve }) => {
 			updatedAt: new Date()
 		}).onConflictDoNothing({ target: user.id }).then(() => {
 			console.log('[E2E Auth] Successfully inserted mock user:', mockUserId);
-		}).catch(err => {
+		}).catch((err) => {
 			console.error('[E2E Auth] Failed to insert mock user:', err);
 		});
 

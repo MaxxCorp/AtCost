@@ -5,7 +5,7 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { env } from '$env/dynamic/private';
+import { MEETUP_CLIENT_ID, MEETUP_CLIENT_SECRET } from '$app/env/private';
 import { db } from '@ac/db';
 import { account } from '@ac/db';
 import { eq, and } from '@ac/db';
@@ -29,8 +29,9 @@ export class MeetupProvider implements SyncProvider {
 		this.config = config;
 
 		// Check environment variables
-		const clientId = env.MEETUP_CLIENT_ID;
-		const clientSecret = env.MEETUP_CLIENT_SECRET;
+		const clientId = MEETUP_CLIENT_ID;
+
+		const clientSecret = MEETUP_CLIENT_SECRET;
 
 		if (!clientId || !clientSecret) {
 			console.error(`[MeetupProvider] Missing OAuth credentials:`, {

@@ -1,11 +1,11 @@
 import * as v from 'valibot';
 import { form } from '$app/server';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { syncConfig, account } from '@ac/db'; // Updated syncConfig import path
 import { eq, and } from '@ac/db';
-import { syncService } from '$lib/server/sync/service';
-import { createSynchronizationSchema } from '$lib/validations/synchronizations';
+import { syncService } from '#lib/server/sync/service.js';
+import { createSynchronizationSchema } from '#lib/validations/synchronizations.js';
 import { list as listSynchronizations } from '../list.remote'; // New import
 
 

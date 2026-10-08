@@ -1,8 +1,8 @@
 import { query } from '$app/server';
 import { db, talent, contact, eq, desc, inArray, notInArray, not, ilike, or, and, sql, exists, talentTimelineEntry, userContact, user } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { talentPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
-import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '$lib/server/cache';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
 export const listTalents = query(PaginationSchema, async (input): Promise<PaginatedResult<any>> => {
     const authUser = getAuthenticatedUser();

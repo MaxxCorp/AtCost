@@ -1,7 +1,7 @@
 import { render } from 'svelte/server';
-import StandardPost from '$lib/templates/instagram/StandardPost.svelte';
-import MinimalPost from '$lib/templates/instagram/MinimalPost.svelte';
-import StoryBanner from '$lib/templates/instagram/StoryBanner.svelte';
+import StandardPost from '#lib/templates/instagram/StandardPost.svelte';
+import MinimalPost from '#lib/templates/instagram/MinimalPost.svelte';
+import StoryBanner from '#lib/templates/instagram/StoryBanner.svelte';
 
 export interface InstagramTemplateData {
 	event: {
