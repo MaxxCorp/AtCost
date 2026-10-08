@@ -22,6 +22,7 @@
 	import { readContact } from "../../../routes/contacts/[id]/read.remote";
 	import { createContactSchema, updateContactSchema } from "@ac/validations";
 	import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
+	import { getContactFilterGroups } from "#lib/filters/index.js";
 
 	interface Props {
 		remoteFunction: any;
@@ -588,6 +589,7 @@
 					icon={Users}
 					mode="embedded"
 					initialItems={initialContacts}
+					filters={getContactFilterGroups(m)}
 					onchange={(ids: string[]) => {
 						recipientContactIds = ids;
 					}}

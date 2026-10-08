@@ -241,24 +241,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const PROVIDER_OPTIONS = [
-		{ id: "google-calendar", label: "Google Calendar" },
-		{ id: "microsoft-calendar", label: "Microsoft Calendar" },
-		{ id: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
-		{ id: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
-		{ id: "wp-the-events-calendar", label: "WP The Events Calendar" },
-		{ id: "email", label: "E-Mail (Brevo)" },
-	];
+	import { getSynchronizationFilterGroups } from "#lib/filters/index.js";
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "providerType",
-			label: m.providers(),
-			icon: RefreshCw,
-			options: PROVIDER_OPTIONS,
-			searchable: true,
-		},
-	]);
+	const filterGroups = $derived<FilterGroup[]>(getSynchronizationFilterGroups(m));
 
 	onMount(async () => {
 		try {

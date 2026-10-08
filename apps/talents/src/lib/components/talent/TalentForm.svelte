@@ -41,6 +41,8 @@
         handleDelete,
         matchContactSearch,
     } from "@ac/ui";
+    import * as m from "#lib/paraglide/messages.js";
+    import { getLocationFilterGroups, getTalentFilterGroups } from "#lib/filters/index.js";
 
     interface Props {
         initialData?: any;
@@ -321,11 +323,6 @@
             }
         }
     }
-
-    import * as m from "#lib/paraglide/messages.js";
-
-
-
     let prevIssuesLength = $state(0);
     function handleStatusChange(newStatus: string) {
         if (newStatus === "hired" && talentData.id) {
@@ -673,6 +670,7 @@
                     icon={User}
                     mode="embedded"
                     singleSelect
+                    filters={getTalentFilterGroups(m)}
                     initialItems={selectedContactList}
                     listItemsRemote={listContacts}
                     onchange={(_ids: string[], items: any[]) => {
@@ -717,6 +715,7 @@
                         title={m.locations()}
                         icon={MapPin}
                         mode="embedded"
+                        filters={getLocationFilterGroups(m)}
                         initialItems={allLocations.filter((l) =>
                             locationIds.includes(l.id),
                         )}

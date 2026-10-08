@@ -46,11 +46,13 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
     // Fetch all location associations for these resources
     const resourceIds = resources.map(r => r.id);
     const locationMap = new Map<string, string[]>();
+    const locationIdMap = new Map<string, string[]>();
 
     if (resourceIds.length > 0) {
         const locAssociations = await db
             .select({
                 resourceId: resourceLocation.resourceId,
+                locationId: resourceLocation.locationId,
                 locationName: location.name,
             })
             .from(resourceLocation)
@@ -63,11 +65,18 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
                 names.push(assoc.locationName);
             }
             locationMap.set(assoc.resourceId, names);
+
+            const ids = locationIdMap.get(assoc.resourceId) || [];
+            if (assoc.locationId && !ids.includes(assoc.locationId)) {
+                ids.push(assoc.locationId);
+            }
+            locationIdMap.set(assoc.resourceId, ids);
         });
 
         const directLocAssociations = await db
             .select({
                 resourceId: resource.id,
+                locationId: resource.locationId,
                 locationName: location.name,
             })
             .from(resource)
@@ -80,15 +89,23 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
                 names.push(assoc.locationName);
             }
             locationMap.set(assoc.resourceId, names);
+
+            const ids = locationIdMap.get(assoc.resourceId) || [];
+            if (assoc.locationId && !ids.includes(assoc.locationId)) {
+                ids.push(assoc.locationId);
+            }
+            locationIdMap.set(assoc.resourceId, ids);
         });
     }
 
     const resourcesWithLocation = resources.map(r => {
         const locNames = locationMap.get(r.id) || [];
+        const locIds = locationIdMap.get(r.id) || (r.locationId ? [r.locationId] : []);
         return {
             ...r,
             locationNames: locNames,
             locationName: locNames.length > 0 ? locNames.join(', ') : null,
+            locationIds: locIds,
         };
     });
 

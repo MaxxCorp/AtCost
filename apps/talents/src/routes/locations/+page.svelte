@@ -12,6 +12,8 @@
         createLocationSchema,
         updateLocationSchema,
     } from "@ac/validations/locations";
+    import * as m from "#lib/paraglide/messages.js";
+    import { getLocationFilterGroups } from "#lib/filters/index.js";
     breadcrumbState.set({ feature: "locations" });
 
 </script>
@@ -37,19 +39,7 @@
                 (loc.city?.toLowerCase().includes(q.toLowerCase()) ?? false)
             );
         }}
-        filters={[
-            {
-                id: "city",
-                label: "City",
-                type: "select",
-                optionsRemote: async () => {
-                    const res = await listLocations({ limit: 1000 });
-                    const items = Array.isArray(res) ? res : res.data;
-                    const cities = [...new Set(items.map((i: any) => i.city).filter(Boolean))];
-                    return cities.map(city => ({ value: city, label: city }));
-                }
-            }
-        ]}
+        filters={getLocationFilterGroups(m)}
     >
         {#snippet renderItemLabel(loc: any)}
             <div class="flex flex-col">

@@ -1,7 +1,9 @@
 <script lang="ts" generics="T extends { id?: string | null; name?: string }">
     import { onMount, untrack, type Component, type Snippet } from "svelte";
-    import type { ListItemContext, FilterDefinition, FilterAssociation, FilterGroup, FilterStateMap } from "./EntityManager.types";
+    import type { ListItemContext, FilterDefinition, FilterAssociation, FilterGroup, FilterStateMap, BooleanFilter, RadioFilterGroup } from "./EntityManager.types";
+    // @ts-ignore
     import FilterMenu from "./FilterMenu.svelte";
+    // @ts-ignore
     import ActiveFilterChips from "./ActiveFilterChips.svelte";
     import {
         Search,
@@ -16,7 +18,9 @@
         MapPin,
     } from "@lucide/svelte";
 
+    // @ts-ignore
     import Button from "./button/button.svelte";
+    // @ts-ignore
     import AsyncButton from "./AsyncButton.svelte";
     import * as Dialog from "./dialog";
     import { toast } from "svelte-sonner";
@@ -52,8 +56,11 @@
         deleteItemRemote?: (ids: string[]) => Promise<any>;
 
         // Filters
+        filterGroups?: FilterGroup[];
         filterAssociations?: FilterAssociation[];
         filters?: FilterDefinition[];
+        booleanFilters?: BooleanFilter[];
+        radioGroups?: RadioFilterGroup[];
 
         // Creation link (standalone mode)
         createHref?: string;
@@ -117,6 +124,7 @@
         editLabel?: string;
         deleteForeverLabel?: string;
         confirmUnlinkLabel?: string;
+        filtersLabel?: string;
         m?: any;
     }
 
@@ -133,8 +141,11 @@
         addAssociationRemote,
         removeAssociationRemote,
         deleteItemRemote,
+        filterGroups = undefined,
         filterAssociations = undefined,
         filters = undefined,
+        booleanFilters = undefined,
+        radioGroups = undefined,
         createHref = undefined,
         createLabel = undefined,
         createRemote,
@@ -171,12 +182,16 @@
         editLabel = "Edit",
         deleteForeverLabel = undefined,
         confirmUnlinkLabel = "Remove link",
+        filtersLabel = undefined,
         m = undefined,
     }: Props<T> = $props();
 
     const i18n = {
         get loadingLabel() {
             return m?.loading_item?.({ item: title.toLowerCase() }) ?? `Loading ${title.toLowerCase()}...`;
+        },
+        get filtersLabel() {
+            return filtersLabel ?? m?.filters?.() ?? (typeof m?.filters === "function" ? m.filters() : (m?.filters ?? "Filters"));
         },
         get noItemsLabel() {
             return m?.no_items?.({ items: title.toLowerCase() }) ?? `No ${title.toLowerCase()} associated yet.`;
@@ -248,9 +263,11 @@
     });
 
     let searchQuery = $state("");
+    let selectorSearchQuery = $state("");
     let activeFilters = $state<FilterStateMap>({});
 
     const allFilterGroups = $derived<FilterGroup[]>([
+        ...(filterGroups || []),
         ...(filterAssociations || []),
         ...(filters || []),
     ]);
@@ -261,9 +278,10 @@
     const effectiveSelectorSortOrder = $derived(selectorSortOrder ?? propSortOrder ?? "asc");
     const activeSelectorGroupBy = $derived(selectorGroupBy ?? groupBy);
     const GroupIcon = $derived(groupIcon ?? MapPin);
+    const activeSearch = $derived(mode === "embedded" ? selectorSearchQuery : searchQuery);
 
     const filterState = $derived({
-        search: searchQuery || undefined,
+        search: activeSearch || undefined,
         limit: 100,
         sortField: effectiveSortField,
         sortOrder: effectiveSortOrder,
@@ -292,10 +310,12 @@
             }
             if (groupId === "locationId" || groupId === "location" || groupId === "locations") {
                 for (const l of item.locations || []) values.push(String(l?.id ?? l?.locationId ?? l?.location?.id));
+                for (const lid of item.locationIds || []) values.push(String(lid?.id ?? lid));
                 if (item.location?.id) values.push(String(item.location.id));
                 if (item.locationId) values.push(String(item.locationId));
             } else if (groupId === "tagId" || groupId === "tag" || groupId === "tags") {
                 for (const t of item.tags || []) values.push(String(t?.id ?? t?.tagId ?? t?.tag?.id ?? t?.name));
+                for (const tid of item.tagIds || []) values.push(String(tid?.id ?? tid));
                 if (item.contact?.tags) {
                     for (const ct of item.contact.tags || []) values.push(String(ct?.id ?? ct?.tagId ?? ct?.tag?.id ?? ct?.name));
                 }
@@ -307,6 +327,12 @@
             } else if (groupId === "frameworkId" || groupId === "framework") {
                 if (item.framework?.id) values.push(String(item.framework.id));
                 if (item.frameworkId) values.push(String(item.frameworkId));
+            } else if (groupId === "city") {
+                if (item.city) values.push(String(item.city));
+            } else if (groupId === "role") {
+                if (item.role) values.push(String(item.role));
+            } else if (groupId === "providerType") {
+                if (item.providerType) values.push(String(item.providerType));
             }
 
             if (exclude.length > 0 && values.some((v) => exclude.includes(v))) {
@@ -398,9 +424,9 @@
             });
     }
 
-    function normalize(res: any) {
+    function normalize<I = T>(res: any): { data: I[]; total: number } {
         if (!res) return { data: [], total: 0 };
-        const data = Array.isArray(res) ? res : (res?.data ?? []);
+        const data: I[] = Array.isArray(res) ? res : (res?.data ?? []);
         const total = Array.isArray(res)
             ? res.length
             : (res?.total ?? data.length);
@@ -417,6 +443,7 @@
 
     // --- STATE ---
     let localAssociatedItems = $state<T[]>(untrack(() => initialItems ?? []));
+    let showSelector = $state(false);
 
     const associationsPromise = $derived(
         entityId && type
@@ -428,8 +455,11 @@
             : Promise.resolve(localAssociatedItems)
     );
 
-    const selectorListPromise = $derived(invokeRemote(listItemsRemote, filterState));
-
+    const selectorListPromise = $derived(
+        mode === "standalone" || showSelector
+            ? invokeRemote(listItemsRemote, filterState)
+            : Promise.resolve({ data: [], total: 0 })
+    );
 
     $effect(() => {
         if (initialItems) {
@@ -438,9 +468,13 @@
             });
         }
     });
-    let showSelector = $state(false);
+
     function toggleSelector() {
         showSelector = !showSelector;
+        if (!showSelector) {
+            selectorSearchQuery = "";
+            activeFilters = {};
+        }
     }
     let showQuickCreate = $state(false);
     let linkingItemId = $state<string | null>(null);
@@ -659,28 +693,33 @@
 <!-- Action Bar (Search, Filters, Actions) -->
 <div class="flex flex-col gap-2 mb-3">
     <div class="flex flex-col md:flex-row gap-3">
-        <div class="relative flex-1">
-            <Search
-                size={14}
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-                type="text"
-                placeholder={i18n.searchPlaceholder}
-                bind:value={searchQuery}
-                class="pl-9 w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:bg-gray-800 dark:text-gray-100 transition-all bg-gray-50/50"
-            />
-        </div>
+        {#if mode === "standalone"}
+            <div class="relative flex-1">
+                <Search
+                    size={14}
+                    class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                    type="text"
+                    placeholder={i18n.searchPlaceholder}
+                    bind:value={searchQuery}
+                    class="pl-9 w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:bg-gray-800 dark:text-gray-100 transition-all bg-gray-50/50"
+                />
+            </div>
+        {/if}
 
-        <div class="flex flex-wrap items-center gap-1.5 md:ml-auto shrink-0 w-full md:w-auto">
+        <div class="flex flex-wrap items-center gap-1.5 {mode === 'standalone' ? 'md:ml-auto' : ''} shrink-0 w-full md:w-auto">
             {#if toolbarActions}
                 {@render toolbarActions()}
             {/if}
 
-            {#if allFilterGroups.length > 0}
+            {#if mode === "standalone" && (allFilterGroups.length > 0 || (booleanFilters && booleanFilters.length > 0) || (radioGroups && radioGroups.length > 0))}
                 <FilterMenu
                     groups={allFilterGroups}
                     bind:filters={activeFilters}
+                    booleanFilters={booleanFilters}
+                    radioGroups={radioGroups}
+                    buttonLabel={i18n.filtersLabel}
                 />
             {/if}
 
@@ -767,14 +806,14 @@
         </div>
     </div>
 
-    <!-- Active Filter Chips -->
-    {#if allFilterGroups.length > 0}
+    <!-- Active Filter Chips (Standalone mode only) -->
+    {#if mode === "standalone" && allFilterGroups.length > 0}
         <ActiveFilterChips
             groups={allFilterGroups}
             filters={activeFilters}
             activeFiltersLabel={i18n.activeFiltersLabel}
             clearAllLabel={i18n.clearAllLabel}
-            onremove={(groupId, optId, type) => {
+            onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
                 const current = activeFilters[groupId] || { include: [], exclude: [] };
                 activeFilters = {
                     ...activeFilters,
@@ -797,8 +836,63 @@
 
 {#if showSelector}
     <div
-        class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 relative min-h-[100px]"
+        class="bg-white border-2 border-blue-50 rounded-2xl p-2.5 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 relative min-h-[100px]"
     >
+        <!-- Link Mode Filter & Search Toolbar -->
+        <div class="flex flex-col gap-2 mb-2 pb-2.5 border-b border-gray-100 dark:border-gray-800">
+            <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                    <Search
+                        size={14}
+                        class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                        type="text"
+                        placeholder={i18n.searchPlaceholder}
+                        bind:value={selectorSearchQuery}
+                        class="pl-9 w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:bg-gray-800 dark:text-gray-100 transition-all bg-gray-50/50"
+                    />
+                </div>
+
+                {#if allFilterGroups.length > 0 || (booleanFilters && booleanFilters.length > 0) || (radioGroups && radioGroups.length > 0)}
+                    <FilterMenu
+                        groups={allFilterGroups}
+                        bind:filters={activeFilters}
+                        booleanFilters={booleanFilters}
+                        radioGroups={radioGroups}
+                        buttonLabel={i18n.filtersLabel}
+                    />
+                {/if}
+            </div>
+
+            <!-- Active Filter Chips in Link Mode -->
+            {#if allFilterGroups.length > 0}
+                <ActiveFilterChips
+                    groups={allFilterGroups}
+                    filters={activeFilters}
+                    activeFiltersLabel={i18n.activeFiltersLabel}
+                    clearAllLabel={i18n.clearAllLabel}
+                    onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+                        const current = activeFilters[groupId] || { include: [], exclude: [] };
+                        activeFilters = {
+                            ...activeFilters,
+                            [groupId]: {
+                                include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                                exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                            },
+                        };
+                    }}
+                    onclearall={() => {
+                        const reset: FilterStateMap = {};
+                        for (const g of allFilterGroups) {
+                            reset[g.id] = { include: [], exclude: [] };
+                        }
+                        activeFilters = reset;
+                    }}
+                />
+            {/if}
+        </div>
+
         <svelte:boundary>
             {#if $effect.pending()}
                 <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px] rounded-xl">
@@ -813,22 +907,23 @@
                         <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                     </div>
                 {:then res}
-                    {@const allItems = normalize(res).data}
-                    {@const sortedAllItems = sortItemsList(allItems, effectiveSelectorSortField, effectiveSelectorSortOrder)}
-                    {@const searchedItems = searchQuery
+                    {@const allItems = normalize<T>(res).data}
+                    {@const sortedAllItems = sortItemsList<T>(allItems, effectiveSelectorSortField, effectiveSelectorSortOrder)}
+                    {@const searchedItems = (activeSearch
                         ? sortedAllItems.filter(
                               (i: any) =>
                                   searchPredicate
-                                      ? searchPredicate(i, searchQuery)
-                                      : (i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                         i.title?.toLowerCase().includes(searchQuery.toLowerCase())),
+                                      ? searchPredicate(i, activeSearch)
+                                      : (i.name?.toLowerCase().includes(activeSearch.toLowerCase()) ||
+                                         i.title?.toLowerCase().includes(activeSearch.toLowerCase()) ||
+                                         i.displayName?.toLowerCase().includes(activeSearch.toLowerCase())),
                           )
-                        : sortedAllItems}
-                    {@const filteredItems = searchedItems.filter((i: any) => matchesFilters(i, activeFilters))}
+                        : sortedAllItems) as T[]}
+                    {@const filteredItems = searchedItems.filter((i: any) => matchesFilters(i, activeFilters)) as T[]}
                     
                     {#if filteredItems.length === 0}
                         <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
-                            {searchQuery ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
+                            {activeSearch ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
                         </div>
                     {:else}
                         {#await associationsPromise}
@@ -837,7 +932,7 @@
                                 <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                             </div>
                         {:then ares}
-                            {@const currentAssociations = normalize(ares).data}
+                            {@const currentAssociations = normalize<T>(ares).data}
 
                             {#snippet renderSelectorItem(item: T)}
                                 {@const isLinked = isAssociated(item, currentAssociations)}
@@ -855,10 +950,10 @@
                                             {#if renderItemLabel}
                                                 {@render renderItemLabel(item)}
                                             {:else}
-                                                {item.displayName ||
+                                                {(item as any).displayName ||
                                                     item.name ||
-                                                    (`${item.givenName || ""} ${item.familyName || ""}`.trim() || undefined) ||
-                                                    item.company ||
+                                                    (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
+                                                    (item as any).company ||
                                                     item.id ||
                                                     "Unnamed Item"}
                                             {/if}
@@ -985,9 +1080,9 @@
                     <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                 </div>
             {:then res}
-                {@const { data: rawAssociations } = normalize(res)}
-                {@const currentAssociations = sortItemsList(rawAssociations, effectiveSortField, effectiveSortOrder)}
-                {@const searchedAssoc = searchQuery
+                {@const { data: rawAssociations } = normalize<T>(res)}
+                {@const currentAssociations = sortItemsList<T>(rawAssociations, effectiveSortField, effectiveSortOrder)}
+                {@const searchedAssoc = (searchQuery
                     ? currentAssociations.filter(
                           (i: any) =>
                               searchPredicate
@@ -999,8 +1094,10 @@
                                         ?.toLowerCase()
                                         .includes(searchQuery.toLowerCase())),
                       )
-                    : currentAssociations}
-                {@const items = searchedAssoc.filter((i: any) => matchesFilters(i, activeFilters))}
+                    : currentAssociations) as T[]}
+                {@const items = (mode === "standalone"
+                    ? searchedAssoc.filter((i: any) => matchesFilters(i, activeFilters))
+                    : searchedAssoc) as T[]}
                 {#if items.length > 0}
                     <div class="grid gap-2">
                         {#each items as item (item.id)}
@@ -1014,10 +1111,10 @@
                                 {#if renderItemLabel}
                                     {@render renderItemLabel(item)}
                                 {:else}
-                                    {item.displayName ||
+                                    {(item as any).displayName ||
                                         item.name ||
-                                        (`${item.givenName || ""} ${item.familyName || ""}`.trim() || undefined) ||
-                                        item.company ||
+                                        (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
+                                        (item as any).company ||
                                         item.id ||
                                         "Unnamed Item"}
                                 {/if}

@@ -20,6 +20,7 @@
     import ShiftplanTalentParticipation from "./ShiftplanTalentParticipation.svelte";
     import { toast } from "svelte-sonner";
     import { goto } from "$app/navigation";
+    import { getTalentFilterGroups } from "#lib/filters/index.js";
 
     let {
         remoteFunction,
@@ -246,6 +247,7 @@
                     title="Talents"
                     icon={Users}
                     mode="embedded"
+                    filters={getTalentFilterGroups(m)}
                     type="shiftplan"
                     entityId={initialData.id}
                     listItemsRemote={() => listTalents()}

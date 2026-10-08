@@ -19,6 +19,7 @@
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { MapPin } from "@lucide/svelte";
+    import { getLocationFilterGroups } from "#lib/filters/index.js";
     import { onMount, untrack } from "svelte";
     import { toast } from "svelte-sonner";
     import { goto } from "$app/navigation";
@@ -269,6 +270,7 @@
                         icon={MapPin}
                         mode="embedded"
                         initialItems={locs.data.filter((l: any) => selectedLocationIds.includes(l.id))}
+                        filters={getLocationFilterGroups(m)}
                         onchange={(ids: string[]) => selectedLocationIds = ids}
                         listItemsRemote={listLocations as any}
                         deleteItemRemote={async (ids: string[]) => {

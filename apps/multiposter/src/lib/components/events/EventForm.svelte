@@ -57,6 +57,11 @@
         removeResourceAssociation,
         fetchEntityResources,
     } from "../../../routes/resources/associate.remote";
+    import {
+        getResourceFilterGroups,
+        getLocationFilterGroups,
+        getContactFilterGroups,
+    } from "#lib/filters/index.js";
     import RichTextEditor from "#lib/components/cms/RichTextEditor.svelte";
     import ImageUploader from "#lib/components/cms/ImageUploader.svelte";
     import RecurrenceDialog from "#lib/components/events/RecurrenceDialog.svelte";
@@ -996,6 +1001,7 @@
                 type="event"
                 entityId={initialData?.id}
                 initialItems={initialData?.resources || []}
+                filters={getResourceFilterGroups(m)}
                 listItemsRemote={listResourcesWithHierarchy as any}
                 fetchAssociationsRemote={fetchEntityResources as any}
                 selectorGroupBy={(r: any) => (r.locationNames?.length ? r.locationNames : (r.locationName || m.no_location?.() || "No Location"))}
@@ -1233,6 +1239,7 @@
                 {type}
                 entityId={initialData?.id}
                 initialItems={initialData?.locations || []}
+                filters={getLocationFilterGroups(m)}
                 listItemsRemote={listLocations as any}
                 fetchAssociationsRemote={fetchEntityLocations as any}
                 addAssociationRemote={async (p: any) =>
@@ -1538,6 +1545,7 @@
         type="event"
         entityId={initialData?.id}
         initialItems={initialData?.contacts || []}
+        filters={getContactFilterGroups(m)}
         onchange={(ids: string[], items?: any[]) => {
             void handleContactsChange(ids, items);
         }}
@@ -1729,6 +1737,7 @@
                             initialItems={(
                                 (formData as any)?.locationAssociations || []
                             ).map((la: any) => la.location).filter(Boolean)}
+                            filters={getLocationFilterGroups(m)}
                             onchange={onLocationsChange}
                             listItemsRemote={listLocations as any}
                             fetchAssociationsRemote={fetchEntityLocations as any}

@@ -8,6 +8,7 @@
     import { createContactSchema } from "#lib/validations/contacts.js";
     import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
+    import { getLocationFilterGroups } from "#lib/filters/index.js";
     import * as m from "#lib/paraglide/messages.js";
     import { listLocations } from "../../locations/list.remote";
     import { createLocation } from "../../locations/new/create.remote";
@@ -67,6 +68,7 @@
                                     type="contact"
                                     entityId={""}
                                     initialItems={[]}
+                                    filters={getLocationFilterGroups(m)}
                                     onchange={onLocationsChange}
                                     listItemsRemote={listLocations}
                                     fetchAssociationsRemote={fetchEntityLocations as any}

@@ -17,11 +17,10 @@
     import { listTalents } from "../../talents/list.remote";
     import { getEntityTalents, associateTalent, dissociateTalent } from "../../talents/associate.remote";
     import { upsertTalent } from "../../talents/talents.remote";
-    import { listTags } from "../../tags/list.remote";
-    import { listLocations } from "../../locations/list.remote";
     import { createTalent } from "../../talents/new/create.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";
     import { readTalent } from "../../talents/[id]/read.remote";
+    import { getTalentFilterGroups } from "#lib/filters/index.js";
     import { unifiedTalentSchema } from "@ac/validations";
     import { EntityManager } from "@ac/ui";
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
@@ -107,33 +106,7 @@
                                             associateTalent({ ...p, talentId: p.itemId } as any)}
                                         removeAssociationRemote={async (p: any) =>
                                             dissociateTalent({ ...p, talentId: p.itemId } as any)}
-                                    filterAssociations={[
-                                        {
-                                            id: "locationId",
-                                            label: "Locations",
-                                            listRemote: listLocations as any,
-                                                getOptionLabel: (l: any) => l.name,
-                                        },
-                                        {
-                                            id: "tagId",
-                                            label: "Tags",
-                                            listRemote: listTags as any,
-                                                getOptionLabel: (t: any) => t.name,
-                                            },
-                                    ]}
-                                    filters={[
-                                        {
-                                            id: "status",
-                                            label: "Status",
-                                            type: "select",
-                                            options: [
-                                                { value: "active", label: "Active" },
-                                                { value: "applicant", label: "Applicant" },
-                                                    { value: "inactive", label: "Inactive" },
-                                            ],
-                                                optionsRemote: async () => [],
-                                        }
-                                    ]}
+                                    filters={getTalentFilterGroups(m)}
                                     createRemote={createTalent}
                                     createSchema={unifiedTalentSchema}
                                     updateRemote={updateTalent}

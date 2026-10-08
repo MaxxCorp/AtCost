@@ -16,10 +16,9 @@
     import { createTalent } from "../../talents/new/create.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";
     import { readTalent } from "../../talents/[id]/read.remote";
-    import { listTags } from "../../talents/talents.remote";
-    import { listLocations } from "../list.remote";
     import { unifiedTalentSchema } from "@ac/validations";
     import { handleDelete } from "@ac/ui";
+    import { getTalentFilterGroups } from "#lib/filters/index.js";
 
 
     const id = $derived(page.params.id as string);
@@ -81,33 +80,7 @@
                             fetchAssociationsRemote={getEntityTalents}
                             addAssociationRemote={async (p: any) => associateTalent({ ...p, talentId: p.itemId } as any)}
                             removeAssociationRemote={async (p: any) => dissociateTalent({ ...p, talentId: p.itemId } as any)}
-                            filterAssociations={[
-                                {
-                                    id: "locationId",
-                                    label: "Locations",
-                                    listRemote: listLocations as any,
-                                    getOptionLabel: (l: any) => l.name,
-                                },
-                                {
-                                    id: "tagId",
-                                    label: "Tags",
-                                    listRemote: listTags as any,
-                                    getOptionLabel: (t: any) => t.name,
-                                },
-                            ]}
-                            filters={[
-                                {
-                                    id: "status",
-                                    label: "Status",
-                                    type: "select",
-                                    options: [
-                                        { value: "active", label: "Active" },
-                                        { value: "applicant", label: "Applicant" },
-                                        { value: "inactive", label: "Inactive" },
-                                    ],
-                                    optionsRemote: async () => [],
-                                }
-                            ]}
+                            filters={getTalentFilterGroups(m)}
                             searchPredicate={(t: any, q: string) => {
                                 const name = (t.contact?.displayName || t.jobTitle || "").toLowerCase();
                                 return name.includes(q.toLowerCase());

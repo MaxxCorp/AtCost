@@ -16,6 +16,7 @@
     import { contractSchema } from "@ac/validations/contracts";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
+    import { getContractFilterGroups } from "#lib/filters/index.js";
 
     const talentIdParam = $derived(page.params.id as string);
     
@@ -110,6 +111,7 @@
                                 title="Contracts"
                                 icon={FileText}
                                 mode="embedded"
+                                filters={getContractFilterGroups(m)}
                                 listItemsRemote={listTalentContracts}
                                 deleteItemRemote={deleteContract}
                                 createRemote={createContract}

@@ -35,15 +35,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "locationId",
-			label: m.locations(),
-			icon: MapPin,
-			optionsRemote: listLocations,
-			searchable: true,
-		},
-	]);
+	import { getResourceFilterGroups } from "#lib/filters/index.js";
+
+	const filterGroups = $derived<FilterGroup[]>(getResourceFilterGroups(m));
 
 	onMount(async () => {
 		try {

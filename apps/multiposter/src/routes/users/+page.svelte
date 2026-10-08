@@ -34,21 +34,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const ROLE_OPTIONS = $derived([
-		{ id: "admin", label: m.admin ? m.admin() : "Admin" },
-		{ id: "user", label: m.user ? m.user() : "User" },
-		{ id: "guest", label: m.guest ? m.guest() : "Guest" },
-	]);
+	import { getUserFilterGroups } from "#lib/filters/index.js";
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "role",
-			label: m.role ? m.role() : "Role",
-			icon: Shield,
-			options: ROLE_OPTIONS,
-			searchable: true,
-		},
-	]);
+	const filterGroups = $derived<FilterGroup[]>(getUserFilterGroups(m));
 
 	onMount(async () => {
 		try {

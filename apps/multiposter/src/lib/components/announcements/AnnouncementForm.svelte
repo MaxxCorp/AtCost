@@ -20,6 +20,7 @@
     import { Tag as TagIcon } from "@lucide/svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { type Location } from "@ac/validations";
+    import { getLocationFilterGroups, getContactFilterGroups } from "#lib/filters/index.js";
 
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
@@ -349,6 +350,7 @@
                             initialItems={locs.data.filter((l: any) =>
                                 selectedLocationIds.includes(l.id),
                             )}
+                            filters={getLocationFilterGroups(m)}
                             onchange={(ids: string[]) =>
                                 (selectedLocationIds = ids)}
                             listItemsRemote={listLocations as any}
@@ -535,6 +537,7 @@
                     mode="embedded"
                     {type}
                     entityId={initialData?.id}
+                    filters={getContactFilterGroups(m)}
                     onchange={(ids: string[]) => (selectedContactIds = ids)}
                     listItemsRemote={listContacts as any}
                     fetchAssociationsRemote={fetchEntityContacts as any}

@@ -24,10 +24,10 @@
     } from "@lucide/svelte";
     import { listTalents } from "./list.remote";
     import { deleteTalent } from "./[id]/delete.remote";
-    import { bulkDeleteTalents, listTags } from "./talents.remote";
-    import { listLocations } from "../locations/list.remote";
+    import { bulkDeleteTalents } from "./talents.remote";
     import { toast } from "svelte-sonner";
     import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+    import { getTalentFilterGroups } from "#lib/filters/index.js";
     
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { onMount } from "svelte";
@@ -45,34 +45,7 @@
     let page = $state(1);
     let limit = $state(50);
 
-    const STATUS_OPTIONS = [
-        { id: "active", label: m.status_active ? m.status_active() : "Active" },
-        { id: "applicant", label: m.status_applicant ? m.status_applicant() : "Applicant" },
-        { id: "inactive", label: m.status_inactive ? m.status_inactive() : "Inactive" },
-    ];
-
-    const filterGroups = $derived<FilterGroup[]>([
-        {
-            id: "locationId",
-            label: m.locations ? m.locations() : "Locations",
-            icon: MapPin,
-            optionsRemote: listLocations,
-            searchable: true,
-        },
-        {
-            id: "tagId",
-            label: m.tags ? m.tags() : "Tags",
-            icon: Tag,
-            optionsRemote: listTags,
-            searchable: true,
-        },
-        {
-            id: "status",
-            label: m.status ? m.status() : "Status",
-            icon: Clock,
-            options: STATUS_OPTIONS,
-        },
-    ]);
+    const filterGroups = $derived<FilterGroup[]>(getTalentFilterGroups(m));
 
     const filterState = $derived({
         page,

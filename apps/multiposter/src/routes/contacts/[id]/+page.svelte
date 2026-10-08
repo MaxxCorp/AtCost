@@ -14,6 +14,7 @@
     import { updateContactSchema } from "#lib/validations/contacts.js";
     import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
+    import { getLocationFilterGroups } from "#lib/filters/index.js";
     import { listLocations } from "../../locations/list.remote";
     import { createLocation } from "../../locations/new/create.remote";
     import { updateLocation } from "../../locations/[id]/update.remote";
@@ -127,6 +128,7 @@
                                             initialItems={(
                                                 contact.locationAssociations || []
                                             ).map((la: any) => la.location).filter(Boolean)}
+                                            filters={getLocationFilterGroups(m)}
                                             onchange={onLocationsChange}
                                             listItemsRemote={listLocations}
                                             fetchAssociationsRemote={fetchEntityLocations as any}

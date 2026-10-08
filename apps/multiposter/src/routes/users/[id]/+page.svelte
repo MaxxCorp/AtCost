@@ -23,6 +23,7 @@
     import { parseRoles } from "#lib/authorization.js";
     import { browser } from '$app/env';
     import { authClient } from "#lib/auth.js";
+    import { getContactFilterGroups } from "#lib/filters/index.js";
 
     const userId = $derived(page.params.id || "");
 
@@ -98,6 +99,7 @@
                                             m={m}
                                             title={m.feature_contacts_title()}
                                             icon={UserIcon}
+                                            filters={getContactFilterGroups(m)}
 
                                             type="user"
                                             entityId={data.id}

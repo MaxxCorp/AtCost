@@ -4,10 +4,9 @@
     import { EntityManager } from "@ac/ui";
     import ContractForm from "./ContractForm.svelte";
     import { listContracts, readContract, createContract, updateContract, deleteContract } from "./contracts.remote";
-    import { listTalents } from "../talents/list.remote";
-    import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { contractSchema } from "@ac/validations/contracts";
+    import { getContractFilterGroups } from "#lib/filters/index.js";
 
     breadcrumbState.set({ feature: "contracts" });
 </script>
@@ -19,20 +18,7 @@
         icon={FileText}
         mode="standalone"
         listItemsRemote={listContracts as any}
-        filterAssociations={[
-            {
-                id: "talentId",
-                label: m.talent ? m.talent() : "Talent",
-                listRemote: listTalents as any,
-                getOptionLabel: (t: any) => t.contact?.displayName,
-            },
-            {
-                id: "frameworkId",
-                label: m.framework ? m.framework() : "Framework",
-                listRemote: listContractFrameworks as any,
-                getOptionLabel: (f: any) => f.name,
-            }
-        ]}
+        filters={getContractFilterGroups(m)}
         deleteItemRemote={deleteContract}
         createHref="/contracts/new"
         createLabel={m.create_contract ? m.create_contract() : "Create Contract"}

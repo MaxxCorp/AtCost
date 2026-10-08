@@ -34,15 +34,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "locationId",
-			label: m.locations(),
-			icon: MapPin,
-			optionsRemote: listLocations,
-			searchable: true,
-		},
-	]);
+	import { getKioskFilterGroups } from "#lib/filters/index.js";
+
+	const filterGroups = $derived<FilterGroup[]>(getKioskFilterGroups(m));
 
 	onMount(async () => {
 		try {

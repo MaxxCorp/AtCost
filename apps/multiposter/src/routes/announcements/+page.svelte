@@ -39,22 +39,9 @@
 	let limit = $state(50);
 	let filterValues = $state<FilterStateMap>({});
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "locationId",
-			label: m.locations(),
-			icon: MapPin,
-			optionsRemote: listLocations,
-			searchable: true,
-		},
-		{
-			id: "tagId",
-			label: m.tags(),
-			icon: TagIcon,
-			optionsRemote: listTags,
-			searchable: true,
-		},
-	]);
+	import { getAnnouncementFilterGroups } from "#lib/filters/index.js";
+
+	const filterGroups = $derived<FilterGroup[]>(getAnnouncementFilterGroups(m));
 
 	onMount(async () => {
 		try {

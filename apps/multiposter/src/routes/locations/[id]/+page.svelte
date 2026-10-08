@@ -11,6 +11,7 @@
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
             import { updateLocationSchema, type Location, type Contact } from "@ac/validations";
     import { User } from "@lucide/svelte";
+    import { getContactFilterGroups } from "#lib/filters/index.js";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { listContacts } from "../../contacts/list.remote";
     import { fetchEntityContacts, addAssociation, removeAssociation } from "../../contacts/associate.remote";
@@ -155,6 +156,7 @@
 
                                             type="location"
                                             entityId={location.id}
+                                            filters={getContactFilterGroups(m)}
                                             listItemsRemote={listContacts as any}
                                             fetchAssociationsRemote={fetchEntityContacts as any}
                                             addAssociationRemote={async (p: any) =>

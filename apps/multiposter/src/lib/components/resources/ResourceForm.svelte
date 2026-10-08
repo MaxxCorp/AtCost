@@ -41,6 +41,7 @@
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import { listMsTenantResources } from "../../../routes/resources/list-ms-tenant-resources.remote";
+    import { getLocationFilterGroups, getContactFilterGroups } from "#lib/filters/index.js";
 
     let {
         remoteFunction,
@@ -273,6 +274,7 @@
                 type="resource"
                 entityId={isUpdating ? initialData?.id : null}
                 initialItems={initialData?.locationIds ? locations.filter(l => initialData.locationIds.includes(l.id)) : []}
+                filters={getLocationFilterGroups(m)}
                 onchange={(ids: any) => (selectedLocationIds = ids)}
                 listItemsRemote={listLocations as any}
                 fetchAssociationsRemote={fetchEntityLocations as any}
@@ -548,6 +550,7 @@
                 type="resource"
                 mode="embedded"
                 entityId={isUpdating ? initialData?.id : null}
+                filters={getContactFilterGroups(m)}
                 onchange={(ids: any) => (selectedContactIds = ids)}
                 listItemsRemote={listContacts as any}
                 fetchAssociationsRemote={fetchEntityContacts as any}

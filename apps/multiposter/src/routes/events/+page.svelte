@@ -203,22 +203,9 @@
 		},
 	]);
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "tagId",
-			label: m.tags(),
-			icon: TagIcon,
-			optionsRemote: listTags,
-			searchable: true,
-		},
-		{
-			id: "locationId",
-			label: m.locations(),
-			icon: MapPin,
-			optionsRemote: listLocations,
-			searchable: true,
-		},
-	]);
+	import { getEventFilterGroups } from "#lib/filters/index.js";
+
+	const filterGroups = $derived<FilterGroup[]>(getEventFilterGroups(m));
 
 	const booleanFilters = $derived([
 		{
