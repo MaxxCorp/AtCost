@@ -32,6 +32,7 @@
         removeAssociation,
         fetchEntityContacts,
         updateAssociationStatus as updateAssociationStatusRemote,
+        updateContactRoles,
     } from "../../../routes/contacts/associate.remote";
     import { createContact } from "../../../routes/contacts/new/create.remote";
     import { updateContact } from "../../../routes/contacts/[id]/update.remote";
@@ -62,6 +63,8 @@
     import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
     import EventRoleManagerModal from "#lib/components/events/EventRoleManagerModal.svelte";
     import EventContactRoleSelector from "#lib/components/events/EventContactRoleSelector.svelte";
+    import { listEventRoles } from "../../../routes/event-roles/list.remote.js";
+    import type { EventRole } from "@ac/validations";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { isSeriesItem } from "#lib/utils/event-series.js";
     import {
@@ -447,6 +450,115 @@
         }
         return map;
     })());
+
+    let availableRoles = $state<EventRole[]>([]);
+
+    async function loadEventRoles(): Promise<EventRole[]> {
+        if (availableRoles.length > 0) return availableRoles;
+        try {
+            const res = await listEventRoles();
+            if (res?.data) {
+                availableRoles = res.data;
+                return res.data;
+            }
+        } catch (err) {
+            console.error("Failed to load event roles:", err);
+        }
+        return availableRoles;
+    }
+
+    onMount(() => {
+        void loadEventRoles();
+    });
+
+    function isEmployeeContact(contactItem: any): boolean {
+        if (!contactItem) return false;
+        const tags = contactItem.tags || [];
+        return tags.some((t: any) => {
+            const name = (t?.name || t?.tag?.name || (typeof t === 'string' ? t : '')).trim().toLowerCase();
+            return name === 'employee' || name === 'employees';
+        });
+    }
+
+    function isPartnerContact(contactItem: any): boolean {
+        if (!contactItem) return false;
+        const tags = contactItem.tags || [];
+        return tags.some((t: any) => {
+            const name = (t?.name || t?.tag?.name || (typeof t === 'string' ? t : '')).trim().toLowerCase();
+            return name === 'partner' || name === 'partners';
+        });
+    }
+
+    function findRole(roles: EventRole[], roleName: string): EventRole | undefined {
+        const target = roleName.trim().toLowerCase();
+        return roles.find((r) => (r.name || '').trim().toLowerCase() === target);
+    }
+
+    async function handleContactsChange(ids: string[], items?: any[]) {
+        currentContactIds = ids;
+        rf.fields.contactIds.set(JSON.stringify(ids));
+        rf.fields.participantsCount.set(baseline + ids.length);
+
+        const roles = await loadEventRoles();
+        const mainRole = findRole(roles, 'Main Contact');
+        const pmRole = findRole(roles, 'Project Manager');
+        const participantRole = findRole(roles, 'Participant');
+
+        const newRolesState: Record<string, string[]> = {};
+        for (const id of ids) {
+            if (contactRolesState[id]) {
+                newRolesState[id] = contactRolesState[id];
+            }
+        }
+
+        // Check if any currently assigned contact already has the Main Contact role
+        let hasMainContact = Object.entries(newRolesState).some(([id, roleIds]) => {
+            return mainRole ? roleIds.includes(mainRole.id) : false;
+        });
+
+        if (items && items.length > 0) {
+            for (const contactItem of items) {
+                if (!contactItem?.id || !ids.includes(contactItem.id)) continue;
+
+                if (!newRolesState[contactItem.id] || newRolesState[contactItem.id].length === 0) {
+                    let assignedRole: EventRole | undefined;
+
+                    if (!hasMainContact) {
+                        if (isEmployeeContact(contactItem)) {
+                            assignedRole = mainRole;
+                            hasMainContact = true;
+                        } else {
+                            assignedRole = participantRole;
+                        }
+                    } else {
+                        if (isEmployeeContact(contactItem) || isPartnerContact(contactItem)) {
+                            assignedRole = pmRole;
+                        } else {
+                            assignedRole = participantRole;
+                        }
+                    }
+
+                    if (assignedRole) {
+                        newRolesState[contactItem.id] = [assignedRole.id];
+                        if (initialData?.id) {
+                            void updateContactRoles({
+                                eventId: initialData.id,
+                                contactId: contactItem.id,
+                                roleIds: [assignedRole.id]
+                            }).catch((err) => console.error("Failed to update contact role:", err));
+                        }
+                    }
+                } else {
+                    if (mainRole && newRolesState[contactItem.id].includes(mainRole.id)) {
+                        hasMainContact = true;
+                    }
+                }
+            }
+        }
+
+        contactRolesState = newRolesState;
+        rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
+    }
 
     // svelte-ignore state_referenced_locally
     const rawInitialParticipants = initialData?.participantsCount;
@@ -1426,10 +1538,8 @@
         type="event"
         entityId={initialData?.id}
         initialItems={initialData?.contacts || []}
-        onchange={(ids: string[]) => {
-            currentContactIds = ids;
-            rf.fields.contactIds.set(JSON.stringify(ids));
-            rf.fields.participantsCount.set(baseline + ids.length);
+        onchange={(ids: string[], items?: any[]) => {
+            void handleContactsChange(ids, items);
         }}
         listItemsRemote={listContacts as any}
         fetchAssociationsRemote={fetchEntityContacts as any}
@@ -1784,7 +1894,17 @@
         class="hidden"
     />
 
-    <EventRoleManagerModal bind:open={isRoleManagerOpen} />
+    <EventRoleManagerModal
+        bind:open={isRoleManagerOpen}
+        onclose={async () => {
+            try {
+                const res = await listEventRoles();
+                if (res?.data) availableRoles = res.data;
+            } catch (e) {
+                console.error(e);
+            }
+        }}
+    />
 
     <div class="pt-4 border-t border-gray-100">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">

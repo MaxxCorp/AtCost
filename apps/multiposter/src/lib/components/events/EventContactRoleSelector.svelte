@@ -78,6 +78,15 @@
             }
         }
     }
+
+    function getRoleLabel(roleName?: string | null) {
+        if (!roleName) return "";
+        const key = roleName.trim().toLowerCase();
+        if (key === "main contact" || key === "maincontact") return m.main_contact?.() ?? roleName;
+        if (key === "project manager" || key === "projectmanager") return m.project_manager?.() ?? roleName;
+        if (key === "participant") return m.participant?.() ?? roleName;
+        return roleName;
+    }
 </script>
 
 <div class="inline-flex items-center gap-1.5 flex-wrap">
@@ -96,7 +105,7 @@
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border {style.bg}"
             >
                 <span class="w-1.5 h-1.5 rounded-full {style.dot}"></span>
-                <span>{role.name}</span>
+                <span>{getRoleLabel(role.name)}</span>
             </span>
         {/each}
 
@@ -135,7 +144,7 @@
                             >
                                 <div class="flex items-center gap-2 truncate">
                                     <span class="w-2 h-2 rounded-full shrink-0 {style.dot}"></span>
-                                    <span class="truncate">{role.name}</span>
+                                    <span class="truncate">{getRoleLabel(role.name)}</span>
                                 </div>
                                 {#if isSelected}
                                     <Check size={14} class="text-blue-600 shrink-0" />

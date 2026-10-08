@@ -125,6 +125,15 @@
             deletingId = null;
         }
     }
+
+    function getRoleLabel(roleName?: string | null) {
+        if (!roleName) return "";
+        const key = roleName.trim().toLowerCase();
+        if (key === "main contact" || key === "maincontact") return m.main_contact?.() ?? roleName;
+        if (key === "project manager" || key === "projectmanager") return m.project_manager?.() ?? roleName;
+        if (key === "participant") return m.participant?.() ?? roleName;
+        return roleName;
+    }
 </script>
 
 <Dialog.Root bind:open onOpenChange={(val) => { if (!val) onclose?.(); }}>
@@ -285,7 +294,7 @@
                                     <div class="flex items-center gap-2.5 min-w-0">
                                         <span class="px-2.5 py-0.5 rounded-md text-xs font-semibold border inline-flex items-center gap-1.5 {colorOpt.bg}">
                                             <span class="w-1.5 h-1.5 rounded-full {colorOpt.dot}"></span>
-                                            <span class="truncate">{role.name}</span>
+                                            <span class="truncate">{getRoleLabel(role.name)}</span>
                                         </span>
                                         {#if role.isDefault}
                                             <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">

@@ -147,7 +147,12 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 
     const rawResults = await db.query.contact.findMany({
         where: inArray(contact.id, ids),
-        with: { user: true },
+        with: {
+            user: true,
+            tags: {
+                with: { tag: true }
+            }
+        },
     });
 
     const rawMap = new Map(rawResults.map((r) => [r.id, r]));
@@ -176,7 +181,10 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 		addresses: [],
 		locationAssociations: [],
 		relations: [],
-		tags: [],
+		tags: (row.tags || []).map((t: any) => ({
+            id: t.tag?.id,
+            name: t.tag?.name
+        })),
 	}));
 
 	return { data, total };
