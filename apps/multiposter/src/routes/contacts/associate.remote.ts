@@ -11,6 +11,8 @@ import { updateContactRolesSchema } from '@ac/validations';
 import { getEntityContacts } from '#lib/server/contacts.js';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
+import { readEvent } from '../events/[id]/read.remote.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
 
 const tableMap = {
     user: userContact,
@@ -144,6 +146,8 @@ export const updateContactRoles = command(updateContactRolesSchema, async (data)
         );
     }
 
+    await invalidateEvent(targetEntityId);
+    void readEvent(targetEntityId).refresh();
     await fetchEntityContacts({ type: 'event', entityId: targetEntityId }).refresh();
     return { success: true };
 });

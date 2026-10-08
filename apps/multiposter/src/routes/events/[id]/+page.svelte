@@ -33,6 +33,7 @@
 
 	const eventId = $derived(page.params.id || "");
     const eventRf = $derived(updateEvent.for(eventId));
+    const eventQuery = $derived(readEvent(eventId));
 
     let collab = $state<CollaborationRoom | null>(null);
 
@@ -76,13 +77,11 @@
 
 {#if browser}
     <svelte:boundary>
-        {#if $effect.pending()}
+        {#if deleteEventAction.pending || (eventQuery.loading && !eventQuery.current)}
             <LoadingSection message={m.loading_event_data()} />
-        {/if}
-
-        <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-            {#await readEvent(eventId) then event}
-                {#if event}
+        {:else if eventQuery.current}
+            {@const event = eventQuery.current}
+            <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
                 <div class="max-w-3xl mx-auto px-4 py-8 text-left">
                     <Breadcrumb
                         feature="events"
@@ -226,16 +225,22 @@
                         </div>
                     </form>
                 </div>
-                {:else}
-                    <ErrorSection
-                        headline={m.event_not_found()}
-                        message={m.event_not_found_message()}
-                        href="/events"
-                        button={m.back_to_events()}
-                    />
-                {/if}
-            {/await}
-        </div>
+            </div>
+        {:else if eventQuery.current === null}
+            <ErrorSection
+                headline={m.event_not_found()}
+                message={m.event_not_found_message()}
+                href="/events"
+                button={m.back_to_events()}
+            />
+        {:else if eventQuery.error}
+            <ErrorSection
+                headline={m.event_not_found()}
+                message={eventQuery.error?.message || m.event_not_found_message()}
+                href="/events"
+                button={m.back_to_events()}
+            />
+        {/if}
         {#snippet failed(error: unknown)}
             <ErrorSection
                 headline={m.event_not_found()}

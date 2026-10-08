@@ -23,6 +23,9 @@
         onopenManager
     }: Props = $props();
 
+    const rolesQuery = listEventRoles();
+    const allRoles = $derived(rolesQuery.current?.data || []);
+
     // Map role color id to styling
     const COLOR_CLASSES: Record<string, { bg: string; dot: string }> = {
         blue: { bg: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
@@ -40,16 +43,18 @@
     }
 
     let activeRoleIds = $derived(
-        selectedRoleIds && selectedRoleIds.length > 0
+        selectedRoleIds !== undefined && selectedRoleIds !== null
             ? selectedRoleIds
             : (Array.isArray(contact?.roles)
                 ? contact.roles.map((r: any) => r.id || r)
                 : [])
     );
 
+    let assigned = $derived(allRoles.filter((r) => activeRoleIds.includes(r.id)));
+
     let isUpdating = $state(false);
 
-    async function toggleRole(role: EventRole, allRoles: EventRole[]) {
+    async function toggleRole(role: EventRole) {
         const id = role.id;
         const currentIds = activeRoleIds;
         let newIds: string[];
@@ -90,14 +95,11 @@
 </script>
 
 <div class="inline-flex items-center gap-1.5 flex-wrap">
-    {#await listEventRoles()}
+    {#if rolesQuery.loading && !rolesQuery.current}
         <div class="inline-flex items-center gap-1 text-[11px] text-gray-400">
             <Loader2 size={12} class="animate-spin" />
         </div>
-    {:then rolesResult}
-        {@const allRoles = rolesResult.data || []}
-        {@const assigned = allRoles.filter((r) => activeRoleIds.includes(r.id))}
-
+    {:else}
         <!-- Render Assigned Role Badges -->
         {#each assigned as role (role.id)}
             {@const style = getColorClass(role.color)}
@@ -110,7 +112,7 @@
         {/each}
 
         <!-- Dropdown to Add / Toggle Roles -->
-        <DropdownMenu.Root>
+        <DropdownMenu.Root onOpenChange={(val) => { if (val) void rolesQuery.refresh(); }}>
             <DropdownMenu.Trigger class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border border-dashed border-gray-300 text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer">
                 {#if isUpdating}
                     <Loader2 size={11} class="animate-spin text-blue-600" />
@@ -139,7 +141,7 @@
                                 class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs hover:bg-gray-100 transition-colors cursor-pointer text-left {isSelected ? 'bg-blue-50/60 font-semibold' : ''}"
                                 onclick={(e) => {
                                     e.preventDefault();
-                                    void toggleRole(role, allRoles);
+                                    void toggleRole(role);
                                 }}
                             >
                                 <div class="flex items-center gap-2 truncate">
@@ -170,7 +172,5 @@
                 {/if}
             </DropdownMenu.Content>
         </DropdownMenu.Root>
-    {:catch}
-        <!-- Fallback if error loading roles -->
-    {/await}
+    {/if}
 </div>

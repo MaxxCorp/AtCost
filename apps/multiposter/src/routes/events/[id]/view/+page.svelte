@@ -46,7 +46,7 @@
     import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
 
     const eventId = $derived(page.params.id || "");
-    const dataPromise = $derived(readEvent(eventId));
+    const eventQuery = $derived(readEvent(eventId));
 
     const session = authClient.useSession();
     // Check if the user is authorized to edit
@@ -168,11 +168,11 @@
 
 <div class="container mx-auto px-4 py-4 md:py-6">
     <div class="max-w-7xl mx-auto">
-        {#await dataPromise}
+        {#if eventQuery.loading && !eventQuery.current}
             <LoadingSection message={m.loading_event_data()} />
-        {:then event}
-            {#if event}
-                {#key event.id}
+        {:else if eventQuery.current}
+            {@const event = eventQuery.current}
+            {#key event.id}
                 {@const hasDescription = !!(event.description && event.description.trim().length > 0)}
                 {@const eventInstances = event.instances || []}
                 {@const hasContact = !!event.resolvedContact}
@@ -768,23 +768,20 @@
                     </Dialog.Root>
                 {/if}
                 {/key}
-            {:else}
+            {:else if eventQuery.current === null}
                 <ErrorSection
                     headline={m.event_not_found()}
                     message={m.event_not_found_message()}
                     href="/events"
                     button={m.back_to_events()}
                 />
+            {:else if eventQuery.error}
+                <ErrorSection
+                    headline={m.error()}
+                    message={eventQuery.error?.message || m.failed_to_load_event()}
+                    href="/events"
+                    button={m.back_to_events()}
+                />
             {/if}
-        {:catch error}
-            <ErrorSection
-                headline={m.error()}
-                message={error instanceof Error
-                    ? error.message
-                    : m.failed_to_load_event()}
-                href="/events"
-                button={m.back_to_events()}
-            />
-        {/await}
     </div>
 </div>

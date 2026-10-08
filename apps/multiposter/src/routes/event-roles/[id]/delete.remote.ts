@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, eventRole, eq } from '@ac/db';
 import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import * as v from 'valibot';
@@ -9,6 +9,12 @@ export const deleteEventRole = command(v.object({ id: v.string() }), async ({ id
     if (!user) throw new Error('Unauthorized');
 
     await db.delete(eventRole).where(eq(eventRole.id, id));
+    try {
+        await requested(listEventRoles, 20).refreshAll();
+    } catch {
+        // no client requested updates
+    }
+    void listEventRoles().refresh();
     void listEventRoles({}).refresh();
     return { success: true };
 });

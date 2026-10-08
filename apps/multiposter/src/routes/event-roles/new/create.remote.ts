@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, eventRole } from '@ac/db';
 import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import { createEventRoleSchema } from '@ac/validations';
@@ -15,6 +15,12 @@ export const createEventRole = command(createEventRoleSchema, async (data) => {
         isDefault: false,
     }).returning();
 
+    try {
+        await requested(listEventRoles, 20).refreshAll();
+    } catch {
+        // no client requested updates
+    }
+    void listEventRoles().refresh();
     void listEventRoles({}).refresh();
 
     return {

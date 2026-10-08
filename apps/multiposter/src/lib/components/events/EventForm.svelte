@@ -451,20 +451,20 @@
         return map;
     })());
 
-    let availableRoles = $state<EventRole[]>([]);
+    const rolesQuery = listEventRoles();
+    const availableRoles = $derived(rolesQuery.current?.data || []);
 
     async function loadEventRoles(): Promise<EventRole[]> {
-        if (availableRoles.length > 0) return availableRoles;
+        if (rolesQuery.current?.data && rolesQuery.current.data.length > 0) {
+            return rolesQuery.current.data;
+        }
         try {
             const res = await listEventRoles();
-            if (res?.data) {
-                availableRoles = res.data;
-                return res.data;
-            }
+            return res.data || [];
         } catch (err) {
             console.error("Failed to load event roles:", err);
+            return [];
         }
-        return availableRoles;
     }
 
     onMount(() => {
@@ -1658,7 +1658,7 @@
             <EventContactRoleSelector
                 {contact}
                 eventId={initialData?.id}
-                selectedRoleIds={contactRolesState[contact.id] || []}
+                bind:selectedRoleIds={contactRolesState[contact.id]}
                 onchange={(newRoleIds: string[]) => {
                     contactRolesState[contact.id] = newRoleIds;
                     rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
@@ -1898,8 +1898,7 @@
         bind:open={isRoleManagerOpen}
         onclose={async () => {
             try {
-                const res = await listEventRoles();
-                if (res?.data) availableRoles = res.data;
+                await rolesQuery.refresh();
             } catch (e) {
                 console.error(e);
             }

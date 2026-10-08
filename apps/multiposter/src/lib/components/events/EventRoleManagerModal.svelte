@@ -26,6 +26,9 @@
 
     let { open = $bindable(false), onclose }: Props = $props();
 
+    const rolesQuery = listEventRoles();
+    const roles = $derived(rolesQuery.current?.data || []);
+
     // Color options for role badges
     const COLOR_OPTIONS = [
         { id: "blue", label: "Blue", bg: "bg-blue-100 text-blue-800 border-blue-200", dot: "bg-blue-500" },
@@ -85,6 +88,7 @@
                 color: newColor,
                 description: newDescription.trim() || undefined
             });
+            await rolesQuery.refresh();
             toast.success(m.role_created?.() ?? "Role created successfully");
             resetNewForm();
         } catch (err: any) {
@@ -104,6 +108,7 @@
                 color: editColor,
                 description: editDescription.trim() || undefined
             });
+            await rolesQuery.refresh();
             toast.success(m.role_updated?.() ?? "Role updated successfully");
             cancelEdit();
         } catch (err: any) {
@@ -118,6 +123,7 @@
         deletingId = id;
         try {
             await deleteEventRole({ id });
+            await rolesQuery.refresh();
             toast.success(m.role_deleted?.() ?? "Role deleted successfully");
         } catch (err: any) {
             toast.error(err?.message || "Failed to delete role");
@@ -136,7 +142,7 @@
     }
 </script>
 
-<Dialog.Root bind:open onOpenChange={(val) => { if (!val) onclose?.(); }}>
+<Dialog.Root bind:open onOpenChange={(val) => { if (val) void rolesQuery.refresh(); else onclose?.(); }}>
     <Dialog.Content class="max-w-xl max-h-[85vh] flex flex-col p-6 overflow-hidden">
         <Dialog.Header class="pb-3 border-b border-gray-100">
             <div class="flex items-center gap-2">
@@ -234,107 +240,104 @@
 
             <!-- Existing Roles List -->
             <div class="space-y-2">
-                {#await listEventRoles()}
+                {#if rolesQuery.loading && !rolesQuery.current}
                     <div class="py-8 flex justify-center text-gray-400">
                         <Loader2 class="animate-spin" size={20} />
                     </div>
-                {:then res}
-                    {@const roles = res.data || []}
-                    {#if roles.length === 0}
-                        <div class="py-8 text-center text-sm text-gray-400">
-                            {m.no_roles?.() ?? "No roles defined yet."}
-                        </div>
-                    {:else}
-                        {#each roles as role (role.id)}
-                            {@const colorOpt = COLOR_OPTIONS.find((c) => c.id === role.color) || COLOR_OPTIONS[0]}
-                            {#if editingId === role.id}
-                                <div class="p-3 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2.5">
-                                    <div class="flex items-center gap-2">
-                                        <input
-                                            type="text"
-                                            bind:value={editName}
-                                            class="flex-1 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                            onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleUpdate(role.id); } }}
-                                        />
-                                    </div>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        {#each COLOR_OPTIONS as opt (opt.id)}
-                                            <button
-                                                type="button"
-                                                class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition-all cursor-pointer {opt.bg} {editColor === opt.id ? 'ring-2 ring-blue-500 ring-offset-1 font-bold' : 'opacity-60 hover:opacity-100'}"
-                                                onclick={() => (editColor = opt.id)}
-                                            >
-                                                <span class="w-1.5 h-1.5 rounded-full {opt.dot}"></span>
-                                                <span>{opt.label}</span>
-                                            </button>
-                                        {/each}
-                                    </div>
-                                    <div class="flex justify-end gap-2 pt-1">
-                                        <Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
-                                            <X size={14} class="mr-1" />
-                                            {m.cancel?.() ?? "Cancel"}
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            disabled={!editName.trim() || editLoading}
-                                            onclick={() => handleUpdate(role.id)}
-                                        >
-                                            {#if editLoading}
-                                                <Loader2 size={14} class="animate-spin mr-1" />
-                                            {:else}
-                                                <Check size={14} class="mr-1" />
-                                            {/if}
-                                            {m.save?.() ?? "Save"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            {:else}
-                                <div class="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 bg-white hover:border-gray-200 transition-all group">
-                                    <div class="flex items-center gap-2.5 min-w-0">
-                                        <span class="px-2.5 py-0.5 rounded-md text-xs font-semibold border inline-flex items-center gap-1.5 {colorOpt.bg}">
-                                            <span class="w-1.5 h-1.5 rounded-full {colorOpt.dot}"></span>
-                                            <span class="truncate">{getRoleLabel(role.name)}</span>
-                                        </span>
-                                        {#if role.isDefault}
-                                            <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">
-                                                (Default)
-                                            </span>
-                                        {/if}
-                                    </div>
-
-                                    <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100">
-                                        <button
-                                            type="button"
-                                            class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                            title={m.edit?.() ?? "Edit"}
-                                            onclick={() => startEdit(role)}
-                                        >
-                                            <Pencil size={14} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                            title={m.delete?.() ?? "Delete"}
-                                            disabled={deletingId === role.id}
-                                            onclick={() => handleDelete(role.id)}
-                                        >
-                                            {#if deletingId === role.id}
-                                                <Loader2 size={14} class="animate-spin text-red-500" />
-                                            {:else}
-                                                <Trash2 size={14} />
-                                            {/if}
-                                        </button>
-                                    </div>
-                                </div>
-                            {/if}
-                        {/each}
-                    {/if}
-                {:catch err}
+                {:else if rolesQuery.error}
                     <div class="py-4 text-center text-xs text-red-500">
-                        {err?.message || "Failed to load roles"}
+                        {rolesQuery.error?.message || "Failed to load roles"}
                     </div>
-                {/await}
+                {:else if roles.length === 0}
+                    <div class="py-8 text-center text-sm text-gray-400">
+                        {m.no_roles?.() ?? "No roles defined yet."}
+                    </div>
+                {:else}
+                    {#each roles as role (role.id)}
+                        {@const colorOpt = COLOR_OPTIONS.find((c) => c.id === role.color) || COLOR_OPTIONS[0]}
+                        {#if editingId === role.id}
+                            <div class="p-3 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2.5">
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        bind:value={editName}
+                                        class="flex-1 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleUpdate(role.id); } }}
+                                    />
+                                </div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {#each COLOR_OPTIONS as opt (opt.id)}
+                                        <button
+                                            type="button"
+                                            class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] border transition-all cursor-pointer {opt.bg} {editColor === opt.id ? 'ring-2 ring-blue-500 ring-offset-1 font-bold' : 'opacity-60 hover:opacity-100'}"
+                                            onclick={() => (editColor = opt.id)}
+                                        >
+                                            <span class="w-1.5 h-1.5 rounded-full {opt.dot}"></span>
+                                            <span>{opt.label}</span>
+                                        </button>
+                                    {/each}
+                                </div>
+                                <div class="flex justify-end gap-2 pt-1">
+                                    <Button type="button" variant="ghost" size="sm" onclick={cancelEdit}>
+                                        <X size={14} class="mr-1" />
+                                        {m.cancel?.() ?? "Cancel"}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={!editName.trim() || editLoading}
+                                        onclick={() => handleUpdate(role.id)}
+                                    >
+                                        {#if editLoading}
+                                            <Loader2 size={14} class="animate-spin mr-1" />
+                                        {:else}
+                                            <Check size={14} class="mr-1" />
+                                        {/if}
+                                        {m.save?.() ?? "Save"}
+                                    </Button>
+                                </div>
+                            </div>
+                        {:else}
+                            <div class="flex items-center justify-between p-2.5 rounded-xl border border-gray-100 bg-white hover:border-gray-200 transition-all group">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span class="px-2.5 py-0.5 rounded-md text-xs font-semibold border inline-flex items-center gap-1.5 {colorOpt.bg}">
+                                        <span class="w-1.5 h-1.5 rounded-full {colorOpt.dot}"></span>
+                                        <span class="truncate">{getRoleLabel(role.name)}</span>
+                                    </span>
+                                    {#if role.isDefault}
+                                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">
+                                            (Default)
+                                        </span>
+                                    {/if}
+                                </div>
+
+                                <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                    <button
+                                        type="button"
+                                        class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                        title={m.edit?.() ?? "Edit"}
+                                        onclick={() => startEdit(role)}
+                                    >
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                        title={m.delete?.() ?? "Delete"}
+                                        disabled={deletingId === role.id}
+                                        onclick={() => handleDelete(role.id)}
+                                    >
+                                        {#if deletingId === role.id}
+                                            <Loader2 size={14} class="animate-spin text-red-500" />
+                                        {:else}
+                                            <Trash2 size={14} />
+                                        {/if}
+                                    </button>
+                                </div>
+                            </div>
+                        {/if}
+                    {/each}
+                {/if}
             </div>
         </div>
 
