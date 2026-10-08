@@ -369,6 +369,59 @@ describe('SyncService - Bulk Sync', () => {
 		);
 	});
 
+	it('should fail bulk sync and insert failed operation when validateCalendarAccess rejects', async () => {
+		const configId = 'config-ms-invalid';
+		const mockConfigRow = {
+			id: configId,
+			userId: 'user-1',
+			providerId: 'provider-1',
+			providerType: 'mock-provider-failing-calendar',
+			direction: 'push',
+			enabled: true,
+			createdAt: new Date(),
+			updatedAt: new Date()
+		};
+
+		class FailingCalendarProvider {
+			type = 'mock-provider-failing-calendar';
+			supportedEntityTypes = ['event'];
+			initialize = vi.fn().mockResolvedValue(undefined);
+			validateCalendarAccess = vi.fn().mockRejectedValue(
+				new Error('Microsoft Calendar sync failed: Specified primary calendar is not available or accessible (404).')
+			);
+			pullEvents = vi.fn();
+			pushEvent = vi.fn();
+		}
+
+		service.registerProvider('mock-provider-failing-calendar' as any, FailingCalendarProvider as any);
+
+		// Config lookup
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([mockConfigRow])
+			})
+		});
+
+		const insertValuesMock = vi.fn().mockReturnValue({
+			returning: vi.fn().mockResolvedValue([{ id: 'op-failed' }])
+		});
+		(db.insert as any).mockReturnValue({
+			values: insertValuesMock
+		});
+
+		await expect(service.startBulkSync(configId)).rejects.toThrow(
+			'Microsoft Calendar sync failed: Specified primary calendar is not available or accessible (404).'
+		);
+
+		expect(insertValuesMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				syncConfigId: configId,
+				status: 'failed',
+				error: expect.stringContaining('Specified primary calendar is not available or accessible')
+			})
+		);
+	});
+
 	it('should build queue including standalone event and recurring instance with healed campaign', async () => {
 		const configId = 'config-bulk-1';
 		const mockConfigRow = {

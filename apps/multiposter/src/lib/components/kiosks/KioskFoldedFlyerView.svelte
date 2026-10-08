@@ -839,7 +839,7 @@
                                             <div class="p-2.5 rounded-lg border border-blue-100 bg-blue-50/40 text-xs text-slate-700 space-y-1.5">
                                                 <div class="font-bold text-blue-900 flex items-center gap-1">
                                                     <Info class="w-3.5 h-3.5 text-blue-600" />
-                                                    <span>{m.welcome_title()}</span>
+                                                    <span>{m.flyer_welcome_title()}</span>
                                                 </div>
                                                 <p class="leading-relaxed text-[11px]">
                                                     {m.welcome_description()}

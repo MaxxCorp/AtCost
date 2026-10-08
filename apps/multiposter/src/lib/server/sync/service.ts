@@ -334,6 +334,26 @@ export class SyncService {
 		const config = this.rowToConfig(configRow);
 		const provider = await this.getProviderInstance(config);
 
+		// Validate calendar access for providers like Microsoft Calendar to avoid silent fallbacks or syncing to unintended calendars
+		if (typeof provider.validateCalendarAccess === 'function') {
+			try {
+				await provider.validateCalendarAccess();
+			} catch (valErr: any) {
+				console.error(`[SyncService] Calendar validation failed for config ${configId}:`, valErr);
+				await db.insert(syncOperationTable).values({
+					syncConfigId: configId,
+					operation: config.direction === 'pull' ? 'pull' : 'push',
+					status: 'failed',
+					entityType: 'event',
+					startedAt: new Date(),
+					completedAt: new Date(),
+					error: valErr.message || String(valErr),
+					results: { total: 0, processed: 0, pushed: 0, pulled: 0, errors: [{ message: valErr.message || String(valErr) }] }
+				});
+				throw valErr;
+			}
+		}
+
 		let pulled = 0;
 		const errors: any[] = [];
 
@@ -2147,6 +2167,26 @@ export class SyncService {
 
 				if (itemsToProcess.length === 0) {
 					continue;
+				}
+
+				// Validate calendar access for providers like Microsoft Calendar before processing items
+				if (typeof provider.validateCalendarAccess === 'function') {
+					try {
+						await provider.validateCalendarAccess();
+					} catch (valErr: any) {
+						console.error(`[SyncService] Calendar validation failed for config ${config.id} in syncItems:`, valErr);
+						await db.insert(syncOperationTable).values({
+							syncConfigId: config.id,
+							operation: 'push',
+							status: 'failed',
+							entityType,
+							startedAt: new Date(),
+							completedAt: new Date(),
+							error: valErr.message || String(valErr),
+							results: { total: itemsToProcess.length, processed: 0, pushed: 0, pulled: 0, errors: [{ message: valErr.message || String(valErr) }] }
+						});
+						continue;
+					}
 				}
 
 				// Create operation record for transparency

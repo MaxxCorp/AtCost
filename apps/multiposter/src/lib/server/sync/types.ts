@@ -198,6 +198,11 @@ export interface SyncProvider {
 	validateConnection(): Promise<boolean>;
 
 	/**
+	 * Validate that the specified calendar is available and accessible
+	 */
+	validateCalendarAccess?(): Promise<void>;
+
+	/**
 	 * Pull events from the provider
 	 * @param syncToken - Token for incremental sync (optional)
 	 * @returns Events and new sync token

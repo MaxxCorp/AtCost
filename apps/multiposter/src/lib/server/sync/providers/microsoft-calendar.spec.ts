@@ -486,4 +486,113 @@ describe('MicrosoftCalendarProvider', () => {
 			expect(external.recurrence![0]).toContain('UNTIL=20261231T235959Z');
 		});
 	});
+
+	describe('validateCalendarAccess and validateConnection', () => {
+		it('should succeed when GET on primary calendar succeeds', async () => {
+			(provider as any).calendarId = 'primary';
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({ id: 'primary-cal' });
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.validateCalendarAccess()).resolves.toBeUndefined();
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/me/calendar',
+				{ method: 'GET' }
+			);
+		});
+
+		it('should succeed when GET on specific calendar ID succeeds', async () => {
+			(provider as any).calendarId = 'custom-cal-123';
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({ id: 'custom-cal-123' });
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.validateCalendarAccess()).resolves.toBeUndefined();
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/me/calendars/custom-cal-123',
+				{ method: 'GET' }
+			);
+		});
+
+		it('should succeed when GET on user email calendar succeeds', async () => {
+			(provider as any).calendarId = 'colleague@example.com';
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({ id: 'cal-colleague' });
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.validateCalendarAccess()).resolves.toBeUndefined();
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/users/colleague%40example.com/calendar',
+				{ method: 'GET' }
+			);
+		});
+
+		it('should throw explicit error and fail without fallback when primary calendar is unavailable', async () => {
+			(provider as any).calendarId = 'primary';
+			const makeRequestMock = vi.fn().mockRejectedValueOnce(new Error('ResourceNotFound: 404'));
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.validateCalendarAccess()).rejects.toThrow(
+				'Microsoft Calendar sync failed: Specified primary calendar is not available or accessible (ResourceNotFound: 404).'
+			);
+		});
+
+		it('should throw explicit error and fail without fallback when custom calendar is unavailable', async () => {
+			(provider as any).calendarId = 'deleted-cal';
+			const makeRequestMock = vi.fn().mockRejectedValueOnce(new Error('AccessDenied: 403'));
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.validateCalendarAccess()).rejects.toThrow(
+				'Microsoft Calendar sync failed: Specified calendar "deleted-cal" is not available or accessible (AccessDenied: 403).'
+			);
+		});
+
+		it('should throw if provider is not initialized', async () => {
+			(provider as any).accessToken = undefined;
+			await expect(provider.validateCalendarAccess()).rejects.toThrow('Provider not initialized');
+		});
+
+		it('should return true from validateConnection when validateCalendarAccess succeeds', async () => {
+			vi.spyOn(provider, 'validateCalendarAccess').mockResolvedValueOnce();
+			expect(await provider.validateConnection()).toBe(true);
+		});
+
+		it('should return false from validateConnection when validateCalendarAccess fails', async () => {
+			vi.spyOn(provider, 'validateCalendarAccess').mockRejectedValueOnce(new Error('Calendar not found'));
+			expect(await provider.validateConnection()).toBe(false);
+		});
+	});
+
+	describe('pullEvents calendar validation', () => {
+		it('should validate calendar access before pulling when syncToken is undefined', async () => {
+			const validateSpy = vi.spyOn(provider, 'validateCalendarAccess').mockResolvedValueOnce();
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({ value: [] });
+			(provider as any).makeRequest = makeRequestMock;
+
+			const result = await provider.pullEvents();
+
+			expect(validateSpy).toHaveBeenCalledTimes(1);
+			expect(result.events).toEqual([]);
+		});
+
+		it('should throw error and abort pull if validateCalendarAccess fails on initial pull', async () => {
+			vi.spyOn(provider, 'validateCalendarAccess').mockRejectedValueOnce(
+				new Error('Microsoft Calendar sync failed: Specified primary calendar is not available or accessible')
+			);
+			const makeRequestMock = vi.fn();
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.pullEvents()).rejects.toThrow(
+				'Microsoft Calendar sync failed: Specified primary calendar is not available or accessible'
+			);
+			expect(makeRequestMock).not.toHaveBeenCalled();
+		});
+
+		it('should not call validateCalendarAccess when syncToken is provided', async () => {
+			const validateSpy = vi.spyOn(provider, 'validateCalendarAccess');
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({ value: [] });
+			(provider as any).makeRequest = makeRequestMock;
+
+			await provider.pullEvents('delta-token-123');
+
+			expect(validateSpy).not.toHaveBeenCalled();
+		});
+	});
 });

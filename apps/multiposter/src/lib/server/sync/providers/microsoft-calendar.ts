@@ -59,8 +59,11 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	async initialize(config: SyncConfig): Promise<void> {
 		this.config = config;
 
-		if (config.settings?.calendarId) {
-			this.calendarId = config.settings.calendarId as string;
+		if (config.settings?.calendarId !== undefined && config.settings?.calendarId !== null) {
+			const trimmed = String(config.settings.calendarId).trim();
+			this.calendarId = trimmed !== '' ? trimmed : 'primary';
+		} else {
+			this.calendarId = 'primary';
 		}
 
 		const [userAccount] = await db
@@ -88,11 +91,29 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		}
 	}
 
+	/**
+	 * Validates that the specified calendar is available and accessible.
+	 * Throws an explicit error if the calendar is not found or is inaccessible.
+	 * Never falls back to other calendars.
+	 */
+	async validateCalendarAccess(): Promise<void> {
+		if (!this.accessToken) throw new Error('Provider not initialized');
+
+		const url = this.getBaseUrl();
+		try {
+			await this.makeRequest(url, { method: 'GET' });
+		} catch (error: any) {
+			const target = this.calendarId === 'primary' ? 'primary calendar' : `calendar "${this.calendarId}"`;
+			console.error(`[MicrosoftCalendarProvider] Specified ${target} is not available:`, error);
+			throw new Error(`Microsoft Calendar sync failed: Specified ${target} is not available or accessible (${error?.message || error}).`);
+		}
+	}
+
 	async validateConnection(): Promise<boolean> {
 		if (!this.accessToken) throw new Error('Provider not initialized');
 
 		try {
-			await this.makeRequest(this.getBaseUrl(), { method: 'GET' });
+			await this.validateCalendarAccess();
 			return true;
 		} catch (error) {
 			console.error('Microsoft Calendar connection validation failed:', error);
@@ -115,6 +136,11 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		nextSyncToken?: string;
 	}> {
 		if (!this.accessToken) throw new Error('Provider not initialized');
+
+		// Validate that the specified calendar is accessible before pulling
+		if (!syncToken) {
+			await this.validateCalendarAccess();
+		}
 
 		let url = '';
 		if (syncToken) {
