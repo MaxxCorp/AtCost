@@ -81,7 +81,30 @@ export const eventTag = pgTable("event_tag", {
     tagId: uuid("tag_id").notNull().references(() => tag.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.eventId, table.tagId] })]);
 
+export const eventRole = pgTable("event_role", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull().unique(),
+    color: text("color").default("blue").notNull(),
+    description: text("description"),
+    isDefault: boolean("is_default").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+
+export const eventContactRole = pgTable("event_contact_role", {
+    eventId: uuid("event_id").notNull().references(() => event.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id").notNull().references(() => eventRole.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.eventId, table.contactId, table.roleId] }),
+    index("event_contact_role_event_contact_idx").on(table.eventId, table.contactId),
+]);
+
 export type Event = typeof event.$inferSelect;
 export type NewEvent = typeof event.$inferInsert;
 export type RecurringSeries = typeof recurringSeries.$inferSelect;
 export type NewRecurringSeries = typeof recurringSeries.$inferInsert;
+export type EventRole = typeof eventRole.$inferSelect;
+export type NewEventRole = typeof eventRole.$inferInsert;
+export type EventContactRole = typeof eventContactRole.$inferSelect;
+export type NewEventContactRole = typeof eventContactRole.$inferInsert;

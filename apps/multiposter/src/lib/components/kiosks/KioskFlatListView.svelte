@@ -306,7 +306,18 @@
                                 <User class="w-3 h-3" />
                                 <span>{m.contact()}</span>
                             </div>
-                            <div class="font-bold text-slate-900 text-sm">{contact.name}</div>
+                            <div class="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
+                                <span>{contact.name}</span>
+                                {#if (contact as any).roles && (contact as any).roles.length > 0}
+                                    <span class="px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded text-[10px] font-semibold">
+                                        {(contact as any).roles[0]}
+                                    </span>
+                                {:else if (contact as any).role}
+                                    <span class="px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded text-[10px] font-semibold">
+                                        {(contact as any).role}
+                                    </span>
+                                {/if}
+                            </div>
                             {#if contact.phone}
                                 <div class="flex items-center gap-1.5 text-slate-600">
                                     <Phone class="w-3 h-3 text-slate-400" />
@@ -558,6 +569,24 @@
                                                     <span class="inline-flex items-center gap-1 text-slate-600 font-medium">
                                                         <RefreshCw class="w-3 h-3 text-slate-500" />
                                                         {formatRecurrenceText((event as any).recurrence, undefined, { omitLength: true })}
+                                                    </span>
+                                                {/if}
+
+                                                {#if event.resolvedContact}
+                                                    <span class="inline-flex items-center gap-1 font-semibold text-slate-700 print:text-black">
+                                                        <User class="w-3.5 h-3.5 text-slate-500 print:text-black" />
+                                                        <span>{event.resolvedContact.name}</span>
+                                                        {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
+                                                            {#each event.resolvedContact.roles as roleName}
+                                                                <span class="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[10px] font-semibold print:border-black print:text-black">
+                                                                    {roleName}
+                                                                </span>
+                                                            {/each}
+                                                        {:else if event.resolvedContact.role}
+                                                            <span class="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[10px] font-semibold print:border-black print:text-black">
+                                                                {event.resolvedContact.role}
+                                                            </span>
+                                                        {/if}
                                                     </span>
                                                 {/if}
                                             </div>

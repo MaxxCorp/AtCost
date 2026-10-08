@@ -44,6 +44,8 @@
         phone?: string;
         qrCodePath?: string;
         qrCodeDataUrl?: string;
+        role?: string | null;
+        roles?: string[] | null;
     }
 
     interface LocationInfo {
@@ -922,9 +924,18 @@
                                         <!-- Contact Person Card -->
                                         {#if loc.contact}
                                             <div class="p-2 rounded-lg border border-slate-700/60 bg-slate-800/60 text-[10px] text-slate-300 space-y-1">
-                                                <div class="font-bold text-white flex items-center gap-1">
+                                                <div class="font-bold text-white flex items-center gap-1.5 flex-wrap">
                                                     <User class="w-3 h-3 text-slate-400" />
                                                     <span>{loc.contact.name}</span>
+                                                    {#if loc.contact.roles && loc.contact.roles.length > 0}
+                                                        <span class="text-[8px] font-bold text-blue-300 bg-blue-900/60 px-1 py-0.2 rounded border border-blue-500/30">
+                                                            {loc.contact.roles[0]}
+                                                        </span>
+                                                    {:else if loc.contact.role}
+                                                        <span class="text-[8px] font-bold text-blue-300 bg-blue-900/60 px-1 py-0.2 rounded border border-blue-500/30">
+                                                            {loc.contact.role}
+                                                        </span>
+                                                    {/if}
                                                 </div>
                                                 {#if loc.contact.phone}
                                                     <div class="flex items-center gap-1 text-slate-300">
@@ -1179,6 +1190,7 @@
                     {@const multiDay = isMultiDayEvent(item as Event)}
                     {@const durationDays = multiDay ? getEventDurationDays(item as Event) : 1}
                     {@const dateParts = getEventDateParts(item as Event)}
+                    {@const c = (item as Event).resolvedContact}
                     <div class="flex items-center gap-1.5 flex-wrap">
                         <!-- Date badge -->
                         {#if multiDay}
@@ -1211,6 +1223,21 @@
                             <span class="text-[8.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
                                 <Ticket class="w-2.5 h-2.5 text-emerald-600" />
                                 <span>{displayPrice}</span>
+                            </span>
+                        {/if}
+                        {#if c}
+                            <span class="text-[8.5px] font-medium bg-slate-50 text-slate-700 border border-slate-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-1 shrink-0">
+                                <User class="w-2.5 h-2.5 text-slate-500" />
+                                <span>{c.name}</span>
+                                {#if c.roles && c.roles.length > 0}
+                                    <span class="text-[7.5px] font-bold text-blue-700 bg-blue-100 px-1 rounded">
+                                        {c.roles[0]}
+                                    </span>
+                                {:else if c.role}
+                                    <span class="text-[7.5px] font-bold text-blue-700 bg-blue-100 px-1 rounded">
+                                        {c.role}
+                                    </span>
+                                {/if}
                             </span>
                         {/if}
                     </div>

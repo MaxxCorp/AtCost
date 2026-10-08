@@ -5,7 +5,7 @@
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { RefreshCw, Ticket, Calendar } from "@lucide/svelte";
+    import { RefreshCw, Ticket, Calendar, User } from "@lucide/svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
@@ -27,6 +27,8 @@
             phone?: string;
             qrCodePath?: string;
             qrCodeDataUrl?: string;
+            role?: string | null;
+            roles?: string[] | null;
         } | null;
     }
 
@@ -139,7 +141,18 @@
                             <span class="text-blue-400 uppercase text-xs font-bold tracking-widest block mb-1">{m.contact()}</span>
                             <div class="flex items-start gap-4">
                                 <div class="space-y-0.5">
-                                    <div class="text-white text-2xl font-bold leading-tight">{currentPageData.location.contact.name}</div>
+                                    <div class="text-white text-2xl font-bold leading-tight flex items-center gap-2 flex-wrap">
+                                        <span>{currentPageData.location.contact.name}</span>
+                                        {#if currentPageData.location.contact.roles && currentPageData.location.contact.roles.length > 0}
+                                            <span class="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md text-xs font-bold uppercase tracking-wider">
+                                                {currentPageData.location.contact.roles[0]}
+                                            </span>
+                                        {:else if currentPageData.location.contact.role}
+                                            <span class="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md text-xs font-bold uppercase tracking-wider">
+                                                {currentPageData.location.contact.role}
+                                            </span>
+                                        {/if}
+                                    </div>
                                     <div class="flex flex-wrap gap-x-6 text-gray-500 text-lg font-medium">
                                         {#if currentPageData.location.contact.email}
                                             <div class="flex items-center gap-1.5">
@@ -254,6 +267,22 @@
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-300 text-sm font-semibold">
                                                 <RefreshCw class="w-3.5 h-3.5" />
                                                 <span>{formatRecurrenceText((item as any).recurrence, undefined, { omitLength: true })}</span>
+                                            </div>
+                                        {/if}
+                                        {#if (item as any).resolvedContact}
+                                            {@const c = (item as any).resolvedContact}
+                                            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-800/80 border border-gray-700/60 rounded-md text-gray-300 text-xs font-medium">
+                                                <User class="w-3.5 h-3.5 text-blue-400" />
+                                                <span>{c.name}</span>
+                                                {#if c.roles && c.roles.length > 0}
+                                                    <span class="px-1.5 py-0.2 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded text-[11px] font-bold">
+                                                        {c.roles[0]}
+                                                    </span>
+                                                {:else if c.role}
+                                                    <span class="px-1.5 py-0.2 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded text-[11px] font-bold">
+                                                        {c.role}
+                                                    </span>
+                                                {/if}
                                             </div>
                                         {/if}
                                     </div>

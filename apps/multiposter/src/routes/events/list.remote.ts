@@ -350,6 +350,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					tag: true
 				}
 			},
+			contactRoles: {
+				with: {
+					role: true
+				}
+			},
 			campaign: true,
 			user: true
 		},
@@ -497,6 +502,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				},
 				locations: { with: { location: true } },
 				resources: { with: { resource: true } },
+				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
 				user: true
@@ -785,8 +791,27 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			return res;
 		});
 
+		const eventContactRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
+		for (const cr of (e.contactRoles || [])) {
+			const list = eventContactRolesMap.get(cr.contactId) || [];
+			if (cr.role) {
+				list.push({ id: cr.role.id, name: cr.role.name, color: cr.role.color });
+			}
+			eventContactRolesMap.set(cr.contactId, list);
+		}
+
+		const eventContactsWithRoles = (e.contacts || []).map((c: any) => {
+			const cObj = c.contact || c;
+			return {
+				...cObj,
+				roles: eventContactRolesMap.get(cObj.id) || [],
+				participationStatus: c.participationStatus || 'needsAction'
+			};
+		});
+
 		const resolvedContact = resolveEventContactSync({
 			...e,
+			contacts: eventContactsWithRoles,
 			locations: evtLocations,
 			resources: resWithLocContacts
 		}, {
@@ -803,6 +828,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 		return {
 			...e,
+			contacts: eventContactsWithRoles,
 			isSeries,
 			qrCodePath: e.id.includes('_inst_') ? `/api/events/${e.id}/qr.png` : (e.qrCodePath?.includes('/api/') ? e.qrCodePath : `/api/events/${e.id}/qr.png`),
 			iCalPath: e.id.includes('_inst_') ? `/api/events/${e.id}/event.ics` : (e.iCalPath?.includes('/api/') ? e.iCalPath : `/api/events/${e.id}/event.ics`),

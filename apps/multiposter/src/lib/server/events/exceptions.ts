@@ -46,6 +46,8 @@ export interface VirtualInstanceDiffInput {
 		submittedResourceIds?: string[];
 		masterContactIds?: string[];
 		submittedContactIds?: string[];
+		masterContactRoles?: Record<string, string[]>;
+		submittedContactRoles?: Record<string, string[]>;
 		masterTags?: string[];
 		submittedTags?: string[];
 		masterSyncIds?: string[];
@@ -112,6 +114,8 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			submittedResourceIds,
 			masterContactIds,
 			submittedContactIds,
+			masterContactRoles,
+			submittedContactRoles,
 			masterTags,
 			submittedTags,
 			masterSyncIds,
@@ -138,6 +142,17 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			if (mSet.size !== sSet.size || [...mSet].some(id => !sSet.has(id))) return true;
 		}
 
+		if (submittedContactRoles !== undefined && masterContactRoles !== undefined) {
+			const mKeys = Object.keys(masterContactRoles);
+			const sKeys = Object.keys(submittedContactRoles);
+			if (mKeys.length !== sKeys.length) return true;
+			for (const key of mKeys) {
+				const mRoles = new Set(masterContactRoles[key] || []);
+				const sRoles = new Set(submittedContactRoles[key] || []);
+				if (mRoles.size !== sRoles.size || [...mRoles].some(r => !sRoles.has(r))) return true;
+			}
+		}
+
 		if (submittedTags !== undefined && masterTags !== undefined) {
 			const mSet = new Set(masterTags.filter(n => n !== 'Series'));
 			const sSet = new Set(submittedTags.filter(n => n !== 'Series'));
@@ -160,7 +175,7 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	return false;
 }
 
-import { db, event, eventLocation, eventResource, eventContact, eventTag, eventMenu, eq, and, or, sql } from '@ac/db';
+import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventMenu, eq, and, or, sql } from '@ac/db';
 import { parseVirtualInstanceId } from '#lib/utils/event-series.js';
 
 /**
@@ -255,6 +270,13 @@ export async function resolveEventIdForAssociations(
 	if (masterCtcs.length > 0) {
 		await db.insert(eventContact).values(
 			masterCtcs.map(c => ({ eventId: created.id, contactId: c.contactId, participationStatus: c.participationStatus }))
+		);
+	}
+
+	const masterContactRoles = await db.select().from(eventContactRole).where(eq(eventContactRole.eventId, masterId));
+	if (masterContactRoles.length > 0) {
+		await db.insert(eventContactRole).values(
+			masterContactRoles.map(cr => ({ eventId: created.id, contactId: cr.contactId, roleId: cr.roleId }))
 		);
 	}
 

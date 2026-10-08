@@ -85,6 +85,8 @@
         renderItemBadge?: Snippet<[T]>;
         renderItemDetail?: Snippet<[T]>;
         participationSnippet?: Snippet<[T]>;
+        rolesSnippet?: Snippet<[T]>;
+        toolbarActions?: Snippet;
 
         // Initial state
         initialItems?: T[];
@@ -145,6 +147,8 @@
         renderItemBadge,
         renderItemDetail,
         participationSnippet,
+        rolesSnippet,
+        toolbarActions,
         initialItems = [],
         searchPredicate = undefined,
         groupBy = undefined,
@@ -669,6 +673,10 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5 md:ml-auto shrink-0 w-full md:w-auto">
+            {#if toolbarActions}
+                {@render toolbarActions()}
+            {/if}
+
             {#if allFilterGroups.length > 0}
                 <FilterMenu
                     groups={allFilterGroups}
@@ -1027,6 +1035,10 @@
                                 {/if}
                             </div>
                         </div>
+
+                        {#if rolesSnippet}
+                            {@render rolesSnippet(item)}
+                        {/if}
 
                         {#if participationSnippet}
                             {@render participationSnippet(item)}

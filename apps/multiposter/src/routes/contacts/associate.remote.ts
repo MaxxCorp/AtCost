@@ -2,11 +2,12 @@ import { command, query } from '$app/server';
 import { db } from '@ac/db';
 import { 
     userContact, locationContact, resourceContact, eventContact, announcementContact,
-    eventContact as eventContactTable
+    eventContact as eventContactTable, eventContactRole
 } from '@ac/db';
 import { eq, and } from '@ac/db';
 import { getAuthenticatedUser, hasAccess } from '#lib/server/authorization.js';
 import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '#lib/validations/contacts.js';
+import { updateContactRolesSchema } from '@ac/validations';
 import { getEntityContacts } from '#lib/server/contacts.js';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
@@ -112,6 +113,38 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
         ));
 
     await fetchEntityContacts({ type, entityId }).refresh();
+    return { success: true };
+});
+
+export const updateContactRoles = command(updateContactRolesSchema, async (data) => {
+    const user = getAuthenticatedUser();
+    if (!hasAccess(user, 'contacts') && !hasAccess(user, 'events')) {
+        throw new Error('Forbidden');
+    }
+
+    const { eventId, contactId, roleIds } = data;
+
+    let targetEntityId = eventId;
+    if (eventId.includes('_inst_')) {
+        targetEntityId = await resolveEventIdForAssociations(eventId, { materializeIfVirtual: true, userId: user?.id });
+    }
+
+    await db.delete(eventContactRole).where(and(
+        eq(eventContactRole.eventId, targetEntityId),
+        eq(eventContactRole.contactId, contactId)
+    ));
+
+    if (roleIds.length > 0) {
+        await db.insert(eventContactRole).values(
+            roleIds.map(roleId => ({
+                eventId: targetEntityId,
+                contactId,
+                roleId,
+            }))
+        );
+    }
+
+    await fetchEntityContacts({ type: 'event', entityId: targetEntityId }).refresh();
     return { success: true };
 });
 

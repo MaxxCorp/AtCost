@@ -929,6 +929,22 @@
 	"select_template": "Vorlage zum Kopieren wählen",
 	"save_as_event_copy": "Als Event-Kopie speichern",
 	"shared_template_notice": "Dieses Menü ist eine geteilte Vorlage. Änderungen wirken sich überall aus, oder erstelle eine Kopie für diese Veranstaltung.",
-	"customize_for_event": "Für dieses Event anpassen"
+	"customize_for_event": "Für dieses Event anpassen",
+	"manage_roles": "Rollen verwalten",
+	"add_role": "Rolle hinzufügen",
+	"create_role": "Rolle erstellen",
+	"edit_role": "Rolle bearbeiten",
+	"delete_role": "Rolle löschen",
+	"role_name": "Rollenname",
+	"role_color": "Rollenfarbe",
+	"no_roles": "Keine Rollen zugewiesen",
+	"roles_description": "Definieren und verwalten Sie Kontaktrollen für Veranstaltungen",
+	"confirm_delete_role": "Sind Sie sicher, dass Sie diese Rolle löschen möchten?",
+	"main_contact": "Hauptkontakt",
+	"project_manager": "Projektleiter",
+	"participant": "Teilnehmer",
+	"role_created": "Rolle erfolgreich erstellt",
+	"role_updated": "Rolle erfolgreich aktualisiert",
+	"role_deleted": "Rolle erfolgreich gelöscht"
 }
 

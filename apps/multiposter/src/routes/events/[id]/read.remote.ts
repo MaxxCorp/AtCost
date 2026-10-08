@@ -67,6 +67,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 					}
 				},
 				resources: { with: { resource: true } },
+				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
 				menus: {
@@ -104,6 +105,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 						}
 					},
 					resources: { with: { resource: true } },
+					contactRoles: { with: { role: true } },
 					tags: { with: { tag: true } },
 					campaign: true,
 					menus: {
@@ -175,6 +177,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 					}
 				},
 				resources: { with: { resource: true } },
+				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
 				menus: {
@@ -216,7 +219,25 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	}
 
 	// 3. Resolve Primary Contact
-	const hasEventEmployee = (result.contacts || []).some((ec: any) => isEmployeeContact(ec.contact || ec));
+	const contactRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
+	for (const cr of (result.contactRoles || [])) {
+		const list = contactRolesMap.get(cr.contactId) || [];
+		if (cr.role) {
+			list.push({ id: cr.role.id, name: cr.role.name, color: cr.role.color });
+		}
+		contactRolesMap.set(cr.contactId, list);
+	}
+
+	const allContacts = (result.contacts || []).map((c: any) => {
+		const contactObj = c.contact || c;
+		return {
+			...contactObj,
+			roles: contactRolesMap.get(contactObj.id) || [],
+			participationStatus: c.participationStatus || 'needsAction'
+		};
+	}).filter((c: any) => c && c.id);
+
+	const hasEventEmployee = allContacts.some((ec: any) => isEmployeeContact(ec));
 	const locationContactsMap = new Map<string, any[]>();
 
 	if (!hasEventEmployee) {
@@ -271,6 +292,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 
 	const resolvedContact = resolveEventContactSync({
 		...result,
+		contacts: allContacts,
 		locations: evtLocations,
 		resources: evtResources
 	}, {
@@ -396,10 +418,6 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 
 	const allLocations = result.locations.map((l: any) => l.location);
 	const allResources = result.resources.map((r: any) => r.resource).filter(Boolean);
-	const allContacts = (result.contacts || []).map((c: any) => ({
-		...(c.contact || c),
-		participationStatus: c.participationStatus || 'needsAction'
-	})).filter((c: any) => c && c.id);
 
 	// Full object
 	return {

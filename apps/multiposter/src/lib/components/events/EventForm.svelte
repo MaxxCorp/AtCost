@@ -60,6 +60,8 @@
     import ImageUploader from "#lib/components/cms/ImageUploader.svelte";
     import RecurrenceDialog from "#lib/components/events/RecurrenceDialog.svelte";
     import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
+    import EventRoleManagerModal from "#lib/components/events/EventRoleManagerModal.svelte";
+    import EventContactRoleSelector from "#lib/components/events/EventContactRoleSelector.svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { isSeriesItem } from "#lib/utils/event-series.js";
     import {
@@ -76,6 +78,7 @@
         ExternalLink,
         Utensils,
         Calculator,
+        Shield,
     } from "@lucide/svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -430,6 +433,20 @@
     // svelte-ignore state_referenced_locally
     const initialContacts = (initialData?.contactIds ?? []) as string[];
     let currentContactIds = $state<string[]>(initialContacts);
+
+    let isRoleManagerOpen = $state(false);
+    // svelte-ignore state_referenced_locally
+    let contactRolesState = $state<Record<string, string[]>>((() => {
+        const map: Record<string, string[]> = {};
+        if (initialData?.contacts) {
+            for (const c of initialData.contacts as any[]) {
+                if (c.id && Array.isArray(c.roles)) {
+                    map[c.id] = c.roles.map((r: any) => r.id || r);
+                }
+            }
+        }
+        return map;
+    })());
 
     // svelte-ignore state_referenced_locally
     const rawInitialParticipants = initialData?.participantsCount;
@@ -1515,6 +1532,31 @@
             </span>
         {/snippet}
 
+        {#snippet toolbarActions()}
+            <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-blue-600 transition-colors shadow-sm cursor-pointer"
+                onclick={() => (isRoleManagerOpen = true)}
+                title={m.manage_roles?.() ?? "Manage Roles"}
+            >
+                <Shield size={14} class="text-blue-600" />
+                <span>{m.manage_roles?.() ?? "Manage Roles"}</span>
+            </button>
+        {/snippet}
+
+        {#snippet rolesSnippet(contact: any)}
+            <EventContactRoleSelector
+                {contact}
+                eventId={initialData?.id}
+                selectedRoleIds={contactRolesState[contact.id] || []}
+                onchange={(newRoleIds: string[]) => {
+                    contactRolesState[contact.id] = newRoleIds;
+                    rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
+                }}
+                onopenManager={() => (isRoleManagerOpen = true)}
+            />
+        {/snippet}
+
         {#snippet participationSnippet(contact: any)}
             <select
                 value={contact.participationStatus || "needsAction"}
@@ -1734,6 +1776,15 @@
         )}
         class="hidden"
     />
+    <input
+        {...rf.fields.contactRolesJson.as(
+            "text",
+            JSON.stringify(contactRolesState),
+        )}
+        class="hidden"
+    />
+
+    <EventRoleManagerModal bind:open={isRoleManagerOpen} />
 
     <div class="pt-4 border-t border-gray-100">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">

@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 import { user, session, account, verification } from "./auth";
 import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, contactTag, userContact } from "./contacts";
 import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
-import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag } from "./events";
+import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag, eventRole, eventContactRole } from "./events";
 import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
 import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
@@ -52,6 +52,7 @@ export const contactRelations = relations(contact, ({ many, one }) => ({
     locationAssociations: many(locationContact),
     resourceAssociations: many(resourceContact),
     events: many(eventContact),
+    eventRoles: many(eventContactRole),
     announcements: many(announcementContact),
     relations: many(contactRelation, { relationName: 'fromRelations' }),
     relatedTo: many(contactRelation, { relationName: 'toRelations' }),
@@ -91,6 +92,7 @@ export const contactTagRelations = relations(contactTag, ({ one }) => ({
 export const eventRelations = relations(event, ({ many, one }) => ({
     resources: many(eventResource),
     contacts: many(eventContact),
+    contactRoles: many(eventContactRole),
     locations: many(eventLocation),
     tags: many(eventTag),
     menus: many(eventMenu),
@@ -99,6 +101,16 @@ export const eventRelations = relations(event, ({ many, one }) => ({
     campaign: one(campaign, { fields: [event.campaignId], references: [campaign.id] }),
     master: one(event, { fields: [event.recurringEventId], references: [event.id], relationName: 'instances' }),
     instances: many(event, { relationName: 'instances' }),
+}));
+
+export const eventRoleRelations = relations(eventRole, ({ many }) => ({
+    contactRoles: many(eventContactRole),
+}));
+
+export const eventContactRoleRelations = relations(eventContactRole, ({ one }) => ({
+    event: one(event, { fields: [eventContactRole.eventId], references: [event.id] }),
+    contact: one(contact, { fields: [eventContactRole.contactId], references: [contact.id] }),
+    role: one(eventRole, { fields: [eventContactRole.roleId], references: [eventRole.id] }),
 }));
 
 export const recurringSeriesRelations = relations(recurringSeries, ({ one, many }) => ({

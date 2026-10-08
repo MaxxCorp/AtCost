@@ -1,6 +1,6 @@
 import { form, getRequestEvent } from '$app/server';
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
@@ -453,6 +453,34 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					if (masterCtcs.length > 0) {
 						await client.insert(eventContact).values(
 							masterCtcs.map((c: any) => ({ eventId: targetEventId, contactId: c.contactId, participationStatus: c.participationStatus }))
+						);
+					}
+				}
+
+				// Contact Roles
+				if (data.contactRolesJson !== undefined) {
+					try {
+						const rolesMap: Record<string, string[]> = data.contactRolesJson ? JSON.parse(data.contactRolesJson) : {};
+						await client.delete(eventContactRole).where(eq(eventContactRole.eventId, targetEventId));
+						const roleEntries: { eventId: string; contactId: string; roleId: string }[] = [];
+						for (const [cId, roleIds] of Object.entries(rolesMap)) {
+							if (Array.isArray(roleIds)) {
+								for (const rId of roleIds) {
+									roleEntries.push({ eventId: targetEventId, contactId: cId, roleId: rId });
+								}
+							}
+						}
+						if (roleEntries.length > 0) {
+							await client.insert(eventContactRole).values(roleEntries);
+						}
+					} catch (err) {
+						console.error('Failed to parse or update contact roles:', err);
+					}
+				} else if (isNewException && instMasterId) {
+					const masterRoles = await client.select().from(eventContactRole).where(eq(eventContactRole.eventId, instMasterId));
+					if (masterRoles.length > 0) {
+						await client.insert(eventContactRole).values(
+							masterRoles.map((r: any) => ({ eventId: targetEventId, contactId: r.contactId, roleId: r.roleId }))
 						);
 					}
 				}

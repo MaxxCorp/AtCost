@@ -278,9 +278,24 @@
                                     <div
                                         class="bg-gray-50 p-4 sm:p-5 rounded-xl relative border border-gray-100 space-y-3"
                                     >
-                                        <p class="font-bold text-gray-900 text-base">
-                                            {event.resolvedContact.name}
-                                        </p>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <p class="font-bold text-gray-900 text-base">
+                                                {event.resolvedContact.name}
+                                            </p>
+                                            {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
+                                                <div class="flex items-center gap-1 flex-wrap">
+                                                    {#each event.resolvedContact.roles as roleName}
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                                            {roleName}
+                                                        </span>
+                                                    {/each}
+                                                </div>
+                                            {:else if event.resolvedContact.role}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                                    {event.resolvedContact.role}
+                                                </span>
+                                            {/if}
+                                        </div>
                                         
                                         <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
                                             {#if event.resolvedContact.qrCodeDataUrl || event.resolvedContact.qrCodePath}
@@ -327,6 +342,30 @@
                                                 <Download size={13} /> {m.save_contact()} (.vcf)
                                             </a>
                                         </div>
+
+                                        {#if (event as any).contacts && (event as any).contacts.length > 1}
+                                            <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-1.5">
+                                                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                    {m.feature_contacts_title?.() ?? "Contacts"}
+                                                </h4>
+                                                <div class="space-y-1">
+                                                    {#each (event as any).contacts.filter((c: any) => c.name !== event.resolvedContact?.name && c.id !== (event.resolvedContact as any)?.id) as otherContact}
+                                                        <div class="flex items-center justify-between text-xs text-gray-700">
+                                                            <span class="font-medium">{otherContact.displayName || `${otherContact.givenName || ''} ${otherContact.familyName || ''}`.trim() || otherContact.company || otherContact.name}</span>
+                                                            {#if otherContact.roles && otherContact.roles.length > 0}
+                                                                <div class="flex items-center gap-1">
+                                                                    {#each otherContact.roles as role}
+                                                                        <span class="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">
+                                                                            {role.name || role}
+                                                                        </span>
+                                                                    {/each}
+                                                                </div>
+                                                            {/if}
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            </div>
+                                        {/if}
                                     </div>
                                 </section>
                             </div>

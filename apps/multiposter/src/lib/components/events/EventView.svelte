@@ -186,7 +186,22 @@
                 <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
                     <Users class="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
                     <div class="min-w-0 flex-1">
-                        <h3 class="font-semibold text-gray-900 text-sm">{m.contact()}</h3>
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="font-semibold text-gray-900 text-sm">{m.contact()}</h3>
+                            {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
+                                <div class="flex items-center gap-1 flex-wrap">
+                                    {#each event.resolvedContact.roles as roleName}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                            {roleName}
+                                        </span>
+                                    {/each}
+                                </div>
+                            {:else if event.resolvedContact.role}
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                    {event.resolvedContact.role}
+                                </span>
+                            {/if}
+                        </div>
                         <p class="text-gray-900 font-medium text-sm mt-0.5">
                             {event.resolvedContact.name}
                         </p>
@@ -219,6 +234,30 @@
                                 <p class="text-2xs text-gray-500 mt-1">
                                     {m.scan_contact_info()}
                                 </p>
+                            </div>
+                        {/if}
+
+                        {#if (event as any).contacts && (event as any).contacts.length > 1}
+                            <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-1.5">
+                                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    {m.feature_contacts_title?.() ?? "Contacts"}
+                                </h4>
+                                <div class="space-y-1">
+                                    {#each (event as any).contacts.filter((c: any) => c.name !== event.resolvedContact?.name && c.id !== (event.resolvedContact as any)?.id) as otherContact}
+                                        <div class="flex items-center justify-between text-xs text-gray-700">
+                                            <span class="font-medium">{otherContact.displayName || `${otherContact.givenName || ''} ${otherContact.familyName || ''}`.trim() || otherContact.company || otherContact.name}</span>
+                                            {#if otherContact.roles && otherContact.roles.length > 0}
+                                                <div class="flex items-center gap-1">
+                                                    {#each otherContact.roles as role}
+                                                        <span class="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">
+                                                            {role.name || role}
+                                                        </span>
+                                                    {/each}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
                             </div>
                         {/if}
                     </div>

@@ -40,6 +40,8 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 		name: string;
 		email: string;
 		phone: string;
+		role?: string | null;
+		roles?: string[] | null;
 		qrCodeDataUrl?: string;
 		qrCodePath?: string;
 	} | null;

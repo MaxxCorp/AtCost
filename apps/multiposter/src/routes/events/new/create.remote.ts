@@ -1,7 +1,7 @@
 import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, sql, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -233,6 +233,26 @@ export const createEvent = form(createEventSchema, async (data) => {
 					contactId,
 				}));
 				await db.insert(eventContact).values(associations);
+			}
+
+			// Contact Roles
+			if (data.contactRolesJson) {
+				try {
+					const rolesMap: Record<string, string[]> = JSON.parse(data.contactRolesJson);
+					const roleEntries: { eventId: string; contactId: string; roleId: string }[] = [];
+					for (const [cId, roleIds] of Object.entries(rolesMap)) {
+						if (Array.isArray(roleIds)) {
+							for (const rId of roleIds) {
+								roleEntries.push({ eventId: targetEventId, contactId: cId, roleId: rId });
+							}
+						}
+					}
+					if (roleEntries.length > 0) {
+						await db.insert(eventContactRole).values(roleEntries);
+					}
+				} catch (err) {
+					console.error('Failed to parse or insert contact roles:', err);
+				}
 			}
 
 			// Tags
