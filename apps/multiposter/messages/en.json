@@ -945,6 +945,15 @@
 	"participant": "Participant",
 	"role_created": "Role created successfully",
 	"role_updated": "Role updated successfully",
-	"role_deleted": "Role deleted successfully"
+	"role_deleted": "Role deleted successfully",
+	"visible_components": "Components",
+	"visible_components_desc": "Select which details to include in the list and printout",
+	"component_contacts": "Associated Contacts",
+	"component_contacts_desc": "All linked contacts with their roles & details",
+	"component_participants": "Participants",
+	"component_participants_desc": "Participant count and max occupancy",
+	"component_visibility": "Visibility Status",
+	"component_visibility_desc": "Show whether items are public or internal",
+	"private_label": "Internal"
 }
 

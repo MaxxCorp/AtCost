@@ -945,6 +945,15 @@
 	"participant": "Teilnehmer",
 	"role_created": "Rolle erfolgreich erstellt",
 	"role_updated": "Rolle erfolgreich aktualisiert",
-	"role_deleted": "Rolle erfolgreich gelöscht"
+	"role_deleted": "Rolle erfolgreich gelöscht",
+	"visible_components": "Komponenten",
+	"visible_components_desc": "Wähle aus, welche Details in der Liste und im Ausdruck angezeigt werden",
+	"component_contacts": "Zugehörige Kontakte",
+	"component_contacts_desc": "Alle verknüpften Kontakte mit Rollen & Details",
+	"component_participants": "Teilnehmer",
+	"component_participants_desc": "Teilnehmerzahl und max. Auslastung",
+	"component_visibility": "Sichtbarkeitsstatus",
+	"component_visibility_desc": "Anzeigen, ob Einträge öffentlich oder intern sind",
+	"private_label": "Intern"
 }
 
