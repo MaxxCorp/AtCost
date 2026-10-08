@@ -65,7 +65,6 @@
     let excludeTentative = $state(untrack(() => initialData?.excludeTentative ?? true));
     let excludeCancelled = $state(untrack(() => initialData?.excludeCancelled ?? false));
     let excludeSeries = $state(untrack(() => initialData?.excludeSeries ?? false));
-    let showEventQrCodes = $state(untrack(() => (initialData as any)?.showEventQrCodes ?? false));
     
     let excludedEventIds = $state<string[]>(untrack(() => initialData?.excludedEventIds || []));
     let includedEventIds = $state<string[]>(untrack(() => initialData?.includedEventIds || []));
@@ -565,17 +564,12 @@
                         <input type="checkbox" bind:checked={excludeSeries} class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" />
                         {m.exclude_series_events()}
                     </label>
-                    <label class="flex items-center gap-2 text-sm text-gray-700 font-medium">
-                        <input type="checkbox" bind:checked={showEventQrCodes} class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" />
-                        {m.show_event_qr_codes()}
-                    </label>
                 </div>
                 
                 <input {...rf.fields.excludeNonPublic.as("text", String(excludeNonPublic))} class="hidden" />
                 <input {...rf.fields.excludeTentative.as("text", String(excludeTentative))} class="hidden" />
                 <input {...rf.fields.excludeCancelled.as("text", String(excludeCancelled))} class="hidden" />
                 <input {...rf.fields.excludeSeries.as("text", String(excludeSeries))} class="hidden" />
-                <input {...rf.fields.showEventQrCodes.as("text", String(showEventQrCodes))} class="hidden" />
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {#await listTags({ limit: 1000 })}
