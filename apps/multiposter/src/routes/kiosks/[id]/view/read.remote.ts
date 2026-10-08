@@ -8,6 +8,7 @@ import * as v from 'valibot';
 
 import { resolveLocationContactSync } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys } from '#lib/server/cache/index.js';
+import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from '#lib/utils/kiosk-dates.js';
 
 function toSafeIsoString(date: Date | string | null | undefined): string | null {
     if (!date) return null;
@@ -101,6 +102,22 @@ export const readKioskView = query(v.string(), async (kioskId) => {
     if (kioskData.rangeMode === 'fixed') {
         startDate = toSafeIsoString(kioskData.startDate) || undefined;
         endDate = toSafeIsoString(kioskData.endDate) || undefined;
+    } else if (kioskData.rangeMode === 'next_week') {
+        const range = getNextWeekRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
+    } else if (kioskData.rangeMode === 'this_week') {
+        const range = getThisWeekRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
+    } else if (kioskData.rangeMode === 'next_month') {
+        const range = getNextMonthRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
+    } else if (kioskData.rangeMode === 'this_month') {
+        const range = getThisMonthRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
     } else {
         const lookPast = Math.max(0, Math.min(Number(kioskData.lookPast || 0), 315360000));
         let lookAheadSeconds = Math.max(0, Math.min(Number(kioskData.lookAhead || 0), 315360000));

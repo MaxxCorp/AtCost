@@ -10,7 +10,7 @@ export const kiosk = pgTable("kiosk", {
     name: text("name").notNull(),
     description: text("description"),
     status: text("status").default("offline").notNull(),
-    rangeMode: text("range_mode", { enum: ["fixed", "relative", "rolling"] }).default("relative").notNull(),
+    rangeMode: text("range_mode", { enum: ["fixed", "relative", "rolling", "next_week", "next_month", "this_week", "this_month"] }).default("relative").notNull(),
     startDate: timestamp("start_date"),
     endDate: timestamp("end_date"),
     lookAhead: integer("look_ahead").default(604800).notNull(), // 7 days in seconds

@@ -52,7 +52,15 @@ export const createKioskSchema = v.object({
         v.maxValue(3650, 'Look past cannot exceed 10 years')
     ), 0),
     uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list'), v.literal('folded_flyer')])),
-    rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
+    rangeMode: v.optional(v.union([
+        v.literal('rolling'),
+        v.literal('fixed'),
+        v.literal('relative'),
+        v.literal('next_week'),
+        v.literal('this_week'),
+        v.literal('next_month'),
+        v.literal('this_month')
+    ])),
     startDate: optionalDateString,
     endDate: optionalDateString,
     excludeNonPublic: v.optional(booleanCoerce),
@@ -89,7 +97,15 @@ export const updateKioskSchema = v.object({
         v.maxValue(3650, 'Look past cannot exceed 10 years')
     )),
     uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list'), v.literal('folded_flyer')])),
-    rangeMode: v.optional(v.union([v.literal('rolling'), v.literal('fixed')])),
+    rangeMode: v.optional(v.union([
+        v.literal('rolling'),
+        v.literal('fixed'),
+        v.literal('relative'),
+        v.literal('next_week'),
+        v.literal('this_week'),
+        v.literal('next_month'),
+        v.literal('this_month')
+    ])),
     startDate: optionalDateString,
     endDate: optionalDateString,
     excludeNonPublic: v.optional(booleanCoerce),

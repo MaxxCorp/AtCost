@@ -49,20 +49,18 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
         if (lookAheadDays !== undefined) dbUpdates.lookAhead = Math.round(Number(lookAheadDays) * 86400);
         if (lookPastDays !== undefined) dbUpdates.lookPast = Math.round(Number(lookPastDays) * 86400);
 
-        if (updates.rangeMode === 'rolling') {
+        if (updates.rangeMode && updates.rangeMode !== 'fixed') {
             dbUpdates.startDate = null;
             dbUpdates.endDate = null;
-        } else {
+        } else if (updates.rangeMode === 'fixed') {
             if (startDate !== undefined) {
                 dbUpdates.startDate = parseSafeDate(startDate);
             }
             if (endDate !== undefined) {
                 dbUpdates.endDate = parseSafeDate(endDate);
             }
-            if (updates.rangeMode === 'fixed' || (dbUpdates.startDate && dbUpdates.endDate)) {
-                if (dbUpdates.startDate && dbUpdates.endDate && dbUpdates.startDate.getTime() > dbUpdates.endDate.getTime()) {
-                    return { success: false, error: 'Start date must be before or equal to end date' };
-                }
+            if (dbUpdates.startDate && dbUpdates.endDate && dbUpdates.startDate.getTime() > dbUpdates.endDate.getTime()) {
+                return { success: false, error: 'Start date must be before or equal to end date' };
             }
         }
 
