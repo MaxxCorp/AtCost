@@ -967,6 +967,20 @@
 	"component_participants_desc": "Participant count and max occupancy",
 	"component_visibility": "Visibility Status",
 	"component_visibility_desc": "Show whether items are public or internal",
-	"private_label": "Internal"
+	"private_label": "Internal",
+	"component_internal_notes": "Internal Notes",
+	"component_internal_notes_desc": "Staff-only notes and comments",
+	"component_hero_image": "Hero Image",
+	"component_hero_image_desc": "Display event artwork and hero images",
+	"grouping": "Grouping",
+	"grouping_desc": "Configure chronological grouping by days, weeks, or months",
+	"grouping_months": "Months",
+	"grouping_months_desc": "Group events under monthly headings",
+	"grouping_weeks": "Weeks",
+	"grouping_weeks_desc": "Group events under calendar week headings",
+	"grouping_days": "Days",
+	"grouping_days_desc": "Group events under individual day headings",
+	"calendar_week_title": "Week {week}",
+	"calendar_week_range": "Week {week} • {start} – {end}"
 }
 

@@ -967,6 +967,20 @@
 	"component_participants_desc": "Teilnehmerzahl und max. Auslastung",
 	"component_visibility": "Sichtbarkeitsstatus",
 	"component_visibility_desc": "Anzeigen, ob Einträge öffentlich oder intern sind",
-	"private_label": "Intern"
+	"private_label": "Intern",
+	"component_internal_notes": "Interne Notizen",
+	"component_internal_notes_desc": "Interne Notizen und Kommentare für Mitarbeiter",
+	"component_hero_image": "Titelbild",
+	"component_hero_image_desc": "Haupt-Titelbild und Grafiken der Veranstaltung anzeigen",
+	"grouping": "Gruppierung",
+	"grouping_desc": "Chronologische Gruppierung nach Tagen, Wochen oder Monaten konfigurieren",
+	"grouping_months": "Monate",
+	"grouping_months_desc": "Veranstaltungen unter Monatsüberschriften gruppieren",
+	"grouping_weeks": "Wochen",
+	"grouping_weeks_desc": "Veranstaltungen unter Kalenderwochen gruppieren",
+	"grouping_days": "Tage",
+	"grouping_days_desc": "Veranstaltungen unter einzelnen Tagen gruppieren",
+	"calendar_week_title": "KW {week}",
+	"calendar_week_range": "KW {week} • {start} – {end}"
 }
 
