@@ -1244,15 +1244,6 @@
                                             </div>
                                         {/if}
                                     </article>
-                                                    alt="Event QR"
-                                                    class={density === 'standard' ? 'w-14 h-14' : 'w-10 h-10'}
-                                                />
-                                                <span class="text-[8px] font-semibold text-slate-500 mt-0.5 uppercase tracking-tight">
-                                                    {m.scan_event_qr()}
-                                                </span>
-                                            </div>
-                                        {/if}
-                                    </article>
                                 {/each}
                             </div>
                         </div>
