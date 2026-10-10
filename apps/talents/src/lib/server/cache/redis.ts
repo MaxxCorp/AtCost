@@ -75,9 +75,9 @@ export function getRedisClient(): Redis | null {
     try {
         const client = new Redis(redisUrl.trim(), {
             lazyConnect: true,
-            maxRetriesPerRequest: 1,
-            connectTimeout: 3000,
-            commandTimeout: 2000,
+            maxRetriesPerRequest: 2,
+            connectTimeout: 5000,
+            commandTimeout: 5000,
             enableAutoPipelining: true,
             retryStrategy(times) {
                 return Math.min(times * 200, 5000);

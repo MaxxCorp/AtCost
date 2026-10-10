@@ -37,8 +37,12 @@ export const auth = betterAuth({
         }
     },
     session: {
+        storeSessionInDatabase: true,
         cookieCache: { enabled: true, maxAge: 24 * 60 * 60 // 24 hours
-         }
+        }
+    },
+    verification: {
+        storeInDatabase: true,
     },
     user: {
         additionalFields: {

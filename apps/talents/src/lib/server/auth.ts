@@ -28,11 +28,21 @@ export const auth = betterAuth({
     database: drizzleAdapter(db, { provider: "pg" }),
     ...secondaryStorage ? { secondaryStorage } : {},
     secret: BETTER_AUTH_SECRET || "development-secret-only-for-build",
-    baseURL: BETTER_AUTH_URL || "http://localhost:5175",
+    baseURL: BETTER_AUTH_URL || "http://localhost:5174",
     basePath: "/api/auth",
+    onAPIError: {
+        throw: true,
+        onError: (error: unknown) => {
+            console.error("[BetterAuth API Error]:", error);
+        }
+    },
     session: {
+        storeSessionInDatabase: true,
         cookieCache: { enabled: true, maxAge: 24 * 60 * 60 // 24 hours
-         }
+        }
+    },
+    verification: {
+        storeInDatabase: true,
     },
     user: {
         additionalFields: {
@@ -64,7 +74,22 @@ export const auth = betterAuth({
         microsoft: {
             clientId: MICROSOFT_CLIENT_ID || "",
             clientSecret: MICROSOFT_CLIENT_SECRET || "",
-            tenantId: MICROSOFT_TENANT_ID || "common"
+            tenantId: MICROSOFT_TENANT_ID || "common",
+            scope: [
+                "openid",
+                "profile",
+                "email",
+                "offline_access"
+            ],
+            mapProfileToUser: (profile: any) => {
+                const email = (profile as any).email || (profile as any).mail || (profile as any).userPrincipalName || (profile as any).preferred_username;
+                return {
+                    email,
+                    name: profile.name || (profile as any).displayName || (profile as any).userPrincipalName,
+                    image: profile.picture,
+                    emailVerified: true,
+                };
+            },
         }
     },
     plugins: [sveltekitCookies(getRequestEvent)],

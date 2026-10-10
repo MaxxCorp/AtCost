@@ -105,7 +105,7 @@ const deduplicatedAuthFetch = async (
 export const authClient = createAuthClient({
 	baseURL: typeof window !== "undefined"
 		? window.location.origin
-		: PUBLIC_BASE_URL || "http://localhost:5175",
+		: PUBLIC_BASE_URL || "http://localhost:5174",
 	basePath: "/api/auth",
 	fetchOptions: {
 		customFetchImpl: deduplicatedAuthFetch,
