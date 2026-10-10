@@ -1,22 +1,23 @@
-import { command } from '$app/server';
-import { db } from '@ac/db';
-import { location } from '@ac/db';
-import { eq, and, inArray } from '@ac/db';
+import { command, requested } from '$app/server';
+import { deleteLocations } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import { invalidateAllKioskViews } from '#lib/server/cache/index.js';
+import { invalidateLocation, invalidateAllKioskViews } from '#lib/server/cache/index.js';
 
 export const deleteLocation = command(v.array(v.string()), async (ids: string[]) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'locations');
 
-    await db
-        .delete(location)
-        .where(inArray(location.id, ids));
-
+    await deleteLocations(ids);
+    await invalidateLocation(ids);
     await invalidateAllKioskViews();
-    await listLocations().refresh();
+
+    try {
+        await requested(listLocations, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listLocations().refresh();
+    void listLocations({}).refresh();
+
     return { success: true };
 });
-

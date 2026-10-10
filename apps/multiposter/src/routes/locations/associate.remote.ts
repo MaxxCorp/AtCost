@@ -1,83 +1,36 @@
 import { command, query } from '$app/server';
-import { db } from '@ac/db';
-import { announcementLocation, eventLocation, kioskLocation, location, resourceLocation, locationContact } from '@ac/db';
-import { eq } from '@ac/db';
+import {
+    addLocationAssociation as attachLocation,
+    removeLocationAssociation as detachLocation,
+    fetchEntityLocations as queryEntityLocations,
+} from '@ac/db';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '@ac/validations';
-import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
-import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
-
-const tableMap = {
-    announcement: announcementLocation,
-    event: eventLocation,
-    kiosk: kioskLocation,
-    resource: resourceLocation,
-    contact: locationContact
-} as const;
-
-const fieldMap = {
-    announcement: 'announcementId',
-    event: 'eventId',
-    kiosk: 'kioskId',
-    resource: 'resourceId',
-    contact: 'contactId'
-} as const;
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 
 export const addLocationAssociation = command(locationAssociationSchema, async (data) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'locations');
+
     const { type, entityId, locationId } = data;
-    
-    await dbAddAssociation({
-        type,
-        entityId,
-        itemId: locationId,
-        tableMap,
-        fieldMap,
-        itemField: 'locationId'
-    });
-    
+    await attachLocation({ type, entityId, locationId });
     await fetchEntityLocations({ type, entityId }).refresh();
     return { success: true };
 });
 
 export const removeLocationAssociation = command(locationAssociationSchema, async (data) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'locations');
+
     const { type, entityId, locationId } = data;
-    
-    await dbRemoveAssociation({
-        type,
-        entityId,
-        itemId: locationId,
-        tableMap,
-        fieldMap,
-        itemField: 'locationId'
-    });
-    
+    await detachLocation({ type, entityId, locationId });
     await fetchEntityLocations({ type, entityId }).refresh();
     return { success: true };
 });
 
 export const fetchEntityLocations = query(getLocationAssociationsSchema, async (data) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'locations');
+
     const { type, entityId } = data;
-    
-    const table = tableMap[type as keyof typeof tableMap];
-    const entityField = fieldMap[type as keyof typeof fieldMap];
-
-    if (!table || !entityField) {
-        throw new Error(`Unsupported entity type: ${type}`);
-    }
-
-    let targetEntityId = entityId;
-    if (type === 'event' && entityId.includes('_inst_')) {
-        targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: false });
-    }
-
-    const results = await db.select({ location: location })
-        .from(table as any)
-        .innerJoin(location, eq((table as any).locationId, location.id))
-        .where(eq((table as any)[entityField], targetEntityId));
-    
-    return results.map(r => ({
-        ...r.location,
-        createdAt: r.location.createdAt.toISOString(),
-        updatedAt: r.location.updatedAt.toISOString(),
-    }));
+    return await queryEntityLocations({ type, entityId });
 });
-

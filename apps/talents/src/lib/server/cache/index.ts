@@ -13,5 +13,7 @@ export {
     cacheKeys,
     hashParams,
     invalidateTalent,
+    invalidateLocation,
+    invalidateAllKioskViews,
 } from './invalidation';
 

@@ -13,6 +13,7 @@
         "./components/*.svelte": "./src/components/*.svelte",
         "./components/forms/ContactForm.svelte": "./src/components/forms/ContactForm.svelte",
         "./components/forms/LocationForm.svelte": "./src/components/forms/LocationForm.svelte",
+        "./components/locations/*.svelte": "./src/components/locations/*.svelte",
         "./components/avatar": "./src/components/avatar/index.ts",
         "./components/breadcrumb": "./src/components/breadcrumb/index.ts",
         "./components/button": "./src/components/button/index.ts",

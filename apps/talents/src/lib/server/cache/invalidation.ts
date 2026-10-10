@@ -27,3 +27,17 @@ export async function invalidateTalent(talentIds?: string | string[]): Promise<v
         bumpNamespaceVersion(CACHE_NAMESPACES.TALENTS),
     ]);
 }
+
+export async function invalidateLocation(locationIds?: string | string[]): Promise<void> {
+    const ids = locationIds ? (Array.isArray(locationIds) ? locationIds : [locationIds]) : [];
+    const keys = ids.map((id) => cacheKeys.location(id));
+
+    await Promise.all([
+        keys.length > 0 ? delCache(keys) : Promise.resolve(),
+        bumpNamespaceVersion(CACHE_NAMESPACES.LOCATIONS),
+    ]);
+}
+
+export async function invalidateAllKioskViews(): Promise<void> {
+    // No-op for talents app
+}

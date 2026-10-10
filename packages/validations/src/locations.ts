@@ -57,12 +57,12 @@ export const LocationPaginationSchema = v.optional(v.object({
 
 
 export const locationAssociationSchema = v.object({
-    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk', 'contact']),
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk', 'contact', 'talent']),
     entityId: v.string(),
     locationId: v.pipe(v.string(), v.uuid()),
 });
 
 export const getLocationAssociationsSchema = v.object({
-    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk', 'contact']),
+    type: v.picklist(['event', 'user', 'location', 'resource', 'announcement', 'kiosk', 'contact', 'talent']),
     entityId: v.string(),
 });

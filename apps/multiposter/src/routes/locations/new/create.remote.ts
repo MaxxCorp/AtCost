@@ -1,55 +1,27 @@
-import { form } from '$app/server';
-import { db } from '@ac/db';
-import { location } from '@ac/db';
+import { form, requested } from '$app/server';
+import { createLocation as insertLocation } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createLocationSchema } from '@ac/validations';
-import { invalidateAllKioskViews } from '#lib/server/cache/index.js';
+import { invalidateLocation, invalidateAllKioskViews } from '#lib/server/cache/index.js';
 
 export const createLocation = form(createLocationSchema, async (data) => {
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'locations');
 
-        const insertData: any = {
-            userId: user.id,
-            name: data.name,
-            description: data.description || null,
-            capacity: data.capacity || null,
-            street: data.street || null,
-            houseNumber: data.houseNumber || null,
-            addressSuffix: data.addressSuffix || null,
-            zip: data.zip || null,
-            city: data.city || null,
-            state: data.state || null,
-            country: data.country || null,
-            roomId: data.roomId || null,
-            latitude: data.latitude ? parseFloat(data.latitude) : null,
-            longitude: data.longitude ? parseFloat(data.longitude) : null,
-            what3words: data.what3words || null,
-            inclusivitySupport: data.inclusivitySupport || null,
-            isPublic: data.isPublic ?? false,
-            heroImage: data.heroImage || null,
-        };
-
-        if (insertData.latitude && isNaN(insertData.latitude)) insertData.latitude = null;
-        if (insertData.longitude && isNaN(insertData.longitude)) insertData.longitude = null;
-
-        const result = await db.insert(location as any).values(insertData).returning();
-
-        if (result.length === 0) {
-            throw new Error('Failed to create location');
-        }
-
-        const newLocation = result[0];
+        const newLocation = await insertLocation(data, user.id);
+        await invalidateLocation(newLocation.id);
         await invalidateAllKioskViews();
-        await listLocations().refresh();
 
-        return { success: true, location: newLocation };
+        try {
+            await requested(listLocations, 20).refreshAll();
+        } catch { /* ignore */ }
+        void listLocations().refresh();
+        void listLocations({}).refresh();
 
-
+        return { success: true, location: newLocation, id: newLocation.id };
     } catch (err: any) {
         return { success: false, error: { message: err.message || 'Creation failed' } };
     }
 });
-

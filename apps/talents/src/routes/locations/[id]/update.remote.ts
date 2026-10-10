@@ -1,52 +1,29 @@
-import { form } from '$app/server';
-import { db, location, eq } from '@ac/db';
+import { form, requested } from '$app/server';
+import { updateLocation as updateLocationRecord } from '@ac/db';
 import { listLocations } from '../list.remote';
 import { readLocation } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { updateLocationSchema } from '@ac/validations/locations';
+import { updateLocationSchema } from '@ac/validations';
+import { invalidateLocation, invalidateAllKioskViews } from '#lib/server/cache/index.js';
 
-export const updateLocation = form(updateLocationSchema, async (data): Promise<{ success: boolean; location?: any; error?: { message: string } }> => {
+export const updateLocation = form(updateLocationSchema, async (data) => {
     try {
         const user = getAuthenticatedUser();
         ensureAccess(user, 'locations');
 
-        const updateData: any = {
-            name: data.name,
-            street: data.street || null,
-            houseNumber: data.houseNumber || null,
-            addressSuffix: data.addressSuffix || null,
-            zip: data.zip || null,
-            city: data.city || null,
-            state: data.state || null,
-            country: data.country || null,
-            roomId: data.roomId || null,
-            latitude: data.latitude ? parseFloat(data.latitude) : null,
-            longitude: data.longitude ? parseFloat(data.longitude) : null,
-            what3words: data.what3words || null,
-            inclusivitySupport: data.inclusivitySupport || null,
-            isPublic: data.isPublic ?? false,
-            heroImage: data.heroImage || null,
-            updatedAt: new Date(),
-        };
+        const updated = await updateLocationRecord(data.id, data);
+        readLocation(data.id).set(updated);
+        await invalidateLocation(data.id);
+        await invalidateAllKioskViews();
 
-        if (updateData.latitude && isNaN(updateData.latitude)) updateData.latitude = null;
-        if (updateData.longitude && isNaN(updateData.longitude)) updateData.longitude = null;
+        try {
+            await requested(listLocations, 20).refreshAll();
+        } catch { /* ignore */ }
+        void listLocations().refresh();
+        void listLocations({}).refresh();
 
-        const result = await db.update(location)
-            .set(updateData)
-            .where(eq(location.id, data.id) as any)
-            .returning();
-
-        if (result.length === 0) {
-            return { success: false, error: { message: 'Location not found' } };
-        }
-
-        readLocation(data.id).refresh();
-        listLocations().refresh();
-
-        return { success: true, location: result[0] };
+        return { success: true, location: updated };
     } catch (err: any) {
-        console.error('updateLocation ERROR:', err);
         return { success: false, error: { message: err.message || 'Update failed' } };
     }
 });

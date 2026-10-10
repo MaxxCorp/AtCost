@@ -1,14 +1,6 @@
-import * as v from 'valibot';
 import { query } from '$app/server';
-import { location } from '@ac/db';
-import type { Location as DbLocation } from '@ac/db';
-import { db } from '@ac/db';
-import { desc } from '@ac/db';
+import { listLocations as queryLocations } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-
-/**
- * Location interface matching the database schema, with dates serialized to strings
- */
 import { LocationPaginationSchema as PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
@@ -23,99 +15,6 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
 	const key = cacheKeys.locationsList(version, hashParams(input));
 
 	return cached(key, 300, async () => {
-	const { page = 1, limit = 50, search = '', city, associatedWith, sortField = 'updatedAt', sortOrder = 'desc' } = input || {};
-	const offset = (page - 1) * limit;
-
-	let baseQuery = db.select({ id: location.id }).from(location).$dynamic();
-	
-	const conditions = [];
-
-    if (associatedWith) {
-        const { eq, sql } = await import('@ac/db');
-        if (associatedWith.type === 'event') {
-            const { eventLocation } = await import('@ac/db');
-            baseQuery = baseQuery.innerJoin(eventLocation, eq(location.id, eventLocation.locationId)) as any;
-            conditions.push(eq(eventLocation.eventId, associatedWith.id));
-        } else if (associatedWith.type === 'contact') {
-            const { locationContact } = await import('@ac/db');
-            baseQuery = baseQuery.innerJoin(locationContact, eq(location.id, locationContact.locationId)) as any;
-            conditions.push(eq(locationContact.contactId, associatedWith.id));
-        } else if (associatedWith.type === 'resource') {
-            const { resourceLocation } = await import('@ac/db');
-            baseQuery = baseQuery.innerJoin(resourceLocation, eq(location.id, resourceLocation.locationId)) as any;
-            conditions.push(eq(resourceLocation.resourceId, associatedWith.id));
-        } else if (associatedWith.type === 'kiosk') {
-            const { kioskLocation } = await import('@ac/db');
-            baseQuery = baseQuery.innerJoin(kioskLocation, eq(location.id, kioskLocation.locationId)) as any;
-            conditions.push(eq(kioskLocation.kioskId, associatedWith.id));
-        } else if (associatedWith.type === 'announcement') {
-            const { announcementLocation } = await import('@ac/db');
-            baseQuery = baseQuery.innerJoin(announcementLocation, eq(location.id, announcementLocation.locationId)) as any;
-            conditions.push(eq(announcementLocation.announcementId, associatedWith.id));
-        } else {
-            conditions.push(sql`1 = 0`);
-        }
-    }
-
-	if (search) {
-		const { ilike, or } = await import('@ac/db');
-		conditions.push(or(
-			ilike(location.name, `%${search}%`),
-			ilike(location.city, `%${search}%`)
-		));
-	}
-
-	if (city) {
-		const { inArray, notInArray } = await import('@ac/db');
-		const { parseFilterValue } = await import('@ac/validations');
-		const { include, exclude } = parseFilterValue(city);
-		if (include.length > 0) {
-			conditions.push(inArray(location.city, include as any));
-		}
-		if (exclude.length > 0) {
-			conditions.push(notInArray(location.city, exclude as any));
-		}
-	}
-
-	if (conditions.length > 0) {
-		const { and } = await import('@ac/db');
-		baseQuery = baseQuery.where(and(...conditions)) as any;
-	}
-
-	const { sql } = await import('@ac/db');
-	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-	const total = Number(countResult[0]?.count || 0);
-
-	if (total === 0) {
-		return { data: [], total: 0 };
-	}
-
-    let orderField: any = location.updatedAt;
-	if (sortField === 'name' || sortField === 'displayName') orderField = location.name;
-	else if (sortField === 'createdAt') orderField = location.createdAt;
-
-	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
-
-	const { inArray } = await import('@ac/db');
-	const paginatedIdsQuery = baseQuery.orderBy(orderExpression).limit(limit).offset(offset);
-	const paginatedIds = (await paginatedIdsQuery).map((r) => r.id);
-
-	if (paginatedIds.length === 0) {
-		return { data: [], total };
-	}
-
-	const rawResults = await db.query.location.findMany({
-		where: inArray(location.id, paginatedIds),
-		with: { user: true },
-		orderBy: [orderExpression]
-	});
-
-	const data = rawResults.map((row) => ({
-		...row,
-		createdAt: row.createdAt.toISOString(),
-		updatedAt: row.updatedAt.toISOString(),
-	}));
-
-	return { data, total };
+		return await queryLocations(input);
 	});
 });
