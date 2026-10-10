@@ -14,7 +14,6 @@ export * from './synchronizations.js';
 export * from './time-off.js';
 export * from './contracts.js';
 export * from './tags.js';
-export * from './campaign-sync.js';
 export * from './consumables.js';
 export * from './recipes.js';
 export * from './menus.js';
