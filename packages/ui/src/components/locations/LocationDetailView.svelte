@@ -1,10 +1,5 @@
 <script lang="ts">
-    import LoadingSection from "../LoadingSection.svelte";
-    import ErrorSection from "../ErrorSection.svelte";
-    import AsyncButton from "../AsyncButton.svelte";
-    import { handleDelete } from "../../hooks/handleDelete.svelte";
-    import LocationForm from "../forms/LocationForm.svelte";
-    import { updateLocationSchema } from "@ac/validations";
+    import { LoadingSection, ErrorSection, AsyncButton, LocationForm, handleDelete } from "../../index.js";
     import { goto } from "$app/navigation";
     import type { Snippet } from "svelte";
 
@@ -13,6 +8,7 @@
         readLocationRemote: (id: string) => any;
         updateLocationRemote: any;
         deleteLocationRemote?: any;
+        validationSchema?: any;
         cancelHref?: string;
         m?: any;
         labels?: any;
@@ -27,6 +23,7 @@
         readLocationRemote,
         updateLocationRemote,
         deleteLocationRemote = undefined,
+        validationSchema = undefined,
         cancelHref = "/locations",
         m = undefined,
         labels = {},
@@ -152,7 +149,7 @@
 
             <LocationForm
                 remoteFunction={rf}
-                validationSchema={updateLocationSchema}
+                {validationSchema}
                 initialData={location}
                 isUpdating={true}
                 {cancelHref}

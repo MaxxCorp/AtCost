@@ -15,7 +15,7 @@
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
     import { readContact } from "../../contacts/[id]/read.remote";
-    import { createContactSchema, updateContactSchema } from "@ac/validations";
+    import { createContactSchema, updateContactSchema, updateLocationSchema } from "@ac/validations";
 
     const locationId = $derived(page.params.id || "");
 </script>
@@ -52,6 +52,7 @@
     readLocationRemote={readLocation}
     updateLocationRemote={updateLocation}
     deleteLocationRemote={deleteLocation}
+    validationSchema={updateLocationSchema}
     cancelHref="/locations"
     {m}
 >

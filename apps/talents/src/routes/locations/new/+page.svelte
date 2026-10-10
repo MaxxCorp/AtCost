@@ -1,6 +1,7 @@
 <script lang="ts">
     import { LocationCreateView } from "@ac/ui";
     import { createLocation } from "./create.remote";
+    import { createLocationSchema } from "@ac/validations";
     import * as m from "#lib/paraglide/messages.js";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
@@ -12,6 +13,7 @@
 
 <LocationCreateView
     createLocationRemote={createLocation}
+    validationSchema={createLocationSchema}
     cancelHref="/locations"
     {m}
 />

@@ -1,10 +1,10 @@
 <script lang="ts">
-    import LocationForm from "../forms/LocationForm.svelte";
-    import { createLocationSchema } from "@ac/validations";
+    import { LocationForm } from "../../index.js";
     import type { Snippet } from "svelte";
 
     interface Props {
         createLocationRemote: any;
+        validationSchema?: any;
         cancelHref?: string;
         m?: any;
         labels?: any;
@@ -15,6 +15,7 @@
 
     let {
         createLocationRemote,
+        validationSchema = undefined,
         cancelHref = "/locations",
         m = undefined,
         labels = {},
@@ -52,7 +53,7 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 md:p-8">
         <LocationForm
             remoteFunction={rf}
-            validationSchema={createLocationSchema}
+            {validationSchema}
             isUpdating={false}
             {cancelHref}
             {m}

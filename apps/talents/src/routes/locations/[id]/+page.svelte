@@ -13,7 +13,7 @@
     import { deleteTalent } from "../../talents/[id]/delete.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";
     import { readTalent } from "../../talents/[id]/read.remote";
-    import { unifiedTalentSchema } from "@ac/validations";
+    import { unifiedTalentSchema, updateLocationSchema } from "@ac/validations";
     import { getTalentFilterGroups } from "#lib/filters/index.js";
 
     const locationId = $derived(page.params.id as string);
@@ -24,6 +24,7 @@
     readLocationRemote={readLocation}
     updateLocationRemote={updateLocation}
     deleteLocationRemote={deleteLocation}
+    validationSchema={updateLocationSchema}
     cancelHref="/locations"
     {m}
     onLocationLoaded={(loc: any) => {
