@@ -83,10 +83,11 @@ export const unifiedTalentSchema = v.object({
 export const timeOffRequestSchema = v.object({
     id: v.optional(v.string()),
     talentId: v.pipe(v.string(), v.minLength(1, "Talent is required")),
-    type: v.picklist(["vacation", "sick", "other"]),
+    type: v.picklist(["AZV", "Urlaub", "Krank", "Kind krank", "Tel. Krankmeldung", "Wichtiger Grund", "Unentschuldigt"]),
     status: v.optional(v.picklist(["pending", "approved", "rejected"]), "pending"),
     startDate: v.pipe(v.string(), v.minLength(1, "Start date is required")),
     endDate: v.pipe(v.string(), v.minLength(1, "End date is required")),
+    note: v.optional(v.string()),
     reason: v.optional(v.string()),
 });
 

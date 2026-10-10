@@ -1,0 +1,3 @@
+ALTER TABLE "shift_plan_template_talent" DROP CONSTRAINT "shift_plan_template_talent_template_id_talent_id_pk";--> statement-breakpoint
+ALTER TABLE "shift_plan_template_talent" ADD CONSTRAINT "shift_plan_template_talent_template_id_talent_id_valid_from_pk" PRIMARY KEY("template_id","talent_id","valid_from");--> statement-breakpoint
+ALTER TABLE "shift_plan_template_talent" ADD COLUMN "valid_from" timestamp with time zone DEFAULT now() NOT NULL;

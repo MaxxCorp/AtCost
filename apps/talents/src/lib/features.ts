@@ -79,6 +79,21 @@ export const FEATURES: readonly FeatureMeta[] = [
         category: 'management'
     },
     {
+        key: 'talent-groups',
+        title: 'Talent Groups',
+        description: 'Organize talents into groups and manage weekly attendance.',
+        href: '/talent-groups',
+        buttonText: 'Manage Groups',
+        claim: 'talent-groups',
+        icon: 'users',
+        gradientFrom: 'from-sky-50',
+        gradientTo: 'to-indigo-50',
+        borderClass: 'border-sky-100',
+        buttonClass: 'bg-sky-600 hover:bg-sky-700',
+        order: 10.5,
+        category: 'management'
+    },
+    {
         key: 'locations',
         title: 'Locations',
         description: 'Manage office locations, branches, and work sites.',
