@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, shiftPlanTemplate, location, eq, desc, sql, and, or, ilike, inArray, notInArray } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import type { ShiftPlanTemplate } from '@ac/db';
 import * as v from 'valibot';
 

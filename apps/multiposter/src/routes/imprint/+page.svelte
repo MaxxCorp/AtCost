@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
-    import ContentBlockEditor from "$lib/components/cms/ContentBlockEditor.svelte";
+    import ContentBlockEditor from "#lib/components/cms/ContentBlockEditor.svelte";
     import { readContent } from "./read.remote";
     import { updateContent } from "./update.remote";
     import { createBlockFunction } from "./create.remote";
@@ -8,7 +8,7 @@
     import { deleteBlockFunction } from "./delete.remote";
     import { listBlocksFunction } from "./list.remote";
     import { renameBlockFunction } from "./rename.remote";
-            import * as m from "$lib/paraglide/messages.js";
+            import * as m from "#lib/paraglide/messages.js";
 
     // Client-side call to read content
     // We can also pass data from server load if we wanted SSR, but remote pattern implies client fetch often.

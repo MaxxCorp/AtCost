@@ -1,12 +1,12 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { goto } from "$app/navigation";
     import type { Campaign } from "../../../routes/campaigns/[id]/read.remote";
     import { deleteCampaigns } from "../../../routes/campaigns/[id]/delete.remote";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "#lib/components/ui/button/index.js";
     import { handleDelete, translateIssue } from "@ac/ui";
     import type { updateCampaign } from "../../../routes/campaigns/[id]/update.remote";
     import type { createCampaign } from "../../../routes/campaigns/new/create.remote";

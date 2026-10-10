@@ -1,13 +1,13 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listContacts } from "./list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { listTags } from "../tags/list.remote";
 	import { deleteContact } from "./[id]/delete.remote";
 
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import {
 		User,
 		Pencil,
@@ -24,11 +24,12 @@
 		ArrowLeft,
 		ArrowRight,
 		ChevronsLeft,
-		ChevronsRight
+		ChevronsRight,
+		Tag as TagIcon
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 
@@ -39,20 +40,9 @@
 	let limit = $state(50);
 	let filterValues = $state<FilterStateMap>({});
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "locationId",
-			label: m.locations(),
-			optionsRemote: listLocations,
-			searchable: true,
-		},
-		{
-			id: "tagId",
-			label: m.tags(),
-			optionsRemote: listTags,
-			searchable: true,
-		},
-	]);
+	import { getContactFilterGroups } from "#lib/filters/index.js";
+
+	const filterGroups = $derived<FilterGroup[]>(getContactFilterGroups(m));
 
 	onMount(async () => {
 		try {

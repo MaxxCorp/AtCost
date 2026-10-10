@@ -1,14 +1,14 @@
 import { type InferSelectModel, eq, getTableColumns, inArray, and } from '@ac/db';
 import { query } from '$app/server';
 import { resource, resourceRelation, location, resourceLocation } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { PaginationSchema } from '@ac/validations';
 
 
 export type ResourceWithHierarchy = InferSelectModel<typeof resource> & {
-
     locationName?: string | null;
+    locationNames?: string[];
     parentIds: string[];
     childIds: string[];
     level: number; // Depth in hierarchy (0 = root)
@@ -43,15 +43,16 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
 
     const resources = await baseQuery;
 
-
     // Fetch all location associations for these resources
     const resourceIds = resources.map(r => r.id);
     const locationMap = new Map<string, string[]>();
+    const locationIdMap = new Map<string, string[]>();
 
     if (resourceIds.length > 0) {
         const locAssociations = await db
             .select({
                 resourceId: resourceLocation.resourceId,
+                locationId: resourceLocation.locationId,
                 locationName: location.name,
             })
             .from(resourceLocation)
@@ -60,15 +61,53 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
 
         locAssociations.forEach(assoc => {
             const names = locationMap.get(assoc.resourceId) || [];
-            names.push(assoc.locationName);
+            if (!names.includes(assoc.locationName)) {
+                names.push(assoc.locationName);
+            }
             locationMap.set(assoc.resourceId, names);
+
+            const ids = locationIdMap.get(assoc.resourceId) || [];
+            if (assoc.locationId && !ids.includes(assoc.locationId)) {
+                ids.push(assoc.locationId);
+            }
+            locationIdMap.set(assoc.resourceId, ids);
+        });
+
+        const directLocAssociations = await db
+            .select({
+                resourceId: resource.id,
+                locationId: resource.locationId,
+                locationName: location.name,
+            })
+            .from(resource)
+            .innerJoin(location, eq(resource.locationId, location.id))
+            .where(inArray(resource.id, resourceIds));
+
+        directLocAssociations.forEach(assoc => {
+            const names = locationMap.get(assoc.resourceId) || [];
+            if (!names.includes(assoc.locationName)) {
+                names.push(assoc.locationName);
+            }
+            locationMap.set(assoc.resourceId, names);
+
+            const ids = locationIdMap.get(assoc.resourceId) || [];
+            if (assoc.locationId && !ids.includes(assoc.locationId)) {
+                ids.push(assoc.locationId);
+            }
+            locationIdMap.set(assoc.resourceId, ids);
         });
     }
 
-    const resourcesWithLocation = resources.map(r => ({
-        ...r,
-        locationName: locationMap.get(r.id)?.join(', ') || null,
-    }));
+    const resourcesWithLocation = resources.map(r => {
+        const locNames = locationMap.get(r.id) || [];
+        const locIds = locationIdMap.get(r.id) || (r.locationId ? [r.locationId] : []);
+        return {
+            ...r,
+            locationNames: locNames,
+            locationName: locNames.length > 0 ? locNames.join(', ') : null,
+            locationIds: locIds,
+        };
+    });
 
     // Fetch all relationships
     const relations = await db

@@ -2,11 +2,12 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, campaign, announcementLocation, announcementTag, tag, announcementResource, resource, locationContact } from '@ac/db';
 import { eq, desc, inArray, notInArray, and, or, not, ilike, sql, exists } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import type { Announcement as DbAnnouncement } from '@ac/db';
 import { announcementPaginationSchema as PaginationSchema, parseFilterValue, type Announcement, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
-import { resolveAnnouncementContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
+import { resolveAnnouncementContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
 /**
  * List all announcements for the authenticated user
@@ -21,6 +22,10 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 		// unauthorized can only see public announcements
 	}
 
+    const version = await getNamespaceVersion(CACHE_NAMESPACES.ANNOUNCEMENTS);
+    const key = cacheKeys.announcementsList(version, hashParams(input));
+
+    return cached(key, 300, async () => {
     const { page = 1, limit = 50, search = '', locationId, tagId, sortField = 'updatedAt', sortOrder = 'desc', excludedAnnouncementIds, includedAnnouncementIds, excludedTags, includedTags } = input || {};
     const offset = (page - 1) * limit;
 
@@ -264,5 +269,6 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     });
 
     return { data: data as any, total };
+    });
 });
 

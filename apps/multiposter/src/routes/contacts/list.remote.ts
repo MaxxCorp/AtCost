@@ -4,8 +4,9 @@ import { contact, locationContact, contactTag, tag } from '@ac/db';
 import type { Contact as DbContact } from '@ac/db';
 import { db } from '@ac/db';
 import { desc, eq, inArray, and, or, not, ilike, sql, exists } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { contactPaginationSchema as PaginationSchema, parseFilterValue, type Contact, type PaginatedResult } from '@ac/validations';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
 /**
  * Query: List all contacts
@@ -14,6 +15,10 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 	const user = getAuthenticatedUser();
 	ensureAccess(user, 'contacts');
 
+	const version = await getNamespaceVersion(CACHE_NAMESPACES.CONTACTS);
+	const key = cacheKeys.contactsList(version, hashParams(input));
+
+	return cached(key, 300, async () => {
 	const { page = 1, limit = 50, search = '', locationId, tagId, associatedWith } = input || {};
 	console.log("[listContacts] input:", { page, limit, search, locationId, tagId, associatedWith });
 	const offset = (page - 1) * limit;
@@ -142,7 +147,12 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 
     const rawResults = await db.query.contact.findMany({
         where: inArray(contact.id, ids),
-        with: { user: true },
+        with: {
+            user: true,
+            tags: {
+                with: { tag: true }
+            }
+        },
     });
 
     const rawMap = new Map(rawResults.map((r) => [r.id, r]));
@@ -171,8 +181,12 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
 		addresses: [],
 		locationAssociations: [],
 		relations: [],
-		tags: [],
+		tags: (row.tags || []).map((t: any) => ({
+            id: t.tag?.id,
+            name: t.tag?.name
+        })),
 	}));
 
 	return { data, total };
+	});
 });

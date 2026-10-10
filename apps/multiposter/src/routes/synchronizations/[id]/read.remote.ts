@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import * as v from 'valibot';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db, syncConfig, syncOperation, eq, and, desc, type SyncConfig, type SyncOperation } from '@ac/db';
 
 /**

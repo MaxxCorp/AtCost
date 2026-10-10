@@ -1,102 +1,131 @@
 <script lang="ts">
-	import { LoadingSection, ErrorSection } from "@ac/ui";
-	import * as m from "$lib/paraglide/messages.js";
-	import { page } from "$app/state";
-	import { goto } from "$app/navigation";
-    import { browser } from "$app/environment";
-	import { readSynchronization as read, getOperations } from "./read.remote";
-	import { updateSynchronization as update } from "./update.remote";
-	import { updateSynchronizationSchema, type UpdateSynchronizationInput as UpdateSyncInput } from "$lib/validations/synchronizations";
-	import { removeBulk } from "./delete.remote";
-	import { sync } from "./sync.remote";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-	import SynchronizationForm from "$lib/components/synchronizations/SynchronizationForm.svelte";
-	import { handleDelete } from "@ac/ui";
-	import { toast } from "svelte-sonner";
-	import {
-		Calendar,
-		RefreshCw,
-		Trash2,
-		CircleCheck,
-		CircleX,
-		Clock,
+    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import * as m from "#lib/paraglide/messages.js";
+    import { page } from "$app/state";
+    import { goto } from "$app/navigation";
+    import { browser } from '$app/env';
+    import { readSynchronization as read, getOperations } from "./read.remote";
+    import { updateSynchronization as update } from "./update.remote";
+	import { updateSynchronizationSchema, type UpdateSynchronizationInput as UpdateSyncInput } from "#lib/validations/synchronizations.js";
+    import { removeBulk } from "./delete.remote";
+    import { startBulkSync, processBulkSyncBatch, sync } from "./sync.remote";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import SynchronizationForm from "#lib/components/synchronizations/SynchronizationForm.svelte";
+    import { handleDelete } from "@ac/ui";
+    import { toast } from "svelte-sonner";
+    import {
+        Calendar,
+        RefreshCw,
+        Trash2,
+        CircleCheck,
+        CircleX,
+        Clock,
 		CircleAlert,
-	} from "@lucide/svelte";
+    } from "@lucide/svelte";
 
-	const configId = $derived(page.params.id || "");
+    const configId = $derived(page.params.id || "");
     const mainRf = $derived(update.for(configId));
 
-	// Version tracker for re-fetching data after actions
-	let version = $state(0);
-	let isSyncing = $state(false);
-	let syncError = $state<string | null>(null);
+    // Version tracker for re-fetching data after actions
+    let version = $state(0);
+    let isSyncing = $state(false);
+    let syncProgress = $state<string | null>(null);
+    let syncError = $state<string | null>(null);
 
-	let prevIssuesLength = $state(0);
-	$effect(() => {
-		const issues = (mainRf as any).allIssues?.() ?? [];
-		if (issues.length > 0 && prevIssuesLength === 0) {
-			toast.error(m.please_fix_validation());
-		}
-		prevIssuesLength = issues.length;
-	});
+    let prevIssuesLength = $state(0);
+    $effect(() => {
+        const issues = (mainRf as any).allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
+            toast.error(m.please_fix_validation());
+        }
+        prevIssuesLength = issues.length;
+    });
 
-	// Derived promises that re-fetch when version changes
-	let configPromise = $derived.by(() => {
-		version;
-		return read(configId);
-	});
+    // Derived promises that re-fetch when version changes
+    let configPromise = $derived.by(() => {
+        version;
+        return read(configId);
+    });
 
-	let operationsPromise = $derived.by(() => {
-		version;
-		return getOperations(configId);
-	});
+    let operationsPromise = $derived.by(() => {
+        version;
+        return getOperations(configId);
+    });
 
-	async function triggerSync() {
-		try {
-			isSyncing = true;
-			syncError = null;
-			await sync(configId);
-			version++; // Trigger re-fetch
-			toast.success(m.sync_completed_successfully());
+    async function triggerBulkSync() {
+        try {
+            isSyncing = true;
+            syncError = null;
+            syncProgress = null;
+
+            const startRes = await startBulkSync(configId);
+            if (startRes.done) {
+                version++;
+                toast.success(m.bulk_sync_completed({ pushed: 0, pulled: startRes.pulled || 0 }));
+                return;
+            }
+
+            let done = false;
+            let lastResult: any = null;
+            while (!done) {
+				const batchRes = await processBulkSyncBatch({
+					configId,
+					operationId: startRes.operationId,
+					batchSize: 10
+				});
+                lastResult = batchRes;
+                done = batchRes.done;
+				syncProgress = m.bulk_sync_progress({
+					current: batchRes.processed,
+					total: batchRes.total
+				});
+            }
+
+            version++;
+            toast.success(m.bulk_sync_completed({
+                pushed: lastResult?.pushed ?? 0,
+                pulled: startRes.pulled ?? 0
+            }));
 		} catch (e: any) {
-			syncError = e.message;
-			toast.error(m.sync_failed() + ": " + e.message);
-		} finally {
-			isSyncing = false;
-		}
-	}
+            syncError = e.message;
+            toast.error(m.bulk_sync_failed() + ": " + (e.message || e));
+        } finally {
+            isSyncing = false;
+            syncProgress = null;
+        }
+    }
 
-	function formatDate(date: Date | null) {
-		if (!date) return m.never();
-		return new Date(date).toLocaleString();
-	}
+    function formatDate(date: Date | null) {
+        if (!date) return m.never();
+        return new Date(date).toLocaleString();
+    }
 
-	function getProviderLabel(providerType: string) {
-		if (providerType === "google-calendar") return "Google Calendar";
-		if (providerType === "microsoft-calendar") return "Microsoft Calendar";
-		return providerType;
-	}
+    function getProviderLabel(providerType: string) {
+        if (providerType === "google-calendar") return "Google Calendar";
+        if (providerType === "microsoft-calendar") return "Microsoft Calendar";
+        return providerType;
+    }
 
-	function getStatusIcon(status: string) {
-		if (status === "completed") return CircleCheck;
-		if (status === "failed") return CircleX;
-		if (status === "pending") return Clock;
-		return CircleAlert;
-	}
-	function getStatusColor(status: string) {
-		if (status === "completed") return "text-green-600";
-		if (status === "failed") return "text-red-600";
-		if (status === "pending") return "text-yellow-600";
-		return "text-gray-600";
-	}
+    function getStatusIcon(status: string) {
+        if (status === "completed") return CircleCheck;
+        if (status === "failed") return CircleX;
+        if (status === "pending") return Clock;
+        return CircleAlert;
+    }
+    function getStatusColor(status: string) {
+        if (status === "completed") return "text-green-600";
+        if (status === "failed") return "text-red-600";
+        if (status === "pending") return "text-yellow-600";
+        return "text-gray-600";
+    }
 
-	function getOperationLabel(operation: string) {
-		if (operation === "pull") return m.pull();
-		if (operation === "push") return m.push();
-		if (operation === "delete") return m.delete();
-		return operation;
-	}
+    function getOperationLabel(operation: string) {
+        if (operation === "pull") return m.pull();
+        if (operation === "push") return m.push();
+        if (operation === "delete") return m.delete();
+        return operation;
+    }
 
     function formatStatus(status: string) {
         if (status === "completed") return m.completed();
@@ -134,9 +163,16 @@
                                             <Calendar class="h-8 w-8 text-blue-600" />
                                         </div>
                                         <div>
-                                            <h1 class="text-3xl font-bold">
-                                                {getProviderLabel(config.providerType)}
-                                            </h1>
+                                            <div class="flex items-center gap-3">
+                                                <h1 class="text-3xl font-bold">
+                                                    {getProviderLabel(config.providerType)}
+                                                </h1>
+                                                {#if (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                        {m.default_shared_target ? m.default_shared_target() : "Default Shared Target"}
+                                                    </span>
+                                                {/if}
+                                            </div>
                                             <p class="text-gray-600">{config.providerId}</p>
                                         </div>
                                     </div>
@@ -144,11 +180,11 @@
                                         <AsyncButton
                                             variant="default"
                                             loading={isSyncing}
-                                            loadingLabel={m.syncing()}
-                                            onclick={triggerSync}
+                                            loadingLabel={syncProgress || m.bulk_syncing()}
+                                            onclick={triggerBulkSync}
                                         >
                                             <RefreshCw class="h-4 w-4 mr-2 {isSyncing ? 'animate-spin' : ''}" />
-                                            {m.sync_now()}
+                                            {m.bulk_sync()}
                                         </AsyncButton>
                                         <AsyncButton
                                             variant={config.enabled ? "secondary" : "default"}
@@ -288,7 +324,10 @@
                                 {/if}
 
                                 <div class="bg-white shadow rounded-lg p-6 space-y-4">
-                                    <h2 class="text-lg font-semibold mb-4">{m.recent_sync_operations()}</h2>
+                                    <div>
+                                        <h2 class="text-lg font-semibold">{m.recent_sync_operations()}</h2>
+                                        <p class="text-xs text-gray-500 mt-0.5">{m.recent_sync_operations_retention_hint()}</p>
+                                    </div>
                                     {#await operationsPromise}
                                         <div class="flex justify-center py-8">
                                             <RefreshCw class="h-6 w-6 animate-spin text-gray-400" />

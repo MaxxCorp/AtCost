@@ -1,6 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager } from "@ac/ui";
     import { Calendar, ArrowLeft, ExternalLink, FileText } from "@lucide/svelte";
     import { 
@@ -10,12 +10,13 @@
         invokeAddTimelineEntry, 
         listEmployees 
     } from '../talents.remote';
-    import { listContracts, deleteContract, createContract, updateContract } from '../../contracts/contracts.remote';
+    import { listContracts, readContract, deleteContract, createContract, updateContract } from '../../contracts/contracts.remote';
     import ContractForm from '../../contracts/ContractForm.svelte';
 
     import { contractSchema } from "@ac/validations/contracts";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
-    import TalentForm from "$lib/components/talent/TalentForm.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
+    import TalentForm from "#lib/components/talent/TalentForm.svelte";
+    import { getContractFilterGroups } from "#lib/filters/index.js";
 
     const talentIdParam = $derived(page.params.id as string);
     
@@ -116,13 +117,14 @@
                                 title="Contracts"
                                 icon={FileText}
                                 mode="embedded"
+                                filters={getContractFilterGroups(m)}
                                 listItemsRemote={listTalentContracts}
                                 deleteItemRemote={deleteContract}
                                 createRemote={createContract}
                                 createSchema={contractSchema}
                                 updateRemote={updateContract}
                                 updateSchema={contractSchema}
-                                getFormData={(c: any) => c}
+                                readItemRemote={(id: string) => readContract({ id })}
                                 searchPredicate={(c: any, q: any) => {
                                     return (c.entgeltgruppe?.toLowerCase() || '').includes(q.toLowerCase());
                                 }}

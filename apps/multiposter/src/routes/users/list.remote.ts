@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { type InferSelectModel } from '@ac/db';
 import { query } from '$app/server';
 import { db, user, desc, asc, ilike, or, and, sql } from '@ac/db';
-import { ensureAccess, getAuthenticatedUser, parseRoles } from '$lib/server/authorization';
+import { ensureAccess, getAuthenticatedUser, parseRoles } from '#lib/server/authorization.js';
 
 import { UserPaginationSchema as PaginationSchema, parseFilterValue, type User, type PaginatedResult } from '@ac/validations';
 

@@ -1,11 +1,12 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { list } from "./list.remote";
 	import { removeBulk } from "./[id]/delete.remote";
+	import { startBulkSync, processBulkSyncBatch } from "./[id]/sync.remote";
 	import { getEmailCampaigns } from "./email-campaigns.remote";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
-	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
+	import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
 	import {
 		Calendar,
 		CircleCheck,
@@ -28,19 +29,24 @@
 		ArrowRight,
 		ChevronsLeft,
 		ChevronsRight,
-		Camera
+		Camera,
+		RefreshCw,
+		Database
 	} from "@lucide/svelte";
+	import { checkMigrationStatus } from "./migration.remote";
+	import MigrationDialog from "#lib/components/sync/MigrationDialog.svelte";
 
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-	import WebhookToggleButton from "$lib/components/synchronizations/WebhookToggleButton.svelte";
-	import { authClient } from "$lib/auth";
-	import { hasAccess } from "$lib/authorization";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
+	import WebhookToggleButton from "#lib/components/synchronizations/WebhookToggleButton.svelte";
+	import { authClient } from "#lib/auth.js";
+	import { hasAccess } from "#lib/authorization.js";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	const session = authClient.useSession();
 	const user = $derived($session.data?.user);
+	let showMigrationDialog = $state(false);
 	const isAdmin = $derived(hasAccess(user, 'synchronizations', 'admin'));
 
 	// Type definition for the list items
@@ -235,23 +241,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const PROVIDER_OPTIONS = [
-		{ id: "google-calendar", label: "Google Calendar" },
-		{ id: "microsoft-calendar", label: "Microsoft Calendar" },
-		{ id: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
-		{ id: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
-		{ id: "wp-the-events-calendar", label: "WP The Events Calendar" },
-		{ id: "email", label: "E-Mail (Brevo)" },
-	];
+	import { getSynchronizationFilterGroups } from "#lib/filters/index.js";
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "providerType",
-			label: m.providers(),
-			options: PROVIDER_OPTIONS,
-			searchable: true,
-		},
-	]);
+	const filterGroups = $derived<FilterGroup[]>(getSynchronizationFilterGroups(m));
 
 	onMount(async () => {
 		try {
@@ -287,6 +279,51 @@
 		sortOrder,
 	});
 
+	let syncingConfigId = $state<string | null>(null);
+	let syncProgress = $state<string | null>(null);
+
+	async function handleBulkSync(configId: string) {
+		if (syncingConfigId) return;
+		syncingConfigId = configId;
+		syncProgress = null;
+
+		try {
+			const startRes = await startBulkSync(configId);
+			if (startRes.done) {
+				toast.success(m.bulk_sync_completed({ pushed: 0, pulled: startRes.pulled || 0 }));
+				list(filterState).refresh();
+				return;
+			}
+
+			let done = false;
+			let lastResult: any = null;
+			while (!done) {
+				const batchRes = await processBulkSyncBatch({
+					configId,
+					operationId: startRes.operationId,
+					batchSize: 10
+				});
+				lastResult = batchRes;
+				done = batchRes.done;
+				syncProgress = m.bulk_sync_progress({
+					current: batchRes.processed,
+					total: batchRes.total
+				});
+			}
+
+			toast.success(m.bulk_sync_completed({
+				pushed: lastResult?.pushed ?? 0,
+				pulled: startRes.pulled ?? 0
+			}));
+			list(filterState).refresh();
+		} catch (e: any) {
+			toast.error(m.bulk_sync_failed() + ": " + (e.message || e));
+		} finally {
+			syncingConfigId = null;
+			syncProgress = null;
+		}
+	}
+
 	async function deleteItem(config: Synchronization) {
 		if (!window.confirm(m.delete_confirm({ item: m.feature_synchronizations_title() }))) return;
 		try {
@@ -321,12 +358,42 @@
 					{m.feature_synchronizations_description ? m.feature_synchronizations_description() : "Manage calendar and email synchronizations"}
 				</p>
 			</div>
-			{#if isAdmin}
-				<Button href="/synchronizations/new" class="w-full md:w-auto shadow-sm">
-					<Plus class="w-4 h-4 mr-2" />
-					{m.new_item({ item: "Synchronization" })}
-				</Button>
-			{/if}
+			<div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+				{#await checkMigrationStatus() then migStatus}
+					{#if migStatus?.hasLegacyData && isAdmin}
+						<Button
+							variant="outline"
+							onclick={() => (showMigrationDialog = true)}
+							class="border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60 shadow-sm"
+						>
+							<Database class="w-4 h-4 mr-2 text-amber-600 dark:text-amber-400" />
+							Migrate Data
+							<span class="ml-2 px-1.5 py-0.5 text-xs font-semibold rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100">
+								{migStatus.totalItems}
+							</span>
+						</Button>
+
+						{#if showMigrationDialog}
+							<MigrationDialog
+								bind:open={showMigrationDialog}
+								statusData={migStatus}
+								oncomplete={() => {
+									checkMigrationStatus().refresh();
+									list(filterState).refresh();
+								}}
+								onclose={() => (showMigrationDialog = false)}
+							/>
+						{/if}
+					{/if}
+				{/await}
+
+				{#if isAdmin}
+					<Button href="/synchronizations/new" class="w-full md:w-auto shadow-sm">
+						<Plus class="w-4 h-4 mr-2" />
+						{m.new_item({ item: "Synchronization" })}
+					</Button>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Action Bar -->
@@ -422,17 +489,24 @@
 							<div class="flex items-start justify-between gap-4 mb-2">
 								<div class="flex-1 min-w-0">
 									<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
-										<a
-											href={`/synchronizations/${config.id}`}
-											class="hover:underline text-blue-600 flex items-center gap-2"
-										>
-											<Icon class="h-5 w-5 flex-shrink-0" />
-											{#if config.name}
-												{config.name}
-											{:else}
-												{getProviderLabel(config.providerType)}
+										<div class="flex items-center gap-2 flex-wrap">
+											<a
+												href={`/synchronizations/${config.id}`}
+												class="hover:underline text-blue-600 flex items-center gap-2"
+											>
+												<Icon class="h-5 w-5 flex-shrink-0" />
+												{#if config.name}
+													{config.name}
+												{:else}
+													{getProviderLabel(config.providerType)}
+												{/if}
+											</a>
+											{#if (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
+												<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+													{m.default_badge ? m.default_badge() : "Default"}
+												</span>
 											{/if}
-										</a>
+										</div>
 									</h3>
 									<p class="text-sm text-gray-500 break-all mt-1">
 										{config.providerId}
@@ -542,6 +616,18 @@
 							</div>
 							
 							{#if isAdmin}
+								<AsyncButton
+									variant="outline"
+									size="sm"
+									class="flex-1 sm:flex-none"
+									loading={syncingConfigId === config.id}
+									loadingLabel={syncProgress || m.bulk_syncing()}
+									disabled={!config.enabled || (syncingConfigId !== null && syncingConfigId !== config.id)}
+									onclick={() => handleBulkSync(config.id)}
+								>
+									<RefreshCw class="w-4 h-4 mr-2 {syncingConfigId === config.id ? 'animate-spin' : ''}" />
+									{m.bulk_sync()}
+								</AsyncButton>
 								<Button
 									href={`/synchronizations/${config.id}`}
 									variant="outline"

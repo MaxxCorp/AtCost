@@ -1,14 +1,16 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '@ac/db';
-import { updateAnnouncementSchema } from '$lib/validations/announcements';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { publishAnnouncementChange } from '$lib/server/realtime';
+import { updateAnnouncementSchema } from '#lib/validations/announcements.js';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { publishAnnouncementChange } from '#lib/server/realtime.js';
 import { listAnnouncements } from '../list.remote';
 import { readAnnouncement } from './read.remote';
 import { eq } from '@ac/db';
-import { syncService } from '$lib/server/sync/service';
-import { type Announcement } from '@ac/validations';
+import { syncService } from '#lib/server/sync/service.js';
+import { type Announcement, createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { invalidateAnnouncement } from '#lib/server/cache/index.js';
+
 
 
 /**
@@ -62,15 +64,31 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
             if (input.syncIds !== undefined) {
                 const syncIds = typeof input.syncIds === 'string' ? JSON.parse(input.syncIds) : input.syncIds;
                 if (updatedAnnouncement?.campaignId) {
+                    const [camp] = await tx.select().from(campaign).where(eq(campaign.id, updatedAnnouncement.campaignId));
+                    const content: CampaignContent = (camp?.content as any)?.version === 1
+                        ? (camp?.content as any)
+                        : createDefaultCampaignContent(syncIds);
+
+                    content.targets = {};
+                    for (const id of syncIds) {
+                        content.targets[id] = { enabled: true };
+                    }
+                    if (!content.items) content.items = {};
+                    if (!content.items[announcementId]) {
+                        content.items[announcementId] = { entityType: 'announcement', syncs: {} };
+                    }
+
                     await tx.update(campaign).set({
-                        content: { syncIds },
+                        content,
                         updatedAt: new Date()
                     }).where(eq(campaign.id, updatedAnnouncement.campaignId));
                 } else if (updatedAnnouncement) {
+                    const newContent = createDefaultCampaignContent(syncIds);
+                    newContent.items[announcementId] = { entityType: 'announcement', syncs: {} };
                     const [newCampaign] = await tx.insert(campaign).values({
                         userId: user.id,
-                        name: `Campaign for ${input.title}`,
-                        content: { syncIds }
+                        name: `Campaign for ${input.title || 'Announcement'}`,
+                        content: newContent
                     }).returning();
                     if (newCampaign) {
                         await tx.update(announcement).set({ campaignId: newCampaign.id }).where(eq(announcement.id, announcementId));
@@ -161,9 +179,14 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
         const { updatedAnnouncement, finalTags } = transactionResult as any;
 
         // Notify listeners
-        await publishAnnouncementChange('update', [announcementId]);
+        await publishAnnouncementChange('update', [announcementId], {
+            id: user.id,
+            name: user.name || user.email,
+            email: user.email
+        });
 
         // Refresh caches
+        await invalidateAnnouncement(announcementId);
         await readAnnouncement(announcementId).refresh();
         await listAnnouncements().refresh();
 

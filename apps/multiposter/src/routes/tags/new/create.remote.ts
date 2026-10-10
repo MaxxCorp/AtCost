@@ -1,7 +1,7 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
 import { tag } from '@ac/db';
-import { ensureAccess, getAuthenticatedUser } from '$lib/server/authorization';
+import { ensureAccess, getAuthenticatedUser } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { listTags } from "../list.remote.js"
 

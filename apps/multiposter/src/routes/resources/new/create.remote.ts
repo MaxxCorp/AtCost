@@ -3,8 +3,8 @@ import { db } from '@ac/db';
 import { resource, resourceRelation, resourceLocation as resourceLocationTable } from '@ac/db';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { createResourceSchema } from '$lib/validations/resources';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { createResourceSchema } from '#lib/validations/resources.js';
 
 
 export const createResource = form(createResourceSchema, async (data) => {

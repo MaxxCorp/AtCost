@@ -1,13 +1,13 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import RichTextEditor from "./RichTextEditor.svelte";
-    import { Button } from "$lib/components/ui/button";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import { Button } from "#lib/components/ui/button/index.js";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import type { readContent } from "../../../routes/imprint/read.remote";
-    import { invalidateAll } from "$app/navigation";
-    import { locales } from "$lib/paraglide/runtime"; // Dynamic locales
-    import * as Dialog from "$lib/components/ui/dialog";
+    import { refreshAll } from "$app/navigation";
+    import { locales } from "#lib/paraglide/runtime.js"; // Dynamic locales
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
 
     type ReadResult = Awaited<ReturnType<typeof readContent>>;
 
@@ -146,7 +146,7 @@
             });
             if (result?.success) {
                 toast.success(`${m.successfully_saved()} (${language}/${branch})`);
-                await invalidateAll();
+                await refreshAll();
                 isEditing = false;
             } else {
                 toast.error(result?.error?.message ?? m.something_went_wrong());
@@ -174,7 +174,7 @@
             });
             if (result?.success) {
                 toast.success(m.successfully_saved());
-                await invalidateAll();
+                await refreshAll();
                 isEditing = false;
             }
         } catch (e: any) {
@@ -192,7 +192,7 @@
             });
             if (result?.success) {
                 toast.success(m.block_created_and_linked());
-                await invalidateAll();
+                await refreshAll();
                 // We could auto-start editing, but we need to wait for reload.
             }
         } catch (e: any) {
@@ -212,7 +212,7 @@
             });
             if (result?.success) {
                 toast.success(m.renamed_successfully());
-                await invalidateAll();
+                await refreshAll();
             }
         } catch (e: any) {
             toast.error(e.message);
@@ -235,7 +235,7 @@
             const result = await remoteLink({ blockId: selectedBlockId });
             if (result?.success) {
                 toast.success(m.block_switched());
-                await invalidateAll();
+                await refreshAll();
                 showSwitchModal = false;
             }
         } catch (e: any) {
@@ -253,7 +253,7 @@
             const result = await remoteDelete({ blockId: currentBlock.id });
             if (result?.success) {
                 toast.success(m.block_deleted());
-                await invalidateAll();
+                await refreshAll();
             }
         } catch (e: any) {
             toast.error(e.message);

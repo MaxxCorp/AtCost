@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
-	import { authClient } from "$lib/auth";
-	import DashboardCard from "$lib/components/ui/DashboardCard.svelte";
-	import { hasAccess, parseRoles, parseClaims } from "$lib/authorization";
-	import { FEATURES, getVisibleFeatures } from "$lib/features";
-		import * as m from "$lib/paraglide/messages";
+	import { authClient } from "#lib/auth.js";
+	import DashboardCard from "#lib/components/ui/DashboardCard.svelte";
+	import { hasAccess, parseRoles, parseClaims } from "#lib/authorization.js";
+	import { FEATURES, getVisibleFeatures } from "#lib/features.js";
+		import * as m from "#lib/paraglide/messages.js";
 
 	const session = authClient.useSession();
 	const user = $derived($session.data?.user);

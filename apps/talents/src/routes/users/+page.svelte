@@ -1,10 +1,10 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     
     import { listUsers } from "./list.remote";
     import { deleteUser } from "./[id]/delete.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { 
         User as UserIcon, 
         Mail, 
@@ -50,6 +50,7 @@
         {
             id: "role",
             label: m.role ? m.role() : "Role",
+            icon: Shield,
             options: ROLE_OPTIONS,
             searchable: true,
         },

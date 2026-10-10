@@ -1,11 +1,11 @@
 <script lang="ts">
-    import * as Dialog from "$lib/components/ui/dialog";
-    import { Button } from "$lib/components/ui/button";
-    import { RRule, Frequency } from "$lib/utils/rrule-compat";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
+    import { Button } from "#lib/components/ui/button/index.js";
+    import { RRule, Frequency } from "#lib/utils/rrule-compat.js";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { RefreshCw } from "@lucide/svelte";
     import { createEventDispatcher } from "svelte";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
 
     let { 
         open = $bindable(false), 

@@ -6,9 +6,9 @@
     import { listAnnouncements } from "../../../routes/announcements/list.remote";
     import { listTags } from "../../../routes/tags/list.remote";
 
-    import * as m from "$lib/paraglide/messages";
-    import Button from "$lib/components/ui/button/button.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import * as m from "#lib/paraglide/messages.js";
+    import Button from "#lib/components/ui/button/button.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { EntityManager, LocationForm, handleDelete, translateIssue } from "@ac/ui";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
@@ -17,10 +17,21 @@
         updateLocationSchema,
     } from "@ac/validations";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
+    import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { MapPin } from "@lucide/svelte";
+    import { getLocationFilterGroups } from "#lib/filters/index.js";
     import { onMount, untrack } from "svelte";
     import { toast } from "svelte-sonner";
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
+    import {
+        formatForInput,
+        getNextWeekRange,
+        getThisWeekRange,
+        getNextMonthRange,
+        getThisMonthRange,
+        formatDateRangeDisplay,
+    } from "#lib/utils/kiosk-dates.js";
  
     let {
         remoteFunction,
@@ -32,8 +43,8 @@
         validationSchema: any;
         initialData?: any;
         isUpdating?: boolean;
-    } = $props();
- 
+     } = $props();
+
     const type = "kiosk";
  
  
@@ -42,9 +53,46 @@
     let lookAheadDays = $state(untrack(() => initialData?.lookAhead ? Math.round(initialData.lookAhead / 86400) : 28));
     let lookPastDays = $state(untrack(() => initialData?.lookPast ? Math.round(initialData.lookPast / 86400) : 0));
     let uiMode = $state(untrack(() => initialData?.uiMode || "carousel"));
-    let rangeMode = $state(untrack(() => initialData?.rangeMode || "rolling"));
-    let startDate = $state(untrack(() => initialData?.startDate ? new Date(initialData.startDate).toISOString().slice(0, 16) : ""));
-    let endDate = $state(untrack(() => initialData?.endDate ? new Date(initialData.endDate).toISOString().slice(0, 16) : ""));
+    let rangeMode = $state(untrack(() => initialData?.rangeMode === "relative" ? "rolling" : (initialData?.rangeMode || "rolling")));
+
+    const isCalendarMode = $derived(
+        rangeMode === "next_week" ||
+        rangeMode === "this_week" ||
+        rangeMode === "next_month" ||
+        rangeMode === "this_month"
+    );
+    const isRollingDaysMode = $derived(rangeMode === "rolling" || rangeMode === "relative");
+    const isFixedMode = $derived(rangeMode === "fixed");
+
+    const calendarPreview = $derived.by(() => {
+        const now = new Date();
+        if (rangeMode === "next_week") {
+            return getNextWeekRange(now);
+        } else if (rangeMode === "this_week") {
+            return getThisWeekRange(now);
+        } else if (rangeMode === "next_month") {
+            return getNextMonthRange(now);
+        } else if (rangeMode === "this_month") {
+            return getThisMonthRange(now);
+        }
+        return null;
+    });
+
+    function formatInitialDate(val: any): string {
+        if (!val) return "";
+        try {
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return "";
+            const year = d.getFullYear();
+            if (year < 1970 || year > 2100) return "";
+            return d.toISOString().slice(0, 16);
+        } catch {
+            return "";
+        }
+    }
+
+    let startDate = $state(untrack(() => formatInitialDate(initialData?.startDate)));
+    let endDate = $state(untrack(() => formatInitialDate(initialData?.endDate)));
  
     let excludeNonPublic = $state(untrack(() => initialData?.excludeNonPublic ?? true));
     let excludeTentative = $state(untrack(() => initialData?.excludeTentative ?? true));
@@ -57,11 +105,6 @@
     let includedAnnouncementIds = $state<string[]>(untrack(() => initialData?.includedAnnouncementIds || []));
     let excludedTags = $state<string[]>(untrack(() => initialData?.excludedTags || ['Series']));
     let includedTags = $state<string[]>(untrack(() => initialData?.includedTags || []));
- 
-
-
- 
-
 
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
@@ -74,78 +117,108 @@
         }
         prevIssuesLength = issues.length;
     });
- 
-    function formatForInput(date: Date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
-        const hours = String(date.getHours()).padStart(2, "0");
-        const minutes = String(date.getMinutes()).padStart(2, "0");
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    function applyNextWeek() {
+        if (isFixedMode) {
+            const { start, end } = getNextWeekRange();
+            startDate = formatForInput(start);
+            endDate = formatForInput(end);
+        } else if (isRollingDaysMode) {
+            lookAheadDays = 7;
+            lookPastDays = 0;
+        } else {
+            rangeMode = "next_week";
+        }
+        rf.validate();
     }
- 
-    function setQuickRange(days: number) {
-        const now = new Date();
-        const start = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate(),
-            0,
-            0,
-        );
-        const end = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + days,
-            23,
-            59,
-        );
- 
-        startDate = formatForInput(start);
-        endDate = formatForInput(end);
+
+    function applyNextMonth() {
+        if (isFixedMode) {
+            const { start, end } = getNextMonthRange();
+            startDate = formatForInput(start);
+            endDate = formatForInput(end);
+        } else if (isRollingDaysMode) {
+            lookAheadDays = 30;
+            lookPastDays = 0;
+        } else {
+            rangeMode = "next_month";
+        }
+        rf.validate();
     }
- 
-    function setNextWeek() {
-        const now = new Date();
-        const day = now.getDay();
-        // Distance to next Monday (1-7 days away)
-        const diff = (8 - (day === 0 ? 7 : day)) % 7 || 7;
-        const nextMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff, 0, 0);
-        const nextSunday = new Date(nextMonday.getFullYear(), nextMonday.getMonth(), nextMonday.getDate() + 6, 23, 59);
-        
-        startDate = formatForInput(nextMonday);
-        endDate = formatForInput(nextSunday);
+
+    function applyThisWeek() {
+        if (isFixedMode) {
+            const { start, end } = getThisWeekRange();
+            startDate = formatForInput(start);
+            endDate = formatForInput(end);
+        } else if (isRollingDaysMode) {
+            lookAheadDays = 7;
+            lookPastDays = 0;
+        } else {
+            rangeMode = "this_week";
+        }
+        rf.validate();
     }
- 
-    function setNextMonth() {
-        const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0);
-        const end = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59); 
-        
-        startDate = formatForInput(start);
-        endDate = formatForInput(end);
+
+    function applyThisMonth() {
+        if (isFixedMode) {
+            const { start, end } = getThisMonthRange();
+            startDate = formatForInput(start);
+            endDate = formatForInput(end);
+        } else if (isRollingDaysMode) {
+            lookAheadDays = 30;
+            lookPastDays = 0;
+        } else {
+            rangeMode = "this_month";
+        }
+        rf.validate();
+    }
+
+    function applyDaysOffset(days: number) {
+        if (isFixedMode) {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0);
+            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, 23, 59);
+            startDate = formatForInput(start);
+            endDate = formatForInput(end);
+        } else if (isRollingDaysMode) {
+            lookAheadDays = days;
+            lookPastDays = 0;
+        } else {
+            rangeMode = "rolling";
+            lookAheadDays = days;
+            lookPastDays = 0;
+        }
+        rf.validate();
     }
 </script>
 
 <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
     <form
         {...rf.enhance(async ({ submit }: any) => {
-                try {
-                    const result: any = await submit();
-                    if (result?.error) {
-                        toast.error(result.error);
-                        return;
-                    }
-                    toast.success(
-                        isUpdating ? m.kiosk_updated() : m.kiosk_created(),
-                    );
-                    goto("/kiosks");
-                } catch (error: any) {
-                    toast.error(
-                        error?.message || m.something_went_wrong(),
-                    );
+            if (rangeMode === "fixed") {
+                if (!startDate || !endDate) {
+                    toast.error("Both start date and end date are required for fixed range mode");
+                    return;
                 }
-            })}
+                if (new Date(startDate) > new Date(endDate)) {
+                    toast.error("Start date must be before or equal to end date");
+                    return;
+                }
+            }
+            try {
+                const result: any = await submit();
+                if (result?.error) {
+                    toast.error(result.error);
+                    return;
+                }
+
+                toast.success(isUpdating ? m.kiosk_updated() : m.kiosk_created());
+                goto(resolve('kiosks'));
+            } catch(error: any) {
+                toast.error(error?.message || m.something_went_wrong());
+            }
+        })}
         class="space-y-6"
     >
         {#if isUpdating && initialData?.id}
@@ -162,7 +235,7 @@
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                 onblur={() => rf.validate()}
             />
-            {#each (rf.fields.name.issues() ?? []) as issue (issue.message)}
+            {#each rf.fields.name.issues() ?? [] as issue (issue.message)}
                 <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
             {/each}
         </div>
@@ -191,15 +264,14 @@
                     {m.feature_locations_title()}
                 </h3>
                 {#key initialData?.id || "new"}
-                    <EntityManager {m}
+                    <EntityManager
+                        m={m}
                         title={m.feature_locations_title()}
                         icon={MapPin}
                         mode="embedded"
-                        initialItems={locs.data.filter((l: any) =>
-                            selectedLocationIds.includes(l.id),
-                        )}
-                        onchange={(ids: string[]) =>
-                            (selectedLocationIds = ids)}
+                        initialItems={locs.data.filter((l: any) => selectedLocationIds.includes(l.id))}
+                        filters={getLocationFilterGroups(m)}
+                        onchange={(ids: string[]) => selectedLocationIds = ids}
                         listItemsRemote={listLocations as any}
                         deleteItemRemote={async (ids: string[]) => {
                             return await handleDelete({
@@ -212,17 +284,9 @@
                         createSchema={createLocationSchema}
                         updateRemote={updateLocation}
                         updateSchema={updateLocationSchema}
-                        getFormData={(l: Location) => l}
+                        readItemRemote={readLocation}
                         searchPredicate={(l: Location, q: string) => {
-                            return (
-                                l.name
-                                    .toLowerCase()
-                                    .includes(q.toLowerCase()) ||
-                                (l.roomId
-                                    ?.toLowerCase()
-                                    .includes(q.toLowerCase()) ??
-                                    false)
-                            );
+                            return l.name.toLowerCase().includes(q.toLowerCase()) || (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false);
                         }}
                         loadingLabel={m.loading_item({
                             item: m.feature_locations_title(),
@@ -274,8 +338,8 @@
                                 validationSchema={schema}
                                 isUpdating={!!id}
                                 initialData={formData}
-                                {onSuccess}
-                                {onCancel}
+                                onSuccess={onSuccess}
+                                onCancel={onCancel}
                                 labels={{
                                     name: m.location_name(),
                                     street: m.street(),
@@ -332,7 +396,7 @@
                     )}
                     class="hidden"
                 />
-                {#each (rf.fields.locationIds.issues() ?? []) as issue (issue.message)}
+                {#each rf.fields.locationIds.issues() ?? [] as issue (issue.message)}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             {:catch error}
@@ -367,6 +431,7 @@
                         <option value="carousel">{m.carousel_full_screen()}</option>
                         <option value="table">{m.table_view_list()}</option>
                         <option value="flat_list">{m.flat_list_print_export()}</option>
+                        <option value="folded_flyer">{m.folded_flyer_print_template()}</option>
                     </select>
                 </div>
 
@@ -380,10 +445,20 @@
                         {...rf.fields.rangeMode.as("select", rangeMode)}
                         bind:value={rangeMode}
                         onchange={() => rf.validate()}
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border bg-white"
                     >
-                        <option value="rolling">{m.rolling_window()}</option>
-                        <option value="fixed">{m.fixed_date_range()}</option>
+                        <optgroup label={m.rolling_calendar()}>
+                            <option value="next_week">{m.next_week()} ({m.auto_updating_badge()})</option>
+                            <option value="next_month">{m.next_month()} ({m.auto_updating_badge()})</option>
+                            <option value="this_week">{m.this_week()} ({m.auto_updating_badge()})</option>
+                            <option value="this_month">{m.this_month()} ({m.auto_updating_badge()})</option>
+                        </optgroup>
+                        <optgroup label={m.rolling_window()}>
+                            <option value="rolling">{m.rolling_days()}</option>
+                        </optgroup>
+                        <optgroup label={m.fixed_date_range()}>
+                            <option value="fixed">{m.fixed_date_range()}</option>
+                        </optgroup>
                     </select>
                 </div>
             </div>
@@ -403,12 +478,102 @@
                     onblur={() => rf.validate()}
                 />
                 <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
-                {#each (rf.fields.loopDuration.issues() ?? []) as issue (issue.message)}
+                {#each rf.fields.loopDuration.issues() ?? [] as issue (issue.message)}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
-            {#if rangeMode === "rolling"}
+            {#if isCalendarMode}
+                <div class="space-y-3 col-span-full border-t pt-4">
+                    <div class="flex items-center justify-between">
+                        <span class="block text-sm font-medium text-gray-700">{m.calendar_period()}</span>
+                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            {m.auto_updating_badge()}
+                        </span>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            class="text-xs px-3 py-1.5 rounded-md border font-medium transition-colors {rangeMode === 'next_week' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200'}"
+                            onclick={() => applyNextWeek()}
+                        >
+                            {m.next_week()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs px-3 py-1.5 rounded-md border font-medium transition-colors {rangeMode === 'next_month' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200'}"
+                            onclick={() => applyNextMonth()}
+                        >
+                            {m.next_month()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs px-3 py-1.5 rounded-md border font-medium transition-colors {rangeMode === 'this_week' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200'}"
+                            onclick={() => applyThisWeek()}
+                        >
+                            {m.this_week()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs px-3 py-1.5 rounded-md border font-medium transition-colors {rangeMode === 'this_month' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200'}"
+                            onclick={() => applyThisMonth()}
+                        >
+                            {m.this_month()}
+                        </button>
+                    </div>
+
+                    {#if calendarPreview}
+                        <div class="bg-blue-50/70 border border-blue-200 rounded-lg p-3 text-xs text-blue-900 space-y-1">
+                            <div class="font-semibold flex items-center gap-1.5 text-blue-800">
+                                <span>📅</span>
+                                <span>{m.active_window_preview()}</span>
+                                <span class="font-mono bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200/60 text-blue-900 font-bold">
+                                    {formatDateRangeDisplay(calendarPreview.start, calendarPreview.end)}
+                                </span>
+                            </div>
+                            <p class="text-blue-700 leading-relaxed">
+                                {m.rolling_calendar_description()}
+                            </p>
+                        </div>
+                    {/if}
+                </div>
+            {:else if isRollingDaysMode}
+                <div class="space-y-3 col-span-full border-t pt-4">
+                    <span class="block text-sm font-medium text-gray-700">{m.quick_selectors()}</span>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyNextWeek()}
+                        >
+                            {m.next_week()} ({m.days_7()})
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyDaysOffset(14)}
+                        >
+                            {m.days_14()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyNextMonth()}
+                        >
+                            {m.next_month()} ({m.days_30()})
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyDaysOffset(90)}
+                        >
+                            {m.days_90()}
+                        </button>
+                    </div>
+                </div>
+
                 <div class="space-y-2">
                     <label
                         for="lookAheadDays"
@@ -417,15 +582,19 @@
                     >
                     <input
                         {...rf.fields.lookAheadDays.as("number", lookAheadDays)}
+                        value={lookAheadDays}
                         min="0"
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        oninput={(e) => {
+                            lookAheadDays = Number(e.currentTarget.value);
+                            rf.validate();
+                        }}
                         onblur={() => rf.validate()}
                     />
-                    {#each (rf.fields.lookAheadDays.issues() ?? []) as issue (issue.message)}
-                        <p class="mt-1 text-sm text-red-600">
-                            {translateIssue(issue.message, m)}
-                        </p>
+
+                    {#each rf.fields.lookAheadDays.issues() ?? [] as issue (issue.message)}
+                        <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
 
@@ -437,36 +606,98 @@
                     >
                     <input
                         {...rf.fields.lookPastDays.as("number", lookPastDays)}
+                        value={lookPastDays}
                         min="0"
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        oninput={(e) => {
+                            lookPastDays = Number(e.currentTarget.value);
+                            rf.validate();
+                        }}
                         onblur={() => rf.validate()}
                     />
-                    {#each (rf.fields.lookPastDays.issues() ?? []) as issue (issue.message)}
-                        <p class="mt-1 text-sm text-red-600">
-                            {translateIssue(issue.message, m)}
-                        </p>
+
+                    {#each rf.fields.lookPastDays.issues() ?? [] as issue (issue.message)}
+                        <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
+
+                <div class="col-span-full">
+                    <p class="text-xs text-gray-500">
+                        {m.tip_use_rolling_calendar()}
+                    </p>
+                </div>
             {:else}
-                <div class="space-y-3 col-span-3 border-t pt-4">
+                <div class="space-y-3 col-span-full border-t pt-4">
                     <span class="block text-sm font-medium text-gray-700"
                         >{m.quick_selectors()}</span
                     >
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
                         <button
                             type="button"
                             class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
-                            onclick={() => setNextWeek()}
+                            onclick={() => applyNextWeek()}
                         >
                             {m.next_week()}
                         </button>
                         <button
                             type="button"
                             class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
-                            onclick={() => setNextMonth()}
+                            onclick={() => applyNextMonth()}
                         >
                             {m.next_month()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyThisWeek()}
+                        >
+                            {m.this_week()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyThisMonth()}
+                        >
+                            {m.this_month()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyDaysOffset(7)}
+                        >
+                            {m.days_7()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => applyDaysOffset(30)}
+                        >
+                            {m.days_30()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => {
+                                const val = startDate ? new Date(startDate) : new Date();
+                                val.setHours(0, 0, 0, 0);
+                                startDate = formatForInput(val);
+                                rf.validate();
+                            }}
+                        >
+                            {m.reset_start_time()}
+                        </button>
+                        <button
+                            type="button"
+                            class="text-xs bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-md transition-colors"
+                            onclick={() => {
+                                const val = endDate ? new Date(endDate) : new Date();
+                                val.setHours(23, 59, 0, 0);
+                                endDate = formatForInput(val);
+                                rf.validate();
+                            }}
+                        >
+                            {m.reset_end_time()}
                         </button>
                     </div>
                 </div>
@@ -480,6 +711,8 @@
                     <input
                         {...rf.fields.startDate.as("datetime-local", startDate)}
                         value={startDate}
+                        min="1970-01-01T00:00"
+                        max="2099-12-31T23:59"
                         oninput={(e) => {
                             startDate = e.currentTarget.value;
                             rf.validate();
@@ -487,7 +720,7 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each (rf.fields.startDate.issues() ?? []) as issue (issue.message)}
+                    {#each rf.fields.startDate.issues() ?? [] as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
                 </div>
@@ -501,6 +734,8 @@
                     <input
                         {...rf.fields.endDate.as("datetime-local", endDate)}
                         value={endDate}
+                        min="1970-01-01T00:00"
+                        max="2099-12-31T23:59"
                         oninput={(e) => {
                             endDate = e.currentTarget.value;
                             rf.validate();
@@ -508,9 +743,23 @@
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
-                    {#each (rf.fields.endDate.issues() ?? []) as issue (issue.message)}
+                    {#each rf.fields.endDate.issues() ?? [] as issue (issue.message)}
                         <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                     {/each}
+                </div>
+
+                {#if rangeMode === "fixed" && startDate && endDate && new Date(startDate) > new Date(endDate)}
+                    <div class="col-span-full">
+                        <p class="text-sm text-red-600 font-medium">
+                            {m.start_date()} must be before or equal to {m.end_date()}
+                        </p>
+                    </div>
+                {/if}
+
+                <div class="col-span-full">
+                    <p class="text-xs text-gray-500">
+                        {m.tip_use_rolling_calendar()}
+                    </p>
                 </div>
             {/if}
         </div>

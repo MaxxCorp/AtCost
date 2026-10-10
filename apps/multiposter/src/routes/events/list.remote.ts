@@ -1,10 +1,12 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult, type Event } from '@ac/validations';
-import { getEventRooms } from '$lib/utils/format-rooms';
-import { resolveEventContactSync, isEmployeeContact } from '$lib/server/contact-resolution';
+import { getEventRooms } from '#lib/utils/format-rooms.js';
+import { resolveEventContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
+import { populateSeriesInstances } from '#lib/server/events/instances.js';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
 	let hasAccess = false;
@@ -16,11 +18,18 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		// unauthorized can only see public events
 	}
 
-	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
+	const version = await getNamespaceVersion(CACHE_NAMESPACES.EVENTS);
+	const key = cacheKeys.eventsList(hasAccess ? 'auth' : 'public', version, hashParams(input));
+
+	return cached(key, 300, async () => {
+	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, includeSeriesEntries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
 	const offset = (page - 1) * limit;
 
 	let baseQuery = db.select({ id: event.id }).from(event).$dynamic();
-	const conditions: any[] = [isNull(event.recurringEventId)];
+	const conditions: any[] = [];
+	if (!includeSeriesEntries) {
+		conditions.push(isNull(event.recurringEventId));
+	}
 
 	if (!hasAccess) {
 		conditions.push(eq(event.isPublic, true));
@@ -138,7 +147,22 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 	
 	if (excludeCancelled) {
-		conditionalFilters.push(ne(event.status, 'cancelled'));
+		conditionalFilters.push(
+			ne(event.status, 'cancelled'),
+			sql`NOT EXISTS (
+				SELECT 1 FROM ${event} master_evt
+				WHERE (
+					master_evt.id = ${event.recurringEventId}
+					OR (
+						${event.seriesId} IS NOT NULL
+						AND master_evt.series_id = ${event.seriesId}
+						AND master_evt.recurring_event_id IS NULL
+						AND master_evt.id != ${event.id}
+					)
+				)
+				AND master_evt.status = 'cancelled'
+			)`
+		);
 	}
 	
 	if (excludeNonPublic) {
@@ -202,7 +226,12 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const startD = new Date(startDate);
 		conditionalFilters.push(or(
 			gte(event.startDateTime, startD),
-			gte(event.endDateTime, startD)
+			gte(event.endDateTime, startD),
+			isNotNull(event.seriesId),
+			and(
+				isNotNull(event.recurrence),
+				sql`${event.recurrence} != '[]'::jsonb`
+			)
 		));
 	}
 	
@@ -289,7 +318,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	// Fetch full data for the paginated IDs
 	const rawResults = await db.query.event.findMany({
-		where: or(inArray(event.id, ids), inArray(event.recurringEventId, ids)),
+		where: includeSeriesEntries ? inArray(event.id, ids) : or(inArray(event.id, ids), inArray(event.recurringEventId, ids)),
 		with: {
 			contacts: {
 				with: {
@@ -321,11 +350,296 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					tag: true
 				}
 			},
+			contactRoles: {
+				with: {
+					role: true
+				}
+			},
 			campaign: true,
 			user: true
 		},
 		orderBy: [orderExpression]
 	});
+
+	// If includeSeriesEntries and date window is specified, also check for any recurring series masters that have instances in this window
+	if (includeSeriesEntries && startDate && endDate && !excludeSeries) {
+		const startD = new Date(startDate);
+		const endD = new Date(endDate);
+
+		const masterConditions: any[] = [
+			isNull(event.recurringEventId),
+			or(
+				isNotNull(event.seriesId),
+				and(isNotNull(event.recurrence), sql`${event.recurrence} != '[]'::jsonb`)
+			),
+			lte(event.startDateTime, endD),
+			hasAccess ? sql`true` : eq(event.isPublic, true)
+		];
+
+		if (excludeTentative) masterConditions.push(ne(event.status, 'tentative'));
+		if (excludeCancelled) masterConditions.push(ne(event.status, 'cancelled'));
+		if (excludeNonPublic) masterConditions.push(eq(event.isPublic, true));
+
+		if (locationId) {
+			const { include, exclude } = parseFilterValue(locationId);
+			if (include.length > 0) {
+				masterConditions.push(
+					or(
+						exists(
+							db.select({ id: sql`1` })
+							  .from(eventLocation)
+							  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, include)))
+						),
+						exists(
+							db.select({ id: sql`1` })
+							  .from(eventResource)
+							  .innerJoin(resource, eq(eventResource.resourceId, resource.id))
+							  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, include)))
+						)
+					)
+				);
+			}
+			if (exclude.length > 0) {
+				masterConditions.push(
+					and(
+						not(exists(
+							db.select({ id: sql`1` })
+							  .from(eventLocation)
+							  .where(and(eq(eventLocation.eventId, event.id), inArray(eventLocation.locationId, exclude)))
+						)),
+						not(exists(
+							db.select({ id: sql`1` })
+							  .from(eventResource)
+							  .innerJoin(resource, eq(eventResource.resourceId, resource.id))
+							  .where(and(eq(eventResource.eventId, event.id), inArray(resource.locationId, exclude)))
+						))
+					)
+				);
+			}
+		}
+
+		if (tagId) {
+			const { include, exclude } = parseFilterValue(tagId);
+			if (include.length > 0) {
+				masterConditions.push(
+					exists(
+						db.select({ id: sql`1` })
+						  .from(eventTag)
+						  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, include)))
+					)
+				);
+			}
+			if (exclude.length > 0) {
+				masterConditions.push(
+					not(exists(
+						db.select({ id: sql`1` })
+						  .from(eventTag)
+						  .where(and(eq(eventTag.eventId, event.id), inArray(eventTag.tagId, exclude)))
+					))
+				);
+			}
+		}
+
+		if (contactId) {
+			const { include, exclude } = parseFilterValue(contactId);
+			if (include.length > 0) {
+				masterConditions.push(
+					exists(
+						db.select({ id: sql`1` })
+						  .from(eventContact)
+						  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, include)))
+					)
+				);
+			}
+			if (exclude.length > 0) {
+				masterConditions.push(
+					not(exists(
+						db.select({ id: sql`1` })
+						  .from(eventContact)
+						  .where(and(eq(eventContact.eventId, event.id), inArray(eventContact.contactId, exclude)))
+					))
+				);
+			}
+		}
+
+		if (excludedTags && excludedTags.length > 0) {
+			masterConditions.push(
+				sql`NOT EXISTS (
+					SELECT 1 FROM ${eventTag} et
+					JOIN ${tag} t ON et.tag_id = t.id
+					WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+				)`
+			);
+		}
+
+		if (includedTags && includedTags.length > 0) {
+			masterConditions.push(
+				sql`EXISTS (
+					SELECT 1 FROM ${eventTag} et
+					JOIN ${tag} t ON et.tag_id = t.id
+					WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+				)`
+			);
+		}
+
+		if (excludedEventIds && excludedEventIds.length > 0) {
+			masterConditions.push(notInArray(event.id, excludedEventIds));
+		}
+
+		const masters = await db.query.event.findMany({
+			where: and(...masterConditions as any),
+			with: {
+				contacts: {
+					with: {
+						contact: {
+							with: {
+								emails: true,
+								phones: true,
+								tags: { with: { tag: true } }
+							}
+						}
+					}
+				},
+				locations: { with: { location: true } },
+				resources: { with: { resource: true } },
+				contactRoles: { with: { role: true } },
+				tags: { with: { tag: true } },
+				campaign: true,
+				user: true
+			}
+		});
+
+		if (masters.length > 0) {
+			const { expandRecurrence } = await import('#lib/server/events/recurrence.js');
+
+			const masterIds = masters.map(m => m.id);
+			const masterSeriesIds = masters.map(m => m.seriesId).filter((id): id is string => Boolean(id));
+
+			const seriesToMasterMap = new Map<string, typeof masters[0]>();
+			const idToMasterMap = new Map<string, typeof masters[0]>();
+			for (const m of masters) {
+				idToMasterMap.set(m.id, m);
+				if (m.seriesId) seriesToMasterMap.set(m.seriesId, m);
+			}
+
+			// Query all existing instances from the DB for these masters
+			const existingDbInstances = await db.query.event.findMany({
+				where: or(
+					inArray(event.recurringEventId, masterIds),
+					masterSeriesIds.length > 0 ? inArray(event.seriesId, masterSeriesIds) : sql`false`
+				),
+				columns: {
+					id: true,
+					recurringEventId: true,
+					seriesId: true,
+					startDateTime: true,
+					originalStartTime: true,
+					status: true,
+					isPublic: true
+				}
+			});
+
+			const existingKeys = new Set<string>();
+
+			// 1. Add all items currently in rawResults
+			for (const r of rawResults) {
+				const masterId = r.recurringEventId || r.id;
+				if (r.startDateTime) {
+					const time = new Date(r.startDateTime).getTime();
+					existingKeys.add(`${masterId}_${time}`);
+					if (r.seriesId) existingKeys.add(`${r.seriesId}_${time}`);
+				}
+			}
+
+			// 2. Also register all existing DB instances (including cancelled/tentative/etc.)
+			// This guarantees recurrence expansion NEVER synthesizes a virtual instance for a slot
+			// that already exists in the database (e.g., cancelled instances).
+			for (const dbInst of existingDbInstances) {
+				const m = (dbInst.recurringEventId ? idToMasterMap.get(dbInst.recurringEventId) : null)
+					|| (dbInst.seriesId ? seriesToMasterMap.get(dbInst.seriesId) : null);
+				if (!m) continue;
+
+				if (dbInst.startDateTime) {
+					const time = new Date(dbInst.startDateTime).getTime();
+					existingKeys.add(`${m.id}_${time}`);
+					if (m.seriesId) existingKeys.add(`${m.seriesId}_${time}`);
+					if (dbInst.seriesId) existingKeys.add(`${dbInst.seriesId}_${time}`);
+				}
+				if (dbInst.originalStartTime && typeof dbInst.originalStartTime === 'object' && 'dateTime' in dbInst.originalStartTime) {
+					const origTime = new Date((dbInst.originalStartTime as any).dateTime).getTime();
+					if (!isNaN(origTime)) {
+						existingKeys.add(`${m.id}_${origTime}`);
+						if (m.seriesId) existingKeys.add(`${m.seriesId}_${origTime}`);
+						if (dbInst.seriesId) existingKeys.add(`${dbInst.seriesId}_${origTime}`);
+					}
+				}
+			}
+
+			const seriesIdToRruleMap = new Map<string, string>();
+			if (masterSeriesIds.length > 0) {
+				const seriesRecords = await db
+					.select({ id: recurringSeries.id, rrule: recurringSeries.rrule })
+					.from(recurringSeries)
+					.where(inArray(recurringSeries.id, masterSeriesIds));
+				for (const s of seriesRecords) {
+					if (s.rrule) seriesIdToRruleMap.set(s.id, s.rrule);
+				}
+			}
+
+			for (const master of masters) {
+				let rruleStr: string | null = null;
+				if (master.recurrence && Array.isArray(master.recurrence) && master.recurrence[0]) {
+					rruleStr = master.recurrence[0];
+				} else if (master.seriesId) {
+					rruleStr = seriesIdToRruleMap.get(master.seriesId) || null;
+				}
+
+				if (!rruleStr || !master.startDateTime) continue;
+
+				const masterTime = new Date(master.startDateTime).getTime();
+				if (masterTime >= startD.getTime() && masterTime <= endD.getTime()) {
+					const key = `${master.id}_${masterTime}`;
+					const seriesKey = master.seriesId ? `${master.seriesId}_${masterTime}` : null;
+					if (!existingKeys.has(key) && (!seriesKey || !existingKeys.has(seriesKey))) {
+						rawResults.push(master);
+						existingKeys.add(key);
+						if (seriesKey) existingKeys.add(seriesKey);
+					}
+				}
+
+				const { expandRecurrenceRange } = await import('#lib/server/events/recurrence.js');
+				const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+
+				const instances = expandRecurrenceRange(
+					rruleStr,
+					new Date(master.startDateTime),
+					master.endDateTime ? new Date(master.endDateTime) : null,
+					startD,
+					endD,
+					master.startTimeZone,
+					masterExdates,
+					false
+				);
+
+				for (const inst of instances) {
+					const instTime = inst.date.getTime();
+					const key = `${master.id}_${instTime}`;
+					const seriesKey = master.seriesId ? `${master.seriesId}_${instTime}` : null;
+					if (!existingKeys.has(key) && (!seriesKey || !existingKeys.has(seriesKey))) {
+						rawResults.push({
+							...master,
+							id: `${master.id}_inst_${inst.date.toISOString()}`,
+							recurringEventId: master.id,
+							startDateTime: inst.date,
+							endDateTime: inst.end || master.endDateTime
+						} as any);
+						existingKeys.add(key);
+						if (seriesKey) existingKeys.add(seriesKey);
+					}
+				}
+			}
+		}
+	}
 
 	// Collect location IDs for events that might need location contact fallback
 	const neededLocationIds = new Set<string>();
@@ -369,7 +683,51 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 
 	let results = rawResults;
-	if (excludePast) {
+	if (includeSeriesEntries && (startDate || endDate)) {
+		const startD = startDate ? new Date(startDate) : null;
+		const endD = endDate ? new Date(endDate) : null;
+		results = results.filter((e: any) => {
+			const s = e.startDateTime ? new Date(e.startDateTime) : null;
+			if (startD && s && s < startD) return false;
+			if (endD && s && s > endD) return false;
+			return true;
+		});
+	}
+
+	if (excludeCancelled) {
+		results = results.filter((e: any) => e.status !== 'cancelled');
+	}
+	if (excludeTentative) {
+		results = results.filter((e: any) => e.status !== 'tentative');
+	}
+	if (excludeNonPublic) {
+		results = results.filter((e: any) => e.isPublic);
+	}
+
+	if (locationId) {
+		const { include, exclude } = parseFilterValue(locationId);
+		if (include.length > 0 || exclude.length > 0) {
+			results = results.filter((e: any) => {
+				const eventLocIds = new Set<string>();
+				for (const l of (e.locations || [])) {
+					const id = l?.id || l?.locationId || l?.location?.id;
+					if (id) eventLocIds.add(id);
+				}
+				for (const r of (e.resources || [])) {
+					const id = r?.locationId || r?.resource?.locationId || r?.location?.id;
+					if (id) eventLocIds.add(id);
+				}
+
+				if (exclude.length > 0 && exclude.some(ex => eventLocIds.has(ex))) {
+					return false;
+				}
+				if (include.length > 0) {
+					return include.some(inc => eventLocIds.has(inc));
+				}
+				return true;
+			});
+		}
+	} else if (excludePast) {
 		const cutoff = new Date();
 		cutoff.setHours(0, 0, 0, 0);
 
@@ -412,6 +770,14 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		const evtResources = e.resources?.map((r: any) => r.resource).filter(Boolean) || [];
 		const rooms = getEventRooms({ locations: evtLocations, resources: evtResources });
 
+		const allLocIds = new Set<string>();
+		for (const l of evtLocations) {
+			if (l?.id) allLocIds.add(l.id);
+		}
+		for (const r of evtResources) {
+			if (r?.locationId) allLocIds.add(r.locationId);
+		}
+
 		const resWithLocContacts = evtResources.map((res: any) => {
 			if (res.locationId && locationContactsMap.has(res.locationId)) {
 				return {
@@ -425,8 +791,27 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			return res;
 		});
 
+		const eventContactRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
+		for (const cr of (e.contactRoles || [])) {
+			const list = eventContactRolesMap.get(cr.contactId) || [];
+			if (cr.role) {
+				list.push({ id: cr.role.id, name: cr.role.name, color: cr.role.color });
+			}
+			eventContactRolesMap.set(cr.contactId, list);
+		}
+
+		const eventContactsWithRoles = (e.contacts || []).map((c: any) => {
+			const cObj = c.contact || c;
+			return {
+				...cObj,
+				roles: eventContactRolesMap.get(cObj.id) || [],
+				participationStatus: c.participationStatus || 'needsAction'
+			};
+		});
+
 		const resolvedContact = resolveEventContactSync({
 			...e,
+			contacts: eventContactsWithRoles,
 			locations: evtLocations,
 			resources: resWithLocContacts
 		}, {
@@ -443,21 +828,35 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 		return {
 			...e,
+			contacts: eventContactsWithRoles,
 			isSeries,
-			startDateTime: e.startDateTime ? e.startDateTime.toISOString() : null,
-			endDateTime: e.endDateTime ? e.endDateTime.toISOString() : null,
-			createdAt: e.createdAt ? e.createdAt.toISOString() : null,
-			updatedAt: e.updatedAt ? e.updatedAt.toISOString() : null,
+			qrCodePath: e.id.includes('_inst_') ? `/api/events/${e.id}/qr.png` : (e.qrCodePath?.includes('/api/') ? e.qrCodePath : `/api/events/${e.id}/qr.png`),
+			iCalPath: e.id.includes('_inst_') ? `/api/events/${e.id}/event.ics` : (e.iCalPath?.includes('/api/') ? e.iCalPath : `/api/events/${e.id}/event.ics`),
+			startDateTime: e.startDateTime ? (e.startDateTime instanceof Date ? e.startDateTime.toISOString() : new Date(e.startDateTime).toISOString()) : null,
+			endDateTime: e.endDateTime ? (e.endDateTime instanceof Date ? e.endDateTime.toISOString() : new Date(e.endDateTime).toISOString()) : null,
+			createdAt: e.createdAt ? (e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString()) : null,
+			updatedAt: e.updatedAt ? (e.updatedAt instanceof Date ? e.updatedAt.toISOString() : new Date(e.updatedAt).toISOString()) : null,
 			locations: evtLocations,
 			resources: evtResources,
 			rooms,
-			locationIds: evtLocations.map((l: any) => l.id),
+			locationIds: Array.from(allLocIds),
 			resourceIds: evtResources.map((r: any) => r.id),
 			tags: e.tags?.map((t: any) => t.tag || t).filter(Boolean) || [],
 			resolvedContact,
 		};
 	});
 
-	return { data, total };
+	await populateSeriesInstances(data);
+
+	if (sortField === 'startDateTime' || includeSeriesEntries) {
+		data.sort((a: any, b: any) => {
+			const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+			const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+			return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+		});
+	}
+
+	return { data, total: includeSeriesEntries ? data.length : total };
+	});
 });
 

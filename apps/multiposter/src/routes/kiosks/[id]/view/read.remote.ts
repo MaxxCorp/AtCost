@@ -6,14 +6,33 @@ import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq } from '@ac/db';
 import * as v from 'valibot';
 
-import { resolveLocationContactSync } from '$lib/server/contact-resolution';
+import { resolveLocationContactSync } from '#lib/server/contact-resolution.js';
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys } from '#lib/server/cache/index.js';
+import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from '#lib/utils/kiosk-dates.js';
+
+function toSafeIsoString(date: Date | string | null | undefined): string | null {
+    if (!date) return null;
+    try {
+        const d = date instanceof Date ? date : new Date(date);
+        if (isNaN(d.getTime())) return null;
+        const year = d.getFullYear();
+        if (year < 1970 || year > 2100) return null;
+        return d.toISOString();
+    } catch {
+        return null;
+    }
+}
 
 export const readKioskView = query(v.string(), async (kioskId) => {
-    const kioskData = await db.query.kiosk.findFirst({
-        where: eq(kiosk.id, kioskId),
-    });
+    const version = await getNamespaceVersion(CACHE_NAMESPACES.KIOSKS);
+    const key = cacheKeys.kioskView(kioskId, version);
 
-    if (!kioskData) return null;
+    return cached(key, 600, async () => {
+        const kioskData = await db.query.kiosk.findFirst({
+            where: eq(kiosk.id, kioskId),
+        });
+
+        if (!kioskData) return null;
 
     const kioskLocationsData = await db.query.kioskLocation.findMany({
         where: eq(kioskLocation.kioskId, kioskId),
@@ -52,9 +71,19 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             name: loc.name,
             street: loc.street,
             houseNumber: loc.houseNumber,
+            addressSuffix: loc.addressSuffix,
             zip: loc.zip,
             city: loc.city,
+            state: loc.state,
             country: loc.country,
+            roomId: loc.roomId,
+            capacity: loc.capacity,
+            inclusivitySupport: loc.inclusivitySupport,
+            what3words: loc.what3words,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            heroImage: loc.heroImage,
+            description: loc.description,
             contact: resolvedContact
         };
     });
@@ -71,19 +100,42 @@ export const readKioskView = query(v.string(), async (kioskId) => {
     let endDate: string | undefined;
     
     if (kioskData.rangeMode === 'fixed') {
-        if (kioskData.startDate) startDate = kioskData.startDate.toISOString();
-        if (kioskData.endDate) endDate = kioskData.endDate.toISOString();
+        startDate = toSafeIsoString(kioskData.startDate) || undefined;
+        endDate = toSafeIsoString(kioskData.endDate) || undefined;
+    } else if (kioskData.rangeMode === 'next_week') {
+        const range = getNextWeekRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
+    } else if (kioskData.rangeMode === 'this_week') {
+        const range = getThisWeekRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
+    } else if (kioskData.rangeMode === 'next_month') {
+        const range = getNextMonthRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
+    } else if (kioskData.rangeMode === 'this_month') {
+        const range = getThisMonthRange(now);
+        startDate = range.start.toISOString();
+        endDate = range.end.toISOString();
     } else {
-        let lookAheadSeconds = kioskData.lookAhead;
-        if (kioskData.uiMode === 'flat_list' && lookAheadSeconds <= 604800) {
+        const lookPast = Math.max(0, Math.min(Number(kioskData.lookPast || 0), 315360000));
+        let lookAheadSeconds = Math.max(0, Math.min(Number(kioskData.lookAhead || 0), 315360000));
+        if ((kioskData.uiMode === 'flat_list' || kioskData.uiMode === 'folded_flyer') && lookAheadSeconds <= 604800) {
             lookAheadSeconds = 2592000; // 30 days default for monthly listings
         }
-        startDate = new Date(now.getTime() - (kioskData.lookPast * 1000)).toISOString();
+        startDate = new Date(now.getTime() - (lookPast * 1000)).toISOString();
         endDate = new Date(now.getTime() + (lookAheadSeconds * 1000)).toISOString();
     }
 
+    // If kioskData.excludeSeries is false, ensure 'Series' tag is not excluded
+    let effectiveExcludedTags = kioskData.excludedTags || [];
+    if (!kioskData.excludeSeries) {
+        effectiveExcludedTags = effectiveExcludedTags.filter(t => t !== 'Series');
+    }
+
     const eventsResult = await listEvents({
-        limit: 100,
+        limit: 250,
         locationId: locationIds.length > 0 ? locationIds : undefined,
         startDate,
         endDate,
@@ -91,10 +143,13 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         excludeCancelled: kioskData.excludeCancelled,
         excludeNonPublic: kioskData.excludeNonPublic,
         excludeSeries: kioskData.excludeSeries,
+        includeSeriesEntries: !kioskData.excludeSeries,
         excludedEventIds: kioskData.excludedEventIds || [],
         includedEventIds: kioskData.includedEventIds || [],
-        excludedTags: kioskData.excludedTags || [],
+        excludedTags: effectiveExcludedTags,
         includedTags: kioskData.includedTags || [],
+        sortField: 'startDateTime',
+        sortOrder: 'asc'
     });
 
     const announcementsResult = await listAnnouncements({
@@ -102,16 +157,59 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         locationId: locationIds.length > 0 ? locationIds : undefined,
         excludedAnnouncementIds: kioskData.excludedAnnouncementIds || [],
         includedAnnouncementIds: kioskData.includedAnnouncementIds || [],
-        excludedTags: kioskData.excludedTags || [],
+        excludedTags: effectiveExcludedTags,
         includedTags: kioskData.includedTags || [],
     });
 
-    const items = [...eventsResult.data, ...announcementsResult.data].sort((a, b) => {
-        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    const locationIdSet = new Set(locationIds);
+    let validEvents = locationIds.length > 0
+        ? eventsResult.data.filter((e: any) => {
+            const eLocIds = new Set<string>();
+            for (const l of (e.locations || [])) {
+                const id = l?.id || l?.locationId || l?.location?.id;
+                if (id) eLocIds.add(id);
+            }
+            for (const r of (e.resources || [])) {
+                const id = r?.locationId || r?.resource?.locationId || r?.location?.id;
+                if (id) eLocIds.add(id);
+            }
+            for (const id of (e.locationIds || [])) {
+                if (id) eLocIds.add(id);
+            }
+            return Array.from(eLocIds).some(id => locationIdSet.has(id));
+        })
+        : eventsResult.data;
+
+    if (kioskData.excludeCancelled) {
+        validEvents = validEvents.filter((e: any) => e.status !== 'cancelled');
+    }
+
+    const validAnnouncements = locationIds.length > 0
+        ? announcementsResult.data.filter((a: any) => {
+            const aLocIds = new Set<string>();
+            for (const l of (a.locations || [])) {
+                const id = l?.id || l?.locationId || l?.location?.id;
+                if (id) aLocIds.add(id);
+            }
+            for (const id of (a.locationIds || [])) {
+                if (id) aLocIds.add(id);
+            }
+            // General announcements without specific location are permitted
+            if (aLocIds.size === 0) return true;
+            return Array.from(aLocIds).some(id => locationIdSet.has(id));
+        })
+        : announcementsResult.data;
+
+    const items = [...validEvents, ...validAnnouncements].sort((a, b) => {
+        const timeA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
+        const timeB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
+        return timeA - timeB;
     });
 
     return {
         kiosk: kioskWithLocations,
         items
     };
+    });
 });
+

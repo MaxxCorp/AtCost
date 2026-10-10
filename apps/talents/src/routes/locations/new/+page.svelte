@@ -2,7 +2,7 @@
     import LocationForm from "@ac/ui/components/forms/LocationForm.svelte";
     import { createLocation } from "./create.remote";
     import { createLocationSchema } from "@ac/validations/locations";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
     breadcrumbState.set({ feature: "locations", current: "New Location" });
 

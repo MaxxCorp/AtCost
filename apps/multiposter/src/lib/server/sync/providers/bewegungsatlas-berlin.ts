@@ -5,7 +5,7 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import { getEntityContacts } from '../../contacts';
 import { db } from '@ac/db';
 import { user, eventResource } from '@ac/db';

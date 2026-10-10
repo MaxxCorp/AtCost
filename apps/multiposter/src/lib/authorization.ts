@@ -1,6 +1,6 @@
 import type { UserWithRolesAndClaims } from './auth.d';
 
-export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements' | 'talents';
+export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements' | 'talents' | 'consumables' | 'recipes' | 'menus';
 
 export function parseRoles(user: UserWithRolesAndClaims): string[] {
 	const raw = user?.roles;
@@ -44,7 +44,12 @@ export function hasAccess(user: UserWithRolesAndClaims | null | undefined, featu
 	const claims = parseClaims<Record<string, any>>(user);
 	if (!claims) return false;
 
-	const claimValue = claims[feature] ?? claims[`multiposter.${feature}`];
+	let claimValue = claims[feature] ?? claims[`multiposter.${feature}`];
+
+	// Consumables, recipes, and menus fall back to events access if not explicitly defined
+	if (claimValue === undefined && (feature === 'consumables' || feature === 'recipes' || feature === 'menus')) {
+		claimValue = claims['events'] ?? claims['multiposter.events'];
+	}
 
 	// If the claim is explicitly true, the user has full (admin) access
 	if (claimValue === true) return true;

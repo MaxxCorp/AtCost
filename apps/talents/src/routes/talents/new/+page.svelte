@@ -1,9 +1,9 @@
 <script lang="ts">
-    import TalentForm from "$lib/components/talent/TalentForm.svelte";
+    import TalentForm from "#lib/components/talent/TalentForm.svelte";
     import { listTalents } from "../list.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
-    import { browser } from "$app/environment";
+    import { browser } from '$app/env';
     $effect(() => {
         breadcrumbState.set({ feature: "talents", current: "New Talent" });
     });

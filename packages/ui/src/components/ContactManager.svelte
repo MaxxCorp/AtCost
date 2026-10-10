@@ -20,7 +20,7 @@
         createSchema?: any;
         updateRemote?: any;
         updateSchema?: any;
-        getFormData?: (item: T) => any;
+        readItemRemote?: (id: string) => Promise<any>;
 
         // Form Rendering
         renderForm?: Snippet<[any]>;
@@ -50,7 +50,7 @@
         createSchema,
         updateRemote,
         updateSchema,
-        getFormData,
+        readItemRemote,
         renderForm,
         renderItemLabel,
         renderItemBadge,
@@ -73,7 +73,7 @@
     {createSchema}
     {updateRemote}
     {updateSchema}
-    {getFormData}
+    {readItemRemote}
     {renderForm}
     {renderItemLabel}
     {renderItemBadge}

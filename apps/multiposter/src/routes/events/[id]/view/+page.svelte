@@ -1,11 +1,11 @@
 <script lang="ts">
     import { LoadingSection, ErrorSection } from "@ac/ui";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { readEvent } from "../read.remote";
-    import { authClient } from "$lib/auth";
+    import { authClient } from "#lib/auth.js";
     import { deleteEvents } from "../../delete.remote";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
     import { toast } from "svelte-sonner";
@@ -14,7 +14,7 @@
         MapPin,
         Users,
         Tag as TagIcon,
-        Earth,
+        Ticket,
         Euro,
         Info,
         Download,
@@ -29,16 +29,24 @@
         Copy,
         Check,
         Lock,
+        Utensils,
     } from "@lucide/svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { getEventRooms } from "$lib/utils/format-rooms";
+    import Button from "#lib/components/ui/button/button.svelte";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import {
+        formatEventStatus,
+        getStatusBadgeClass,
+        getStatusDotClass,
+    } from "#lib/utils/format-event-status.js";
 
-    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import * as Dialog from "$lib/components/ui/dialog";
+    import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
+    import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
 
-    const eventId = page.params.id || "";
-    let dataPromise = $state(readEvent(eventId));
+    const eventId = $derived(page.params.id || "");
+    const eventQuery = $derived(readEvent(eventId));
 
     const session = authClient.useSession();
     // Check if the user is authorized to edit
@@ -70,6 +78,7 @@
     let canShare = $state(false);
     let copiedLink = $state(false);
     let heroImageFailed = $state(false);
+    let menuDialogOpen = $state(false);
 
     onMount(() => {
         canShare = typeof navigator !== "undefined" && !!navigator.share;
@@ -159,16 +168,22 @@
 
 <div class="container mx-auto px-4 py-4 md:py-6">
     <div class="max-w-7xl mx-auto">
-        {#await dataPromise}
+        {#if eventQuery.loading && !eventQuery.current}
             <LoadingSection message={m.loading_event_data()} />
-        {:then event}
-            {#if event}
+        {:else if eventQuery.current}
+            {@const event = eventQuery.current}
+            {#key event.id}
                 {@const hasDescription = !!(event.description && event.description.trim().length > 0)}
                 {@const eventInstances = event.instances || []}
                 {@const hasContact = !!event.resolvedContact}
                 {@const hasStaffNotes = !!(checkCanEdit(event) && event.internalNotes && event.internalNotes.trim().length > 0)}
+                {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
 
                 <Breadcrumb feature="events" current={event.summary} />
+
+                <div class="mt-4">
+                    <SeriesModeSelector event={event} variant="banner" viewMode={true} />
+                </div>
 
                 <div
                     class="bg-white shadow-xl rounded-2xl p-5 md:p-8 mt-4 border border-gray-100 space-y-6"
@@ -194,28 +209,30 @@
                                 <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight">
                                     {event.summary}
                                 </h1>
-                                {#if event.isPublic}
+                                {#if isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                                     <span
-                                        class="px-2.5 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full flex items-center gap-1"
+                                        class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full border border-emerald-200 flex items-center gap-1"
                                     >
-                                        <Earth size={12} /> {m.public_label()}
+                                        <Ticket size={12} />
+                                        {m.ticket_price_free?.() || 'Free'}
                                     </span>
                                 {/if}
                                 {#if event.status}
                                     <span
-                                        class="px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize {
-                                            event.status === 'cancelled'
-                                                ? 'bg-red-100 text-red-800'
-                                                : event.status === 'confirmed'
-                                                ? 'bg-emerald-100 text-emerald-800'
-                                                : 'bg-amber-100 text-amber-800'
-                                        }"
+                                        class="px-2.5 py-0.5 text-xs font-semibold rounded-full capitalize inline-flex items-center gap-1.5 {getStatusBadgeClass(
+                                            event.status,
+                                        )}"
                                     >
-                                        {event.status}
+                                        <span
+                                            class="w-1.5 h-1.5 rounded-full {getStatusDotClass(
+                                                event.status,
+                                            )}"
+                                        ></span>
+                                        {formatEventStatus(event.status)}
                                     </span>
                                 {/if}
                                 {#if event.tags && event.tags.length > 0}
-                                    {#each event.tags as tag}
+                                    {#each event.tags as tag (tag.id || tag.name)}
                                         <span
                                             class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100 flex items-center gap-1"
                                         >
@@ -224,6 +241,7 @@
                                         </span>
                                     {/each}
                                 {/if}
+
                             </div>
                         </div>
 
@@ -260,9 +278,24 @@
                                     <div
                                         class="bg-gray-50 p-4 sm:p-5 rounded-xl relative border border-gray-100 space-y-3"
                                     >
-                                        <p class="font-bold text-gray-900 text-base">
-                                            {event.resolvedContact.name}
-                                        </p>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <p class="font-bold text-gray-900 text-base">
+                                                {event.resolvedContact.name}
+                                            </p>
+                                            {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
+                                                <div class="flex items-center gap-1 flex-wrap">
+                                                    {#each event.resolvedContact.roles as roleName}
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                                            {roleName}
+                                                        </span>
+                                                    {/each}
+                                                </div>
+                                            {:else if event.resolvedContact.role}
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                                    {event.resolvedContact.role}
+                                                </span>
+                                            {/if}
+                                        </div>
                                         
                                         <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
                                             {#if event.resolvedContact.qrCodeDataUrl || event.resolvedContact.qrCodePath}
@@ -309,6 +342,30 @@
                                                 <Download size={13} /> {m.save_contact()} (.vcf)
                                             </a>
                                         </div>
+
+                                        {#if (event as any).contacts && (event as any).contacts.length > 1}
+                                            <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-1.5">
+                                                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                    {m.feature_contacts_title?.() ?? "Contacts"}
+                                                </h4>
+                                                <div class="space-y-1">
+                                                    {#each (event as any).contacts.filter((c: any) => c.name !== event.resolvedContact?.name && c.id !== (event.resolvedContact as any)?.id) as otherContact}
+                                                        <div class="flex items-center justify-between text-xs text-gray-700">
+                                                            <span class="font-medium">{otherContact.displayName || `${otherContact.givenName || ''} ${otherContact.familyName || ''}`.trim() || otherContact.company || otherContact.name}</span>
+                                                            {#if otherContact.roles && otherContact.roles.length > 0}
+                                                                <div class="flex items-center gap-1">
+                                                                    {#each otherContact.roles as role}
+                                                                        <span class="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">
+                                                                            {role.name || role}
+                                                                        </span>
+                                                                    {/each}
+                                                                </div>
+                                                            {/if}
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            </div>
+                                        {/if}
                                     </div>
                                 </section>
                             </div>
@@ -382,41 +439,7 @@
 
                                             {#if event.recurringEventId || (event.seriesId && !event.recurringEventId && event.recurrence && (event.recurrence as string[]).length > 0)}
                                                 <div class="mt-2">
-                                                    {#if !event.recurringEventId && eventInstances.length > 0}
-                                                        <Dialog.Root>
-                                                            <Dialog.Trigger class="text-xs text-blue-600 hover:underline flex items-center gap-1 text-left font-medium">
-                                                                <RefreshCw size={13} class="flex-shrink-0" />
-                                                                {formatRecurrenceText((event.recurrence as string[])[0])} ({eventInstances.length} {m.instances()})
-                                                            </Dialog.Trigger>
-                                                            <Dialog.Content class="sm:max-w-[440px]">
-                                                                <Dialog.Header>
-                                                                    <Dialog.Title>{m.instances()}</Dialog.Title>
-                                                                    <Dialog.Description>
-                                                                        {event.recurrence ? formatRecurrenceText((event.recurrence as string[])[0]) : ''}
-                                                                    </Dialog.Description>
-                                                                </Dialog.Header>
-                                                                <div class="max-h-[60vh] overflow-y-auto pr-1 mt-4 space-y-2">
-                                                                    {#each eventInstances as instance}
-                                                                        <a href={`/events/${instance.id}/view`} class="block p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
-                                                                            <div class="font-medium text-gray-900 text-sm">{instance.summary}</div>
-                                                                            <div class="text-xs text-gray-500 flex items-center gap-1.5 mt-1">
-                                                                                <Calendar size={13} />
-                                                                                {formatDate(instance.startDateTime)} 
-                                                                                {#if instance.startDateTime}
-                                                                                    {formatTime(instance.startDateTime)}
-                                                                                {/if}
-                                                                            </div>
-                                                                        </a>
-                                                                    {/each}
-                                                                </div>
-                                                            </Dialog.Content>
-                                                        </Dialog.Root>
-                                                    {:else if event.recurringEventId && event.recurrence && (event.recurrence as string[]).length > 0}
-                                                        <a href={`/events/${event.recurringEventId}/view`} class="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium">
-                                                            <RefreshCw size={13} class="flex-shrink-0" />
-                                                            {formatRecurrenceText((event.recurrence as string[])[0])}
-                                                        </a>
-                                                    {/if}
+                                                    <SeriesModeSelector event={event} variant="inline" viewMode={true} />
                                                 </div>
                                             {/if}
                                         </div>
@@ -424,7 +447,7 @@
 
                                     <!-- Locations -->
                                     {#if event.locations && event.locations.length > 0}
-                                        {#each event.locations as loc}
+                                        {#each event.locations as loc (loc.id || loc.name)}
                                             <li
                                                 class="flex items-start gap-3 text-gray-700"
                                             >
@@ -488,7 +511,7 @@
                                     {/if}
 
                                     <!-- Ticket Price -->
-                                    {#if event.ticketPrice && !event.ticketPriceUnknown}
+                                    {#if displayTicketPrice}
                                         <li
                                             class="flex items-center gap-3 text-gray-700"
                                         >
@@ -496,7 +519,7 @@
                                                 size={18}
                                                 class="text-green-600 flex-shrink-0"
                                             />
-                                            <span class="font-medium">{event.ticketPrice}</span>
+                                            <span class="font-medium">{displayTicketPrice}</span>
                                         </li>
                                     {/if}
                                 </ul>
@@ -540,6 +563,17 @@
                                     onclick={() => handleShare(event)}
                                 >
                                     <Share2 size={16} /> {m.share()}
+                                </Button>
+                            {/if}
+
+                            {#if event.menus && event.menus.length > 0}
+                                <Button
+                                    variant="outline"
+                                    class="flex items-center gap-2 text-violet-700 border-violet-200 hover:bg-violet-50"
+                                    onclick={() => (menuDialogOpen = true)}
+                                >
+                                    <Utensils size={16} class="text-violet-600" />
+                                    {m.menu?.() || 'Menu'}
                                 </Button>
                             {/if}
 
@@ -640,23 +674,114 @@
                         {/if}
                     </div>
                 </div>
-            {:else}
+
+                <!-- Menu & Price List Dialog -->
+                {#if event.menus && event.menus.length > 0}
+                    <Dialog.Root bind:open={menuDialogOpen}>
+                        <Dialog.Content class="max-w-2xl max-h-[85vh] overflow-y-auto">
+                            <Dialog.Header>
+                                <div class="flex items-center gap-2 text-violet-700">
+                                    <Utensils size={22} />
+                                    <Dialog.Title class="text-xl font-bold text-gray-900">
+                                        {m.feature_menus_title?.() || 'Menu & Price List'}
+                                    </Dialog.Title>
+                                </div>
+                                <Dialog.Description class="text-sm text-gray-500">
+                                    {event.summary} - {m.menu_details?.() || 'Items and prices for this event.'}
+                                </Dialog.Description>
+                            </Dialog.Header>
+
+                            <div class="space-y-6 py-4">
+                                {#each event.menus as menu}
+                                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                                        <div class="bg-gray-50 p-4 border-b border-gray-200">
+                                            <div class="flex items-center justify-between">
+                                                <h3 class="font-bold text-gray-900 text-lg">{menu.name}</h3>
+                                                {#if menu.totalPricePerPortion != null}
+                                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-800">
+                                                        €{Number(menu.totalPricePerPortion).toFixed(2)} / {m.portion?.() || 'portion'}
+                                                    </span>
+                                                {/if}
+                                            </div>
+                                            {#if menu.description}
+                                                <p class="text-sm text-gray-600 mt-1">{menu.description}</p>
+                                            {/if}
+                                        </div>
+
+                                        {#if menu.items && menu.items.length > 0}
+                                            <div class="divide-y divide-gray-100">
+                                                {#each menu.items as item}
+                                                    <div class="p-3.5 flex items-start justify-between gap-4 hover:bg-gray-50/50 transition-colors">
+                                                        <div class="space-y-1">
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="font-medium text-gray-900 text-sm">{item.name}</span>
+                                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-medium {item.itemType === 'recipe' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}">
+                                                                    {item.itemType === 'recipe' ? (m.recipe?.() || 'Recipe') : (m.consumable?.() || 'Consumable')}
+                                                                </span>
+                                                            </div>
+                                                            {#if item.description}
+                                                                <p class="text-xs text-gray-500">{item.description}</p>
+                                                            {/if}
+                                                            {#if item.portionAmount}
+                                                                <p class="text-xs text-gray-400">
+                                                                    {m.portion_size?.() || 'Portion'}: {item.portionAmount} {item.unit || ''}
+                                                                </p>
+                                                            {/if}
+                                                        </div>
+                                                        <div class="text-right shrink-0">
+                                                            <span class="font-mono font-semibold text-sm text-gray-900">
+                                                                €{(Number(item.unitPrice) || 0).toFixed(2)}
+                                                            </span>
+                                                            {#if checkCanEdit(event) && item.costPrice > 0}
+                                                                <span class="block text-[10px] text-gray-400 font-mono">
+                                                                    cost €{Number(item.costPrice).toFixed(2)} • {item.factor ? `${Number(item.factor).toFixed(1)}×` : ''}
+                                                                </span>
+                                                            {/if}
+                                                        </div>
+                                                    </div>
+                                                {/each}
+                                            </div>
+                                        {:else}
+                                            <div class="p-6 text-center text-sm text-gray-500">
+                                                {m.no_items_in_menu?.() || 'No items listed in this menu.'}
+                                            </div>
+                                        {/if}
+
+                                        {#if event.participantsCount && event.participantsCount > 1 && menu.totalPricePerPortion}
+                                            <div class="bg-violet-50/50 p-3 border-t border-violet-100 flex items-center justify-between text-xs text-violet-900">
+                                                <span>{m.total_for_participants?.() || 'Total for'} {event.participantsCount} {m.participants?.() || 'participants'}:</span>
+                                                <span class="font-mono font-bold text-sm">
+                                                    €{(Number(menu.totalPricePerPortion) * event.participantsCount).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/each}
+                            </div>
+
+                            <Dialog.Footer>
+                                <Button variant="outline" onclick={() => (menuDialogOpen = false)}>
+                                    {m.close?.() || 'Close'}
+                                </Button>
+                            </Dialog.Footer>
+                        </Dialog.Content>
+                    </Dialog.Root>
+                {/if}
+                {/key}
+            {:else if eventQuery.current === null}
                 <ErrorSection
                     headline={m.event_not_found()}
                     message={m.event_not_found_message()}
                     href="/events"
                     button={m.back_to_events()}
                 />
+            {:else if eventQuery.error}
+                <ErrorSection
+                    headline={m.error()}
+                    message={eventQuery.error?.message || m.failed_to_load_event()}
+                    href="/events"
+                    button={m.back_to_events()}
+                />
             {/if}
-        {:catch error}
-            <ErrorSection
-                headline={m.error()}
-                message={error instanceof Error
-                    ? error.message
-                    : m.failed_to_load_event()}
-                href="/events"
-                button={m.back_to_events()}
-            />
-        {/await}
     </div>
 </div>

@@ -4,8 +4,8 @@ import { user } from '@ac/db';
 import { eq } from '@ac/db';
 import { listUsers } from '../list.remote';
 import { readUser } from './read.remote';
-import { getAuthenticatedUser, ensureAccess, parseRoles } from '$lib/server/authorization';
-import { updateUserSchema } from '$lib/validations/users';
+import { getAuthenticatedUser, ensureAccess, parseRoles } from '#lib/server/authorization.js';
+import { updateUserSchema } from '#lib/validations/users.js';
 import { error } from '@sveltejs/kit';
 
 export const updateUser = form(updateUserSchema, async (data) => {

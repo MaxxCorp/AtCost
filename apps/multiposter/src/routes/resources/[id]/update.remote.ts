@@ -5,9 +5,9 @@ import { eq, and } from '@ac/db';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
 import { readResource } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { updateResourceSchema } from '$lib/validations/resources';
-import { syncService } from '$lib/server/sync/service';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { updateResourceSchema } from '#lib/validations/resources.js';
+import { syncService } from '#lib/server/sync/service.js';
 
 export const updateResource = form(updateResourceSchema, async (data) => {
     console.log('--- updateResource START ---');

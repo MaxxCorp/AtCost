@@ -1,7 +1,7 @@
 import { LocalBlobStorageProvider } from './local';
 import { VercelBlobStorageProvider } from './vercel';
 import type { BlobStorageProvider } from './types';
-import { env } from '$env/dynamic/private';
+import { VERCEL, BLOB_READ_WRITE_TOKEN } from '$app/env/private';
 
 let provider: BlobStorageProvider;
 
@@ -13,7 +13,7 @@ export function getStorageProvider(): BlobStorageProvider {
 
     // Use Vercel provider if VERCEL env is set, or if BLOB_READ_WRITE_TOKEN is present
     // Fallback to local for non-vercel environments unless explicitly forced
-    const isVercel = env.VERCEL === '1' || !!env.BLOB_READ_WRITE_TOKEN;
+    const isVercel = VERCEL === '1' || !!BLOB_READ_WRITE_TOKEN;
 
     if (isVercel) {
 

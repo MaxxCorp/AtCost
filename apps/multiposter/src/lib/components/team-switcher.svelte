@@ -1,9 +1,9 @@
 <script lang="ts">
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import { useSidebar } from "$lib/components/ui/sidebar/index.js";
-	import ChevronsUpDownIcon from "$lib/components/icons/chevrons-up-down.svelte";
-	import PlusIcon from "$lib/components/icons/plus.svelte";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
+	import * as Sidebar from "#lib/components/ui/sidebar/index.js";
+	import { useSidebar } from "#lib/components/ui/sidebar/index.js";
+	import ChevronsUpDownIcon from "#lib/components/icons/chevrons-up-down.svelte";
+	import PlusIcon from "#lib/components/icons/plus.svelte";
 
 	// This should be `Component` after @lucide/svelte updates types
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

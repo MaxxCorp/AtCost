@@ -2,15 +2,19 @@ import * as v from 'valibot';
 import { type InferSelectModel, db, desc, and, or, ilike, sql, inArray } from '@ac/db';
 import { query } from '$app/server';
 import { location } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 
 import { LocationPaginationSchema as PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
-
+import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
 export const listLocations = query(PaginationSchema, async (input): Promise<PaginatedResult<Location>> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'locations');
 
+    const version = await getNamespaceVersion(CACHE_NAMESPACES.LOCATIONS);
+    const key = cacheKeys.locationsList(version, hashParams(input));
+
+    return cached(key, 300, async () => {
     const { page = 1, limit = 50, search = '', city } = input || {};
     const offset = (page - 1) * limit;
 
@@ -51,4 +55,5 @@ export const listLocations = query(PaginationSchema, async (input): Promise<Pagi
     }));
 
     return { data, total };
+    });
 });

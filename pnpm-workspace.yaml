@@ -8,4 +8,4 @@ allowBuilds:
   '@google/genai': true
   protobufjs: true
 patchedDependencies:
-  '@sveltejs/adapter-vercel': patches/@sveltejs__adapter-vercel.patch
+  '@sveltejs/kit@3.0.0': patches/@sveltejs__kit@3.0.0.patch

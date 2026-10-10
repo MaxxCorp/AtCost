@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, user } from '@ac/db';
-import { getOptionalUser, parseRoles } from '$lib/server/authorization';
+import { getOptionalUser, parseRoles } from '#lib/server/authorization.js';
 import { desc, type InferSelectModel, sql, and, or, ilike } from '@ac/db';
 import * as v from 'valibot';
 

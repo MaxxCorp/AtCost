@@ -1,7 +1,7 @@
 import { query, form, command } from '$app/server';
 import { db, timesheetEntry, shiftPlan, eq, and, isNull, desc } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import * as service from '$lib/server/timesheets/service';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import * as service from '#lib/server/timesheets/service.js';
 import { manageTimesheetsSchema } from '@ac/validations';
 import * as v from 'valibot';
 

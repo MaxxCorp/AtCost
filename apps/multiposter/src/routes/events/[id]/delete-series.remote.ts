@@ -3,11 +3,12 @@ import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { eq, or } from '@ac/db';
 import { listEvents } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import { publishEventChange } from '$lib/server/realtime';
-import { syncService } from '$lib/server/sync/service';
-import { getStorageProvider } from '$lib/server/blob-storage';
+import { publishEventChange } from '#lib/server/realtime.js';
+import { syncService } from '#lib/server/sync/service.js';
+import { getStorageProvider } from '#lib/server/blob-storage/index.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
 
 /**
  * Command: Delete an entire recurring series.
@@ -26,11 +27,13 @@ export const deleteSeries = command(
         const user = getAuthenticatedUser();
         ensureAccess(user, 'events');
 
+        const realEventId = eventId.includes('_inst_') ? eventId.split('_inst_')[0] : eventId;
+
         // Find the event to get its series info
         const [targetEvent] = await db
             .select()
             .from(event)
-            .where(eq(event.id, eventId));
+            .where(eq(event.id, realEventId));
 
         if (!targetEvent) {
             throw new Error('Event not found');
@@ -116,11 +119,13 @@ export const deleteSeries = command(
         // Publish deletion events
         if (deletedEventIds.length > 0) {
             await publishEventChange('delete', deletedEventIds);
+            await invalidateEvent(deletedEventIds);
         }
 
-        await 
+        await listEvents().refresh();
 
         console.log('--- deleteSeries DONE ---');
         return { success: true, deletedCount: deletedEventIds.length };
     }
 );
+

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import SignupForm from "$lib/components/signup-form.svelte";
+    import SignupForm from "#lib/components/signup-form.svelte";
 </script>
 
 <div class="grid min-h-svh lg:grid-cols-2">

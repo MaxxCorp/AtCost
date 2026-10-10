@@ -6,10 +6,37 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { env } from '$env/dynamic/private';
+
+import {
+	MICROSOFT_TENANT_ID,
+	MICROSOFT_CLIENT_ID,
+	MICROSOFT_CLIENT_SECRET
+} from '$app/env/private';
+
 import { db } from '@ac/db';
 import { account } from '@ac/db';
 import { eq, and } from '@ac/db';
+import { RRule } from '#lib/utils/rrule-compat.js';
+
+const RRULE_WEEKDAY_TO_GRAPH: Record<number, string> = {
+	0: 'monday',
+	1: 'tuesday',
+	2: 'wednesday',
+	3: 'thursday',
+	4: 'friday',
+	5: 'saturday',
+	6: 'sunday'
+};
+
+const GRAPH_DAY_TO_RRULE: Record<string, string> = {
+	monday: 'MO',
+	tuesday: 'TU',
+	wednesday: 'WE',
+	thursday: 'TH',
+	friday: 'FR',
+	saturday: 'SA',
+	sunday: 'SU'
+};
 
 export class MicrosoftCalendarProvider implements SyncProvider {
 	readonly type: ProviderType = 'microsoft-calendar';
@@ -17,6 +44,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	readonly supportsWebhooks = true;
 	readonly supportedDirections: SyncDirection[] = ['pull', 'push', 'bidirectional'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeRecurrence = true;
 
 	shouldSyncEvent(event: any): boolean {
 		// Microsoft Calendar allows syncing of all events (including tentative and non-public)
@@ -31,8 +59,11 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	async initialize(config: SyncConfig): Promise<void> {
 		this.config = config;
 
-		if (config.settings?.calendarId) {
-			this.calendarId = config.settings.calendarId as string;
+		if (config.settings?.calendarId !== undefined && config.settings?.calendarId !== null) {
+			const trimmed = String(config.settings.calendarId).trim();
+			this.calendarId = trimmed !== '' ? trimmed : 'primary';
+		} else {
+			this.calendarId = 'primary';
 		}
 
 		const [userAccount] = await db
@@ -60,11 +91,29 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		}
 	}
 
+	/**
+	 * Validates that the specified calendar is available and accessible.
+	 * Throws an explicit error if the calendar is not found or is inaccessible.
+	 * Never falls back to other calendars.
+	 */
+	async validateCalendarAccess(): Promise<void> {
+		if (!this.accessToken) throw new Error('Provider not initialized');
+
+		const url = this.getBaseUrl();
+		try {
+			await this.makeRequest(url, { method: 'GET' });
+		} catch (error: any) {
+			const target = this.calendarId === 'primary' ? 'primary calendar' : `calendar "${this.calendarId}"`;
+			console.error(`[MicrosoftCalendarProvider] Specified ${target} is not available:`, error);
+			throw new Error(`Microsoft Calendar sync failed: Specified ${target} is not available or accessible (${error?.message || error}).`);
+		}
+	}
+
 	async validateConnection(): Promise<boolean> {
 		if (!this.accessToken) throw new Error('Provider not initialized');
 
 		try {
-			await this.makeRequest(this.getBaseUrl(), { method: 'GET' });
+			await this.validateCalendarAccess();
 			return true;
 		} catch (error) {
 			console.error('Microsoft Calendar connection validation failed:', error);
@@ -87,6 +136,11 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		nextSyncToken?: string;
 	}> {
 		if (!this.accessToken) throw new Error('Provider not initialized');
+
+		// Validate that the specified calendar is accessible before pulling
+		if (!syncToken) {
+			await this.validateCalendarAccess();
+		}
 
 		let url = '';
 		if (syncToken) {
@@ -128,7 +182,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			}
 		}
 
-		const events: ExternalEvent[] = allEvents.map(e => this.mapToExternalEvent(e));
+		const events: ExternalEvent[] = allEvents.map((e) => this.mapToExternalEvent(e));
 
 		return {
 			events,
@@ -179,23 +233,38 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 
 		const msEvent = this.mapToMicrosoftEvent(event);
 		const url = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}`;
+		const response = await this.makeRequest<any>(url, { method: 'PATCH', body: JSON.stringify(msEvent) });
 
-		const response = await this.makeRequest<any>(url, {
-			method: 'PATCH',
-			body: JSON.stringify(msEvent)
-		});
-
-		return {
-			etag: response['@odata.etag']
-		};
+		return { etag: response['@odata.etag'] };
 	}
 
 	async deleteEvent(externalId: string): Promise<void> {
 		if (!this.accessToken) throw new Error('Provider not initialized');
 
+		// First try to cancel the event so room attendees / resources are freed up in Exchange/365
+		try {
+			const cancelUrl = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}/cancel`;
+			await this.makeRequest(cancelUrl, {
+				method: 'POST',
+				body: JSON.stringify({
+					comment: 'Event deleted'
+				})
+			});
+		} catch (cancelError: any) {
+			// If not an organizer meeting with attendees or already cancelled/deleted, ignore
+		}
+
 		const url = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}`;
 
-		await this.makeRequest(url, { method: 'DELETE' });
+		try {
+			await this.makeRequest(url, { method: 'DELETE' });
+		} catch (error: any) {
+			if (error?.message?.includes('404') || error?.message?.includes('ResourceNotFound') || error?.status === 404) {
+				console.log(`[MicrosoftCalendarProvider] Event ${externalId} already deleted from Microsoft Calendar`);
+				return;
+			}
+			throw error;
+		}
 	}
 
 	async setupWebhook(callbackUrl: string): Promise<WebhookSubscription> {
@@ -224,7 +293,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			body: JSON.stringify({
 				changeType: 'created,updated,deleted',
 				notificationUrl: callbackUrl,
-				resource: resource,
+				resource,
 				expirationDateTime: expiresAt.toISOString(),
 				clientState: this.config.id // Use config ID for verification
 			})
@@ -294,14 +363,14 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 
 	private async refreshAccessToken(): Promise<string> {
 		if (!this.refreshToken) throw new Error("No refresh token available");
-		
-		const tenantId = env.MICROSOFT_TENANT_ID || 'common';
+
+		const tenantId = MICROSOFT_TENANT_ID || 'common';
 		const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 			body: new URLSearchParams({
-				client_id: env.MICROSOFT_CLIENT_ID || '',
-				client_secret: env.MICROSOFT_CLIENT_SECRET || '',
+				client_id: MICROSOFT_CLIENT_ID || '',
+				client_secret: MICROSOFT_CLIENT_SECRET || '',
 				grant_type: 'refresh_token',
 				refresh_token: this.refreshToken
 			})
@@ -321,10 +390,10 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		if (this.config) {
 			await db.update(account)
 				.set({
-					accessToken: this.accessToken,
-					refreshToken: this.refreshToken,
-					accessTokenExpiresAt: new Date(Date.now() + (data.expires_in * 1000)),
-					updatedAt: new Date()
+				accessToken: this.accessToken,
+				refreshToken: this.refreshToken,
+				accessTokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+				updatedAt: new Date()
 				})
 				.where(
 					and(
@@ -355,7 +424,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 				await this.refreshAccessToken();
 				headers.set('Authorization', `Bearer ${this.accessToken}`);
 				const retryOptions = { ...options, headers };
-				
+
 				const retryResponse = await fetch(url, retryOptions);
 				if (!retryResponse.ok) {
 					const errText = await retryResponse.text();
@@ -378,11 +447,21 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		const startDateTime = msEvent.start?.dateTime ? new Date(msEvent.start.dateTime + 'Z') : undefined;
 		const endDateTime = msEvent.end?.dateTime ? new Date(msEvent.end.dateTime + 'Z') : undefined;
 
+		let recurrence: string[] | undefined = undefined;
+		if (msEvent.recurrence) {
+			const rrule = this.mapMicrosoftRecurrenceToRRule(msEvent.recurrence);
+			if (rrule) {
+				recurrence = [rrule];
+			}
+		}
+
 		return {
 			externalId: msEvent.id,
-			providerId: this.config!.providerId,
+			providerId: (this.config!).providerId,
 			summary: msEvent.subject || 'Untitled Event',
-			status: isCancelled ? 'cancelled' : (msEvent.showAs === 'tentative' ? 'tentative' : 'confirmed'),
+			status: isCancelled
+				? 'cancelled'
+				: msEvent.showAs === 'tentative' ? 'tentative' : 'confirmed',
 			description: msEvent.body?.content ?? undefined,
 			location: msEvent.location?.displayName ?? undefined,
 			isAllDay: msEvent.isAllDay ?? false,
@@ -395,10 +474,13 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 				displayName: a.emailAddress?.name,
 				responseStatus: a.status?.response
 			})),
+			recurrence,
 			etag: msEvent['@odata.etag'],
 			updatedAt: msEvent.lastModifiedDateTime ? new Date(msEvent.lastModifiedDateTime) : undefined,
 			metadata: {
-				app_event_id: msEvent.transactionId // we'll use transactionId to store internal id to prevent echoes
+				app_event_id: msEvent.transactionId, // we'll use transactionId to store internal id to prevent echoes
+				seriesMasterId: msEvent.seriesMasterId ?? undefined,
+				type: msEvent.type ?? undefined
 			}
 		};
 	}
@@ -421,6 +503,240 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		} catch (e) {
 			return date.toISOString().split('.')[0];
 		}
+	}
+
+	private getDayOfWeekInTimeZone(date: Date, timeZone: string): string {
+		try {
+			return new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long' }).format(date).toLowerCase();
+		} catch {
+			const jsDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+			return jsDays[date.getUTCDay()];
+		}
+	}
+
+	private getDayOfMonthInTimeZone(date: Date, timeZone: string): number {
+		try {
+			const val = parseInt(new Intl.DateTimeFormat('en-US', { timeZone, day: 'numeric' }).format(date), 10);
+			return isNaN(val) ? date.getUTCDate() : val;
+		} catch {
+			return date.getUTCDate();
+		}
+	}
+
+	private getMonthInTimeZone(date: Date, timeZone: string): number {
+		try {
+			const val = parseInt(new Intl.DateTimeFormat('en-US', { timeZone, month: 'numeric' }).format(date), 10);
+			return isNaN(val) ? date.getUTCMonth() + 1 : val;
+		} catch {
+			return date.getUTCMonth() + 1;
+		}
+	}
+
+	private mapPositionToIndex(pos?: number): 'first' | 'second' | 'third' | 'fourth' | 'last' {
+		if (pos === 1) return 'first';
+		if (pos === 2) return 'second';
+		if (pos === 3) return 'third';
+		if (pos === 4) return 'fourth';
+		if (pos === -1 || pos === 5) return 'last';
+		return 'first';
+	}
+
+	private mapIndexToPosition(index?: string): number | null {
+		switch (index?.toLowerCase()) {
+			case 'first': return 1;
+			case 'second': return 2;
+			case 'third': return 3;
+			case 'fourth': return 4;
+			case 'last': return -1;
+			default: return null;
+		}
+	}
+
+	private mapRRuleToMicrosoftRecurrence(rruleStr: string, start: Date, startTimeZone: string): any {
+		try {
+			const firstLine = rruleStr.split(/\r?\n/)[0].trim();
+			const cleanStr = firstLine.replace(/^RRULE:/i, '').trim();
+			const options = RRule.parseString(cleanStr);
+
+			const startDate = this.formatLocal(start, startTimeZone).split('T')[0];
+			const range: any = {
+				startDate,
+				recurrenceTimeZone: startTimeZone
+			};
+
+			if (options.until) {
+				range.type = 'endDate';
+				const endDate = this.formatLocal(new Date(options.until), startTimeZone).split('T')[0];
+				range.endDate = endDate < startDate ? startDate : endDate;
+			} else if (options.count && typeof options.count === 'number' && options.count > 0) {
+				range.type = 'numbered';
+				range.numberOfOccurrences = options.count;
+			} else {
+				range.type = 'noEnd';
+			}
+
+			const interval = options.interval || 1;
+			const pattern: any = { interval };
+
+			const byweekday = options.byweekday
+				? Array.isArray(options.byweekday) ? options.byweekday : [options.byweekday]
+				: [];
+			const daysOfWeek = byweekday.map((w: any) => {
+				const num = typeof w === 'number' ? w : w.weekday;
+				return RRULE_WEEKDAY_TO_GRAPH[num];
+			}).filter(Boolean);
+
+			const wkstObj = options.wkst;
+			const wkstNum = typeof wkstObj === 'object' && wkstObj !== null ? wkstObj.weekday : wkstObj;
+			const firstDayOfWeek = wkstNum !== undefined && wkstNum !== null && RRULE_WEEKDAY_TO_GRAPH[wkstNum] ? RRULE_WEEKDAY_TO_GRAPH[wkstNum] : 'sunday';
+			const isRelative = byweekday.some((w: any) => typeof w !== 'number' && w.n !== undefined) || options.bysetpos !== null && options.bysetpos !== undefined;
+			let pos: number | undefined = undefined;
+			if (options.bysetpos !== null && options.bysetpos !== undefined) {
+				pos = Array.isArray(options.bysetpos) ? options.bysetpos[0] : options.bysetpos;
+			} else if (byweekday.length > 0 && typeof byweekday[0] !== 'number' && byweekday[0].n !== undefined) {
+				pos = byweekday[0].n;
+			}
+
+			switch (options.freq) {
+				case 3: // DAILY
+					pattern.type = 'daily';
+					break;
+				case 2: // WEEKLY
+					pattern.type = 'weekly';
+					pattern.daysOfWeek = daysOfWeek.length > 0 ? daysOfWeek : [this.getDayOfWeekInTimeZone(start, startTimeZone)];
+					pattern.firstDayOfWeek = firstDayOfWeek;
+					break;
+				case 1: // MONTHLY
+					if (isRelative) {
+						pattern.type = 'relativeMonthly';
+						pattern.daysOfWeek = daysOfWeek.length > 0 ? daysOfWeek : [this.getDayOfWeekInTimeZone(start, startTimeZone)];
+						pattern.index = this.mapPositionToIndex(pos);
+					} else {
+						pattern.type = 'absoluteMonthly';
+						pattern.dayOfMonth = options.bymonthday
+							? Array.isArray(options.bymonthday) ? options.bymonthday[0] : options.bymonthday
+							: this.getDayOfMonthInTimeZone(start, startTimeZone);
+					}
+					break;
+				case 0: // YEARLY
+					if (isRelative) {
+						pattern.type = 'relativeYearly';
+						pattern.daysOfWeek = daysOfWeek.length > 0 ? daysOfWeek : [this.getDayOfWeekInTimeZone(start, startTimeZone)];
+						pattern.index = this.mapPositionToIndex(pos);
+						pattern.month = options.bymonth
+							? Array.isArray(options.bymonth) ? options.bymonth[0] : options.bymonth
+							: this.getMonthInTimeZone(start, startTimeZone);
+					} else {
+						pattern.type = 'absoluteYearly';
+						pattern.dayOfMonth = options.bymonthday
+							? Array.isArray(options.bymonthday) ? options.bymonthday[0] : options.bymonthday
+							: this.getDayOfMonthInTimeZone(start, startTimeZone);
+						pattern.month = options.bymonth
+							? Array.isArray(options.bymonth) ? options.bymonth[0] : options.bymonth
+							: this.getMonthInTimeZone(start, startTimeZone);
+					}
+					break;
+				default:
+					return undefined;
+			}
+
+			return { pattern, range };
+		} catch (e) {
+			console.warn('[MicrosoftCalendarProvider] Failed to parse recurrence rule:', rruleStr, e);
+			return undefined;
+		}
+	}
+
+	private mapMicrosoftRecurrenceToRRule(recurrence: any): string | undefined {
+		const pattern = recurrence?.pattern;
+		const range = recurrence?.range;
+		if (!pattern) return undefined;
+
+		const parts: string[] = [];
+
+		switch (pattern.type?.toLowerCase()) {
+			case 'daily':
+				parts.push('FREQ=DAILY');
+				break;
+			case 'weekly':
+				parts.push('FREQ=WEEKLY');
+				if (pattern.daysOfWeek && Array.isArray(pattern.daysOfWeek) && pattern.daysOfWeek.length > 0) {
+					const days = pattern.daysOfWeek
+						.map((d: string) => GRAPH_DAY_TO_RRULE[d.toLowerCase()])
+						.filter(Boolean);
+					if (days.length > 0) {
+						parts.push(`BYDAY=${days.join(',')}`);
+					}
+				}
+				if (pattern.firstDayOfWeek) {
+					const wkst = GRAPH_DAY_TO_RRULE[pattern.firstDayOfWeek.toLowerCase()];
+					if (wkst) parts.push(`WKST=${wkst}`);
+				}
+				break;
+			case 'absolutemonthly':
+				parts.push('FREQ=MONTHLY');
+				if (pattern.dayOfMonth) {
+					parts.push(`BYMONTHDAY=${pattern.dayOfMonth}`);
+				}
+				break;
+			case 'relativemonthly': {
+					parts.push('FREQ=MONTHLY');
+					const pos = this.mapIndexToPosition(pattern.index);
+				const days = (pattern.daysOfWeek || [])
+					.map((d: string) => GRAPH_DAY_TO_RRULE[d.toLowerCase()])
+					.filter(Boolean);
+					if (days.length === 1 && pos !== null) {
+						parts.push(`BYDAY=${pos}${days[0]}`);
+					} else if (days.length > 0) {
+						parts.push(`BYDAY=${days.join(',')}`);
+						if (pos !== null) parts.push(`BYSETPOS=${pos}`);
+					}
+					break;
+				}
+			case 'absoluteyearly':
+				parts.push('FREQ=YEARLY');
+				if (pattern.month) {
+					parts.push(`BYMONTH=${pattern.month}`);
+				}
+				if (pattern.dayOfMonth) {
+					parts.push(`BYMONTHDAY=${pattern.dayOfMonth}`);
+				}
+				break;
+			case 'relativeyearly': {
+					parts.push('FREQ=YEARLY');
+					if (pattern.month) {
+						parts.push(`BYMONTH=${pattern.month}`);
+					}
+					const pos = this.mapIndexToPosition(pattern.index);
+				const days = (pattern.daysOfWeek || [])
+					.map((d: string) => GRAPH_DAY_TO_RRULE[d.toLowerCase()])
+					.filter(Boolean);
+					if (days.length === 1 && pos !== null) {
+						parts.push(`BYDAY=${pos}${days[0]}`);
+					} else if (days.length > 0) {
+						parts.push(`BYDAY=${days.join(',')}`);
+						if (pos !== null) parts.push(`BYSETPOS=${pos}`);
+					}
+					break;
+				}
+			default:
+				return undefined;
+		}
+
+		if (pattern.interval && pattern.interval > 1) {
+			parts.push(`INTERVAL=${pattern.interval}`);
+		}
+
+		if (range) {
+			if (range.type === 'endDate' && range.endDate) {
+				const cleanEnd = range.endDate.replace(/-/g, '');
+				parts.push(`UNTIL=${cleanEnd}T235959Z`);
+			} else if (range.type === 'numbered' && range.numberOfOccurrences) {
+				parts.push(`COUNT=${range.numberOfOccurrences}`);
+			}
+		}
+
+		return `RRULE:${parts.join(';')}`;
 	}
 
 	private mapToMicrosoftEvent(event: ExternalEvent): any {
@@ -446,29 +762,35 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		};
 
 		const startTimeZone = event.startTimeZone || 'UTC';
-		if (event.startDateTime) {
-			msEvent.start = {
-				dateTime: this.formatLocal(event.startDateTime, startTimeZone),
-				timeZone: startTimeZone
-			};
-		}
+		const start = event.startDateTime ? new Date(event.startDateTime) : new Date();
+		msEvent.start = {
+			dateTime: this.formatLocal(start, startTimeZone),
+			timeZone: startTimeZone
+		};
 
 		const endTimeZone = event.endTimeZone || startTimeZone;
-		if (event.endDateTime) {
-			msEvent.end = {
-				dateTime: this.formatLocal(event.endDateTime, endTimeZone),
-				timeZone: endTimeZone
-			};
-		}
+		const end = event.endDateTime
+			? new Date(event.endDateTime)
+			: new Date(start.getTime() + 60 * 60 * 1000);
+		msEvent.end = {
+			dateTime: this.formatLocal(end, endTimeZone),
+			timeZone: endTimeZone
+		};
 
 		if (event.attendees && event.attendees.length > 0) {
-			msEvent.attendees = event.attendees.map(a => ({
-				emailAddress: {
-					address: a.email,
-					name: a.displayName
-				},
+			msEvent.attendees = event.attendees.map((a) => ({
+				emailAddress: { address: a.email, name: a.displayName },
 				type: a.type || 'required'
 			}));
+		}
+
+		if (event.recurrence && event.recurrence.length > 0) {
+			const recurrence = this.mapRRuleToMicrosoftRecurrence(event.recurrence[0], start, startTimeZone);
+			if (recurrence) {
+				msEvent.recurrence = recurrence;
+			}
+		} else if (event.recurrence !== undefined && event.recurrence.length === 0) {
+			msEvent.recurrence = null;
 		}
 
 		return msEvent;

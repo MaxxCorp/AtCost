@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { getContent } from '$lib/server/cms/operations';
+import { getContent } from '#lib/server/cms/operations.js';
 import { getRequestEvent } from '$app/server';
-import { readContentSchema } from '$lib/validations/cms';
+import { readContentSchema } from '#lib/validations/cms.js';
 
 export const readContent = query(readContentSchema, async (params) => {
     console.log('[GDPR read.remote] Called with params:', params);

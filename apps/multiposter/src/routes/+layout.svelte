@@ -1,20 +1,20 @@
 <script lang="ts">
 	import "../app.css";
-	import favicon from "$lib/assets/favicon.svg";
-	import AuthHeader from "$lib/components/AuthHeader.svelte";
-	import AppSidebar from "$lib/components/app-sidebar.svelte";
-	import { Toaster } from "$lib/components/ui/sonner/index.js";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
+	import favicon from "#lib/assets/favicon.svg";
+	import AuthHeader from "#lib/components/AuthHeader.svelte";
+	import AppSidebar from "#lib/components/app-sidebar.svelte";
+	import { Toaster } from "#lib/components/ui/sonner/index.js";
+	import * as Sidebar from "#lib/components/ui/sidebar/index.js";
+	import * as Breadcrumb from "#lib/components/ui/breadcrumb/index.js";
 	import { onMount, tick } from "svelte";
-	import { browser } from "$app/environment";
-	import { kioskState } from "$lib/stores/kiosk.svelte";
+	import { browser } from '$app/env';
+	import { kioskState } from "#lib/stores/kiosk.svelte.js";
 	import { slide } from "svelte/transition";
 	import { page } from "$app/state";
-	import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
-	import { FEATURES } from "$lib/features";
-	import * as m from "$lib/paraglide/messages.js";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime.js";
+	import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
+	import { FEATURES } from "#lib/features.js";
+	import * as m from "#lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "#lib/paraglide/runtime.js";
 
 	let { children } = $props();
 
@@ -38,6 +38,9 @@
 	);
 	let isKioskPage = $derived(
 		page.url.pathname.startsWith("/kiosks/") || kioskState.isKiosk,
+	);
+	let isKioskView = $derived(
+		page.url.pathname.includes("/view") || kioskState.isKiosk,
 	);
 
 	const featureMeta = $derived.by(() =>
@@ -65,14 +68,25 @@
 			{@render children()}
 		{/key}
 	</main>
-{:else if isKioskPage}
-	{#if !kioskState.isKiosk || kioskState.isHeaderVisible}
-		<div transition:slide class="relative z-50">
+{:else if isKioskView}
+	{#if kioskState.isHeaderVisible}
+		<div transition:slide class="relative z-50 print:hidden">
 			<AuthHeader />
 		</div>
 	{/if}
-	<main class="min-h-screen bg-gray-50">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+	<main class="min-h-screen bg-gray-50 print:bg-white print:min-h-0 print:p-0 print:m-0">
+		{#key page.url.pathname}
+			{@render children()}
+		{/key}
+	</main>
+{:else if isKioskPage}
+	{#if !kioskState.isKiosk || kioskState.isHeaderVisible}
+		<div transition:slide class="relative z-50 print:hidden">
+			<AuthHeader />
+		</div>
+	{/if}
+	<main class="min-h-screen bg-gray-50 print:bg-white print:min-h-0 print:p-0 print:m-0">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:p-0 print:m-0 print:max-w-none">
 			{#key page.url.pathname}
 				{@render children()}
 			{/key}
@@ -95,7 +109,7 @@
 									>
 								</Breadcrumb.Item>
 
-								{#each breadcrumbSegments as segment, i}
+								{#each breadcrumbSegments as segment, i (segment.href || segment.label || i)}
 									<Breadcrumb.Separator />
 									<Breadcrumb.Item>
 										{#if segment.href && (i < breadcrumbSegments.length - 1 || breadcrumbState.current)}

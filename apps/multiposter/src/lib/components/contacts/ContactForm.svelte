@@ -1,5 +1,5 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import SharedContactForm from "@ac/ui/components/forms/ContactForm.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Location, type Contact } from "@ac/validations";

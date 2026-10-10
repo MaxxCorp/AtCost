@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db, resource, resourceLocation, location, eventResource } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { desc, getTableColumns, and, or, not, inArray, notInArray, eq, exists, sql, ilike } from '@ac/db';
 import { resourcePaginationSchema as PaginationSchema, parseFilterValue, type Resource, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';

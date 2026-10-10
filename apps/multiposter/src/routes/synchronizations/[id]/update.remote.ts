@@ -1,9 +1,9 @@
 import { form, requested } from '$app/server';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { syncConfig } from '@ac/db';
 import { eq, and } from '@ac/db';
-import { updateSynchronizationSchema } from '$lib/validations/synchronizations';
+import { updateSynchronizationSchema } from '#lib/validations/synchronizations.js';
 import { list as listSynchronizations } from '../list.remote';
 import { readSynchronization as read } from './read.remote';
 
@@ -36,6 +36,10 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 		const newSettings = input.settings !== undefined
 			? (typeof input.settings === 'string' ? JSON.parse(input.settings) : { ...(existing.settings as any || {}), ...input.settings })
 			: existing.settings;
+
+		if (newSettings && newSettings.isDefault !== undefined) {
+			newSettings.isDefault = newSettings.isDefault === true || newSettings.isDefault === 'true';
+		}
 
 		const newCredentials = input.credentials !== undefined
 			? (typeof input.credentials === 'string' ? JSON.parse(input.credentials) : { ...(existing.credentials as any || {}), ...input.credentials })

@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import * as m from '$lib/paraglide/messages';
+import * as m from '#lib/paraglide/messages.js';
 
 const recurrenceSchema = v.union([v.array(v.string()), v.string()]);
 const attendeesSchema = v.array(v.object({
@@ -50,6 +50,7 @@ export const eventBaseSchema = v.object({
 	guestsCanSeeOtherGuests: v.optional(v.union([v.boolean(), v.string()])),
 	resourceIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	contactIds: v.optional(v.string()),
+	contactRolesJson: v.optional(v.string()),
 	categoryBerlinDotDe: v.optional(v.string()),
 	ticketPrice: v.pipe(v.string(), v.minLength(1, m.ticket_price_required?.() ?? 'Ticket price is required')),
 	ticketPriceUnknown: v.optional(v.union([v.boolean(), v.string()])),
@@ -57,6 +58,8 @@ export const eventBaseSchema = v.object({
 	syncIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	status: v.optional(v.string()),
 	heroImage: v.optional(v.string()),
+	participantsCount: v.optional(v.union([v.number(), v.string()])),
+	menuIds: v.optional(v.union([v.array(v.string()), v.string()])),
 });
 
 /**
@@ -70,5 +73,6 @@ export const createEventSchema = eventBaseSchema;
  */
 export const updateEventSchema = v.object({
     ...v.partial(eventBaseSchema).entries,
-    id: v.pipe(v.string(), v.uuid())
+    id: v.pipe(v.string(), v.minLength(1)),
+    seriesMode: v.optional(v.string()),
 });

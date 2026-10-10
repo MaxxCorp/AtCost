@@ -1,23 +1,25 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
     import { page } from "$app/state";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { readContact } from "./read.remote";
     import { updateContact } from "./update.remote";
     import { deleteContact } from "./delete.remote";
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
-    import ScanNamecardButton from "$lib/components/contacts/ScanNamecardButton.svelte";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-            import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
+    import ScanNamecardButton from "#lib/components/contacts/ScanNamecardButton.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+            import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { goto } from "$app/navigation";
 
-    import { updateContactSchema } from "$lib/validations/contacts";
+    import { updateContactSchema } from "#lib/validations/contacts.js";
     import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
+    import { getLocationFilterGroups } from "#lib/filters/index.js";
     import { listLocations } from "../../locations/list.remote";
     import { createLocation } from "../../locations/new/create.remote";
     import { updateLocation } from "../../locations/[id]/update.remote";
     import { deleteLocation } from "../../locations/[id]/delete.remote";
+    import { readLocation } from "../../locations/[id]/read.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
@@ -72,7 +74,7 @@
                         <div class="flex justify-between items-center mb-6 mt-2">
                             <h1 class="text-3xl font-bold">{m.edit_contact()}</h1>
                             <div class="flex items-center gap-2">
-                                <ScanNamecardButton onScanned={(data) => formComponent?.fillData(data)} />
+                                <ScanNamecardButton onScanned={(data: any) => formComponent?.fillData(data)} />
                                 <AsyncButton
                                     type="button"
                                     loadingLabel={m.deleting()}
@@ -111,7 +113,7 @@
                                     ).map((la: any) => la.locationId),
                                 }}
                             >
-                                {#snippet children({ onLocationsChange })}
+                                {#snippet children({ onLocationsChange }: any)}
                                     <div class="mt-8 border-t pt-8">
                                         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
                                             <MapPin size={18} class="text-blue-600" />
@@ -126,6 +128,7 @@
                                             initialItems={(
                                                 contact.locationAssociations || []
                                             ).map((la: any) => la.location).filter(Boolean)}
+                                            filters={getLocationFilterGroups(m)}
                                             onchange={onLocationsChange}
                                             listItemsRemote={listLocations}
                                             fetchAssociationsRemote={fetchEntityLocations as any}
@@ -154,7 +157,7 @@
                                             createSchema={createLocationSchema}
                                             updateRemote={updateLocation}
                                             updateSchema={updateLocationSchema}
-                                            getFormData={(l: any) => l}
+                                            readItemRemote={readLocation}
                                             searchPredicate={(l: any, q: string) => {
                                                 return (
                                                     l.name

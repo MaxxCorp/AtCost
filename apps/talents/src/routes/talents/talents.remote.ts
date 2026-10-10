@@ -1,6 +1,6 @@
 import { query, form, command } from '$app/server';
 import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '#lib/server/authorization.js';
 import {
     talentTimelineEntrySchema,
     unifiedTalentSchema,
@@ -8,15 +8,17 @@ import {
     type PaginatedResult
 } from '@ac/validations';
 import * as v from 'valibot';
-import { readTalent as readTalentService, type TalentProfile } from '$lib/server/talents/service';
+import { readTalent as readTalentService, type TalentProfile } from '#lib/server/talents/service.js';
 import { listTalents } from './list.remote';
 import { readTalent } from './[id]/read.remote';
+import { invalidateTalent } from '#lib/server/cache/index.js';
 
 export const bulkDeleteTalents = command(v.array(v.string()), async (ids): Promise<{ success: boolean }> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
     for (const id of ids) {
         await db.delete(talent).where(eq(talent.id, id));
     }
+    await invalidateTalent(ids);
     await (listTalents as any).refresh();
     return { success: true };
 });
@@ -45,6 +47,7 @@ const addTimelineEntryHandler = async (data: {
         }
     }).returning();
 
+    await invalidateTalent(data.talentId);
     await (readTalent(data.talentId) as any).refresh();
     return { success: true, id: newEntry.id };
 };
@@ -188,7 +191,10 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
 
         // Refresh the detail view and list to ensure client-side data is in sync
         if (result.talentId) {
+            await invalidateTalent(result.talentId);
             void readTalent(result.talentId).refresh();
+        } else {
+            await invalidateTalent();
         }
         void listTalents().refresh();
 

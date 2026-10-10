@@ -1,7 +1,7 @@
 import { command } from '$app/server';
-import { linkBlockSchema } from '$lib/validations/cms';
-import { linkBlock, getBlock } from '$lib/server/cms/operations';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { linkBlockSchema } from '#lib/validations/cms.js';
+import { linkBlock, getBlock } from '#lib/server/cms/operations.js';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import { error } from '@sveltejs/kit';
 
 export const linkBlockFunction = command(linkBlockSchema, async (data) => {

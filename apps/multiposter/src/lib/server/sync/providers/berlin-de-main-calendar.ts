@@ -8,10 +8,10 @@ import type {
 import { db } from '@ac/db';
 import { user, eventResource } from '@ac/db';
 import { eq } from '@ac/db';
-import { resolveEventContact } from '$lib/server/contact-resolution';
+import { resolveEventContact } from '#lib/server/contact-resolution.js';
 import { parsePricing } from '../utils/pricing';
-import { env } from '$env/dynamic/private';
 import { htmlToPlainText } from '../utils/html';
+import { isSeriesItem } from '#lib/utils/event-series.js';
 
 /**
  * Berlin.de Main Calendar sync provider implementation
@@ -23,7 +23,34 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 	readonly supportsWebhooks = false;
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeRecurrence = false;
 
+	shouldSyncEvent(event: any): boolean {
+		if (event.status === 'cancelled') return false;
+		if (event.status === 'tentative' || !event.isPublic) return false;
+
+		// Berlin.de restriction: recurring event series must never be synced due to the approval system
+		if (isSeriesItem(event)) {
+			return false;
+		}
+
+		// Berlin.de restriction: dates in the past or > 365 days in the future are not allowed
+		if (event.startDateTime) {
+			const start = new Date(event.startDateTime);
+			const now = new Date();
+			const end = event.endDateTime ? new Date(event.endDateTime) : start;
+			if (end.getTime() < now.getTime()) {
+				return false;
+			}
+
+			const maxFuture = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+			if (start.getTime() > maxFuture.getTime()) {
+				return false;
+			}
+		}
+
+		return true;
+	}
 
 	private config?: SyncConfig;
 	private formUrl = 'https://www.berlin.de/tickets/6226271-2789889-datenerfassung.html';

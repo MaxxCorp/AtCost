@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { create } from "./create.remote";
 	import { goto } from "$app/navigation";
-	import { createSynchronizationSchema } from "$lib/validations/synchronizations";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
-	import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
+	import { createSynchronizationSchema } from "#lib/validations/synchronizations.js";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
+	import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
 	import { toast } from "svelte-sonner";
-	import SynchronizationForm from "$lib/components/synchronizations/SynchronizationForm.svelte";
+	import SynchronizationForm from "#lib/components/synchronizations/SynchronizationForm.svelte";
 
 	const formId = crypto.randomUUID();
 	const rf = create.for(formId);

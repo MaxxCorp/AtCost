@@ -5,7 +5,6 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { env } from '$env/dynamic/private';
 import { htmlToPlainText } from '../utils/html';
 
 /**

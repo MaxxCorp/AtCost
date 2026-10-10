@@ -1,4 +1,4 @@
-import { auth } from '$lib/server/auth';
+import { auth } from '#lib/server/auth.js';
 import type { RequestHandler } from '@sveltejs/kit';
 
 // Catch-all auth endpoint to support Better Auth routes like:

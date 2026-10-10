@@ -7,8 +7,8 @@ import { eq } from '@ac/db';
 import type { Campaign } from '@ac/db';
 import { readCampaign } from './read.remote';
 import { listCampaigns } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { updateCampaignSchema } from '$lib/validations/campaigns';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { updateCampaignSchema } from '#lib/validations/campaigns.js';
 
 export const updateCampaign = form(updateCampaignSchema, async (data) => {
 	const user = getAuthenticatedUser();

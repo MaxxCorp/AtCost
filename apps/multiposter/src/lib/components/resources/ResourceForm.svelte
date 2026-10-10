@@ -1,18 +1,20 @@
 <script lang="ts">
     import { untrack } from "svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import * as m from "$lib/paraglide/messages";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "#lib/components/ui/button/index.js";
     import { goto } from "$app/navigation";
     import type { createResource } from "../../../routes/resources/new/create.remote";
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
-    import type { AllocationCalendar } from "$lib/validations/resources";
-    import ContactForm from "$lib/components/contacts/ContactForm.svelte";
+    import type { AllocationCalendar } from "#lib/validations/resources.js";
+    import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
+    import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
+    import { readContact } from "../../../routes/contacts/[id]/read.remote";
     import {
         fetchEntityContacts,
         addAssociation,
@@ -39,6 +41,7 @@
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import { listMsTenantResources } from "../../../routes/resources/list-ms-tenant-resources.remote";
+    import { getLocationFilterGroups, getContactFilterGroups } from "#lib/filters/index.js";
 
     let {
         remoteFunction,
@@ -271,6 +274,7 @@
                 type="resource"
                 entityId={isUpdating ? initialData?.id : null}
                 initialItems={initialData?.locationIds ? locations.filter(l => initialData.locationIds.includes(l.id)) : []}
+                filters={getLocationFilterGroups(m)}
                 onchange={(ids: any) => (selectedLocationIds = ids)}
                 listItemsRemote={listLocations as any}
                 fetchAssociationsRemote={fetchEntityLocations as any}
@@ -289,7 +293,7 @@
                 createSchema={createLocationSchema}
                 updateRemote={updateLocation}
                 updateSchema={updateLocationSchema}
-                getFormData={(l: any) => l}
+                readItemRemote={readLocation}
                 searchPredicate={(l: any, q: string) => {
                     return l.name.toLowerCase().includes(q.toLowerCase()) || 
                            (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false);
@@ -546,6 +550,7 @@
                 type="resource"
                 mode="embedded"
                 entityId={isUpdating ? initialData?.id : null}
+                filters={getContactFilterGroups(m)}
                 onchange={(ids: any) => (selectedContactIds = ids)}
                 listItemsRemote={listContacts as any}
                 fetchAssociationsRemote={fetchEntityContacts as any}
@@ -564,14 +569,7 @@
                 createSchema={createContactSchema}
                 updateRemote={updateContact}
                 updateSchema={updateContactSchema}
-                getFormData={(c: Contact) => ({
-                    contact: c,
-                    emails: c.emails,
-                    phones: c.phones,
-                    addresses: c.addresses,
-                    relations: c.relations,
-                    tags: c.tags,
-                })}
+                readItemRemote={readContact}
                 searchPredicate={matchContactSearch}
                 loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
                 noItemsLabel={m.no_items_associated_label({ item: m.feature_contacts_title() })}

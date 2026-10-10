@@ -5,12 +5,15 @@
     import { listLocations } from "./list.remote";
     import { createLocation } from "./new/create.remote";
     import { updateLocation } from "./[id]/update.remote";
+    import { readLocation } from "./[id]/read.remote";
     import { deleteLocation } from "./[id]/delete.remote";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import {
         createLocationSchema,
         updateLocationSchema,
     } from "@ac/validations/locations";
+    import * as m from "#lib/paraglide/messages.js";
+    import { getLocationFilterGroups } from "#lib/filters/index.js";
     breadcrumbState.set({ feature: "locations" });
 
 </script>
@@ -29,26 +32,14 @@
         createSchema={createLocationSchema}
         updateRemote={updateLocation}
         updateSchema={updateLocationSchema}
-        getFormData={(loc: any) => loc}
+        readItemRemote={readLocation}
         searchPredicate={(loc: any, q: any) => {
             return (
                 loc.name.toLowerCase().includes(q.toLowerCase()) ||
                 (loc.city?.toLowerCase().includes(q.toLowerCase()) ?? false)
             );
         }}
-        filters={[
-            {
-                id: "city",
-                label: "City",
-                type: "select",
-                optionsRemote: async () => {
-                    const res = await listLocations({ limit: 1000 });
-                    const items = Array.isArray(res) ? res : res.data;
-                    const cities = [...new Set(items.map((i: any) => i.city).filter(Boolean))];
-                    return cities.map(city => ({ value: city, label: city }));
-                }
-            }
-        ]}
+        filters={getLocationFilterGroups(m)}
     >
         {#snippet renderItemLabel(loc: any)}
             <div class="flex flex-col">

@@ -5,10 +5,13 @@
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { RefreshCw } from "@lucide/svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { getEventRooms } from "$lib/utils/format-rooms";
-    import * as m from "$lib/paraglide/messages";
+    import { RefreshCw, Ticket, Calendar, User } from "@lucide/svelte";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import { isNonSeriesEvent } from "#lib/utils/event-series.js";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
+    import * as m from "#lib/paraglide/messages.js";
 
     interface LocationInfo {
         id: string;
@@ -24,6 +27,8 @@
             phone?: string;
             qrCodePath?: string;
             qrCodeDataUrl?: string;
+            role?: string | null;
+            roles?: string[] | null;
         } | null;
     }
 
@@ -136,7 +141,18 @@
                             <span class="text-blue-400 uppercase text-xs font-bold tracking-widest block mb-1">{m.contact()}</span>
                             <div class="flex items-start gap-4">
                                 <div class="space-y-0.5">
-                                    <div class="text-white text-2xl font-bold leading-tight">{currentPageData.location.contact.name}</div>
+                                    <div class="text-white text-2xl font-bold leading-tight flex items-center gap-2 flex-wrap">
+                                        <span>{currentPageData.location.contact.name}</span>
+                                        {#if currentPageData.location.contact.roles && currentPageData.location.contact.roles.length > 0}
+                                            <span class="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md text-xs font-bold uppercase tracking-wider">
+                                                {currentPageData.location.contact.roles[0]}
+                                            </span>
+                                        {:else if currentPageData.location.contact.role}
+                                            <span class="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-md text-xs font-bold uppercase tracking-wider">
+                                                {currentPageData.location.contact.role}
+                                            </span>
+                                        {/if}
+                                    </div>
                                     <div class="flex flex-wrap gap-x-6 text-gray-500 text-lg font-medium">
                                         {#if currentPageData.location.contact.email}
                                             <div class="flex items-center gap-1.5">
@@ -182,23 +198,54 @@
                     {#key currentPage}
                         {#each currentPageData.items as item, i}
                             {@const eventRooms = getEventRooms(item)}
+                            {@const displayPrice = formatTicketPrice((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
+                            {@const isSpecialNonSeries = isNonSeriesEvent(item)}
+                            {@const multiDay = isMultiDayEvent(item)}
+                            {@const durationDays = multiDay ? getEventDurationDays(item) : 1}
+                            {@const dateParts = getEventDateParts(item)}
                             <tr 
-                                class="border-b border-gray-900/30 hover:bg-blue-500/5 transition-all duration-300 h-[12vh] min-h-[100px]"
+                                class="border-b border-gray-900/30 hover:bg-blue-500/5 transition-all duration-300 h-[12vh] min-h-[100px] {isSpecialNonSeries ? 'bg-amber-500/10 border-l-4 border-l-amber-400' : ''}"
                                 in:fly={{ x: 20, duration: 600, delay: i * 80 }}
                             >
                                 <td class="py-4 px-6 align-middle">
-                                    <div class="text-3xl font-black whitespace-nowrap">{formatDate(item.startDateTime)}</div>
+                                    {#if multiDay}
+                                        <div class="text-2xl lg:text-3xl font-black whitespace-nowrap text-indigo-400">
+                                            {dateParts.startDay}.–{dateParts.endDay}.
+                                        </div>
+                                        <div class="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                                            {dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? ` / ${dateParts.endMonth}` : ''} • {durationDays} {m.days_count({ count: durationDays })}
+                                        </div>
+                                    {:else}
+                                        <div class="text-3xl font-black whitespace-nowrap {isSpecialNonSeries ? 'text-amber-400' : ''}">{formatDate(item.startDateTime)}</div>
+                                    {/if}
                                 </td>
                                 <td class="py-4 px-6 align-middle">
-                                    <div class="text-2xl font-bold text-gray-400 whitespace-nowrap">{formatTime(item.startDateTime)}</div>
+                                    {#if multiDay}
+                                        {#if (item as any).isAllDay}
+                                            <div class="text-xl font-bold text-indigo-300 whitespace-nowrap uppercase tracking-wider">{m.all_day_label()}</div>
+                                        {:else}
+                                            <div class="text-xl font-bold text-gray-300 whitespace-nowrap">{formatTime(item.startDateTime)}</div>
+                                            {#if item.endDateTime}
+                                                <div class="text-xs font-semibold text-gray-400 whitespace-nowrap">→ {formatTime(item.endDateTime)}</div>
+                                            {/if}
+                                        {/if}
+                                    {:else}
+                                        <div class="text-2xl font-bold text-gray-400 whitespace-nowrap">{formatTime(item.startDateTime)}</div>
+                                    {/if}
                                 </td>
                                 <td class="py-4 px-6 align-middle">
                                     <div class="space-y-1.5 overflow-hidden">
-                                        <div class="text-3xl font-black leading-tight line-clamp-2 flex items-center gap-3">
+                                        <div class="text-3xl font-black leading-tight line-clamp-2 flex flex-wrap items-center gap-3">
+                                            {#if multiDay}
+                                                <span class="inline-flex items-center gap-1.5 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 self-center">
+                                                    <Calendar class="w-3.5 h-3.5" />
+                                                    {m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})
+                                                </span>
+                                            {/if}
                                             {#if (item as any).status === 'cancelled'}
                                                 <span class="inline-block bg-red-600/80 text-white text-sm font-black px-3 py-1 rounded-full uppercase tracking-widest self-center shrink-0">{m.cancelled()}</span>
                                             {/if}
-                                            <span class={(item as any).status === 'cancelled' ? 'line-through opacity-50 text-gray-500' : ''}>{item.summary || m.untitled_event().toUpperCase()}</span>
+                                            <span class={(item as any).status === 'cancelled' ? 'line-through opacity-50 text-gray-500' : isSpecialNonSeries ? 'text-amber-100' : ''}>{item.summary || m.untitled_event().toUpperCase()}</span>
                                         </div>
                                         {#if eventRooms.length > 0}
                                             <div class="flex flex-wrap items-center gap-1.5">
@@ -210,16 +257,44 @@
                                                 {/each}
                                             </div>
                                         {/if}
+                                        {#if displayPrice && !isEventFree((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
+                                            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-sm font-semibold">
+                                                <Ticket class="w-3.5 h-3.5 text-emerald-400" />
+                                                <span>{displayPrice}</span>
+                                            </div>
+                                        {/if}
                                         {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-300 text-sm font-semibold">
                                                 <RefreshCw class="w-3.5 h-3.5" />
-                                                <span>{formatRecurrenceText((item as any).recurrence)}</span>
+                                                <span>{formatRecurrenceText((item as any).recurrence, undefined, { omitLength: true })}</span>
+                                            </div>
+                                        {/if}
+                                        {#if (item as any).resolvedContact}
+                                            {@const c = (item as any).resolvedContact}
+                                            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-800/80 border border-gray-700/60 rounded-md text-gray-300 text-xs font-medium">
+                                                <User class="w-3.5 h-3.5 text-blue-400" />
+                                                <span>{c.name}</span>
+                                                {#if c.roles && c.roles.length > 0}
+                                                    <span class="px-1.5 py-0.2 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded text-[11px] font-bold">
+                                                        {c.roles[0]}
+                                                    </span>
+                                                {:else if c.role}
+                                                    <span class="px-1.5 py-0.2 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded text-[11px] font-bold">
+                                                        {c.role}
+                                                    </span>
+                                                {/if}
                                             </div>
                                         {/if}
                                     </div>
                                 </td>
                                 <td class="py-4 px-6 align-middle">
                                     <div class="flex flex-wrap gap-1.5 max-h-[8vh] overflow-hidden">
+                                        {#if isEventFree((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
+                                            <span class="px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                                                <Ticket class="w-3 h-3" />
+                                                {m.ticket_price_free?.() || 'Free'}
+                                            </span>
+                                        {/if}
                                         {#each (item.tags || []).slice(0, 3) as tag}
                                             <span class="px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-xs font-bold uppercase tracking-wider">
                                                 {tag.name || tag}

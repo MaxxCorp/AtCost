@@ -1,4 +1,4 @@
-import { syncService } from '$lib/server/sync/service';
+import { syncService } from '#lib/server/sync/service.js';
 import type { RequestEvent } from '@sveltejs/kit';
 
 /**

@@ -1,6 +1,6 @@
-import { ICONS } from '$lib/icons';
-import type { Feature } from '$lib/authorization';
-import * as m from '$lib/paraglide/messages';
+import { ICONS } from '#lib/icons.js';
+import type { Feature } from '#lib/authorization.js';
+import * as m from '#lib/paraglide/messages.js';
 
 export interface FeatureMeta {
   key: Feature;
@@ -143,6 +143,48 @@ export const FEATURES: readonly FeatureMeta[] = [
     borderClass: 'border-gray-100',
     buttonClass: 'bg-gray-600 hover:bg-gray-700',
     order: 9
+  },
+  {
+    key: 'consumables',
+    title: () => m.feature_consumables_title(),
+    description: () => m.feature_consumables_description(),
+    href: '/consumables',
+    buttonText: () => m.feature_consumables_button(),
+    claim: 'consumables',
+    icon: 'cart',
+    gradientFrom: 'from-amber-50',
+    gradientTo: 'to-orange-50',
+    borderClass: 'border-amber-100',
+    buttonClass: 'bg-amber-600 hover:bg-amber-700',
+    order: 10
+  },
+  {
+    key: 'recipes',
+    title: () => m.feature_recipes_title(),
+    description: () => m.feature_recipes_description(),
+    href: '/recipes',
+    buttonText: () => m.feature_recipes_button(),
+    claim: 'recipes',
+    icon: 'chefHat',
+    gradientFrom: 'from-emerald-50',
+    gradientTo: 'to-teal-50',
+    borderClass: 'border-emerald-100',
+    buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+    order: 11
+  },
+  {
+    key: 'menus',
+    title: () => m.feature_menus_title(),
+    description: () => m.feature_menus_description(),
+    href: '/menus',
+    buttonText: () => m.feature_menus_button(),
+    claim: 'menus',
+    icon: 'utensils',
+    gradientFrom: 'from-violet-50',
+    gradientTo: 'to-purple-50',
+    borderClass: 'border-purple-100',
+    buttonClass: 'bg-purple-600 hover:bg-purple-700',
+    order: 12
   }
 ] as const;
 

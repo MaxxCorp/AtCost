@@ -1,6 +1,6 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { goto } from "$app/navigation";
     import { readUser } from "./read.remote";
     import { updateUser } from "./update.remote";
@@ -9,21 +9,21 @@
 
     import { ErrorSection, LoadingSection, AsyncButton, UserForm, handleDelete } from "@ac/ui";
     import { User as UserIcon } from "@lucide/svelte";
-    import { parseRoles } from "$lib/authorization";
-    import { FEATURES } from "$lib/features";
-    import { browser } from "$app/environment";
-    import { authClient } from "$lib/auth";
+    import { parseRoles } from "#lib/authorization.js";
+    import { FEATURES } from "#lib/features.js";
+    import { browser } from '$app/env';
+    import { authClient } from "#lib/auth.js";
 
     import { listTalents } from "../../talents/list.remote";
     import { getEntityTalents, associateTalent, dissociateTalent } from "../../talents/associate.remote";
     import { upsertTalent } from "../../talents/talents.remote";
-    import { listTags } from "../../tags/list.remote";
-    import { listLocations } from "../../locations/list.remote";
     import { createTalent } from "../../talents/new/create.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";
+    import { readTalent } from "../../talents/[id]/read.remote";
+    import { getTalentFilterGroups } from "#lib/filters/index.js";
     import { unifiedTalentSchema } from "@ac/validations";
     import { EntityManager } from "@ac/ui";
-    import TalentForm from "$lib/components/talent/TalentForm.svelte";
+    import TalentForm from "#lib/components/talent/TalentForm.svelte";
 
     const userId = $derived(page.params.id || "");
 
@@ -40,171 +40,146 @@
 
 <div class="container mx-auto px-4 py-8">
     <div class="max-w-2xl mx-auto">
-                    {#if browser}
-                {#await dataPromise}
-                    <LoadingSection message="Loading user and session data..." />
-                {:then [user, session]}
-                    {#if user}
-                        <div class="bg-white shadow rounded-lg p-6 space-y-4">
-                            <div class="flex justify-between items-start mb-6">
-                                <div>
+        {#if browser}
+            {#await dataPromise}
+                <LoadingSection message="Loading user and session data..." />
+            {:then [user, session]}
+                {#if user}
+                    <div class="bg-white shadow rounded-lg p-6 space-y-4">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
                                     <h1 class="text-3xl font-bold mb-2">
                                         {user.name}
                                     </h1>
-                                    <p class="text-gray-500">{user.email}</p>
-                                </div>
-                                <div class="flex gap-2">
-                                    <AsyncButton
-                                        type="button"
-                                        loadingLabel="Deleting..."
-                                        loading={deleteUser.pending}
-                                        variant="destructive"
-                                        onclick={async () => {
-                                            const confirmed = await handleDelete({
-                                                ids: [user.id],
-                                                deleteFn: async (ids: string[]) => deleteUser(ids),
+                                <p class="text-gray-500">{user.email}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <AsyncButton
+                                    type="button"
+                                    loadingLabel="Deleting..."
+                                    loading={deleteUser.pending}
+                                    variant="destructive"
+                                    onclick={async () => {
+                                        const confirmed = await handleDelete({
+                                            ids: [user.id],
+                                            deleteFn: async (ids: string[]) => deleteUser(ids),
                                                 itemName: "Users",
-                                            });
-                                            if (confirmed) {
-                                                goto("/users");
-                                            }
-                                        }}
+                                        });
+                                        if (confirmed) {
+                                            goto("/users");
+                                        }
+                                    }}
                                     >
                                         Delete
                                     </AsyncButton>
-                                </div>
                             </div>
+                        </div>
 
-                            <h2 class="text-xl font-semibold mb-4">Edit User</h2>
-                            <UserForm
-                                remoteFunction={updateUser.for(userId)}
-                                validationSchema={updateUserSchema}
-                                isUpdating={true}
-                                initialData={user}
-                                {m}
-                                {appConfigList}
-                                canEditRoles={session?.data?.user ? parseRoles(session.data.user).includes("admin") : false}
-                                onSuccess={() => goto("/users")}
-                                onCancel={() => goto("/users")}
-                            >
-                                {#snippet extraEntities(data: any)}
+                        <h2 class="text-xl font-semibold mb-4">Edit User</h2>
+                        <UserForm
+                            remoteFunction={updateUser.for(userId)}
+                            validationSchema={updateUserSchema}
+                            isUpdating={true}
+                            initialData={user}
+                            m={m}
+                            appConfigList={appConfigList}
+                            canEditRoles={session?.data?.user
+                                ? parseRoles(session.data.user).includes("admin")
+                                : false}
+                            onSuccess={() => goto("/users")}
+                            onCancel={() => goto("/users")}
+                        >
+                            {#snippet extraEntities(data: any)}
                                     <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4 mt-8 pt-8 border-t">
-                                        <UserIcon size={20} class="text-indigo-500" />
-                                        {m.talents()}
-                                    </h3>
-                                    <EntityManager
-                                        title="Associated Talents"
-                                        icon={UserIcon}
-                                        mode="embedded"
-                                        type="user"
-                                        entityId={data.id}
-                                        listItemsRemote={listTalents as any}
-                                        fetchAssociationsRemote={getEntityTalents as any}
+                                    <UserIcon size={20} class="text-indigo-500" />
+                                    {m.talents()}
+                                </h3>
+                                <EntityManager
+                                    title="Associated Talents"
+                                    icon={UserIcon}
+                                    mode="embedded"
+                                    type="user"
+                                    entityId={data.id}
+                                    listItemsRemote={listTalents as any}
+                                    fetchAssociationsRemote={getEntityTalents as any}
                                         addAssociationRemote={async (p: any) =>
                                             associateTalent({ ...p, talentId: p.itemId } as any)}
                                         removeAssociationRemote={async (p: any) =>
                                             dissociateTalent({ ...p, talentId: p.itemId } as any)}
-                                        filterAssociations={[
-                                            {
-                                                id: "locationId",
-                                                label: "Locations",
-                                                listRemote: listLocations as any,
-                                                getOptionLabel: (l: any) => l.name,
-                                            },
-                                            {
-                                                id: "tagId",
-                                                label: "Tags",
-                                                listRemote: listTags as any,
-                                                getOptionLabel: (t: any) => t.name,
-                                            },
-                                        ]}
-                                        filters={[
-                                            {
-                                                id: "status",
-                                                label: "Status",
-                                                type: "select",
-                                                options: [
-                                                    { value: "active", label: "Active" },
-                                                    { value: "applicant", label: "Applicant" },
-                                                    { value: "inactive", label: "Inactive" },
-                                                ],
-                                                optionsRemote: async () => [],
-                                            }
-                                        ]}
-                                        createRemote={createTalent}
-                                        createSchema={unifiedTalentSchema}
-                                        updateRemote={updateTalent}
-                                        updateSchema={unifiedTalentSchema}
-                                        getFormData={(t: any) => ({
-                                            talent: { ...t },
-                                            contact: { ...t.contact },
-                                            linkedUserId: userId
-                                        })}
-                                        searchPredicate={(t: any, q: string) => {
-                                            const query = q.toLowerCase();
+                                    filters={getTalentFilterGroups(m)}
+                                    createRemote={createTalent}
+                                    createSchema={unifiedTalentSchema}
+                                    updateRemote={updateTalent}
+                                    updateSchema={unifiedTalentSchema}
+                                    readItemRemote={readTalent}
+                                    searchPredicate={(t: any, q: string) => {
+                                        const query = q.toLowerCase();
                                             const name = (
                                                 t.contact?.displayName ||
                                                 `${t.contact?.givenName || ""} ${t.contact?.familyName || ""}`
                                             ).toLowerCase();
-                                            const jobTitle = (t.jobTitle || "").toLowerCase();
-                                            const email = (t.contact?.emails?.[0]?.value || "").toLowerCase();
-                                            
+                                        const jobTitle = (t.jobTitle || "").toLowerCase();
+                                        const email = (t.contact?.emails?.[0]?.value || "").toLowerCase();
+
                                             return name.includes(query) || 
                                                 jobTitle.includes(query) || 
                                                 email.includes(query);
-                                        }}
-                                    >
-                                        {#snippet renderItemLabel(talent: any)}
-                                            <div class="flex flex-col">
-                                                <span class="font-bold">
+                                    }}
+                                >
+                                    {#snippet renderItemLabel(talent: any)}
+                                        <div class="flex flex-col">
+                                            <span class="font-bold">
                                                     {talent.contact?.displayName ||
                                                         `${talent.contact?.givenName || ""} ${talent.contact?.familyName || ""}`}
-                                                </span>
-                                                {#if talent.jobTitle}
-                                                    <span class="text-xs text-gray-500 font-normal">{talent.jobTitle}</span>
-                                                {/if}
-                                            </div>
-                                        {/snippet}
+                                            </span>
+                                            {#if talent.jobTitle}
+                                                <span class="text-xs text-gray-500 font-normal">{talent.jobTitle}</span>
+                                            {/if}
+                                        </div>
+                                    {/snippet}
 
-                                        {#snippet renderForm({ remoteFunction, initialData, onSuccess, onCancel, id }: { remoteFunction: any, initialData?: any, onSuccess: (result: any) => void, onCancel: () => void, id?: string })}
-                                            <TalentForm
-                                                initialData={{
-                                                    ...(initialData || {}),
-                                                    contact: {
-                                                        ...(initialData?.contact || {}),
-                                                        linkedUserId: userId
-                                                    }
-                                                }}
-                                                talentId={id}
-                                                {remoteFunction}
-                                                {onSuccess}
-                                                {onCancel}
-                                            />
-                                        {/snippet}
-                                    </EntityManager>
-                                {/snippet}
-                            </UserForm>
-                        </div>
-                    {:else}
-                        <ErrorSection
-                            headline="User not found"
-                            message="The user you are trying to edit could not be found."
-                            href="/users"
-                            button="Back to Users"
-                        />
-                    {/if}
-                {:catch error}
+                                    {#snippet renderForm({ remoteFunction, initialData, onSuccess, onCancel, id }: { 
+                                        remoteFunction: any;
+                                        initialData?: any;
+                                        onSuccess: (result: any) => void;
+                                        onCancel: () => void;
+                                        id?: string
+                                     })}
+                                        <TalentForm
+                                            initialData={{
+                                                ...initialData || {},
+                                                contact: { ...initialData?.contact || {}, linkedUserId: userId }
+                                            }}
+                                            talentId={id}
+                                            remoteFunction={remoteFunction}
+                                            onSuccess={onSuccess}
+                                            onCancel={onCancel}
+                                        />
+                                    {/snippet}
+                                </EntityManager>
+                            {/snippet}
+                        </UserForm>
+                    </div>
+                {:else}
                     <ErrorSection
-                        headline="Error"
-                        message={error instanceof Error
-                            ? error.message
-                            : "Failed to load user"}
+                        headline="User not found"
+                        message="The user you are trying to edit could not be found."
                         href="/users"
                         button="Back to Users"
                     />
-                {/await}
-            {:else}
-                <LoadingSection message="Loading user..." />
-            {/if}
-            </div>
+                {/if}
+            {:catch error}
+                <ErrorSection
+                    headline="Error"
+                        message={error instanceof Error
+                            ? error.message
+                            : "Failed to load user"}
+                    href="/users"
+                    button="Back to Users"
+                />
+            {/await}
+        {:else}
+            <LoadingSection message="Loading user..." />
+        {/if}
+    </div>
 </div>

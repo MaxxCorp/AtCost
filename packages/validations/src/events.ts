@@ -32,6 +32,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	}[];
 	rooms?: string[];
 	tags?: Tag[];
+	contacts?: any[];
 	syncIds?: string[];
 	participationStatuses?: Record<string, string>;
 	maxOccupancy?: number | null;
@@ -39,6 +40,8 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 		name: string;
 		email: string;
 		phone: string;
+		role?: string | null;
+		roles?: string[] | null;
 		qrCodeDataUrl?: string;
 		qrCodePath?: string;
 	} | null;
@@ -47,6 +50,8 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	isSeries?: boolean;
 	instanceCount?: number;
 	instances?: Event[];
+	menus?: any[];
+	menuIds?: string[];
 };
 
 
@@ -69,6 +74,7 @@ export const eventPaginationSchema = v.optional(v.object({
     excludePast: v.optional(v.boolean()),
     excludeSeries: v.optional(v.boolean()),
     onlySeries: v.optional(v.boolean()),
+    includeSeriesEntries: v.optional(v.boolean()),
     excludedEventIds: v.optional(v.array(v.string())),
     includedEventIds: v.optional(v.array(v.string())),
     excludedTags: v.optional(v.array(v.string())),

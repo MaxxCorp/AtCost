@@ -5,11 +5,12 @@ import {
     contactRelation, tag, contactTag, locationContact
 } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
-import { updateContactSchema, type Contact } from '$lib/validations/contacts';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { generateContactAssets } from '$lib/server/contacts';
+import { updateContactSchema, type Contact } from '#lib/validations/contacts.js';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { generateContactAssets } from '#lib/server/contacts.js';
 import { listContacts } from '../list.remote';
 import { readContact } from './read.remote';
+import { invalidateContact } from '#lib/server/cache/index.js';
 
 export const updateContact = form(updateContactSchema, async (input) => {
     console.log('--- updateContact START ---');
@@ -258,6 +259,7 @@ export const updateContact = form(updateContactSchema, async (input) => {
         } as Contact;
 
         console.log('--- updateContact SUCCESS ---');
+        await invalidateContact(id);
         readContact(id).set(transformed);
         await listContacts().refresh();
         return { success: true, contact: transformed };

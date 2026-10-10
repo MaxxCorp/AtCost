@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { syncService } from '$lib/server/sync/service';
-import { getEmailCampaignsSchema } from '$lib/validations/synchronizations';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { syncService } from '#lib/server/sync/service.js';
+import { getEmailCampaignsSchema } from '#lib/validations/synchronizations.js';
 
 export const getEmailCampaigns = query(getEmailCampaignsSchema, async (data) => {
 	const user = getAuthenticatedUser();

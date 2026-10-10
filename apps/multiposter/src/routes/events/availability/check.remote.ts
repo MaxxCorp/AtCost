@@ -1,8 +1,8 @@
 import { query } from '$app/server';
 import * as v from 'valibot';
 import { db, resource, contact, contactEmail, contactTag, tag, eq, inArray } from '@ac/db';
-import { availabilityService } from '$lib/server/availability/service';
-import { getAuthenticatedUser } from '$lib/server/authorization';
+import { availabilityService } from '#lib/server/availability/service.js';
+import { getAuthenticatedUser } from '#lib/server/authorization.js';
 
 const checkAvailabilitySchema = v.object({
     startDateTime: v.pipe(v.string(), v.minLength(1)),

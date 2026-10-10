@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listResources } from "./list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { deleteResource } from "./[id]/delete.remote";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		Box,
 		Pencil,
@@ -18,12 +18,13 @@
 		ArrowRight,
 		ChevronsLeft,
 		ChevronsRight,
-		X
+		X,
+		MapPin
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 
@@ -34,14 +35,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "locationId",
-			label: m.locations(),
-			optionsRemote: listLocations,
-			searchable: true,
-		},
-	]);
+	import { getResourceFilterGroups } from "#lib/filters/index.js";
+
+	const filterGroups = $derived<FilterGroup[]>(getResourceFilterGroups(m));
 
 	onMount(async () => {
 		try {

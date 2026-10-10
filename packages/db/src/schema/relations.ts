@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 import { user, session, account, verification } from "./auth";
 import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, contactTag, userContact } from "./contacts";
 import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
-import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag } from "./events";
+import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag, eventRole, eventContactRole } from "./events";
 import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
 import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
@@ -10,6 +10,9 @@ import { kiosk, kioskLocation } from "./kiosks";
 import { syncConfig, syncOperation, syncMapping, webhookSubscription } from "./sync";
 import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion, cmsMedia } from "./cms";
 import { contract, contractFramework, contractFrameworkContract } from "./contracts";
+import { consumable } from "./consumables";
+import { recipe, recipeConsumable } from "./recipes";
+import { menu, menuItem, eventMenu } from "./menus";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -27,6 +30,9 @@ export const userRelations = relations(user, ({ many }) => ({
     userTalents: many(userTalent),
     accounts: many(account),
     sessions: many(session),
+    consumables: many(consumable),
+    recipes: many(recipe),
+    menus: many(menu),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -46,6 +52,7 @@ export const contactRelations = relations(contact, ({ many, one }) => ({
     locationAssociations: many(locationContact),
     resourceAssociations: many(resourceContact),
     events: many(eventContact),
+    eventRoles: many(eventContactRole),
     announcements: many(announcementContact),
     relations: many(contactRelation, { relationName: 'fromRelations' }),
     relatedTo: many(contactRelation, { relationName: 'toRelations' }),
@@ -85,13 +92,25 @@ export const contactTagRelations = relations(contactTag, ({ one }) => ({
 export const eventRelations = relations(event, ({ many, one }) => ({
     resources: many(eventResource),
     contacts: many(eventContact),
+    contactRoles: many(eventContactRole),
     locations: many(eventLocation),
     tags: many(eventTag),
+    menus: many(eventMenu),
     series: one(recurringSeries, { fields: [event.seriesId], references: [recurringSeries.id] }),
     user: one(user, { fields: [event.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [event.campaignId], references: [campaign.id] }),
     master: one(event, { fields: [event.recurringEventId], references: [event.id], relationName: 'instances' }),
     instances: many(event, { relationName: 'instances' }),
+}));
+
+export const eventRoleRelations = relations(eventRole, ({ many }) => ({
+    contactRoles: many(eventContactRole),
+}));
+
+export const eventContactRoleRelations = relations(eventContactRole, ({ one }) => ({
+    event: one(event, { fields: [eventContactRole.eventId], references: [event.id] }),
+    contact: one(contact, { fields: [eventContactRole.contactId], references: [contact.id] }),
+    role: one(eventRole, { fields: [eventContactRole.roleId], references: [eventRole.id] }),
 }));
 
 export const recurringSeriesRelations = relations(recurringSeries, ({ one, many }) => ({
@@ -339,5 +358,39 @@ export const contractFrameworkRelations = relations(contractFramework, ({ many }
 export const contractFrameworkContractRelations = relations(contractFrameworkContract, ({ one }) => ({
     contract: one(contract, { fields: [contractFrameworkContract.contractId], references: [contract.id] }),
     framework: one(contractFramework, { fields: [contractFrameworkContract.frameworkId], references: [contractFramework.id] }),
+}));
+
+export const consumableRelations = relations(consumable, ({ one, many }) => ({
+    user: one(user, { fields: [consumable.userId], references: [user.id] }),
+    recipeConsumables: many(recipeConsumable),
+    menuItems: many(menuItem),
+}));
+
+export const recipeRelations = relations(recipe, ({ one, many }) => ({
+    user: one(user, { fields: [recipe.userId], references: [user.id] }),
+    consumables: many(recipeConsumable),
+    menuItems: many(menuItem),
+}));
+
+export const recipeConsumableRelations = relations(recipeConsumable, ({ one }) => ({
+    recipe: one(recipe, { fields: [recipeConsumable.recipeId], references: [recipe.id] }),
+    consumable: one(consumable, { fields: [recipeConsumable.consumableId], references: [consumable.id] }),
+}));
+
+export const menuRelations = relations(menu, ({ one, many }) => ({
+    user: one(user, { fields: [menu.userId], references: [user.id] }),
+    items: many(menuItem),
+    events: many(eventMenu),
+}));
+
+export const menuItemRelations = relations(menuItem, ({ one }) => ({
+    menu: one(menu, { fields: [menuItem.menuId], references: [menu.id] }),
+    consumable: one(consumable, { fields: [menuItem.consumableId], references: [consumable.id] }),
+    recipe: one(recipe, { fields: [menuItem.recipeId], references: [recipe.id] }),
+}));
+
+export const eventMenuRelations = relations(eventMenu, ({ one }) => ({
+    event: one(event, { fields: [eventMenu.eventId], references: [event.id] }),
+    menu: one(menu, { fields: [eventMenu.menuId], references: [menu.id] }),
 }));
 

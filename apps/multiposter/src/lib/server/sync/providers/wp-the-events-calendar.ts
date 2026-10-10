@@ -5,10 +5,14 @@ import type {
 	ProviderType,
 	SyncDirection
 } from '../types';
-import { env } from '$env/dynamic/private';
-import { db } from '@ac/db';
-import { syncMapping } from '@ac/db';
-import { eq, and } from '@ac/db';
+
+import {
+	WP_EVENTS_CALENDAR_BASE_URL,
+	WP_EVENTS_CALENDAR_USERNAME,
+	WP_EVENTS_CALENDAR_APP_PASSWORD,
+	BETTER_AUTH_URL
+} from '$app/env/private';
+
 import crypto from 'crypto';
 import { parsePricing } from '../utils/pricing';
 
@@ -22,20 +26,26 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	readonly supportsWebhooks = false;
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
-
+	readonly supportsNativeRecurrence = false;
 
 	private config?: SyncConfig;
 	private baseUrl = '';
 	private username = '';
 	private applicationPassword = '';
 
+	// In-memory caches to prevent redundant REST API calls during sync runs
+	private venueCache = new Map<string, number>();
+	private organizerCache = new Map<string, number>();
+	private tagCache = new Map<string, number>();
+
 	async initialize(config: SyncConfig): Promise<void> {
 		this.config = config;
 
 		// Get WordPress credentials from environment variables
-		this.baseUrl = env.WP_EVENTS_CALENDAR_BASE_URL || '';
-		this.username = env.WP_EVENTS_CALENDAR_USERNAME || '';
-		this.applicationPassword = env.WP_EVENTS_CALENDAR_APP_PASSWORD || '';
+		this.baseUrl = WP_EVENTS_CALENDAR_BASE_URL || '';
+
+		this.username = WP_EVENTS_CALENDAR_USERNAME || '';
+		this.applicationPassword = WP_EVENTS_CALENDAR_APP_PASSWORD || '';
 
 		if (!this.baseUrl) {
 			throw new Error('WP_EVENTS_CALENDAR_BASE_URL environment variable is required');
@@ -107,7 +117,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			// Ensure venues exist
 			const venueIds: number[] = [];
-			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
+			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : event.venue ? [event.venue] : [];
 
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
@@ -209,7 +219,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		try {
 			// Ensure venues exist
 			const venueIds: number[] = [];
-			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : (event.venue ? [event.venue] : []);
+			const venuesToProcess = event.venues && event.venues.length > 0 ? event.venues : event.venue ? [event.venue] : [];
 
 			for (const v of venuesToProcess) {
 				const vId = await this.ensureVenue(v, v.id || event.metadata?.locationId || event.venueId);
@@ -307,10 +317,18 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			});
 
 			if (!response.ok) {
+				if (response.status === 404) {
+					console.log(`[WP-Provider] Event ${externalId} already deleted from WordPress Events Calendar`);
+					return;
+				}
 				const errorText = await response.text();
 				throw new Error(`WordPress API error: ${response.status} ${response.statusText} - ${errorText}`);
 			}
-		} catch (error) {
+		} catch (error: any) {
+			if (error?.message?.includes('404')) {
+				console.log(`[WP-Provider] Event ${externalId} already deleted from WordPress Events Calendar`);
+				return;
+			}
 			console.error('Failed to delete event from WordPress Events Calendar:', error);
 			throw error;
 		}
@@ -326,48 +344,13 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		if (!this.config) return undefined;
 
 		try {
-			// 1. Check mapping
-			if (internalId) {
-				const [mapping] = await db
-					.select()
-					.from(syncMapping)
-					.where(and(
-						eq(syncMapping.syncConfigId, this.config.id),
-						eq(syncMapping.locationId, internalId)
-					));
-
-				if (mapping) {
-					try {
-						const venueData: any = {
-							venue: venue.name,
-							address: venue.address,
-							city: venue.city,
-							country: venue.country,
-							province: venue.province,
-							zip: venue.zip,
-							phone: venue.phone,
-							website: venue.website,
-							show_map: 'true',
-							show_map_link: 'true',
-						};
-
-						await fetch(this.getApiUrl(`/tribe/events/v1/venues/${mapping.externalId}`), {
-							method: 'POST',
-							headers: {
-								'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
-								'Content-Type': 'application/json',
-							},
-							body: JSON.stringify(venueData),
-						});
-					} catch (e) {
-						console.error('[WP-Sync] Failed to update venue:', e);
-					}
-
-					return parseInt(mapping.externalId, 10);
-				}
+			// Check in-memory cache first
+			const cacheKey = internalId || venue.name;
+			if (this.venueCache.has(cacheKey)) {
+				return this.venueCache.get(cacheKey);
 			}
 
-			// 2. Search for existing venue by name
+			// 1. Search for existing venue by name
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', venue.name);
 
@@ -389,7 +372,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 3. Create new venue if not found
+			// 2. Create new venue if not found
 			if (!externalId) {
 				console.log(`[WP-Sync] Creating new venue: ${venue.name}`);
 				const venueData: any = {
@@ -403,7 +386,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 					website: venue.website,
 					show_map: 'true',
 					show_map_link: 'true',
-					status: 'publish', // Ensure it's available immediately
+					status: 'publish' // Ensure it's available immediately
 				};
 
 				const createResponse = await fetch(this.getApiUrl('/tribe/events/v1/venues'), {
@@ -424,25 +407,16 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 4. Save mapping
-			if (externalId && internalId) {
-				await db.insert(syncMapping).values({
-					id: crypto.randomUUID(),
-					syncConfigId: this.config.id,
-					externalId: externalId,
-					providerId: this.config.providerId,
-					locationId: internalId,
-					contactId: null,
-					eventId: null,
-					announcementId: null,
-					tagId: null,
-					etag: null,
-					metadata: null,
-					lastSyncedAt: new Date()
-				});
+			if (externalId) {
+				const parsedId = parseInt(externalId, 10);
+				this.venueCache.set(cacheKey, parsedId);
+				if (internalId && venue.name) {
+					this.venueCache.set(venue.name, parsedId);
+				}
+				return parsedId;
 			}
 
-			return externalId ? parseInt(externalId, 10) : undefined;
+			return undefined;
 
 		} catch (error) {
 			console.error('Error ensuring venue in WordPress:', error);
@@ -461,42 +435,13 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		if (!this.config) return undefined;
 
 		try {
-			// 1. Check mapping
-			if (internalId) {
-				const [mapping] = await db
-					.select()
-					.from(syncMapping)
-					.where(and(
-						eq(syncMapping.syncConfigId, this.config.id),
-						eq(syncMapping.contactId, internalId)
-					));
-
-				if (mapping) {
-					try {
-						const organizerData: any = {
-							organizer: organizer.name,
-							email: organizer.email,
-							phone: organizer.phone,
-							website: organizer.website,
-						};
-
-						await fetch(this.getApiUrl(`/tribe/events/v1/organizers/${mapping.externalId}`), {
-							method: 'POST',
-							headers: {
-								'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
-								'Content-Type': 'application/json',
-							},
-							body: JSON.stringify(organizerData),
-						});
-					} catch (e) {
-						console.error('[WP-Sync] Failed to update organizer:', e);
-					}
-
-					return parseInt(mapping.externalId, 10);
-				}
+			// Check in-memory cache first
+			const cacheKey = internalId || organizer.email || organizer.name;
+			if (this.organizerCache.has(cacheKey)) {
+				return this.organizerCache.get(cacheKey);
 			}
 
-			// 2. Search
+			// 1. Search
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', organizer.email || organizer.name);
 
@@ -525,14 +470,14 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 3. Create
+			// 2. Create
 			if (!externalId) {
 				const organizerData: any = {
 					organizer: organizer.name,
 					email: organizer.email,
 					phone: organizer.phone,
 					website: organizer.website,
-					status: 'publish', // Ensure it's available immediately
+					status: 'publish' // Ensure it's available immediately
 				};
 
 				const createResponse = await fetch(this.getApiUrl('/tribe/events/v1/organizers'), {
@@ -552,25 +497,15 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 4. Save mapping
-			if (externalId && internalId) {
-				await db.insert(syncMapping).values({
-					id: crypto.randomUUID(),
-					syncConfigId: this.config.id,
-					externalId: externalId,
-					providerId: this.config.providerId,
-					contactId: internalId,
-					locationId: null,
-					eventId: null,
-					announcementId: null,
-					tagId: null,
-					etag: null,
-					metadata: null,
-					lastSyncedAt: new Date()
-				});
+			if (externalId) {
+				const parsedId = parseInt(externalId, 10);
+				this.organizerCache.set(cacheKey, parsedId);
+				if (organizer.email) this.organizerCache.set(organizer.email, parsedId);
+				if (organizer.name) this.organizerCache.set(organizer.name, parsedId);
+				return parsedId;
 			}
 
-			return externalId ? parseInt(externalId, 10) : undefined;
+			return undefined;
 		} catch (error) {
 			console.error('Error ensuring organizer in WordPress:', error);
 		}
@@ -587,20 +522,13 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		if (!this.config) return undefined;
 
 		try {
-			// 1. Check mapping
-			const [mapping] = await db
-				.select()
-				.from(syncMapping)
-				.where(and(
-					eq(syncMapping.syncConfigId, this.config.id),
-					eq(syncMapping.tagId, tag.id)
-				));
-
-			if (mapping) {
-				return parseInt(mapping.externalId, 10);
+			// Check in-memory cache first
+			const cacheKey = tag.id || tag.name;
+			if (this.tagCache.has(cacheKey)) {
+				return this.tagCache.get(cacheKey);
 			}
 
-			// 2. Search
+			// 1. Search
 			const searchParams = new URLSearchParams();
 			searchParams.set('search', tag.name);
 			const searchUrl = this.getApiUrl('/wp/v2/tags', searchParams);
@@ -622,7 +550,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 3. Create
+			// 2. Create
 			if (!externalId) {
 				const createResponse = await fetch(this.getApiUrl('/wp/v2/tags'), {
 					method: 'POST',
@@ -639,25 +567,14 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				}
 			}
 
-			// 4. Save mapping
 			if (externalId) {
-				await db.insert(syncMapping).values({
-					id: crypto.randomUUID(),
-					syncConfigId: this.config.id,
-					externalId: externalId,
-					providerId: this.config.providerId,
-					tagId: tag.id,
-					locationId: null,
-					contactId: null,
-					eventId: null,
-					announcementId: null,
-					etag: null,
-					metadata: null,
-					lastSyncedAt: new Date()
-				});
+				const parsedId = parseInt(externalId, 10);
+				this.tagCache.set(cacheKey, parsedId);
+				this.tagCache.set(tag.name, parsedId);
+				return parsedId;
 			}
 
-			return externalId ? parseInt(externalId, 10) : undefined;
+			return undefined;
 		} catch (error) {
 			console.error('Error ensuring tag in WordPress:', error);
 		}
@@ -741,10 +658,16 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	}
 
 	private mapEventToWpFormat(event: ExternalEvent): any {
+		// If description is empty or contains no meaningful content, use an invisible string
+		// (zero-width space) so the sync will not be rejected by The Events Calendar WP plugin API.
+		const hasContent = Boolean(event.description && (event.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/[\s\u200B\uFEFF]/g, '').length > 0 || (/<(img|iframe|svg|video|audio|figure)\b/i).test(event.description)));
+
+		const description = hasContent ? event.description! : '\u200B';
+
 		// Map our internal event format to WordPress Events Calendar REST API format
 		const wpEvent: any = {
 			title: event.summary,
-			description: event.description || '',
+			description,
 			status: 'publish', // Publish immediately
 			hide_from_listings: false,
 			show_map: 'true',
@@ -755,7 +678,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		const resolvedTz = event.startTimeZone || process.env.TZ || 'Europe/Berlin';
 
 		// Format date helper
-		const formatDate = (date: Date, timeZone: string): { date: string, time: string } => {
+		const formatDate = (date: Date, timeZone: string): { date: string; time: string } => {
 			const tz = timeZone;
 
 			// Format date part (YYYY-MM-DD)
@@ -840,8 +763,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		}
 
 		// Map Website URL
-		if (event.metadata?.eventId && env.BETTER_AUTH_URL) {
-			wpEvent.website = `${env.BETTER_AUTH_URL}/events/${event.metadata.eventId}/view`;
+		if (event.metadata?.eventId && BETTER_AUTH_URL) {
+			wpEvent.website = `${BETTER_AUTH_URL}/events/${event.metadata.eventId}/view`;
 		} else if (event.source?.url) {
 			// Fallback to source URL
 			wpEvent.website = event.source.url;

@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import * as m from '$lib/paraglide/messages';
+import * as m from '#lib/paraglide/messages.js';
 
 // Minimal pure Valibot schemas for contact sub-entities
 const contactBaseSchema = v.object({
@@ -131,5 +131,4 @@ export const getAssociationsSchema = v.object({
     entityId: v.string(),
 });
 
-export { matchContactSearch } from '@ac/ui';
 

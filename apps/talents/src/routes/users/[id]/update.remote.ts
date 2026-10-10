@@ -3,7 +3,7 @@ import { db, user } from '@ac/db';
 import { eq } from '@ac/db';
 import { listUsers } from '../list.remote';
 import { readUser } from './read.remote';
-import { getAuthenticatedUser, ensureAccess, parseRoles } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess, parseRoles } from '#lib/server/authorization.js';
 import { updateUserSchema } from '@ac/validations';
 
 import { error } from '@sveltejs/kit';

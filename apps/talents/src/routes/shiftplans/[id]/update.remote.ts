@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db, shiftPlanTemplate } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateShiftplanSchema } from '@ac/validations';
 import { eq } from '@ac/db';
 

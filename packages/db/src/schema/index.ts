@@ -10,3 +10,6 @@ export * from "./talents";
 export * from "./cms";
 export * from "./relations";
 export * from "./contracts";
+export * from "./consumables";
+export * from "./recipes";
+export * from "./menus";

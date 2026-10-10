@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
     import { page } from "$app/state";
-    import { authClient } from "$lib/auth";
+    import { authClient } from "#lib/auth.js";
     import { goto } from "$app/navigation";
     import { readAnnouncement } from "../read.remote";
-            import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+            import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { Share2, Pencil } from "@lucide/svelte";
-    import Button from "$lib/components/ui/button/button.svelte";
-    import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
+    import Button from "#lib/components/ui/button/button.svelte";
+    import AnnouncementView from "#lib/components/announcements/AnnouncementView.svelte";
     import { onMount } from "svelte";
 
     let id = $derived(page.params.id);

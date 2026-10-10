@@ -5,6 +5,8 @@ import {
 import { getRequestEvent } from '$app/server';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';
+import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
+
 
 /**
  * Backend logic for managing contacts and their associations.
@@ -213,8 +215,30 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         contact: true
     };
 
+    let targetEntityId = entityId;
+    if (type === 'event' && entityId.includes('_inst_')) {
+        targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: false });
+    }
+
+    const eventRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
+    if (type === 'event') {
+        const rolesData = await db.query.eventContactRole.findMany({
+            where: (t: any, { eq }: any) => eq(t.eventId, targetEntityId),
+            with: {
+                role: true
+            }
+        });
+        for (const r of rolesData) {
+            const list = eventRolesMap.get(r.contactId) || [];
+            if (r.role) {
+                list.push({ id: r.role.id, name: r.role.name, color: r.role.color });
+            }
+            eventRolesMap.set(r.contactId, list);
+        }
+    }
+
     const associations = await (db.query as any)[tableName].findMany({
-        where: (t: any, { eq }: any) => eq(t[entityField], entityId),
+        where: (t: any, { eq }: any) => eq(t[entityField], targetEntityId),
         with: withOptions
     });
 
@@ -222,9 +246,12 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         const c = a.contact;
         if (!c) return null;
         
-        // Add participation status for events if present
+        const roles = eventRolesMap.get(c.id) || [];
+
+        // Add participation status and roles for events if present
         const result = {
             ...c,
+            roles,
             participationStatus: a.participationStatus || 'needsAction'
         };
 

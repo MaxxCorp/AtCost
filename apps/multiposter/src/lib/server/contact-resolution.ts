@@ -6,6 +6,8 @@ export interface ResolvedContact {
 	name: string;
 	email: string;
 	phone: string;
+	role?: string;
+	roles?: string[];
 	qrCodePath?: string;
 	qrCodeDataUrl?: string;
 }
@@ -14,6 +16,19 @@ export interface ContactResolutionOptions {
 	filterWorkOnly?: boolean;
 	fallbackToLocation?: boolean;
 	fallbackToFirst?: boolean;
+}
+
+/**
+ * Checks whether a contact has a "Main Contact" role.
+ */
+export function isMainContact(contactOrAssociation: any): boolean {
+	if (!contactOrAssociation) return false;
+	const c = contactOrAssociation.contact || contactOrAssociation;
+	const roles = contactOrAssociation.roles || c.roles || contactOrAssociation.eventRoles || c.eventRoles || [];
+	return roles.some((r: any) => {
+		const name = (typeof r === 'string' ? r : r.name || r.role?.name || '').trim().toLowerCase();
+		return name === 'main contact' || name === 'maincontact' || name === 'main_contact';
+	});
 }
 
 /**
@@ -58,10 +73,16 @@ export function extractContactDetails(contactOrAssociation: any, options: { filt
 		qrCodePath = `/api/contacts/${c.id}/qr.png`;
 	}
 
+	const rawRoles = contactOrAssociation.roles || c.roles || contactOrAssociation.eventRoles || c.eventRoles || [];
+	const roles = rawRoles.map((r: any) => typeof r === 'string' ? r : r.name || r.role?.name || '').filter(Boolean);
+	const role = roles.length > 0 ? roles.join(', ') : (c.role || undefined);
+
 	return {
 		name: fullName,
 		email,
 		phone,
+		role,
+		roles: roles.length > 0 ? roles : undefined,
 		qrCodePath,
 		qrCodeDataUrl: c.qrCodeDataUrl || (qrCodePath?.startsWith('data:') ? qrCodePath : undefined)
 	};
@@ -141,7 +162,19 @@ export function resolveEventContactSync(
 
 	const { fallbackToLocation = true, fallbackToFirst = true, filterWorkOnly = false } = options;
 
-	const eventContacts = (eventData.contacts || []).map((ec: any) => ec.contact || ec);
+	const eventContacts = (eventData.contacts || []).map((ec: any) => {
+		const c = ec.contact || ec;
+		return {
+			...c,
+			roles: ec.roles || c.roles || []
+		};
+	});
+
+	// Priority 0: Event contact assigned the role "Main Contact"
+	const eventMainContact = eventContacts.find((c: any) => isMainContact(c));
+	if (eventMainContact) {
+		return extractContactDetails(eventMainContact, { filterWorkOnly });
+	}
 
 	// Priority 1: Event contact tagged as "Employee"
 	const eventEmployee = eventContacts.find((c: any) => isEmployeeContact(c));
@@ -214,6 +247,10 @@ export async function resolveEventContact(
 
 	// 1. Check event contacts
 	const eventContacts = await getEntityContacts('event', eventId, true);
+	const eventMainContact = eventContacts.find((c: any) => isMainContact(c));
+	if (eventMainContact) {
+		return extractContactDetails(eventMainContact, { filterWorkOnly });
+	}
 	const eventEmployee = eventContacts.find((c: any) => isEmployeeContact(c));
 	if (eventEmployee) {
 		return extractContactDetails(eventEmployee, { filterWorkOnly });

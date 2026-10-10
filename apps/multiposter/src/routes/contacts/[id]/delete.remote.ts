@@ -3,9 +3,10 @@ import { command } from '$app/server';
 import { db } from '@ac/db';
 import { contact } from '@ac/db';
 import { inArray, and, eq } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { listContacts } from '../list.remote';
-import { getStorageProvider } from '$lib/server/blob-storage';
+import { getStorageProvider } from '#lib/server/blob-storage/index.js';
+import { invalidateContact } from '#lib/server/cache/index.js';
 
 const deleteContactsSchema = v.array(v.string());
 
@@ -35,6 +36,8 @@ export const deleteContact = command(deleteContactsSchema, async (ids) => {
         }
     }
 
+    await invalidateContact(deletedIds);
     await listContacts().refresh();
     return { count: result.length, ids: deletedIds };
 });
+

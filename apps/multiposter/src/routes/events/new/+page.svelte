@@ -1,13 +1,13 @@
 <script lang="ts">
-    import * as m from "$lib/paraglide/messages.js";
+    import * as m from "#lib/paraglide/messages.js";
     import { goto } from "$app/navigation";
     import { toast } from "svelte-sonner";
 	import { createEvent } from "./create.remote";
-	import { createEventSchema } from "$lib/validations/events";
-	import EventForm from "$lib/components/events/EventForm.svelte";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import AsyncButton from "$lib/components/ui/AsyncButton.svelte";
-    import { Button } from "$lib/components/ui/button";
+	import { createEventSchema } from "#lib/validations/events.js";
+	import EventForm from "#lib/components/events/EventForm.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
+    import { Button } from "#lib/components/ui/button/index.js";
 
     const formId = crypto.randomUUID();
     const rf = createEvent.for(formId);

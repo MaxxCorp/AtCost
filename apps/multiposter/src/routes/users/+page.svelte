@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listUsers } from "./list.remote";
 	import { deleteUser } from "./[id]/delete.remote";
 
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		User as UserIcon,
 		Pencil,
@@ -23,7 +23,7 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 
@@ -34,20 +34,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const ROLE_OPTIONS = $derived([
-		{ id: "admin", label: m.admin ? m.admin() : "Admin" },
-		{ id: "user", label: m.user ? m.user() : "User" },
-		{ id: "guest", label: m.guest ? m.guest() : "Guest" },
-	]);
+	import { getUserFilterGroups } from "#lib/filters/index.js";
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "role",
-			label: m.role ? m.role() : "Role",
-			options: ROLE_OPTIONS,
-			searchable: true,
-		},
-	]);
+	const filterGroups = $derived<FilterGroup[]>(getUserFilterGroups(m));
 
 	onMount(async () => {
 		try {

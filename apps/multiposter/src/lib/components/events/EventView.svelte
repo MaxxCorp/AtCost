@@ -1,8 +1,8 @@
 <script lang="ts">
     import { type Event } from "@ac/validations";
 
-    import { m } from "$lib/paraglide/messages";
-    import { getLocale } from "$lib/paraglide/runtime";
+    import { m } from "#lib/paraglide/messages.js";
+    import { getLocale } from "#lib/paraglide/runtime.js";
     import {
         Calendar,
         Clock,
@@ -14,11 +14,13 @@
         Tag,
         Euro,
         RefreshCw,
-        Earth,
         Info,
+        Ticket,
     } from "@lucide/svelte";
-    import { formatRecurrenceText } from "$lib/utils/format-recurrence";
-    import { getEventRooms } from "$lib/utils/format-rooms";
+    import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from "#lib/utils/format-event-date.js";
 
     let { event }: { event: Event } = $props();
 
@@ -45,12 +47,28 @@
         });
     }
 
+    const multiDay = $derived(isMultiDayEvent(event));
+    const durationDays = $derived(multiDay ? getEventDurationDays(event) : 1);
+
     const displayDate = $derived(
-        event.isAllDay && event.startDateTime
-            ? formatDate(event.startDateTime)
-            : event.startDateTime
-              ? formatDateTime(event.startDateTime)
-              : "",
+        multiDay
+            ? formatFriendlyEventTime(
+                event,
+                {
+                    all_day: m.all_day?.() || "All Day",
+                    on: m.on?.() || "on",
+                    to: m.to?.() || "to",
+                    until: m.until?.() || "until",
+                    days_count: (c) => m.days_count({ count: c }),
+                    loading: m.loading?.() || "Loading...",
+                },
+                getLocale()
+            )
+            : event.isAllDay && event.startDateTime
+                ? formatDate(event.startDateTime)
+                : event.startDateTime
+                  ? formatDateTime(event.startDateTime)
+                  : ""
     );
 
     let imageLoadError = $state(false);
@@ -58,12 +76,12 @@
 
     const hasContact = $derived(!!event.resolvedContact);
     const hasDescription = $derived(!!(event.description && event.description.trim().length > 0));
+    const displayTicketPrice = $derived(formatTicketPrice((event as any).ticketPrice, (event as any).ticketPriceUnknown));
     const hasSidebar = $derived(
         !!(event as any).qrCodeDataUrl ||
         !!event.qrCodePath ||
-        !!(event as any).ticketPrice ||
+        !!displayTicketPrice ||
         !!(event as any).categoryBerlinDotDe ||
-        (((event as any).confirmedParticipants !== undefined) && (event as any).confirmedParticipants > 0) ||
         (((event as any).inclusivityInformation) && (event as any).inclusivityInformation.length > 0)
     );
 </script>
@@ -90,14 +108,30 @@
             <h1 class="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
                 {event.summary}
             </h1>
+            {#if multiDay}
+                <span class="bg-white/20 text-white text-xs sm:text-sm font-semibold px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs flex items-center gap-1 shadow-xs">
+                    <Calendar class="w-3.5 h-3.5 text-blue-200" />
+                    <span>{m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})</span>
+                </span>
+            {/if}
             {#if event.status === 'cancelled'}
                 <span class="bg-rose-600 text-white text-xs sm:text-sm font-bold px-3 py-1 rounded-full border border-white/20 uppercase tracking-widest shadow-sm">
                     {m.cancelled?.() || 'Cancelled'}
                 </span>
-            {:else if event.isPublic}
-                <span class="bg-emerald-500/90 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <Earth size={12} /> {m.public_label?.() || 'Public'}
+            {/if}
+            {#if isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
+                <span class="bg-emerald-500/90 text-white text-xs sm:text-sm font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                    <Ticket class="w-3.5 h-3.5" />
+                    <span>{m.ticket_price_free?.() || 'Free'}</span>
                 </span>
+            {/if}
+            {#if event.tags && event.tags.length > 0}
+                {#each event.tags as tag (typeof tag === 'string' ? tag : tag.id || tag.name)}
+                    <span class="bg-white/20 text-white text-xs sm:text-sm font-medium px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs flex items-center gap-1">
+                        <Tag class="w-3 h-3 text-blue-200" />
+                        <span>{typeof tag === 'string' ? tag : tag.name}</span>
+                    </span>
+                {/each}
             {/if}
         </div>
         <div class="flex flex-col items-start md:items-end text-blue-100 text-sm sm:text-base font-medium flex-shrink-0">
@@ -105,10 +139,10 @@
                 <Calendar class="w-4 h-4" />
                 <span>{displayDate}</span>
             </div>
-            {#if (event.recurrence && (event.recurrence as string[]).length > 0) || event.recurringEventId || event.seriesId}
+            {#if (event.recurrence && (Array.isArray(event.recurrence) ? event.recurrence.length > 0 : true)) || event.recurringEventId || event.seriesId}
                 <div class="flex items-center gap-1.5 text-xs sm:text-sm text-blue-200 mt-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/20">
                     <RefreshCw class="w-3.5 h-3.5" />
-                    <span>{formatRecurrenceText((event.recurrence as string[])?.[0])}</span>
+                    <span>{formatRecurrenceText(Array.isArray(event.recurrence) ? event.recurrence[0] : (typeof event.recurrence === 'string' ? event.recurrence : null))}</span>
                 </div>
             {/if}
         </div>
@@ -126,7 +160,7 @@
                         <h3 class="font-semibold text-gray-900 text-sm">
                             {m.location()}
                         </h3>
-                        {#each event.locations as loc}
+                        {#each event.locations as loc (loc.id || loc.name)}
                             <p class="text-gray-700 text-sm font-medium mt-0.5">{loc.name}</p>
                             {#if loc.street || loc.city}
                                 <p class="text-xs text-gray-500">{loc.street || ''} {loc.houseNumber || ''} {loc.zip || ''} {loc.city || ''}</p>
@@ -152,7 +186,22 @@
                 <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
                     <Users class="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
                     <div class="min-w-0 flex-1">
-                        <h3 class="font-semibold text-gray-900 text-sm">{m.contact()}</h3>
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="font-semibold text-gray-900 text-sm">{m.contact()}</h3>
+                            {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
+                                <div class="flex items-center gap-1 flex-wrap">
+                                    {#each event.resolvedContact.roles as roleName}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                            {roleName}
+                                        </span>
+                                    {/each}
+                                </div>
+                            {:else if event.resolvedContact.role}
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                    {event.resolvedContact.role}
+                                </span>
+                            {/if}
+                        </div>
                         <p class="text-gray-900 font-medium text-sm mt-0.5">
                             {event.resolvedContact.name}
                         </p>
@@ -185,6 +234,30 @@
                                 <p class="text-2xs text-gray-500 mt-1">
                                     {m.scan_contact_info()}
                                 </p>
+                            </div>
+                        {/if}
+
+                        {#if (event as any).contacts && (event as any).contacts.length > 1}
+                            <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-1.5">
+                                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    {m.feature_contacts_title?.() ?? "Contacts"}
+                                </h4>
+                                <div class="space-y-1">
+                                    {#each (event as any).contacts.filter((c: any) => c.name !== event.resolvedContact?.name && c.id !== (event.resolvedContact as any)?.id) as otherContact}
+                                        <div class="flex items-center justify-between text-xs text-gray-700">
+                                            <span class="font-medium">{otherContact.displayName || `${otherContact.givenName || ''} ${otherContact.familyName || ''}`.trim() || otherContact.company || otherContact.name}</span>
+                                            {#if otherContact.roles && otherContact.roles.length > 0}
+                                                <div class="flex items-center gap-1">
+                                                    {#each otherContact.roles as role}
+                                                        <span class="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">
+                                                            {role.name || role}
+                                                        </span>
+                                                    {/each}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
                             </div>
                         {/if}
                     </div>
@@ -242,7 +315,7 @@
                 {/if}
 
                 <!-- Event Details Sidebar -->
-                {#if (event as any).ticketPrice || (event as any).categoryBerlinDotDe || ((event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0) || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
+                {#if displayTicketPrice || (event as any).categoryBerlinDotDe || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
                     <div
                         class="bg-indigo-50/70 rounded-xl p-4 border border-indigo-100 space-y-3"
                     >
@@ -254,10 +327,10 @@
                         </h3>
 
                         <div class="space-y-2.5 text-xs">
-                            {#if (event as any).ticketPrice && !(event as any).ticketPriceUnknown}
+                            {#if displayTicketPrice}
                                 <div class="flex items-center gap-2 text-indigo-800">
                                     <Euro class="w-4 h-4 opacity-75" />
-                                    <span class="font-semibold">{(event as any).ticketPrice}</span>
+                                    <span class="font-semibold">{displayTicketPrice}</span>
                                 </div>
                             {/if}
 
@@ -270,23 +343,11 @@
                                 </div>
                             {/if}
 
-                            {#if (event as any).confirmedParticipants !== undefined && (event as any).confirmedParticipants > 0}
-                                <div class="flex items-start gap-2 text-indigo-800">
-                                    <Users class="w-4 h-4 opacity-75 mt-0.5" />
-                                    <span>
-                                        <strong>{(event as any).confirmedParticipants}</strong> {m.confirmed_participants()}
-                                        {#if event.maxOccupancy}
-                                            <span class="opacity-75 block">{m.capacity()}: {event.maxOccupancy}</span>
-                                        {/if}
-                                    </span>
-                                </div>
-                            {/if}
-
                             {#if (event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0}
                                 <div class="flex items-start gap-2 text-indigo-800">
                                     <Accessibility class="w-4 h-4 opacity-75 mt-0.5" />
                                     <div class="flex flex-wrap gap-1">
-                                        {#each (event as any).inclusivityInformation as info}
+                                        {#each (event as any).inclusivityInformation as info, idx (idx)}
                                             <span class="bg-white/60 text-indigo-900 px-1.5 py-0.5 rounded border border-indigo-100/50">
                                                 {info}
                                             </span>

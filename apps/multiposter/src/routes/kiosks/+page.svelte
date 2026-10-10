@@ -2,9 +2,9 @@
 	import { listKiosks } from "./list.remote";
 	import { listLocations } from "../locations/list.remote";
 	import { deleteKiosk } from "./[id]/delete.remote";
-	import * as m from "$lib/paraglide/messages.js";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import * as m from "#lib/paraglide/messages.js";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		Pencil,
 		Trash2,
@@ -19,10 +19,10 @@
 		X,
 		Clock,
 	} from "@lucide/svelte";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
 
@@ -34,14 +34,9 @@
 	let page = $state(1);
 	let limit = $state(50);
 
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "locationId",
-			label: m.locations(),
-			optionsRemote: listLocations,
-			searchable: true,
-		},
-	]);
+	import { getKioskFilterGroups } from "#lib/filters/index.js";
+
+	const filterGroups = $derived<FilterGroup[]>(getKioskFilterGroups(m));
 
 	onMount(async () => {
 		try {
@@ -219,6 +214,15 @@
 								>
 									<Monitor class="w-5 h-5 text-gray-400" />
 									{kiosk.name}
+									{#if kiosk.uiMode === "folded_flyer"}
+										<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+											{m.folded_flyer_badge()}
+										</span>
+									{:else if kiosk.uiMode === "flat_list"}
+										<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+											Flat List
+										</span>
+									{/if}
 								</h3>
 							</div>
 						</a>

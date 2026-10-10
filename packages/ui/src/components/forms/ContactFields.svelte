@@ -19,6 +19,7 @@
     import { Tag as TagIcon } from "@lucide/svelte";
     import { handleDelete } from "../../hooks/handleDelete.svelte";
     import { translateIssue } from "../../utils.js";
+    import TagForm from "./TagForm.svelte";
 
     interface Props {
         // Bindable state
@@ -55,6 +56,7 @@
         createTagRemote?: any;
         deleteTagRemote?: any;
         updateTagRemote?: any;
+        readTagRemote?: any;
         createTagSchema?: any;
         updateTagSchema?: any;
         initialTags?: any[];
@@ -81,6 +83,7 @@
         createTagRemote,
         deleteTagRemote,
         updateTagRemote,
+        readTagRemote,
         createTagSchema,
         updateTagSchema,
         initialTags = [],
@@ -459,6 +462,7 @@
                     createSchema={createTagSchema}
                     updateRemote={updateTagRemote}
                     updateSchema={updateTagSchema}
+                    readItemRemote={readTagRemote}
                     deleteItemRemote={deleteTagRemote ? async (ids: string[]) => {
                         return await handleDelete({
                             ids,
@@ -466,7 +470,6 @@
                             itemName: labels?.tag ?? "tag",
                         });
                     } : undefined}
-                    getFormData={(t: any) => t}
                     searchPredicate={(t: any, q: string) => t.name.toLowerCase().includes(q.toLowerCase())}
                     linkItemLabel={labels?.linkTag ?? "Link Tag"}
                     associatedItemLabel={labels?.associatedTags ?? "Associated Tags"}
@@ -478,43 +481,15 @@
                         {tag.name}
                     {/snippet}
                     {#snippet renderForm({ remoteFunction: state, schema, initialData: formData, onSuccess, onCancel, id }: any)}
-                        <form
-                            {...state.preflight(schema).enhance(async ({ submit }: { submit: any }) => {
-                                try {
-                                    const res = await submit();
-                                    if (res && res.success !== false) {
-                                        onSuccess(res);
-                                    }
-                                } catch (err) {
-                                    console.error("[ContactFields] Tag Quick Create Error:", err);
-                                }
-                            })}
-                            class="space-y-4 p-4"
-                        >
-                            {#if id && state.fields?.id}
-                                <input {...state.fields?.id?.as("hidden", id)} />
-                            {/if}
-                            <div>
-                                <label for="tag-name" class="block text-sm font-medium text-gray-700">{i18n.summary}</label>
-                                <input 
-                                    {...state.fields?.name?.as("text")}
-                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                    value={formData?.name ?? ""}
-                                />
-                                {#each (state.fields?.name?.issues?.() ?? []) as issue}
-                                    <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
-                                {/each}
-                            </div>
-                            <div class="flex justify-end gap-2 pt-4 border-t">
-                                <Button variant="outline" type="button" onclick={onCancel}>{m?.cancel?.() ?? "Cancel"}</Button>
-                                <AsyncButton 
-                                    type="submit" 
-                                    loading={state.pending}
-                                >
-                                    {id ? (m?.update?.() ?? "Update") : (m?.create?.() ?? "Create")}
-                                </AsyncButton>
-                            </div>
-                        </form>
+                        <TagForm
+                            remoteFunction={state}
+                            validationSchema={schema}
+                            isUpdating={!!id}
+                            initialData={formData}
+                            {onSuccess}
+                            {onCancel}
+                            {m}
+                        />
                     {/snippet}
                 </EntityManager>
             </div>

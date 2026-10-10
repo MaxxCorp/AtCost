@@ -3,32 +3,42 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { sveltekitCookies } from "better-auth/svelte-kit";
 import { getRequestEvent } from "$app/server";
 import { db, setConnectionString } from "@ac/db";
-import { env } from '$env/dynamic/private';
+
+import {
+    DATABASE_URL,
+    BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    MICROSOFT_CLIENT_ID,
+    MICROSOFT_CLIENT_SECRET,
+    MICROSOFT_TENANT_ID
+} from "$app/env/private";
+
+import { getBetterAuthSecondaryStorage } from "#lib/server/cache/index.js";
 
 // Initialize DB connection string from SvelteKit environment
-if (env.DATABASE_URL) {
-    setConnectionString(env.DATABASE_URL);
+if (DATABASE_URL) {
+    setConnectionString(DATABASE_URL);
 }
 
+const secondaryStorage = getBetterAuthSecondaryStorage();
+
 export const auth = betterAuth({
-    database: drizzleAdapter(db, {
-        provider: "pg",
-    }),
-    secret: env.BETTER_AUTH_SECRET || "development-secret-only-for-build",
-    baseURL: env.BETTER_AUTH_URL || "http://localhost:5173",
+    database: drizzleAdapter(db, { provider: "pg" }),
+    ...secondaryStorage ? { secondaryStorage } : {},
+    secret: BETTER_AUTH_SECRET || "development-secret-only-for-build",
+    baseURL: BETTER_AUTH_URL || "http://localhost:5173",
     basePath: "/api/auth",
-    trustHost: true,
     onAPIError: {
         throw: true,
-        onError: (error) => {
+        onError: (error: unknown) => {
             console.error("[BetterAuth API Error]:", error);
         }
     },
     session: {
-        cookieCache: {
-            enabled: true,
-            maxAge: 30 * 60, // 30 minutes
-        },
+        cookieCache: { enabled: true, maxAge: 24 * 60 * 60 // 24 hours
+         }
     },
     user: {
         additionalFields: {
@@ -54,8 +64,8 @@ export const auth = betterAuth({
     },
     socialProviders: {
         google: {
-            clientId: env.GOOGLE_CLIENT_ID || "",
-            clientSecret: env.GOOGLE_CLIENT_SECRET || "",
+            clientId: GOOGLE_CLIENT_ID || "",
+            clientSecret: GOOGLE_CLIENT_SECRET || "",
             scope: [
                 "openid",
                 "email",
@@ -66,30 +76,27 @@ export const auth = betterAuth({
             prompt: "consent"
         },
         microsoft: {
-            clientId: env.MICROSOFT_CLIENT_ID || "",
-            clientSecret: env.MICROSOFT_CLIENT_SECRET || "",
-            tenantId: env.MICROSOFT_TENANT_ID || "common",
+            clientId: MICROSOFT_CLIENT_ID || "",
+            clientSecret: MICROSOFT_CLIENT_SECRET || "",
+            tenantId: MICROSOFT_TENANT_ID || "common",
             scope: [
                 "openid",
                 "profile",
                 "email",
                 "Calendars.ReadWrite",
+                "Calendars.ReadWrite.Shared",
                 "offline_access"
             ],
-            mapProfileToUser: (profile) => {
+            mapProfileToUser: (profile: any) => {
                 const email = (profile as any).email || (profile as any).mail || (profile as any).userPrincipalName || (profile as any).preferred_username;
                 return {
-                    email: email,
+                    email,
                     name: profile.name || (profile as any).displayName || (profile as any).userPrincipalName,
                     image: profile.picture,
                     emailVerified: true,
-                    claims: {
-                        ...(profile as any),
-                        email: email
-                    }
                 };
             },
         }
     },
     plugins: [sveltekitCookies(getRequestEvent)],
-});
+} as any);

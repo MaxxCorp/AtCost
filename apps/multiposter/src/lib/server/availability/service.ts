@@ -1,9 +1,17 @@
-import { db, event, eventResource, eventContact, resource, account, eq, and, ne, inArray, lte, gte } from '@ac/db';
-import { env } from '$env/dynamic/private';
+import { db, event, eventResource, eventContact, resource, account, recurringSeries, eq, and, ne, or, inArray, lte, gte, isNotNull } from '@ac/db';
+import { expandRecurrenceRange } from '#lib/server/events/recurrence.js';
+
+import {
+    MICROSOFT_TENANT_ID,
+    MICROSOFT_CLIENT_ID,
+    MICROSOFT_CLIENT_SECRET
+} from '$app/env/private';
 
 export interface AvailabilityResult {
     available: boolean;
     reason?: string;
+    eventId?: string;
+    eventTitle?: string;
 }
 
 export interface AvailabilityProvider {
@@ -28,9 +36,9 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
         const results = new Map<string, AvailabilityResult>();
         if (emails.length === 0) return results;
 
-        const tenantId = env.MICROSOFT_TENANT_ID;
-        const clientId = env.MICROSOFT_CLIENT_ID;
-        const clientSecret = env.MICROSOFT_CLIENT_SECRET;
+        const tenantId = MICROSOFT_TENANT_ID;
+        const clientId = MICROSOFT_CLIENT_ID;
+        const clientSecret = MICROSOFT_CLIENT_SECRET;
 
         let accessToken: string | null = null;
         let isUserToken = false;
@@ -69,17 +77,19 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
             }
         }
 
-        if (!accessToken) return results;
+        const makeScheduleCall = async (token: string, asUser: boolean) => {
+            const endpoint = asUser
+                ? 'https://graph.microsoft.com/v1.0/me/calendar/getSchedule'
+                : emails.length > 0
+                    ? `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(emails[0])}/calendar/getSchedule`
+                    : null;
 
-        try {
-            const endpoint = isUserToken
-                ? 'https://graph.microsoft.com/v1.0/me/getSchedule'
-                : 'https://graph.microsoft.com/v1.0/getSchedule';
+            if (!endpoint) return null;
 
-            const response = await fetch(endpoint, {
+            return await fetch(endpoint, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${accessToken}`,
+                    Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -95,6 +105,42 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
                     availabilityViewInterval: 60
                 })
             });
+        };
+
+        const getUserToken = async (): Promise<string | null> => {
+            if (!userId) return null;
+            const [userAccount] = await db
+                .select()
+                .from(account)
+                .where(and(eq(account.userId, userId), eq(account.providerId, 'microsoft')))
+                .limit(1);
+            return userAccount?.accessToken || null;
+        };
+
+        try {
+            let response: Response | null = null;
+            if (accessToken) {
+                response = await makeScheduleCall(accessToken, isUserToken);
+                // If app token was rejected with 403 or 401 and we have a userId, fallback to user delegated token
+                if (response && (response.status === 403 || response.status === 401) && !isUserToken && userId) {
+                    console.log(`[MicrosoftAvailabilityProvider] App token returned ${response.status}. Falling back to user delegated token for user ${userId}...`);
+                    const userToken = await getUserToken();
+                    if (userToken) {
+                        accessToken = userToken;
+                        isUserToken = true;
+                        response = await makeScheduleCall(userToken, true);
+                    }
+                }
+            } else if (userId) {
+                const userToken = await getUserToken();
+                if (userToken) {
+                    accessToken = userToken;
+                    isUserToken = true;
+                    response = await makeScheduleCall(userToken, true);
+                }
+            }
+
+            if (!response) return results;
 
             if (response.ok) {
                 const data = await response.json();
@@ -105,9 +151,19 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
                         // '0' = free, '1' = tentative, '2' = busy, '3' = out of office, '4' = working elsewhere
                         const isBusy = view.includes('1') || view.includes('2') || view.includes('3');
                         if (isBusy) {
+                            let eventTitle: string | undefined;
+                            if (Array.isArray(item.scheduleItems)) {
+                                const busyItem = item.scheduleItems.find((s: any) =>
+                                    ['busy', 'tentative', 'oof'].includes((s.status || '').toLowerCase())
+                                );
+                                if (busyItem?.subject) {
+                                    eventTitle = busyItem.subject;
+                                }
+                            }
                             results.set(email, {
                                 available: false,
-                                reason: 'Busy in Microsoft 365 Calendar'
+                                reason: eventTitle ? `Busy in Microsoft 365: "${eventTitle}"` : 'Busy in Microsoft 365 Calendar',
+                                eventTitle
                             });
                         } else {
                             results.set(email, { available: true });
@@ -144,14 +200,24 @@ export class AvailabilityService {
         const resourceAvailability: Record<string, AvailabilityResult> = {};
         const contactAvailability: Record<string, AvailabilityResult> = {};
 
-        const resourceIds = params.resources.map(r => r.id);
-        const contactIds = params.contacts.map(c => c.id);
+        const isVirtual = Boolean(params.currentEventId && params.currentEventId.includes('_inst_'));
+        const currentMasterId = isVirtual ? (params.currentEventId!).split('_inst_')[0] : null;
+
+        const currentInstIso = isVirtual
+            ? decodeURIComponent((params.currentEventId!).split('_inst_')[1])
+            : null;
+
+        const isUuid = Boolean(params.currentEventId && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).test(params.currentEventId));
+        const dbCurrentEventId = isUuid ? params.currentEventId : null;
+        const resourceIds = params.resources.map((r) => r.id);
+        const contactIds = params.contacts.map((c) => c.id);
 
         // 1. Local DB Collision Check for Resources
         if (resourceIds.length > 0) {
             const resourceCollisions = await db
                 .select({
                     resourceId: eventResource.resourceId,
+                    eventId: event.id,
                     eventTitle: event.summary
                 })
                 .from(eventResource)
@@ -159,7 +225,7 @@ export class AvailabilityService {
                 .where(and(
                     inArray(eventResource.resourceId, resourceIds),
                     ne(event.status, 'cancelled'),
-                    params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                    dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
                     lte(event.startDateTime, params.endDateTime),
                     gte(event.endDateTime, params.startDateTime)
                 ));
@@ -167,8 +233,80 @@ export class AvailabilityService {
             for (const c of resourceCollisions) {
                 resourceAvailability[c.resourceId] = {
                     available: false,
-                    reason: `Booked in "${c.eventTitle || 'another event'}"`
+                    reason: `Booked in "${c.eventTitle || 'another event'}"`,
+                    eventId: c.eventId,
+                    eventTitle: c.eventTitle || undefined
                 };
+            }
+
+            // Check recurring events linked to resources for occurrence collisions within the requested range
+            const unflaggedResourceIds = resourceIds.filter((id) => !resourceAvailability[id] || resourceAvailability[id].available !== false);
+            if (unflaggedResourceIds.length > 0) {
+                const recurringEvents = await db
+                    .select({
+                        resourceId: eventResource.resourceId,
+                        eventId: event.id,
+                        eventTitle: event.summary,
+                        startDateTime: event.startDateTime,
+                        endDateTime: event.endDateTime,
+                        recurrence: event.recurrence,
+                        seriesId: event.seriesId,
+                        exdates: event.exdates,
+                        startTimeZone: event.startTimeZone
+                    })
+                    .from(eventResource)
+                    .innerJoin(event, eq(eventResource.eventId, event.id))
+                    .where(and(
+                        inArray(eventResource.resourceId, unflaggedResourceIds),
+                        ne(event.status, 'cancelled'),
+                        dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
+                        or(isNotNull(event.recurrence), isNotNull(event.seriesId))
+                    ));
+
+                const resourceSeriesIds = Array.from(new Set(recurringEvents.map((r) => r.seriesId).filter((id): id is string => Boolean(id))));
+                const resourceSeriesMap = new Map<string, string>();
+                if (resourceSeriesIds.length > 0) {
+                    const seriesRows = await db.select({ id: recurringSeries.id, rrule: recurringSeries.rrule }).from(recurringSeries).where(inArray(recurringSeries.id, resourceSeriesIds));
+                    for (const s of seriesRows) {
+                        if (s.rrule) resourceSeriesMap.set(s.id, s.rrule);
+                    }
+                }
+
+                for (const r of recurringEvents) {
+                    if (resourceAvailability[r.resourceId] && !resourceAvailability[r.resourceId].available) continue;
+                    if (!r.startDateTime) continue;
+
+                    let rrule: string | null = null;
+                    if (Array.isArray(r.recurrence) && r.recurrence[0]) {
+                        rrule = r.recurrence[0];
+                    } else if (r.seriesId) {
+                        rrule = resourceSeriesMap.get(r.seriesId) || null;
+                    }
+
+                    if (rrule) {
+                        const exdates = Array.isArray(r.exdates) ? r.exdates as string[] : [];
+                        const occurrences = expandRecurrenceRange(rrule, new Date(r.startDateTime), r.endDateTime ? new Date(r.endDateTime) : null, params.startDateTime, params.endDateTime, r.startTimeZone, exdates);
+
+                        // If checking an instance belonging to this master event, exclude the instance itself
+                        const conflictingOccurrences = occurrences.filter((occ) => {
+                            if (r.eventId === currentMasterId && currentInstIso) {
+                                const occTime = (occ.date || (occ as any).start).getTime();
+                                const targetTime = new Date(currentInstIso).getTime();
+                                if (Math.abs(occTime - targetTime) < 60000) return false;
+                            }
+                            return true;
+                        });
+
+                        if (conflictingOccurrences.length > 0) {
+                            resourceAvailability[r.resourceId] = {
+                                available: false,
+                                reason: `Booked in "${r.eventTitle || 'another event'}"`,
+                                eventId: r.eventId,
+                                eventTitle: r.eventTitle || undefined
+                            };
+                        }
+                    }
+                }
             }
         }
 
@@ -177,6 +315,7 @@ export class AvailabilityService {
             const contactCollisions = await db
                 .select({
                     contactId: eventContact.contactId,
+                    eventId: event.id,
                     eventTitle: event.summary
                 })
                 .from(eventContact)
@@ -184,7 +323,7 @@ export class AvailabilityService {
                 .where(and(
                     inArray(eventContact.contactId, contactIds),
                     ne(event.status, 'cancelled'),
-                    params.currentEventId ? ne(event.id, params.currentEventId) : undefined,
+                    dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
                     lte(event.startDateTime, params.endDateTime),
                     gte(event.endDateTime, params.startDateTime)
                 ));
@@ -192,8 +331,80 @@ export class AvailabilityService {
             for (const c of contactCollisions) {
                 contactAvailability[c.contactId] = {
                     available: false,
-                    reason: `Assigned to "${c.eventTitle || 'another event'}"`
+                    reason: `Assigned to "${c.eventTitle || 'another event'}"`,
+                    eventId: c.eventId,
+                    eventTitle: c.eventTitle || undefined
                 };
+            }
+
+            // Check recurring events for contacts
+            const unflaggedContactIds = contactIds.filter((id) => !contactAvailability[id] || contactAvailability[id].available !== false);
+            if (unflaggedContactIds.length > 0) {
+                const recurringContactEvents = await db
+                    .select({
+                        contactId: eventContact.contactId,
+                        eventId: event.id,
+                        eventTitle: event.summary,
+                        startDateTime: event.startDateTime,
+                        endDateTime: event.endDateTime,
+                        recurrence: event.recurrence,
+                        seriesId: event.seriesId,
+                        exdates: event.exdates,
+                        startTimeZone: event.startTimeZone
+                    })
+                    .from(eventContact)
+                    .innerJoin(event, eq(eventContact.eventId, event.id))
+                    .where(and(
+                        inArray(eventContact.contactId, unflaggedContactIds),
+                        ne(event.status, 'cancelled'),
+                        dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
+                        or(isNotNull(event.recurrence), isNotNull(event.seriesId))
+                    ));
+
+                const contactSeriesIds = Array.from(new Set(recurringContactEvents.map((r) => r.seriesId).filter((id): id is string => Boolean(id))));
+                const contactSeriesMap = new Map<string, string>();
+                if (contactSeriesIds.length > 0) {
+                    const seriesRows = await db.select({ id: recurringSeries.id, rrule: recurringSeries.rrule }).from(recurringSeries).where(inArray(recurringSeries.id, contactSeriesIds));
+                    for (const s of seriesRows) {
+                        if (s.rrule) contactSeriesMap.set(s.id, s.rrule);
+                    }
+                }
+
+                for (const r of recurringContactEvents) {
+                    if (contactAvailability[r.contactId] && !contactAvailability[r.contactId].available) continue;
+                    if (!r.startDateTime) continue;
+
+                    let rrule: string | null = null;
+                    if (Array.isArray(r.recurrence) && r.recurrence[0]) {
+                        rrule = r.recurrence[0];
+                    } else if (r.seriesId) {
+                        rrule = contactSeriesMap.get(r.seriesId) || null;
+                    }
+
+                    if (rrule) {
+                        const exdates = Array.isArray(r.exdates) ? r.exdates as string[] : [];
+                        const occurrences = expandRecurrenceRange(rrule, new Date(r.startDateTime), r.endDateTime ? new Date(r.endDateTime) : null, params.startDateTime, params.endDateTime, r.startTimeZone, exdates);
+
+                        // If checking an instance belonging to this master event, exclude the instance itself
+                        const conflictingOccurrences = occurrences.filter((occ) => {
+                            if (r.eventId === currentMasterId && currentInstIso) {
+                                const occTime = (occ.date || (occ as any).start).getTime();
+                                const targetTime = new Date(currentInstIso).getTime();
+                                if (Math.abs(occTime - targetTime) < 60000) return false;
+                            }
+                            return true;
+                        });
+
+                        if (conflictingOccurrences.length > 0) {
+                            contactAvailability[r.contactId] = {
+                                available: false,
+                                reason: `Assigned to "${r.eventTitle || 'another event'}"`,
+                                eventId: r.eventId,
+                                eventTitle: r.eventTitle || undefined
+                            };
+                        }
+                    }
+                }
             }
         }
 
@@ -248,6 +459,51 @@ export class AvailabilityService {
                                 resourceAvailability[target.id] = res;
                             } else {
                                 contactAvailability[target.id] = res;
+                            }
+                        }
+                    }
+
+                    // For any newly flagged busy resources from external provider without eventId,
+                    // attempt to find a matching local event in this timeslot
+                    const externalBusyResourceIds = Object.entries(resourceAvailability)
+                        .filter(([_, r]) => !r.available && !r.eventId)
+                        .map(([id]) => id);
+
+                    if (externalBusyResourceIds.length > 0) {
+                        const candidateEvents = await db
+                            .select({
+                                id: event.id,
+                                summary: event.summary
+                            })
+                            .from(event)
+                            .where(and(
+                                ne(event.status, 'cancelled'),
+                                dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
+                                lte(event.startDateTime, params.endDateTime),
+                                gte(event.endDateTime, params.startDateTime)
+                            ));
+
+                        if (candidateEvents.length > 0) {
+                            for (const id of externalBusyResourceIds) {
+                                const r = resourceAvailability[id];
+                                if (!r || r.eventId) continue;
+
+                                if (r.eventTitle) {
+                                    const matched = candidateEvents.find((e) => e.summary && e.summary.toLowerCase().trim() === (r.eventTitle!).toLowerCase().trim());
+
+                                    if (matched) {
+                                        r.eventId = matched.id;
+                                        r.eventTitle = matched.summary;
+                                        continue;
+                                    }
+                                }
+
+                                if (candidateEvents.length === 1) {
+                                    r.eventId = candidateEvents[0].id;
+                                    if (!r.eventTitle) {
+                                        r.eventTitle = candidateEvents[0].summary;
+                                    }
+                                }
                             }
                         }
                     }

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listCampaigns } from "./list.remote";
 	import { deleteCampaigns } from "./[id]/delete.remote";
 
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		Megaphone,
 		Pencil,
@@ -20,7 +20,7 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");

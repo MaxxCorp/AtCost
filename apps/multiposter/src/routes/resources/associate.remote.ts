@@ -2,9 +2,10 @@ import { command, query } from '$app/server';
 import { db } from '@ac/db';
 import { eventResource, resource, announcementResource, kioskResource, resourceLocation } from '@ac/db';
 import { eq } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { resourceAssociationSchema, getResourceAssociationsSchema } from '@ac/validations';
-import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '$lib/server/associations';
+import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
+import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
 const tableMap = {
     event: eventResource,
@@ -20,7 +21,7 @@ const fieldMap = {
     location: 'locationId'
 } as const;
 
-import { syncService } from '$lib/server/sync/service';
+import { syncService } from '#lib/server/sync/service.js';
 
 export const addResourceAssociation = command(resourceAssociationSchema, async (data) => {
     const user = getAuthenticatedUser();
@@ -34,7 +35,8 @@ export const addResourceAssociation = command(resourceAssociationSchema, async (
         itemId: resourceId,
         tableMap,
         fieldMap,
-        itemField: 'resourceId'
+        itemField: 'resourceId',
+        userId: user?.id
     });
     
     if (type === 'event' && user?.id) {
@@ -57,7 +59,8 @@ export const removeResourceAssociation = command(resourceAssociationSchema, asyn
         itemId: resourceId,
         tableMap,
         fieldMap,
-        itemField: 'resourceId'
+        itemField: 'resourceId',
+        userId: user?.id
     });
     
     if (type === 'event' && user?.id) {
@@ -78,10 +81,15 @@ export const fetchEntityResources = query(getResourceAssociationsSchema, async (
         throw new Error(`Unsupported entity type: ${type}`);
     }
 
+    let targetEntityId = entityId;
+    if (type === 'event' && entityId.includes('_inst_')) {
+        targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: false });
+    }
+
     const results = await db.select({ resource: resource })
         .from(table as any)
         .innerJoin(resource, eq((table as any).resourceId, resource.id))
-        .where(eq((table as any)[entityField], entityId));
+        .where(eq((table as any)[entityField], targetEntityId));
     
     return results.map(r => ({
         ...r.resource,
@@ -89,3 +97,4 @@ export const fetchEntityResources = query(getResourceAssociationsSchema, async (
         updatedAt: r.resource.updatedAt.toISOString(),
     }));
 });
+

@@ -2,22 +2,17 @@
     import { LoadingSection, AsyncButton, ErrorSection } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { format, differenceInMinutes } from 'date-fns';
-    import { browser } from "$app/environment";
-    import { invalidateAll } from "$app/navigation";
+    import { refreshAll } from "$app/navigation";
     
     // Import action handle
     import { manageTimesheets } from '../../../routes/my-timesheet/timesheets.remote';
     import { manageTimesheetsSchema } from '@ac/validations';
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
 
     /**
      * TIMESHEET MANAGER (Native Remote Functions)
      */
-
-    let { profile, status } = $props<{ 
-        profile: any, 
-        status: any 
-    }>();
+    let { profile, status } = $props<{ profile: any; status: any }>();
 
     // Dedicated action handle
     const rf = manageTimesheets as any;
@@ -49,16 +44,32 @@
 
     async function handleRefresh() {
         // Re-run the server-side load function
-        await invalidateAll();
+        await refreshAll();
     }
 
 </script>
 
 <div class="space-y-6">
     {#if !profile}
-         <div class="flex flex-col items-center justify-center min-h-[400px] p-12 bg-white rounded-3xl border border-dashed border-gray-200">
-            <div class="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mb-6">
-                <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707.293h-3.172v-3.172" /></svg>
+        <div
+            class="flex flex-col items-center justify-center min-h-[400px] p-12 bg-white rounded-3xl border border-dashed border-gray-200"
+        >
+            <div
+                class="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mb-6"
+            >
+                <svg
+                    class="w-8 h-8 text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707.293h-3.172v-3.172"
+                    ></path>
+                </svg>
             </div>
             <h3 class="text-xl font-black text-gray-400 italic text-center tracking-tight leading-relaxed uppercase">{m.neural_node_disconnected()}<br/><span class="text-xs font-bold opacity-60 uppercase tracking-widest">{m.bridging_service_unavailable()}</span></h3>
         </div>
@@ -67,14 +78,37 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div class="lg:col-span-2 space-y-8">
                 <!-- Clock Control Card -->
-                <div class="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden group">
-                    <div class="p-10 bg-gradient-to-br from-indigo-50/10 via-white to-white relative overflow-hidden">
-                        <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-100/20 blur-3xl rounded-full -mr-32 -mt-32"></div>
- 
-                        <div class="flex flex-col items-center justify-center space-y-8 relative z-10 text-center">
-                            <div class="relative w-48 h-48 rounded-full flex items-center justify-center border-8 border-white shadow-2xl transition-all duration-1000 {isActive ? 'bg-emerald-500 shadow-emerald-200 scale-105' : 'bg-gray-100 shadow-gray-100'}">
-                                <svg class="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+
+                <div
+                    class="bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden group"
+                >
+                    <div
+                        class="p-10 bg-gradient-to-br from-indigo-50/10 via-white to-white relative overflow-hidden"
+                    >
+                        <div
+                            class="absolute top-0 right-0 w-64 h-64 bg-indigo-100/20 blur-3xl rounded-full -mr-32 -mt-32"
+                        ></div>
+
+                        <div
+                            class="flex flex-col items-center justify-center space-y-8 relative z-10 text-center"
+                        >
+                            <div
+                                class="relative w-48 h-48 rounded-full flex items-center justify-center border-8 border-white shadow-2xl transition-all duration-1000 {isActive
+                                    ? 'bg-emerald-500 shadow-emerald-200 scale-105'
+                                    : 'bg-gray-100 shadow-gray-100'}"
+                            >
+                                <svg
+                                    class="w-24 h-24 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    ></path>
                                 </svg>
                                 {#if isActive}
                                     <div class="absolute inset-0 rounded-full border-4 border-emerald-400 animate-ping opacity-25"></div>
@@ -96,87 +130,87 @@
                                     {/if}
                                 </div>
                             </div>
- 
-                                <form
-                                    class="flex gap-4 w-full max-sm:flex-col sm:max-w-sm"
-                                    {...(rf as any).preflight(manageTimesheetsSchema).enhance(async ({ submit }: { submit: any }) => {
-                                        try {
-                                            const result: any = await submit();
-                                            if (result?.success) {
-                                                toast.success(formAction === 'clock_in' ? m.clocked_in_success() : m.clocked_out_success());
-                                                await handleRefresh();
-                                            } else {
-                                                toast.error(result?.error?.message || result?.message || m.action_failed());
-                                            }
-                                        } catch (e: any) {
-                                            toast.error(e.message || m.sync_error());
+
+                            <form
+                                class="flex gap-4 w-full max-sm:flex-col sm:max-w-sm"
+                                {...(rf as any).preflight(manageTimesheetsSchema).enhance(async ({ submit }: { submit: any }) => {
+                                    try {
+                                        const result: any = await submit();
+                                        if (result?.success) {
+                                            toast.success(formAction === 'clock_in' ? m.clocked_in_success() : m.clocked_out_success());
+                                            await handleRefresh();
+                                        } else {
+                                            toast.error(result?.error?.message || result?.message || m.action_failed());
                                         }
-                                    })}
-                                >
-                                    <!-- Proper SvelteKit Remote Form Hidden Inputs -->
-                                    <input {...rf.fields.action.as('hidden', formAction)} />
-                                    {#if profile?.id}
-                                        <input {...rf.fields.talentId.as('hidden', profile.id)} />
-                                    {/if}
-                                    {#if formAction === 'clock_out' && formEntryId}
-                                        <input {...rf.fields.entryId.as('hidden', formEntryId)} />
-                                    {/if}
-                                    
-                                    {#if formAction === 'clock_in'}
-                                        <input {...rf.fields.type.as('hidden', 'manual')} />
+                                        } catch (e: any) {
+                                        toast.error(e.message || m.sync_error());
+                                    }
+                                })}
+                            >
+                                <!-- Proper SvelteKit Remote Form Hidden Inputs -->
+                                <input {...rf.fields.action.as('hidden', formAction)} />
+                                {#if profile?.id}
+                                    <input {...rf.fields.talentId.as('hidden', profile.id)} />
+                                {/if}
+                                {#if formAction === 'clock_out' && formEntryId}
+                                    <input {...rf.fields.entryId.as('hidden', formEntryId)} />
+                                {/if}
+
+                                {#if formAction === 'clock_in'}
+                                    <input {...rf.fields.type.as('hidden', 'manual')} />
                                         <input {...rf.fields.startTime.as('hidden', startTimeOverride)} />
-                                    {:else}
+                                {:else}
                                         <input {...rf.fields.endTime.as('hidden', endTimeOverride)} />
-                                    {/if}
- 
-                                    <div class="flex flex-col gap-6 w-full">
-                                        <div class="space-y-3">
-                                            {#if !isActive}
+                                {/if}
+
+                                <div class="flex flex-col gap-6 w-full">
+                                    <div class="space-y-3">
+                                        {#if !isActive}
                                                 <div class="animate-in fade-in slide-in-from-top-2 duration-500">
                                                     <label for="startTime" class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1 mb-1 block">{m.start_time_record()}</label>
-                                                    <input 
-                                                        id="startTime"
-                                                        type="datetime-local" 
-                                                        bind:value={startTimeOverride}
-                                                        class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm hover:border-gray-200"
-                                                    />
-                                                </div>
-                                            {:else}
+                                                <input
+                                                    id="startTime"
+                                                    type="datetime-local"
+                                                    bind:value={startTimeOverride}
+                                                    class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm hover:border-gray-200"
+                                                />
+                                            </div>
+                                        {:else}
                                                 <div class="animate-in fade-in slide-in-from-top-2 duration-500">
                                                     <label for="endTime" class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1 mb-1 block">{m.end_time_record()}</label>
-                                                    <input 
-                                                        id="endTime"
-                                                        type="datetime-local" 
-                                                        bind:value={endTimeOverride}
-                                                        class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-sm hover:border-gray-200"
-                                                    />
-                                                </div>
-                                            {/if}
-                                        </div>
- 
-                                        <div class="flex gap-4">
-                                            {#if !isActive}
-                                                <AsyncButton 
-                                                    type="submit"
+                                                <input
+                                                    id="endTime"
+                                                    type="datetime-local"
+                                                    bind:value={endTimeOverride}
+                                                    class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-sm hover:border-gray-200"
+                                                />
+                                            </div>
+                                        {/if}
+                                    </div>
+
+                                    <div class="flex gap-4">
+                                        {#if !isActive}
+                                            <AsyncButton
+                                                type="submit"
                                                     onclick={() => { formAction = 'clock_in'; formEntryId = ''; }}
-                                                    loading={rf.pending}
-                                                    class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-20 rounded-[2rem] text-xl font-black shadow-2xl shadow-emerald-200 active:scale-95 transition-all uppercase tracking-widest border-b-4 border-emerald-800"
+                                                loading={rf.pending}
+                                                class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-20 rounded-[2rem] text-xl font-black shadow-2xl shadow-emerald-200 active:scale-95 transition-all uppercase tracking-widest border-b-4 border-emerald-800"
                                                 >
                                                     {m.initiate()}
                                                 </AsyncButton>
-                                            {:else}
-                                                <AsyncButton 
-                                                    type="submit"
+                                        {:else}
+                                            <AsyncButton
+                                                type="submit"
                                                     onclick={() => { formAction = 'clock_out'; formEntryId = status.activeEntry.id; }}
-                                                    loading={rf.pending}
-                                                    class="flex-1 bg-rose-600 hover:bg-rose-700 text-white h-20 rounded-[2rem] text-xl font-black shadow-2xl shadow-rose-200 active:scale-95 transition-all uppercase tracking-widest border-b-4 border-rose-800"
+                                                loading={rf.pending}
+                                                class="flex-1 bg-rose-600 hover:bg-rose-700 text-white h-20 rounded-[2rem] text-xl font-black shadow-2xl shadow-rose-200 active:scale-95 transition-all uppercase tracking-widest border-b-4 border-rose-800"
                                                 >
                                                     {m.terminate()}
                                                 </AsyncButton>
-                                            {/if}
-                                        </div>
+                                        {/if}
                                     </div>
-                                </form>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -191,7 +225,19 @@
                             aria-label="Refresh activity log"
                             class="p-2 hover:bg-indigo-50 rounded-xl text-indigo-600 transition-colors"
                         >
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                ></path>
+                            </svg>
                         </button>
                     </div>
                     <div class="divide-y divide-gray-50">
@@ -199,8 +245,24 @@
                             {#each status.recentEntries as entry}
                                 <div class="px-8 py-5 flex items-center justify-between hover:bg-indigo-50/10 transition-all group">
                                     <div class="flex items-center gap-6">
-                                        <div class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all bg-white border border-gray-100 shadow-sm group-hover:shadow-md {entry.endTime ? 'text-gray-400' : 'text-emerald-600 border-emerald-100'}">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        <div
+                                            class="w-10 h-10 rounded-2xl flex items-center justify-center transition-all bg-white border border-gray-100 shadow-sm group-hover:shadow-md {entry.endTime
+                                                ? 'text-gray-400'
+                                                : 'text-emerald-600 border-emerald-100'}"
+                                        >
+                                            <svg
+                                                class="w-5 h-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    stroke-width="2"
+                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                ></path>
+                                            </svg>
                                         </div>
                                         <div>
                                             <div class="text-[14px] font-black text-gray-900 tracking-tight uppercase italic leading-none mb-1">{format(new Date(entry.startTime), 'EEEE, MMM d')}</div>

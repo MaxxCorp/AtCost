@@ -1,16 +1,21 @@
-import { form } from '$app/server';
+import { form, getRequestEvent } from '$app/server';
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
-import { eq, and, or, ne, inArray } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { eq, and, or, ne, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { updateEventSchema } from '$lib/validations/events';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { updateEventSchema } from '#lib/validations/events.js';
 import { error } from '@sveltejs/kit';
-import { generateEventAssets } from '$lib/server/events/assets';
-import { publishEventChange } from '$lib/server/realtime';
-import { syncService } from '$lib/server/sync/service';
+import { generateEventAssets } from '#lib/server/events/assets.js';
+import { publishEventChange } from '#lib/server/realtime.js';
+import { syncService } from '#lib/server/sync/service.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
+import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import { hasVirtualInstanceChanged } from '#lib/server/events/exceptions.js';
+import { isSeriesItem } from '#lib/utils/event-series.js';
+import * as m from '#lib/paraglide/messages.js';
 
 // Complete rewrite to support recurrence and use helper
 export const updateEvent = form(updateEventSchema, async (data) => {
@@ -22,9 +27,26 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		ensureAccess(user, 'events');
 		console.log('User authenticated:', user.id);
 
-		const [oldEvent] = await db.select().from(event).where(eq(event.id, data.id));
-		if (!oldEvent) {
-			error(404, 'Event not found');
+		const isVirtualInstance = data.id.includes('_inst_');
+		const [instMasterId, instIso] = isVirtualInstance ? data.id.split('_inst_') : [null, null];
+
+		let oldEvent: any = null;
+		if (isVirtualInstance && instMasterId) {
+			const [masterEvent] = await db.select().from(event).where(eq(event.id, instMasterId));
+			if (!masterEvent) {
+				error(404, 'Master event not found');
+			}
+			oldEvent = masterEvent;
+		} else {
+			const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.id);
+			if (!isUuid) {
+				error(400, 'Invalid event ID');
+			}
+			const [found] = await db.select().from(event).where(eq(event.id, data.id));
+			if (!found) {
+				error(404, 'Event not found');
+			}
+			oldEvent = found;
 		}
 
 		// Handle reminders
@@ -98,39 +120,10 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on';
 
-		// Resolve old recurrence rule (checking event.recurrence and recurringSeries)
-		let oldRec = oldEvent.recurrence ? (Array.isArray(oldEvent.recurrence) ? oldEvent.recurrence[0] : oldEvent.recurrence) : null;
-		if (!oldRec && oldEvent.seriesId) {
-			const [series] = await db.select().from(recurringSeries).where(eq(recurringSeries.id, oldEvent.seriesId));
-			if (series?.rrule) {
-				oldRec = series.rrule;
-			}
-		}
-
-		const newRec = data.recurrence || null;
-		const recurrenceChanged = oldRec !== newRec;
-
-		const oldStartMs = oldEvent.startDateTime ? new Date(oldEvent.startDateTime).getTime() : 0;
-		const newStartMs = updateData.startDateTime ? new Date(updateData.startDateTime).getTime() : oldStartMs;
-		const startChanged = oldStartMs !== newStartMs;
-
-		const oldEndMs = oldEvent.endDateTime ? new Date(oldEvent.endDateTime).getTime() : 0;
-		const newEndMs = updateData.endDateTime ? new Date(updateData.endDateTime).getTime() : oldEndMs;
-		const endChanged = oldEndMs !== newEndMs;
-
-		const shouldReexpand = data.recurrence !== undefined && (recurrenceChanged || startChanged || endChanged);
-
 		if (data.recurrence !== undefined) {
-			if (shouldReexpand) {
-				// If empty string, treat as null (clearing recurrence)
-				updateData.recurrence = data.recurrence ? [data.recurrence] : null;
-
-				// If we are setting recurrence, this event becomes a Master (or is already).
-				// ensure it doesn't point to another event as parent
+			updateData.recurrence = data.recurrence ? (Array.isArray(data.recurrence) ? data.recurrence : [data.recurrence]) : null;
+			if (updateData.recurrence) {
 				updateData.recurringEventId = null;
-			} else {
-				// Recurrence and dates have not changed, ignore it so downstream re-expansion doesn't trigger
-				data.recurrence = undefined;
 			}
 		}
 
@@ -142,6 +135,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		updateData.guestsCanModify = data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on';
 		updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
 		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
+		if (data.participantsCount !== undefined) updateData.participantsCount = Number(data.participantsCount) || 0;
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
@@ -149,6 +143,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
 		const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
 		const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
+		const menuIds = data.menuIds ? (typeof data.menuIds === 'string' ? JSON.parse(data.menuIds) : data.menuIds) : undefined;
 
 		let tagNames: string[] | undefined = undefined;
 		if (data.tags !== undefined) {
@@ -157,14 +152,160 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 		let oldInstanceIds: string[] = [];
 
-		const updatedEvent = await db.transaction(async (tx) => {
-			const [updatedEvent] = await tx
-				.update(event)
-				.set(updateData)
-				.where(eq(event.id, data.id))
-				.returning();
+		let effectiveTargetId = data.id;
 
-			if (!updatedEvent) {
+		const txResult = await db.transaction(async (tx) => {
+			let targetId = data.id;
+			let isNewException = false;
+
+			if (isVirtualInstance && instMasterId && instIso) {
+				if (data.seriesMode === 'series') {
+					targetId = instMasterId;
+				} else {
+					const decodedIso = decodeURIComponent(instIso);
+					const [existingException] = await tx.select().from(event).where(
+						and(
+							eq(event.recurringEventId, instMasterId),
+							or(
+								sql`${event.originalStartTime}->>'dateTime' = ${instIso}`,
+								sql`${event.originalStartTime}->>'dateTime' = ${decodedIso}`
+							)
+						)
+					);
+
+					if (existingException) {
+						targetId = existingException.id;
+					} else {
+						const [master] = await tx.select().from(event).where(eq(event.id, instMasterId));
+						if (!master) {
+							error(404, 'Master event not found');
+						}
+
+						// Protection against unnecessary exception creation:
+						// If the user opened the instance in edit mode and saved without changing anything,
+						// do NOT create a new exception row in the database.
+						const targetStart = new Date(decodedIso);
+						const duration = (master.startDateTime && master.endDateTime)
+							? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+							: 3600000;
+						const targetEnd = new Date(targetStart.getTime() + duration);
+
+						let masterLocationIds: string[] | undefined;
+						if (locationIds !== undefined) {
+							const masterLocs = await tx.select({ id: eventLocation.locationId }).from(eventLocation).where(eq(eventLocation.eventId, instMasterId));
+							masterLocationIds = masterLocs.map(l => l.id);
+						}
+
+						let masterResourceIds: string[] | undefined;
+						if (resourceIds !== undefined) {
+							const masterRes = await tx.select({ id: eventResource.resourceId }).from(eventResource).where(eq(eventResource.eventId, instMasterId));
+							masterResourceIds = masterRes.map(r => r.id);
+						}
+
+						let masterContactIds: string[] | undefined;
+						if (contactIds !== undefined) {
+							const masterCtc = await tx.select({ id: eventContact.contactId }).from(eventContact).where(eq(eventContact.eventId, instMasterId));
+							masterContactIds = masterCtc.map(c => c.id);
+						}
+
+						let masterTags: string[] | undefined;
+						if (tagNames !== undefined) {
+							const masterTagsData = await tx.select({ name: tag.name }).from(eventTag).innerJoin(tag, eq(eventTag.tagId, tag.id)).where(eq(eventTag.eventId, instMasterId));
+							masterTags = masterTagsData.map(t => t.name);
+						}
+
+						let masterSyncIds: string[] | undefined;
+						let submittedSyncIds: string[] | undefined;
+						if (data.syncIds !== undefined) {
+							const [camp] = master.campaignId ? await tx.select().from(campaign).where(eq(campaign.id, master.campaignId)) : [null];
+							masterSyncIds = camp ? getCampaignTargetIds(camp.content) : [];
+							submittedSyncIds = Array.isArray(data.syncIds) ? data.syncIds : (typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : []);
+						}
+
+						let masterMenuIds: string[] | undefined;
+						if (menuIds !== undefined) {
+							const masterMenus = await tx.select({ id: eventMenu.menuId }).from(eventMenu).where(eq(eventMenu.eventId, instMasterId));
+							masterMenuIds = masterMenus.map(m => m.id);
+						}
+
+						const hasChanges = hasVirtualInstanceChanged({
+							master,
+							submitted: {
+								summary: data.summary,
+								description: data.description,
+								internalNotes: data.internalNotes,
+								status: data.status,
+								categoryBerlinDotDe: data.categoryBerlinDotDe,
+								heroImage: data.heroImage,
+								ticketPrice: updateData.ticketPrice,
+								ticketPriceUnknown: updateData.ticketPriceUnknown,
+								isAllDay: updateData.isAllDay,
+								isPublic: updateData.isPublic,
+								guestsCanInviteOthers: updateData.guestsCanInviteOthers,
+								guestsCanModify: updateData.guestsCanModify,
+								guestsCanSeeOtherGuests: updateData.guestsCanSeeOtherGuests,
+								participantsCount: data.participantsCount,
+								reminders
+							},
+							targetStart,
+							targetEnd,
+							submittedStart: updateData.startDateTime,
+							submittedEnd: updateData.endDateTime,
+							associations: {
+								masterLocationIds,
+								submittedLocationIds: locationIds,
+								masterResourceIds,
+								submittedResourceIds: resourceIds,
+								masterContactIds,
+								submittedContactIds: contactIds,
+								masterTags,
+								submittedTags: tagNames,
+								masterSyncIds,
+								submittedSyncIds,
+								masterMenuIds,
+								submittedMenuIds: menuIds,
+							}
+						});
+
+						if (!hasChanges) {
+							console.log(`[Update Remote] No changes detected for virtual instance ${data.id}. Skipping exception creation.`);
+							return { isUnchanged: true };
+						}
+
+						const { id: _, createdAt: _c, updatedAt: _u, ...masterRest } = master;
+						const [createdException] = await tx.insert(event).values({
+							...masterRest,
+							recurringEventId: instMasterId,
+							originalStartTime: { dateTime: decodedIso },
+							isException: true,
+							recurrence: null,
+							seriesId: null,
+							...updateData,
+							userId: user.id
+						}).returning();
+
+						targetId = createdException.id;
+						isNewException = true;
+					}
+				}
+			}
+
+			effectiveTargetId = targetId;
+
+			let targetRecord: any;
+			if (isNewException) {
+				const [fetched] = await tx.select().from(event).where(eq(event.id, targetId));
+				targetRecord = fetched;
+			} else {
+				const [updated] = await tx
+					.update(event)
+					.set(updateData)
+					.where(eq(event.id, targetId))
+					.returning();
+				targetRecord = updated;
+			}
+
+			if (!targetRecord) {
 				error(404, 'Event not found');
 			}
 
@@ -173,27 +314,90 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			if (data.syncIds !== undefined) {
 				const syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
 				console.log(`[Update Remote] Parsed syncIds:`, syncIds);
-				if (updatedEvent.campaignId) {
+
+				const isSeries = Boolean(
+					isVirtualInstance ||
+					isSeriesItem(targetRecord) ||
+					(Array.isArray(targetRecord.recurrence) && targetRecord.recurrence.length > 0 && targetRecord.recurrence[0]) ||
+					(typeof targetRecord.recurrence === 'string' && targetRecord.recurrence.trim().length > 0) ||
+					targetRecord.seriesId ||
+					targetRecord.recurringEventId
+				);
+				if (isSeries && syncIds.length > 0) {
+					const berlinConfigs = await tx
+						.select({ id: syncConfig.id, providerType: syncConfig.providerType })
+						.from(syncConfig)
+						.where(
+							and(
+								inArray(syncConfig.id, syncIds),
+								or(
+									eq(syncConfig.providerType, 'berlin-de-mh-calendar'),
+									eq(syncConfig.providerType, 'berlin-de-main-calendar')
+								)
+							)
+						);
+					if (berlinConfigs.length > 0) {
+						const hasMain = berlinConfigs.some(c => c.providerType === 'berlin-de-main-calendar');
+						const hasMh = berlinConfigs.some(c => c.providerType === 'berlin-de-mh-calendar');
+						const errorMsg = (hasMain && hasMh)
+							? m.berlin_de_series_sync_not_allowed()
+							: hasMain
+								? m.berlin_de_main_series_sync_not_allowed()
+								: m.berlin_de_mh_series_sync_not_allowed();
+						return {
+							success: false,
+							error: errorMsg
+						};
+					}
+				}
+
+				if (targetRecord.campaignId) {
+					const [camp] = await tx.select().from(campaign).where(eq(campaign.id, targetRecord.campaignId));
+					const content: CampaignContent = (camp?.content as any)?.version === 1
+						? (camp?.content as any)
+						: createDefaultCampaignContent(syncIds);
+
+					// Update targets
+					content.targets = {};
+					for (const id of syncIds) {
+						content.targets[id] = { enabled: true };
+					}
+					if (!content.items) content.items = {};
+					if (!content.items[targetRecord.id]) {
+						content.items[targetRecord.id] = { entityType: 'event', syncs: {} };
+					}
+
 					await tx.update(campaign).set({
-						content: { syncIds },
+						content,
 						updatedAt: new Date()
-					}).where(eq(campaign.id, updatedEvent.campaignId));
+					}).where(eq(campaign.id, targetRecord.campaignId));
 				} else {
+					const newContent = createDefaultCampaignContent(syncIds);
+					newContent.items[targetRecord.id] = { entityType: 'event', syncs: {} };
 					const [newCampaign] = await tx.insert(campaign).values({
 						userId: user.id,
-						name: `Campaign for ${updatedEvent.summary}`,
-						content: { syncIds }
+						name: `Campaign for ${targetRecord.summary}`,
+						content: newContent
 					}).returning();
 					if (newCampaign) {
-						await tx.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, updatedEvent.id));
-						updatedEvent.campaignId = newCampaign.id;
+						await tx.update(event).set({ campaignId: newCampaign.id }).where(eq(event.id, targetRecord.id));
+						targetRecord.campaignId = newCampaign.id;
 					}
+				}
+
+				// If master event, ensure existing recurring instances also have campaignId set
+				if (targetRecord.campaignId && !targetRecord.recurringEventId) {
+					const instanceCondition = or(
+						eq(event.recurringEventId, targetRecord.id),
+						targetRecord.seriesId ? and(eq(event.seriesId, targetRecord.seriesId), ne(event.id, targetRecord.id)) : undefined
+					);
+					await tx.update(event).set({ campaignId: targetRecord.campaignId }).where(instanceCondition);
 				}
 			}
 
 			// Add Series tag if recurring
 			if (tagNames !== undefined) {
-				if (updatedEvent.seriesId || (updatedEvent.recurrence && (updatedEvent.recurrence as string[]).length > 0) || updatedEvent.recurringEventId) {
+				if (targetRecord.seriesId || (targetRecord.recurrence && (targetRecord.recurrence as string[]).length > 0) || targetRecord.recurringEventId) {
 					if (!tagNames.includes('Series')) {
 						tagNames.push('Series');
 					}
@@ -210,6 +414,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							locationIds.map((id: string) => ({ eventId: targetEventId, locationId: id }))
 						);
 					}
+				} else if (isNewException && instMasterId) {
+					const masterLocs = await client.select().from(eventLocation).where(eq(eventLocation.eventId, instMasterId));
+					if (masterLocs.length > 0) {
+						await client.insert(eventLocation).values(
+							masterLocs.map((l: any) => ({ eventId: targetEventId, locationId: l.locationId }))
+						);
+					}
 				}
 
 				// Resources
@@ -220,6 +431,13 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							resourceIds.map((id: string) => ({ eventId: targetEventId, resourceId: id }))
 						);
 					}
+				} else if (isNewException && instMasterId) {
+					const masterRess = await client.select().from(eventResource).where(eq(eventResource.eventId, instMasterId));
+					if (masterRess.length > 0) {
+						await client.insert(eventResource).values(
+							masterRess.map((r: any) => ({ eventId: targetEventId, resourceId: r.resourceId }))
+						);
+					}
 				}
 
 				// Contacts
@@ -228,6 +446,41 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					if (contactIds.length > 0) {
 						await client.insert(eventContact).values(
 							contactIds.map((id: string) => ({ eventId: targetEventId, contactId: id }))
+						);
+					}
+				} else if (isNewException && instMasterId) {
+					const masterCtcs = await client.select().from(eventContact).where(eq(eventContact.eventId, instMasterId));
+					if (masterCtcs.length > 0) {
+						await client.insert(eventContact).values(
+							masterCtcs.map((c: any) => ({ eventId: targetEventId, contactId: c.contactId, participationStatus: c.participationStatus }))
+						);
+					}
+				}
+
+				// Contact Roles
+				if (data.contactRolesJson !== undefined) {
+					try {
+						const rolesMap: Record<string, string[]> = data.contactRolesJson ? JSON.parse(data.contactRolesJson) : {};
+						await client.delete(eventContactRole).where(eq(eventContactRole.eventId, targetEventId));
+						const roleEntries: { eventId: string; contactId: string; roleId: string }[] = [];
+						for (const [cId, roleIds] of Object.entries(rolesMap)) {
+							if (Array.isArray(roleIds)) {
+								for (const rId of roleIds) {
+									roleEntries.push({ eventId: targetEventId, contactId: cId, roleId: rId });
+								}
+							}
+						}
+						if (roleEntries.length > 0) {
+							await client.insert(eventContactRole).values(roleEntries);
+						}
+					} catch (err) {
+						console.error('Failed to parse or update contact roles:', err);
+					}
+				} else if (isNewException && instMasterId) {
+					const masterRoles = await client.select().from(eventContactRole).where(eq(eventContactRole.eventId, instMasterId));
+					if (masterRoles.length > 0) {
+						await client.insert(eventContactRole).values(
+							masterRoles.map((r: any) => ({ eventId: targetEventId, contactId: r.contactId, roleId: r.roleId }))
 						);
 					}
 				}
@@ -247,177 +500,54 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							}
 						}
 					}
+				} else if (isNewException && instMasterId) {
+					const masterTags = await client.select().from(eventTag).where(eq(eventTag.eventId, instMasterId));
+					if (masterTags.length > 0) {
+						await client.insert(eventTag).values(
+							masterTags.map((t: any) => ({ eventId: targetEventId, tagId: t.tagId }))
+						);
+					}
+				}
+
+				// Menus
+				if (menuIds !== undefined) {
+					await client.delete(eventMenu).where(eq(eventMenu.eventId, targetEventId));
+					if (menuIds.length > 0) {
+						await client.insert(eventMenu).values(
+							menuIds.map((id: string) => ({ eventId: targetEventId, menuId: id }))
+						);
+					}
+				} else if (isNewException && instMasterId) {
+					const masterMenus = await client.select().from(eventMenu).where(eq(eventMenu.eventId, instMasterId));
+					if (masterMenus.length > 0) {
+						await client.insert(eventMenu).values(
+							masterMenus.map((m: any) => ({ eventId: targetEventId, menuId: m.menuId }))
+						);
+					}
 				}
 			};
 
-			// Update Associations for Master Event
-			await linkAssociations(data.id, tx);
+			// Update Associations for Target Event
+			await linkAssociations(targetId, tx);
 
-			// Handle Recurrence Expansion/Update
-			if (data.recurrence !== undefined) {
-				console.log('Handling recurrence instances update...');
-
-				// 1. Find existing instances to clean up external mappings
-				const existingInstances = await tx.select({ id: event.id }).from(event).where(
-					or(
-						updatedEvent.seriesId ? and(eq(event.seriesId, updatedEvent.seriesId), ne(event.id, data.id)) : undefined,
-						eq(event.recurringEventId, data.id)
-					)
-				);
-				oldInstanceIds = existingInstances.map(i => i.id);
-
-				// Delete existing instances from DB
-				if (oldInstanceIds.length > 0) {
-					await tx.delete(event).where(inArray(event.id, oldInstanceIds));
-				}
-
-				// 2. Handle series record
-				let seriesId = updatedEvent.seriesId;
-				let newRecurrenceRule: string | null = null;
-				if (data.recurrence) {
-					newRecurrenceRule = Array.isArray(data.recurrence) ? data.recurrence[0] : data.recurrence;
-				}
-
-				if (newRecurrenceRule) {
-					const start = updatedEvent.startDateTime ? new Date(updatedEvent.startDateTime) : new Date();
-					const end = updatedEvent.endDateTime ? new Date(updatedEvent.endDateTime) : null;
-
-					if (seriesId) {
-						await tx.update(recurringSeries)
-							.set({
-								rrule: newRecurrenceRule,
-								anchorDate: start,
-								anchorEndDate: end,
-								updatedAt: new Date(),
-							})
-							.where(eq(recurringSeries.id, seriesId));
-					} else {
-						const [newSeries] = await tx.insert(recurringSeries).values({
-							rrule: newRecurrenceRule,
-							anchorDate: start,
-							anchorEndDate: end,
-							userId: user.id,
-						}).returning();
-						if (newSeries) {
-							seriesId = newSeries.id;
-							await tx.update(event)
-								.set({ seriesId })
-								.where(eq(event.id, data.id));
-							updatedEvent.seriesId = seriesId;
-						}
-					}
-
-					// 3. Expand and create new instances
-					const { expandRecurrence } = await import('$lib/server/events/recurrence');
-
-					let start2: Date = updatedEvent.startDateTime ? new Date(updatedEvent.startDateTime) : new Date();
-					let end2: Date | null = updatedEvent.endDateTime ? new Date(updatedEvent.endDateTime) : null;
-
-					const instances = expandRecurrence(newRecurrenceRule, start2, end2, 50, true, updatedEvent.startTimeZone || 'UTC');
-
-					for (const { date, end: instanceEnd } of instances) {
-						const instanceId = crypto.randomUUID();
-
-						await tx.insert(event).values({
-							id: instanceId,
-							userId: user.id,
-							campaignId: updatedEvent.campaignId,
-							summary: updatedEvent.summary,
-							description: updatedEvent.description,
-							internalNotes: updatedEvent.internalNotes,
-							categoryBerlinDotDe: updatedEvent.categoryBerlinDotDe,
-							ticketPrice: updatedEvent.ticketPrice,
-							isAllDay: updatedEvent.isAllDay,
-							status: updatedEvent.status,
-							startDateTime: date,
-							startTimeZone: updatedEvent.startTimeZone,
-							endDateTime: instanceEnd || new Date(date.getTime() + 60*60*1000),
-							endTimeZone: updatedEvent.endTimeZone,
-							seriesId: seriesId,
-							isException: false,
-							recurrence: updatedEvent.recurrence,
-							recurringEventId: updatedEvent.id,
-							originalStartTime: { dateTime: date.toISOString() },
-							attendees: updatedEvent.attendees,
-							reminders: updatedEvent.reminders,
-							isPublic: updatedEvent.isPublic,
-							guestsCanInviteOthers: updatedEvent.guestsCanInviteOthers,
-							guestsCanModify: updatedEvent.guestsCanModify,
-							guestsCanSeeOtherGuests: updatedEvent.guestsCanSeeOtherGuests,
-						});
-
-						await linkAssociations(instanceId, tx);
-					}
-				} else {
-					if (seriesId) {
-						await tx.delete(recurringSeries).where(eq(recurringSeries.id, seriesId));
-						await tx.update(event)
-							.set({ seriesId: null })
-							.where(eq(event.id, data.id));
-						updatedEvent.seriesId = null;
-					}
-				}
-			} else {
-				// data.recurrence is undefined, meaning recurrence structure did not change.
-				// If the updated event is a master event and belongs to a series, propagate updates to instances.
-				if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
-					console.log('Propagating common field updates to recurring instances...');
-					const affectedInstances = await tx
-						.select({ id: event.id })
-						.from(event)
-						.where(
-							and(
-								eq(event.recurringEventId, updatedEvent.id),
-								eq(event.isException, false)
-							)
-						);
-
-					if (affectedInstances.length > 0) {
-						const instanceUpdatePayload: any = {
-							updatedAt: new Date()
-						};
-						if (updateData.summary !== undefined) instanceUpdatePayload.summary = updateData.summary;
-						if (updateData.description !== undefined) instanceUpdatePayload.description = updateData.description;
-						if (updateData.internalNotes !== undefined) instanceUpdatePayload.internalNotes = updateData.internalNotes;
-						if (updateData.status !== undefined) instanceUpdatePayload.status = updateData.status;
-						if (updateData.categoryBerlinDotDe !== undefined) instanceUpdatePayload.categoryBerlinDotDe = updateData.categoryBerlinDotDe;
-						instanceUpdatePayload.ticketPriceUnknown = updateData.ticketPriceUnknown;
-						if (updateData.ticketPrice !== undefined) instanceUpdatePayload.ticketPrice = updateData.ticketPriceUnknown ? "0" : updateData.ticketPrice;
-						instanceUpdatePayload.isAllDay = updateData.isAllDay;
-						if (updateData.startTimeZone !== undefined) instanceUpdatePayload.startTimeZone = updateData.startTimeZone;
-						if (updateData.endTimeZone !== undefined) instanceUpdatePayload.endTimeZone = updateData.endTimeZone;
-						if (updateData.attendees !== undefined) instanceUpdatePayload.attendees = updateData.attendees;
-						if (updateData.reminders !== undefined) instanceUpdatePayload.reminders = updateData.reminders;
-						instanceUpdatePayload.isPublic = updateData.isPublic;
-						instanceUpdatePayload.guestsCanInviteOthers = updateData.guestsCanInviteOthers;
-						instanceUpdatePayload.guestsCanModify = updateData.guestsCanModify;
-						instanceUpdatePayload.guestsCanSeeOtherGuests = updateData.guestsCanSeeOtherGuests;
-						if (updateData.heroImage !== undefined) instanceUpdatePayload.heroImage = updateData.heroImage;
-						if (updatedEvent.campaignId !== undefined) instanceUpdatePayload.campaignId = updatedEvent.campaignId;
-
-						await tx
-							.update(event)
-							.set(instanceUpdatePayload)
-							.where(
-								and(
-									eq(event.recurringEventId, updatedEvent.id),
-									eq(event.isException, false)
-								)
-							);
-
-						for (const inst of affectedInstances) {
-							await linkAssociations(inst.id, tx);
-						}
-					}
+			// Clean up legacy series record if recurrence was explicitly cleared
+			if (data.recurrence === null || (Array.isArray(data.recurrence) && data.recurrence.length === 0)) {
+				if (targetRecord.seriesId) {
+					await tx.delete(recurringSeries).where(eq(recurringSeries.id, targetRecord.seriesId));
+					await tx.update(event).set({ seriesId: null }).where(eq(event.id, targetId));
+					targetRecord.seriesId = null;
 				}
 			}
-			return updatedEvent;
+
+			return targetRecord;
 		});
 
-		if (oldInstanceIds.length > 0) {
-			console.log(`[Update Remote] Cleaning up sync mappings for ${oldInstanceIds.length} replaced instance events...`);
-			await syncService.deleteEventMappings(user.id, oldInstanceIds).catch(console.error);
+		if ((txResult as any)?.isUnchanged) {
+			console.log(`[Update Remote] Virtual instance ${data.id} had no changes. Skipping asset/sync/exception creation.`);
+			return { success: true };
 		}
+
+		const updatedEvent = txResult;
 
 		// Determine origin for asset generation
 		let origin: string | undefined;
@@ -426,44 +556,32 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			origin = getRequestEvent()?.url.origin;
 		} catch (e) { /* ignore */ }
 
-		// Regenerate assets for all involved events (master + instances if updated)
+		// Regenerate assets for the updated event
 		console.log('Regenerating assets after update...');
-		await generateEventAssets(data.id, origin);
-
-		if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
-			const instances = await db.query.event.findMany({
-				where: (e, { eq, and, ne }) => and(
-					eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),
-					ne(e.id, data.id)
-				)
-			});
-			for (const inst of instances) {
-				await generateEventAssets(inst.id, origin);
-			}
-		}
+		await generateEventAssets(effectiveTargetId, origin);
 
 		console.log('Event updated successfully, refreshing list...');
 
-		if (updatedEvent) {
-			let allAffectedIds = [updatedEvent.id];
-			if (updatedEvent.seriesId && !updatedEvent.recurringEventId) {
-				const instances = await db.query.event.findMany({
-					where: (e, { eq, and, ne }) => and(
-						eq(e.seriesId, updatedEvent.seriesId || '00000000-0000-0000-0000-000000000000'),
-						ne(e.id, data.id)
-					),
-					columns: { id: true }
-				});
-				allAffectedIds = [updatedEvent.id, ...instances.map(i => i.id)];
-			}
+		await publishEventChange('update', [effectiveTargetId], {
+			id: user.id,
+			name: user.name || user.email,
+			email: user.email
+		});
 
-			await publishEventChange('update', allAffectedIds);
-			// Trigger background sync to external providers for all affected instances
-			await syncService.syncItems(user.id, allAffectedIds, 'event');
+		try {
+			await syncService.syncItems(user.id, [effectiveTargetId], 'event');
+		} catch (err) {
+			console.error('[Update Remote] Sync error:', err);
 		}
 
 		// Refresh caches
-		await readEvent(data.id).refresh();
+		const invalidateIds = [effectiveTargetId, data.id];
+		if (instMasterId) invalidateIds.push(instMasterId);
+		await invalidateEvent(invalidateIds);
+		await readEvent(effectiveTargetId).refresh();
+		if (data.id !== effectiveTargetId) {
+			await readEvent(data.id).refresh();
+		}
 		await listEvents().refresh();
 		console.log('--- updateEvent DONE ---');
 		return { success: true };

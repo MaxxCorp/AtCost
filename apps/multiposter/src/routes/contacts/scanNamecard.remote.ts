@@ -1,11 +1,11 @@
 import { query, command } from '$app/server';
-import { env } from '$env/dynamic/private';
+import { GEMINI_API_KEY } from '$app/env/private';
 import { GoogleGenAI, Type } from '@google/genai';
 import * as v from 'valibot';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 
 export const isScanAvailable = query(v.any(), async () => {
-    return !!env.GEMINI_API_KEY;
+    return !!GEMINI_API_KEY;
 });
 
 const scanSchema = v.object({
@@ -17,13 +17,13 @@ export const scanNamecard = command(scanSchema, async ({ imageBase64, mimeType }
     const user = getAuthenticatedUser();
     ensureAccess(user, 'contacts');
 
-    if (!env.GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY) {
         return { success: false, error: 'Gemini API key is not configured.' };
     }
 
     try {
-        const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-        
+        const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
         const response = await ai.models.generateContent({
             model: 'gemini-3.5-flash',
             contents: [

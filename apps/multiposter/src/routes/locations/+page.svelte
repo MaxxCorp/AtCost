@@ -1,9 +1,9 @@
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages";
+	import * as m from "#lib/paraglide/messages.js";
 	import { listLocations } from "./list.remote";
 	import { deleteLocation } from "./[id]/delete.remote";
-	import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-	import Button from "$lib/components/ui/button/button.svelte";
+	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+	import Button from "#lib/components/ui/button/button.svelte";
 	import {
 		MapPin,
 		Pencil,
@@ -23,10 +23,11 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
-	import { getPreference, setPreference } from "$lib/utils/idb";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import { getPreference, setPreference } from "#lib/utils/idb.js";
+	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 
 	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+	import { getLocationFilterGroups } from "#lib/filters/index.js";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
@@ -58,22 +59,7 @@
 		setPreference("locationsFilters", JSON.stringify(prefsToSave)).catch(console.error);
 	});
 
-	// For the city filter options
-	const allCitiesQuery = listLocations({ limit: 1000 });
-	const availableCities = $derived.by(() => {
-		const res = allCitiesQuery.current?.data || [];
-		const cities = new Set(res.map((r: any) => r.city).filter(Boolean));
-		return Array.from(cities).sort().map((c) => ({ id: c as string, label: c as string }));
-	});
-
-	const filterGroups = $derived<FilterGroup[]>([
-		{
-			id: "city",
-			label: m.cities(),
-			options: availableCities,
-			searchable: true,
-		},
-	]);
+	const filterGroups = $derived<FilterGroup[]>(getLocationFilterGroups(m));
 
 	const filterState = $derived({
 		page,
@@ -127,7 +113,7 @@
 				/>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
-				{#if availableCities.length > 0}
+				{#if filterGroups.length > 0}
 					<FilterMenu
 						groups={filterGroups}
 						bind:filters={filterValues}
@@ -157,7 +143,7 @@
 		</div>
 
 		<!-- Active Filter Chips -->
-		{#if availableCities.length > 0}
+		{#if filterGroups.length > 0}
 			<ActiveFilterChips
 				groups={filterGroups}
 				filters={filterValues}

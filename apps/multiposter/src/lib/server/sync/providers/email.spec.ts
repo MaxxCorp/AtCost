@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { EmailProvider } from './email';
 import { getAvailableEmailTemplates, renderEmailTemplate } from '../../email-templates';
+
+vi.mock('$env/dynamic/private', () => ({
+	env: {}
+}));
 
 describe('Email Templates & EmailProvider', () => {
 	it('should list available email templates', () => {

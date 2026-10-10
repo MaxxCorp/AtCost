@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-    import KioskForm from "$lib/components/kiosks/KioskForm.svelte";
-    import * as m from "$lib/paraglide/messages";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+    import KioskForm from "#lib/components/kiosks/KioskForm.svelte";
+    import * as m from "#lib/paraglide/messages.js";
     import { getKiosk } from "./read.remote";
     import { updateKiosk } from "./update.remote";
-    import { updateKioskSchema } from "$lib/validations/kiosks";
+    import { updateKioskSchema } from "#lib/validations/kiosks.js";
     import { page } from "$app/state";
         
     const kioskId = $derived(page.params.id || "");

@@ -1,15 +1,18 @@
-import { form } from '$app/server';
+import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventLocation, tag, eventTag, recurringSeries, campaign } from '@ac/db';
-import { eq, and } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { eq, and, or, sql, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { createEventSchema } from '$lib/validations/events';
-import { generateEventAssets } from '$lib/server/events/assets';
-import { publishEventChange } from '$lib/server/realtime';
-import { syncService } from '$lib/server/sync/service';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { createEventSchema } from '#lib/validations/events.js';
+import { generateEventAssets } from '#lib/server/events/assets.js';
+import { publishEventChange } from '#lib/server/realtime.js';
+import { syncService } from '#lib/server/sync/service.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
+import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import * as m from '#lib/paraglide/messages.js';
 
 export const createEvent = form(createEventSchema, async (data) => {
 	console.log('--- createEvent START ---');
@@ -100,21 +103,6 @@ export const createEvent = form(createEventSchema, async (data) => {
 		// Deduplicate tags
 		tagNames = [...new Set(tagNames)];
 
-		// Create recurring_series record if recurrence rule exists
-		let seriesId: string | null = null;
-		if (recurrenceRule) {
-			const [newSeries] = await db.insert(recurringSeries).values({
-				rrule: recurrenceRule,
-				anchorDate: start,
-				anchorEndDate: end,
-				userId: user.id,
-			} as any).returning();
-			if (newSeries) {
-				seriesId = newSeries.id;
-				console.log('Created recurring_series:', seriesId);
-			}
-		}
-
 		const eventId = crypto.randomUUID();
 		console.log('Generated Event ID:', eventId);
 
@@ -124,15 +112,61 @@ export const createEvent = form(createEventSchema, async (data) => {
             syncIds = typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : data.syncIds;
         }
 
+        // Auto-include default shared sync targets if syncIds was not explicitly provided
+        if (data.syncIds === undefined || data.syncIds === null) {
+            const defaultConfigs = await db
+                .select({ id: syncConfig.id })
+                .from(syncConfig)
+                .where(
+                    and(
+                        eq(syncConfig.enabled, true),
+                        sql`(${syncConfig.settings}->>'isDefault' = 'true')`
+                    )
+                );
+            syncIds = defaultConfigs.map(c => c.id);
+        }
+
+        if (recurrenceRule && syncIds.length > 0) {
+            const berlinConfigs = await db
+                .select({ id: syncConfig.id, providerType: syncConfig.providerType })
+                .from(syncConfig)
+                .where(
+                    and(
+                        inArray(syncConfig.id, syncIds),
+                        or(
+                            eq(syncConfig.providerType, 'berlin-de-mh-calendar'),
+                            eq(syncConfig.providerType, 'berlin-de-main-calendar')
+                        )
+                    )
+                );
+            if (berlinConfigs.length > 0) {
+                const hasMain = berlinConfigs.some(c => c.providerType === 'berlin-de-main-calendar');
+                const hasMh = berlinConfigs.some(c => c.providerType === 'berlin-de-mh-calendar');
+                const errorMsg = (hasMain && hasMh)
+                    ? m.berlin_de_series_sync_not_allowed()
+                    : hasMain
+                        ? m.berlin_de_main_series_sync_not_allowed()
+                        : m.berlin_de_mh_series_sync_not_allowed();
+                return {
+                    success: false,
+                    error: errorMsg
+                };
+            }
+        }
+
+        const initialCampaignContent: CampaignContent = createDefaultCampaignContent(syncIds);
+        initialCampaignContent.items[eventId] = { entityType: 'event', syncs: {} };
+
         // Create Campaign for the event
         const [newCampaign] = await db.insert(campaign).values({
             userId: user.id,
             name: `Campaign for ${data.summary}`,
-            content: { syncIds }
+            content: initialCampaignContent
         } as any).returning();
 
 		// Insert Master Event
 		console.log('Inserting event into DB...');
+		const participantsCount = data.participantsCount !== undefined ? Number(data.participantsCount) || 0 : 0;
 		const [newEvent] = await db.insert(event).values({
 			id: eventId,
 			userId: user.id,
@@ -149,12 +183,13 @@ export const createEvent = form(createEventSchema, async (data) => {
 			startTimeZone: data.startTimeZone || null,
 			endDateTime: end,
 			endTimeZone: data.endTimeZone || null,
-			// New series-based recurrence
-			seriesId: seriesId,
+			seriesId: null,
+			recurringEventId: null,
 			isException: false,
-			// Legacy fields (kept for backward compatibility)
 			recurrence: recurrenceRule ? [recurrenceRule] : null,
+			exdates: [],
 			attendees: (data.attendees as any) || null,
+			participantsCount,
 			reminders: reminders as any,
 			isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
 			heroImage: data.heroImage || null,
@@ -200,11 +235,29 @@ export const createEvent = form(createEventSchema, async (data) => {
 				await db.insert(eventContact).values(associations);
 			}
 
+			// Contact Roles
+			if (data.contactRolesJson) {
+				try {
+					const rolesMap: Record<string, string[]> = JSON.parse(data.contactRolesJson);
+					const roleEntries: { eventId: string; contactId: string; roleId: string }[] = [];
+					for (const [cId, roleIds] of Object.entries(rolesMap)) {
+						if (Array.isArray(roleIds)) {
+							for (const rId of roleIds) {
+								roleEntries.push({ eventId: targetEventId, contactId: cId, roleId: rId });
+							}
+						}
+					}
+					if (roleEntries.length > 0) {
+						await db.insert(eventContactRole).values(roleEntries);
+					}
+				} catch (err) {
+					console.error('Failed to parse or insert contact roles:', err);
+				}
+			}
+
 			// Tags
 			if (tagNames.length > 0) {
 				for (const name of tagNames) {
-					// Find or create tag
-					// Note: This is sequential to avoid race conditions on create, potentially slow but safe
 					let [existingTag] = await db.select().from(tag).where(eq(tag.name, name));
 					if (!existingTag) {
 						[existingTag] = await db.insert(tag).values({ name, userId: user.id }).returning();
@@ -214,89 +267,47 @@ export const createEvent = form(createEventSchema, async (data) => {
 					}
 				}
 			}
+
+			// Menus
+			let menuIds = [];
+			if (typeof data.menuIds === 'string') {
+				try { menuIds = JSON.parse(data.menuIds); } catch { menuIds = []; }
+			} else if (Array.isArray(data.menuIds)) {
+				menuIds = data.menuIds;
+			}
+			if (menuIds.length > 0) {
+				const associations = (menuIds as string[]).map((menuId: string) => ({
+					eventId: targetEventId,
+					menuId,
+				}));
+				await db.insert(eventMenu).values(associations);
+			}
 		};
 
 		// Link associations for master event
 		await linkAssociations(newEvent.id);
 
-		// Determine origin for asset generation (shared by instances and master)
+		// Determine origin for asset generation
 		let origin: string | undefined;
 		try {
 			const { getRequestEvent } = await import('$app/server');
 			origin = getRequestEvent()?.url.origin;
 		} catch (e) { /* ignore */ }
 
-		// Handle Instances
-		const allEventIds = [newEvent.id];
-		if (recurrenceRule) {
-			try {
-				const { expandRecurrence } = await import('$lib/server/events/recurrence');
-				const instances = expandRecurrence(recurrenceRule, start, end, 50, true, data.startTimeZone || 'UTC');
-
-				for (const { date, end: instanceEnd } of instances) {
-					const instanceId = crypto.randomUUID();
-
-					await db.insert(event).values({
-						id: instanceId,
-						userId: user.id,
-                        campaignId: newCampaign?.id,
-						summary: data.summary,
-						description: data.description || null,
-						internalNotes: data.internalNotes || null,
-						categoryBerlinDotDe: data.categoryBerlinDotDe || null,
-                        ticketPriceUnknown: data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on',
-                        ticketPrice: (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on') ? "0" : (data.ticketPrice || null),
-                        isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
-                        status: data.status || 'confirmed',
-                        startDateTime: date,
-						startTimeZone: data.startTimeZone || null,
-						endDateTime: instanceEnd || end,
-						endTimeZone: data.endTimeZone || null,
-						// New series-based recurrence
-						seriesId: seriesId,
-						isException: false,
-						// Legacy fields (kept for backward compatibility)
-						recurrence: recurrenceRule ? [recurrenceRule] : null,
-						recurringEventId: newEvent.id, // Link to master (legacy)
-						originalStartTime: { dateTime: date.toISOString() }, // The date this instance represents
-						attendees: (data.attendees as any) || null,
-						reminders: reminders as any,
-						isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
-						heroImage: data.heroImage || null,
-						guestsCanInviteOthers: data.guestsCanInviteOthers === 'true' || data.guestsCanInviteOthers === true || data.guestsCanInviteOthers === 'on',
-						guestsCanModify: data.guestsCanModify === 'true' || data.guestsCanModify === true || data.guestsCanModify === 'on',
-						guestsCanSeeOtherGuests: data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on',
-					} as any);
-
-					// Link associations for instance
-					await linkAssociations(instanceId);
-
-					allEventIds.push(instanceId);
-
-					// Generate assets for instance
-					await generateEventAssets(instanceId, origin);
-				}
-			} catch (e) {
-				console.error('Error expanding recurrence:', e);
-				// We don't fail the request, just log error. Master event is created.
-			}
-		}
-
 		console.log('Generating assets for master event via create.remote...');
 		await generateEventAssets(newEvent.id, origin);
 
-		// Note: We are not generating assets for all instances synchronously to avoid timeout.
-		// They will be generated on access or effectively we should trigger a background job.
-		// For now, we leave it.
+		console.log('Event created successfully, triggering sync and refreshing list...');
 
-		console.log('Event created successfully, refreshing list...');
+		await publishEventChange('create', [newEvent.id]);
 
-		if (newEvent) {
-			await publishEventChange('create', allEventIds);
-			// Trigger background sync to external providers for all created instances
-			await syncService.syncItems(user.id, allEventIds, 'event');
+		try {
+			await syncService.syncItems(user.id, [newEvent.id], 'event');
+		} catch (err) {
+			console.error('[Create Remote] Sync error:', err);
 		}
 
+		await invalidateEvent([newEvent.id]);
 		await listEvents().refresh();
 		console.log('--- createEvent DONE ---');
 		return { success: true };

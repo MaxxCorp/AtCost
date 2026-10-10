@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { authClient } from "$lib/auth";
+    import { authClient } from "#lib/auth.js";
     import { Button } from "@ac/ui/components/button";
-    import { cn, type WithElementRef } from "$lib/utils.js";
+    import { cn, type WithElementRef } from "#lib/utils.js";
     import type { HTMLAttributes } from "svelte/elements";
 
     let {

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import TimesheetsManager from "$lib/components/dashboard_timesheets/TimesheetsManager.svelte";
-    import { breadcrumbState } from "$lib/stores/breadcrumb.svelte";
+    import TimesheetsManager from "#lib/components/dashboard_timesheets/TimesheetsManager.svelte";
+    import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { getMyTalentProfile } from "../talents/talents.remote";
     import { getMyStatus } from "./timesheets.remote";
     import { LoadingSection, ErrorSection } from "@ac/ui";

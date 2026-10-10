@@ -2,17 +2,17 @@
     import { onMount, onDestroy } from "svelte";
     import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
-    import { kioskState } from "$lib/stores/kiosk.svelte";
-    import EventView from "$lib/components/events/EventView.svelte";
-    import AnnouncementView from "$lib/components/announcements/AnnouncementView.svelte";
-    import KioskTableView from "$lib/components/kiosks/KioskTableView.svelte";
-    import KioskFlatListView from "$lib/components/kiosks/KioskFlatListView.svelte";
+    import { kioskState } from "#lib/stores/kiosk.svelte.js";
+    import EventView from "#lib/components/events/EventView.svelte";
+    import AnnouncementView from "#lib/components/announcements/AnnouncementView.svelte";
+    import KioskTableView from "#lib/components/kiosks/KioskTableView.svelte";
+    import KioskFlatListView from "#lib/components/kiosks/KioskFlatListView.svelte";
+    import KioskFoldedFlyerView from "#lib/components/kiosks/KioskFoldedFlyerView.svelte";
     import { type Event, type Announcement } from "@ac/validations";
 
-    import { browser } from "$app/environment";
+    import { browser } from '$app/env';
     // import * as Ably from "ably";
-    import { toast } from "svelte-sonner";
-    import { invalidate, invalidateAll } from "$app/navigation";
+    import { invalidate, refreshAll } from "$app/navigation";
 
     import { page } from "$app/state";
     import { readKioskView } from "./read.remote";
@@ -42,7 +42,7 @@
     }
 
     function resetInactivity() {
-        if (kiosk?.uiMode === 'flat_list') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer') return;
         console.log("Resetting inactivity timer"); // debug
         showHeader();
         // Reset loop timer on interaction to prevent flipping while reading/swiping
@@ -52,7 +52,7 @@
     // --- Loop Logic ---
     function startLoop() {
         clearInterval(timer);
-        if (kiosk?.uiMode === 'flat_list') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer') return;
         timer = setInterval(
             () => {
                 nextSlide(true); // Auto-advance
@@ -94,59 +94,59 @@
                 freshItems.map(async (item) => {
                     let qrData = (item as any).qrCodeDataUrl;
 
-                    // If it's an event and has a path but no dataUrl (or we want to ensure it's loaded), fetch it
-                    if ("qrCodePath" in item && item.qrCodePath && !qrData) {
-                        try {
-                            const res = await fetch(item.qrCodePath);
-                            if (res.ok) {
-                                const blob = await res.blob();
-                                qrData = await new Promise((resolve) => {
-                                    const reader = new FileReader();
+                // If it's an event and has a path but no dataUrl (or we want to ensure it's loaded), fetch it
+                if ("qrCodePath" in item && item.qrCodePath && !qrData) {
+                    try {
+                        const res = await fetch(item.qrCodePath);
+                        if (res.ok) {
+                            const blob = await res.blob();
+                            qrData = await new Promise((resolve) => {
+                                const reader = new FileReader();
                                     reader.onloadend = () =>
                                         resolve(reader.result as string);
-                                    reader.readAsDataURL(blob);
-                                });
-                            }
+                                reader.readAsDataURL(blob);
+                            });
+                        }
                         } catch (e) {
                             console.error(
                                 "Failed to cache QR code for event",
                                 item.id,
                                 e,
                             );
-                        }
                     }
+                }
 
-                    // Enrich contact QR code if it exists
+                // Enrich contact QR code if it exists
                     if (
                         "resolvedContact" in item &&
                         item.resolvedContact?.qrCodePath
                     ) {
-                        try {
+                    try {
                             const res = await fetch(
                                 item.resolvedContact.qrCodePath,
                             );
-                            if (res.ok) {
-                                const blob = await res.blob();
+                        if (res.ok) {
+                            const blob = await res.blob();
                                 const contactQrData = await new Promise<string>(
                                     (resolve) => {
-                                        const reader = new FileReader();
+                                const reader = new FileReader();
                                         reader.onloadend = () =>
                                             resolve(reader.result as string);
-                                        reader.readAsDataURL(blob);
+                                reader.readAsDataURL(blob);
                                     },
                                 );
                                 item.resolvedContact.qrCodeDataUrl =
                                     contactQrData;
-                            }
+                        }
                         } catch (e) {
                             console.error(
                                 "Failed to cache contact QR code for event",
                                 item.id,
                                 e,
                             );
-                        }
                     }
-                    return { ...item, qrCodeDataUrl: qrData };
+                }
+                return { ...item, qrCodeDataUrl: qrData };
                 }),
             );
 
@@ -154,23 +154,23 @@
             if (kiosk?.locations) {
                 kiosk.locations = await Promise.all(
                     kiosk.locations.map(async (loc: any) => {
-                        if (loc.contact?.qrCodePath && !loc.contact?.qrCodeDataUrl) {
-                            try {
-                                const res = await fetch(loc.contact.qrCodePath);
-                                if (res.ok) {
-                                    const blob = await res.blob();
-                                    const qrData = await new Promise<string>((resolve) => {
-                                        const reader = new FileReader();
+                    if (loc.contact?.qrCodePath && !loc.contact?.qrCodeDataUrl) {
+                        try {
+                            const res = await fetch(loc.contact.qrCodePath);
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                const qrData = await new Promise<string>((resolve) => {
+                                    const reader = new FileReader();
                                         reader.onloadend = () => resolve(reader.result as string);
-                                        reader.readAsDataURL(blob);
-                                    });
-                                    loc.contact.qrCodeDataUrl = qrData;
-                                }
-                            } catch (e) {
-                                console.error("Failed to cache QR code for location contact", loc.id, e);
+                                    reader.readAsDataURL(blob);
+                                });
+                                loc.contact.qrCodeDataUrl = qrData;
                             }
+                            } catch (e) {
+                            console.error("Failed to cache QR code for location contact", loc.id, e);
                         }
-                        return loc;
+                    }
+                    return loc;
                     })
                 );
             }
@@ -313,31 +313,28 @@
             // @ts-ignore
             import("ably")
                 .then((AblyModule) => {
-                    const Ably = AblyModule.default;
-                    realtime = new Ably.Realtime(
-                        "N_sNCA.u0wYQw:Z-pG0k2QoH0_8L4h2X4Z0k2QoH0_8L4h2X4Z0k2QoH0",
-                    );
+                const Ably = AblyModule.default;
 
-                    const eventsChannel =
-                        realtime.channels.get("event-changes");
-                    eventsChannel.subscribe("change", (message: any) => {
+                realtime = new Ably.Realtime("N_sNCA.u0wYQw:Z-pG0k2QoH0_8L4h2X4Z0k2QoH0_8L4h2X4Z0k2QoH0");
+                const eventsChannel = realtime.channels.get("event-changes");
+                eventsChannel.subscribe("change", (message: any) => {
                         console.log(
                             "Kiosk Event update received:",
                             message.data,
                         );
-                        invalidateAll();
-                    });
+                    refreshAll();
+                });
 
                     const announcementChannel = realtime.channels.get(
                         "announcement-changes",
                     );
-                    announcementChannel.subscribe("change", (message: any) => {
+                announcementChannel.subscribe("change", (message: any) => {
                         console.log(
                             "Kiosk Announcement update received:",
                             message.data,
                         );
-                        invalidateAll();
-                    });
+                    refreshAll();
+                });
                 })
                 .catch((e) => console.error(e));
         }
@@ -362,12 +359,16 @@
     onmousemove={resetInactivity}
     onmousedown={resetInactivity}
     onkeydown={resetInactivity}
-/>
+></svelte:window>
 
 {#if kiosk?.uiMode === "flat_list"}
-    <div class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto">
-        <KioskFlatListView {items} {kiosk} />
-    </div>
+    <div
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto"
+    ><KioskFlatListView items={items} kiosk={kiosk} /></div>
+{:else if kiosk?.uiMode === "folded_flyer"}
+    <div
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto"
+    ><KioskFoldedFlyerView items={items} kiosk={kiosk} /></div>
 {:else}
     <div
         class="fixed inset-0 bg-gray-900 overflow-hidden flex items-center justify-center"
@@ -394,7 +395,7 @@
                 </p>
             </div>
         {:else if kiosk?.uiMode === "table"}
-            <KioskTableView {items} {kiosk} />
+            <KioskTableView items={items} kiosk={kiosk} />
         {:else}
             <div
                 class="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 overflow-y-auto"

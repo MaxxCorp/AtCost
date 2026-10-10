@@ -175,6 +175,11 @@ export interface SyncProvider {
 	readonly supportsWebhooks: boolean;
 	readonly supportedDirections: SyncDirection[];
 	readonly supportedEntityTypes: ('event' | 'announcement')[];
+	/**
+	 * Whether the provider natively supports recurrence rules (RRULE) like Google Calendar or Microsoft Calendar.
+	 * When false or undefined, recurring series are expanded into individual instances for the provider.
+	 */
+	readonly supportsNativeRecurrence?: boolean;
 
 	/**
 	 * Determine if a specific event should be synced by this provider.
@@ -191,6 +196,11 @@ export interface SyncProvider {
 	 * Validate credentials and connection
 	 */
 	validateConnection(): Promise<boolean>;
+
+	/**
+	 * Validate that the specified calendar is available and accessible
+	 */
+	validateCalendarAccess?(): Promise<void>;
 
 	/**
 	 * Pull events from the provider

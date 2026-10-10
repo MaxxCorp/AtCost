@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { authClient } from "$lib/auth";
+	import { authClient } from "#lib/auth.js";
 	import { onMount } from "svelte";
-	import * as m from "$lib/paraglide/messages";
-	import { setLocale, getLocale } from "$lib/paraglide/runtime";
+	import * as m from "#lib/paraglide/messages.js";
+	import { setLocale, getLocale } from "#lib/paraglide/runtime.js";
 
 	let sessionPromise = $state(authClient.getSession());
 	let isOpen = $state(false);
@@ -50,7 +50,7 @@
 	}
 </script>
 
-<header class="bg-white shadow-sm border-b border-gray-200">
+<header class="bg-white shadow-sm border-b border-gray-200 print:hidden">
 	<nav
 		class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center"
 	>

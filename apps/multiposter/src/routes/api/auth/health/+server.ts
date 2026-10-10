@@ -1,5 +1,13 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+
+import {
+  BETTER_AUTH_URL,
+  BETTER_AUTH_SECRET,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  DATABASE_URL
+} from '$app/env/private';
+
 import { db } from '@ac/db';
 import { sql } from '@ac/db';
 
@@ -12,18 +20,18 @@ export const GET: RequestHandler = async ({ request }) => {
 
   try {
     // Environment presence checks (booleans only; never expose values)
-    results.betterAuthUrlPresent = Boolean(env.BETTER_AUTH_URL);
-    results.betterAuthSecretPresent = Boolean(env.BETTER_AUTH_SECRET);
-    results.googleClientIdPresent = Boolean(env.GOOGLE_CLIENT_ID);
-    results.googleClientSecretPresent = Boolean(env.GOOGLE_CLIENT_SECRET);
-    results.databaseUrlPresent = Boolean(env.DATABASE_URL);
+    results.betterAuthUrlPresent = Boolean(BETTER_AUTH_URL);
+    results.betterAuthSecretPresent = Boolean(BETTER_AUTH_SECRET);
+    results.googleClientIdPresent = Boolean(GOOGLE_CLIENT_ID);
+    results.googleClientSecretPresent = Boolean(GOOGLE_CLIENT_SECRET);
+    results.databaseUrlPresent = Boolean(DATABASE_URL);
     step('env');
 
     // Host/domain sanity
     try {
-      if (env.BETTER_AUTH_URL) {
+      if (BETTER_AUTH_URL) {
         const reqHost = new URL(request.url).host;
-        const authHost = new URL(env.BETTER_AUTH_URL).host;
+        const authHost = new URL(BETTER_AUTH_URL).host;
         results.hostMatchesBetterAuthUrl = reqHost === authHost;
         results.requestHost = reqHost;
         results.configuredAuthHost = authHost;
@@ -34,7 +42,7 @@ export const GET: RequestHandler = async ({ request }) => {
     step('host');
 
     // Database connectivity quick check with one retry
-    if (env.DATABASE_URL) {
+    if (DATABASE_URL) {
       let dbOk = false;
       let errorMsg: string | undefined;
       for (let attempt = 1; attempt <= 2; attempt++) {
@@ -56,15 +64,8 @@ export const GET: RequestHandler = async ({ request }) => {
     step('db');
 
     // Overall status
-    const ok = Boolean(
-      results.betterAuthUrlPresent &&
-        results.betterAuthSecretPresent &&
-        results.googleClientIdPresent &&
-        results.googleClientSecretPresent &&
-        results.databaseUrlPresent &&
-        results.databaseOk !== false &&
-        (results.hostMatchesBetterAuthUrl !== false)
-    );
+    const ok = Boolean(results.betterAuthUrlPresent && results.betterAuthSecretPresent && results.googleClientIdPresent && results.googleClientSecretPresent && results.databaseUrlPresent && results.databaseOk !== false && results.hostMatchesBetterAuthUrl !== false);
+
     step('final');
 
     const body = JSON.stringify({ ok, checks: results }, null, 2);

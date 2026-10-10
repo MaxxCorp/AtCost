@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
-	import CircleIcon from "$lib/components/icons/circle.svelte";
-	import { cn, type WithoutChild } from "$lib/utils.js";
+	import CircleIcon from "#lib/components/icons/circle.svelte";
+	import { cn, type WithoutChild } from "#lib/utils.js";
 
 	let {
 		ref = $bindable(null),
@@ -22,7 +22,7 @@
 >
 	{#snippet children({ checked })}
 		<span
-			class="pointer-events-none absolute start-2 flex size-3.5 items-center justify-center"
+			class="pointer-events-none absolute start-2 top-1/2 -translate-y-1/2 flex size-3.5 items-center justify-center"
 		>
 			{#if checked}
 				<CircleIcon class="size-2 fill-current" />

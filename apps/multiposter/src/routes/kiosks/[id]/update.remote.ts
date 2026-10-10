@@ -2,11 +2,32 @@ import { form } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
 import { eq, and } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { updateKioskSchema } from '$lib/validations/kiosks';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { updateKioskSchema } from '#lib/validations/kiosks.js';
 import { getKiosk } from './read.remote';
 import { listKiosks } from '../list.remote';
 import { error } from '@sveltejs/kit';
+import { invalidateKiosk } from '#lib/server/cache/index.js';
+
+
+
+function parseSafeDate(val: string | null | undefined): Date | null {
+    if (!val || typeof val !== 'string' || val.trim() === '') return null;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) {
+        throw new Error(`Invalid date value: "${val}"`);
+    }
+    const year = d.getFullYear();
+    if (year < 1970 || year > 2100) {
+        throw new Error(`Date year out of valid range (1970-2100): ${year}`);
+    }
+    try {
+        d.toISOString();
+    } catch {
+        throw new Error(`Invalid time value: "${val}"`);
+    }
+    return d;
+}
 
 export const updateKiosk = form(updateKioskSchema, async (data) => {
     try {
@@ -25,10 +46,23 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
         if (updates.excludedTags !== undefined) dbUpdates.excludedTags = parseJsonArray(updates.excludedTags);
         if (updates.includedTags !== undefined) dbUpdates.includedTags = parseJsonArray(updates.includedTags);
 
-        if (lookAheadDays !== undefined) dbUpdates.lookAhead = Math.round(lookAheadDays * 86400);
-        if (lookPastDays !== undefined) dbUpdates.lookPast = Math.round(lookPastDays * 86400);
-        if (startDate !== undefined) dbUpdates.startDate = startDate ? new Date(startDate) : null;
-        if (endDate !== undefined) dbUpdates.endDate = endDate ? new Date(endDate) : null;
+        if (lookAheadDays !== undefined) dbUpdates.lookAhead = Math.round(Number(lookAheadDays) * 86400);
+        if (lookPastDays !== undefined) dbUpdates.lookPast = Math.round(Number(lookPastDays) * 86400);
+
+        if (updates.rangeMode && updates.rangeMode !== 'fixed') {
+            dbUpdates.startDate = null;
+            dbUpdates.endDate = null;
+        } else if (updates.rangeMode === 'fixed') {
+            if (startDate !== undefined) {
+                dbUpdates.startDate = parseSafeDate(startDate);
+            }
+            if (endDate !== undefined) {
+                dbUpdates.endDate = parseSafeDate(endDate);
+            }
+            if (dbUpdates.startDate && dbUpdates.endDate && dbUpdates.startDate.getTime() > dbUpdates.endDate.getTime()) {
+                return { success: false, error: 'Start date must be before or equal to end date' };
+            }
+        }
 
         const [updated] = await db.update(kiosk)
             .set({
@@ -60,6 +94,7 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
         }
 
         // Refresh caches - Fetch the full state to ensure absolute consistency and avoid partial state wiping
+        await invalidateKiosk(id);
         getKiosk(id).set({ ...updated, locationIds });
         await listKiosks().refresh();
         return { success: true };

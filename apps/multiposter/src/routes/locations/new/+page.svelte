@@ -1,11 +1,11 @@
 <script lang="ts">
     import { createLocation } from "./create.remote";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import {
         createLocationSchema,
         updateLocationSchema,
     } from "@ac/validations";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { LocationForm } from "@ac/ui";
     import { listLocations } from "../list.remote";
     import { updateLocation } from "../[id]/update.remote";

@@ -3,7 +3,7 @@ import {
     db, timeOffRequest, timeOffBalance, talent, 
     eq, and, desc, or, ilike, sql, inArray, notInArray
 } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { timeOffRequestSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import * as v from 'valibot';
 

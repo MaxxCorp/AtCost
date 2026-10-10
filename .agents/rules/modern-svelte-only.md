@@ -21,6 +21,52 @@ trigger: always_on
   - This is a server-side instruction for "single-flight mutations" where the server tells the client which queries to invalidate or update in the same response.
   - DO NOT call other remote functions directly; only use the specialized mutation instructions (`.refresh()`, `.set()`).
   - Example: `void listEvents().refresh();` or `readEvent(updatedEvent.id).set(updatedEvent);`.
+  - **Argument Consistency**: SvelteKit serializes query arguments to form cache keys. If a client calls `listItems()` (argument `undefined`), calling `void listItems({}).refresh()` on the server will NOT match because `undefined !== "{}"`. Refresh both default shapes and use `requested` to refresh client-requested queries:
+    ```ts
+    import { requested } from '$app/server';
+
+    try {
+        await requested(listItems, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listItems().refresh();
+    void listItems({}).refresh();
+    ```
+
+## Remote Function Query Reactivity in Svelte 5 Components
+
+- **NEVER use `{#await myRemoteQuery()}` for Remote Functions data**:
+  - `{#await promise}` in Svelte binds ONLY to the initial Promise resolution.
+  - When a query is updated by a server-side single-flight mutation (`.refresh()`, `.set()`) or client-side `.refresh()`, the Promise passed to `{#await}` does NOT unresolve or emit a new resolution.
+  - Consequently, `{:then}` remains frozen with stale data, and creating, modifying, or deleting items will NEVER reflect in the UI without a full page reload!
+- **ALWAYS consume Remote Queries via `query.current` and Svelte 5 Runes**:
+  - `query.current` is a reactive getter on `RemoteResource`. Whenever `.refresh()` or a server mutation updates the query, `query.current` automatically updates reactively:
+    ```svelte
+    <script lang="ts">
+        // Static parameter or no args:
+        const query = listItems();
+        // Reactive parameter:
+        const query = $derived(getItem(id));
+
+        const items = $derived(query.current?.data ?? []);
+    </script>
+
+    {#if query.loading && !query.current}
+        <LoadingSection />
+    {:else if query.error}
+        <ErrorSection error={query.error} />
+    {:else if query.current}
+        {#each items as item (item.id)}
+            ...
+        {/each}
+    {/if}
+    ```
+- **Client-Side Refresh Triggers**:
+  - In modal dialogs, drawers, or selectors (e.g. `EventRoleManagerModal`):
+    - After executing a mutation command (`create`, `update`, `delete`), call `await query.refresh()` immediately to guarantee instant UI update.
+    - When opening a dialog/dropdown, refresh the query in the trigger's event handler (e.g. `onOpenChange={(open) => { if (open) void query.refresh(); }}`).
+- **Two-way props and empty collections**:
+  - When deriving selection state from a prop or fallback, NEVER use `selectedIds && selectedIds.length > 0 ? selectedIds : fallback`. If the user unchecks all items, `selectedIds` is `[]`, which evaluates `.length > 0` to false and improperly reverts to `fallback`.
+  - Instead, check: `selectedIds !== undefined && selectedIds !== null ? selectedIds : fallback`.
 
 ## Svelte 5 State and Navigation Standards
 
@@ -41,5 +87,7 @@ trigger: always_on
   - Third-party library integrations (e.g., charts, maps, toast notifications).
   - Direct DOM manipulation.
   - Analytics and logging.
-- **Async Data**: For asynchronous data loading in the script, prefer handling promises via `{#await}` in the template or using `$derived` if the result needs to be reactive.
+- **Async Data & Remote Queries**: 
+  - For remote functions, ALWAYS use `const query = $derived(remoteQuery(args));` and `query.current` / `query.loading` / `query.error`.
+  - NEVER use `{#await remoteQuery()}` as it freezes and ignores query invalidations/refreshes.
 - **Simplicity and Svelte idiomatics**: If you are building massive abstractions or conversions, you are likely to do something wrong, as Svelte + Sveltekit are designed to offer solutions that require little code in most cases. go to svelte.dev documentation or consult the svelte MCP, when in doubt to see, whether there is a simpler way.

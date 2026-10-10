@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
-	import CheckIcon from "$lib/components/icons/check.svelte";
-	import MinusIcon from "$lib/components/icons/minus.svelte";
-	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
+	import CheckIcon from "#lib/components/icons/check.svelte";
+	import MinusIcon from "#lib/components/icons/minus.svelte";
+	import { cn, type WithoutChildrenOrChild } from "#lib/utils.js";
 	import type { Snippet } from "svelte";
 
 	let {
@@ -30,7 +30,7 @@
 >
 	{#snippet children({ checked, indeterminate })}
 		<span
-			class="pointer-events-none absolute start-2 flex size-3.5 items-center justify-center"
+			class="pointer-events-none absolute start-2 top-1/2 -translate-y-1/2 flex size-3.5 items-center justify-center"
 		>
 			{#if indeterminate}
 				<MinusIcon class="size-4" />

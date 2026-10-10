@@ -1,11 +1,14 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '@ac/db';
-import { createAnnouncementSchema } from '$lib/validations/announcements';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { publishAnnouncementChange } from '$lib/server/realtime';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign, syncConfig } from '@ac/db';
+import { createAnnouncementSchema } from '#lib/validations/announcements.js';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { publishAnnouncementChange } from '#lib/server/realtime.js';
 import { listAnnouncements } from '../list.remote';
-import { syncService } from '$lib/server/sync/service';
+import { syncService } from '#lib/server/sync/service.js';
+import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
+import { eq, and, sql } from '@ac/db';
+import { invalidateAnnouncement } from '#lib/server/cache/index.js';
 
 
 /**
@@ -47,12 +50,28 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
             syncIds = typeof input.syncIds === 'string' ? JSON.parse(input.syncIds) : input.syncIds;
         }
 
+        // Auto-include default shared sync targets if syncIds was not explicitly provided
+        if (input.syncIds === undefined || input.syncIds === null) {
+            const defaultConfigs = await db
+                .select({ id: syncConfig.id })
+                .from(syncConfig)
+                .where(
+                    and(
+                        eq(syncConfig.enabled, true),
+                        sql`(${syncConfig.settings}->>'isDefault' = 'true')`
+                    )
+                );
+            syncIds = defaultConfigs.map(c => c.id);
+        }
+
+        const initialCampaignContent: CampaignContent = createDefaultCampaignContent(syncIds);
+
         await db.transaction(async (tx) => {
             // Create Campaign for the announcement
             const [newCampaign] = await tx.insert(campaign).values({
                 userId: user.id,
                 name: `Campaign for ${input.title}`,
-                content: { syncIds }
+                content: initialCampaignContent
             }).returning();
 
             // Insert Announcement
@@ -67,6 +86,10 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
             }).returning({ id: announcement.id });
 
             announcementId = newAnnouncement.id;
+            initialCampaignContent.items[announcementId] = { entityType: 'announcement', syncs: {} };
+            if (newCampaign) {
+                await tx.update(campaign).set({ content: initialCampaignContent }).where(eq(campaign.id, newCampaign.id));
+            }
 
             // Insert Tags
             const finalTagIds = new Set<string>(tagIds);
@@ -128,6 +151,7 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
         // Notify listeners
         await publishAnnouncementChange('create', [announcementId]);
 
+        await invalidateAnnouncement(announcementId);
         // Refresh list cache if applicable
         await listAnnouncements().refresh();
 

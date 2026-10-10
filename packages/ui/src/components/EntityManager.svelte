@@ -1,7 +1,9 @@
 <script lang="ts" generics="T extends { id?: string | null; name?: string }">
     import { onMount, untrack, type Component, type Snippet } from "svelte";
-    import type { ListItemContext, FilterDefinition, FilterAssociation, FilterGroup, FilterStateMap } from "./EntityManager.types";
+    import type { ListItemContext, FilterDefinition, FilterAssociation, FilterGroup, FilterStateMap, BooleanFilter, RadioFilterGroup } from "./EntityManager.types";
+    // @ts-ignore
     import FilterMenu from "./FilterMenu.svelte";
+    // @ts-ignore
     import ActiveFilterChips from "./ActiveFilterChips.svelte";
     import {
         Search,
@@ -13,9 +15,12 @@
         Trash2,
         Database,
         Loader2,
+        MapPin,
     } from "@lucide/svelte";
 
+    // @ts-ignore
     import Button from "./button/button.svelte";
+    // @ts-ignore
     import AsyncButton from "./AsyncButton.svelte";
     import * as Dialog from "./dialog";
     import { toast } from "svelte-sonner";
@@ -51,8 +56,11 @@
         deleteItemRemote?: (ids: string[]) => Promise<any>;
 
         // Filters
+        filterGroups?: FilterGroup[];
         filterAssociations?: FilterAssociation[];
         filters?: FilterDefinition[];
+        booleanFilters?: BooleanFilter[];
+        radioGroups?: RadioFilterGroup[];
 
         // Creation link (standalone mode)
         createHref?: string;
@@ -63,7 +71,7 @@
         createSchema?: any;
         updateRemote?: any;
         updateSchema?: any;
-        getFormData?: (item: T) => any;
+        readItemRemote?: (id: string) => Promise<any>;
 
         // Form Rendering
         renderForm?: Snippet<
@@ -84,6 +92,8 @@
         renderItemBadge?: Snippet<[T]>;
         renderItemDetail?: Snippet<[T]>;
         participationSnippet?: Snippet<[T]>;
+        rolesSnippet?: Snippet<[T]>;
+        toolbarActions?: Snippet;
 
         // Initial state
         initialItems?: T[];
@@ -91,9 +101,16 @@
         // Search predicate
         searchPredicate?: (item: T, query: string) => boolean;
 
+        // Grouping props
+        groupBy?: ((item: T) => string | string[] | null | undefined) | string;
+        selectorGroupBy?: ((item: T) => string | string[] | null | undefined) | string;
+        groupIcon?: Component<any>;
+
         // Sorting props
         sortField?: string;
         sortOrder?: "asc" | "desc";
+        selectorSortField?: string;
+        selectorSortOrder?: "asc" | "desc";
 
         // Localization props
         loadingLabel?: string;
@@ -107,6 +124,7 @@
         editLabel?: string;
         deleteForeverLabel?: string;
         confirmUnlinkLabel?: string;
+        filtersLabel?: string;
         m?: any;
     }
 
@@ -123,24 +141,34 @@
         addAssociationRemote,
         removeAssociationRemote,
         deleteItemRemote,
+        filterGroups = undefined,
         filterAssociations = undefined,
         filters = undefined,
+        booleanFilters = undefined,
+        radioGroups = undefined,
         createHref = undefined,
         createLabel = undefined,
         createRemote,
         createSchema,
         updateRemote,
         updateSchema,
-        getFormData,
+        readItemRemote,
         renderForm,
         renderItemLabel,
         renderItemBadge,
         renderItemDetail,
         participationSnippet,
+        rolesSnippet,
+        toolbarActions,
         initialItems = [],
         searchPredicate = undefined,
+        groupBy = undefined,
+        selectorGroupBy = undefined,
+        groupIcon = undefined,
         sortField: propSortField = undefined,
         sortOrder: propSortOrder = undefined,
+        selectorSortField = undefined,
+        selectorSortOrder = undefined,
 
         // Localization defaults
         loadingLabel = `Loading ${title.toLowerCase()}...`,
@@ -154,12 +182,16 @@
         editLabel = "Edit",
         deleteForeverLabel = undefined,
         confirmUnlinkLabel = "Remove link",
+        filtersLabel = undefined,
         m = undefined,
     }: Props<T> = $props();
 
     const i18n = {
         get loadingLabel() {
             return m?.loading_item?.({ item: title.toLowerCase() }) ?? `Loading ${title.toLowerCase()}...`;
+        },
+        get filtersLabel() {
+            return filtersLabel ?? m?.filters?.() ?? (typeof m?.filters === "function" ? m.filters() : (m?.filters ?? "Filters"));
         },
         get noItemsLabel() {
             return m?.no_items?.({ items: title.toLowerCase() }) ?? `No ${title.toLowerCase()} associated yet.`;
@@ -211,6 +243,15 @@
         },
         get failedToLoadAssociations() {
             return m?.failed_to_load_associations?.() ?? "Failed to load associations";
+        },
+        get activeFiltersLabel() {
+            return m?.active_filters?.() ?? "Active Filters:";
+        },
+        get clearAllLabel() {
+            return m?.clear_all_filters?.() ?? m?.clear_all?.() ?? "Clear all";
+        },
+        get unassignedGroupLabel() {
+            return m?.no_location?.() ?? m?.no_locations_associated?.() ?? "No Location";
         }
     };
 
@@ -222,18 +263,25 @@
     });
 
     let searchQuery = $state("");
+    let selectorSearchQuery = $state("");
     let activeFilters = $state<FilterStateMap>({});
 
     const allFilterGroups = $derived<FilterGroup[]>([
+        ...(filterGroups || []),
         ...(filterAssociations || []),
         ...(filters || []),
     ]);
 
     const effectiveSortField = $derived(propSortField ?? "displayName");
     const effectiveSortOrder = $derived(propSortOrder ?? "asc");
+    const effectiveSelectorSortField = $derived(selectorSortField ?? propSortField ?? "displayName");
+    const effectiveSelectorSortOrder = $derived(selectorSortOrder ?? propSortOrder ?? "asc");
+    const activeSelectorGroupBy = $derived(selectorGroupBy ?? groupBy);
+    const GroupIcon = $derived(groupIcon ?? MapPin);
+    const activeSearch = $derived(mode === "embedded" ? selectorSearchQuery : searchQuery);
 
     const filterState = $derived({
-        search: searchQuery || undefined,
+        search: activeSearch || undefined,
         limit: 100,
         sortField: effectiveSortField,
         sortOrder: effectiveSortOrder,
@@ -262,10 +310,12 @@
             }
             if (groupId === "locationId" || groupId === "location" || groupId === "locations") {
                 for (const l of item.locations || []) values.push(String(l?.id ?? l?.locationId ?? l?.location?.id));
+                for (const lid of item.locationIds || []) values.push(String(lid?.id ?? lid));
                 if (item.location?.id) values.push(String(item.location.id));
                 if (item.locationId) values.push(String(item.locationId));
             } else if (groupId === "tagId" || groupId === "tag" || groupId === "tags") {
                 for (const t of item.tags || []) values.push(String(t?.id ?? t?.tagId ?? t?.tag?.id ?? t?.name));
+                for (const tid of item.tagIds || []) values.push(String(tid?.id ?? tid));
                 if (item.contact?.tags) {
                     for (const ct of item.contact.tags || []) values.push(String(ct?.id ?? ct?.tagId ?? ct?.tag?.id ?? ct?.name));
                 }
@@ -277,6 +327,12 @@
             } else if (groupId === "frameworkId" || groupId === "framework") {
                 if (item.framework?.id) values.push(String(item.framework.id));
                 if (item.frameworkId) values.push(String(item.frameworkId));
+            } else if (groupId === "city") {
+                if (item.city) values.push(String(item.city));
+            } else if (groupId === "role") {
+                if (item.role) values.push(String(item.role));
+            } else if (groupId === "providerType") {
+                if (item.providerType) values.push(String(item.providerType));
             }
 
             if (exclude.length > 0 && values.some((v) => exclude.includes(v))) {
@@ -301,17 +357,76 @@
 
     function sortItemsList<I>(items: I[], field: string, order: "asc" | "desc"): I[] {
         if (!items || !Array.isArray(items)) return [];
-        return [...items].sort((a, b) => {
-            const valA = getItemSortValue(a, field);
-            const valB = getItemSortValue(b, field);
-            const cmp = valA.localeCompare(valB, undefined, { sensitivity: "base", numeric: true });
-            return order === "desc" ? -cmp : cmp;
+        return [...items].sort((a: any, b: any) => {
+            const rawA = a?.[field];
+            const rawB = b?.[field];
+            const numA = rawA !== null && rawA !== undefined && rawA !== "" && !isNaN(Number(rawA)) ? Number(rawA) : null;
+            const numB = rawB !== null && rawB !== undefined && rawB !== "" && !isNaN(Number(rawB)) ? Number(rawB) : null;
+
+            if (numA !== null && numB === null) {
+                return -1;
+            }
+            if (numA === null && numB !== null) {
+                return 1;
+            }
+
+            let cmp = 0;
+            if (numA !== null && numB !== null) {
+                cmp = numA - numB;
+            } else {
+                const valA = getItemSortValue(a, field);
+                const valB = getItemSortValue(b, field);
+                cmp = valA.localeCompare(valB, undefined, { sensitivity: "base", numeric: true });
+            }
+
+            const res = order === "desc" ? -cmp : cmp;
+            if (res !== 0) return res;
+
+            const nameA = getItemSortValue(a, "displayName");
+            const nameB = getItemSortValue(b, "displayName");
+            return nameA.localeCompare(nameB, undefined, { sensitivity: "base", numeric: true });
         });
     }
 
-    function normalize(res: any) {
+    function groupItems<I>(
+        items: I[],
+        grouper: ((item: I) => string | string[] | null | undefined) | string,
+        unassignedLabel = "No Location"
+    ) {
+        const groups: Record<string, I[]> = {};
+        for (const item of items) {
+            const rawKey = typeof grouper === "function" ? grouper(item) : (item as any)?.[grouper];
+            const keys = Array.isArray(rawKey)
+                ? (rawKey.length > 0 ? rawKey : [unassignedLabel])
+                : [rawKey];
+
+            for (let key of keys) {
+                key = (typeof key === "string" ? key.trim() : (key != null ? String(key) : "")) || "";
+                if (!key) key = unassignedLabel;
+                if (!groups[key]) {
+                    groups[key] = [];
+                }
+                groups[key].push(item);
+            }
+        }
+
+        return Object.entries(groups)
+            .map(([name, groupItems]) => ({
+                name,
+                items: groupItems,
+            }))
+            .sort((a, b) => {
+                const isUnassignedA = a.name === unassignedLabel || !a.name;
+                const isUnassignedB = b.name === unassignedLabel || !b.name;
+                if (isUnassignedA && !isUnassignedB) return 1;
+                if (!isUnassignedA && isUnassignedB) return -1;
+                return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+            });
+    }
+
+    function normalize<I = T>(res: any): { data: I[]; total: number } {
         if (!res) return { data: [], total: 0 };
-        const data = Array.isArray(res) ? res : (res?.data ?? []);
+        const data: I[] = Array.isArray(res) ? res : (res?.data ?? []);
         const total = Array.isArray(res)
             ? res.length
             : (res?.total ?? data.length);
@@ -328,19 +443,23 @@
 
     // --- STATE ---
     let localAssociatedItems = $state<T[]>(untrack(() => initialItems ?? []));
+    let showSelector = $state(false);
 
     const associationsPromise = $derived(
         entityId && type
             ? fetchAssociationsRemote
-                ? invokeRemote(fetchAssociationsRemote, { type, entityId })
+                ? invokeRemote(fetchAssociationsRemote, { type, entityId }).catch(() => localAssociatedItems)
                 : invokeRemote(listItemsRemote, {
                       associatedWith: { type, id: entityId },
-                  })
+                  }).catch(() => localAssociatedItems)
             : Promise.resolve(localAssociatedItems)
     );
 
-    const selectorListPromise = $derived(invokeRemote(listItemsRemote, filterState));
-
+    const selectorListPromise = $derived(
+        mode === "standalone" || showSelector
+            ? invokeRemote(listItemsRemote, filterState)
+            : Promise.resolve({ data: [], total: 0 })
+    );
 
     $effect(() => {
         if (initialItems) {
@@ -349,9 +468,13 @@
             });
         }
     });
-    let showSelector = $state(false);
+
     function toggleSelector() {
         showSelector = !showSelector;
+        if (!showSelector) {
+            selectorSearchQuery = "";
+            activeFilters = {};
+        }
     }
     let showQuickCreate = $state(false);
     let linkingItemId = $state<string | null>(null);
@@ -495,7 +618,7 @@
             }
         }
 
-        let newItem = result?.data || result?.contact || result?.resource || result?.tag;
+        let newItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
         if (!newItem && result && typeof result === 'object' && 'id' in result) {
             newItem = result;
         }
@@ -538,7 +661,7 @@
         editingItem = null;
         if (!targetId) return;
 
-        let updatedItem = result?.data || result?.contact || result?.resource || result?.tag;
+        let updatedItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
         if (!updatedItem && result && typeof result === 'object' && 'id' in result) {
             updatedItem = result;
         }
@@ -570,24 +693,33 @@
 <!-- Action Bar (Search, Filters, Actions) -->
 <div class="flex flex-col gap-2 mb-3">
     <div class="flex flex-col md:flex-row gap-3">
-        <div class="relative flex-1">
-            <Search
-                size={14}
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-                type="text"
-                placeholder={i18n.searchPlaceholder}
-                bind:value={searchQuery}
-                class="pl-9 w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:bg-gray-800 dark:text-gray-100 transition-all bg-gray-50/50"
-            />
-        </div>
+        {#if mode === "standalone"}
+            <div class="relative flex-1">
+                <Search
+                    size={14}
+                    class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                    type="text"
+                    placeholder={i18n.searchPlaceholder}
+                    bind:value={searchQuery}
+                    class="pl-9 w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:bg-gray-800 dark:text-gray-100 transition-all bg-gray-50/50"
+                />
+            </div>
+        {/if}
 
-        <div class="flex flex-wrap items-center gap-1.5 md:ml-auto shrink-0 w-full md:w-auto">
-            {#if allFilterGroups.length > 0}
+        <div class="flex flex-wrap items-center gap-1.5 {mode === 'standalone' ? 'md:ml-auto' : ''} shrink-0 w-full md:w-auto">
+            {#if toolbarActions}
+                {@render toolbarActions()}
+            {/if}
+
+            {#if mode === "standalone" && (allFilterGroups.length > 0 || (booleanFilters && booleanFilters.length > 0) || (radioGroups && radioGroups.length > 0))}
                 <FilterMenu
                     groups={allFilterGroups}
                     bind:filters={activeFilters}
+                    booleanFilters={booleanFilters}
+                    radioGroups={radioGroups}
+                    buttonLabel={i18n.filtersLabel}
                 />
             {/if}
 
@@ -632,6 +764,30 @@
                             {/if}
                         </Button>
                     {/if}
+                {:catch}
+                    {#if !singleSelect || localAssociatedItems.length === 0}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onclick={toggleSelector}
+                            class="h-9 px-3 rounded-xl {showSelector
+                                ? 'bg-blue-50 text-blue-600'
+                                : 'text-gray-500 hover:bg-gray-100'}"
+                        >
+                            {#if showSelector}
+                                <X size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{i18n.closeSearchLabel}</span
+                                >
+                            {:else}
+                                <Link size={16} class="mr-1.5" />
+                                <span class="text-sm font-semibold"
+                                    >{i18n.linkItemLabel}</span
+                                >
+                            {/if}
+                        </Button>
+                    {/if}
                 {/await}
             {/if}
 
@@ -650,12 +806,14 @@
         </div>
     </div>
 
-    <!-- Active Filter Chips -->
-    {#if allFilterGroups.length > 0}
+    <!-- Active Filter Chips (Standalone mode only) -->
+    {#if mode === "standalone" && allFilterGroups.length > 0}
         <ActiveFilterChips
             groups={allFilterGroups}
             filters={activeFilters}
-            onremove={(groupId, optId, type) => {
+            activeFiltersLabel={i18n.activeFiltersLabel}
+            clearAllLabel={i18n.clearAllLabel}
+            onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
                 const current = activeFilters[groupId] || { include: [], exclude: [] };
                 activeFilters = {
                     ...activeFilters,
@@ -678,8 +836,63 @@
 
 {#if showSelector}
     <div
-        class="bg-white border-2 border-blue-50 rounded-2xl p-2 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 relative min-h-[100px]"
+        class="bg-white border-2 border-blue-50 rounded-2xl p-2.5 mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 relative min-h-[100px]"
     >
+        <!-- Link Mode Filter & Search Toolbar -->
+        <div class="flex flex-col gap-2 mb-2 pb-2.5 border-b border-gray-100 dark:border-gray-800">
+            <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                    <Search
+                        size={14}
+                        class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                        type="text"
+                        placeholder={i18n.searchPlaceholder}
+                        bind:value={selectorSearchQuery}
+                        class="pl-9 w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:bg-gray-800 dark:text-gray-100 transition-all bg-gray-50/50"
+                    />
+                </div>
+
+                {#if allFilterGroups.length > 0 || (booleanFilters && booleanFilters.length > 0) || (radioGroups && radioGroups.length > 0)}
+                    <FilterMenu
+                        groups={allFilterGroups}
+                        bind:filters={activeFilters}
+                        booleanFilters={booleanFilters}
+                        radioGroups={radioGroups}
+                        buttonLabel={i18n.filtersLabel}
+                    />
+                {/if}
+            </div>
+
+            <!-- Active Filter Chips in Link Mode -->
+            {#if allFilterGroups.length > 0}
+                <ActiveFilterChips
+                    groups={allFilterGroups}
+                    filters={activeFilters}
+                    activeFiltersLabel={i18n.activeFiltersLabel}
+                    clearAllLabel={i18n.clearAllLabel}
+                    onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+                        const current = activeFilters[groupId] || { include: [], exclude: [] };
+                        activeFilters = {
+                            ...activeFilters,
+                            [groupId]: {
+                                include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                                exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                            },
+                        };
+                    }}
+                    onclearall={() => {
+                        const reset: FilterStateMap = {};
+                        for (const g of allFilterGroups) {
+                            reset[g.id] = { include: [], exclude: [] };
+                        }
+                        activeFilters = reset;
+                    }}
+                />
+            {/if}
+        </div>
+
         <svelte:boundary>
             {#if $effect.pending()}
                 <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px] rounded-xl">
@@ -694,22 +907,23 @@
                         <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                     </div>
                 {:then res}
-                    {@const allItems = normalize(res).data}
-                    {@const sortedAllItems = sortItemsList(allItems, effectiveSortField, effectiveSortOrder)}
-                    {@const searchedItems = searchQuery
+                    {@const allItems = normalize<T>(res).data}
+                    {@const sortedAllItems = sortItemsList<T>(allItems, effectiveSelectorSortField, effectiveSelectorSortOrder)}
+                    {@const searchedItems = (activeSearch
                         ? sortedAllItems.filter(
                               (i: any) =>
                                   searchPredicate
-                                      ? searchPredicate(i, searchQuery)
-                                      : (i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                         i.title?.toLowerCase().includes(searchQuery.toLowerCase())),
+                                      ? searchPredicate(i, activeSearch)
+                                      : (i.name?.toLowerCase().includes(activeSearch.toLowerCase()) ||
+                                         i.title?.toLowerCase().includes(activeSearch.toLowerCase()) ||
+                                         i.displayName?.toLowerCase().includes(activeSearch.toLowerCase())),
                           )
-                        : sortedAllItems}
-                    {@const filteredItems = searchedItems.filter((i: any) => matchesFilters(i, activeFilters))}
+                        : sortedAllItems) as T[]}
+                    {@const filteredItems = searchedItems.filter((i: any) => matchesFilters(i, activeFilters)) as T[]}
                     
                     {#if filteredItems.length === 0}
                         <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
-                            {searchQuery ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
+                            {activeSearch ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
                         </div>
                     {:else}
                         {#await associationsPromise}
@@ -718,8 +932,9 @@
                                 <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                             </div>
                         {:then ares}
-                            {@const currentAssociations = normalize(ares).data}
-                            {#each filteredItems as item (item.id)}
+                            {@const currentAssociations = normalize<T>(ares).data}
+
+                            {#snippet renderSelectorItem(item: T)}
                                 {@const isLinked = isAssociated(item, currentAssociations)}
                                 <div
                                     class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 transition-all rounded-xl p-2 {isLinked
@@ -735,10 +950,10 @@
                                             {#if renderItemLabel}
                                                 {@render renderItemLabel(item)}
                                             {:else}
-                                                {item.displayName ||
+                                                {(item as any).displayName ||
                                                     item.name ||
-                                                    (`${item.givenName || ""} ${item.familyName || ""}`.trim() || undefined) ||
-                                                    item.company ||
+                                                    (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
+                                                    (item as any).company ||
                                                     item.id ||
                                                     "Unnamed Item"}
                                             {/if}
@@ -746,7 +961,7 @@
                                     </div>
 
                                     <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start">
-                                        {#if updateRemote && renderForm && getFormData}
+                                        {#if updateRemote && renderForm && readItemRemote}
                                             <button
                                                 type="button"
                                                 class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -804,7 +1019,31 @@
                                         {/if}
                                     </div>
                                 </div>
-                            {/each}
+                            {/snippet}
+
+                            {#if activeSelectorGroupBy}
+                                {@const grouped = groupItems(filteredItems, activeSelectorGroupBy, i18n.unassignedGroupLabel)}
+                                {#each grouped as group (group.name)}
+                                    <div class="pt-2.5 pb-1 px-2 first:pt-1 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xs z-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                        <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                            <GroupIcon size={13} class="text-gray-400 shrink-0" />
+                                            <span>{group.name}</span>
+                                        </div>
+                                        <span class="text-[11px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-full">
+                                            {group.items.length}
+                                        </span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        {#each group.items as item (group.name + '-' + item.id)}
+                                            {@render renderSelectorItem(item)}
+                                        {/each}
+                                    </div>
+                                {/each}
+                            {:else}
+                                {#each filteredItems as item (item.id)}
+                                    {@render renderSelectorItem(item)}
+                                {/each}
+                            {/if}
                         {/await}
                     {/if}
                 {/await}
@@ -841,9 +1080,9 @@
                     <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                 </div>
             {:then res}
-                {@const { data: rawAssociations } = normalize(res)}
-                {@const currentAssociations = sortItemsList(rawAssociations, effectiveSortField, effectiveSortOrder)}
-                {@const searchedAssoc = searchQuery
+                {@const { data: rawAssociations } = normalize<T>(res)}
+                {@const currentAssociations = sortItemsList<T>(rawAssociations, effectiveSortField, effectiveSortOrder)}
+                {@const searchedAssoc = (searchQuery
                     ? currentAssociations.filter(
                           (i: any) =>
                               searchPredicate
@@ -855,8 +1094,10 @@
                                         ?.toLowerCase()
                                         .includes(searchQuery.toLowerCase())),
                       )
-                    : currentAssociations}
-                {@const items = searchedAssoc.filter((i: any) => matchesFilters(i, activeFilters))}
+                    : currentAssociations) as T[]}
+                {@const items = (mode === "standalone"
+                    ? searchedAssoc.filter((i: any) => matchesFilters(i, activeFilters))
+                    : searchedAssoc) as T[]}
                 {#if items.length > 0}
                     <div class="grid gap-2">
                         {#each items as item (item.id)}
@@ -870,10 +1111,10 @@
                                 {#if renderItemLabel}
                                     {@render renderItemLabel(item)}
                                 {:else}
-                                    {item.displayName ||
+                                    {(item as any).displayName ||
                                         item.name ||
-                                        (`${item.givenName || ""} ${item.familyName || ""}`.trim() || undefined) ||
-                                        item.company ||
+                                        (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
+                                        (item as any).company ||
                                         item.id ||
                                         "Unnamed Item"}
                                 {/if}
@@ -892,12 +1133,16 @@
                             </div>
                         </div>
 
+                        {#if rolesSnippet}
+                            {@render rolesSnippet(item)}
+                        {/if}
+
                         {#if participationSnippet}
                             {@render participationSnippet(item)}
                         {/if}
 
                         <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start mt-1 sm:mt-0">
-                            {#if updateRemote && renderForm && getFormData}
+                            {#if updateRemote && renderForm && readItemRemote}
                                 <button
                                     type="button"
                                     class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
@@ -1005,22 +1250,33 @@
                 {:then res}
                     {@const currentAssociations = normalize(res).data}
                     <svelte:boundary>
-                        {#if editingItem && getFormData}
-                            {@render renderForm({
-                                remoteFunction: updateRemote,
-                                schema: updateSchema,
-                                initialData: getFormData(editingItem),
-                                onSuccess: (result) => {
-                                    void handleInPlaceUpdateSuccess(
-                                        result,
-                                        currentAssociations,
-                                    );
-                                },
-                                onCancel: () => {
-                                    editingItem = null;
-                                },
-                                id: editingItem.id,
-                            })}
+                        {#if editingItem && readItemRemote}
+                            {#await invokeRemote(readItemRemote, editingItem.id)}
+                                <div class="p-8 flex flex-col items-center justify-center gap-2">
+                                    <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                    <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                                </div>
+                            {:then fullItem}
+                                {@render renderForm({
+                                    remoteFunction: updateRemote,
+                                    schema: updateSchema,
+                                    initialData: fullItem,
+                                    onSuccess: (result) => {
+                                        void handleInPlaceUpdateSuccess(
+                                            result,
+                                            currentAssociations,
+                                        );
+                                    },
+                                    onCancel: () => {
+                                        editingItem = null;
+                                    },
+                                    id: editingItem.id,
+                                })}
+                            {:catch error}
+                                <div class="p-8 text-center text-red-500 text-sm">
+                                    {error?.message || i18n.failedToLoadLabel}
+                                </div>
+                            {/await}
                         {:else if showQuickCreate}
                             {@render renderForm({
                                 remoteFunction: createRemote,

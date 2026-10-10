@@ -17,3 +17,13 @@ export const tagPaginationSchema = v.intersect([
         search: v.optional(v.string()),
     })
 ]);
+
+export const createTagSchema = v.object({
+    name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
+});
+
+export const updateTagSchema = v.object({
+    id: v.pipe(v.string(), v.uuid()),
+    name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
+});
+

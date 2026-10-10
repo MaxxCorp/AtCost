@@ -23,6 +23,7 @@ export const synchronizationBaseSchema = v.object({
         recipientContactIds: v.optional(v.union([v.array(v.string()), v.string()])),
         includeEventContacts: v.optional(v.union([v.boolean(), v.string()])),
         apiKey: v.optional(v.string()),
+        isDefault: v.optional(v.union([v.boolean(), v.string()])),
     })),
 });
 
@@ -44,3 +45,17 @@ export const getEmailCampaignsSchema = v.object({
     limit: v.optional(v.union([v.number(), v.string()])),
     offset: v.optional(v.union([v.number(), v.string()])),
 });
+
+export const processBulkSyncBatchSchema = v.object({
+    configId: v.pipe(v.string(), v.uuid()),
+    operationId: v.pipe(v.string(), v.uuid()),
+    batchSize: v.optional(v.number()),
+});
+export type ProcessBulkSyncBatchInput = v.InferOutput<typeof processBulkSyncBatchSchema>;
+
+export const processMigrationBatchSchema = v.object({
+    operationId: v.pipe(v.string(), v.uuid()),
+    batchSize: v.optional(v.number()),
+});
+export type ProcessMigrationBatchInput = v.InferOutput<typeof processMigrationBatchSchema>;
+

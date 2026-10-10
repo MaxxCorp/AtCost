@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
     import { page } from "$app/state";
-    import * as m from "$lib/paraglide/messages";
+    import * as m from "#lib/paraglide/messages.js";
     import { readResource } from "./read.remote";
     import { listLocations } from "../../locations/list.remote";
     import { listResources } from "../list.remote";
-    import Breadcrumb from "$lib/components/ui/Breadcrumb.svelte";
-            import ResourceForm from "$lib/components/resources/ResourceForm.svelte";
+    import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
+            import ResourceForm from "#lib/components/resources/ResourceForm.svelte";
     import { updateResource } from "./update.remote";
-    import { updateResourceSchema } from "$lib/validations/resources";
+    import { updateResourceSchema } from "#lib/validations/resources.js";
 
     const resourceId = $derived(page.params.id || "");
 

@@ -3,9 +3,10 @@ import { db } from '@ac/db';
 import { announcement } from '@ac/db';
 import { inArray } from '@ac/db';
 import { listAnnouncements } from '../list.remote';
-import { getAuthenticatedUser, ensureAccess } from '$lib/server/authorization';
-import { publishAnnouncementChange } from '$lib/server/realtime';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { publishAnnouncementChange } from '#lib/server/realtime.js';
 import * as v from 'valibot';
+import { invalidateAnnouncement } from '#lib/server/cache/index.js';
 
 /**
  * Command for bulk deleting announcements
@@ -25,6 +26,8 @@ export const deleteAnnouncements = command(v.array(v.string()), async (ids: stri
     // Notify listeners
     await publishAnnouncementChange('delete', ids);
 
+    await invalidateAnnouncement(ids);
     await listAnnouncements().refresh();
     return { success: true };
 });
+

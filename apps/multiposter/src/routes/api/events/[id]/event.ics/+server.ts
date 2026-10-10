@@ -1,21 +1,80 @@
-import { db } from '@ac/db';
+import { db, sql } from '@ac/db';
 import ICAL from 'ical.js';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { cached, cacheKeys } from '#lib/server/cache/index.js';
 
 export const GET: RequestHandler = async ({ params }) => {
     const eventId = params.id;
-    const data = await db.query.event.findFirst({
-        where: (table, { eq }) => eq(table.id, eventId),
-        with: {
-            locations: { with: { location: true } },
-            contacts: { with: { contact: true } }
-        }
-    });
 
-    if (!data) {
-        error(404, 'Event not found');
-    }
+    const cachedResult = await cached(cacheKeys.eventIcs(eventId), 3600, async () => {
+        let data: any = null;
+        const isVirtual = eventId.includes('_inst_');
+
+        if (isVirtual) {
+            const [masterId, instIso] = eventId.split('_inst_');
+            const decodedIso = decodeURIComponent(instIso);
+            data = await db.query.event.findFirst({
+                where: (table, { and, eq, or }) => and(
+                    eq(table.recurringEventId, masterId),
+                    or(
+                        sql`${table.originalStartTime}->>'dateTime' = ${instIso}`,
+                        sql`${table.originalStartTime}->>'dateTime' = ${decodedIso}`
+                    )
+                ),
+                with: {
+                    locations: { with: { location: true } },
+                    contacts: { with: { contact: true } }
+                }
+            });
+
+            if (!data) {
+                const master = await db.query.event.findFirst({
+                    where: (table, { eq }) => eq(table.id, masterId),
+                    with: {
+                        locations: { with: { location: true } },
+                        contacts: { with: { contact: true } }
+                    }
+                });
+                if (master && instIso) {
+                    const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+                    const targetDate = new Date(decodedIso);
+                    if (!isNaN(targetDate.getTime())) {
+                        const isExcluded = masterExdates.some(ex => {
+                            const exTime = new Date(ex).getTime();
+                            return !isNaN(exTime) && Math.abs(exTime - targetDate.getTime()) < 60000;
+                        });
+                        if (!isExcluded) {
+                            const duration = (master.startDateTime && master.endDateTime)
+                                ? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
+                                : 3600000;
+                            data = {
+                                ...master,
+                                id: eventId,
+                                startDateTime: targetDate,
+                                endDateTime: new Date(targetDate.getTime() + duration),
+                                recurrence: null
+                            };
+                        }
+                    }
+                }
+            }
+        } else {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
+            if (isUuid) {
+                data = await db.query.event.findFirst({
+                    where: (table, { eq }) => eq(table.id, eventId),
+                    with: {
+                        locations: { with: { location: true } },
+                        contacts: { with: { contact: true } }
+                    }
+                });
+            }
+        }
+
+        if (!data) {
+            error(404, 'Event not found');
+        }
 
     const vcalendar = new ICAL.Component(['vcalendar', [], []]);
     vcalendar.addPropertyWithValue('prodid', '-//MaxxCorp//ac-multiposter//EN');
@@ -64,15 +123,39 @@ export const GET: RequestHandler = async ({ params }) => {
     if (data.endDateTime) vevent.addPropertyWithValue('dtend', ICAL.Time.fromJSDate(data.endDateTime, true));
     vevent.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(data.updatedAt, true));
 
+    if (data.recurrence && Array.isArray(data.recurrence) && data.recurrence[0]) {
+        try {
+            const cleanRule = data.recurrence[0].replace(/^RRULE:/i, '');
+            vevent.addPropertyWithValue('rrule', ICAL.Recur.fromString(cleanRule));
+        } catch (e) {
+            console.warn('Failed to parse RRULE for ICS:', e);
+        }
+    }
+
+    if (data.exdates && Array.isArray(data.exdates) && data.exdates.length > 0) {
+        for (const ex of data.exdates) {
+            const exD = new Date(ex);
+            if (!isNaN(exD.getTime())) {
+                vevent.addPropertyWithValue('exdate', ICAL.Time.fromJSDate(exD, true));
+            }
+        }
+    }
+
     vcalendar.addSubcomponent(vevent);
 
     const icsContent = vcalendar.toString();
+        return {
+            summary: data.summary,
+            icsContent
+        };
+    });
 
-    return new Response(new Uint8Array(Buffer.from(icsContent)), {
+    return new Response(new Uint8Array(Buffer.from(cachedResult.icsContent)), {
         headers: {
             'Content-Type': 'text/calendar',
-            'Content-Disposition': `attachment; filename="${data.summary.replace(/\s+/g, '_')}.ics"`,
+            'Content-Disposition': `attachment; filename="${cachedResult.summary.replace(/\s+/g, '_')}.ics"`,
             'Cache-Control': 'public, max-age=60'
         }
     });
 };
+
