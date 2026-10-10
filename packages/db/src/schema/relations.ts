@@ -3,7 +3,7 @@ import { user, session, account, verification } from "./auth";
 import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, contactTag, userContact } from "./contacts";
 import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
 import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag, eventRole, eventContactRole } from "./events";
-import { talent, talentTimelineEntry, shiftPlan, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
+import { talent, talentTimelineEntry, shiftPlan, shiftSchedulingGroup, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
 import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
@@ -174,9 +174,15 @@ export const talentTimelineEntryRelations = relations(talentTimelineEntry, ({ on
     talent: one(talent, { fields: [talentTimelineEntry.talentId], references: [talent.id] }),
 }));
 
+export const shiftSchedulingGroupRelations = relations(shiftSchedulingGroup, ({ one, many }) => ({
+    location: one(location, { fields: [shiftSchedulingGroup.locationId], references: [location.id] }),
+    shifts: many(shiftPlan),
+}));
+
 export const shiftPlanRelations = relations(shiftPlan, ({ one, many }) => ({
     talent: one(talent, { fields: [shiftPlan.talentId], references: [talent.id] }),
     location: one(location, { fields: [shiftPlan.locationId], references: [location.id] }),
+    schedulingGroup: one(shiftSchedulingGroup, { fields: [shiftPlan.schedulingGroupId], references: [shiftSchedulingGroup.id] }),
     timesheetEntries: many(timesheetEntry),
 }));
 
@@ -222,6 +228,7 @@ export const syncMappingRelations = relations(syncMapping, ({ one }) => ({
     contact: one(contact, { fields: [syncMapping.contactId], references: [contact.id] }),
     tag: one(tag, { fields: [syncMapping.tagId], references: [tag.id] }),
     resource: one(resource, { fields: [syncMapping.resourceId], references: [resource.id] }),
+    shiftPlan: one(shiftPlan, { fields: [syncMapping.shiftPlanId], references: [shiftPlan.id] }),
 }));
 
 export const webhookSubscriptionRelations = relations(webhookSubscription, ({ one }) => ({

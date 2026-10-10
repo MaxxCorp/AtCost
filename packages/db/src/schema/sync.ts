@@ -65,6 +65,7 @@ export const syncMapping = pgTable("sync_mapping", {
     contactId: uuid("contact_id"),
     tagId: uuid("tag_id"),
     resourceId: uuid("resource_id"),
+    shiftPlanId: uuid("shift_plan_id"),
     providerId: text("provider_id"),
     etag: text("etag"),
     metadata: jsonb("metadata"),

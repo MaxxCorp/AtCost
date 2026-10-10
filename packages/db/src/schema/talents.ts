@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, jsonb, doublePrecision, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, jsonb, doublePrecision, primaryKey, boolean, integer } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { contact } from "./contacts";
 import { location } from "./resources";
@@ -34,15 +34,35 @@ export const talentTimelineEntry = pgTable("talent_timeline_entry", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
-// --- TIMESHEET TABLES ---
+// --- TIMESHEET & SHIFT TABLES (MS Teams Shifts Compatible) ---
+
+export const shiftSchedulingGroup = pgTable("shift_scheduling_group", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    code: text("code"),
+    color: text("color").default("purple").notNull(),
+    locationId: uuid("location_id").references(() => location.id, { onDelete: "set null" }),
+    order: integer("order").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
 
 export const shiftPlan = pgTable("shift_plan", {
     id: uuid("id").primaryKey().defaultRandom(),
-    talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
+    displayName: text("display_name"),
+    talentId: uuid("talent_id").references(() => talent.id, { onDelete: "cascade" }),
     locationId: uuid("location_id").references(() => location.id, { onDelete: "set null" }),
+    schedulingGroupId: uuid("scheduling_group_id").references(() => shiftSchedulingGroup.id, { onDelete: "set null" }),
     startTime: timestamp("start_time").notNull(),
     endTime: timestamp("end_time").notNull(),
+    theme: text("theme").default("blue").notNull(),
+    isShared: boolean("is_shared").default(false).notNull(),
+    openSlotCount: integer("open_slot_count").default(1).notNull(),
+    activities: jsonb("activities"),
     notes: text("notes"),
+    externalId: text("external_id"),
+    syncStatus: text("sync_status", { enum: ["synced", "pending", "error"] }),
+    syncedAt: timestamp("synced_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
@@ -137,6 +157,8 @@ export type Talent = typeof talent.$inferSelect;
 export type NewTalent = typeof talent.$inferInsert;
 export type TalentTimelineEntry = typeof talentTimelineEntry.$inferSelect;
 export type NewTalentTimelineEntry = typeof talentTimelineEntry.$inferInsert;
+export type ShiftSchedulingGroup = typeof shiftSchedulingGroup.$inferSelect;
+export type NewShiftSchedulingGroup = typeof shiftSchedulingGroup.$inferInsert;
 export type ShiftPlan = typeof shiftPlan.$inferSelect;
 export type NewShiftPlan = typeof shiftPlan.$inferInsert;
 export type TimesheetEntry = typeof timesheetEntry.$inferSelect;

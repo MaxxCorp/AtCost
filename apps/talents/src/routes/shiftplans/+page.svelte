@@ -2,6 +2,7 @@
     import * as m from "#lib/paraglide/messages.js";
     import { listShiftplans } from "./list.remote";
     import { deleteShiftplans } from "./[id]/delete.remote";
+    import ShiftScheduleMatrix from "#lib/components/shiftplans/ShiftScheduleMatrix.svelte";
     import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
     
     import { listLocations } from "../locations/list.remote";
@@ -17,7 +18,9 @@
         ArrowLeft,
         ArrowRight,
         ChevronsLeft,
-        ChevronsRight
+        ChevronsRight,
+        Layers,
+        CalendarDays
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
@@ -25,6 +28,9 @@
 
     type Shiftplan = Awaited<ReturnType<typeof listShiftplans>>["data"][number];
 
+    let activeTab = $state<"schedule" | "templates">("schedule");
+
+    // Templates view state
     let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
@@ -51,98 +57,155 @@
         sortOrder,
     });
 
+    // Reactive Remote Query per modern-svelte-only rules (NEVER use {#await})
+    const shiftplansQuery = $derived(listShiftplans(filterState));
+    const templatesList = $derived(shiftplansQuery.current?.data ?? []);
+    const templatesTotal = $derived(shiftplansQuery.current?.total ?? 0);
+
     async function deleteItem(plan: Shiftplan) {
         if (!window.confirm(m.delete_confirm ? m.delete_confirm({ item: m.shiftplans ? m.shiftplans() : "Shift plan" }) : "Delete this shift plan?")) return;
         try {
             await deleteShiftplans([plan.id]);
             toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
-            listShiftplans(filterState).refresh();
+            void shiftplansQuery.refresh();
         } catch (error: any) {
             toast.error(error?.message || (m.something_went_wrong ? m.something_went_wrong() : "Something went wrong"));
         }
     }
 </script>
 
-<div class="container mx-auto px-4 py-8 max-w-5xl">
+<div class="container mx-auto px-4 py-8 max-w-7xl">
     <div class="space-y-6">
+        <!-- Header & Top Navigation -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 class="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
-                    <Calendar class="text-purple-500" size={32} />
+                    <Calendar class="text-purple-600" size={32} />
                     {m.shiftplans_title ? m.shiftplans_title() : "Shift Plans"}
                 </h1>
-                <p class="text-gray-500 mt-1">{m.shiftplans_subtitle ? m.shiftplans_subtitle() : "Manage schedules, templates, and workdays."}</p>
+                <p class="text-gray-500 mt-1">
+                    {m.shiftplans_subtitle ? m.shiftplans_subtitle() : "Manage schedules, templates, and workdays."}
+                </p>
             </div>
-            <Button href="/shiftplans/new" class="w-full md:w-auto shadow-sm">
-                <Plus class="w-4 h-4 mr-2" />
-                {m.create_shiftplan ? m.create_shiftplan() : "Create Shift Plan"}
-            </Button>
+
+            <!-- Tab Switcher & New Template Action -->
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <div class="bg-gray-100 p-1 rounded-2xl flex items-center shadow-2xs">
+                    <button
+                        type="button"
+                        onclick={() => activeTab = "schedule"}
+                        class={[
+                            "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer",
+                            activeTab === "schedule"
+                                ? "bg-white text-purple-700 shadow-xs"
+                                : "text-gray-600 hover:text-gray-900"
+                        ]}
+                    >
+                        <CalendarDays size={15} />
+                        <span>Weekly Schedule</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => activeTab = "templates"}
+                        class={[
+                            "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer",
+                            activeTab === "templates"
+                                ? "bg-white text-purple-700 shadow-xs"
+                                : "text-gray-600 hover:text-gray-900"
+                        ]}
+                    >
+                        <Layers size={15} />
+                        <span>Templates & Presets</span>
+                    </button>
+                </div>
+
+                {#if activeTab === "templates"}
+                    <Button href="/shiftplans/new" class="shadow-xs shrink-0">
+                        <Plus class="w-4 h-4 mr-1.5" />
+                        Create Template
+                    </Button>
+                {/if}
+            </div>
         </div>
 
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <h1 class="text-2xl font-black mb-6 text-gray-900 px-1">{m.shiftplans ? m.shiftplans() : "Shiftplans"}</h1>
+        <!-- TAB 1: Weekly Schedule Matrix (MS Teams Shifts Roster) -->
+        {#if activeTab === "schedule"}
+            <ShiftScheduleMatrix />
+        {/if}
 
-            <!-- Action Bar -->
-            <div class="flex flex-col md:flex-row gap-3 mb-6">
-                <div class="relative flex-1">
-                    <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder={m.search_shift_plans()}
-                        bind:value={searchQuery}
-                        oninput={() => (page = 1)}
-                        class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all bg-gray-50/50"
-                    />
+        <!-- TAB 2: Templates & Presets List -->
+        {#if activeTab === "templates"}
+            <div class="bg-white rounded-3xl p-6 shadow-xs border border-gray-100 space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-black text-gray-900">Shiftplan Templates</h2>
+                        <p class="text-xs text-gray-500">Reusable schedule blueprints that can be assigned to staff.</p>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <FilterMenu
-                        groups={filterGroups}
-                        bind:filters={filterValues}
-                        buttonLabel={m.filters ? m.filters() : "Filters"}
-                        onchange={() => (page = 1)}
-                    />
+
+                <!-- Action Bar -->
+                <div class="flex flex-col md:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder={m.search_shift_plans()}
+                            bind:value={searchQuery}
+                            oninput={() => (page = 1)}
+                            class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all bg-gray-50/50"
+                        />
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <FilterMenu
+                            groups={filterGroups}
+                            bind:filters={filterValues}
+                            buttonLabel={m.filters ? m.filters() : "Filters"}
+                            onchange={() => (page = 1)}
+                        />
+                    </div>
                 </div>
-            </div>
 
-            <!-- Active Filter Chips -->
-            <ActiveFilterChips
-                groups={filterGroups}
-                filters={filterValues}
-                activeFiltersLabel={m.active_filters ? m.active_filters() : "Active Filters:"}
-                clearAllLabel={m.clear_all_filters ? m.clear_all_filters() : "Clear all"}
-                onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
-                    const current = filterValues[groupId] || { include: [], exclude: [] };
-                    filterValues = {
-                        ...filterValues,
-                        [groupId]: {
-                            include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
-                            exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
-                        },
-                    };
-                    page = 1;
-                }}
-                onclearall={() => {
-                    const reset: FilterStateMap = {};
-                    for (const g of filterGroups) {
-                        reset[g.id] = { include: [], exclude: [] };
-                    }
-                    filterValues = reset;
-                    page = 1;
-                }}
-            />
+                <!-- Active Filter Chips -->
+                <ActiveFilterChips
+                    groups={filterGroups}
+                    filters={filterValues}
+                    activeFiltersLabel={m.active_filters ? m.active_filters() : "Active Filters:"}
+                    clearAllLabel={m.clear_all_filters ? m.clear_all_filters() : "Clear all"}
+                    onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
+                        const current = filterValues[groupId] || { include: [], exclude: [] };
+                        filterValues = {
+                            ...filterValues,
+                            [groupId]: {
+                                include: type === "include" ? current.include.filter((id) => id !== optId) : current.include,
+                                exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
+                            },
+                        };
+                        page = 1;
+                    }}
+                    onclearall={() => {
+                        const reset: FilterStateMap = {};
+                        for (const g of filterGroups) {
+                            reset[g.id] = { include: [], exclude: [] };
+                        }
+                        filterValues = reset;
+                        page = 1;
+                    }}
+                />
 
-            <!-- Main List -->
-            <svelte:boundary>
-                {#if $effect.pending()}
-                    <div class="py-12 text-center text-gray-500">{m.loading ? m.loading() : "Loading..."}</div>
-                {/if}
-                <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+                <!-- Templates Grid (Reactive with query.current, NO {#await}) -->
+                {#if shiftplansQuery.loading && !shiftplansQuery.current}
+                    <div class="py-12 text-center text-gray-400 font-medium">Loading templates...</div>
+                {:else if shiftplansQuery.error}
+                    <div class="py-12 text-center text-red-500 font-medium">
+                        Failed to load templates: {shiftplansQuery.error.message}
+                    </div>
+                {:else}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {#each (await listShiftplans(filterState)).data || [] as plan (plan.id)}
+                        {#each templatesList as plan (plan.id)}
                             <div class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-purple-200 transition-all hover:shadow-lg group flex flex-col justify-between">
                                 <div class="flex items-start justify-between mb-4">
                                     <div class="flex items-center gap-3">
-                                        <div class="p-3 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 border border-purple-200 shadow-sm">
+                                        <div class="p-3 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 border border-purple-200 shadow-xs">
                                             <Calendar size={20} />
                                         </div>
                                     </div>
@@ -208,83 +271,78 @@
                     </div>
 
                     <!-- Pagination -->
-                    {#await listShiftplans(filterState) then result}
-                        {#if result && result.total > limit}
-                            {@const totalPages = Math.ceil(result.total / limit)}
-                            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100">
-                                <div class="flex items-center gap-3 text-sm text-gray-500">
-                                    <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
-                                    <div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-                                        <select
-                                            bind:value={limit}
-                                            onchange={() => (page = 1)}
-                                            class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
-                                        >
-                                            <option value={10}>{m.items_per_page({ count: 10 })}</option>
-                                            <option value={20}>{m.items_per_page({ count: 20 })}</option>
-                                            <option value={50}>{m.items_per_page({ count: 50 })}</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1 sm:gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={page === 1}
-                                        onclick={() => page = 1}
-                                        class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                    {#if templatesTotal > limit}
+                        {@const totalPages = Math.ceil(templatesTotal / limit)}
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100">
+                            <div class="flex items-center gap-3 text-sm text-gray-500">
+                                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, templatesTotal)} of {templatesTotal}</span>
+                                <div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                                    <select
+                                        bind:value={limit}
+                                        onchange={() => (page = 1)}
+                                        class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
                                     >
-                                        <ChevronsLeft size={16} />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page === 1}
-                                        onclick={() => page > 1 && page--}
-                                        class="h-9 px-3 border-gray-200 shrink-0"
-                                    >
-                                        <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-                                        Previous
-                                    </Button>
-                                    <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700">
-                                        <select
-                                            bind:value={page}
-                                            class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 rounded px-1 min-w-[2.5rem]"
-                                        >
-                                            {#each Array(totalPages) as _, i}
-                                                <option value={i + 1}>{i + 1}</option>
-                                            {/each}
-                                        </select>
-                                        <span class="text-gray-400">/ {totalPages}</span>
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page === totalPages}
-                                        onclick={() => page < totalPages && page++}
-                                        class="h-9 px-3 border-gray-200 shrink-0"
-                                    >
-                                        Next
-                                        <ArrowRight size={16} class="ml-1.5 hidden sm:block" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={page === totalPages}
-                                        onclick={() => page = totalPages}
-                                        class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-                                    >
-                                        <ChevronsRight size={16} />
-                                    </Button>
+                                        <option value={10}>10 per page</option>
+                                        <option value={20}>20 per page</option>
+                                        <option value={50}>50 per page</option>
+                                    </select>
                                 </div>
                             </div>
-                        {/if}
-                    {/await}
-                </div>
-                {#snippet failed(error: unknown)}
-                    <div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
-                {/snippet}
-            </svelte:boundary>
-        </div>
+                            <div class="flex items-center gap-1 sm:gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={page === 1}
+                                    onclick={() => page = 1}
+                                    class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                                >
+                                    <ChevronsLeft size={16} />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page === 1}
+                                    onclick={() => page > 1 && page--}
+                                    class="h-9 px-3 border-gray-200 shrink-0"
+                                >
+                                    <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+                                    Previous
+                                </Button>
+                                <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700">
+                                    <select
+                                        bind:value={page}
+                                        class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 rounded px-1 min-w-[2.5rem]"
+                                    >
+                                        {#each Array(totalPages) as _, i (i)}
+                                            <option value={i + 1}>{i + 1}</option>
+                                        {/each}
+                                    </select>
+                                    <span class="text-gray-400">/ {totalPages}</span>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page === totalPages}
+                                    onclick={() => page < totalPages && page++}
+                                    class="h-9 px-3 border-gray-200 shrink-0"
+                                >
+                                    Next
+                                    <ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={page === totalPages}
+                                    onclick={() => page = totalPages}
+                                    class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                                >
+                                    <ChevronsRight size={16} />
+                                </Button>
+                            </div>
+                        </div>
+                    {/if}
+                {/if}
+            </div>
+        {/if}
     </div>
 </div>
