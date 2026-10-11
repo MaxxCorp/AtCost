@@ -404,6 +404,12 @@ export async function syncConditions(options: {
                 effectiveDate: startDate,
                 status: 'pending_review',
                 wageGrid: latestAwoGrid,
+                stepProgressionRules: { '1': 12, '2': 24, '3': 36, '4': 48, '5': 60 },
+                tenureBenefits: [
+                    { years: 10, label: '10 Jahre Betriebszugehörigkeit', bonus: 250.0, specialLeaveDays: 1 },
+                    { years: 25, label: '25 Jahre Dienstjubiläum (Tarifvertrag)', bonus: 500.0, specialLeaveDays: 1 },
+                    { years: 40, label: '40 Jahre Dienstjubiläum (Tarifvertrag)', bonus: 600.0, specialLeaveDays: 2 },
+                ],
                 allowances: {
                     capitalAllowance: 150.00,
                     capitalFormingBenefits: 6.65,
@@ -445,17 +451,30 @@ export async function syncConditions(options: {
         }
     }
 
+    // --- 3. CHECK EXPERIENCE-BASED PAY RAISES & TENURE MILESTONE TASKS ---
+    let milestoneTasksCount = 0;
+    try {
+        const { syncContractMilestoneTasks } = await import('../tasks/service.js');
+        const milestoneResult = await syncContractMilestoneTasks({ force: options.force });
+        milestoneTasksCount = milestoneResult.createdTasksCount;
+        createdTasks.push(...milestoneResult.createdTasks);
+    } catch (milestoneErr) {
+        console.error('[SyncConditions] Error syncing contract milestone tasks:', milestoneErr);
+    }
+
+    const totalTasksGenerated = createdTasks.length;
     return {
         success: true,
-        changed: createdConditions.length > 0,
+        changed: createdConditions.length > 0 || milestoneTasksCount > 0,
         period,
         conditionsCount: createdConditions.length,
-        tasksCount: createdTasks.length,
+        tasksCount: totalTasksGenerated,
+        milestoneTasksCount,
         createdConditions,
         createdTasks,
-        message: createdConditions.length > 0
-            ? `Pull completed: ${createdConditions.length} condition update(s) generated. Shared review task(s) created for Admins, HR & Management.`
-            : 'Conditions check completed: All rates are up-to-date with current approved benchmarks.',
+        message: totalTasksGenerated > 0
+            ? `Pull completed: ${createdConditions.length} condition update(s) and ${milestoneTasksCount} milestone task(s) generated. Shared review task(s) active for Admins, HR & Management.`
+            : 'Conditions check completed: All rates and contract experience milestones are up to date.',
     };
 }
 
@@ -557,6 +576,12 @@ export async function approveCondition(params: {
                         wageGrid: target.wageGrid,
                         allowances: target.allowances,
                         surcharges: target.surcharges,
+                        stepProgressionRules: target.stepProgressionRules || { '1': 12, '2': 24, '3': 36, '4': 48, '5': 60 },
+                        tenureBenefits: target.tenureBenefits || [
+                            { years: 10, label: '10 Jahre Betriebszugehörigkeit', bonus: 250.0, specialLeaveDays: 1 },
+                            { years: 25, label: '25 Jahre Dienstjubiläum (Tarifvertrag)', bonus: 500.0, specialLeaveDays: 1 },
+                            { years: 40, label: '40 Jahre Dienstjubiläum (Tarifvertrag)', bonus: 600.0, specialLeaveDays: 2 },
+                        ],
                         tariffCode: target.tariffCode,
                         approvedPeriod: target.effectivePeriod,
                     },

@@ -79,6 +79,21 @@ export const FEATURES: readonly FeatureMeta[] = [
         category: 'self-service'
     },
     {
+        key: 'tasks',
+        title: 'Objective Center',
+        description: 'Shared management approvals, experience-based pay raises, and operational objectives.',
+        href: '/tasks',
+        buttonText: 'View Objectives',
+        claim: 'tasks',
+        icon: 'checkSquare',
+        gradientFrom: 'from-indigo-50',
+        gradientTo: 'to-purple-50',
+        borderClass: 'border-indigo-100',
+        buttonClass: 'bg-indigo-600 hover:bg-indigo-700',
+        order: 9,
+        category: 'management'
+    },
+    {
         key: 'talents',
         title: 'Talents',
         description: 'Manage talent records, history timeline, and contact information.',

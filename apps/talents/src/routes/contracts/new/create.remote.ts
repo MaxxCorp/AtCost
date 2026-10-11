@@ -11,14 +11,25 @@ export const createContract = form(contractSchema, async (data) => {
 
     const insertData: any = { ...data };
     const frameworkIds: string[] = Array.isArray(insertData.frameworkIds) ? insertData.frameworkIds : [];
-    delete insertData.frameworkIds;
+    const startDate = new Date(insertData.startDate);
+    let nextStufenaufstiegDate = insertData.nextStufenaufstiegDate ? new Date(insertData.nextStufenaufstiegDate) : null;
+    let stufenlaufzeitMonths = insertData.stufenlaufzeitMonths;
+
+    if (!nextStufenaufstiegDate && insertData.erfahrungsstufe && insertData.erfahrungsstufe < 6) {
+        const schedule: Record<number, number> = { 1: 12, 2: 24, 3: 36, 4: 48, 5: 60 };
+        stufenlaufzeitMonths = stufenlaufzeitMonths || schedule[insertData.erfahrungsstufe] || 12;
+        const target = new Date(startDate);
+        target.setMonth(target.getMonth() + stufenlaufzeitMonths);
+        nextStufenaufstiegDate = target;
+    }
 
     const [newContract] = await db.insert(contract).values({
         ...insertData,
         parentContractId: insertData.parentContractId || null,
-        startDate: new Date(insertData.startDate),
+        startDate,
         endDate: insertData.endDate ? new Date(insertData.endDate) : null,
-        nextStufenaufstiegDate: insertData.nextStufenaufstiegDate ? new Date(insertData.nextStufenaufstiegDate) : null,
+        stufenlaufzeitMonths,
+        nextStufenaufstiegDate,
     } as any).returning();
 
     // Create single-flight junction entries

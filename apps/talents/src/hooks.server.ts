@@ -23,8 +23,13 @@ const handleMockAuth: Handle = async ({ event, resolve }) => {
     // SECURITY: NEVER RUN IN PRODUCTION
     if (!dev) return resolve(event);
 
-     // Inject mock user for debugging if not authenticated
-    const isStaticAsset = event.url.pathname.includes('.') || event.url.pathname.startsWith('/_') || event.url.pathname.startsWith('/favicon');
+    // Inject mock user for debugging if not authenticated
+    const isRemoteFunction = event.url.pathname.startsWith('/_app/remote');
+    const isStaticAsset = !isRemoteFunction && (
+        (event.url.pathname.includes('.') && !event.url.pathname.includes('/_app/')) ||
+        (event.url.pathname.startsWith('/_') && !event.url.pathname.startsWith('/_app/remote')) ||
+        event.url.pathname.startsWith('/favicon')
+    );
     
     if (!isStaticAsset && !event.locals.user) {
         (event.locals as any).user = {
@@ -34,7 +39,7 @@ const handleMockAuth: Handle = async ({ event, resolve }) => {
             name: 'Mock Admin',
             createdAt: new Date(),
             updatedAt: new Date(),
-            roles: '["admin"]'
+            roles: ['admin', 'hr_manager', 'top_management']
         };
         (event.locals as any).session = {
             id: 'mock-session',

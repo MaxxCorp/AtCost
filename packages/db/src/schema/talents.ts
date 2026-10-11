@@ -144,11 +144,24 @@ export const task = pgTable("task", {
     title: text("title").notNull(),
     description: text("description"),
     targetRoles: jsonb("target_roles").$type<string[]>(),
+    dueDate: timestamp("due_date"),
     data: jsonb("data"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
+export const taskTypeConfig = pgTable("task_type_config", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskType: text("task_type").notNull().unique(), // e.g. "experience_step_increase", "tenure_anniversary", "condition_update_approval", "probation_end"
+    name: text("name").notNull(),
+    description: text("description"),
+    leadTimeDays: integer("lead_time_days").default(30).notNull(),
+    targetRoles: jsonb("target_roles").$type<string[]>().default(["admin", "hr_manager", "top_management"]).notNull(),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    autoPromptDifferentialUpdate: boolean("auto_prompt_differential_update").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
 
 export const userTalent = pgTable("user_talent", {
     userId: text("user_id").notNull(),
@@ -179,3 +192,5 @@ export type ShiftPlanTemplateTalent = typeof shiftPlanTemplateTalent.$inferSelec
 export type NewShiftPlanTemplateTalent = typeof shiftPlanTemplateTalent.$inferInsert;
 export type Task = typeof task.$inferSelect;
 export type NewTask = typeof task.$inferInsert;
+export type TaskTypeConfig = typeof taskTypeConfig.$inferSelect;
+export type NewTaskTypeConfig = typeof taskTypeConfig.$inferInsert;

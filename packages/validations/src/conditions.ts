@@ -71,6 +71,13 @@ export const unionContractConditionSchema = v.object({
     wageGrid: v.optional(v.record(v.string(), v.record(v.string(), v.number()))),
     allowances: v.optional(v.record(v.string(), v.any())),
     surcharges: v.optional(v.record(v.string(), v.any())),
+    stepProgressionRules: v.optional(v.record(v.string(), v.number())),
+    tenureBenefits: v.optional(v.array(v.object({
+        years: v.number(),
+        label: v.string(),
+        bonus: v.optional(v.number()),
+        specialLeaveDays: v.optional(v.number()),
+    }))),
     source: v.optional(v.string(), 'tarifregister_verdi'),
     changeSummary: v.optional(v.string()),
     changesDiff: v.optional(v.array(changeDiffItemSchema)),

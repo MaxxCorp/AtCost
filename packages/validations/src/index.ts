@@ -20,3 +20,4 @@ export * from './menus.js';
 export * from './event-roles.js';
 export * from './payroll.js';
 export * from './conditions.js';
+export * from './tasks.js';

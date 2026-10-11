@@ -79,6 +79,17 @@ export const unionContractCondition = pgTable("union_contract_condition", {
         [key: string]: any;
     }>(),
 
+    // Periodic experience step advancement schedules (e.g. Stufe -> duration in months)
+    stepProgressionRules: jsonb("step_progression_rules").$type<Record<string, number>>(),
+
+    // Employment tenure & anniversary benefits (e.g. 10, 25, 40 years milestones)
+    tenureBenefits: jsonb("tenure_benefits").$type<Array<{
+        years: number;
+        label: string;
+        bonus?: number;
+        specialLeaveDays?: number;
+    }>>(),
+
     // Audit and review metadata
     source: text("source").default("tarifregister_verdi").notNull(),
     changeSummary: text("change_summary"),

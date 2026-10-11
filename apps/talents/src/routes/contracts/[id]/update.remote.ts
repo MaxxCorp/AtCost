@@ -16,13 +16,26 @@ export const updateContract = form(updateContractSchema, async (data) => {
     delete updateData.frameworkIds;
     delete updateData.id;
 
+    const startDate = new Date(updateData.startDate);
+    let nextStufenaufstiegDate = updateData.nextStufenaufstiegDate ? new Date(updateData.nextStufenaufstiegDate) : null;
+    let stufenlaufzeitMonths = updateData.stufenlaufzeitMonths;
+
+    if (!nextStufenaufstiegDate && updateData.erfahrungsstufe && updateData.erfahrungsstufe < 6) {
+        const schedule: Record<number, number> = { 1: 12, 2: 24, 3: 36, 4: 48, 5: 60 };
+        stufenlaufzeitMonths = stufenlaufzeitMonths || schedule[updateData.erfahrungsstufe] || 12;
+        const target = new Date(startDate);
+        target.setMonth(target.getMonth() + stufenlaufzeitMonths);
+        nextStufenaufstiegDate = target;
+    }
+
     const [updatedContract] = await db.update(contract)
         .set({
             ...updateData,
             parentContractId: updateData.parentContractId || null,
-            startDate: new Date(updateData.startDate),
+            startDate,
             endDate: updateData.endDate ? new Date(updateData.endDate) : null,
-            nextStufenaufstiegDate: updateData.nextStufenaufstiegDate ? new Date(updateData.nextStufenaufstiegDate) : null,
+            stufenlaufzeitMonths,
+            nextStufenaufstiegDate,
         } as any)
         .where(eq(contract.id, contractId))
         .returning();
