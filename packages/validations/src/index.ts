@@ -16,7 +16,7 @@ export * from './contracts.js';
 export * from './tags.js';
 export * from './consumables.js';
 export * from './recipes.js';
-export * from './menus.js';
+export * from './prices.js';
 export * from './event-roles.js';
 export * from './payroll.js';
 export * from './conditions.js';

@@ -24,8 +24,8 @@
     } from "@lucide/svelte";
     import { listConsumables } from "../../../routes/consumables/list.remote";
     import { listRecipes } from "../../../routes/recipes/list.remote";
-    import { listMenus } from "../../../routes/menus/list.remote";
-    import type { Consumable, Recipe, MenuItem } from "@ac/validations";
+    import { listPrices } from "../../../routes/prices/list.remote";
+    import type { Consumable, Recipe, PriceItem } from "@ac/validations";
 
     let {
         remoteFunction,
@@ -37,7 +37,7 @@
         participantsCount = 1,
         onSuccess = undefined,
         onCancel = undefined,
-        cancelHref = "/menus",
+        cancelHref = "/prices",
     }: {
         remoteFunction: any;
         validationSchema: any;
@@ -86,10 +86,10 @@
             }
         }
         try {
-            const tplRes = await listMenus({ isTemplate: true, limit: 100 });
+            const tplRes = await listPrices({ isTemplate: true, limit: 100 });
             if (tplRes?.data) templatesList = tplRes.data;
         } catch (e) {
-            console.error('Failed to load menu templates:', e);
+            console.error('Failed to load price templates:', e);
         }
     });
 
@@ -102,7 +102,7 @@
         }
     });
 
-    // Default isTemplate to false if embedded in an event form, true if creating from standalone /menus
+    // Default isTemplate to false if embedded in an event form, true if creating from standalone /prices
     let isTemplate = $state(untrack(() => {
         if (initialData?.isTemplate !== undefined) return Boolean(initialData.isTemplate);
         return onSuccess ? false : true;
@@ -110,7 +110,7 @@
 
     let templatesList = $state<any[]>([]);
 
-    interface FormMenuItem {
+    interface FormPriceItem {
         id?: string;
         itemType: 'consumable' | 'recipe';
         consumableId?: string | null;
@@ -128,7 +128,7 @@
 
     let defaultFactor = $state(2.0);
 
-    let items = $state<FormMenuItem[]>(untrack(() => {
+    let items = $state<FormPriceItem[]>(untrack(() => {
         if (!initialData?.items) return [];
         return initialData.items.map((it: any, index: number) => {
             const factor = it.factor !== undefined && it.factor !== null ? Number(it.factor) : 2.0;
@@ -370,8 +370,8 @@
             if (res === true || res?.success || (rf as any).result?.success) {
                 toast.success(
                     isUpdating
-                        ? (m.item_updated?.({ item: m.menu?.() || 'Menu' }) || 'Menu updated successfully')
-                        : (m.item_created?.({ item: m.menu?.() || 'Menu' }) || 'Menu created successfully')
+                        ? (m.item_updated?.({ item: m.price_list?.() || 'Price List' }) || 'Price list updated successfully')
+                        : (m.item_created?.({ item: m.price_list?.() || 'Price List' }) || 'Price list created successfully')
                 );
                 if (onSuccess) {
                     onSuccess(res);
@@ -387,7 +387,7 @@
                 toast.error(errorMsg);
             }
         } catch (err: any) {
-            console.error('Error submitting menu form:', err);
+            console.error('Error submitting price form:', err);
             toast.error(err.message || 'Error submitting form');
         }
     })}
@@ -404,7 +404,7 @@
     {#if isUpdating && initialData?.isTemplate && onSuccess}
         <div class="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl flex items-center gap-2.5 text-xs text-amber-900">
             <Info size={16} class="text-amber-600 shrink-0" />
-            <span>{m.shared_template_notice?.() || 'This menu is a shared template. To customize it only for this event without affecting other events, uncheck "Reusable Template" below.'}</span>
+            <span>{m.shared_template_notice?.() || 'This price list is a shared template. Saving changes will update it everywhere, or you can create an event-specific copy.'}</span>
         </div>
     {/if}
 
@@ -413,12 +413,12 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="sm:col-span-2">
                 <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">
-                    {m.name?.() || 'Menu Name'} <span class="text-red-500">*</span>
+                    {m.name?.() || 'Price List Name'} <span class="text-red-500">*</span>
                 </label>
                 <input
                     id="name"
                     {...rf.fields.name.as('text', initialData?.name ?? '')}
-                    placeholder="e.g., Wedding Catering Dinner, Coffee Break, BBQ Package"
+                    placeholder="e.g., Standard Bar, Drink Package, Merchandise, Catering"
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.name.issues() as issue (issue.message)}
@@ -439,7 +439,7 @@
                         class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                     />
                     <span class="text-sm text-gray-700">
-                        {m.menu_template?.() || 'Reusable Template'}
+                        {m.price_template?.() || 'Reusable Template'}
                     </span>
                 </label>
             </div>
@@ -452,7 +452,7 @@
             <input
                 id="description"
                 {...rf.fields.description.as('text', initialData?.description ?? '')}
-                placeholder="Optional description of the menu / catering package"
+                placeholder="Optional description of the price list / package"
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
         </div>
@@ -464,7 +464,7 @@
             <div>
                 <h3 class="text-base font-bold text-gray-900 flex items-center gap-2">
                     <Tag size={18} class="text-blue-600" />
-                    {m.menu_items?.() || 'Price Items'}
+                    {m.price_items?.() || 'Price Items'}
                 </h3>
                 <p class="text-xs text-gray-500 mt-0.5">
                     {m.markup_factor?.() || 'Pricing Factor'}: items default to {defaultFactor}× cost markup. Modify per item or apply across the price list.
@@ -526,40 +526,43 @@
             </div>
         </div>
 
-        <!-- Add Items Bar -->
-        <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/70 space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
+        <!-- Add Items Bar (Consumables vs Recipes tabs) -->
+        <div class="p-4 bg-gray-50/75 rounded-xl border border-gray-200/70 space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1 p-1 bg-white rounded-lg border border-gray-200 shadow-2xs">
                     <button
                         type="button"
                         onclick={() => activeTab = 'consumable'}
-                        class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors {activeTab === 'consumable' ? 'bg-amber-600 text-white shadow-2xs' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'}"
+                        class="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-colors {activeTab === 'consumable' ? 'bg-amber-100 text-amber-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'}"
                     >
-                        <Package size={14} />
-                        {m.add_from_consumables?.() || 'From Consumables'}
+                        <Package size={13} class="text-amber-600" />
+                        {m.consumables?.() || 'Consumables'} ({consumablesList.length})
                     </button>
                     <button
                         type="button"
                         onclick={() => activeTab = 'recipe'}
-                        class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors {activeTab === 'recipe' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'}"
+                        class="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-colors {activeTab === 'recipe' ? 'bg-emerald-100 text-emerald-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'}"
                     >
-                        <ChefHat size={14} />
-                        {m.add_from_recipes?.() || 'From Recipes'}
+                        <ChefHat size={13} class="text-emerald-600" />
+                        {m.recipes?.() || 'Recipes'} ({recipesList.length})
                     </button>
                 </div>
 
+                <!-- Template quick-loader (when templates exist) -->
                 {#if templatesList.length > 0}
-                    <div class="flex items-center gap-1.5 text-xs">
-                        <Sparkles size={14} class="text-violet-600" />
+                    <div class="flex items-center gap-2">
                         <select
-                            onchange={(e: any) => { if (e.target.value) { loadFromTemplate(e.target.value); e.target.value = ''; } }}
-                            class="px-2.5 py-1 rounded-lg border border-violet-200 bg-violet-50/70 hover:bg-violet-100/60 text-violet-900 text-xs font-semibold focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                            onchange={(e: any) => {
+                                if (e.target.value) {
+                                    loadFromTemplate(e.target.value);
+                                    e.target.value = '';
+                                }
+                            }}
+                            class="px-2.5 py-1 text-xs rounded-lg border border-indigo-200 bg-white text-indigo-900 font-medium focus:ring-2 focus:ring-indigo-500"
                         >
-                            <option value="">{m.load_from_template?.() || 'Copy from Template...'} ▾</option>
+                            <option value="">{m.load_from_template?.() || 'Import from Template...'}</option>
                             {#each templatesList as tpl (tpl.id)}
-                                <option value={tpl.id}>
-                                    {tpl.name} ({tpl.items?.length || 0} items)
-                                </option>
+                                <option value={tpl.id}>{tpl.name} ({(tpl.items || []).length} items)</option>
                             {/each}
                         </select>
                     </div>
@@ -567,41 +570,43 @@
             </div>
 
             {#if activeTab === 'consumable'}
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div class="flex flex-col sm:flex-row gap-2">
                     <select
                         bind:value={selectedConsumableId}
-                        class="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
                     >
-                        <option value="">-- {m.select_consumable?.() || 'Select Consumable'} --</option>
+                        <option value="">{m.select_consumable?.() || 'Select a consumable...'}</option>
                         {#each consumablesList as c (c.id)}
-                            {@const cpu = c.amount > 0 ? c.purchasePrice / c.amount : c.purchasePrice}
+                            {@const unitCost = c.amount > 0 ? (c.purchasePrice / c.amount).toFixed(2) : c.purchasePrice.toFixed(2)}
                             <option value={c.id}>
-                                {c.name} — Cost: €{cpu.toFixed(2)} / {c.unit} ({c.storageLocation || 'Storage'})
+                                {c.name} — €{unitCost} / {c.unit || 'unit'} (Pkg: €{c.purchasePrice.toFixed(2)})
                             </option>
                         {/each}
                     </select>
+
                     <Button
                         type="button"
                         onclick={handleAddFromConsumable}
                         class="flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs whitespace-nowrap"
                     >
                         <Plus size={14} />
-                        {m.add_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'Add Item'}
+                        {m.add_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'Add Consumable'}
                     </Button>
                 </div>
             {:else}
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div class="flex flex-col sm:flex-row gap-2">
                     <select
                         bind:value={selectedRecipeId}
-                        class="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
                     >
-                        <option value="">-- {m.select_recipe?.() || 'Select Recipe'} --</option>
+                        <option value="">{m.select_recipe?.() || 'Select a prepared recipe...'}</option>
                         {#each recipesList as r (r.id)}
                             <option value={r.id}>
-                                {r.name} — Cost: €{(r.costPerPortion ?? 0).toFixed(2)} / portion
+                                {r.name} — €{(r.costPerPortion ?? 0).toFixed(2)} / portion ({r.portions} {r.portions === 1 ? 'portion' : 'portions'})
                             </option>
                         {/each}
                     </select>
+
                     <Button
                         type="button"
                         onclick={handleAddFromRecipe}
@@ -618,7 +623,7 @@
         {#if items.length === 0}
             <div class="py-8 text-center border-2 border-dashed border-gray-200 rounded-xl">
                 <Receipt size={32} class="mx-auto text-gray-300 mb-2" />
-                <p class="text-sm font-medium text-gray-500">{m.no_items_in_menu?.() || 'No price items added yet.'}</p>
+                <p class="text-sm font-medium text-gray-500">{m.no_items_in_price_list?.() || 'No price items added yet.'}</p>
                 <p class="text-xs text-gray-400 mt-1">Use the bar above to add consumables or recipes to this price list.</p>
             </div>
         {:else}
@@ -783,7 +788,7 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-6">
                     <div>
                         <span class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
-                            {m.menu_items?.() || 'Items'} & {m.participants?.() || 'Participants'}
+                            {m.price_items?.() || 'Items'} & {m.participants?.() || 'Participants'}
                         </span>
                         <p class="text-xl font-bold text-white mt-0.5">
                             {items.length} {items.length === 1 ? 'item' : 'items'}

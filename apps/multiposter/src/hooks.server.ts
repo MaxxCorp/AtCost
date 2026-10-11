@@ -64,7 +64,7 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 		'/events',
 		'/kiosks',
 		'/locations',
-		'/menus',
+		'/prices',
 		'/recipes',
 		'/resources',
 		'/synchronizations',

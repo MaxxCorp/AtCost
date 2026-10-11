@@ -4,7 +4,7 @@ import type { Consumable } from './consumables.js';
 import type { Recipe } from './recipes.js';
 import type { Tag } from './tags.js';
 
-export type MenuItem = Omit<DbMenuItem, 'createdAt' | 'updatedAt'> & {
+export type PriceItem = Omit<DbMenuItem, 'createdAt' | 'updatedAt'> & {
     createdAt?: string;
     updatedAt?: string;
     consumable?: Consumable | null;
@@ -12,11 +12,12 @@ export type MenuItem = Omit<DbMenuItem, 'createdAt' | 'updatedAt'> & {
     tags?: Tag[];
 };
 
+export type PriceListItem = PriceItem;
 
-export type Menu = Omit<DbMenu, 'createdAt' | 'updatedAt'> & {
+export type Price = Omit<DbMenu, 'createdAt' | 'updatedAt'> & {
     createdAt: string;
     updatedAt: string;
-    items?: MenuItem[];
+    items?: PriceItem[];
     totalPricePerPortion?: number;
     totalCostPerPortion?: number;
     user?: {
@@ -26,7 +27,9 @@ export type Menu = Omit<DbMenu, 'createdAt' | 'updatedAt'> & {
     };
 };
 
-export const menuPaginationSchema = v.optional(v.object({
+export type PriceList = Price;
+
+export const pricePaginationSchema = v.optional(v.object({
     page: v.optional(v.number(), 1),
     limit: v.optional(v.number(), 50),
     search: v.optional(v.string()),
@@ -41,7 +44,9 @@ export const menuPaginationSchema = v.optional(v.object({
     sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});
 
-export const menuItemInputSchema = v.object({
+export const priceListPaginationSchema = pricePaginationSchema;
+
+export const priceItemInputSchema = v.object({
     id: v.optional(v.string()),
     itemType: v.picklist(['consumable', 'recipe']),
     consumableId: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
@@ -71,8 +76,10 @@ export const menuItemInputSchema = v.object({
     ), 0),
 });
 
-export const createMenuSchema = v.object({
-    name: v.pipe(v.string(), v.minLength(1, 'Menu name is required')),
+export const priceListItemInputSchema = priceItemInputSchema;
+
+export const createPriceSchema = v.object({
+    name: v.pipe(v.string(), v.minLength(1, 'Price list name is required')),
     description: v.optional(v.string()),
     isTemplate: v.optional(v.union([
         v.boolean(),
@@ -81,9 +88,11 @@ export const createMenuSchema = v.object({
     items: v.optional(v.union([v.string(), v.array(v.string())])),
 });
 
-export const updateMenuSchema = v.object({
+export const createPriceListSchema = createPriceSchema;
+
+export const updatePriceSchema = v.object({
     id: v.pipe(v.string(), v.minLength(1)),
-    name: v.pipe(v.string(), v.minLength(1, 'Menu name is required')),
+    name: v.pipe(v.string(), v.minLength(1, 'Price list name is required')),
     description: v.optional(v.string()),
     isTemplate: v.optional(v.union([
         v.boolean(),
@@ -92,13 +101,20 @@ export const updateMenuSchema = v.object({
     items: v.optional(v.union([v.string(), v.array(v.string())])),
 });
 
-export const menuAssociationSchema = v.object({
+export const updatePriceListSchema = updatePriceSchema;
+
+export const priceAssociationSchema = v.object({
     type: v.picklist(['event']),
     entityId: v.string(),
-    menuId: v.pipe(v.string(), v.uuid()),
+    priceId: v.optional(v.pipe(v.string(), v.uuid())),
+    priceListId: v.optional(v.pipe(v.string(), v.uuid())),
 });
 
-export const getMenuAssociationsSchema = v.object({
+export const priceListAssociationSchema = priceAssociationSchema;
+
+export const getPriceAssociationsSchema = v.object({
     type: v.picklist(['event']),
     entityId: v.string(),
 });
+
+export const getPriceListAssociationsSchema = getPriceAssociationsSchema;

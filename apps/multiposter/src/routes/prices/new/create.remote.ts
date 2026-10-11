@@ -1,14 +1,13 @@
 import { form, requested } from '$app/server';
 import { db, menu, menuItem } from '@ac/db';
-import { listMenus } from '../list.remote';
+import { listPrices } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { createMenuSchema } from '@ac/validations';
+import { createPriceSchema } from '@ac/validations';
 
-export const createMenu = form(createMenuSchema, async (data) => {
-    console.log('--- createMenu START ---', JSON.stringify(data));
+export const createPrice = form(createPriceSchema, async (data) => {
     try {
         const user = getAuthenticatedUser();
-        ensureAccess(user, 'menus');
+        ensureAccess(user, 'prices');
 
         const result = await db.transaction(async (tx) => {
             const [newMenu] = await tx.insert(menu).values({
@@ -48,31 +47,30 @@ export const createMenu = form(createMenuSchema, async (data) => {
         });
 
         try {
-            await requested(listMenus, 20).refreshAll();
+            await requested(listPrices, 20).refreshAll();
         } catch (e) {
-            console.warn('--- createMenu requested refresh warning ---', e);
+            console.warn('--- createPrice requested refresh warning ---', e);
         }
         try {
-            await listMenus().refresh();
+            await listPrices().refresh();
         } catch (refreshErr) {
-            console.warn('--- createMenu refresh warning ---', refreshErr);
+            console.warn('--- createPrice refresh warning ---', refreshErr);
         }
-        console.log('--- createMenu SUCCESS ---', result.id);
 
         return {
             success: true,
-            menu: {
+            data: {
                 ...result,
                 createdAt: result.createdAt.toISOString(),
                 updatedAt: result.updatedAt.toISOString(),
             }
         };
     } catch (err: any) {
-        console.error('--- createMenu ERROR ---', err);
+        console.error('--- createPrice ERROR ---', err);
         return {
             success: false,
             error: {
-                message: err?.message || 'Failed to create menu'
+                message: err?.message || 'Failed to create price list'
             }
         };
     }

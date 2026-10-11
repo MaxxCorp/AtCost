@@ -12,7 +12,7 @@
     } from "@lucide/svelte";
     import Button from "#lib/components/ui/button/button.svelte";
 
-    interface MenuItemData {
+    interface PriceItemData {
         id?: string;
         itemType?: 'consumable' | 'recipe';
         name: string;
@@ -30,27 +30,29 @@
         }>;
     }
 
-    interface MenuData {
+    interface PriceData {
         id?: string;
         name: string;
         description?: string | null;
         isTemplate?: boolean | null;
         totalPricePerPortion?: number | null;
         totalCostPerPortion?: number | null;
-        items?: MenuItemData[];
+        items?: PriceItemData[];
     }
 
     let {
-        menus = [],
+        prices = [],
         participantsCount = 1,
         canEdit = false,
         eventSummary = "",
     }: {
-        menus: MenuData[];
+        prices?: PriceData[];
         participantsCount?: number;
         canEdit?: boolean;
         eventSummary?: string;
     } = $props();
+
+    const displayPrices = $derived(prices || []);
 
     let activeSectionId = $state<string>("all");
 
@@ -58,13 +60,13 @@
         id: string;
         name: string;
         color: string;
-        items: MenuItemData[];
+        items: PriceItemData[];
         subtotal: number;
         costSubtotal: number;
     }
 
-    // Process each menu and organize items into sections based on their tags
-    function computeSections(items: MenuItemData[] = []): SectionGroup[] {
+    // Process each price list and organize items into sections based on their tags
+    function computeSections(items: PriceItemData[] = []): SectionGroup[] {
         const sectionMap = new Map<string, SectionGroup>();
         const otherSection: SectionGroup = {
             id: "__other__",
@@ -128,7 +130,7 @@
         <div class="flex items-center gap-2">
             <Receipt size={20} class="text-violet-600" />
             <h2 class="text-lg font-bold text-gray-900">
-                {m.feature_menus_title?.() || 'Prices'}
+                {m.feature_prices_title?.() || 'Prices'}
             </h2>
             {#if eventSummary}
                 <span class="text-xs text-gray-500 font-medium hidden sm:inline">
@@ -154,24 +156,24 @@
             {eventSummary || (m.price_list?.() || 'Price List')}
         </h1>
         <p class="text-xs text-gray-500 mt-1">
-            {m.menu_details?.() || 'Items and prices for this event.'}
+            {m.feature_prices_description?.() || 'Items and prices for this event.'}
             {#if participantsCount > 1}
                 • {participantsCount} {m.participants?.() || 'participants'}
             {/if}
         </p>
     </div>
 
-    {#if !menus || menus.length === 0}
+    {#if !displayPrices || displayPrices.length === 0}
         <div class="p-8 text-center border-2 border-dashed border-gray-200 rounded-xl">
             <Receipt size={32} class="mx-auto text-gray-300 mb-2" />
             <p class="text-sm font-medium text-gray-500">
-                {m.no_items_in_menu?.() || 'No price items listed.'}
+                {m.no_items_in_price_list?.() || 'No price items listed.'}
             </p>
         </div>
     {:else}
-        {#each menus as menu (menu.id || menu.name)}
-            {@const sections = computeSections(menu.items || [])}
-            {@const totalItemCount = (menu.items || []).length}
+        {#each displayPrices as priceList (priceList.id || priceList.name)}
+            {@const sections = computeSections(priceList.items || [])}
+            {@const totalItemCount = (priceList.items || []).length}
             {@const activeSections = activeSectionId === "all" ? sections : sections.filter(s => s.id === activeSectionId)}
 
             <div class="price-list-card border border-gray-200 rounded-xl overflow-hidden shadow-xs bg-white">
@@ -180,25 +182,25 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                             <div class="flex items-center gap-2">
-                                <h3 class="font-bold text-gray-900 text-lg">{menu.name}</h3>
-                                {#if menu.isTemplate}
+                                <h3 class="font-bold text-gray-900 text-lg">{priceList.name}</h3>
+                                {#if priceList.isTemplate}
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 text-violet-800">
                                         <Layers size={10} /> {m.template?.() || 'Template'}
                                     </span>
                                 {/if}
                             </div>
-                            {#if menu.description}
-                                <p class="text-xs text-gray-500 mt-1">{menu.description}</p>
+                            {#if priceList.description}
+                                <p class="text-xs text-gray-500 mt-1">{priceList.description}</p>
                             {/if}
                         </div>
 
-                        {#if menu.totalPricePerPortion != null}
+                        {#if priceList.totalPricePerPortion != null}
                             <div class="text-left sm:text-right">
                                 <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-bold">
                                     {m.price_list?.() || 'Price / Portion'}
                                 </span>
                                 <span class="text-xl font-extrabold text-violet-900 font-mono">
-                                    €{Number(menu.totalPricePerPortion).toFixed(2)}
+                                    €{Number(priceList.totalPricePerPortion).toFixed(2)}
                                 </span>
                             </div>
                         {/if}
@@ -236,9 +238,9 @@
                 </div>
 
                 <!-- Sections & Items -->
-                {#if (menu.items || []).length === 0}
+                {#if (priceList.items || []).length === 0}
                     <div class="p-8 text-center text-sm text-gray-500">
-                        {m.no_items_in_menu?.() || 'No items listed in this price list.'}
+                        {m.no_items_in_price_list?.() || 'No items listed in this price list.'}
                     </div>
                 {:else}
                     <div class="divide-y divide-gray-100">
@@ -318,7 +320,7 @@
                 {/if}
 
                 <!-- Totals Footer -->
-                {#if participantsCount && participantsCount > 1 && menu.totalPricePerPortion}
+                {#if participantsCount && participantsCount > 1 && priceList.totalPricePerPortion}
                     <div class="bg-violet-50/70 p-3.5 border-t border-violet-100 flex items-center justify-between text-xs text-violet-950 font-medium">
                         <div class="flex items-center gap-1.5">
                             <Calculator size={14} class="text-violet-600" />
@@ -328,7 +330,7 @@
                         </div>
                         <div class="text-right">
                             <span class="font-mono font-black text-base text-violet-900">
-                                €{(Number(menu.totalPricePerPortion) * participantsCount).toFixed(2)}
+                                €{(Number(priceList.totalPricePerPortion) * participantsCount).toFixed(2)}
                             </span>
                         </div>
                     </div>

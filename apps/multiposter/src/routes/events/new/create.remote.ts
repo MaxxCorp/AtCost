@@ -268,17 +268,18 @@ export const createEvent = form(createEventSchema, async (data) => {
 				}
 			}
 
-			// Menus
-			let menuIds = [];
-			if (typeof data.menuIds === 'string') {
-				try { menuIds = JSON.parse(data.menuIds); } catch { menuIds = []; }
-			} else if (Array.isArray(data.menuIds)) {
-				menuIds = data.menuIds;
+			// Prices
+			const rawPriceIds = data.priceIds;
+			let priceIds = [];
+			if (typeof rawPriceIds === 'string') {
+				try { priceIds = JSON.parse(rawPriceIds); } catch { priceIds = []; }
+			} else if (Array.isArray(rawPriceIds)) {
+				priceIds = rawPriceIds;
 			}
-			if (menuIds.length > 0) {
-				const associations = (menuIds as string[]).map((menuId: string) => ({
+			if (priceIds.length > 0) {
+				const associations = (priceIds as string[]).map((priceId: string) => ({
 					eventId: targetEventId,
-					menuId,
+					menuId: priceId,
 				}));
 				await db.insert(eventMenu).values(associations);
 			}

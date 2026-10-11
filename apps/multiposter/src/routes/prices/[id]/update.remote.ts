@@ -1,13 +1,13 @@
 import { form, requested } from '$app/server';
 import { db, menu, menuItem, eq } from '@ac/db';
-import { listMenus } from '../list.remote';
-import { readMenu } from './read.remote';
+import { listPrices } from '../list.remote';
+import { readPrice } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { updateMenuSchema } from '@ac/validations';
+import { updatePriceSchema } from '@ac/validations';
 
-export const updateMenu = form(updateMenuSchema, async (data) => {
+export const updatePrice = form(updatePriceSchema, async (data) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'menus');
+    ensureAccess(user, 'prices');
 
     const result = await db.transaction(async (tx) => {
         const [updatedMenu] = await tx
@@ -21,7 +21,7 @@ export const updateMenu = form(updateMenuSchema, async (data) => {
             .returning();
 
         if (!updatedMenu) {
-            throw new Error('Menu not found');
+            throw new Error('Price list not found');
         }
 
         // Delete existing items and re-insert
@@ -57,20 +57,20 @@ export const updateMenu = form(updateMenuSchema, async (data) => {
     });
 
     try {
-        await requested(listMenus, 20).refreshAll();
+        await requested(listPrices, 20).refreshAll();
     } catch (e) {
-        console.warn('--- updateMenu requested refresh warning ---', e);
+        console.warn('--- updatePrice requested refresh warning ---', e);
     }
     try {
-        await listMenus().refresh();
-        await readMenu(data.id).refresh();
+        await listPrices().refresh();
+        await readPrice(data.id).refresh();
     } catch (refreshErr) {
-        console.warn('--- updateMenu refresh warning ---', refreshErr);
+        console.warn('--- updatePrice refresh warning ---', refreshErr);
     }
 
     return {
         success: true,
-        menu: {
+        data: {
             ...result,
             createdAt: result.createdAt.toISOString(),
             updatedAt: result.updatedAt.toISOString(),

@@ -173,12 +173,12 @@ export const FEATURES: readonly FeatureMeta[] = [
     order: 11
   },
   {
-    key: 'menus',
-    title: () => m.feature_menus_title(),
-    description: () => m.feature_menus_description(),
-    href: '/menus',
-    buttonText: () => m.feature_menus_button(),
-    claim: 'menus',
+    key: 'prices',
+    title: () => m.feature_prices_title?.() || 'Prices',
+    description: () => m.feature_prices_description?.() || 'Aggregate consumables and recipes into price lists and templates.',
+    href: '/prices',
+    buttonText: () => m.feature_prices_button?.() || 'Manage Prices',
+    claim: 'prices',
     icon: 'tag',
     gradientFrom: 'from-violet-50',
     gradientTo: 'to-purple-50',

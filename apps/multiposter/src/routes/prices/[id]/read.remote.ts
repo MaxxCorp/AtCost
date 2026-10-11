@@ -2,11 +2,11 @@ import { query } from '$app/server';
 import { db, menu, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import type { Menu } from '@ac/validations';
+import type { Price } from '@ac/validations';
 
-export const readMenu = query(v.string(), async (id: string): Promise<Menu | null> => {
+export const readPrice = query(v.string(), async (id: string): Promise<Price | null> => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'menus');
+    ensureAccess(user, 'prices');
 
     const m = await db.query.menu.findFirst({
         where: eq(menu.id, id),
@@ -77,7 +77,6 @@ export const readMenu = query(v.string(), async (id: string): Promise<Menu | nul
             } : null,
         };
     });
-
 
     return {
         id: m.id,

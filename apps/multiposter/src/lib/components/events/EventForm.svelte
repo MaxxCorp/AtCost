@@ -99,18 +99,18 @@
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
     import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
-    import { listMenus } from "../../../routes/menus/list.remote";
+    import { listPrices } from "../../../routes/prices/list.remote";
     import {
-        addMenuAssociation,
-        removeMenuAssociation,
-        fetchEntityMenus,
-    } from "../../../routes/menus/associate.remote";
-    import { createMenu } from "../../../routes/menus/new/create.remote";
-    import { updateMenu } from "../../../routes/menus/[id]/update.remote";
-    import { readMenu } from "../../../routes/menus/[id]/read.remote";
-    import { deleteMenus } from "../../../routes/menus/[id]/delete.remote";
-    import { createMenuSchema, updateMenuSchema } from "@ac/validations";
-    import MenuForm from "#lib/components/menus/MenuForm.svelte";
+        addPriceAssociation,
+        removePriceAssociation,
+        fetchEntityPrices,
+    } from "../../../routes/prices/associate.remote";
+    import { createPrice } from "../../../routes/prices/new/create.remote";
+    import { updatePrice } from "../../../routes/prices/[id]/update.remote";
+    import { readPrice } from "../../../routes/prices/[id]/read.remote";
+    import { deletePrices } from "../../../routes/prices/[id]/delete.remote";
+    import { createPriceSchema, updatePriceSchema } from "@ac/validations";
+    import PriceForm from "#lib/components/prices/PriceForm.svelte";
     import * as v from "valibot";
     import { FieldCollaboratorBadge, type CollaborationRoom } from "#lib/client/collaboration/index.js";
 
@@ -589,7 +589,7 @@
 
     let totalParticipants = $derived(baseline + currentContactIds.length);
     // svelte-ignore state_referenced_locally
-    let currentMenus = $state<any[]>(initialData?.menus || []);
+    let currentPrices = $state<any[]>(initialData?.prices || []);
 
     function updateBaseline(delta: number) {
         baseline = Math.max(0, baseline + delta);
@@ -1885,60 +1885,60 @@
     <div class="pt-4 border-t border-gray-100">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
             <Receipt size={18} class="text-blue-600" />
-            {m.feature_menus_title?.() || 'Prices'} ({m.optional?.() || 'optional'})
+            {m.feature_prices_title?.() || 'Prices'} ({m.optional?.() || 'optional'})
         </h3>
         {#key initialData?.id || "new"}
             <EntityManager {m}
-                title={m.feature_menus_title?.() || 'Prices'}
+                title={m.feature_prices_title?.() || 'Prices'}
                 icon={Receipt}
                 mode="embedded"
                 type="event"
                 entityId={initialData?.id}
-                initialItems={initialData?.menus || []}
+                initialItems={initialData?.prices || []}
                 sortField="name"
                 selectorSortField="name"
-                listItemsRemote={listMenus as any}
-                fetchAssociationsRemote={fetchEntityMenus as any}
+                listItemsRemote={listPrices as any}
+                fetchAssociationsRemote={fetchEntityPrices as any}
                 addAssociationRemote={async (p: any) =>
-                    addMenuAssociation({ ...p, menuId: p.itemId } as any)}
+                    addPriceAssociation({ ...p, priceId: p.itemId } as any)}
                 removeAssociationRemote={async (p: any) =>
-                    removeMenuAssociation({ ...p, menuId: p.itemId } as any)}
+                    removePriceAssociation({ ...p, priceId: p.itemId } as any)}
                 onchange={(ids: string[], items: any[]) => {
-                    currentMenus = items;
-                    rf.fields.menuIds.set(JSON.stringify(ids));
+                    currentPrices = items;
+                    rf.fields.priceIds.set(JSON.stringify(ids));
                 }}
                 deleteItemRemote={async (ids: string[]) => {
                     return await handleDelete({
                         ids,
-                        deleteFn: deleteMenus,
-                        itemName: m.menu?.() || 'price list',
+                        deleteFn: deletePrices,
+                        itemName: m.price_list?.() || 'price list',
                     });
                 }}
-                createRemote={createMenu}
-                createSchema={createMenuSchema}
-                updateRemote={updateMenu}
-                updateSchema={updateMenuSchema}
-                readItemRemote={readMenu}
-                searchPredicate={(menuItem: any, q: string) => {
+                createRemote={createPrice}
+                createSchema={createPriceSchema}
+                updateRemote={updatePrice}
+                updateSchema={updatePriceSchema}
+                readItemRemote={readPrice}
+                searchPredicate={(priceItem: any, q: string) => {
                     const qLower = q.toLowerCase();
                     return (
-                        menuItem.name?.toLowerCase().includes(qLower) ||
-                        menuItem.description?.toLowerCase().includes(qLower)
+                        priceItem.name?.toLowerCase().includes(qLower) ||
+                        priceItem.description?.toLowerCase().includes(qLower)
                     );
                 }}
-                loadingLabel={m.loading_item?.({ item: m.menus?.() || 'Prices' }) || 'Loading prices...'}
-                noItemsLabel={m.no_items_associated_label?.({ item: m.menus?.() || 'Prices' }) || 'No prices associated'}
-                noItemsFoundLabel={m.no_items_found?.({ item: m.menus?.() || 'Prices' }) || 'No prices found'}
-                searchPlaceholder={m.search_placeholder?.({ item: m.menus?.() || 'Prices' }) || 'Search prices...'}
-                linkItemLabel={m.link_item_label?.({ item: m.menu?.() || 'Price List' }) || 'Link Price List'}
-                associatedItemLabel={m.associated_item_label?.({ item: m.menus?.() || 'Prices' }) || 'Associated Prices'}
+                loadingLabel={m.loading_item?.({ item: m.prices?.() || 'Prices' }) || 'Loading prices...'}
+                noItemsLabel={m.no_items_associated_label?.({ item: m.prices?.() || 'Prices' }) || 'No prices associated'}
+                noItemsFoundLabel={m.no_items_found?.({ item: m.prices?.() || 'Prices' }) || 'No prices found'}
+                searchPlaceholder={m.search_placeholder?.({ item: m.prices?.() || 'Prices' }) || 'Search prices...'}
+                linkItemLabel={m.link_item_label?.({ item: m.price_list?.() || 'Price List' }) || 'Link Price List'}
+                associatedItemLabel={m.associated_item_label?.({ item: m.prices?.() || 'Prices' }) || 'Associated Prices'}
                 quickCreateLabel={m.quick_create?.() || 'Quick Create'}
                 closeSearchLabel={m.close_search?.() || 'Close'}
                 editLabel={m.edit?.() || 'Edit'}
                 deleteLabel={m.delete?.() || 'Delete'}
                 unlinkLabel={m.unlink?.() || 'Unlink'}
-                deleteForeverLabel={m.delete_forever?.({ item: m.menu?.() || 'Price List' }) || 'Delete Price List'}
-                confirmUnlinkLabel={m.confirm_unlink_label?.({ item: m.menu?.() || 'Price List' }) || 'Unlink Price List'}
+                deleteForeverLabel={m.delete_forever?.({ item: m.price_list?.() || 'Price List' }) || 'Delete Price List'}
+                confirmUnlinkLabel={m.confirm_unlink_label?.({ item: m.price_list?.() || 'Price List' }) || 'Unlink Price List'}
                 selectAllLabel={m.select_all?.() || 'Select All'}
                 deselectAllLabel={m.deselect_all?.() || 'Deselect All'}
             >
@@ -1951,7 +1951,7 @@
                             </span>
                         {:else}
                             <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                                {m.event_menu?.() || 'Event'}
+                                Event
                             </span>
                         {/if}
                     </div>
@@ -1980,43 +1980,43 @@
                 {/snippet}
 
                 {#snippet renderForm({
-                    remoteFunction: rfMenu,
-                    schema: menuSchema,
-                    id: menuId,
-                    initialData: menuFormData = null,
-                    onSuccess: menuSuccess,
-                    onCancel: menuCancel,
+                    remoteFunction: rfPrice,
+                    schema: priceSchema,
+                    id: priceId,
+                    initialData: priceFormData = null,
+                    onSuccess: priceSuccess,
+                    onCancel: priceCancel,
                 }: any)}
-                    <MenuForm
-                        remoteFunction={rfMenu}
-                        validationSchema={menuSchema}
-                        isUpdating={!!menuId}
-                        initialData={menuFormData}
+                    <PriceForm
+                        remoteFunction={rfPrice}
+                        validationSchema={priceSchema}
+                        isUpdating={!!priceId}
+                        initialData={priceFormData}
                         participantsCount={totalParticipants}
-                        onSuccess={menuSuccess}
-                        onCancel={menuCancel}
+                        onSuccess={priceSuccess}
+                        onCancel={priceCancel}
                     />
                 {/snippet}
             </EntityManager>
         {/key}
 
         <input
-            {...rf.fields.menuIds.as(
+            {...rf.fields.priceIds.as(
                 "text",
-                JSON.stringify(initialData?.menuIds || []),
+                JSON.stringify(initialData?.priceIds || []),
             )}
             class="hidden"
         />
 
-        {#if currentMenus.length > 0}
-            {@const cateringTotal = currentMenus.reduce((sum, item) => sum + (Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1), 0)}
-            {@const cateringCost = currentMenus.reduce((sum, item) => sum + (Number(item.totalCostPerPortion) || 0) * (totalParticipants || 1), 0)}
+        {#if currentPrices.length > 0}
+            {@const cateringTotal = currentPrices.reduce((sum, item) => sum + (Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1), 0)}
+            {@const cateringCost = currentPrices.reduce((sum, item) => sum + (Number(item.totalCostPerPortion) || 0) * (totalParticipants || 1), 0)}
             {@const cateringProfit = cateringTotal - cateringCost}
             <div class="mt-3 p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div class="flex items-center gap-2">
                     <Receipt size={18} class="text-emerald-600" />
                     <span class="font-semibold text-gray-800">{m.catering_calculation?.() || 'Total Price Calculation'}:</span>
-                    <span class="text-xs text-gray-600">({currentMenus.length} {currentMenus.length === 1 ? (m.menu?.() || 'price list') : (m.menus?.() || 'prices')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
+                    <span class="text-xs text-gray-600">({currentPrices.length} {currentPrices.length === 1 ? (m.price_list?.() || 'price list') : (m.prices?.() || 'prices')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
                 </div>
                 <div class="flex items-center gap-3 text-right">
                     {#if cateringCost > 0}

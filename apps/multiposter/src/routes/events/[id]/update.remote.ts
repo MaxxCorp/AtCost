@@ -143,7 +143,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		const locationIds = data.locationIds ? (typeof data.locationIds === 'string' ? JSON.parse(data.locationIds) : data.locationIds) : undefined;
 		const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
 		const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
-		const menuIds = data.menuIds ? (typeof data.menuIds === 'string' ? JSON.parse(data.menuIds) : data.menuIds) : undefined;
+		const priceIds = data.priceIds ? (typeof data.priceIds === 'string' ? JSON.parse(data.priceIds) : data.priceIds) : undefined;
 
 		let tagNames: string[] | undefined = undefined;
 		if (data.tags !== undefined) {
@@ -223,7 +223,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						}
 
 						let masterMenuIds: string[] | undefined;
-						if (menuIds !== undefined) {
+						if (priceIds !== undefined) {
 							const masterMenus = await tx.select({ id: eventMenu.menuId }).from(eventMenu).where(eq(eventMenu.eventId, instMasterId));
 							masterMenuIds = masterMenus.map(m => m.id);
 						}
@@ -263,7 +263,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								masterSyncIds,
 								submittedSyncIds,
 								masterMenuIds,
-								submittedMenuIds: menuIds,
+								submittedMenuIds: priceIds,
 							}
 						});
 
@@ -509,12 +509,12 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					}
 				}
 
-				// Menus
-				if (menuIds !== undefined) {
+				// Prices
+				if (priceIds !== undefined) {
 					await client.delete(eventMenu).where(eq(eventMenu.eventId, targetEventId));
-					if (menuIds.length > 0) {
+					if (priceIds.length > 0) {
 						await client.insert(eventMenu).values(
-							menuIds.map((id: string) => ({ eventId: targetEventId, menuId: id }))
+							priceIds.map((id: string) => ({ eventId: targetEventId, menuId: id }))
 						);
 					}
 				} else if (isNewException && instMasterId) {

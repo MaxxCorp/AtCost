@@ -45,7 +45,7 @@
     import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
-    import PriceListView from "#lib/components/menus/PriceListView.svelte";
+    import PriceListView from "#lib/components/prices/PriceListView.svelte";
 
     const eventId = $derived(page.params.id || "");
     const eventQuery = $derived(readEvent(eventId));
@@ -80,7 +80,7 @@
     let canShare = $state(false);
     let copiedLink = $state(false);
     let heroImageFailed = $state(false);
-    let menuDialogOpen = $state(false);
+    let pricesDialogOpen = $state(false);
 
     onMount(() => {
         canShare = typeof navigator !== "undefined" && !!navigator.share;
@@ -569,14 +569,14 @@
                                 </Button>
                             {/if}
 
-                            {#if event.menus && event.menus.length > 0}
+                            {#if event.prices && event.prices.length > 0}
                                 <Button
                                     variant="outline"
                                     class="flex items-center gap-2 text-violet-700 border-violet-200 hover:bg-violet-50"
-                                    onclick={() => (menuDialogOpen = true)}
+                                    onclick={() => (pricesDialogOpen = true)}
                                 >
                                     <Receipt size={16} class="text-violet-600" />
-                                    {m.event_menu?.() || 'Prices'}
+                                    {m.prices?.() || 'Prices'}
                                 </Button>
                             {/if}
 
@@ -679,24 +679,24 @@
                 </div>
 
                 <!-- Prices & Price List Dialog -->
-                {#if event.menus && event.menus.length > 0}
-                    <Dialog.Root bind:open={menuDialogOpen}>
+                {#if event.prices && event.prices.length > 0}
+                    <Dialog.Root bind:open={pricesDialogOpen}>
                         <Dialog.Content class="max-w-3xl max-h-[90vh] overflow-y-auto">
                             <Dialog.Header>
                                 <div class="flex items-center gap-2 text-violet-700">
                                     <Receipt size={22} />
                                     <Dialog.Title class="text-xl font-bold text-gray-900">
-                                        {m.event_menu?.() || 'Prices'}
+                                        {m.prices?.() || 'Prices'}
                                     </Dialog.Title>
                                 </div>
                                 <Dialog.Description class="text-sm text-gray-500">
-                                    {event.summary} - {m.menu_details?.() || 'Items and prices for this event.'}
+                                    {event.summary} - {m.feature_prices_description?.() || 'Items and prices for this event.'}
                                 </Dialog.Description>
                             </Dialog.Header>
 
                             <div class="py-2">
                                 <PriceListView
-                                    menus={event.menus}
+                                    prices={event.prices}
                                     participantsCount={event.participantsCount || 1}
                                     canEdit={checkCanEdit(event)}
                                     eventSummary={event.summary}
@@ -704,7 +704,7 @@
                             </div>
 
                             <Dialog.Footer class="print:hidden">
-                                <Button variant="outline" onclick={() => (menuDialogOpen = false)}>
+                                <Button variant="outline" onclick={() => (pricesDialogOpen = false)}>
                                     {m.close?.() || 'Close'}
                                 </Button>
                             </Dialog.Footer>

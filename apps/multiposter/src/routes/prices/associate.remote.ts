@@ -1,7 +1,7 @@
 import { command, query } from '$app/server';
-import { db, eventMenu, menu, eq } from '@ac/db';
+import { db, eventMenu, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { menuAssociationSchema, getMenuAssociationsSchema } from '@ac/validations';
+import { priceAssociationSchema, getPriceAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
@@ -13,47 +13,51 @@ const fieldMap = {
     event: 'eventId',
 } as const;
 
-export const addMenuAssociation = command(menuAssociationSchema, async (data) => {
+export const addPriceAssociation = command(priceAssociationSchema, async (data) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'menus');
+    ensureAccess(user, 'prices');
 
-    const { type, entityId, menuId } = data;
+    const { type, entityId, priceId, priceListId } = data;
+    const targetId = priceId || priceListId;
+    if (!targetId) throw new Error('Missing price list ID');
 
     await dbAddAssociation({
         type,
         entityId,
-        itemId: menuId,
+        itemId: targetId,
         tableMap,
         fieldMap,
         itemField: 'menuId',
         userId: user?.id
     });
 
-    await fetchEntityMenus({ type, entityId }).refresh();
+    await fetchEntityPrices({ type, entityId }).refresh();
     return { success: true };
 });
 
-export const removeMenuAssociation = command(menuAssociationSchema, async (data) => {
+export const removePriceAssociation = command(priceAssociationSchema, async (data) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'menus');
+    ensureAccess(user, 'prices');
 
-    const { type, entityId, menuId } = data;
+    const { type, entityId, priceId, priceListId } = data;
+    const targetId = priceId || priceListId;
+    if (!targetId) throw new Error('Missing price list ID');
 
     await dbRemoveAssociation({
         type,
         entityId,
-        itemId: menuId,
+        itemId: targetId,
         tableMap,
         fieldMap,
         itemField: 'menuId',
         userId: user?.id
     });
 
-    await fetchEntityMenus({ type, entityId }).refresh();
+    await fetchEntityPrices({ type, entityId }).refresh();
     return { success: true };
 });
 
-export const fetchEntityMenus = query(getMenuAssociationsSchema, async (data) => {
+export const fetchEntityPrices = query(getPriceAssociationsSchema, async (data) => {
     const { type, entityId } = data;
 
     const table = tableMap[type as keyof typeof tableMap];
@@ -140,7 +144,6 @@ export const fetchEntityMenus = query(getMenuAssociationsSchema, async (data) =>
                 } : null,
             };
         });
-
 
         return {
             id: m.id,

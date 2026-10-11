@@ -1,12 +1,12 @@
 import { query } from '$app/server';
-import { db, menu, eventMenu, and, eq, ilike, desc, asc, count } from '@ac/db';
+import { db, menu, and, eq, ilike, desc, asc, count } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { menuPaginationSchema as PaginationSchema, type Menu, type PaginatedResult } from '@ac/validations';
+import { pricePaginationSchema as PaginationSchema, type Price, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
 
-export const listMenus = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<Menu>> => {
+export const listPrices = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<Price>> => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'menus');
+    ensureAccess(user, 'prices');
 
     const { page = 1, limit = 50, search = '', isTemplate, sortField = 'name', sortOrder = 'asc' } = input || {};
     const offset = (page - 1) * limit;
@@ -61,7 +61,7 @@ export const listMenus = query(PaginationSchema, async (input: v.InferOutput<typ
         }
     });
 
-    const data: Menu[] = rows.map((m: any) => {
+    const data: Price[] = rows.map((m: any) => {
         let totalPricePerPortion = 0;
         let totalCostPerPortion = 0;
         const items = (m.items || []).map((it: any) => {
@@ -104,7 +104,6 @@ export const listMenus = query(PaginationSchema, async (input: v.InferOutput<typ
                 } : null,
             };
         });
-
 
         return {
             id: m.id,
