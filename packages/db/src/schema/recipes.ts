@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, uuid, doublePrecision, primaryKey } from "drizzle-orm/pg-core";
 import { consumable } from "./consumables";
+import { tag } from "./contacts";
 
 export const recipe = pgTable("recipe", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -21,7 +22,17 @@ export const recipeConsumable = pgTable("recipe_consumable", {
     primaryKey({ columns: [table.recipeId, table.consumableId] })
 ]);
 
+export const recipeTag = pgTable("recipe_tag", {
+    recipeId: uuid("recipe_id").notNull().references(() => recipe.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id").notNull().references(() => tag.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.recipeId, table.tagId] })
+]);
+
 export type Recipe = typeof recipe.$inferSelect;
 export type NewRecipe = typeof recipe.$inferInsert;
 export type RecipeConsumable = typeof recipeConsumable.$inferSelect;
 export type NewRecipeConsumable = typeof recipeConsumable.$inferInsert;
+export type RecipeTag = typeof recipeTag.$inferSelect;
+export type NewRecipeTag = typeof recipeTag.$inferInsert;
+

@@ -43,6 +43,15 @@ export const listRecipes = query(PaginationSchema, async (input: v.InferOutput<t
                 with: {
                     consumable: true,
                 }
+            },
+            tags: {
+                with: {
+                    tag: {
+                        with: {
+                            category: true
+                        }
+                    }
+                }
             }
         }
     });
@@ -85,8 +94,10 @@ export const listRecipes = query(PaginationSchema, async (input: v.InferOutput<t
             consumables: ingredients,
             totalCost: Math.round(totalCost * 100) / 100,
             costPerPortion: Math.round(costPerPortion * 100) / 100,
+            tags: (r.tags || []).map((t: any) => t.tag).filter(Boolean),
         };
     });
+
 
     return {
         data,

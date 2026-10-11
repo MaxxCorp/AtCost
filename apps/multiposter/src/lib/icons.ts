@@ -48,5 +48,13 @@ export const ICONS = {
   cart: {
     path: 'M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0',
     strokeWidth: 2
+  } satisfies IconDef,
+  tag: {
+    path: 'M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z M7 7h.01',
+    strokeWidth: 2
+  } satisfies IconDef,
+  receipt: {
+    path: 'M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1zM8 7h8M8 11h8M8 15h5',
+    strokeWidth: 2
   } satisfies IconDef
 } as const;

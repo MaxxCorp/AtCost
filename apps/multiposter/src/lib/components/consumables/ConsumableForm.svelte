@@ -5,7 +5,20 @@
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
     import { goto, refreshAll } from "$app/navigation";
-    import { Euro, Calendar, MapPin, Package, Scale } from "@lucide/svelte";
+    import { Euro, Calendar, MapPin, Package, Scale, Tag as TagIcon } from "@lucide/svelte";
+    import { TagManager } from "@ac/ui";
+    import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
+    import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
+    import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
+    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
+    import { readTag as readTagRemote } from "../../../routes/tags/[id]/read.remote";
+    import {
+        listTagCategories as listTagCategoriesRemote,
+        createTagCategoryCommand,
+        updateTagCategoryCommand,
+        deleteTagCategoryAction
+    } from "../../../routes/tags/categories.remote";
+    import { createTagSchema, updateTagSchema } from "@ac/validations";
 
     let {
         remoteFunction,
@@ -27,6 +40,10 @@
 
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
+
+    const tagCategoriesQuery = $derived(listTagCategoriesRemote({ limit: 100 }));
+    const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
+
 
     let prevIssuesLength = $state(0);
     $effect(() => {
@@ -93,6 +110,17 @@
     {#if isUpdating && initialData?.id}
         <input {...rf.fields.id.as('hidden', initialData.id)} />
     {/if}
+
+    <input
+        {...rf.fields.tags.as(
+            "text",
+            isUpdating && initialData?.tags
+                ? initialData.tags.map((t: any) => t.name).join(", ")
+                : "",
+        )}
+        class="hidden"
+    />
+
 
     <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
         <div>
@@ -220,7 +248,43 @@
         </div>
     </div>
 
+    <!-- Tags Section -->
+    <div>
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <TagIcon size={18} class="text-blue-600" />
+            {m.tags?.() || 'Tags'}
+        </h3>
+        {#key initialData?.id || "new"}
+            <TagManager
+                title={m.tags?.() || 'Tags'}
+                icon={TagIcon}
+                mode="embedded"
+                preferenceKey="em_filters_consumable_tags"
+                initialItems={initialData?.tags || []}
+                listItemsRemote={listTagsRemote}
+                onchange={(ids: any, items: any[]) => {
+                    rf.fields.tags.set(items.map((i: any) => i.name).join(", "));
+                }}
+                createRemote={createTagRemote}
+                createSchema={createTagSchema}
+                updateRemote={updateTagRemote}
+                updateSchema={updateTagSchema}
+                readItemRemote={readTagRemote}
+                deleteItemRemote={deleteTagRemote}
+                categories={availableTagCategories}
+                createCategoryRemote={createTagCategoryCommand}
+                updateCategoryRemote={updateTagCategoryCommand}
+                deleteCategoryRemote={deleteTagCategoryAction}
+                onCategoryCreated={() => { void tagCategoriesQuery.refresh(); }}
+                onCategoryUpdated={() => { void tagCategoriesQuery.refresh(); }}
+                onCategoryDeleted={() => { void tagCategoriesQuery.refresh(); }}
+                {m}
+            />
+        {/key}
+    </div>
+
     <div class="flex items-center justify-end gap-3 pt-2">
+
         {#if onCancel}
             <Button variant="outline" onclick={onCancel}>
                 {m.cancel?.() || 'Cancel'}

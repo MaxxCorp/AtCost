@@ -46,8 +46,16 @@ export const listMenus = query(PaginationSchema, async (input: v.InferOutput<typ
         with: {
             items: {
                 with: {
-                    consumable: true,
-                    recipe: true,
+                    consumable: {
+                        with: {
+                            tags: { with: { tag: { with: { category: true } } } }
+                        }
+                    },
+                    recipe: {
+                        with: {
+                            tags: { with: { tag: { with: { category: true } } } }
+                        }
+                    },
                 }
             }
         }
@@ -61,6 +69,10 @@ export const listMenus = query(PaginationSchema, async (input: v.InferOutput<typ
             const lineCostPerPortion = (it.costPrice || 0) * (it.portionAmount || 1);
             totalPricePerPortion += linePricePerPortion;
             totalCostPerPortion += lineCostPerPortion;
+
+            const itemTags = it.itemType === 'recipe'
+                ? (it.recipe?.tags || []).map((t: any) => t.tag || t).filter(Boolean)
+                : (it.consumable?.tags || []).map((t: any) => t.tag || t).filter(Boolean);
 
             return {
                 id: it.id,
@@ -76,19 +88,23 @@ export const listMenus = query(PaginationSchema, async (input: v.InferOutput<typ
                 factor: it.factor,
                 unitPrice: it.unitPrice,
                 sortOrder: it.sortOrder,
+                tags: itemTags,
                 consumable: it.consumable ? {
                     ...it.consumable,
                     expirationDate: it.consumable.expirationDate ? it.consumable.expirationDate.toISOString() : null,
                     createdAt: it.consumable.createdAt.toISOString(),
                     updatedAt: it.consumable.updatedAt.toISOString(),
+                    tags: (it.consumable.tags || []).map((t: any) => t.tag || t).filter(Boolean),
                 } : null,
                 recipe: it.recipe ? {
                     ...it.recipe,
                     createdAt: it.recipe.createdAt.toISOString(),
                     updatedAt: it.recipe.updatedAt.toISOString(),
+                    tags: (it.recipe.tags || []).map((t: any) => t.tag || t).filter(Boolean),
                 } : null,
             };
         });
+
 
         return {
             id: m.id,

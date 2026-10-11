@@ -10,8 +10,8 @@ import { kiosk, kioskLocation } from "./kiosks";
 import { syncConfig, syncOperation, syncMapping, webhookSubscription } from "./sync";
 import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion, cmsMedia } from "./cms";
 import { contract, contractFramework, contractFrameworkContract } from "./contracts";
-import { consumable } from "./consumables";
-import { recipe, recipeConsumable } from "./recipes";
+import { consumable, consumableTag } from "./consumables";
+import { recipe, recipeConsumable, recipeTag } from "./recipes";
 import { menu, menuItem, eventMenu } from "./menus";
 import { payrollRun, payrollProfile, payslip } from "./payroll";
 import { hmo } from "./hmos";
@@ -90,6 +90,8 @@ export const tagRelations = relations(tag, ({ many, one }) => ({
     announcementAssociations: many(announcementTag),
     eventAssociations: many(eventTag),
     talentAssociations: many(talentTag),
+    consumableAssociations: many(consumableTag),
+    recipeAssociations: many(recipeTag),
 }));
 
 export const contactTagRelations = relations(contactTag, ({ one }) => ({
@@ -389,12 +391,24 @@ export const consumableRelations = relations(consumable, ({ one, many }) => ({
     user: one(user, { fields: [consumable.userId], references: [user.id] }),
     recipeConsumables: many(recipeConsumable),
     menuItems: many(menuItem),
+    tags: many(consumableTag),
+}));
+
+export const consumableTagRelations = relations(consumableTag, ({ one }) => ({
+    consumable: one(consumable, { fields: [consumableTag.consumableId], references: [consumable.id] }),
+    tag: one(tag, { fields: [consumableTag.tagId], references: [tag.id] }),
 }));
 
 export const recipeRelations = relations(recipe, ({ one, many }) => ({
     user: one(user, { fields: [recipe.userId], references: [user.id] }),
     consumables: many(recipeConsumable),
     menuItems: many(menuItem),
+    tags: many(recipeTag),
+}));
+
+export const recipeTagRelations = relations(recipeTag, ({ one }) => ({
+    recipe: one(recipe, { fields: [recipeTag.recipeId], references: [recipe.id] }),
+    tag: one(tag, { fields: [recipeTag.tagId], references: [tag.id] }),
 }));
 
 export const recipeConsumableRelations = relations(recipeConsumable, ({ one }) => ({

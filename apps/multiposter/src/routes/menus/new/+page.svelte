@@ -6,38 +6,40 @@
     import { listConsumables } from "../../consumables/list.remote";
     import { listRecipes } from "../../recipes/list.remote";
     import { createMenuSchema } from "@ac/validations";
-    import { Utensils } from "@lucide/svelte";
+    import { Tag } from "@lucide/svelte";
     import { LoadingSection } from "@ac/ui";
 
-    const dataPromise = Promise.all([
-        listConsumables({ limit: 200 }),
-        listRecipes({ limit: 200 })
-    ]);
+    const consumablesQuery = listConsumables({ limit: 200 });
+    const recipesQuery = listRecipes({ limit: 200 });
+
+    const consumables = $derived(consumablesQuery.current?.data ?? []);
+    const recipes = $derived(recipesQuery.current?.data ?? []);
+    const isLoading = $derived(consumablesQuery.loading || recipesQuery.loading);
 </script>
 
 <div class="container mx-auto px-4 py-6 max-w-5xl space-y-6">
-    <Breadcrumb feature="menus" current={m.create_item_label?.({ item: m.menu?.() || 'Menu' }) || 'New Menu'} />
+    <Breadcrumb feature="menus" current={m.create_item_label?.({ item: m.menu?.() || 'Price List' }) || 'New Price List'} />
 
     <div>
         <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2.5">
-            <Utensils size={28} class="text-violet-600" />
-            {m.create_item_label?.({ item: m.menu?.() || 'Menu' }) || 'New Menu'}
+            <Tag size={28} class="text-violet-600" />
+            {m.create_item_label?.({ item: m.menu?.() || 'Price List' }) || 'New Price List'}
         </h1>
         <p class="text-sm text-gray-500 mt-1">
-            Aggregate consumables and recipes into a menu template with unit prices and total calculation.
+            {m.feature_menus_description?.() || 'Aggregate consumables and recipes into price lists and templates.'}
         </p>
     </div>
 
-    {#await dataPromise}
+    {#if isLoading && !consumablesQuery.current && !recipesQuery.current}
         <LoadingSection message="Loading items..." />
-    {:then [consumablesResult, recipesResult]}
+    {:else}
         <MenuForm
             remoteFunction={createMenu}
             validationSchema={createMenuSchema}
             isUpdating={false}
-            allConsumables={consumablesResult?.data || []}
-            allRecipes={recipesResult?.data || []}
+            allConsumables={consumables}
+            allRecipes={recipes}
             cancelHref="/menus"
         />
-    {/await}
+    {/if}
 </div>

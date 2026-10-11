@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, doublePrecision, primaryKey } from "drizzle-orm/pg-core";
+import { tag } from "./contacts";
 
 export const consumable = pgTable("consumable", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -14,5 +15,15 @@ export const consumable = pgTable("consumable", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
+export const consumableTag = pgTable("consumable_tag", {
+    consumableId: uuid("consumable_id").notNull().references(() => consumable.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id").notNull().references(() => tag.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.consumableId, table.tagId] })
+]);
+
 export type Consumable = typeof consumable.$inferSelect;
 export type NewConsumable = typeof consumable.$inferInsert;
+export type ConsumableTag = typeof consumableTag.$inferSelect;
+export type NewConsumableTag = typeof consumableTag.$inferInsert;
+

@@ -6,7 +6,8 @@
     import { Button } from "#lib/components/ui/button/index.js";
     import { goto, refreshAll } from "$app/navigation";
     import {
-        Utensils,
+        Tag,
+        Receipt,
         ChefHat,
         Package,
         Plus,
@@ -116,6 +117,7 @@
         recipeId?: string | null;
         name: string;
         description?: string;
+        tags?: any[];
         portionAmount: number;
         unit?: string;
         costPrice: number;
@@ -144,6 +146,7 @@
                 recipeId: it.recipeId || null,
                 name: it.name || '',
                 description: it.description || '',
+                tags: it.tags || [],
                 portionAmount: it.portionAmount !== undefined ? it.portionAmount : 1,
                 unit: it.unit || '',
                 costPrice,
@@ -180,6 +183,7 @@
                 recipeId: null,
                 name: c.name,
                 description: c.description || '',
+                tags: c.tags || [],
                 portionAmount: 1,
                 unit: c.unit || 'piece',
                 costPrice: roundedCost,
@@ -212,6 +216,7 @@
                 recipeId: r.id,
                 name: r.name,
                 description: r.description || '',
+                tags: r.tags || [],
                 portionAmount: 1,
                 unit: 'portion',
                 costPrice: portionCost,
@@ -242,6 +247,7 @@
                 recipeId: it.recipeId || null,
                 name: it.name || '',
                 description: it.description || '',
+                tags: it.tags || [],
                 portionAmount: it.portionAmount !== undefined ? it.portionAmount : 1,
                 unit: it.unit || '',
                 costPrice,
@@ -452,16 +458,16 @@
         </div>
     </div>
 
-    <!-- Menu Items Selection Section -->
+    <!-- Price Items Selection Section -->
     <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-5">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-gray-100">
             <div>
                 <h3 class="text-base font-bold text-gray-900 flex items-center gap-2">
-                    <Utensils size={18} class="text-blue-600" />
-                    {m.menu_items?.() || 'Menu Items'}
+                    <Tag size={18} class="text-blue-600" />
+                    {m.menu_items?.() || 'Price Items'}
                 </h3>
                 <p class="text-xs text-gray-500 mt-0.5">
-                    {m.markup_factor?.() || 'Pricing Factor'}: items default to {defaultFactor}× cost markup. Modify per item or apply across the menu.
+                    {m.markup_factor?.() || 'Pricing Factor'}: items default to {defaultFactor}× cost markup. Modify per item or apply across the price list.
                 </p>
             </div>
 
@@ -611,9 +617,9 @@
         <!-- Items Table -->
         {#if items.length === 0}
             <div class="py-8 text-center border-2 border-dashed border-gray-200 rounded-xl">
-                <Utensils size={32} class="mx-auto text-gray-300 mb-2" />
-                <p class="text-sm font-medium text-gray-500">No menu items added yet.</p>
-                <p class="text-xs text-gray-400 mt-1">Use the bar above to add consumables or recipes to this menu.</p>
+                <Receipt size={32} class="mx-auto text-gray-300 mb-2" />
+                <p class="text-sm font-medium text-gray-500">{m.no_items_in_menu?.() || 'No price items added yet.'}</p>
+                <p class="text-xs text-gray-400 mt-1">Use the bar above to add consumables or recipes to this price list.</p>
             </div>
         {:else}
             <div class="overflow-x-auto">
@@ -645,6 +651,15 @@
                                     />
                                     {#if item.description}
                                         <p class="text-xs text-gray-400 mt-0.5 truncate">{item.description}</p>
+                                    {/if}
+                                    {#if item.tags && item.tags.length > 0}
+                                        <div class="flex flex-wrap gap-1 mt-1">
+                                            {#each item.tags as t (t.id || t.name)}
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                                    {t.name}
+                                                </span>
+                                            {/each}
+                                        </div>
                                     {/if}
                                 </td>
 

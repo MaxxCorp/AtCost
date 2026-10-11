@@ -42,15 +42,25 @@ export const listConsumables = query(PaginationSchema, async (input: v.InferOutp
 
     const orderFn = sortOrder === 'desc' ? desc : asc;
 
-    const rows = await db
-        .select()
-        .from(consumable)
-        .where(whereClause)
-        .orderBy(orderFn(orderColumn))
-        .limit(limit)
-        .offset(offset);
+    const rows = await db.query.consumable.findMany({
+        where: whereClause,
+        orderBy: [orderFn(orderColumn)],
+        limit,
+        offset,
+        with: {
+            tags: {
+                with: {
+                    tag: {
+                        with: {
+                            category: true
+                        }
+                    }
+                }
+            }
+        }
+    });
 
-    const data: Consumable[] = rows.map((r) => {
+    const data: Consumable[] = rows.map((r: any) => {
         const costPerUnit = r.amount > 0 ? r.purchasePrice / r.amount : r.purchasePrice;
         return {
             ...r,
@@ -58,6 +68,7 @@ export const listConsumables = query(PaginationSchema, async (input: v.InferOutp
             createdAt: r.createdAt.toISOString(),
             updatedAt: r.updatedAt.toISOString(),
             costPerUnit: Math.round(costPerUnit * 100) / 100,
+            tags: (r.tags || []).map((t: any) => t.tag).filter(Boolean),
         };
     });
 
@@ -66,3 +77,4 @@ export const listConsumables = query(PaginationSchema, async (input: v.InferOutp
         total,
     };
 });
+

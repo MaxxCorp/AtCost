@@ -179,7 +179,7 @@ export const FEATURES: readonly FeatureMeta[] = [
     href: '/menus',
     buttonText: () => m.feature_menus_button(),
     claim: 'menus',
-    icon: 'utensils',
+    icon: 'tag',
     gradientFrom: 'from-violet-50',
     gradientTo: 'to-purple-50',
     borderClass: 'border-purple-100',

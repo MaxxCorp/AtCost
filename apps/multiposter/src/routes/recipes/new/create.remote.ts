@@ -1,5 +1,5 @@
 import { form, requested } from '$app/server';
-import { db, recipe, recipeConsumable } from '@ac/db';
+import { db, recipe, recipeConsumable, recipeTag, tag, eq } from '@ac/db';
 import { listRecipes } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createRecipeSchema } from '@ac/validations';
@@ -37,8 +37,43 @@ export const createRecipe = form(createRecipeSchema, async (data) => {
                 );
             }
 
+            // Tags persistence
+            const tagNames: string[] = [];
+            if (typeof data.tags === 'string') {
+                tagNames.push(...data.tags.split(',').map((t: string) => t.trim()).filter(Boolean));
+            } else if (Array.isArray(data.tags)) {
+                tagNames.push(...data.tags.map((t: string) => String(t).trim()).filter(Boolean));
+            }
+            if (data.tagNames) {
+                try {
+                    const parsed = JSON.parse(data.tagNames);
+                    if (Array.isArray(parsed)) tagNames.push(...parsed.map((t: string) => String(t).trim()).filter(Boolean));
+                } catch {}
+            }
+
+            for (const name of tagNames) {
+                let [existingTag] = await tx.select().from(tag).where(eq(tag.name, name));
+                if (!existingTag) {
+                    [existingTag] = await tx.insert(tag).values({ name, userId: user.id }).returning();
+                }
+                if (existingTag) {
+                    await tx.insert(recipeTag).values({ recipeId: newRecipe.id, tagId: existingTag.id }).onConflictDoNothing();
+                }
+            }
+
+            let tagIds: string[] = [];
+            if (Array.isArray(data.tagIds)) {
+                tagIds = data.tagIds;
+            } else if (typeof data.tagIds === 'string') {
+                try { tagIds = JSON.parse(data.tagIds); } catch {}
+            }
+            for (const tagId of tagIds) {
+                await tx.insert(recipeTag).values({ recipeId: newRecipe.id, tagId }).onConflictDoNothing();
+            }
+
             return newRecipe;
         });
+
 
         try {
             await requested(listRecipes, 20).refreshAll();

@@ -1,5 +1,5 @@
 import { form, requested } from '$app/server';
-import { db, recipe, recipeConsumable, eq } from '@ac/db';
+import { db, recipe, recipeConsumable, recipeTag, tag, eq } from '@ac/db';
 import { listRecipes } from '../list.remote';
 import { readRecipe } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -46,8 +46,47 @@ export const updateRecipe = form(updateRecipeSchema, async (data) => {
             );
         }
 
+        // Tags synchronization if provided
+        if (data.tags !== undefined || data.tagIds !== undefined || data.tagNames !== undefined) {
+            await tx.delete(recipeTag).where(eq(recipeTag.recipeId, data.id));
+
+            const tagNames: string[] = [];
+            if (typeof data.tags === 'string') {
+                tagNames.push(...data.tags.split(',').map((t: string) => t.trim()).filter(Boolean));
+            } else if (Array.isArray(data.tags)) {
+                tagNames.push(...data.tags.map((t: string) => String(t).trim()).filter(Boolean));
+            }
+            if (data.tagNames) {
+                try {
+                    const parsed = JSON.parse(data.tagNames);
+                    if (Array.isArray(parsed)) tagNames.push(...parsed.map((t: string) => String(t).trim()).filter(Boolean));
+                } catch {}
+            }
+
+            for (const name of tagNames) {
+                let [existingTag] = await tx.select().from(tag).where(eq(tag.name, name));
+                if (!existingTag) {
+                    [existingTag] = await tx.insert(tag).values({ name, userId: user.id }).returning();
+                }
+                if (existingTag) {
+                    await tx.insert(recipeTag).values({ recipeId: data.id, tagId: existingTag.id }).onConflictDoNothing();
+                }
+            }
+
+            let tagIds: string[] = [];
+            if (Array.isArray(data.tagIds)) {
+                tagIds = data.tagIds;
+            } else if (typeof data.tagIds === 'string') {
+                try { tagIds = JSON.parse(data.tagIds); } catch {}
+            }
+            for (const tagId of tagIds) {
+                await tx.insert(recipeTag).values({ recipeId: data.id, tagId }).onConflictDoNothing();
+            }
+        }
+
         return updatedRecipe;
     });
+
 
     try {
         await requested(listRecipes, 20).refreshAll();

@@ -2,13 +2,16 @@ import * as v from 'valibot';
 import type { Menu as DbMenu, MenuItem as DbMenuItem } from '@ac/db';
 import type { Consumable } from './consumables.js';
 import type { Recipe } from './recipes.js';
+import type { Tag } from './tags.js';
 
 export type MenuItem = Omit<DbMenuItem, 'createdAt' | 'updatedAt'> & {
     createdAt?: string;
     updatedAt?: string;
     consumable?: Consumable | null;
     recipe?: Recipe | null;
+    tags?: Tag[];
 };
+
 
 export type Menu = Omit<DbMenu, 'createdAt' | 'updatedAt'> & {
     createdAt: string;

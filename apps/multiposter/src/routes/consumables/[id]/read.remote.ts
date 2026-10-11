@@ -8,10 +8,20 @@ export const readConsumable = query(v.string(), async (id: string): Promise<Cons
     const user = getAuthenticatedUser();
     ensureAccess(user, 'consumables');
 
-    const [row] = await db
-        .select()
-        .from(consumable)
-        .where(eq(consumable.id, id));
+    const row = await db.query.consumable.findFirst({
+        where: eq(consumable.id, id),
+        with: {
+            tags: {
+                with: {
+                    tag: {
+                        with: {
+                            category: true
+                        }
+                    }
+                }
+            }
+        }
+    });
 
     if (!row) return null;
 
@@ -23,5 +33,7 @@ export const readConsumable = query(v.string(), async (id: string): Promise<Cons
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
         costPerUnit: Math.round(costPerUnit * 100) / 100,
+        tags: (row.tags || []).map((t: any) => t.tag).filter(Boolean),
     };
 });
+

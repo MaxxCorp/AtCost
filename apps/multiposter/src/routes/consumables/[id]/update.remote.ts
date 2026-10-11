@@ -1,5 +1,5 @@
 import { form, requested } from '$app/server';
-import { db, consumable, eq } from '@ac/db';
+import { db, consumable, consumableTag, tag, eq } from '@ac/db';
 import { listConsumables } from '../list.remote';
 import { readConsumable } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -44,6 +44,45 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
         if (!updated) {
             throw new Error('Consumable not found');
         }
+
+        // Tags synchronization if provided
+        if (data.tags !== undefined || data.tagIds !== undefined || data.tagNames !== undefined) {
+            await db.delete(consumableTag).where(eq(consumableTag.consumableId, data.id));
+
+            const tagNames: string[] = [];
+            if (typeof data.tags === 'string') {
+                tagNames.push(...data.tags.split(',').map((t: string) => t.trim()).filter(Boolean));
+            } else if (Array.isArray(data.tags)) {
+                tagNames.push(...data.tags.map((t: string) => String(t).trim()).filter(Boolean));
+            }
+            if (data.tagNames) {
+                try {
+                    const parsed = JSON.parse(data.tagNames);
+                    if (Array.isArray(parsed)) tagNames.push(...parsed.map((t: string) => String(t).trim()).filter(Boolean));
+                } catch {}
+            }
+
+            for (const name of tagNames) {
+                let [existingTag] = await db.select().from(tag).where(eq(tag.name, name));
+                if (!existingTag) {
+                    [existingTag] = await db.insert(tag).values({ name, userId: user.id }).returning();
+                }
+                if (existingTag) {
+                    await db.insert(consumableTag).values({ consumableId: data.id, tagId: existingTag.id }).onConflictDoNothing();
+                }
+            }
+
+            let tagIds: string[] = [];
+            if (Array.isArray(data.tagIds)) {
+                tagIds = data.tagIds;
+            } else if (typeof data.tagIds === 'string') {
+                try { tagIds = JSON.parse(data.tagIds); } catch {}
+            }
+            for (const tagId of tagIds) {
+                await db.insert(consumableTag).values({ consumableId: data.id, tagId }).onConflictDoNothing();
+            }
+        }
+
 
         try {
             await requested(listConsumables, 20).refreshAll();

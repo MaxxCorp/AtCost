@@ -1,11 +1,13 @@
 import * as v from 'valibot';
 import type { Consumable as DbConsumable } from '@ac/db';
+import type { Tag } from './tags.js';
 
 export type Consumable = Omit<DbConsumable, 'createdAt' | 'updatedAt' | 'expirationDate'> & {
     expirationDate: string | null;
     createdAt: string;
     updatedAt: string;
     costPerUnit?: number;
+    tags?: Tag[];
     user?: {
         id: string;
         name: string | null;
@@ -39,6 +41,9 @@ export const createConsumableSchema = v.object({
     amount: v.optional(v.union([v.number(), v.string()]), 1),
     storageLocation: v.optional(v.string()),
     expirationDate: v.optional(v.string()),
+    tags: v.optional(v.union([v.string(), v.array(v.string())])),
+    tagIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    tagNames: v.optional(v.string()),
 });
 
 export const updateConsumableSchema = v.object({
@@ -50,4 +55,8 @@ export const updateConsumableSchema = v.object({
     amount: v.optional(v.union([v.number(), v.string()]), 1),
     storageLocation: v.optional(v.string()),
     expirationDate: v.optional(v.string()),
+    tags: v.optional(v.union([v.string(), v.array(v.string())])),
+    tagIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    tagNames: v.optional(v.string()),
 });
+

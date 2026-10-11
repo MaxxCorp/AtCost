@@ -91,6 +91,7 @@
         Loader2,
         ExternalLink,
         Utensils,
+        Receipt,
         Calculator,
         Shield,
     } from "@lucide/svelte";
@@ -1883,13 +1884,13 @@
 
     <div class="pt-4 border-t border-gray-100">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
-            <Utensils size={18} class="text-blue-600" />
-            {m.feature_menus_title?.() || 'Menus & Catering'} ({m.optional?.() || 'optional'})
+            <Receipt size={18} class="text-blue-600" />
+            {m.feature_menus_title?.() || 'Prices'} ({m.optional?.() || 'optional'})
         </h3>
         {#key initialData?.id || "new"}
             <EntityManager {m}
-                title={m.feature_menus_title?.() || 'Menus & Catering'}
-                icon={Utensils}
+                title={m.feature_menus_title?.() || 'Prices'}
+                icon={Receipt}
                 mode="embedded"
                 type="event"
                 entityId={initialData?.id}
@@ -1910,7 +1911,7 @@
                     return await handleDelete({
                         ids,
                         deleteFn: deleteMenus,
-                        itemName: m.menu?.() || 'menu',
+                        itemName: m.menu?.() || 'price list',
                     });
                 }}
                 createRemote={createMenu}
@@ -1925,19 +1926,19 @@
                         menuItem.description?.toLowerCase().includes(qLower)
                     );
                 }}
-                loadingLabel={m.loading_item?.({ item: m.menus?.() || 'Menus' }) || 'Loading menus...'}
-                noItemsLabel={m.no_items_associated_label?.({ item: m.menus?.() || 'Menus' }) || 'No menus associated'}
-                noItemsFoundLabel={m.no_items_found?.({ item: m.menus?.() || 'Menus' }) || 'No menus found'}
-                searchPlaceholder={m.search_placeholder?.({ item: m.menus?.() || 'Menus' }) || 'Search menus...'}
-                linkItemLabel={m.link_item_label?.({ item: m.menu?.() || 'Menu' }) || 'Link Menu'}
-                associatedItemLabel={m.associated_item_label?.({ item: m.menus?.() || 'Menus' }) || 'Associated Menus'}
+                loadingLabel={m.loading_item?.({ item: m.menus?.() || 'Prices' }) || 'Loading prices...'}
+                noItemsLabel={m.no_items_associated_label?.({ item: m.menus?.() || 'Prices' }) || 'No prices associated'}
+                noItemsFoundLabel={m.no_items_found?.({ item: m.menus?.() || 'Prices' }) || 'No prices found'}
+                searchPlaceholder={m.search_placeholder?.({ item: m.menus?.() || 'Prices' }) || 'Search prices...'}
+                linkItemLabel={m.link_item_label?.({ item: m.menu?.() || 'Price List' }) || 'Link Price List'}
+                associatedItemLabel={m.associated_item_label?.({ item: m.menus?.() || 'Prices' }) || 'Associated Prices'}
                 quickCreateLabel={m.quick_create?.() || 'Quick Create'}
                 closeSearchLabel={m.close_search?.() || 'Close'}
                 editLabel={m.edit?.() || 'Edit'}
                 deleteLabel={m.delete?.() || 'Delete'}
                 unlinkLabel={m.unlink?.() || 'Unlink'}
-                deleteForeverLabel={m.delete_forever?.({ item: m.menu?.() || 'Menu' }) || 'Delete Menu'}
-                confirmUnlinkLabel={m.confirm_unlink_label?.({ item: m.menu?.() || 'Menu' }) || 'Unlink Menu'}
+                deleteForeverLabel={m.delete_forever?.({ item: m.menu?.() || 'Price List' }) || 'Delete Price List'}
+                confirmUnlinkLabel={m.confirm_unlink_label?.({ item: m.menu?.() || 'Price List' }) || 'Unlink Price List'}
                 selectAllLabel={m.select_all?.() || 'Select All'}
                 deselectAllLabel={m.deselect_all?.() || 'Deselect All'}
             >
@@ -2013,9 +2014,9 @@
             {@const cateringProfit = cateringTotal - cateringCost}
             <div class="mt-3 p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div class="flex items-center gap-2">
-                    <Utensils size={18} class="text-emerald-600" />
-                    <span class="font-semibold text-gray-800">{m.catering_calculation?.() || 'Total Catering Calculation'}:</span>
-                    <span class="text-xs text-gray-600">({currentMenus.length} {currentMenus.length === 1 ? (m.menu?.() || 'menu') : (m.menus?.() || 'menus')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
+                    <Receipt size={18} class="text-emerald-600" />
+                    <span class="font-semibold text-gray-800">{m.catering_calculation?.() || 'Total Price Calculation'}:</span>
+                    <span class="text-xs text-gray-600">({currentMenus.length} {currentMenus.length === 1 ? (m.menu?.() || 'price list') : (m.menus?.() || 'prices')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
                 </div>
                 <div class="flex items-center gap-3 text-right">
                     {#if cateringCost > 0}

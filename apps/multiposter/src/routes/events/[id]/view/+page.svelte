@@ -30,6 +30,7 @@
         Check,
         Lock,
         Utensils,
+        Receipt,
     } from "@lucide/svelte";
     import Button from "#lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
@@ -44,6 +45,7 @@
     import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
+    import PriceListView from "#lib/components/menus/PriceListView.svelte";
 
     const eventId = $derived(page.params.id || "");
     const eventQuery = $derived(readEvent(eventId));
@@ -573,8 +575,8 @@
                                     class="flex items-center gap-2 text-violet-700 border-violet-200 hover:bg-violet-50"
                                     onclick={() => (menuDialogOpen = true)}
                                 >
-                                    <Utensils size={16} class="text-violet-600" />
-                                    {m.menu?.() || 'Menu'}
+                                    <Receipt size={16} class="text-violet-600" />
+                                    {m.event_menu?.() || 'Prices'}
                                 </Button>
                             {/if}
 
@@ -676,15 +678,15 @@
                     </div>
                 </div>
 
-                <!-- Menu & Price List Dialog -->
+                <!-- Prices & Price List Dialog -->
                 {#if event.menus && event.menus.length > 0}
                     <Dialog.Root bind:open={menuDialogOpen}>
-                        <Dialog.Content class="max-w-2xl max-h-[85vh] overflow-y-auto">
+                        <Dialog.Content class="max-w-3xl max-h-[90vh] overflow-y-auto">
                             <Dialog.Header>
                                 <div class="flex items-center gap-2 text-violet-700">
-                                    <Utensils size={22} />
+                                    <Receipt size={22} />
                                     <Dialog.Title class="text-xl font-bold text-gray-900">
-                                        {m.feature_menus_title?.() || 'Menu & Price List'}
+                                        {m.event_menu?.() || 'Prices'}
                                     </Dialog.Title>
                                 </div>
                                 <Dialog.Description class="text-sm text-gray-500">
@@ -692,75 +694,16 @@
                                 </Dialog.Description>
                             </Dialog.Header>
 
-                            <div class="space-y-6 py-4">
-                                {#each event.menus as menu}
-                                    <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-                                        <div class="bg-gray-50 p-4 border-b border-gray-200">
-                                            <div class="flex items-center justify-between">
-                                                <h3 class="font-bold text-gray-900 text-lg">{menu.name}</h3>
-                                                {#if menu.totalPricePerPortion != null}
-                                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-800">
-                                                        €{Number(menu.totalPricePerPortion).toFixed(2)} / {m.portion?.() || 'portion'}
-                                                    </span>
-                                                {/if}
-                                            </div>
-                                            {#if menu.description}
-                                                <p class="text-sm text-gray-600 mt-1">{menu.description}</p>
-                                            {/if}
-                                        </div>
-
-                                        {#if menu.items && menu.items.length > 0}
-                                            <div class="divide-y divide-gray-100">
-                                                {#each menu.items as item}
-                                                    <div class="p-3.5 flex items-start justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                                                        <div class="space-y-1">
-                                                            <div class="flex items-center gap-2">
-                                                                <span class="font-medium text-gray-900 text-sm">{item.name}</span>
-                                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-medium {item.itemType === 'recipe' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}">
-                                                                    {item.itemType === 'recipe' ? (m.recipe?.() || 'Recipe') : (m.consumable?.() || 'Consumable')}
-                                                                </span>
-                                                            </div>
-                                                            {#if item.description}
-                                                                <p class="text-xs text-gray-500">{item.description}</p>
-                                                            {/if}
-                                                            {#if item.portionAmount}
-                                                                <p class="text-xs text-gray-400">
-                                                                    {m.portion_size?.() || 'Portion'}: {item.portionAmount} {item.unit || ''}
-                                                                </p>
-                                                            {/if}
-                                                        </div>
-                                                        <div class="text-right shrink-0">
-                                                            <span class="font-mono font-semibold text-sm text-gray-900">
-                                                                €{(Number(item.unitPrice) || 0).toFixed(2)}
-                                                            </span>
-                                                            {#if checkCanEdit(event) && item.costPrice > 0}
-                                                                <span class="block text-[10px] text-gray-400 font-mono">
-                                                                    cost €{Number(item.costPrice).toFixed(2)} • {item.factor ? `${Number(item.factor).toFixed(1)}×` : ''}
-                                                                </span>
-                                                            {/if}
-                                                        </div>
-                                                    </div>
-                                                {/each}
-                                            </div>
-                                        {:else}
-                                            <div class="p-6 text-center text-sm text-gray-500">
-                                                {m.no_items_in_menu?.() || 'No items listed in this menu.'}
-                                            </div>
-                                        {/if}
-
-                                        {#if event.participantsCount && event.participantsCount > 1 && menu.totalPricePerPortion}
-                                            <div class="bg-violet-50/50 p-3 border-t border-violet-100 flex items-center justify-between text-xs text-violet-900">
-                                                <span>{m.total_for_participants?.() || 'Total for'} {event.participantsCount} {m.participants?.() || 'participants'}:</span>
-                                                <span class="font-mono font-bold text-sm">
-                                                    €{(Number(menu.totalPricePerPortion) * event.participantsCount).toFixed(2)}
-                                                </span>
-                                            </div>
-                                        {/if}
-                                    </div>
-                                {/each}
+                            <div class="py-2">
+                                <PriceListView
+                                    menus={event.menus}
+                                    participantsCount={event.participantsCount || 1}
+                                    canEdit={checkCanEdit(event)}
+                                    eventSummary={event.summary}
+                                />
                             </div>
 
-                            <Dialog.Footer>
+                            <Dialog.Footer class="print:hidden">
                                 <Button variant="outline" onclick={() => (menuDialogOpen = false)}>
                                     {m.close?.() || 'Close'}
                                 </Button>

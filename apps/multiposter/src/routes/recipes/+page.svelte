@@ -157,6 +157,16 @@
                                         <p class="text-xs text-gray-500 line-clamp-2">{item.description}</p>
                                     {/if}
 
+                                    {#if item.tags && item.tags.length > 0}
+                                        <div class="flex flex-wrap gap-1 pt-1">
+                                            {#each item.tags as t (t.id || t.name)}
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    {t.name}
+                                                </span>
+                                            {/each}
+                                        </div>
+                                    {/if}
+
                                     <div class="pt-2 text-xs text-gray-600 flex items-center gap-1.5">
                                         <Scale size={13} class="text-blue-500" />
                                         <span>{(item.consumables || []).length} {m.ingredients?.() || 'ingredients'}</span>

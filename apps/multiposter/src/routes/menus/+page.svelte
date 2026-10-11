@@ -6,7 +6,8 @@
     import Button from "#lib/components/ui/button/button.svelte";
     import { LoadingSection, ErrorSection } from "@ac/ui";
     import {
-        Utensils,
+        Tag,
+        Receipt,
         Pencil,
         Trash2,
         Plus,
@@ -62,11 +63,11 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2.5">
-                <Utensils size={28} class="text-violet-600" />
-                {m.feature_menus_title?.() || 'Menus'}
+                <Tag size={28} class="text-violet-600" />
+                {m.feature_menus_title?.() || 'Prices'}
             </h1>
             <p class="text-sm text-gray-500 mt-1">
-                {m.feature_menus_description?.() || 'Aggregate consumables and recipes into event menus and templates.'}
+                {m.feature_menus_description?.() || 'Aggregate consumables and recipes into price lists and templates.'}
             </p>
         </div>
 
@@ -75,7 +76,7 @@
             class="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white self-start sm:self-auto"
         >
             <Plus size={16} />
-            {m.create_item_label?.({ item: m.menu?.() || 'Menu' }) || 'New Menu'}
+            {m.create_item_label?.({ item: m.menu?.() || 'Price List' }) || 'New Price List'}
         </Button>
     </div>
 
@@ -87,7 +88,7 @@
                 type="text"
                 bind:value={searchQuery}
                 oninput={() => (page = 1)}
-                placeholder={m.search_placeholder?.({ item: m.menus?.() || 'Menus' }) || 'Search menus...'}
+                placeholder={m.search_placeholder?.({ item: m.menus?.() || 'Prices' }) || 'Search prices...'}
                 class="w-full pl-9 pr-3.5 py-2 rounded-lg border border-gray-300 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
         </div>
@@ -99,9 +100,9 @@
                 onchange={() => (page = 1)}
                 class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
-                <option value="all">All Menus</option>
-                <option value="templates">Templates Only</option>
-                <option value="custom">Custom Menus Only</option>
+                <option value="all">{m.menus?.() || 'All Prices'}</option>
+                <option value="templates">{m.all_templates?.() || 'Templates Only'}</option>
+                <option value="custom">Event-Specific Only</option>
             </select>
 
             <span class="text-xs text-gray-500 flex items-center gap-1">
@@ -150,14 +151,14 @@
         <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
             {#if !result?.data || result.data.length === 0}
                 <div class="bg-white p-12 text-center rounded-2xl border border-gray-100 shadow-xs space-y-3">
-                    <Utensils size={40} class="mx-auto text-gray-300" />
-                    <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.menus?.() || 'Menus' }) || 'No menus found'}</h3>
+                    <Receipt size={40} class="mx-auto text-gray-300" />
+                    <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.menus?.() || 'Prices' }) || 'No price lists found'}</h3>
                     <p class="text-sm text-gray-500 max-w-md mx-auto">
-                        Create your first concerted menu template aggregating consumables and recipes.
+                        Create your first price list aggregating consumables and recipes.
                     </p>
                     <Button href="/menus/new" class="bg-violet-600 hover:bg-violet-700 text-white mt-2">
                         <Plus size={16} class="mr-1.5" />
-                        {m.create_item_label?.({ item: m.menu?.() || 'Menu' }) || 'New Menu'}
+                        {m.create_item_label?.({ item: m.menu?.() || 'Price List' }) || 'New Price List'}
                     </Button>
                 </div>
             {:else}

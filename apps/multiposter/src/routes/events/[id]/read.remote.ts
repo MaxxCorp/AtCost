@@ -186,8 +186,16 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 							with: {
 								items: {
 									with: {
-										consumable: true,
-										recipe: true,
+										consumable: {
+											with: {
+												tags: { with: { tag: { with: { category: true } } } }
+											}
+										},
+										recipe: {
+											with: {
+												tags: { with: { tag: { with: { category: true } } } }
+											}
+										},
 									}
 								}
 							}
@@ -358,8 +366,12 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			const lineCost = (it.costPrice || 0) * (it.portionAmount || 1);
 			totalPricePerPortion += linePrice;
 			totalCostPerPortion += lineCost;
+			const itemTags = it.itemType === 'recipe'
+				? (it.recipe?.tags || []).map((t: any) => t.tag || t).filter(Boolean)
+				: (it.consumable?.tags || []).map((t: any) => t.tag || t).filter(Boolean);
 			return {
 				...it,
+				tags: itemTags,
 				createdAt: it.createdAt ? toIsoSafe(it.createdAt) : undefined,
 				updatedAt: it.updatedAt ? toIsoSafe(it.updatedAt) : undefined,
 			};

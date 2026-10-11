@@ -186,7 +186,17 @@
                                                 {#if item.description}
                                                     <div class="text-xs text-gray-400 truncate max-w-xs">{item.description}</div>
                                                 {/if}
+                                                {#if item.tags && item.tags.length > 0}
+                                                    <div class="flex flex-wrap gap-1 mt-1">
+                                                        {#each item.tags as t (t.id || t.name)}
+                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                                                {t.name}
+                                                            </span>
+                                                        {/each}
+                                                    </div>
+                                                {/if}
                                             </td>
+
                                             <td class="py-3 px-4 text-gray-700">
                                                 <span class="font-medium text-gray-900">€{item.purchasePrice.toFixed(2)}</span>
                                                 <span class="text-xs text-gray-400"> / {item.amount} {item.unit}</span>

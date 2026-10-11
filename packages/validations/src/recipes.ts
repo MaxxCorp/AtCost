@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 import type { Recipe as DbRecipe } from '@ac/db';
 import type { Consumable } from './consumables.js';
+import type { Tag } from './tags.js';
 
 export interface RecipeIngredient {
     consumableId: string;
@@ -16,6 +17,7 @@ export type Recipe = Omit<DbRecipe, 'createdAt' | 'updatedAt'> & {
     consumables?: RecipeIngredient[];
     costPerPortion?: number;
     totalCost?: number;
+    tags?: Tag[];
     user?: {
         id: string;
         name: string | null;
@@ -55,6 +57,9 @@ export const createRecipeSchema = v.object({
         v.transform((val) => typeof val === 'number' ? val : parseFloat(String(val)) || 1)
     ),
     ingredients: v.optional(v.union([v.string(), v.array(v.string())])),
+    tags: v.optional(v.union([v.string(), v.array(v.string())])),
+    tagIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    tagNames: v.optional(v.string()),
 });
 
 export const updateRecipeSchema = v.object({
@@ -67,4 +72,8 @@ export const updateRecipeSchema = v.object({
         v.transform((val) => typeof val === 'number' ? val : parseFloat(String(val)) || 1)
     ),
     ingredients: v.optional(v.union([v.string(), v.array(v.string())])),
+    tags: v.optional(v.union([v.string(), v.array(v.string())])),
+    tagIds: v.optional(v.union([v.array(v.string()), v.string()])),
+    tagNames: v.optional(v.string()),
 });
+

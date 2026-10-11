@@ -15,6 +15,15 @@ export const readRecipe = query(v.string(), async (id: string): Promise<Recipe |
                 with: {
                     consumable: true,
                 }
+            },
+            tags: {
+                with: {
+                    tag: {
+                        with: {
+                            category: true
+                        }
+                    }
+                }
             }
         }
     });
@@ -58,5 +67,7 @@ export const readRecipe = query(v.string(), async (id: string): Promise<Recipe |
         consumables: ingredients,
         totalCost: Math.round(totalCost * 100) / 100,
         costPerPortion: Math.round(costPerPortion * 100) / 100,
+        tags: (r.tags || []).map((t: any) => t.tag).filter(Boolean),
     };
 });
+

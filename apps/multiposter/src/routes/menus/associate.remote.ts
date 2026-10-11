@@ -75,9 +75,14 @@ export const fetchEntityMenus = query(getMenuAssociationsSchema, async (data) =>
                 with: {
                     items: {
                         with: {
-                            consumable: true,
+                            consumable: {
+                                with: {
+                                    tags: { with: { tag: { with: { category: true } } } }
+                                }
+                            },
                             recipe: {
                                 with: {
+                                    tags: { with: { tag: { with: { category: true } } } },
                                     consumables: {
                                         with: {
                                             consumable: true
@@ -101,6 +106,10 @@ export const fetchEntityMenus = query(getMenuAssociationsSchema, async (data) =>
             const linePricePerPortion = (it.unitPrice || 0) * (it.portionAmount || 1);
             totalPricePerPortion += linePricePerPortion;
 
+            const itemTags = it.itemType === 'recipe'
+                ? (it.recipe?.tags || []).map((t: any) => t.tag || t).filter(Boolean)
+                : (it.consumable?.tags || []).map((t: any) => t.tag || t).filter(Boolean);
+
             return {
                 id: it.id,
                 menuId: it.menuId,
@@ -115,19 +124,23 @@ export const fetchEntityMenus = query(getMenuAssociationsSchema, async (data) =>
                 factor: it.factor,
                 unitPrice: it.unitPrice,
                 sortOrder: it.sortOrder,
+                tags: itemTags,
                 consumable: it.consumable ? {
                     ...it.consumable,
                     expirationDate: it.consumable.expirationDate ? it.consumable.expirationDate.toISOString() : null,
                     createdAt: it.consumable.createdAt.toISOString(),
                     updatedAt: it.consumable.updatedAt.toISOString(),
+                    tags: (it.consumable.tags || []).map((t: any) => t.tag || t).filter(Boolean),
                 } : null,
                 recipe: it.recipe ? {
                     ...it.recipe,
                     createdAt: it.recipe.createdAt.toISOString(),
                     updatedAt: it.recipe.updatedAt.toISOString(),
+                    tags: (it.recipe.tags || []).map((t: any) => t.tag || t).filter(Boolean),
                 } : null,
             };
         });
+
 
         return {
             id: m.id,
