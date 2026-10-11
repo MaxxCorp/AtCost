@@ -16,6 +16,8 @@
     // @ts-ignore
     import EntityManager_ from "../EntityManager.svelte";
     const EntityManager = EntityManager_ as any;
+    // @ts-ignore
+    import TagManager from "../TagManager.svelte";
     import { Tag as TagIcon } from "@lucide/svelte";
     import { handleDelete } from "../../hooks/handleDelete.svelte";
     import { translateIssue } from "../../utils.js";
@@ -449,10 +451,11 @@
                     <TagIcon size={18} class="text-blue-600" />
                     {labels?.tags ?? "Tags"}
                 </h3>
-                <EntityManager
+                <TagManager
                     title={labels?.tags ?? "Tag"}
                     icon={TagIcon}
                     mode="embedded"
+                    preferenceKey="em_filters_contact_tags"
                     initialItems={initialTags}
                     listItemsRemote={listTagsRemote}
                     onchange={(ids: any, items: any) => {
@@ -463,35 +466,10 @@
                     updateRemote={updateTagRemote}
                     updateSchema={updateTagSchema}
                     readItemRemote={readTagRemote}
-                    deleteItemRemote={deleteTagRemote ? async (ids: string[]) => {
-                        return await handleDelete({
-                            ids,
-                            deleteFn: deleteTagRemote,
-                            itemName: labels?.tag ?? "tag",
-                        });
-                    } : undefined}
-                    searchPredicate={(t: any, q: string) => t.name.toLowerCase().includes(q.toLowerCase())}
-                    linkItemLabel={labels?.linkTag ?? "Link Tag"}
-                    associatedItemLabel={labels?.associatedTags ?? "Associated Tags"}
-                    searchPlaceholder={labels?.searchTags ?? "Search tags..."}
-                    noItemsLabel={labels?.noTags ?? "No tags associated."}
-                    quickCreateLabel={labels?.quickCreateTag ?? "Quick Create Tag"}
-                >
-                    {#snippet renderItemLabel(tag: any)}
-                        {tag.name}
-                    {/snippet}
-                    {#snippet renderForm({ remoteFunction: state, schema, initialData: formData, onSuccess, onCancel, id }: any)}
-                        <TagForm
-                            remoteFunction={state}
-                            validationSchema={schema}
-                            isUpdating={!!id}
-                            initialData={formData}
-                            {onSuccess}
-                            {onCancel}
-                            {m}
-                        />
-                    {/snippet}
-                </EntityManager>
+                    deleteItemRemote={deleteTagRemote}
+                    {labels}
+                    {m}
+                />
             </div>
         {:else}
             <div>

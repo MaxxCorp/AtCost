@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import * as m from "#lib/paraglide/messages.js";
-    import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager } from "@ac/ui";
+    import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager, TagManager } from "@ac/ui";
     import { Calendar, ArrowLeft, ExternalLink, FileText, Layers, TrendingUp, Sparkles, CheckCircle, Shield, Scale, HeartHandshake, ShieldCheck } from "@lucide/svelte";
     import { 
         readTalent, 
@@ -17,12 +17,25 @@
     import { updateContract } from '../../contracts/[id]/update.remote';
     import ContractForm from '../../contracts/ContractForm.svelte';
 
+    import { listTags } from '../../tags/list.remote.js';
+    import { readTag } from '../../tags/[id]/read.remote.js';
+    import { createTag } from '../../tags/new/create.remote.js';
+    import { updateTag } from '../../tags/[id]/update.remote.js';
+    import { deleteTag } from '../../tags/[id]/delete.remote.js';
+    import {
+        listTagCategories,
+        createTagCategoryCommand,
+        updateTagCategoryCommand,
+        deleteTagCategoryAction
+    } from '../../tags/categories.remote.js';
+    import { createTagSchema, updateTagSchema } from '@ac/validations';
+    import { updateTalentTagsAction } from './tags.remote.js';
+
     import { contractSchema, updateContractSchema } from "@ac/validations/contracts";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
     import PayrollProfileForm from "#lib/components/payroll/PayrollProfileForm.svelte";
     import { getContractFilterGroups } from "#lib/filters/index.js";
-    import TalentTagsCard from "#lib/components/talent/TalentTagsCard.svelte";
 
     const talentIdParam = $derived(page.params.id as string);
     const talentQuery = $derived(readTalent(talentIdParam));
@@ -48,6 +61,9 @@
     });
 
     const listTalentContracts = (params: any) => listContracts({ ...params, talentId: talentIdParam });
+
+    const tagCategoriesQuery = $derived(listTagCategories({ limit: 100 }));
+    const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
 </script>
 
 <div class="max-w-4xl mx-auto px-4 py-8">
@@ -361,11 +377,38 @@
                         </div>
 
                         <div class="pt-8 border-t border-gray-100">
-                            <TalentTagsCard
-                                talentId={talentIdParam}
-                                currentTags={talent.tags || []}
-                                onUpdated={() => {
+                            <TagManager
+                                title="Mitarbeiter-Tags"
+                                mode="embedded"
+                                preferenceKey="em_filters_talent_tags"
+                                initialItems={talent.tags || []}
+                                onchange={async (ids: string[]) => {
+                                    await updateTalentTagsAction({
+                                        talentId: talentIdParam,
+                                        tagIds: ids,
+                                    });
                                     void talentQuery.refresh();
+                                }}
+                                listItemsRemote={listTags}
+                                createRemote={createTag}
+                                createSchema={createTagSchema}
+                                updateRemote={updateTag}
+                                updateSchema={updateTagSchema}
+                                readItemRemote={readTag}
+                                deleteItemRemote={deleteTag}
+                                categories={availableTagCategories}
+                                categoriesRemote={listTagCategories}
+                                createCategoryRemote={createTagCategoryCommand}
+                                updateCategoryRemote={updateTagCategoryCommand}
+                                deleteCategoryRemote={deleteTagCategoryAction}
+                                onCategoryCreated={() => {
+                                    void tagCategoriesQuery.refresh();
+                                }}
+                                onCategoryUpdated={() => {
+                                    void tagCategoriesQuery.refresh();
+                                }}
+                                onCategoryDeleted={() => {
+                                    void tagCategoriesQuery.refresh();
                                 }}
                             />
                         </div>

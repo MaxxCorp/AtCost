@@ -13,6 +13,7 @@ export { ICONS, type IconDef } from "./icons.js";
 import _EntityManager from './components/EntityManager.svelte';
 export const EntityManager = _EntityManager as any;
 export { default as ContactManager } from './components/ContactManager.svelte';
+export { default as TagManager } from './components/TagManager.svelte';
 export { default as AsyncButton } from './components/AsyncButton.svelte';
 export { default as BulkActionToolbar } from './components/BulkActionToolbar.svelte';
 export { default as LoadingSection } from './components/LoadingSection.svelte';

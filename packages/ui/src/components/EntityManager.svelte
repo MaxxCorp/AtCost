@@ -16,6 +16,7 @@
         Database,
         Loader2,
         MapPin,
+        Folder,
     } from "@lucide/svelte";
 
     // @ts-ignore
@@ -89,6 +90,7 @@
         >;
 
         // Rendering snippets
+        renderItem?: Snippet<[T]>;
         renderItemLabel?: Snippet<[T]>;
         renderItemBadge?: Snippet<[T]>;
         renderItemDetail?: Snippet<[T]>;
@@ -156,6 +158,7 @@
         updateSchema,
         readItemRemote,
         renderForm,
+        renderItem,
         renderItemLabel,
         renderItemBadge,
         renderItemDetail,
@@ -310,8 +313,9 @@
     const effectiveSelectorSortField = $derived(selectorSortField ?? propSortField ?? "displayName");
     const effectiveSelectorSortOrder = $derived(selectorSortOrder ?? propSortOrder ?? "asc");
     const activeSelectorGroupBy = $derived(selectorGroupBy ?? groupBy);
+    const GroupIcon = $derived(groupIcon || Folder);
     const isStandalone = $derived(
-        mode === "standalone" || (!type && !entityId && !fetchAssociationsRemote && (!initialItems || initialItems.length === 0))
+        mode === "standalone" || (!type && !entityId && !fetchAssociationsRemote && !onchange && (!initialItems || initialItems.length === 0))
     );
     const activeSearch = $derived(!isStandalone ? selectorSearchQuery : searchQuery);
 
@@ -986,7 +990,9 @@
                                                 ? 'text-blue-700'
                                                 : 'text-gray-900'} truncate"
                                         >
-                                            {#if renderItemLabel}
+                                            {#if renderItem}
+                                                {@render renderItem(item)}
+                                            {:else if renderItemLabel}
                                                 {@render renderItemLabel(item)}
                                             {:else}
                                                 {(item as any).displayName ||
@@ -1150,16 +1156,18 @@
                                     <div
                                         class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
                                     >
-                                {#if renderItemLabel}
-                                    {@render renderItemLabel(item)}
-                                {:else}
-                                    {(item as any).displayName ||
-                                        item.name ||
-                                        (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
-                                        (item as any).company ||
-                                        item.id ||
-                                        "Unnamed Item"}
-                                {/if}
+                                    {#if renderItem}
+                                        {@render renderItem(item)}
+                                    {:else if renderItemLabel}
+                                        {@render renderItemLabel(item)}
+                                    {:else}
+                                        {(item as any).displayName ||
+                                            item.name ||
+                                            (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
+                                            (item as any).company ||
+                                            item.id ||
+                                            "Unnamed Item"}
+                                    {/if}
                             </div>
                             <div class="flex items-center gap-2 mt-0.5">
                                 {#if renderItemBadge}

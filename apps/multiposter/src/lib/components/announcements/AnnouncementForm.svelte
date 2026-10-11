@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
-    import { EntityManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
+    import { EntityManager, TagManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -25,7 +25,7 @@
 
     import { Tag as TagIcon } from "@lucide/svelte";
     import { listLocations } from "../../../routes/locations/list.remote";
-    import { type Location } from "@ac/validations";
+    import { type Location, createTagSchema, updateTagSchema } from "@ac/validations";
     import { getLocationFilterGroups, getContactFilterGroups } from "#lib/filters/index.js";
 
     import { createLocation } from "../../../routes/locations/new/create.remote";
@@ -269,76 +269,31 @@
                     {m.tags()}
                 </h3>
                 {#key initialData?.id || "new"}
-                    <EntityManager {m}
+                    <TagManager
                         title={m.tags()}
                         icon={TagIcon}
                         mode="embedded"
+                        preferenceKey="em_filters_announcement_tags"
                         initialItems={initialData?.tags || []}
                         listItemsRemote={listTagsRemote}
                         onchange={(ids: any, items: any[]) => {
                             tagsString = items.map((i) => i.name).join(", ");
                         }}
-                        deleteItemRemote={deleteTagRemote}
                         createRemote={createTagRemote}
-                        createSchema={v.object({
-                            name: v.pipe(v.string(), v.minLength(1)),
-                        })}
+                        createSchema={createTagSchema}
                         updateRemote={updateTagRemote}
-                        updateSchema={v.object({
-                            name: v.pipe(v.string(), v.minLength(1)),
-                        })}
+                        updateSchema={updateTagSchema}
                         readItemRemote={readTagRemote}
-                        searchPredicate={(t: any, q: string) =>
-                            t.name.toLowerCase().includes(q.toLowerCase())}
-                        loadingLabel={m.loading_item({ item: m.tags() })}
-                        noItemsLabel={m.no_items_associated_label({
-                            item: m.tags(),
-                        })}
-                        noItemsFoundLabel={m.no_items_found({ item: m.tags() })}
-                        searchPlaceholder={m.search_placeholder({
-                            item: m.tags(),
-                        })}
-                        linkItemLabel={m.link_item_label({ item: m.tags() })}
-                        associatedItemLabel={m.associated_item_label({
-                            item: m.tags(),
-                        })}
-                        quickCreateLabel={m.quick_create()}
-                        closeSearchLabel={m.close_search()}
-                        editLabel={m.edit()}
-                        deleteLabel={m.delete()}
-                        unlinkLabel={m.unlink()}
-                        selectAllLabel={m.select_all()}
-                        deselectAllLabel={m.deselect_all()}
-                    >
-                        {#snippet renderItemLabel(tag: any)}
-                            {tag.name}
-                        {/snippet}
-                        {#snippet renderForm({
-                            remoteFunction,
-                            schema,
-                            initialData: formData,
-                            onSuccess,
-                            onCancel,
-                            id,
-                        }: any)}
-                            <TagForm
-                                {remoteFunction}
-                                validationSchema={schema}
-                                isUpdating={!!id}
-                                initialData={formData}
-                                categories={availableTagCategories}
-                                createCategoryRemote={createTagCategoryCommand}
-                                updateCategoryRemote={updateTagCategoryCommand}
-                                deleteCategoryRemote={deleteTagCategoryAction}
-                                onCategoryCreated={() => { void tagCategoriesQuery.refresh(); }}
-                                onCategoryUpdated={() => { void tagCategoriesQuery.refresh(); }}
-                                onCategoryDeleted={() => { void tagCategoriesQuery.refresh(); }}
-                                {onSuccess}
-                                {onCancel}
-                                {m}
-                            />
-                        {/snippet}
-                    </EntityManager>
+                        deleteItemRemote={deleteTagRemote}
+                        categories={availableTagCategories}
+                        createCategoryRemote={createTagCategoryCommand}
+                        updateCategoryRemote={updateTagCategoryCommand}
+                        deleteCategoryRemote={deleteTagCategoryAction}
+                        onCategoryCreated={() => { void tagCategoriesQuery.refresh(); }}
+                        onCategoryUpdated={() => { void tagCategoriesQuery.refresh(); }}
+                        onCategoryDeleted={() => { void tagCategoriesQuery.refresh(); }}
+                        {m}
+                    />
                 {/key}
             </div>
 
