@@ -24,7 +24,7 @@
     import { onMount, type Snippet, untrack } from "svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { type Contact } from "@ac/validations";
-    import TagForm from "@ac/ui/components/forms/TagForm.svelte";
+    import { TagForm } from "@ac/ui";
     import { readTag } from "../../../routes/tags/[id]/read.remote";
     import {
         listTagCategories as listTagCategoriesRemote,
@@ -32,7 +32,6 @@
         updateTagCategoryCommand,
         deleteTagCategoryAction
     } from "../../../routes/tags/categories.remote";
-        
     import {
         addAssociation,
         removeAssociation,

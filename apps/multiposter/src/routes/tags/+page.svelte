@@ -153,11 +153,11 @@
                         </div>
                     {/snippet}
 
-                    {#snippet renderForm({ remoteFunction, schema, isUpdating, initialData, onSuccess, onCancel }: any)}
+                    {#snippet renderForm({ remoteFunction, schema, isUpdating, initialData, onSuccess, onCancel, id }: any)}
                         <TagForm
                             {remoteFunction}
                             validationSchema={schema}
-                            {isUpdating}
+                            isUpdating={isUpdating || !!id || !!initialData?.id}
                             {initialData}
                             categories={availableCategories}
                             createCategoryRemote={createTagCategoryCommand}
@@ -218,11 +218,11 @@
                         </div>
                     {/snippet}
 
-                    {#snippet renderForm({ remoteFunction, schema, isUpdating, initialData, onSuccess, onCancel }: any)}
+                    {#snippet renderForm({ remoteFunction, schema, isUpdating, initialData, onSuccess, onCancel, id }: any)}
                         <TagCategoryForm
                             {remoteFunction}
                             validationSchema={schema}
-                            {isUpdating}
+                            isUpdating={isUpdating || !!id || !!initialData?.id}
                             {initialData}
                             {onSuccess}
                             {onCancel}

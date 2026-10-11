@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from "svelte";
     // @ts-ignore
     import AsyncButton from "../AsyncButton.svelte";
     import { toast } from "svelte-sonner";
@@ -54,12 +55,26 @@
         { name: "Slate", value: "slate", bg: "bg-slate-500" },
     ];
 
+    const effectiveIsUpdating = $derived(isUpdating || !!initialData?.id || !!initialData?.data?.id);
+    let selectedVisibility = $state(initialData?.data?.visibility || initialData?.visibility || "internal");
     // svelte-ignore state_referenced_locally
-    let selectedVisibility = $state(initialData?.visibility || "internal");
+    let selectedColor = $state(initialData?.data?.color || initialData?.color || "indigo");
     // svelte-ignore state_referenced_locally
-    let selectedColor = $state(initialData?.color || "indigo");
-    // svelte-ignore state_referenced_locally
-    let selectedCategoryId = $state(initialData?.categoryId || "");
+    let selectedCategoryId = $state(initialData?.data?.categoryId || initialData?.categoryId || "");
+
+    let lastInitializedId = $state<string | null>(initialData?.data?.id || initialData?.id || null);
+    $effect(() => {
+        const item = initialData?.data || initialData;
+        const currentId = item?.id;
+        if (currentId && currentId !== lastInitializedId) {
+            lastInitializedId = currentId;
+            untrack(() => {
+                if (item.visibility) selectedVisibility = item.visibility;
+                if (item.color) selectedColor = item.color;
+                if (item.categoryId !== undefined) selectedCategoryId = item.categoryId || "";
+            });
+        }
+    });
 
     let categoriesList = $state<Array<{ id: string; name: string; color?: string; description?: string | null; slug?: string | null }>>([]);
 
@@ -197,27 +212,7 @@
         }
     });
 
-    $effect(() => {
-        const data = initialData || {};
-        if (remoteFunction.fields.name && data.name) {
-            remoteFunction.fields.name.set(data.name);
-        }
-        if (remoteFunction.fields.visibility && data.visibility) {
-            remoteFunction.fields.visibility.set(data.visibility);
-            selectedVisibility = data.visibility;
-        }
-        if (remoteFunction.fields.categoryId && data.categoryId) {
-            remoteFunction.fields.categoryId.set(data.categoryId);
-            selectedCategoryId = data.categoryId;
-        }
-        if (remoteFunction.fields.color && data.color) {
-            remoteFunction.fields.color.set(data.color);
-            selectedColor = data.color;
-        }
-        if (remoteFunction.fields.description && data.description) {
-            remoteFunction.fields.description.set(data.description);
-        }
-    });
+
 </script>
 
 <form
@@ -246,8 +241,8 @@
             }
         })}
 >
-    {#if isUpdating && initialData?.id && remoteFunction.fields.id}
-        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
+    {#if (effectiveIsUpdating || initialData?.id || initialData?.data?.id) && remoteFunction.fields.id}
+        <input {...remoteFunction.fields.id.as("hidden", initialData?.id || initialData?.data?.id)} />
     {/if}
 
     <!-- Name -->
@@ -257,7 +252,7 @@
         </label>
         <input
             id="tag-name"
-            {...remoteFunction.fields.name.as("text")}
+            {...remoteFunction.fields.name.as("text", initialData?.data?.name || initialData?.name || "")}
             placeholder="z.B. Gehaltsempfänger, Barista, VIP, Festangestellt"
             class="w-full px-3.5 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden {(remoteFunction.fields.name.issues() ?? []).length > 0 ? 'border-rose-500' : 'border-gray-200'}"
             onblur={() => remoteFunction.validate()}
@@ -433,7 +428,7 @@
         </label>
         <textarea
             id="tag-desc"
-            {...remoteFunction.fields.description.as("text", initialData?.description ?? "")}
+            {...remoteFunction.fields.description.as("text", initialData?.data?.description || initialData?.description || "")}
             rows="2"
             placeholder="Optionale Beschreibung des Tags..."
             class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden"
@@ -453,11 +448,11 @@
         <AsyncButton
             type="submit"
             size="sm"
-            loadingLabel={isUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
+            loadingLabel={effectiveIsUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
             loading={(remoteFunction as any).pending}
             class="bg-indigo-600 hover:bg-indigo-700 text-white"
         >
-            {isUpdating ? "Änderungen speichern" : "Tag anlegen"}
+            {effectiveIsUpdating ? "Änderungen speichern" : "Tag anlegen"}
         </AsyncButton>
     </div>
 </form>

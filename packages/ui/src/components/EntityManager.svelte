@@ -85,6 +85,7 @@
                     onSuccess: (result: any) => void;
                     onCancel: () => void;
                     id?: string;
+                    isUpdating?: boolean;
                 },
             ]
         >;
@@ -489,22 +490,27 @@
     // --- STATE ---
     let localAssociatedItems = $state<T[]>(untrack(() => initialItems ?? []));
     let showSelector = $state(false);
+    let refreshTrigger = $state(0);
 
-    const associationsPromise = $derived(
-        entityId && type
-            ? fetchAssociationsRemote
+    const associationsPromise = $derived.by(() => {
+        void refreshTrigger;
+        if (entityId && type) {
+            return fetchAssociationsRemote
                 ? invokeRemote(fetchAssociationsRemote, { type, entityId }).catch(() => localAssociatedItems)
                 : invokeRemote(listItemsRemote, {
                       associatedWith: { type, id: entityId },
-                  }).catch(() => localAssociatedItems)
-            : Promise.resolve(localAssociatedItems)
-    );
+                  }).catch(() => localAssociatedItems);
+        }
+        return Promise.resolve(localAssociatedItems);
+    });
 
-    const selectorListPromise = $derived(
-        isStandalone || showSelector
-            ? invokeRemote(listItemsRemote, filterState)
-            : Promise.resolve({ data: [], total: 0 })
-    );
+    const selectorListPromise = $derived.by(() => {
+        void refreshTrigger;
+        if (isStandalone || showSelector) {
+            return invokeRemote(listItemsRemote, filterState);
+        }
+        return Promise.resolve({ data: [], total: 0 });
+    });
 
     const displayedItemsPromise = $derived(
         isStandalone ? selectorListPromise : associationsPromise
@@ -632,6 +638,7 @@
             if (!success) return;
 
             const newList = currentList.filter((i) => i.id !== item.id);
+            refreshTrigger++;
 
             if (typeof selectorListPromise?.refresh === 'function') {
                 await selectorListPromise.refresh();
@@ -672,6 +679,7 @@
         }
 
         if (newId) {
+            refreshTrigger++;
             if (typeof selectorListPromise?.refresh === 'function') {
                 await selectorListPromise.refresh();
             }
@@ -708,6 +716,8 @@
         const targetId = editingItem?.id;
         editingItem = null;
         if (!targetId) return;
+
+        refreshTrigger++;
 
         let updatedItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
         if (!updatedItem && result && typeof result === 'object' && 'id' in result) {
@@ -1306,36 +1316,40 @@
                     {@const currentAssociations = normalize(res).data}
                     <svelte:boundary>
                         {#if editingItem && readItemRemote}
-                            {#await invokeRemote(readItemRemote, editingItem.id)}
-                                <div class="p-8 flex flex-col items-center justify-center gap-2">
-                                    <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                    <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
-                                </div>
-                            {:then fullItem}
-                                {@render renderForm({
-                                    remoteFunction: updateRemote,
-                                    schema: updateSchema,
-                                    initialData: fullItem,
-                                    onSuccess: (result) => {
-                                        void handleInPlaceUpdateSuccess(
-                                            result,
-                                            currentAssociations,
-                                        );
-                                    },
-                                    onCancel: () => {
-                                        editingItem = null;
-                                    },
-                                    id: editingItem.id,
-                                })}
-                            {:catch error}
-                                <div class="p-8 text-center text-red-500 text-sm">
-                                    {error?.message || i18n.failedToLoadLabel}
-                                </div>
-                            {/await}
+                            {#key editingItem.id}
+                                {#await invokeRemote(readItemRemote, editingItem.id)}
+                                    <div class="p-8 flex flex-col items-center justify-center gap-2">
+                                        <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                        <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                                    </div>
+                                {:then fullItem}
+                                    {@render renderForm({
+                                        remoteFunction: updateRemote,
+                                        schema: updateSchema,
+                                        initialData: fullItem,
+                                        isUpdating: true,
+                                        onSuccess: (result) => {
+                                            void handleInPlaceUpdateSuccess(
+                                                result,
+                                                currentAssociations,
+                                            );
+                                        },
+                                        onCancel: () => {
+                                            editingItem = null;
+                                        },
+                                        id: editingItem.id,
+                                    })}
+                                {:catch error}
+                                    <div class="p-8 text-center text-red-500 text-sm">
+                                        {error?.message || i18n.failedToLoadLabel}
+                                    </div>
+                                {/await}
+                            {/key}
                         {:else if showQuickCreate}
                             {@render renderForm({
                                 remoteFunction: createRemote,
                                 schema: createSchema,
+                                isUpdating: false,
                                 onSuccess: (result) => {
                                     void handleQuickCreateSuccess(
                                         result,

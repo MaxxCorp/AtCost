@@ -38,7 +38,9 @@
         { name: "Slate", value: "slate", bg: "bg-slate-500" },
     ];
 
-    let selectedColor = $state(initialData?.color || "indigo");
+    const effectiveIsUpdating = $derived(isUpdating || !!initialData?.id || !!initialData?.data?.id);
+    // svelte-ignore state_referenced_locally
+    let selectedColor = $state(initialData?.data?.color || initialData?.color || "indigo");
 
     let submissionTriggered = $state(false);
     $effect(() => {
@@ -49,15 +51,7 @@
         }
     });
 
-    $effect(() => {
-        const data = initialData || {};
-        const keys = ["name", "slug", "description", "color", "icon"];
-        for (const key of keys) {
-            if (remoteFunction.fields[key] && data[key] !== undefined) {
-                remoteFunction.fields[key].set(data[key]);
-            }
-        }
-    });
+
 </script>
 
 <form
@@ -86,8 +80,8 @@
             }
         })}
 >
-    {#if isUpdating && initialData?.id && remoteFunction.fields.id}
-        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
+    {#if (effectiveIsUpdating || initialData?.id || initialData?.data?.id) && remoteFunction.fields.id}
+        <input {...remoteFunction.fields.id.as("hidden", initialData?.id || initialData?.data?.id)} />
     {/if}
 
     <div>
@@ -96,7 +90,7 @@
         </label>
         <input
             id="cat-name"
-            {...remoteFunction.fields.name.as("text")}
+            {...remoteFunction.fields.name.as("text", initialData?.data?.name || initialData?.name || "")}
             placeholder="z.B. Abrechnung & Vergütung, Abteilungen"
             class="w-full px-3.5 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden {(remoteFunction.fields.name.issues() ?? []).length > 0 ? 'border-rose-500' : 'border-gray-200'}"
             onblur={() => remoteFunction.validate()}
@@ -112,16 +106,16 @@
         </label>
         <input
             id="cat-slug"
-            {...remoteFunction.fields.slug.as("text", "")}
+            {...remoteFunction.fields.slug.as("text", initialData?.data?.slug || initialData?.slug || "")}
             placeholder="z.B. payroll, department"
             class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden font-mono"
         />
     </div>
 
     <div>
-        <label class="block font-semibold text-gray-700 mb-1.5">
+        <span class="block font-semibold text-gray-700 mb-1.5">
             Akzentfarbe
-        </label>
+        </span>
         <div class="flex items-center gap-2 flex-wrap">
             {#each colorPresets as preset}
                 <button
@@ -150,7 +144,7 @@
         </label>
         <textarea
             id="cat-desc"
-            {...remoteFunction.fields.description.as("text", "")}
+            {...remoteFunction.fields.description.as("text", initialData?.data?.description || initialData?.description || "")}
             rows="2"
             placeholder="Verwendungszweck dieser Kategorie..."
             class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden"
@@ -170,11 +164,11 @@
         <AsyncButton
             type="submit"
             size="sm"
-            loadingLabel={isUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
+            loadingLabel={effectiveIsUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
             loading={(remoteFunction as any).pending}
             class="bg-indigo-600 hover:bg-indigo-700 text-white"
         >
-            {isUpdating ? "Änderungen speichern" : "Kategorie anlegen"}
+            {effectiveIsUpdating ? "Änderungen speichern" : "Kategorie anlegen"}
         </AsyncButton>
     </div>
 </form>

@@ -11,8 +11,11 @@
             "default": "./src/index.ts"
         },
         "./components/*.svelte": "./src/components/*.svelte",
+        "./components/forms/*.svelte": "./src/components/forms/*.svelte",
         "./components/forms/ContactForm.svelte": "./src/components/forms/ContactForm.svelte",
         "./components/forms/LocationForm.svelte": "./src/components/forms/LocationForm.svelte",
+        "./components/forms/TagForm.svelte": "./src/components/forms/TagForm.svelte",
+        "./components/forms/TagCategoryForm.svelte": "./src/components/forms/TagCategoryForm.svelte",
         "./components/locations/*.svelte": "./src/components/locations/*.svelte",
         "./components/avatar": "./src/components/avatar/index.ts",
         "./components/breadcrumb": "./src/components/breadcrumb/index.ts",
