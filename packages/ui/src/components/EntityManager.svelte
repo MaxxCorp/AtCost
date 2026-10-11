@@ -277,8 +277,10 @@
     const effectiveSelectorSortField = $derived(selectorSortField ?? propSortField ?? "displayName");
     const effectiveSelectorSortOrder = $derived(selectorSortOrder ?? propSortOrder ?? "asc");
     const activeSelectorGroupBy = $derived(selectorGroupBy ?? groupBy);
-    const GroupIcon = $derived(groupIcon ?? MapPin);
-    const activeSearch = $derived(mode === "embedded" ? selectorSearchQuery : searchQuery);
+    const isStandalone = $derived(
+        mode === "standalone" || (!type && !entityId && !fetchAssociationsRemote && (!initialItems || initialItems.length === 0))
+    );
+    const activeSearch = $derived(!isStandalone ? selectorSearchQuery : searchQuery);
 
     const filterState = $derived({
         search: activeSearch || undefined,
@@ -456,9 +458,13 @@
     );
 
     const selectorListPromise = $derived(
-        mode === "standalone" || showSelector
+        isStandalone || showSelector
             ? invokeRemote(listItemsRemote, filterState)
             : Promise.resolve({ data: [], total: 0 })
+    );
+
+    const displayedItemsPromise = $derived(
+        isStandalone ? selectorListPromise : associationsPromise
     );
 
     $effect(() => {
@@ -693,7 +699,7 @@
 <!-- Action Bar (Search, Filters, Actions) -->
 <div class="flex flex-col gap-2 mb-3">
     <div class="flex flex-col md:flex-row gap-3">
-        {#if mode === "standalone"}
+        {#if isStandalone}
             <div class="relative flex-1">
                 <Search
                     size={14}
@@ -708,12 +714,12 @@
             </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-1.5 {mode === 'standalone' ? 'md:ml-auto' : ''} shrink-0 w-full md:w-auto">
+        <div class="flex flex-wrap items-center gap-1.5 {isStandalone ? 'md:ml-auto' : ''} shrink-0 w-full md:w-auto">
             {#if toolbarActions}
                 {@render toolbarActions()}
             {/if}
 
-            {#if mode === "standalone" && (allFilterGroups.length > 0 || (booleanFilters && booleanFilters.length > 0) || (radioGroups && radioGroups.length > 0))}
+            {#if isStandalone && (allFilterGroups.length > 0 || (booleanFilters && booleanFilters.length > 0) || (radioGroups && radioGroups.length > 0))}
                 <FilterMenu
                     groups={allFilterGroups}
                     bind:filters={activeFilters}
@@ -734,7 +740,7 @@
                 </Button>
             {/if}
 
-            {#if mode !== "standalone"}
+            {#if !isStandalone}
                 {#await associationsPromise}
                     <div class="flex items-center justify-center p-1">
                         <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
@@ -807,7 +813,7 @@
     </div>
 
     <!-- Active Filter Chips (Standalone mode only) -->
-    {#if mode === "standalone" && allFilterGroups.length > 0}
+    {#if isStandalone && allFilterGroups.length > 0}
         <ActiveFilterChips
             groups={allFilterGroups}
             filters={activeFilters}
@@ -1074,7 +1080,7 @@
             </div>
         {/if}
         <div class={$effect.pending() ? 'opacity-50 pointer-events-none transition-opacity duration-200' : 'transition-opacity duration-200'}>
-            {#await associationsPromise}
+            {#await displayedItemsPromise}
                 <div class="flex items-center justify-center py-6 text-gray-500 gap-2 font-medium text-sm">
                     <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
                     <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
@@ -1092,10 +1098,13 @@
                                         .includes(searchQuery.toLowerCase()) ||
                                     i.title
                                         ?.toLowerCase()
+                                        .includes(searchQuery.toLowerCase()) ||
+                                    i.displayName
+                                        ?.toLowerCase()
                                         .includes(searchQuery.toLowerCase())),
                       )
                     : currentAssociations) as T[]}
-                {@const items = (mode === "standalone"
+                {@const items = (isStandalone
                     ? searchedAssoc.filter((i: any) => matchesFilters(i, activeFilters))
                     : searchedAssoc) as T[]}
                 {#if items.length > 0}
@@ -1243,7 +1252,7 @@
             </Dialog.Header>
 
             <div style="overflow-y: auto; flex: 1; min-height: 0;">
-                {#await associationsPromise}
+                {#await displayedItemsPromise}
                     <div class="p-8 flex justify-center">
                         <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                     </div>

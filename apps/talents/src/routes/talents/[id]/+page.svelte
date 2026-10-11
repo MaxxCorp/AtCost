@@ -206,17 +206,23 @@
                             <EntityManager
                                 title="Contracts"
                                 icon={FileText}
-                                mode="embedded"
+                                mode="standalone"
                                 filters={getContractFilterGroups(m)}
                                 listItemsRemote={listTalentContracts}
-                                deleteItemRemote={deleteContract}
+                                deleteItemRemote={async (ids: string[]) => {
+                                    const res = await deleteContract(ids);
+                                    void effectiveContractQuery.refresh();
+                                    return res;
+                                }}
                                 createRemote={createContract}
                                 createSchema={contractSchema}
                                 updateRemote={updateContract}
                                 updateSchema={updateContractSchema}
                                 readItemRemote={(id: string) => readContract({ id })}
                                 searchPredicate={(c: any, q: any) => {
-                                    return (c.entgeltgruppe?.toLowerCase() || '').includes(q.toLowerCase());
+                                    return (c.title?.toLowerCase() || '').includes(q.toLowerCase()) ||
+                                           (c.entgeltgruppe?.toLowerCase() || '').includes(q.toLowerCase()) ||
+                                           (c.contractType?.toLowerCase() || '').includes(q.toLowerCase());
                                 }}
                             >
                                 {#snippet renderItemLabel(c: any)}
@@ -269,7 +275,10 @@
                                         validationSchema={schema}
                                         isUpdating={!!id}
                                         initialData={{ ...initialData, talentId: talentIdParam }}
-                                        {onSuccess}
+                                        onSuccess={(result: any) => {
+                                            void effectiveContractQuery.refresh();
+                                            onSuccess(result);
+                                        }}
                                         {onCancel}
                                     />
                                 {/snippet}

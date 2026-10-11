@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, eq } from '@ac/db';
 import { contract, contractFrameworkContract } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -34,8 +34,15 @@ export const updateContract = form(updateContractSchema, async (data) => {
         await db.insert(contractFrameworkContract).values(mappings);
     }
 
-    await listContracts().refresh();
-    await readTalentEffectiveContract({ talentId: updatedContract.talentId }).refresh();
+    try {
+        await requested(listContracts, 20).refreshAll();
+    } catch { /* ignore */ }
+    try {
+        await requested(readTalentEffectiveContract, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listContracts().refresh();
+    void listContracts({}).refresh();
+    void readTalentEffectiveContract({ talentId: updatedContract.talentId }).refresh();
     await readContract({ id: contractId }).set({
         ...updatedContract,
         frameworkIds,

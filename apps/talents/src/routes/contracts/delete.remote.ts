@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, inArray, eq } from '@ac/db';
 import { contract } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -15,9 +15,17 @@ export const deleteContract = command(v.array(v.string()), async (ids: string[])
     const talentIds = Array.from(new Set(contractsToDelete.map(c => c.talentId)));
 
     await db.delete(contract).where(inArray(contract.id, ids));
-    await listContracts().refresh();
+
+    try {
+        await requested(listContracts, 20).refreshAll();
+    } catch { /* ignore */ }
+    try {
+        await requested(readTalentEffectiveContract, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listContracts().refresh();
+    void listContracts({}).refresh();
     for (const tId of talentIds) {
-        await readTalentEffectiveContract({ talentId: tId }).refresh();
+        void readTalentEffectiveContract({ talentId: tId }).refresh();
     }
 
     return { success: true };

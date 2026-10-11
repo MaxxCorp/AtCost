@@ -1,13 +1,11 @@
 import * as v from "valibot";
-import { FilterableIdSchema } from './pagination.js';
+import { FilterableIdSchema, PaginationBaseSchema } from './pagination.js';
 
 export const contractTypePicklist = v.picklist(["base_contract", "amendment", "settlement", "addendum"]);
 export type ContractType = v.InferOutput<typeof contractTypePicklist>;
 
 export const contractPaginationSchema = v.optional(v.object({
-    page: v.optional(v.number(), 1),
-    limit: v.optional(v.number(), 50),
-    search: v.optional(v.string(), ''),
+    ...PaginationBaseSchema.entries,
     talentId: FilterableIdSchema,
     frameworkId: FilterableIdSchema,
     contractType: v.optional(v.string()),
