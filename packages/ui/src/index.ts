@@ -34,6 +34,9 @@ export { default as LocationList } from './components/locations/LocationList.sve
 export { default as LocationCreateView } from './components/locations/LocationCreateView.svelte';
 export { default as LocationDetailView } from './components/locations/LocationDetailView.svelte';
 export { default as TagForm } from './components/forms/TagForm.svelte';
+export { default as TagCategoryForm } from './components/forms/TagCategoryForm.svelte';
 export { IsMobile } from "./hooks/is-mobile.svelte.ts";
 export { handleDelete } from "./hooks/handleDelete.svelte.ts";
 export { getCachedOptionLabel, loadOptionsForGroup, registerGroupOptions, normalizeOption } from "./utils/filterOptionsCache.svelte.ts";
+export { openDB, setPreference, getPreference } from "./utils/idb.js";
+

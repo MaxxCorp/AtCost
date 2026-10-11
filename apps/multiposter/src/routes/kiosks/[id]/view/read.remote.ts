@@ -204,6 +204,15 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         const timeA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
         const timeB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
         return timeA - timeB;
+    }).map((item: any) => {
+        if (!item.tags || !Array.isArray(item.tags)) return item;
+        return {
+            ...item,
+            tags: item.tags.filter((t: any) => {
+                const vis = t?.tag ? t.tag.visibility : t?.visibility;
+                return vis === 'external';
+            })
+        };
     });
 
     return {

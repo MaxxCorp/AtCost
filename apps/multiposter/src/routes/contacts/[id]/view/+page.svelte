@@ -114,9 +114,10 @@
                                         </span>
                                     {/if}
                                     {#if contact.tags && contact.tags.length > 0}
-                                        {#each contact.tags as t}
+                                        {#each contact.tags.filter((t: any) => (t.tag ? t.tag.visibility === 'external' : t.visibility === 'external')) as t}
                                             <span
                                                 class="px-2 py-0.5 bg-indigo-100 text-indigo-800 text-xs font-medium rounded-full flex items-center gap-1"
+                                                style={t.color ? `background-color: ${t.color}15; color: ${t.color};` : undefined}
                                             >
                                                 <TagIcon size={12} />
                                                 {t.name}

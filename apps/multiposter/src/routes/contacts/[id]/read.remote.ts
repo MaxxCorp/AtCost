@@ -119,11 +119,15 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
             addresses: workAddresses,
             // No relations for public view
             relations: [],
-            // Tags are ok to show
-            tags: result.tags.map((t: any) => ({
-                id: t.tag.id,
-                name: t.tag.name
-            })),
+            // Only external tags for public view
+            tags: result.tags
+                .filter((t: any) => t.tag?.visibility === 'external')
+                .map((t: any) => ({
+                    id: t.tag.id,
+                    name: t.tag.name,
+                    visibility: t.tag.visibility,
+                    color: t.tag.color
+                })),
             // Public file versions
             qrCodePath: publicQrCodePath,
             vCardPath: publicVCardPath,

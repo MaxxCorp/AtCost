@@ -841,7 +841,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			rooms,
 			locationIds: Array.from(allLocIds),
 			resourceIds: evtResources.map((r: any) => r.id),
-			tags: e.tags?.map((t: any) => t.tag || t).filter(Boolean) || [],
+			tags: (e.tags?.map((t: any) => t.tag || t).filter(Boolean) || []).filter((tagItem: any) => hasAccess || tagItem?.visibility === 'external'),
 			resolvedContact,
 		};
 	});

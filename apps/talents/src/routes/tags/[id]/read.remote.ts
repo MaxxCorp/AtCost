@@ -1,14 +1,23 @@
 import { query } from '$app/server';
-import { db } from '@ac/db';
-import { tag } from '@ac/db';
-import { eq } from '@ac/db';
-import { getAuthenticatedUser } from '#lib/server/authorization.js';
+import { db, tag, eq } from '@ac/db';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 
 export const readTag = query(v.string(), async (id: string) => {
-    getAuthenticatedUser();
-    
-    return await db.query.tag.findFirst({
-        where: eq(tag.id, id)
-    }) || null;
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'talents');
+
+    const result = await db.query.tag.findFirst({
+        where: eq(tag.id, id),
+        with: {
+            category: true
+        }
+    });
+
+    if (!result) return null;
+
+    return {
+        ...result,
+        createdAt: result.createdAt.toISOString()
+    };
 });

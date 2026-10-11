@@ -9,6 +9,8 @@ import {
     timeOffRequest,
     contact,
     userTalent,
+    tag,
+    talentTag,
     eq,
     and,
     gte,
@@ -49,7 +51,17 @@ export function getMonthDateRange(period: string): { startDate: Date; endDate: D
 }
 
 export async function createPayrollRun(input: CreatePayrollRunInput) {
-    const { startDate, endDate } = getMonthDateRange(input.period);
+    let startDate: Date;
+    let endDate: Date;
+
+    if (input.startDate && input.endDate) {
+        startDate = new Date(input.startDate);
+        endDate = new Date(input.endDate);
+    } else {
+        const range = getMonthDateRange(input.period);
+        startDate = range.startDate;
+        endDate = range.endDate;
+    }
 
     const [created] = await db.insert(payrollRun).values({
         name: input.name,
@@ -57,6 +69,10 @@ export async function createPayrollRun(input: CreatePayrollRunInput) {
         startDate,
         endDate,
         jurisdiction: input.jurisdiction || 'DE',
+        targetGroup: input.targetGroup || 'all',
+        tagIds: input.tagIds || [],
+        cycleType: input.cycleType || 'monthly',
+        paymentDueDate: input.paymentDueDate ? new Date(input.paymentDueDate) : null,
         status: 'draft',
         notes: input.notes,
     }).returning();
@@ -68,7 +84,22 @@ export async function getPayrollRun(id: string) {
     const run = await db.query.payrollRun.findFirst({
         where: eq(payrollRun.id, id),
     });
-    return run;
+    if (!run) return null;
+
+    let targetTags: any[] = [];
+    if (run.tagIds && Array.isArray(run.tagIds) && run.tagIds.length > 0) {
+        targetTags = await db.query.tag.findMany({
+            where: inArray(tag.id, run.tagIds),
+            with: {
+                category: true,
+            }
+        });
+    }
+
+    return {
+        ...run,
+        targetTags,
+    };
 }
 
 export async function calculatePayrollRun(runId: string) {
@@ -86,7 +117,7 @@ export async function calculatePayrollRun(runId: string) {
     // Retrieve approved conditions effective for this specific run period (guarantees retroactive consistency)
     const effectiveSocialCondition = await getEffectiveSocialInsuranceCondition(run.endDate, run.jurisdiction);
 
-    // Fetch all talents with contact details
+    // Fetch all talents with contact details and tags
     const allTalents = await db.query.talent.findMany({
         with: {
             contact: true,
@@ -94,8 +125,38 @@ export async function calculatePayrollRun(runId: string) {
                 orderBy: [asc(contract.precedence), asc(contract.startDate)],
             },
             payrollProfile: true,
+            tags: {
+                with: {
+                    tag: true,
+                }
+            }
         },
     });
+
+    // Filter talents according to run targetGroup and tagIds
+    let eligibleTalents = allTalents;
+
+    if (run.tagIds && Array.isArray(run.tagIds) && run.tagIds.length > 0) {
+        const tagSet = new Set(run.tagIds);
+        eligibleTalents = eligibleTalents.filter(t => {
+            const talentTagIds = (t.tags || []).map(tt => tt.tagId);
+            return talentTagIds.some(id => tagSet.has(id));
+        });
+    }
+
+    if (run.targetGroup === 'salaried') {
+        eligibleTalents = eligibleTalents.filter(t => {
+            const effRes = resolveEffectiveContract(t.contracts as any, run.endDate);
+            const eff = effRes?.effective;
+            return !eff || eff.wageType !== 'hourly';
+        });
+    } else if (run.targetGroup === 'hourly') {
+        eligibleTalents = eligibleTalents.filter(t => {
+            const effRes = resolveEffectiveContract(t.contracts as any, run.endDate);
+            const eff = effRes?.effective;
+            return eff && eff.wageType === 'hourly';
+        });
+    }
 
     let totalGross = 0;
     let totalNet = 0;
@@ -107,7 +168,7 @@ export async function calculatePayrollRun(runId: string) {
     // Delete existing calculated payslips for this run to regenerate cleanly
     await db.delete(payslip).where(eq(payslip.payrollRunId, runId));
 
-    for (const t of allTalents) {
+    for (const t of eligibleTalents) {
         // Resolve active contract at run end date
         const effectiveContractRes = resolveEffectiveContract(t.contracts as any, run.endDate);
         const effectiveContract = effectiveContractRes?.effective || null;

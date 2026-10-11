@@ -25,6 +25,7 @@
     import * as Dialog from "./dialog";
     import { toast } from "svelte-sonner";
     import { getContactDisplayName } from "../utils.js";
+    import { getPreference, setPreference } from "../utils/idb.js";
 
     interface Props<T extends { id?: string | null; name?: string }> {
         title: string;
@@ -125,6 +126,7 @@
         deleteForeverLabel?: string;
         confirmUnlinkLabel?: string;
         filtersLabel?: string;
+        preferenceKey?: string;
         m?: any;
     }
 
@@ -183,6 +185,7 @@
         deleteForeverLabel = undefined,
         confirmUnlinkLabel = "Remove link",
         filtersLabel = undefined,
+        preferenceKey = undefined,
         m = undefined,
     }: Props<T> = $props();
 
@@ -256,10 +259,40 @@
     };
 
     let mounted = true;
+    let initialPrefLoaded = $state(false);
+    const effectivePreferenceKey = $derived(
+        preferenceKey ?? (title ? `em_filters_${title.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : undefined)
+    );
+
     onMount(() => {
+        mounted = true;
+        if (effectivePreferenceKey) {
+            getPreference<FilterStateMap | null>(effectivePreferenceKey, null)
+                .then((saved) => {
+                    if (saved && typeof saved === "object") {
+                        activeFilters = saved;
+                    }
+                })
+                .catch((err) => {
+                    console.warn("Failed to load filter preferences", err);
+                })
+                .finally(() => {
+                    initialPrefLoaded = true;
+                });
+        } else {
+            initialPrefLoaded = true;
+        }
+
         return () => {
             mounted = false;
         };
+    });
+
+    $effect(() => {
+        if (initialPrefLoaded && effectivePreferenceKey) {
+            const snap = $state.snapshot(activeFilters);
+            void setPreference(effectivePreferenceKey, snap);
+        }
     });
 
     let searchQuery = $state("");

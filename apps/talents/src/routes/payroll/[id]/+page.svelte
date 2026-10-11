@@ -164,11 +164,48 @@
                     <span class="text-xs text-gray-400 font-medium">
                         Rechtskreis: {run.jurisdiction} (Deutschland)
                     </span>
+                    {#if run.targetGroup === 'salaried'}
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Gehaltsempfänger (Monatsgehalt)
+                        </span>
+                    {:else if run.targetGroup === 'hourly'}
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                            Stundenlohnempfänger (Zeitlohn)
+                        </span>
+                    {:else if run.targetGroup === 'tagged'}
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                            Tag-Gruppe ({run.targetTags?.length ?? run.tagIds?.length ?? 0} Tags)
+                        </span>
+                    {:else}
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                            Alle Mitarbeiter
+                        </span>
+                    {/if}
+                    {#if run.paymentDueDate}
+                        <span class="inline-flex items-center gap-1 text-xs text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
+                            <Clock size={12} />
+                            Fälligkeit: {new Date(run.paymentDueDate).toLocaleDateString('de-DE')}
+                        </span>
+                    {/if}
                 </div>
 
                 <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
                     {run.name}
                 </h1>
+
+                {#if run.targetTags && run.targetTags.length > 0}
+                    <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span class="text-xs text-gray-500 font-medium">Zielgruppen-Tags:</span>
+                        {#each run.targetTags as tg}
+                            <span 
+                                class="text-xs px-2 py-0.5 rounded-lg font-medium border"
+                                style={tg.color ? `background-color: ${tg.color}15; color: ${tg.color}; border-color: ${tg.color}35;` : undefined}
+                            >
+                                {tg.name}
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
 
                 {#if run.notes}
                     <p class="text-xs text-gray-500">{run.notes}</p>
@@ -176,6 +213,7 @@
 
                 <div class="flex items-center gap-4 text-xs text-gray-400 pt-1">
                     <span>Zeitraum: {new Date(run.startDate).toLocaleDateString('de-DE')} bis {new Date(run.endDate).toLocaleDateString('de-DE')}</span>
+                    <span>· Zyklus: {run.cycleType === 'weekly' ? 'Wöchentlich' : run.cycleType === 'custom' ? 'Benutzerdefiniert' : 'Monatlich'}</span>
                     {#if run.calculatedAt}
                         <span>· Zuletzt berechnet: {new Date(run.calculatedAt).toLocaleString('de-DE')}</span>
                     {/if}

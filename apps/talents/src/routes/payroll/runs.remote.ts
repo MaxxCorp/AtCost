@@ -12,13 +12,14 @@ import {
     calculatePayrollRun,
     approvePayrollRun,
     finalizePayrollRun,
+    getPayrollRun,
 } from '#lib/server/payroll/service.js';
 
 export const listPayrollRuns = query(payrollRunPaginationSchema, async (input) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'payroll');
 
-    const { page = 1, limit = 50, search = '', status, period, jurisdiction } = input || {};
+    const { page = 1, limit = 50, search = '', status, period, jurisdiction, targetGroup, tagId } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select().from(payrollRun).$dynamic();
@@ -32,6 +33,12 @@ export const listPayrollRuns = query(payrollRunPaginationSchema, async (input) =
     }
     if (jurisdiction) {
         conditions.push(eq(payrollRun.jurisdiction, jurisdiction));
+    }
+    if (targetGroup) {
+        conditions.push(eq(payrollRun.targetGroup, targetGroup as any));
+    }
+    if (tagId) {
+        conditions.push(sql`${payrollRun.tagIds} @> ${JSON.stringify([tagId])}::jsonb`);
     }
     if (search) {
         conditions.push(
@@ -61,6 +68,7 @@ export const listPayrollRuns = query(payrollRunPaginationSchema, async (input) =
         ...r,
         startDate: r.startDate.toISOString(),
         endDate: r.endDate.toISOString(),
+        paymentDueDate: r.paymentDueDate ? r.paymentDueDate.toISOString() : undefined,
         calculatedAt: r.calculatedAt ? r.calculatedAt.toISOString() : undefined,
         finalizedAt: r.finalizedAt ? r.finalizedAt.toISOString() : undefined,
         createdAt: r.createdAt.toISOString(),
@@ -74,9 +82,7 @@ export const readPayrollRun = query(v.object({ id: v.string() }), async ({ id })
     const user = getAuthenticatedUser();
     ensureAccess(user, 'payroll');
 
-    const run = await db.query.payrollRun.findFirst({
-        where: eq(payrollRun.id, id),
-    });
+    const run = await getPayrollRun(id);
 
     if (!run) return null;
 
@@ -84,6 +90,7 @@ export const readPayrollRun = query(v.object({ id: v.string() }), async ({ id })
         ...run,
         startDate: run.startDate.toISOString(),
         endDate: run.endDate.toISOString(),
+        paymentDueDate: run.paymentDueDate ? run.paymentDueDate.toISOString() : undefined,
         calculatedAt: run.calculatedAt ? run.calculatedAt.toISOString() : undefined,
         finalizedAt: run.finalizedAt ? run.finalizedAt.toISOString() : undefined,
         createdAt: run.createdAt.toISOString(),

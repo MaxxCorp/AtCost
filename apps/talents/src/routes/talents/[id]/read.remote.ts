@@ -22,7 +22,16 @@ export const readTalent = query(v.string(), async (id: string) => {
                     }
                 },
                 timelineEntries: true,
-                userAssociations: { with: { user: true } }
+                userAssociations: { with: { user: true } },
+                tags: {
+                    with: {
+                        tag: {
+                            with: {
+                                category: true
+                            }
+                        }
+                    }
+                }
             }
         });
 

@@ -121,7 +121,9 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
             isPublic: result.isPublic,
             createdAt: result.createdAt.toISOString(),
             updatedAt: result.updatedAt.toISOString(),
-            tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
+            tags: result.tags
+                .filter(t => t.tag?.visibility === 'external')
+                .map(t => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),
             locations: result.locations.filter(l => l.location.isPublic).map(l => l.location),
             resolvedContact,
             contactIds: [],
@@ -137,7 +139,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         ...result,
         createdAt: result.createdAt.toISOString(),
         updatedAt: result.updatedAt.toISOString(),
-        tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name })),
+        tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),
         contactIds: result.contacts.map(c => c.contactId),
         locationIds: result.locations.map(l => l.locationId),
         locations: result.locations.map(l => l.location),

@@ -232,9 +232,10 @@
                                     </span>
                                 {/if}
                                 {#if event.tags && event.tags.length > 0}
-                                    {#each event.tags as tag (tag.id || tag.name)}
+                                    {#each event.tags.filter((t: any) => (t.tag ? t.tag.visibility === 'external' : t.visibility === 'external')) as tag (tag.id || tag.name)}
                                         <span
                                             class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100 flex items-center gap-1"
+                                            style={tag.color ? `background-color: ${tag.color}15; color: ${tag.color}; border-color: ${tag.color}40;` : undefined}
                                         >
                                             <TagIcon size={12} />
                                             {tag.name}

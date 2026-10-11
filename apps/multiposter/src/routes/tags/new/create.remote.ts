@@ -1,33 +1,36 @@
-import { form } from '$app/server';
-import { db } from '@ac/db';
-import { tag } from '@ac/db';
+import { form, requested } from '$app/server';
+import { db, tag, eq } from '@ac/db';
 import { ensureAccess, getAuthenticatedUser } from '#lib/server/authorization.js';
-import * as v from 'valibot';
-import { listTags } from "../list.remote.js"
-
-const createTagSchema = v.object({
-    name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
-});
+import { createTagSchema } from '@ac/validations';
+import { listTags } from "../list.remote.js";
 
 export const createTag = form(createTagSchema, async (input) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, "events");
 
-    // Check if tag already exists for this user
+    // Check if tag already exists
     const existing = await db.query.tag.findFirst({
-        where: (tags, { eq }) => eq(tags.name, input.name)
+        where: eq(tag.name, input.name)
     });
 
     if (existing) {
-        return existing;
+        return { success: true, tag: existing };
     }
 
     const [newTag] = await db.insert(tag).values({
         name: input.name,
+        visibility: input.visibility || 'internal',
+        categoryId: input.categoryId || null,
+        color: input.color || 'indigo',
+        description: input.description || null,
         userId: user.id
     }).returning();
 
-    await listTags({ limit: 50 }).refresh();
+    try {
+        await requested(listTags, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listTags().refresh();
+    void listTags({ limit: 50 }).refresh();
+
     return { success: true, tag: newTag };
 });
-

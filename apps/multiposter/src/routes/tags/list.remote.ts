@@ -1,18 +1,37 @@
 import { query } from '$app/server';
-import { db } from '@ac/db';
-import { tag } from '@ac/db';
-import { inArray, sql, ilike } from '@ac/db';
-import { tagPaginationSchema as PaginationSchema } from '@ac/validations';
+import { db, tag, inArray, sql, ilike, eq, and, or } from '@ac/db';
+import { tagPaginationSchema } from '@ac/validations';
 import type * as v from 'valibot';
+import { ensureDefaultCategoriesAndTags } from '#lib/server/tags/service.js';
 
-export const listTags = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>) => {
-    const { page = 1, limit = 50, search = '', sortField = 'createdAt', sortOrder = 'desc' } = input || {};
+export const listTags = query(tagPaginationSchema, async (input: v.InferOutput<typeof tagPaginationSchema>) => {
+    await ensureDefaultCategoriesAndTags();
+
+    const { page = 1, limit = 50, search = '', sortField = 'name', sortOrder = 'asc', visibility, categoryId } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select({ id: tag.id }).from(tag).$dynamic();
+    const conditions = [];
     
-    if (search) {
-        baseQuery = baseQuery.where(ilike(tag.name, `%${search}%`)) as any;
+    if (search.trim()) {
+        conditions.push(
+            or(
+                ilike(tag.name, `%${search}%`),
+                ilike(tag.description, `%${search}%`)
+            )
+        );
+    }
+
+    if (visibility) {
+        conditions.push(eq(tag.visibility, visibility as any));
+    }
+
+    if (categoryId) {
+        conditions.push(eq(tag.categoryId, categoryId));
+    }
+
+    if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions as any)) as any;
     }
 
     const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
@@ -22,8 +41,8 @@ export const listTags = query(PaginationSchema, async (input: v.InferOutput<type
         return { data: [], total: 0 };
     }
 
-    let orderField: any = tag.createdAt;
-    if (sortField === 'name') orderField = tag.name;
+    let orderField: any = tag.name;
+    if (sortField === 'createdAt') orderField = tag.createdAt;
 
     const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
 
@@ -42,7 +61,8 @@ export const listTags = query(PaginationSchema, async (input: v.InferOutput<type
         where: inArray(tag.id, ids),
         orderBy: [orderExpression],
         with: {
-            user: true
+            user: true,
+            category: true,
         }
     });
 

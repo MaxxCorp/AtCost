@@ -260,7 +260,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
             ...row,
             createdAt: row.createdAt.toISOString(),
             updatedAt: row.updatedAt.toISOString(),
-            tags: row.tags?.map((t: any) => t.tag) || [],
+            tags: (row.tags?.map((t: any) => t.tag) || []).filter((tagItem: any) => hasAccess || tagItem?.visibility === 'external'),
             locations,
             locationIds: locations.map((l: any) => l.id),
             contactIds: row.contacts?.map((c: any) => c.contactId) || [],

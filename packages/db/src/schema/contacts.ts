@@ -75,14 +75,32 @@ export const contactRelation = pgTable("contact_relation", {
     index("contact_relation_target_idx").on(table.targetContactId),
 ]);
 
+export const tagCategory = pgTable("tag_category", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    slug: text("slug"),
+    description: text("description"),
+    color: text("color").default("indigo").notNull(),
+    icon: text("icon"),
+    isDefault: boolean("is_default").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+
 export const tag = pgTable("tag", {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     userId: text("user_id").notNull(),
+    visibility: text("visibility", { enum: ["internal", "external"] }).default("internal").notNull(),
+    categoryId: uuid("category_id").references(() => tagCategory.id, { onDelete: "set null" }),
+    color: text("color").default("indigo").notNull(),
+    description: text("description"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
     index("tag_user_idx").on(table.userId),
     index("tag_name_user_idx").on(table.userId, table.name),
+    index("tag_category_idx").on(table.categoryId),
+    index("tag_visibility_idx").on(table.visibility),
 ]);
 
 export const contactTag = pgTable("contact_tag", {
@@ -105,5 +123,8 @@ export type ContactPhone = typeof contactPhone.$inferSelect;
 export type NewContactPhone = typeof contactPhone.$inferInsert;
 export type ContactAddress = typeof contactAddress.$inferSelect;
 export type NewContactAddress = typeof contactAddress.$inferInsert;
+export type TagCategory = typeof tagCategory.$inferSelect;
+export type NewTagCategory = typeof tagCategory.$inferInsert;
 export type Tag = typeof tag.$inferSelect;
 export type NewTag = typeof tag.$inferInsert;
+

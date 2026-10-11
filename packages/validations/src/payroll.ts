@@ -64,6 +64,12 @@ export const PAYROLL_PROFILE_SGB2_16D_PRESET = {
 
 // --- VALIDATION SCHEMAS ---
 
+export const payrollTargetGroupPicklist = v.picklist(['all', 'tagged', 'salaried', 'hourly']);
+export type PayrollTargetGroup = v.InferOutput<typeof payrollTargetGroupPicklist>;
+
+export const payrollCycleTypePicklist = v.picklist(['monthly', 'weekly', 'biweekly', 'custom']);
+export type PayrollCycleType = v.InferOutput<typeof payrollCycleTypePicklist>;
+
 export const payrollRunPaginationSchema = v.optional(
     v.object({
         page: v.optional(v.number(), 1),
@@ -72,14 +78,22 @@ export const payrollRunPaginationSchema = v.optional(
         status: v.optional(v.string()),
         period: v.optional(v.string()),
         jurisdiction: v.optional(v.string()),
+        targetGroup: v.optional(v.string()),
+        tagId: v.optional(v.string()),
     }),
     {}
 );
 
 export const createPayrollRunSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
-    period: v.pipe(v.string(), v.regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Period must be in YYYY-MM format')),
+    period: v.pipe(v.string(), v.minLength(1, 'Period is required')),
     jurisdiction: v.optional(payrollJurisdictionPicklist, 'DE'),
+    targetGroup: v.optional(payrollTargetGroupPicklist, 'all'),
+    tagIds: v.optional(v.array(v.string()), []),
+    cycleType: v.optional(payrollCycleTypePicklist, 'monthly'),
+    paymentDueDate: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
     notes: v.optional(v.string()),
 });
 
@@ -89,6 +103,10 @@ export const updatePayrollRunSchema = v.object({
     id: v.pipe(v.string(), v.minLength(1, 'Payroll run ID is required')),
     name: v.optional(v.string()),
     status: v.optional(payrollStatusPicklist),
+    targetGroup: v.optional(payrollTargetGroupPicklist),
+    tagIds: v.optional(v.array(v.string())),
+    cycleType: v.optional(payrollCycleTypePicklist),
+    paymentDueDate: v.optional(v.string()),
     notes: v.optional(v.string()),
 });
 

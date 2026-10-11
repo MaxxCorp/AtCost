@@ -1,26 +1,31 @@
-import { form } from '$app/server';
-import { db } from '@ac/db';
-import { tag } from '@ac/db';
-import { eq, and } from '@ac/db';
-import { getAuthenticatedUser } from '#lib/server/authorization.js';
-import * as v from 'valibot';
-import { readTag } from '../[id]/read.remote';
-import { listTags } from '../list.remote';
-
-const updateTagSchema = v.object({
-    id: v.pipe(v.string(), v.uuid()),
-    name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
-});
+import { form, requested } from '$app/server';
+import { db, tag, eq } from '@ac/db';
+import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { updateTagSchema } from '@ac/validations';
+import { readTag } from './read.remote.js';
+import { listTags } from '../list.remote.js';
 
 export const updateTag = form(updateTagSchema, async (input) => {
     const user = getAuthenticatedUser();
+    ensureAccess(user, 'talents');
 
     const [updatedTag] = await db.update(tag)
-        .set({ name: input.name })
+        .set({
+            name: input.name,
+            visibility: input.visibility,
+            categoryId: input.categoryId !== undefined ? (input.categoryId || null) : undefined,
+            color: input.color,
+            description: input.description,
+        })
         .where(eq(tag.id, input.id))
         .returning();
 
-    readTag(updatedTag.id).set(updatedTag);
+    void readTag(updatedTag.id).refresh();
+    try {
+        await requested(listTags, 20).refreshAll();
+    } catch { /* ignore */ }
     void listTags().refresh();
+    void listTags({}).refresh();
+
     return { success: true, ...updatedTag };
 });

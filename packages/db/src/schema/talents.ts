@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, uuid, jsonb, doublePrecision, primaryKey, boolean, integer } from "drizzle-orm/pg-core";
 import { user } from "./auth";
-import { contact } from "./contacts";
+import { contact, tag } from "./contacts";
 import { location } from "./resources";
 
 // --- TALENT TABLES ---
@@ -168,6 +168,13 @@ export const userTalent = pgTable("user_talent", {
     talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.userId, table.talentId] })]);
 
+export const talentTag = pgTable("talent_tag", {
+    talentId: uuid("talent_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id").notNull().references(() => tag.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.talentId, table.tagId] }),
+]);
+
 export type Talent = typeof talent.$inferSelect;
 export type NewTalent = typeof talent.$inferInsert;
 export type TalentTimelineEntry = typeof talentTimelineEntry.$inferSelect;
@@ -194,3 +201,6 @@ export type Task = typeof task.$inferSelect;
 export type NewTask = typeof task.$inferInsert;
 export type TaskTypeConfig = typeof taskTypeConfig.$inferSelect;
 export type NewTaskTypeConfig = typeof taskTypeConfig.$inferInsert;
+export type TalentTag = typeof talentTag.$inferSelect;
+export type NewTalentTag = typeof talentTag.$inferInsert;
+

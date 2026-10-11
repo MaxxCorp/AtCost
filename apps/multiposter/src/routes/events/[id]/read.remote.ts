@@ -400,7 +400,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			rooms: getEventRooms({ locations: publicLocations, resources: publicResources }),
 			locationIds: publicLocations.map((l: any) => l.id),
 			resourceIds: publicResources.map((r: any) => r.id),
-			tags: result.tags.map((t: any) => ({ id: t.tag.id, name: t.tag.name })),
+			tags: result.tags
+				.filter((t: any) => t.tag?.visibility === 'external')
+				.map((t: any) => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),
 			resolvedContact,
 			contactIds: [],
 			syncIds: [],
@@ -437,7 +439,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		resourceIds: result.resources.map((r: any) => r.resourceId),
 		contactIds: result.contacts.map((c: any) => c.contactId),
 		locationIds: result.locations.map((l: any) => l.locationId),
-		tags: result.tags.map((t: any) => ({ id: t.tag.id, name: t.tag.name })),
+		tags: result.tags.map((t: any) => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),
 		syncIds: getCampaignTargetIds(result.campaign?.content),
 		resolvedContact,
 		seriesMaster: seriesMaster ?? undefined,

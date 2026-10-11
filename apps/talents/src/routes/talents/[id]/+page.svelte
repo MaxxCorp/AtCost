@@ -22,22 +22,21 @@
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
     import PayrollProfileForm from "#lib/components/payroll/PayrollProfileForm.svelte";
     import { getContractFilterGroups } from "#lib/filters/index.js";
+    import TalentTagsCard from "#lib/components/talent/TalentTagsCard.svelte";
 
     const talentIdParam = $derived(page.params.id as string);
+    const talentQuery = $derived(readTalent(talentIdParam));
+    const talent = $derived(talentQuery.current);
     const effectiveContractQuery = $derived(readTalentEffectiveContract({ talentId: talentIdParam }));
     const effectiveResult = $derived(effectiveContractQuery.current?.resolution);
-    
 
-    
     $effect(() => {
-        readTalent(talentIdParam).then(talent => {
-            if (talent?.contact) {
-                breadcrumbState.set({
-                    feature: "talents",
-                    current: `Edit: ${talent.contact.displayName}`,
-                });
-            }
-        }).catch(() => {});
+        if (talent?.contact) {
+            breadcrumbState.set({
+                feature: "talents",
+                current: `Edit: ${talent.contact.displayName}`,
+            });
+        }
     });
 
     let employees = $state<any[]>([]);
@@ -57,8 +56,11 @@
             <LoadingSection message="Loading talent details..." />
         {/if}
         <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-            {#await readTalent(talentIdParam) then talent}
-                {#if talent}
+            {#if talentQuery.loading && !talent}
+                <LoadingSection message="Lade Mitarbeiterdaten..." />
+            {:else if talentQuery.error}
+                <ErrorSection headline="Fehler beim Laden" message={talentQuery.error.message} />
+            {:else if talent}
                     <div class="mb-6">
                         <a
                             href="/talents"
@@ -357,6 +359,16 @@
                                 <PayrollProfileForm talentId={talentIdParam} />
                             </div>
                         </div>
+
+                        <div class="pt-8 border-t border-gray-100">
+                            <TalentTagsCard
+                                talentId={talentIdParam}
+                                currentTags={talent.tags || []}
+                                onUpdated={() => {
+                                    void talentQuery.refresh();
+                                }}
+                            />
+                        </div>
                     </div>
                 {:else}
                     <div
@@ -376,7 +388,6 @@
                         </a>
                     </div>
                 {/if}
-            {/await}
         </div>
         {#snippet failed(error: unknown)}
             <ErrorSection headline="Error loading talent" message={error instanceof Error ? error.message : "An error occurred"} />

@@ -19,9 +19,12 @@
         Sparkles,
         ShieldCheck,
         Building2,
-        Layers
+        Layers,
+        Check,
+        Tag as TagIcon
     } from "@lucide/svelte";
     import ConditionsHistoryManager from "#lib/components/conditions/ConditionsHistoryManager.svelte";
+    import { listTags } from "../tags/list.remote.js";
 
     breadcrumbState.set({
         feature: "payroll",
@@ -39,6 +42,14 @@
     const today = new Date();
     const defaultPeriod = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
     const defaultName = `Gehaltsabrechnung ${today.toLocaleString('de-DE', { month: 'long', year: 'numeric' })}`;
+
+    let selectedTargetGroup = $state<'all' | 'salaried' | 'hourly' | 'tagged'>('all');
+    let selectedTagIds = $state<string[]>([]);
+    let selectedCycleType = $state<'monthly' | 'weekly' | 'custom'>('monthly');
+    let paymentDueDateStr = $state('');
+
+    const tagsQuery = $derived(listTags({ limit: 100 }));
+    const allTags = $derived(tagsQuery.current?.data ?? []);
 
     const createRunForm = createPayrollRunAction.preflight(createPayrollRunSchema);
 
@@ -253,6 +264,29 @@
                             <span class="text-[11px] text-gray-400 font-medium">
                                 Rechtskreis: {run.jurisdiction}
                             </span>
+                            {#if run.targetGroup === 'salaried'}
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Gehaltsempfänger (Monatlich)
+                                </span>
+                            {:else if run.targetGroup === 'hourly'}
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                    Stundenlohnempfänger (Wöchentlich)
+                                </span>
+                            {:else if run.targetGroup === 'tagged'}
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                                    Tag-Gruppe ({run.tagIds?.length ?? 0} Tags)
+                                </span>
+                            {:else}
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                    Alle Mitarbeiter
+                                </span>
+                            {/if}
+                            {#if run.paymentDueDate}
+                                <span class="inline-flex items-center gap-1 text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 font-medium">
+                                    <Clock size={11} />
+                                    Fällig: {new Date(run.paymentDueDate).toLocaleDateString('de-DE')}
+                                </span>
+                            {/if}
                         </div>
 
                         <h3 class="text-lg font-bold text-gray-900">
@@ -313,12 +347,15 @@
             {/each}
         </div>
     {/if}
+    {:else}
+        <ConditionsHistoryManager />
+    {/if}
 </div>
 
 <!-- Modal: Neuer Abrechnungslauf -->
 {#if isCreateModalOpen}
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <Calendar class="w-5 h-5 text-indigo-600" />
@@ -386,6 +423,141 @@
                 </div>
 
                 <div>
+                    <label for="targetGroup" class="block font-semibold text-gray-700 mb-1">
+                        Zielgruppe der Mitarbeiter *
+                    </label>
+                    <select
+                        id="targetGroup"
+                        bind:value={selectedTargetGroup}
+                        onchange={(e) => {
+                            const val = (e.target as HTMLSelectElement).value;
+                            selectedTargetGroup = val as any;
+                            if (createRunForm.fields.targetGroup) {
+                                createRunForm.fields.targetGroup.set(val as any);
+                            }
+                            if (val === 'salaried') {
+                                paymentDueDateStr = `${defaultPeriod}-28`;
+                                if (createRunForm.fields.paymentDueDate) {
+                                    createRunForm.fields.paymentDueDate.set(paymentDueDateStr);
+                                }
+                            }
+                        }}
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden bg-white"
+                    >
+                        <option value="all">Alle Mitarbeiter (Gesamtes Unternehmen)</option>
+                        <option value="salaried">Gehaltsempfänger (Monatsgehalt - Auszahlung vor Monatsende)</option>
+                        <option value="hourly">Stundenlohnempfänger (Zeitlohn - Auszahlung Folgewoche)</option>
+                        <option value="tagged">Nach spezifischen Tags filtern (Gruppen / Teams)</option>
+                    </select>
+                    <input {...createRunForm.fields.targetGroup.as('text', selectedTargetGroup)} class="hidden" />
+                    {#each createRunForm.fields.targetGroup.issues() ?? [] as issue}
+                        <p class="text-[11px] text-rose-600 mt-1">{issue.message}</p>
+                    {/each}
+                </div>
+
+                {#if selectedTargetGroup === 'tagged'}
+                    <div class="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-gray-800 text-xs flex items-center gap-1.5">
+                                <TagIcon size={13} class="text-indigo-600" />
+                                Mitarbeiter-Tags auswählen
+                            </span>
+                            <span class="text-[11px] text-gray-500">
+                                {selectedTagIds.length} gewählt
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-gray-500">
+                            Nur Mitarbeiter mit mindestens einem der gewählten Tags werden in diesen Lauf einbezogen.
+                        </p>
+                        <div class="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                            {#if allTags.length === 0}
+                                <p class="text-gray-400 text-[11px] py-2 text-center">Keine Tags vorhanden.</p>
+                            {:else}
+                                {#each allTags as t (t.id)}
+                                    {@const isChecked = selectedTagIds.includes(t.id)}
+                                    <button
+                                        type="button"
+                                        class="w-full flex items-center justify-between p-1.5 rounded-lg text-left transition-colors border {isChecked ? 'bg-indigo-50 border-indigo-200 text-indigo-950 font-medium' : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'}"
+                                        onclick={() => {
+                                            if (isChecked) {
+                                                selectedTagIds = selectedTagIds.filter(id => id !== t.id);
+                                            } else {
+                                                selectedTagIds = [...selectedTagIds, t.id];
+                                            }
+                                            if (createRunForm.fields.tagIds) {
+                                                createRunForm.fields.tagIds.set(selectedTagIds);
+                                            }
+                                        }}
+                                    >
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <div class="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 {isChecked ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white'}">
+                                                {#if isChecked}
+                                                    <Check size={10} strokeWidth={3} />
+                                                {/if}
+                                            </div>
+                                            {#if t.color}
+                                                <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {t.color};"></span>
+                                            {/if}
+                                            <span class="text-xs truncate">{t.name}</span>
+                                            {#if t.category}
+                                                <span class="text-[10px] px-1 py-0.2 rounded bg-black/5 text-gray-500 font-normal">
+                                                    {t.category.name}
+                                                </span>
+                                            {/if}
+                                        </div>
+                                    </button>
+                                {/each}
+                            {/if}
+                        </div>
+                    </div>
+                {/if}
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="cycleType" class="block font-semibold text-gray-700 mb-1">
+                            Abrechnungszyklus
+                        </label>
+                        <select
+                            id="cycleType"
+                            bind:value={selectedCycleType}
+                            onchange={(e) => {
+                                const val = (e.target as HTMLSelectElement).value;
+                                selectedCycleType = val as any;
+                                if (createRunForm.fields.cycleType) {
+                                    createRunForm.fields.cycleType.set(val as any);
+                                }
+                            }}
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden bg-white"
+                        >
+                            <option value="monthly">Monatlich</option>
+                            <option value="weekly">Wöchentlich</option>
+                            <option value="custom">Benutzerdefiniert</option>
+                        </select>
+                        <input {...createRunForm.fields.cycleType.as('text', selectedCycleType)} class="hidden" />
+                    </div>
+
+                    <div>
+                        <label for="paymentDueDate" class="block font-semibold text-gray-700 mb-1">
+                            Auszahlungstag / Fälligkeit
+                        </label>
+                        <input
+                            id="paymentDueDate"
+                            type="date"
+                            bind:value={paymentDueDateStr}
+                            onchange={(e) => {
+                                const val = (e.target as HTMLInputElement).value;
+                                paymentDueDateStr = val;
+                                if (createRunForm.fields.paymentDueDate) {
+                                    createRunForm.fields.paymentDueDate.set(val || undefined);
+                                }
+                            }}
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden"
+                        />
+                        <input {...createRunForm.fields.paymentDueDate.as('text', paymentDueDateStr)} class="hidden" />
+                    </div>
+                </div>
+
+                <div>
                     <label for="jurisdiction" class="block font-semibold text-gray-700 mb-1">
                         Rechtskreis / Steuerjurisdiktion
                     </label>
@@ -440,8 +612,5 @@
             </form>
         </div>
     </div>
-{/if}
-{:else}
-    <ConditionsHistoryManager />
 {/if}
 

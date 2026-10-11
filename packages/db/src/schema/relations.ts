@@ -1,9 +1,9 @@
 import { relations } from "drizzle-orm";
 import { user, session, account, verification } from "./auth";
-import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, contactTag, userContact } from "./contacts";
+import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, tagCategory, contactTag, userContact } from "./contacts";
 import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
 import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag, eventRole, eventContactRole } from "./events";
-import { talent, talentTimelineEntry, shiftPlan, shiftSchedulingGroup, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
+import { talent, talentTag, talentTimelineEntry, shiftPlan, shiftSchedulingGroup, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
 import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
@@ -78,11 +78,17 @@ export const contactRelationRelations = relations(contactRelation, ({ one }) => 
     targetContact: one(contact, { fields: [contactRelation.targetContactId], references: [contact.id], relationName: 'toRelations' }),
 }));
 
+export const tagCategoryRelations = relations(tagCategory, ({ many }) => ({
+    tags: many(tag),
+}));
+
 export const tagRelations = relations(tag, ({ many, one }) => ({
     user: one(user, { fields: [tag.userId], references: [user.id] }),
+    category: one(tagCategory, { fields: [tag.categoryId], references: [tagCategory.id] }),
     contactAssociations: many(contactTag),
     announcementAssociations: many(announcementTag),
     eventAssociations: many(eventTag),
+    talentAssociations: many(talentTag),
 }));
 
 export const contactTagRelations = relations(contactTag, ({ one }) => ({
@@ -154,6 +160,7 @@ export const resourceRelationRelations = relations(resourceRelation, ({ one }) =
 
 export const talentRelations = relations(talent, ({ one, many }) => ({
     contact: one(contact, { fields: [talent.contactId], references: [contact.id] }),
+    tags: many(talentTag),
     timelineEntries: many(talentTimelineEntry),
     shiftPlans: many(shiftPlan),
     timesheetEntries: many(timesheetEntry),
@@ -166,6 +173,11 @@ export const talentRelations = relations(talent, ({ one, many }) => ({
     contracts: many(contract),
     payrollProfile: one(payrollProfile, { fields: [talent.id], references: [payrollProfile.talentId] }),
     payslips: many(payslip),
+}));
+
+export const talentTagRelations = relations(talentTag, ({ one }) => ({
+    talent: one(talent, { fields: [talentTag.talentId], references: [talent.id] }),
+    tag: one(tag, { fields: [talentTag.tagId], references: [tag.id] }),
 }));
 
 export const taskRelations = relations(task, ({ one }) => ({

@@ -10,6 +10,10 @@ export const payrollRun = pgTable("payroll_run", {
     endDate: timestamp("end_date").notNull(),
     jurisdiction: text("jurisdiction").default("DE").notNull(), // 'DE', 'AT', 'CH', etc.
     status: text("status", { enum: ["draft", "calculated", "approved", "finalized", "cancelled"] }).default("draft").notNull(),
+    targetGroup: text("target_group", { enum: ["all", "tagged", "salaried", "hourly"] }).default("all").notNull(),
+    tagIds: jsonb("tag_ids").$type<string[]>().default([]).notNull(),
+    cycleType: text("cycle_type", { enum: ["monthly", "weekly", "biweekly", "custom"] }).default("monthly").notNull(),
+    paymentDueDate: timestamp("payment_due_date"),
     totalGross: doublePrecision("total_gross").default(0).notNull(),
     totalNet: doublePrecision("total_net").default(0).notNull(),
     totalEmployerCost: doublePrecision("total_employer_cost").default(0).notNull(),
