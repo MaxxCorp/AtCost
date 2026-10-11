@@ -197,6 +197,21 @@ export const FEATURES: readonly FeatureMeta[] = [
         buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
         order: 16,
         category: 'management'
+    },
+    {
+        key: 'hmos',
+        title: 'Insurers & Social Providers',
+        description: 'Manage statutory health funds (GKV/PKV), accident insurers (BGs), and pension funds (ZVK/VBL).',
+        href: '/hmos',
+        buttonText: 'Manage Insurers',
+        claim: 'hmos',
+        icon: 'heartPulse',
+        gradientFrom: 'from-rose-50',
+        gradientTo: 'to-pink-50',
+        borderClass: 'border-rose-100',
+        buttonClass: 'bg-rose-600 hover:bg-rose-700',
+        order: 17,
+        category: 'management'
     }
 ] as const;
 

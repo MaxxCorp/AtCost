@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, uuid, jsonb, doublePrecision, integer, boolean } from "drizzle-orm/pg-core";
 import { talent } from "./talents";
 import { contract } from "./contracts";
+import { hmo } from "./hmos";
 
 export const payrollRun = pgTable("payroll_run", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -36,6 +37,13 @@ export const payrollProfile = pgTable("payroll_profile", {
     churchTax: text("church_tax", { enum: ["none", "ev", "rk"] }).default("none").notNull(),
     state: text("state").default("BE").notNull(), // Bundesland (BE, BY, NW, BW, etc.)
     socialSecurityNumber: text("social_security_number"), // RV-Nummer / SV-Nummer
+    hmoId: uuid("hmo_id").references(() => hmo.id, { onDelete: "set null" }),
+    accidentHmoId: uuid("accident_hmo_id").references(() => hmo.id, { onDelete: "set null" }), // Berufsgenossenschaft
+    accidentAdditionalApplicable: boolean("accident_additional_applicable").default(true), // e.g. Ausgleichsumlage Wohlfahrtspflege (0.08 € / 1000 €) für Sozialunternehmen
+    pensionHmoId: uuid("pension_hmo_id").references(() => hmo.id, { onDelete: "set null" }), // Zusatzversorgung / ZVK / VBL
+    u1CompensationPercent: doublePrecision("u1_compensation_percent").default(70.0), // Chosen U1 Erstattungssatz (50%, 70%, 80%)
+    u1Exempt: boolean("u1_exempt").default(false), // True if employer > 30 employees
+    u3Exempt: boolean("u3_exempt").default(false), // Insolvenzgeldumlage exemption (e.g. public sector)
     healthInsuranceName: text("health_insurance_name").default("Techniker Krankenkasse (TK)").notNull(),
     healthInsuranceType: text("health_insurance_type", { enum: ["statutory", "private"] }).default("statutory").notNull(),
     healthInsuranceAdditionalContributionPercent: doublePrecision("health_insurance_additional_contribution_percent").default(2.5).notNull(),

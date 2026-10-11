@@ -4,6 +4,7 @@ import {
     unionContractCondition,
     task,
     contractFramework,
+    hmo,
     eq,
     and,
     or,
@@ -348,6 +349,39 @@ export async function syncConditions(options: {
         }
     }
 
+    // Sync HMO entities in hmo table so they are always available and up to date
+    try {
+        const existingHmos = await db.select().from(hmo);
+        if (existingHmos.length === 0) {
+            for (const item of DEFAULT_GERMAN_HMO_RATES) {
+                await db.insert(hmo).values({
+                    name: item.name,
+                    code: item.code || null,
+                    additionalContributionPercent: item.additionalContributionPercent,
+                    type: 'statutory',
+                    isActive: true
+                });
+            }
+        } else {
+            for (const latestHmo of latestSocial.hmoRates) {
+                const found = existingHmos.find(
+                    (h) => h.name.toLowerCase() === latestHmo.name.toLowerCase() || (latestHmo.code && h.code === latestHmo.code)
+                );
+                if (!found) {
+                    await db.insert(hmo).values({
+                        name: latestHmo.name,
+                        code: latestHmo.code || null,
+                        additionalContributionPercent: latestHmo.additionalContributionPercent,
+                        type: 'statutory',
+                        isActive: true
+                    });
+                }
+            }
+        }
+    } catch (hmoErr) {
+        console.error('[SyncConditions] Error syncing HMO table:', hmoErr);
+    }
+
     // --- 2. UNION CONTRACT (AWO BERLIN) CHECK ---
     const unionDiffs: ChangeDiffItem[] = [];
     const latestAwoGrid = { ...DEFAULT_AWO_BERLIN_WAGE_GRID };
@@ -532,6 +566,23 @@ export async function approveCondition(params: {
                 await db.update(task)
                     .set({ status: 'completed', updatedAt: approvedAt })
                     .where(eq(task.id, t.id));
+            }
+        }
+
+        // Apply updated HMO contribution rates to the hmo table
+        if (target.hmoRates && Array.isArray(target.hmoRates)) {
+            for (const h of target.hmoRates) {
+                const existing = await db.query.hmo.findFirst({
+                    where: or(eq(hmo.name, h.name), h.code ? eq(hmo.code, h.code) : undefined)
+                });
+                if (existing) {
+                    await db.update(hmo)
+                        .set({
+                            additionalContributionPercent: h.additionalContributionPercent,
+                            updatedAt: approvedAt
+                        })
+                        .where(eq(hmo.id, existing.id));
+                }
             }
         }
 

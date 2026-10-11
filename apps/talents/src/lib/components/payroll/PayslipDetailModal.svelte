@@ -91,7 +91,18 @@
                         <div>Ki.-Freibetrag: <strong class="text-gray-900">{formatNumber(profile.childCount ?? 0)}</strong></div>
                         <div>KiSt: <strong class="text-gray-900">{calcDetails.churchTaxType === 'none' ? 'Keine' : calcDetails.churchTaxType?.toUpperCase()}</strong></div>
                         <div>Bundesland: <strong class="text-gray-900">{calcDetails.state || 'Berlin (BE)'}</strong></div>
-                        <div class="col-span-2 truncate">Krankenkasse: <strong class="text-gray-900">{profile.healthInsuranceName || 'Techniker Krankenkasse (TK)'}</strong></div>
+                        <div class="col-span-2 truncate">
+                            Krankenkasse: <strong class="text-gray-900">{calcDetails.hmoName || profile.healthInsuranceName || 'Techniker Krankenkasse (TK)'}</strong>
+                            {#if calcDetails.hmoAdditionalContributionPercent !== undefined}
+                                <span class="text-indigo-700 font-semibold ml-1">({formatNumber(calcDetails.hmoAdditionalContributionPercent)}% Zusatzbeitrag)</span>
+                            {/if}
+                        </div>
+                        <div class="col-span-2 truncate text-gray-600">
+                            Unfallversicherung (BG): <strong class="text-gray-900">{calcDetails.accidentInsurerName || profile.accidentHmo?.name || 'BGW (Gesundheitsdienst & Wohlfahrtspflege)'}</strong>
+                            {#if calcDetails.pensionFundName || profile.pensionHmo?.name}
+                                <span class="ml-2">· ZVK: <strong class="text-gray-900">{calcDetails.pensionFundName || profile.pensionHmo?.name}</strong></span>
+                            {/if}
+                        </div>
                         {#if payslip.contract?.entgeltgruppe}
                             <div>Tarif: <strong class="text-indigo-900">{payslip.contract.entgeltgruppe} (Stufe {payslip.contract.erfahrungsstufe ?? 1})</strong></div>
                         {/if}
@@ -264,6 +275,12 @@
                             <span class="text-gray-600">Pflegeversicherung (PV AN):</span>
                             <span class="font-semibold text-gray-900">{formatCurrency(payslip.employeeLongTermCareInsurance)}</span>
                         </div>
+                        {#if calcDetails.employeePensionFund && calcDetails.employeePensionFund > 0}
+                            <div class="flex justify-between py-1 border-b border-sky-100/60 text-purple-900 font-medium">
+                                <span>Zusatzversorgung (ZVK/VBL AN):</span>
+                                <span class="font-semibold">{formatCurrency(calcDetails.employeePensionFund)}</span>
+                            </div>
+                        {/if}
                         <div class="flex justify-between pt-2 font-bold text-sky-950 text-sm">
                             <span>Gesamt SV-Arbeitnehmer:</span>
                             <span>{formatCurrency(payslip.totalEmployeeSocialSecurity)}</span>
@@ -295,18 +312,74 @@
                 {/if}
             </div>
 
-            <!-- Employer Cost Summary (Arbeitgeberaufwand) -->
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-gray-700">
-                <div class="font-bold text-gray-900 mb-2 flex items-center justify-between">
-                    <span>Arbeitgeberbelastung / Gesamtpersonalkosten (AG-Anteile & Umlagen)</span>
-                    <span class="text-sm font-extrabold text-indigo-950">{formatCurrency(payslip.totalEmployerCost)}</span>
+            <!-- Employer Cost Summary (Arbeitgeberaufwand) with full Insurer Breakdown -->
+            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-gray-700 space-y-3">
+                <div class="font-bold text-gray-900 flex items-center justify-between pb-2 border-b border-slate-200">
+                    <div>
+                        <span class="text-sm font-extrabold text-slate-900">Arbeitgeberbelastung / Gesamtpersonalkosten</span>
+                        <span class="text-[11px] text-gray-500 block font-normal">Gesetzliche AG-Anteile, Sozialkassen-Umlagen (U1–U3), Berufsgenossenschaft & Zusatzversorgung</span>
+                    </div>
+                    <span class="text-base font-black font-mono text-indigo-950">{formatCurrency(payslip.totalEmployerCost)}</span>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] text-gray-600 pt-1">
-                    <div>KV AG: <strong>{formatCurrency(payslip.employerHealthInsurance)}</strong></div>
-                    <div>RV AG: <strong>{formatCurrency(payslip.employerPensionInsurance)}</strong></div>
-                    <div>AV AG: <strong>{formatCurrency(payslip.employerUnemploymentInsurance)}</strong></div>
-                    <div>PV AG: <strong>{formatCurrency(payslip.employerLongTermCareInsurance)}</strong></div>
-                    <div>U1/U2/Insolvenz: <strong>{formatCurrency(payslip.employerLevies)}</strong></div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                    <div class="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                        <span class="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">KV AG</span>
+                        <strong class="text-xs text-gray-900 font-mono">{formatCurrency(payslip.employerHealthInsurance)}</strong>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                        <span class="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">RV AG (9,3%)</span>
+                        <strong class="text-xs text-gray-900 font-mono">{formatCurrency(payslip.employerPensionInsurance)}</strong>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                        <span class="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">AV AG (1,3%)</span>
+                        <strong class="text-xs text-gray-900 font-mono">{formatCurrency(payslip.employerUnemploymentInsurance)}</strong>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                        <span class="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">PV AG</span>
+                        <strong class="text-xs text-gray-900 font-mono">{formatCurrency(payslip.employerLongTermCareInsurance)}</strong>
+                    </div>
+                </div>
+
+                <!-- Extended Levies & Specialized Providers -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-[11px] pt-1">
+                    <div class="bg-rose-50/50 p-2.5 rounded-lg border border-rose-100">
+                        <span class="text-rose-800 block text-[10px] uppercase font-bold tracking-wider">
+                            U1 Umlage {calcDetails.u1TierPercent ? `(${calcDetails.u1TierPercent}%)` : ''}
+                        </span>
+                        <strong class="text-xs text-rose-950 font-mono">{formatCurrency(calcDetails.u1Levy ?? 0)}</strong>
+                        <span class="text-[10px] text-rose-700 block mt-0.5">Entgeltfortzahlung</span>
+                    </div>
+
+                    <div class="bg-rose-50/50 p-2.5 rounded-lg border border-rose-100">
+                        <span class="text-rose-800 block text-[10px] uppercase font-bold tracking-wider">U2 Umlage</span>
+                        <strong class="text-xs text-rose-950 font-mono">{formatCurrency(calcDetails.u2Levy ?? 0)}</strong>
+                        <span class="text-[10px] text-rose-700 block mt-0.5">Mutterschutz</span>
+                    </div>
+
+                    <div class="bg-rose-50/50 p-2.5 rounded-lg border border-rose-100">
+                        <span class="text-rose-800 block text-[10px] uppercase font-bold tracking-wider">U3 Insolvenz</span>
+                        <strong class="text-xs text-rose-950 font-mono">{formatCurrency(calcDetails.u3Levy ?? 0)}</strong>
+                        <span class="text-[10px] text-rose-700 block mt-0.5">Insolvenzgeld</span>
+                    </div>
+
+                    <div class="bg-amber-50/60 p-2.5 rounded-lg border border-amber-200/80">
+                        <span class="text-amber-800 block text-[10px] uppercase font-bold tracking-wider truncate" title={calcDetails.accidentInsurerName || 'Berufsgenossenschaft'}>
+                            BG (Unfallvers.)
+                        </span>
+                        <strong class="text-xs text-amber-950 font-mono">{formatCurrency(calcDetails.employerAccidentInsurance ?? 0)}</strong>
+                        <span class="text-[10px] text-amber-700 block mt-0.5 truncate" title={calcDetails.accidentInsuranceAdditional ? `Inkl. ${formatCurrency(calcDetails.accidentInsuranceAdditional)} ${calcDetails.accidentAdditionalLabel || 'Ausgleichsumlage'}` : (calcDetails.accidentInsurerName || 'DGUV')}>
+                            {calcDetails.accidentInsuranceAdditional ? `Inkl. Wohlfahrtspflege` : (calcDetails.accidentInsurerName || 'DGUV')}
+                        </span>
+                    </div>
+
+                    <div class="bg-purple-50/60 p-2.5 rounded-lg border border-purple-200/80">
+                        <span class="text-purple-800 block text-[10px] uppercase font-bold tracking-wider truncate" title={calcDetails.pensionFundName || 'ZVK / VBL'}>
+                            Zusatzvers. (AG)
+                        </span>
+                        <strong class="text-xs text-purple-950 font-mono">{formatCurrency(calcDetails.employerPensionFund ?? 0)}</strong>
+                        <span class="text-[10px] text-purple-700 block mt-0.5 truncate">{calcDetails.pensionFundName || 'Optional'}</span>
+                    </div>
                 </div>
             </div>
 

@@ -15,4 +15,5 @@ export * from "./recipes";
 export * from "./menus";
 export * from "./payroll";
 export * from "./conditions";
+export * from "./hmos";
 

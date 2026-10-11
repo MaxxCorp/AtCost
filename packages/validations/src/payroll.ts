@@ -119,6 +119,13 @@ export const payrollProfileSchema = v.object({
     churchTax: v.optional(churchTaxPicklist, 'none'),
     state: v.optional(v.string(), 'BE'), // German state: BE, BY, NW, etc.
     socialSecurityNumber: v.optional(v.string()),
+    hmoId: v.optional(v.string()),
+    accidentHmoId: v.optional(v.string()),
+    accidentAdditionalApplicable: v.optional(v.boolean(), true),
+    pensionHmoId: v.optional(v.string()),
+    u1CompensationPercent: v.optional(v.number(), 70.0),
+    u1Exempt: v.optional(v.boolean(), false),
+    u3Exempt: v.optional(v.boolean(), false),
     healthInsuranceName: v.optional(v.string(), 'Techniker Krankenkasse (TK)'),
     healthInsuranceType: v.optional(healthInsuranceTypePicklist, 'statutory'),
     healthInsuranceAdditionalContributionPercent: v.optional(v.number(), 2.5),
@@ -243,6 +250,12 @@ export interface PayrollCalculationResult {
     employerUnemploymentInsurance: number;
     employerLongTermCareInsurance: number;
     employerLevies: number;
+    employerAccidentInsurance: number;
+    employerPensionFund: number;
+    employeePensionFund: number;
+    u1Levy: number;
+    u2Levy: number;
+    u3Levy: number;
     totalEmployerSocialSecurity: number;
     totalEmployerCost: number;
 
@@ -591,9 +604,43 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
         let employerUnemploymentInsurance = 0;
         let employerLongTermCareInsurance = 0;
         let employerLevies = 0;
+        let employerAccidentInsurance = 0;
+        let accidentInsuranceBase = 0;
+        let accidentInsuranceAdditional = 0;
+        let employerPensionFund = 0;
+        let employeePensionFund = 0;
+        let u1Levy = 0;
+        let u2Levy = 0;
+        let u3Levy = 0;
+        let effectiveU1Rate = 0.021;
+        let effectiveU2Rate = 0.0044;
+        let effectiveU3Rate = 0.0015;
+        let u1Tier = 70.0;
 
         let socialSecurityGross = 0;
         let pensionGross = 0;
+
+        // Resolve HMO contribution rate and insurance type upfront from loaded HMO record or profile
+        let addContribPercent = 2.5;
+        let insuranceType = payrollProfile?.healthInsuranceType ?? 'statutory';
+
+        if (payrollProfile?.hmo) {
+            addContribPercent = Number(payrollProfile.hmo.additionalContributionPercent ?? 2.5);
+            if (payrollProfile.hmo.type) {
+                insuranceType = payrollProfile.hmo.type;
+            }
+        } else if (payrollProfile?.healthInsuranceAdditionalContributionPercent !== undefined && payrollProfile?.healthInsuranceAdditionalContributionPercent !== null) {
+            addContribPercent = Number(payrollProfile.healthInsuranceAdditionalContributionPercent);
+        } else if (cond?.hmoRates && payrollProfile?.healthInsuranceName) {
+            const targetName = payrollProfile.healthInsuranceName.toLowerCase().trim();
+            const matchedHmo = cond.hmoRates.find((h) => {
+                const hName = h.name.toLowerCase().trim();
+                return hName === targetName || targetName.includes(hName) || hName.includes(targetName);
+            });
+            if (matchedHmo && typeof matchedHmo.additionalContributionPercent === 'number') {
+                addContribPercent = matchedHmo.additionalContributionPercent;
+            }
+        }
 
         if (fundingProgram === 'sgb2_16d') {
             // SGB II § 16d Arbeitsgelegenheit (AGH): Mehraufwandsentschädigung (MAE)
@@ -653,21 +700,9 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             }
 
             // Health Insurance (KV): 7.3% base + half of additional contribution (Zusatzbeitrag)
-            // Look up specific Krankenkasse from condition hmoRates if present
-            let addContribPercent = Number(payrollProfile?.healthInsuranceAdditionalContributionPercent ?? 2.5);
-            if (cond?.hmoRates && payrollProfile?.healthInsuranceName) {
-                const targetName = payrollProfile.healthInsuranceName.toLowerCase().trim();
-                const matchedHmo = cond.hmoRates.find((h) => {
-                    const hName = h.name.toLowerCase().trim();
-                    return hName === targetName || targetName.includes(hName) || hName.includes(targetName);
-                });
-                if (matchedHmo && typeof matchedHmo.additionalContributionPercent === 'number') {
-                    addContribPercent = matchedHmo.additionalContributionPercent;
-                }
-            }
             const kvHalfRate = kvBaseRateHalf + (addContribPercent / 100 / 2);
 
-            if (payrollProfile?.healthInsuranceType !== 'private') {
+            if (insuranceType !== 'private') {
                 employeeHealthInsurance = Math.round(socialSecurityGross * kvHalfRate * 100) / 100;
                 employerHealthInsurance = Math.round(socialSecurityGross * kvHalfRate * 100) / 100;
             }
@@ -706,11 +741,54 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             employeeLongTermCareInsurance = Math.round(socialSecurityGross * anPvRate * 100) / 100;
             employerLongTermCareInsurance = Math.round(socialSecurityGross * agPvRate * 100) / 100;
 
-            // Employer Levies (Umlagen U1, U2, Insolvenzgeld)
-            employerLevies = Math.round((
-                (socialSecurityGross * (u1Rate + u2Rate)) +
-                (pensionGross * insolvenzRate)
-            ) * 100) / 100;
+            // Health Insurer (Einzugsstelle) employer levies: U1, U2, U3
+            const healthHmo = payrollProfile?.hmo;
+            const isU1Exempt = Boolean(payrollProfile?.u1Exempt);
+            u1Tier = Number(payrollProfile?.u1CompensationPercent ?? healthHmo?.u1DefaultCompensationPercent ?? 70.0);
+
+            effectiveU1Rate = Number(cond?.u1Rate ?? 0.021); // Default 2.10%
+            if (healthHmo?.u1Rates && Array.isArray(healthHmo.u1Rates) && healthHmo.u1Rates.length > 0) {
+                const matchedTier = healthHmo.u1Rates.find((t: any) => Math.abs(Number(t.compensationPercent) - u1Tier) < 1);
+                if (matchedTier) {
+                    effectiveU1Rate = Number(matchedTier.contributionPercent) / 100;
+                } else {
+                    effectiveU1Rate = Number(healthHmo.u1Rates[0].contributionPercent) / 100;
+                }
+            }
+
+            effectiveU2Rate = healthHmo?.u2Rate ? (Number(healthHmo.u2Rate) / 100) : Number(cond?.u2Rate ?? 0.0044);
+            const isU3Exempt = Boolean(payrollProfile?.u3Exempt);
+            effectiveU3Rate = healthHmo?.u3Rate ? (Number(healthHmo.u3Rate) / 100) : Number(cond?.insolvenzRate ?? 0.0015);
+
+            u1Levy = isU1Exempt ? 0 : Math.round(socialSecurityGross * effectiveU1Rate * 100) / 100;
+            u2Levy = Math.round(socialSecurityGross * effectiveU2Rate * 100) / 100;
+            u3Levy = isU3Exempt ? 0 : Math.round(pensionGross * effectiveU3Rate * 100) / 100;
+            employerLevies = Math.round((u1Levy + u2Levy + u3Levy) * 100) / 100;
+
+            // Accident Insurance (Gesetzliche Unfallversicherung - Berufsgenossenschaft / DGUV)
+            const accidentHmo = payrollProfile?.accidentHmo;
+            if (accidentHmo) {
+                const gefahrklasse = Number(accidentHmo.accidentGefahrklasse ?? 1.25);
+                const beitragsfuss = Number(accidentHmo.accidentBeitragsfuss ?? 3.50);
+                accidentInsuranceBase = Math.round(((socialSecurityGross * gefahrklasse * beitragsfuss) / 1000) * 100) / 100;
+
+                const additionalRate = Number(accidentHmo.accidentAdditionalRate ?? 0);
+                const isAdditionalApplicable = payrollProfile?.accidentAdditionalApplicable !== false && additionalRate > 0;
+                if (isAdditionalApplicable) {
+                    accidentInsuranceAdditional = Math.round(((socialSecurityGross * additionalRate) / 1000) * 100) / 100;
+                }
+
+                employerAccidentInsurance = Math.round((accidentInsuranceBase + accidentInsuranceAdditional) * 100) / 100;
+            }
+
+            // Supplementary Pension Fund (Zusatzversorgungskasse - ZVK / VBL / bAV)
+            const pensionHmo = payrollProfile?.pensionHmo;
+            if (pensionHmo) {
+                const agPensionRate = Number(pensionHmo.pensionEmployerPercent ?? 4.0) / 100;
+                const anPensionRate = Number(pensionHmo.pensionEmployeePercent ?? 1.81) / 100;
+                employerPensionFund = Math.round(grossSalary * agPensionRate * 100) / 100;
+                employeePensionFund = Math.round(grossSalary * anPensionRate * 100) / 100;
+            }
         }
 
         const totalTax = Math.round((wageTax + solidaritySurcharge + churchTax) * 100) / 100;
@@ -721,7 +799,7 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             employeeLongTermCareInsurance
         ) * 100) / 100;
 
-        const netSalary = Math.round((grossSalary - totalTax - totalEmployeeSocialSecurity) * 100) / 100;
+        const netSalary = Math.round((grossSalary - totalTax - totalEmployeeSocialSecurity - employeePensionFund) * 100) / 100;
 
         // Net deductions: e.g. full VL transfer (standard 40.00 € total savings transfer)
         let netDeductions = 0;
@@ -738,7 +816,9 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             employerPensionInsurance +
             employerUnemploymentInsurance +
             employerLongTermCareInsurance +
-            employerLevies
+            employerLevies +
+            employerAccidentInsurance +
+            employerPensionFund
         ) * 100) / 100;
 
         const totalEmployerCost = Math.round((grossSalary + totalEmployerSocialSecurity) * 100) / 100;
@@ -938,6 +1018,93 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
                     legalReference: '§ 27 Abs. 3 Nr. 5 SGB III',
                 });
             }
+
+            if (u1Levy > 0) {
+                lineItems.push({
+                    code: 'U1_LEVY',
+                    name: `U1-Umlage Entgeltfortzahlung (Erstattung ${u1Tier}%, Satz ${(effectiveU1Rate * 100).toFixed(2)}%)`,
+                    category: 'employer_contribution',
+                    amount: u1Levy,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: 'AAG § 1',
+                });
+            }
+
+            if (u2Levy > 0) {
+                lineItems.push({
+                    code: 'U2_LEVY',
+                    name: `U2-Umlage Mutterschutz (${(effectiveU2Rate * 100).toFixed(2)}%)`,
+                    category: 'employer_contribution',
+                    amount: u2Levy,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: 'AAG § 1 / MuSchG',
+                });
+            }
+
+            if (u3Levy > 0) {
+                lineItems.push({
+                    code: 'U3_LEVY',
+                    name: `U3-Insolvenzgeldumlage (${(effectiveU3Rate * 100).toFixed(2)}%)`,
+                    category: 'employer_contribution',
+                    amount: u3Levy,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: '§ 358 SGB III',
+                });
+            }
+
+            if (employerAccidentInsurance > 0) {
+                const bgName = payrollProfile?.accidentHmo?.name || 'Berufsgenossenschaft';
+                lineItems.push({
+                    code: 'ACCIDENT_INSURANCE',
+                    name: `Gesetzliche Unfallversicherung Grundbeitrag (${bgName} - GK ${Number(payrollProfile?.accidentHmo?.accidentGefahrklasse ?? 1.25).toFixed(2)}, Fuß ${Number(payrollProfile?.accidentHmo?.accidentBeitragsfuss ?? 3.50).toFixed(2)} €)`,
+                    category: 'employer_contribution',
+                    amount: accidentInsuranceBase,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: '§ 153 SGB VII',
+                });
+
+                if (accidentInsuranceAdditional > 0) {
+                    const addLabel = payrollProfile?.accidentHmo?.accidentAdditionalLabel || 'Ausgleichsumlage Wohlfahrtspflege';
+                    const addRate = Number(payrollProfile?.accidentHmo?.accidentAdditionalRate ?? 0.08);
+                    lineItems.push({
+                        code: 'ACCIDENT_INSURANCE_ADDITIONAL',
+                        name: `${addLabel} (${addRate.toFixed(2)} € / 1.000 € Entgelt)`,
+                        category: 'employer_contribution',
+                        amount: accidentInsuranceAdditional,
+                        taxExempt: true,
+                        socialSecurityExempt: true,
+                        legalReference: '§ 2 Abs. 1 Nr. 9 SGB VII',
+                    });
+                }
+            }
+
+            if (employerPensionFund > 0) {
+                lineItems.push({
+                    code: 'PENSION_FUND_AG',
+                    name: `Zusatzversorgung AG-Umlage (${payrollProfile?.pensionHmo?.name || 'ZVK/VBL'})`,
+                    category: 'employer_contribution',
+                    amount: employerPensionFund,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: 'BetrAVG / TVöD',
+                });
+            }
+
+            if (employeePensionFund > 0) {
+                lineItems.push({
+                    code: 'PENSION_FUND_AN',
+                    name: `Zusatzversorgung AN-Eigenanteil (${payrollProfile?.pensionHmo?.name || 'ZVK/VBL'})`,
+                    category: 'deduction',
+                    amount: employeePensionFund,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: 'BetrAVG / TVöD',
+                });
+            }
         }
 
         return {
@@ -986,6 +1153,12 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             employerUnemploymentInsurance,
             employerLongTermCareInsurance,
             employerLevies,
+            employerAccidentInsurance,
+            employerPensionFund,
+            employeePensionFund,
+            u1Levy,
+            u2Levy,
+            u3Levy,
             totalEmployerSocialSecurity,
             totalEmployerCost,
 
@@ -1018,6 +1191,29 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
                 coachingHoursPerMonth,
                 deuevPersonengruppe,
                 deuevBeitragsgruppe,
+                hmoId: payrollProfile?.hmoId || payrollProfile?.hmo?.id || null,
+                hmoName: payrollProfile?.hmo?.name || payrollProfile?.healthInsuranceName || 'Techniker Krankenkasse (TK)',
+                hmoAdditionalContributionPercent: addContribPercent,
+                hmoType: insuranceType,
+                u1Levy,
+                u1RateUsed: effectiveU1Rate,
+                u1TierPercent: u1Tier,
+                isU1Exempt: Boolean(payrollProfile?.u1Exempt),
+                u2Levy,
+                u2RateUsed: effectiveU2Rate,
+                u3Levy,
+                u3RateUsed: effectiveU3Rate,
+                isU3Exempt: Boolean(payrollProfile?.u3Exempt),
+                employerAccidentInsurance,
+                accidentInsuranceBase,
+                accidentInsuranceAdditional,
+                accidentAdditionalRate: Number(payrollProfile?.accidentHmo?.accidentAdditionalRate ?? 0),
+                accidentAdditionalLabel: payrollProfile?.accidentHmo?.accidentAdditionalLabel || null,
+                isAccidentAdditionalApplicable: payrollProfile?.accidentAdditionalApplicable !== false,
+                accidentInsurerName: payrollProfile?.accidentHmo?.name || null,
+                employerPensionFund,
+                employeePensionFund,
+                pensionFundName: payrollProfile?.pensionHmo?.name || null,
             },
         };
     }

@@ -3,6 +3,7 @@ import {
     payrollRun,
     payrollProfile,
     payslip,
+    hmo,
     talent,
     contract,
     timesheetEntry,
@@ -124,7 +125,13 @@ export async function calculatePayrollRun(runId: string) {
             contracts: {
                 orderBy: [asc(contract.precedence), asc(contract.startDate)],
             },
-            payrollProfile: true,
+            payrollProfile: {
+                with: {
+                    hmo: true,
+                    accidentHmo: true,
+                    pensionHmo: true,
+                }
+            },
             tags: {
                 with: {
                     tag: true,
@@ -209,8 +216,44 @@ export async function calculatePayrollRun(runId: string) {
             )
         );
 
-        // Prepare payroll profile fallback if not created yet
-        const profile = t.payrollProfile || {
+        // Prepare payroll profile fallback and load HMO / insurer records directly for computation
+        const rawProfile = t.payrollProfile as any;
+        let hmoRecord = rawProfile?.hmo || null;
+        let accidentHmoRecord = rawProfile?.accidentHmo || null;
+        let pensionHmoRecord = rawProfile?.pensionHmo || null;
+
+        if (!hmoRecord && rawProfile?.hmoId) {
+            hmoRecord = await db.query.hmo.findFirst({
+                where: eq(hmo.id, rawProfile.hmoId),
+            }) || null;
+        }
+
+        if (!accidentHmoRecord && rawProfile?.accidentHmoId) {
+            accidentHmoRecord = await db.query.hmo.findFirst({
+                where: eq(hmo.id, rawProfile.accidentHmoId),
+            }) || null;
+        }
+        if (!accidentHmoRecord) {
+            accidentHmoRecord = await db.query.hmo.findFirst({
+                where: and(eq(hmo.category, 'accident'), eq(hmo.isActive, true)),
+            }) || null;
+        }
+
+        if (!pensionHmoRecord && rawProfile?.pensionHmoId) {
+            pensionHmoRecord = await db.query.hmo.findFirst({
+                where: eq(hmo.id, rawProfile.pensionHmoId),
+            }) || null;
+        }
+
+        const profile = rawProfile ? {
+            ...rawProfile,
+            hmo: hmoRecord,
+            accidentHmo: accidentHmoRecord,
+            pensionHmo: pensionHmoRecord,
+            healthInsuranceName: hmoRecord?.name ?? rawProfile.healthInsuranceName ?? 'Techniker Krankenkasse (TK)',
+            healthInsuranceAdditionalContributionPercent: hmoRecord ? hmoRecord.additionalContributionPercent : Number(rawProfile.healthInsuranceAdditionalContributionPercent ?? 2.5),
+            healthInsuranceType: hmoRecord?.type ?? rawProfile.healthInsuranceType ?? 'statutory',
+        } : {
             taxClass: '1',
             childCount: 0,
             churchTax: 'none',
@@ -230,6 +273,9 @@ export async function calculatePayrollRun(runId: string) {
             coachingHoursPerMonth: 2,
             deuevPersonengruppe: '101',
             deuevBeitragsgruppe: '1111',
+            hmo: null,
+            accidentHmo: accidentHmoRecord,
+            pensionHmo: null,
         };
 
         const calcInput: PayrollCalculationInput = {

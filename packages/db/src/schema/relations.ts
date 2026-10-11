@@ -14,6 +14,7 @@ import { consumable } from "./consumables";
 import { recipe, recipeConsumable } from "./recipes";
 import { menu, menuItem, eventMenu } from "./menus";
 import { payrollRun, payrollProfile, payslip } from "./payroll";
+import { hmo } from "./hmos";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -422,8 +423,15 @@ export const payrollRunRelations = relations(payrollRun, ({ many }) => ({
     payslips: many(payslip),
 }));
 
+export const hmoRelations = relations(hmo, ({ many }) => ({
+    payrollProfiles: many(payrollProfile),
+}));
+
 export const payrollProfileRelations = relations(payrollProfile, ({ one }) => ({
     talent: one(talent, { fields: [payrollProfile.talentId], references: [talent.id] }),
+    hmo: one(hmo, { fields: [payrollProfile.hmoId], references: [hmo.id] }),
+    accidentHmo: one(hmo, { fields: [payrollProfile.accidentHmoId], references: [hmo.id] }),
+    pensionHmo: one(hmo, { fields: [payrollProfile.pensionHmoId], references: [hmo.id] }),
 }));
 
 export const payslipRelations = relations(payslip, ({ one }) => ({
@@ -431,4 +439,5 @@ export const payslipRelations = relations(payslip, ({ one }) => ({
     talent: one(talent, { fields: [payslip.talentId], references: [talent.id] }),
     contract: one(contract, { fields: [payslip.contractId], references: [contract.id] }),
 }));
+
 
