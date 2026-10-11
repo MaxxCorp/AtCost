@@ -356,6 +356,8 @@ export const userTalentRelations = relations(userTalent, ({ one }) => ({
 export const contractRelations = relations(contract, ({ one, many }) => ({
     talent: one(talent, { fields: [contract.talentId], references: [talent.id] }),
     frameworks: many(contractFrameworkContract),
+    parentContract: one(contract, { fields: [contract.parentContractId], references: [contract.id], relationName: 'contractHierarchy' }),
+    amendments: many(contract, { relationName: 'contractHierarchy' }),
 }));
 
 export const contractFrameworkRelations = relations(contractFramework, ({ many }) => ({

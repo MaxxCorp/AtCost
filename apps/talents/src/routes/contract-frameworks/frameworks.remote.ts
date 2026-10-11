@@ -57,7 +57,10 @@ export const createContractFramework = form(contractFrameworkSchema, async (data
 
     const [newFramework] = await db.insert(contractFramework).values({
         name: data.name,
+        code: data.code || null,
         description: data.description || null,
+        isDefault: data.isDefault ?? false,
+        defaultValues: data.defaultValues || null,
     }).returning();
 
     await listContractFrameworks().refresh();
@@ -72,7 +75,10 @@ export const updateContractFramework = form(v.intersect([v.object({ id: v.string
     const [updatedFramework] = await db.update(contractFramework)
         .set({
             name: updateData.name,
+            code: updateData.code || null,
             description: updateData.description || null,
+            isDefault: updateData.isDefault ?? false,
+            defaultValues: updateData.defaultValues || null,
         })
         .where(eq(contractFramework.id, data.id))
         .returning();
