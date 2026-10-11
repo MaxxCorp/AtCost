@@ -27,6 +27,11 @@ import {
     type PayrollProfileInput,
     type PayrollCalculationInput
 } from "@ac/validations";
+import {
+    getEffectiveSocialInsuranceCondition,
+    getEffectiveUnionContractCondition
+} from "#lib/server/conditions/service.js";
+
 
 export function getMonthDateRange(period: string): { startDate: Date; endDate: Date } {
     const [yearStr, monthStr] = period.split("-");
@@ -78,6 +83,9 @@ export async function calculatePayrollRun(runId: string) {
 
     const engine = getPayrollEngine(run.jurisdiction);
 
+    // Retrieve approved conditions effective for this specific run period (guarantees retroactive consistency)
+    const effectiveSocialCondition = await getEffectiveSocialInsuranceCondition(run.endDate, run.jurisdiction);
+
     // Fetch all talents with contact details
     const allTalents = await db.query.talent.findMany({
         with: {
@@ -103,6 +111,20 @@ export async function calculatePayrollRun(runId: string) {
         // Resolve active contract at run end date
         const effectiveContractRes = resolveEffectiveContract(t.contracts as any, run.endDate);
         const effectiveContract = effectiveContractRes?.effective || null;
+
+        // If contract references a collective agreement wageTable, resolve approved tariff condition for this run period
+        if (effectiveContract?.wageTable && (!effectiveContract.wageAmount || effectiveContract.wageAmount === 0)) {
+            const effectiveUnionCondition = await getEffectiveUnionContractCondition(effectiveContract.wageTable, run.endDate);
+            if (effectiveUnionCondition?.wageGrid && effectiveContract.entgeltgruppe) {
+                const eg = effectiveContract.entgeltgruppe;
+                const stufe = String(effectiveContract.erfahrungsstufe || 1);
+                const gridVal = (effectiveUnionCondition.wageGrid as any)?.[eg]?.[stufe];
+                if (typeof gridVal === 'number' && gridVal > 0) {
+                    effectiveContract.wageAmount = gridVal;
+                    effectiveContract.effectiveWageAmount = gridVal;
+                }
+            }
+        }
 
         // Fetch approved timesheet entries for this talent in this period
         const timesheets = await db.select().from(timesheetEntry).where(
@@ -157,9 +179,11 @@ export async function calculatePayrollRun(runId: string) {
             endDate: run.endDate,
             contract: effectiveContract,
             payrollProfile: profile,
+            socialInsuranceConditions: effectiveSocialCondition as any,
             timesheetEntries: timesheets,
             timeOffRequests: leaves,
         };
+
 
         const result = engine.calculate(calcInput);
 

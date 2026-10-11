@@ -169,6 +169,13 @@
       "when": 1791706980601,
       "tag": "0023_condemned_living_lightning",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791709340386,
+      "tag": "0024_lethal_agent_brand",
+      "breakpoints": true
     }
   ]
 }

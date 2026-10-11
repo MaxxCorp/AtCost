@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import { FilterableIdSchema } from './pagination.js';
+import type { SocialInsuranceConditionInput } from './conditions.js';
 
 // --- ENUMS & PICKLISTS ---
 
@@ -158,6 +159,7 @@ export interface PayrollCalculationInput {
     endDate: Date;
     contract: any | null; // effective resolved contract
     payrollProfile: any | null;
+    socialInsuranceConditions?: SocialInsuranceConditionInput | null;
     timesheetEntries: Array<{
         startTime: Date | string;
         endTime?: Date | string | null;
@@ -170,6 +172,7 @@ export interface PayrollCalculationInput {
         endDate: Date | string;
     }>;
 }
+
 
 export interface PayrollCalculationResult {
     jurisdiction: string;
@@ -543,7 +546,19 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             contract?.fundingProgram === 'sgb2_16i'
         ) ? 'sgb2_16i' : 'none';
 
-        const isMinijob = fundingProgram === 'none' && (employmentType === 'minijob' || (grossSalary <= GermanPayrollEngine.MINIJOB_LIMIT && employmentType !== 'regular'));
+        // Social Insurance conditions (dynamic from approved version or statutory fallback)
+        const cond = input.socialInsuranceConditions;
+        const bbgKvPv = Number(cond?.bbgKvPvMonthly ?? GermanPayrollEngine.BBG_KV_PV_MONTHLY);
+        const bbgRvAv = Number(cond?.bbgRvAvMonthly ?? GermanPayrollEngine.BBG_RV_AV_MONTHLY);
+        const minijobLimit = Number(cond?.minijobLimit ?? GermanPayrollEngine.MINIJOB_LIMIT);
+        const rvRateHalf = Number(cond?.rvRateHalf ?? GermanPayrollEngine.RV_RATE_HALF);
+        const avRateHalf = Number(cond?.avRateHalf ?? GermanPayrollEngine.AV_RATE_HALF);
+        const kvBaseRateHalf = Number(cond?.kvBaseRateHalf ?? GermanPayrollEngine.KV_BASE_RATE_HALF);
+        const u1Rate = Number(cond?.u1Rate ?? GermanPayrollEngine.U1_RATE);
+        const u2Rate = Number(cond?.u2Rate ?? GermanPayrollEngine.U2_RATE);
+        const insolvenzRate = Number(cond?.insolvenzRate ?? GermanPayrollEngine.INSOLVENZ_RATE);
+
+        const isMinijob = fundingProgram === 'none' && (employmentType === 'minijob' || (grossSalary <= minijobLimit && employmentType !== 'regular'));
 
         let wageTax = 0;
         let solidaritySurcharge = 0;
@@ -580,8 +595,8 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             employerLongTermCareInsurance = 0;
             employerLevies = 0;
         } else if (isMinijob) {
-            socialSecurityGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_KV_PV_MONTHLY);
-            pensionGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_RV_AV_MONTHLY);
+            socialSecurityGross = Math.min(rawSvGross, bbgKvPv);
+            pensionGross = Math.min(rawSvGross, bbgRvAv);
             // Minijob rules (§ 8 SGB IV):
             // Employee pays 0% wage tax (pauschal by employer) and 0% SV (if exempt from RV)
             if (payrollProfile?.pensionInsuranceExempt === false) {
@@ -593,10 +608,10 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             employerPensionInsurance = Math.round(grossSalary * 0.15 * 100) / 100;
             employerHealthInsurance = Math.round(grossSalary * 0.13 * 100) / 100;
             const employerFlatTax = Math.round(grossSalary * 0.02 * 100) / 100;
-            employerLevies = Math.round(grossSalary * (GermanPayrollEngine.U1_RATE + GermanPayrollEngine.U2_RATE + GermanPayrollEngine.INSOLVENZ_RATE) * 100) / 100 + employerFlatTax;
+            employerLevies = Math.round(grossSalary * (u1Rate + u2Rate + insolvenzRate) * 100) / 100 + employerFlatTax;
         } else {
-            socialSecurityGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_KV_PV_MONTHLY);
-            pensionGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_RV_AV_MONTHLY);
+            socialSecurityGross = Math.min(rawSvGross, bbgKvPv);
+            pensionGross = Math.min(rawSvGross, bbgRvAv);
 
             // Standard employment or SGB II § 16i taxation
             const taxClass = (payrollProfile?.taxClass || '1') as TaxClass;
@@ -620,38 +635,50 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             }
 
             // Health Insurance (KV): 7.3% base + half of additional contribution (Zusatzbeitrag)
-            const addContribPercent = Number(payrollProfile?.healthInsuranceAdditionalContributionPercent ?? 2.5);
-            const kvHalfRate = GermanPayrollEngine.KV_BASE_RATE_HALF + (addContribPercent / 100 / 2);
+            // Look up specific Krankenkasse from condition hmoRates if present
+            let addContribPercent = Number(payrollProfile?.healthInsuranceAdditionalContributionPercent ?? 2.5);
+            if (cond?.hmoRates && payrollProfile?.healthInsuranceName) {
+                const targetName = payrollProfile.healthInsuranceName.toLowerCase().trim();
+                const matchedHmo = cond.hmoRates.find((h) => {
+                    const hName = h.name.toLowerCase().trim();
+                    return hName === targetName || targetName.includes(hName) || hName.includes(targetName);
+                });
+                if (matchedHmo && typeof matchedHmo.additionalContributionPercent === 'number') {
+                    addContribPercent = matchedHmo.additionalContributionPercent;
+                }
+            }
+            const kvHalfRate = kvBaseRateHalf + (addContribPercent / 100 / 2);
 
             if (payrollProfile?.healthInsuranceType !== 'private') {
                 employeeHealthInsurance = Math.round(socialSecurityGross * kvHalfRate * 100) / 100;
                 employerHealthInsurance = Math.round(socialSecurityGross * kvHalfRate * 100) / 100;
             }
 
-            // Pension Insurance (RV): 9.3% each
+            // Pension Insurance (RV): 9.3% each (or dynamic rvRateHalf)
             if (!payrollProfile?.pensionInsuranceExempt) {
-                employeePensionInsurance = Math.round(pensionGross * GermanPayrollEngine.RV_RATE_HALF * 100) / 100;
-                employerPensionInsurance = Math.round(pensionGross * GermanPayrollEngine.RV_RATE_HALF * 100) / 100;
+                employeePensionInsurance = Math.round(pensionGross * rvRateHalf * 100) / 100;
+                employerPensionInsurance = Math.round(pensionGross * rvRateHalf * 100) / 100;
             }
 
             // Unemployment Insurance (AV):
             // CRITICAL: In § 16i SGB II, the employee is EXEMPT from ALV gem. § 27 Abs. 3 Nr. 5 SGB III!
             const isAvExempt = fundingProgram === 'sgb2_16i' || !!payrollProfile?.unemploymentInsuranceExempt;
             if (!isAvExempt) {
-                employeeUnemploymentInsurance = Math.round(pensionGross * GermanPayrollEngine.AV_RATE_HALF * 100) / 100;
-                employerUnemploymentInsurance = Math.round(pensionGross * GermanPayrollEngine.AV_RATE_HALF * 100) / 100;
+                employeeUnemploymentInsurance = Math.round(pensionGross * avRateHalf * 100) / 100;
+                employerUnemploymentInsurance = Math.round(pensionGross * avRateHalf * 100) / 100;
             }
 
             // Long-Term Care Insurance (Pflegeversicherung PV):
             // Base: 4.0% total. Standard states: AN 2.2%, AG 1.8%.
             // Saxony (SN): AN 2.7%, AG 1.3%.
             // Childless surcharge: +0.6% for employees without children over age 23.
-            let anPvRate = state === 'SN' ? 0.027 : 0.022;
-            let agPvRate = state === 'SN' ? 0.013 : 0.018;
+            let anPvRate = state === 'SN' ? 0.027 : Number(cond?.pvBaseRateAn ?? 0.022);
+            let agPvRate = state === 'SN' ? 0.013 : Number(cond?.pvBaseRateAg ?? 0.018);
+            const childlessSurcharge = Number(cond?.pvChildlessSurcharge ?? 0.006);
 
             const hasChildren = payrollProfile?.hasChildren || childCount > 0;
             if (!hasChildren) {
-                anPvRate += 0.006; // Kinderlosenzuschlag
+                anPvRate += childlessSurcharge; // Kinderlosenzuschlag
             } else if (childCount >= 2) {
                 // Discount of 0.25% per child from 2nd to 5th child
                 const discountedChildren = Math.min(childCount - 1, 4);
@@ -663,8 +690,8 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
 
             // Employer Levies (Umlagen U1, U2, Insolvenzgeld)
             employerLevies = Math.round((
-                (socialSecurityGross * (GermanPayrollEngine.U1_RATE + GermanPayrollEngine.U2_RATE)) +
-                (pensionGross * GermanPayrollEngine.INSOLVENZ_RATE)
+                (socialSecurityGross * (u1Rate + u2Rate)) +
+                (pensionGross * insolvenzRate)
             ) * 100) / 100;
         }
 

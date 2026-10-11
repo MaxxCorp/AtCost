@@ -1,21 +1,45 @@
 <script lang="ts">
     import { format } from 'date-fns';
     import { AsyncButton } from '@ac/ui';
-    import { completeTask } from '../../../routes/tasks.remote';
-    import { manageTimesheets } from '../../../routes/my-timesheet/timesheets.remote';
+    import { completeTask, listTasks, listCompletedTasks } from '../../../routes/tasks.remote.js';
+    import { manageTimesheets } from '../../../routes/my-timesheet/timesheets.remote.js';
+    import { readCondition } from '../../../routes/conditions.remote.js';
+    import ConditionReviewModal from '../conditions/ConditionReviewModal.svelte';
     import { toast } from 'svelte-sonner';
     import { refreshAll } from '$app/navigation';
+    import { ShieldAlert, Sparkles, CheckCircle2, XCircle } from '@lucide/svelte';
 
     let { task } = $props<{ task: any }>();
 
     const ct = completeTask;
     const mt = manageTimesheets;
 
-    async function handleTimesheetAction(action: 'approve' | 'reject') {
-        // Fallback for custom logic if needed, but we'll try to use form submit
+    let isReviewModalOpen = $state(false);
+    let conditionData = $state<any>(null);
+    let isLoadingCondition = $state(false);
+
+    async function openReviewModal() {
+        if (!task.data?.conditionId) {
+            toast.error('Konditions-ID nicht gefunden.');
+            return;
+        }
+        isLoadingCondition = true;
+        try {
+            const condition = await readCondition({
+                id: task.data.conditionId,
+                type: task.data.updateType || 'social_insurance'
+            });
+            conditionData = condition;
+            isReviewModalOpen = true;
+        } catch (err: any) {
+            toast.error(err?.message || 'Fehler beim Laden der Konditionsdaten.');
+        } finally {
+            isLoadingCondition = false;
+        }
     }
 
-    const typeColors = {
+    const typeColors: Record<string, string> = {
+        condition_update_approval: 'bg-indigo-50 text-indigo-700 border-indigo-200',
         timesheet_approval: 'bg-amber-50 text-amber-700 border-amber-100',
         profile_update: 'bg-blue-50 text-blue-700 border-blue-100',
         correction: 'bg-rose-50 text-rose-700 border-rose-100',
@@ -23,11 +47,17 @@
     };
 </script>
 
-<div class="p-6 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+<div class="p-6 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+    {#if task.type === 'condition_update_approval'}
+        <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-indigo-500/10 to-transparent rounded-bl-3xl pointer-events-none"></div>
+    {/if}
+
     <div class="flex items-start justify-between gap-4">
         <div class="flex gap-4">
-            <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-gray-50 group-hover:bg-white border border-transparent group-hover:border-gray-100 transition-all">
-                {#if task.type === 'timesheet_approval'}
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-gray-50 group-hover:bg-white border border-transparent group-hover:border-gray-100 transition-all shrink-0">
+                {#if task.type === 'condition_update_approval'}
+                    <ShieldAlert class="w-6 h-6 text-indigo-600" />
+                {:else if task.type === 'timesheet_approval'}
                     <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 {:else if task.type === 'correction'}
                     <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -36,10 +66,15 @@
                 {/if}
             </div>
             <div>
-                <div class="flex items-center gap-2 mb-1">
-                    <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border {(typeColors as any)[task.type] || typeColors.manual}">
-                        {task.type.replace('_', ' ')}
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border {typeColors[task.type] || typeColors.manual}">
+                        {task.type === 'condition_update_approval' ? 'Tarif / HMO Freigabe' : task.type.replace('_', ' ')}
                     </span>
+                    {#if task.targetRoles}
+                        <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                            Shared Queue (Management & HR)
+                        </span>
+                    {/if}
                     <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                         {format(new Date(task.createdAt), 'MMM d, HH:mm')}
                     </span>
@@ -58,8 +93,17 @@
             </div>
         </div>
 
-        <div class="flex flex-col gap-2">
-            {#if task.type === 'timesheet_approval'}
+        <div class="flex flex-col gap-2 shrink-0">
+            {#if task.type === 'condition_update_approval'}
+                <button
+                    type="button"
+                    onclick={openReviewModal}
+                    disabled={isLoadingCondition}
+                    class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm shadow-indigo-600/20 disabled:opacity-50"
+                >
+                    {isLoadingCondition ? 'Laden...' : 'Prüfen & Freigeben'}
+                </button>
+            {:else if task.type === 'timesheet_approval'}
                 <form 
                     {...mt.enhance(async ({ submit }) => {
                         const ok = await submit() as any;
@@ -70,7 +114,7 @@
                     })}
                 >
                     <input {...(mt.fields as any).action.as('hidden', 'approve')} />
-                    <input {...(mt.fields as any).entryId.as('hidden', task.data.timesheetEntryId)} />
+                    <input {...(mt.fields as any).entryId.as('hidden', task.data?.timesheetEntryId)} />
                     <AsyncButton 
                         type="submit"
                         loading={mt.pending}
@@ -90,7 +134,7 @@
                     })}
                 >
                     <input {...(mt.fields as any).action.as('hidden', 'reject')} />
-                    <input {...(mt.fields as any).entryId.as('hidden', task.data.timesheetEntryId)} />
+                    <input {...(mt.fields as any).entryId.as('hidden', task.data?.timesheetEntryId)} />
                     <input {...(mt.fields as any).comment.as('hidden', 'Rejected via task manager')} />
                     <AsyncButton 
                         type="submit"
@@ -123,3 +167,17 @@
         </div>
     </div>
 </div>
+
+{#if isReviewModalOpen && conditionData}
+    <ConditionReviewModal
+        condition={conditionData}
+        type={task.data?.updateType || 'social_insurance'}
+        open={true}
+        onClose={() => { isReviewModalOpen = false; }}
+        onApproved={async () => {
+            isReviewModalOpen = false;
+            void listTasks().refresh();
+            void listCompletedTasks().refresh();
+        }}
+    />
+{/if}

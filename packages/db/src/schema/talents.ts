@@ -137,16 +137,18 @@ export const timeOffBalance = pgTable("time_off_balance", {
 // --- TASK TABLES ---
 export const task = pgTable("task", {
     id: uuid("id").primaryKey().defaultRandom(),
-    type: text("type", { enum: ["timesheet_approval", "profile_update", "correction", "manual"] }).notNull(),
+    type: text("type").notNull(),
     status: text("status", { enum: ["pending", "completed", "archived"] }).default("pending").notNull(),
-    assigneeId: uuid("assignee_id").notNull().references(() => talent.id, { onDelete: "cascade" }),
+    assigneeId: uuid("assignee_id").references(() => talent.id, { onDelete: "cascade" }),
     creatorId: uuid("creator_id").references(() => talent.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     description: text("description"),
+    targetRoles: jsonb("target_roles").$type<string[]>(),
     data: jsonb("data"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
+
 
 export const userTalent = pgTable("user_talent", {
     userId: text("user_id").notNull(),

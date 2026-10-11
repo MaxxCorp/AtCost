@@ -18,15 +18,19 @@
         ArrowRight, 
         Sparkles,
         ShieldCheck,
-        Building2
+        Building2,
+        Layers
     } from "@lucide/svelte";
+    import ConditionsHistoryManager from "#lib/components/conditions/ConditionsHistoryManager.svelte";
 
     breadcrumbState.set({
         feature: "payroll",
         current: "Abrechnungsläufe",
     });
 
+    let currentTab = $state<'runs' | 'conditions'>('runs');
     let search = $state("");
+
     let statusFilter = $state<string | undefined>(undefined);
     let isCreateModalOpen = $state(false);
     let isSubmitting = $state(false);
@@ -112,8 +116,28 @@
         </div>
     </div>
 
+    <!-- Navigation Tabs -->
+    <div class="flex bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200/50 w-fit">
+        <button
+            type="button"
+            onclick={() => currentTab = 'runs'}
+            class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all {currentTab === 'runs' ? 'bg-white text-emerald-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-800'}"
+        >
+            Abrechnungsläufe
+        </button>
+        <button
+            type="button"
+            onclick={() => currentTab = 'conditions'}
+            class="px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all {currentTab === 'conditions' ? 'bg-white text-indigo-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-800'}"
+        >
+            Tarif- & Versicherungskonditionen (Auto-Update & Historie)
+        </button>
+    </div>
+
+    {#if currentTab === 'runs'}
     <!-- KPI Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
         <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-2xs space-y-1">
             <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Gesamtaufwand (Arbeitgeber)</span>
             <div class="text-2xl font-black text-gray-900 tracking-tight">
@@ -417,3 +441,7 @@
         </div>
     </div>
 {/if}
+{:else}
+    <ConditionsHistoryManager />
+{/if}
+
