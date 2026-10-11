@@ -1,9 +1,14 @@
 <script lang="ts">
     import { listTags } from '../../../routes/tags/list.remote.js';
-    import { listTagCategories } from '../../../routes/tags/categories.remote.js';
+    import {
+        listTagCategories,
+        createTagCategoryCommand,
+        updateTagCategoryCommand,
+        deleteTagCategoryAction
+    } from '../../../routes/tags/categories.remote.js';
     import { updateTalentTagsAction } from '../../../routes/talents/[id]/tags.remote.js';
-    import { Button } from '@ac/ui';
-    import { Tag as TagIcon, Check, Plus, Globe, Lock, Sparkles, Loader2, X, Search, CheckCircle2 } from '@lucide/svelte';
+    import { Button, AsyncButton } from '@ac/ui';
+    import { Tag as TagIcon, Check, Plus, Pencil, Trash2, FolderPlus, FolderEdit, Globe, Lock, Sparkles, Loader2, X, Search, CheckCircle2 } from '@lucide/svelte';
     import { toast } from 'svelte-sonner';
 
     interface TagItem {
@@ -16,13 +21,21 @@
         category?: { id: string; name: string } | null;
     }
 
+    type TagInput = TagItem | { tag: TagItem } | { tagId?: string; tag?: TagItem };
+
     interface Props {
         talentId: string;
-        currentTags?: TagItem[];
+        currentTags?: TagInput[];
         onUpdated?: () => void;
     }
 
     let { talentId, currentTags = [], onUpdated }: Props = $props();
+
+    const normalizedCurrentTags = $derived.by(() => {
+        return (currentTags || [])
+            .map((item: any) => (item && 'tag' in item && item.tag ? item.tag : item))
+            .filter((t: any): t is TagItem => Boolean(t && t.id));
+    });
 
     const tagsQuery = $derived(listTags({ limit: 100 }));
     const categoriesQuery = $derived(listTagCategories({ limit: 50 }));
@@ -35,10 +48,106 @@
     let isSaving = $state(false);
     let searchQuery = $state('');
     let selectedCategoryFilter = $state<string>('all');
+    let isCategoryModalOpen = $state(false);
+    let categoryModalMode = $state<'create' | 'edit'>('create');
+    let editingCategoryId = $state<string | null>(null);
+    let catFormName = $state('');
+    let catFormColor = $state('indigo');
+    let catFormDescription = $state('');
+    let isSavingCategory = $state(false);
+
+    const categoryColorPresets = [
+        { name: "Indigo", value: "indigo", bg: "bg-indigo-500" },
+        { name: "Emerald", value: "emerald", bg: "bg-emerald-500" },
+        { name: "Blue", value: "blue", bg: "bg-blue-500" },
+        { name: "Amber", value: "amber", bg: "bg-amber-500" },
+        { name: "Rose", value: "rose", bg: "bg-rose-500" },
+        { name: "Purple", value: "purple", bg: "bg-purple-500" },
+        { name: "Teal", value: "teal", bg: "bg-teal-500" },
+        { name: "Slate", value: "slate", bg: "bg-slate-500" },
+    ];
+
+    function openCreateCategory() {
+        categoryModalMode = 'create';
+        editingCategoryId = null;
+        catFormName = '';
+        catFormColor = 'indigo';
+        catFormDescription = '';
+        isCategoryModalOpen = true;
+    }
+
+    function openEditCategory(catId: string) {
+        const cat = allCategories.find(c => c.id === catId);
+        if (!cat) return;
+        categoryModalMode = 'edit';
+        editingCategoryId = catId;
+        catFormName = cat.name || '';
+        catFormColor = cat.color || 'indigo';
+        catFormDescription = cat.description || '';
+        isCategoryModalOpen = true;
+    }
+
+    async function handleSaveCategory() {
+        if (!catFormName.trim()) {
+            toast.error("Bitte einen Kategorienamen eingeben");
+            return;
+        }
+
+        isSavingCategory = true;
+        try {
+            if (categoryModalMode === 'create') {
+                const res = await createTagCategoryCommand({
+                    name: catFormName.trim(),
+                    color: catFormColor,
+                    description: catFormDescription.trim() || undefined,
+                });
+                const newCat = res?.category || res;
+                await categoriesQuery.refresh();
+                if (newCat?.id) {
+                    selectedCategoryFilter = newCat.id;
+                }
+                toast.success("Kategorie erfolgreich erstellt");
+            } else if (editingCategoryId) {
+                await updateTagCategoryCommand({
+                    id: editingCategoryId,
+                    name: catFormName.trim(),
+                    color: catFormColor,
+                    description: catFormDescription.trim() || undefined,
+                });
+                await categoriesQuery.refresh();
+                toast.success("Kategorie erfolgreich aktualisiert");
+            }
+            isCategoryModalOpen = false;
+        } catch (err: any) {
+            toast.error(err?.message || "Fehler beim Speichern der Kategorie");
+        } finally {
+            isSavingCategory = false;
+        }
+    }
+
+    async function handleDeleteCategory() {
+        if (!editingCategoryId) return;
+        if (!confirm("Möchten Sie diese Kategorie wirklich löschen?")) return;
+
+        isSavingCategory = true;
+        try {
+            await deleteTagCategoryAction({ id: editingCategoryId });
+            await categoriesQuery.refresh();
+            if (selectedCategoryFilter === editingCategoryId) {
+                selectedCategoryFilter = 'all';
+            }
+            toast.success("Kategorie gelöscht");
+            isCategoryModalOpen = false;
+        } catch (err: any) {
+            toast.error(err?.message || "Fehler beim Löschen der Kategorie");
+        } finally {
+            isSavingCategory = false;
+        }
+    }
 
     // Sync selectedTagIds when currentTags changes and not actively saving
     $effect(() => {
-        selectedTagIds = (currentTags || []).map(t => t.id);
+        selectedTagIds = normalizedCurrentTags.map(t => t.id);
     });
 
     // Preset helper names
@@ -154,7 +263,7 @@
     // Lookup map of all tags for badge display
     const tagsMap = $derived.by(() => {
         const map = new Map<string, TagItem>();
-        for (const t of currentTags) {
+        for (const t of normalizedCurrentTags) {
             map.set(t.id, t);
         }
         for (const t of allTags) {
@@ -198,26 +307,22 @@
                     size="sm" 
                     disabled={isSaving}
                     onclick={() => { 
-                        selectedTagIds = (currentTags || []).map(t => t.id);
+                        selectedTagIds = normalizedCurrentTags.map(t => t.id);
                         isEditing = false; 
                     }}
                 >
                     Abbrechen
                 </Button>
-                <Button 
+                <AsyncButton 
                     variant="primary" 
                     size="sm" 
-                    disabled={isSaving}
+                    loading={isSaving}
+                    loadingLabel="Speichern..."
                     onclick={handleSave}
                 >
-                    {#if isSaving}
-                        <Loader2 size={16} class="mr-1.5 animate-spin" />
-                        Speichern...
-                    {:else}
-                        <Check size={16} class="mr-1.5" />
-                        Speichern
-                    {/if}
-                </Button>
+                    <Check size={16} class="mr-1.5" />
+                    Speichern
+                </AsyncButton>
             {/if}
         </div>
     </div>
@@ -347,17 +452,41 @@
                         class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                 </div>
-                <select
-                    bind:value={selectedCategoryFilter}
-                    aria-label="Kategorie filtern"
-                    class="w-full sm:w-auto px-2.5 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                >
-                    <option value="all">Alle Kategorien</option>
-                    {#each allCategories as cat}
-                        <option value={cat.id}>{cat.name}</option>
-                    {/each}
-                    <option value="none">Ohne Kategorie</option>
-                </select>
+                <div class="flex items-center gap-1.5 w-full sm:w-auto">
+                    <select
+                        bind:value={selectedCategoryFilter}
+                        aria-label="Kategorie filtern"
+                        class="w-full sm:w-auto px-2.5 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                        <option value="all">Alle Kategorien</option>
+                        {#each allCategories as cat}
+                            <option value={cat.id}>{cat.name}</option>
+                        {/each}
+                        <option value="none">Ohne Kategorie</option>
+                    </select>
+
+                    <button
+                        type="button"
+                        onclick={openCreateCategory}
+                        class="p-1.5 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 text-gray-600 hover:text-indigo-600 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                        title="Neue Tag-Kategorie anlegen"
+                        aria-label="Neue Tag-Kategorie anlegen"
+                    >
+                        <Plus size={14} />
+                    </button>
+
+                    {#if selectedCategoryFilter !== 'all' && selectedCategoryFilter !== 'none'}
+                        <button
+                            type="button"
+                            onclick={() => openEditCategory(selectedCategoryFilter)}
+                            class="p-1.5 border border-indigo-200 rounded-lg bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                            title="Ausgewählte Kategorie bearbeiten"
+                            aria-label="Ausgewählte Kategorie bearbeiten"
+                        >
+                            <Pencil size={14} />
+                        </button>
+                    {/if}
+                </div>
             </div>
 
             <!-- Tags List grouped by Category -->
@@ -370,7 +499,19 @@
                     {#each groupedTags as group (group.categoryId ?? 'none')}
                         <div class="bg-gray-50/70 rounded-xl p-3 border border-gray-100">
                             <div class="text-xs font-semibold text-gray-600 mb-2 flex items-center justify-between">
-                                <span>{group.categoryName}</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span>{group.categoryName}</span>
+                                    {#if group.categoryId}
+                                        <button
+                                            type="button"
+                                            onclick={() => openEditCategory(group.categoryId!)}
+                                            class="p-0.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded transition-colors cursor-pointer"
+                                            title="Kategorie '{group.categoryName}' bearbeiten"
+                                        >
+                                            <Pencil size={12} />
+                                        </button>
+                                    {/if}
+                                </div>
                                 <span class="text-[10px] text-gray-400 font-normal">
                                     {group.tags.length} Tags
                                 </span>
@@ -420,6 +561,126 @@
                         </div>
                     {/each}
                 {/if}
+            </div>
+        </div>
+    {/if}
+
+    <!-- Category Modal -->
+    {#if isCategoryModalOpen}
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="category-modal-title"
+        >
+            <div class="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden text-xs">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div class="flex items-center gap-2">
+                        <div class="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                            {#if categoryModalMode === 'create'}
+                                <FolderPlus size={16} />
+                            {:else}
+                                <FolderEdit size={16} />
+                            {/if}
+                        </div>
+                        <h3 id="category-modal-title" class="font-bold text-gray-900 text-sm">
+                            {categoryModalMode === 'create' ? 'Neue Kategorie erstellen' : 'Kategorie bearbeiten'}
+                        </h3>
+                    </div>
+                    <button
+                        type="button"
+                        onclick={() => { isCategoryModalOpen = false; }}
+                        class="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <div class="p-5 space-y-4">
+                    <div>
+                        <label for="talent-cat-name" class="block font-semibold text-gray-700 mb-1">
+                            Kategoriename *
+                        </label>
+                        <input
+                            id="talent-cat-name"
+                            type="text"
+                            bind:value={catFormName}
+                            placeholder="z.B. Abrechnung, Festangestellte, Vertrieb..."
+                            class="w-full px-3.5 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden text-xs"
+                        />
+                    </div>
+
+                    <div>
+                        <span class="block font-semibold text-gray-700 mb-1.5">
+                            Farbe
+                        </span>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            {#each categoryColorPresets as preset}
+                                <button
+                                    type="button"
+                                    onclick={() => { catFormColor = preset.value; }}
+                                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-all cursor-pointer {catFormColor === preset.value ? 'border-gray-900 bg-gray-900 text-white font-bold' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}"
+                                >
+                                    <span class="w-2.5 h-2.5 rounded-full {preset.bg}"></span>
+                                    {preset.name}
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="talent-cat-desc" class="block font-semibold text-gray-700 mb-1">
+                            Beschreibung (optional)
+                        </label>
+                        <textarea
+                            id="talent-cat-desc"
+                            bind:value={catFormDescription}
+                            rows="2"
+                            placeholder="Optionale Beschreibung für diese Tag-Kategorie..."
+                            class="w-full px-3.5 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden text-xs"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="px-5 py-3.5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                    <div>
+                        {#if categoryModalMode === 'edit'}
+                            <AsyncButton
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onclick={handleDeleteCategory}
+                                loading={isSavingCategory}
+                                loadingLabel="Wird gelöscht..."
+                                class="text-rose-600 hover:bg-rose-50 border-rose-200 hover:border-rose-300"
+                            >
+                                <Trash2 size={14} class="mr-1" />
+                                Löschen
+                            </AsyncButton>
+                        {/if}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onclick={() => { isCategoryModalOpen = false; }}
+                            disabled={isSavingCategory}
+                            class="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 font-medium text-gray-700 transition-colors cursor-pointer text-xs"
+                        >
+                            Abbrechen
+                        </button>
+                        <AsyncButton
+                            type="button"
+                            size="sm"
+                            onclick={handleSaveCategory}
+                            loading={isSavingCategory}
+                            loadingLabel="Speichern..."
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
+                        >
+                            <Check size={14} class="mr-1" />
+                            {categoryModalMode === 'create' ? 'Kategorie erstellen' : 'Übernehmen'}
+                        </AsyncButton>
+                    </div>
+                </div>
             </div>
         </div>
     {/if}

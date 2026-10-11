@@ -14,6 +14,12 @@
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
     import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import { readTag as readTagRemote } from "../../../routes/tags/[id]/read.remote";
+    import {
+        listTagCategories as listTagCategoriesRemote,
+        createTagCategoryCommand,
+        updateTagCategoryCommand,
+        deleteTagCategoryAction
+    } from "../../../routes/tags/categories.remote";
     import * as v from "valibot";
 
 
@@ -76,6 +82,9 @@
     const rf = (remoteFunction as any).preflight(validationSchema);
 
     const type = "announcement";
+
+    const tagCategoriesQuery = $derived(listTagCategoriesRemote({ limit: 100 }));
+    const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
 
     function getCollaboratorStyle(fieldName: string) {
         const peer = collab?.getFieldCollaborator(fieldName);
@@ -317,6 +326,13 @@
                                 validationSchema={schema}
                                 isUpdating={!!id}
                                 initialData={formData}
+                                categories={availableTagCategories}
+                                createCategoryRemote={createTagCategoryCommand}
+                                updateCategoryRemote={updateTagCategoryCommand}
+                                deleteCategoryRemote={deleteTagCategoryAction}
+                                onCategoryCreated={() => { void tagCategoriesQuery.refresh(); }}
+                                onCategoryUpdated={() => { void tagCategoriesQuery.refresh(); }}
+                                onCategoryDeleted={() => { void tagCategoriesQuery.refresh(); }}
                                 {onSuccess}
                                 {onCancel}
                                 {m}

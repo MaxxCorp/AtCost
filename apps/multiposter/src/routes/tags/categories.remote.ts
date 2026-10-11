@@ -53,7 +53,38 @@ export const createTagCategoryAction = form(createTagCategorySchema, async (inpu
     return { success: true, category: created };
 });
 
+export const createTagCategoryCommand = command(createTagCategorySchema, async (input) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'events');
+
+    const created = await createCategory(input);
+
+    try {
+        await requested(listTagCategories, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listTagCategories().refresh();
+    void listTagCategories({}).refresh();
+
+    return { success: true, category: created };
+});
+
 export const updateTagCategoryAction = form(updateTagCategorySchema, async (input) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'events');
+
+    const updated = await updateCategory(input);
+
+    try {
+        await requested(listTagCategories, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listTagCategories().refresh();
+    void listTagCategories({}).refresh();
+    void readTagCategory({ id: input.id }).refresh();
+
+    return { success: true, category: updated };
+});
+
+export const updateTagCategoryCommand = command(updateTagCategorySchema, async (input) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'events');
 

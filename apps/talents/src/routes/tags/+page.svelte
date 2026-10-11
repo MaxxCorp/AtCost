@@ -8,7 +8,9 @@
         listTagCategories,
         readTagCategory,
         createTagCategoryAction,
+        createTagCategoryCommand,
         updateTagCategoryAction,
+        updateTagCategoryCommand,
         deleteTagCategoryAction
     } from "./categories.remote.js";
 
@@ -161,6 +163,12 @@
                             {isUpdating}
                             {initialData}
                             categories={availableCategories}
+                            createCategoryRemote={createTagCategoryCommand}
+                            updateCategoryRemote={updateTagCategoryCommand}
+                            deleteCategoryRemote={deleteTagCategoryAction}
+                            onCategoryCreated={() => { void categoriesQuery.refresh(); }}
+                            onCategoryUpdated={() => { void categoriesQuery.refresh(); }}
+                            onCategoryDeleted={() => { void categoriesQuery.refresh(); }}
                             {onSuccess}
                             {onCancel}
                         />

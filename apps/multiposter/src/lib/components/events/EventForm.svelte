@@ -26,6 +26,12 @@
     import { type Contact } from "@ac/validations";
     import TagForm from "@ac/ui/components/forms/TagForm.svelte";
     import { readTag } from "../../../routes/tags/[id]/read.remote";
+    import {
+        listTagCategories as listTagCategoriesRemote,
+        createTagCategoryCommand,
+        updateTagCategoryCommand,
+        deleteTagCategoryAction
+    } from "../../../routes/tags/categories.remote";
         
     import {
         addAssociation,
@@ -257,6 +263,9 @@
     });
 
     let showRecurrenceDialog = $state(false);
+
+    const tagCategoriesQuery = $derived(listTagCategoriesRemote({ limit: 100 }));
+    const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
 
     // Date/Time handling
     const timezones = Intl.supportedValuesOf
@@ -841,7 +850,7 @@
     <RecurrenceDialog
         bind:open={showRecurrenceDialog}
         value={rf.fields.recurrence.value() ?? initialData?.recurrence?.[0] ?? ""}
-        onchange={(val: string) => rf.fields.recurrence.set(val)}
+        onchange={(val: string | null) => rf.fields.recurrence.set(val ?? "")}
     />
     {#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
         <input
@@ -979,6 +988,13 @@
                     validationSchema={schema}
                     initialData={formData}
                     isUpdating={!!id}
+                    categories={availableTagCategories}
+                    createCategoryRemote={createTagCategoryCommand}
+                    updateCategoryRemote={updateTagCategoryCommand}
+                    deleteCategoryRemote={deleteTagCategoryAction}
+                    onCategoryCreated={() => { void tagCategoriesQuery.refresh(); }}
+                    onCategoryUpdated={() => { void tagCategoriesQuery.refresh(); }}
+                    onCategoryDeleted={() => { void tagCategoriesQuery.refresh(); }}
                     {onSuccess}
                     {onCancel}
                     {m}

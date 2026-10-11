@@ -1,10 +1,11 @@
 <script lang="ts">
+    // @ts-ignore
     import AsyncButton from "../AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "../button/index.js";
     import { goto } from "$app/navigation";
     import { translateIssue } from "../../utils.js";
-    import { Shield, Globe } from "@lucide/svelte";
+    import { Shield, Globe, Plus, Pencil, Trash2, FolderPlus, FolderEdit, Check, X, Loader2 } from "@lucide/svelte";
 
     let {
         remoteFunction,
@@ -12,6 +13,12 @@
         isUpdating = false,
         initialData = null,
         categories = [],
+        createCategoryRemote = undefined,
+        updateCategoryRemote = undefined,
+        deleteCategoryRemote = undefined,
+        onCategoryCreated = undefined,
+        onCategoryUpdated = undefined,
+        onCategoryDeleted = undefined,
         onSuccess = undefined,
         onCancel = undefined,
         cancelHref = "/tags",
@@ -22,7 +29,13 @@
         validationSchema: any;
         isUpdating?: boolean;
         initialData?: any;
-        categories?: Array<{ id: string; name: string; color?: string }>;
+        categories?: Array<{ id: string; name: string; color?: string; description?: string | null; slug?: string | null }>;
+        createCategoryRemote?: any;
+        updateCategoryRemote?: any;
+        deleteCategoryRemote?: any;
+        onCategoryCreated?: (newCategory: any) => void;
+        onCategoryUpdated?: (updatedCategory: any) => void;
+        onCategoryDeleted?: (categoryId: string) => void;
         onSuccess?: (result: any) => void;
         onCancel?: () => void;
         cancelHref?: string;
@@ -41,9 +54,139 @@
         { name: "Slate", value: "slate", bg: "bg-slate-500" },
     ];
 
+    // svelte-ignore state_referenced_locally
     let selectedVisibility = $state(initialData?.visibility || "internal");
+    // svelte-ignore state_referenced_locally
     let selectedColor = $state(initialData?.color || "indigo");
+    // svelte-ignore state_referenced_locally
     let selectedCategoryId = $state(initialData?.categoryId || "");
+
+    let categoriesList = $state<Array<{ id: string; name: string; color?: string; description?: string | null; slug?: string | null }>>([]);
+
+    $effect(() => {
+        categoriesList = [...categories];
+    });
+
+    const selectedCategory = $derived(categoriesList.find(c => c.id === selectedCategoryId));
+
+    let isCategoryModalOpen = $state(false);
+    let categoryModalMode = $state<'create' | 'edit'>('create');
+    let catFormName = $state('');
+    let catFormColor = $state('indigo');
+    let catFormDescription = $state('');
+    let catFormSlug = $state('');
+    let isSavingCategory = $state(false);
+
+    function openCreateCategory() {
+        categoryModalMode = 'create';
+        catFormName = '';
+        catFormColor = 'indigo';
+        catFormDescription = '';
+        catFormSlug = '';
+        isCategoryModalOpen = true;
+    }
+
+    function openEditCategory(cat: any) {
+        if (!cat) return;
+        categoryModalMode = 'edit';
+        catFormName = cat.name || '';
+        catFormColor = cat.color || 'indigo';
+        catFormDescription = cat.description || '';
+        catFormSlug = cat.slug || '';
+        isCategoryModalOpen = true;
+    }
+
+    async function handleSaveCategory() {
+        if (!catFormName.trim()) {
+            toast.error("Bitte einen Kategorienamen eingeben");
+            return;
+        }
+
+        isSavingCategory = true;
+        try {
+            if (categoryModalMode === 'create') {
+                if (createCategoryRemote) {
+                    const res = await createCategoryRemote({
+                        name: catFormName.trim(),
+                        color: catFormColor,
+                        description: catFormDescription.trim() || undefined,
+                        slug: catFormSlug.trim() || undefined,
+                    });
+                    const newCat = res?.category || res;
+                    if (newCat?.id) {
+                        categoriesList = [...categoriesList, newCat];
+                        selectedCategoryId = newCat.id;
+                        if (remoteFunction?.fields?.categoryId) {
+                            remoteFunction.fields.categoryId.set(newCat.id);
+                        }
+                        onCategoryCreated?.(newCat);
+                    }
+                } else {
+                    const newCat = {
+                        id: crypto.randomUUID(),
+                        name: catFormName.trim(),
+                        color: catFormColor,
+                        description: catFormDescription.trim() || null,
+                        slug: catFormSlug.trim() || null,
+                    };
+                    categoriesList = [...categoriesList, newCat];
+                    selectedCategoryId = newCat.id;
+                    if (remoteFunction?.fields?.categoryId) {
+                        remoteFunction.fields.categoryId.set(newCat.id);
+                    }
+                    onCategoryCreated?.(newCat);
+                }
+                toast.success("Kategorie erfolgreich erstellt");
+            } else {
+                if (updateCategoryRemote && selectedCategoryId) {
+                    const res = await updateCategoryRemote({
+                        id: selectedCategoryId,
+                        name: catFormName.trim(),
+                        color: catFormColor,
+                        description: catFormDescription.trim() || undefined,
+                        slug: catFormSlug.trim() || undefined,
+                    });
+                    const updatedCat = res?.category || res;
+                    categoriesList = categoriesList.map(c => c.id === selectedCategoryId ? { ...c, name: catFormName.trim(), color: catFormColor, description: catFormDescription.trim() } : c);
+                    onCategoryUpdated?.(updatedCat);
+                } else {
+                    categoriesList = categoriesList.map(c => c.id === selectedCategoryId ? { ...c, name: catFormName.trim(), color: catFormColor, description: catFormDescription.trim() } : c);
+                    onCategoryUpdated?.({ id: selectedCategoryId, name: catFormName.trim(), color: catFormColor, description: catFormDescription.trim() });
+                }
+                toast.success("Kategorie erfolgreich aktualisiert");
+            }
+            isCategoryModalOpen = false;
+        } catch (err: any) {
+            toast.error(err?.message || "Fehler beim Speichern der Kategorie");
+        } finally {
+            isSavingCategory = false;
+        }
+    }
+
+    async function handleDeleteCategory() {
+        if (!selectedCategoryId) return;
+        if (!confirm("Möchten Sie diese Kategorie wirklich löschen?")) return;
+
+        isSavingCategory = true;
+        try {
+            if (deleteCategoryRemote) {
+                await deleteCategoryRemote({ id: selectedCategoryId });
+            }
+            const deletedId = selectedCategoryId;
+            categoriesList = categoriesList.filter(c => c.id !== deletedId);
+            selectedCategoryId = '';
+            if (remoteFunction?.fields?.categoryId) {
+                remoteFunction.fields.categoryId.set(null);
+            }
+            onCategoryDeleted?.(deletedId);
+            toast.success("Kategorie gelöscht");
+            isCategoryModalOpen = false;
+        } catch (err: any) {
+            toast.error(err?.message || "Fehler beim Löschen der Kategorie");
+        } finally {
+            isSavingCategory = false;
+        }
+    }
 
     let submissionTriggered = $state(false);
     $effect(() => {
@@ -185,26 +328,82 @@
 
     <!-- Category -->
     <div>
-        <label for="tag-category" class="block font-semibold text-gray-700 mb-1">
-            Kategorie
-        </label>
-        <select
-            id="tag-category"
-            value={selectedCategoryId}
-            onchange={(e) => {
-                const val = (e.target as HTMLSelectElement).value;
-                selectedCategoryId = val;
-                if (remoteFunction.fields.categoryId) {
-                    remoteFunction.fields.categoryId.set(val || null);
-                }
-            }}
-            class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden bg-white"
-        >
-            <option value="">Keine Kategorie (Allgemein)</option>
-            {#each categories as cat}
-                <option value={cat.id}>{cat.name}</option>
-            {/each}
-        </select>
+        <div class="flex items-center justify-between mb-1">
+            <label for="tag-category" class="block font-semibold text-gray-700">
+                Kategorie
+            </label>
+            <div class="flex items-center gap-2">
+                {#if selectedCategoryId && selectedCategory}
+                    <button
+                        type="button"
+                        onclick={() => openEditCategory(selectedCategory)}
+                        class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline transition-colors cursor-pointer"
+                        title="Ausgewählte Kategorie bearbeiten"
+                    >
+                        <Pencil class="w-3 h-3" />
+                        Kategorie bearbeiten
+                    </button>
+                {/if}
+                <button
+                    type="button"
+                    onclick={openCreateCategory}
+                    class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline transition-colors cursor-pointer"
+                    title="Neue Kategorie anlegen"
+                >
+                    <Plus class="w-3 h-3" />
+                    Neue Kategorie
+                </button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+            <select
+                id="tag-category"
+                value={selectedCategoryId}
+                onchange={(e) => {
+                    const val = (e.target as HTMLSelectElement).value;
+                    selectedCategoryId = val;
+                    if (remoteFunction.fields.categoryId) {
+                        remoteFunction.fields.categoryId.set(val || null);
+                    }
+                }}
+                class="flex-1 px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden bg-white"
+            >
+                <option value="">Keine Kategorie (Allgemein)</option>
+                {#each categoriesList as cat}
+                    <option value={cat.id}>{cat.name}</option>
+                {/each}
+            </select>
+
+            <button
+                type="button"
+                onclick={openCreateCategory}
+                class="p-2 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-600 hover:text-indigo-600 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                title="Neue Kategorie erstellen"
+                aria-label="Neue Kategorie erstellen"
+            >
+                <Plus class="w-4 h-4" />
+            </button>
+
+            {#if selectedCategoryId && selectedCategory}
+                <button
+                    type="button"
+                    onclick={() => openEditCategory(selectedCategory)}
+                    class="p-2 border border-indigo-200 rounded-xl bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                    title="Ausgewählte Kategorie bearbeiten"
+                    aria-label="Ausgewählte Kategorie bearbeiten"
+                >
+                    <Pencil class="w-4 h-4" />
+                </button>
+            {/if}
+        </div>
+
+        {#if selectedCategory?.description}
+            <p class="text-[11px] text-gray-500 mt-1 italic">
+                {selectedCategory.description}
+            </p>
+        {/if}
+
         {#if remoteFunction.fields.categoryId}
             <input {...remoteFunction.fields.categoryId.as("text", selectedCategoryId)} class="hidden" />
         {/if}
@@ -212,9 +411,9 @@
 
     <!-- Color Preset -->
     <div>
-        <label class="block font-semibold text-gray-700 mb-1.5">
+        <span class="block font-semibold text-gray-700 mb-1.5">
             Farbe / Tag-Pill
-        </label>
+        </span>
         <div class="flex items-center gap-2 flex-wrap">
             {#each colorPresets as preset}
                 <button
@@ -272,3 +471,123 @@
         </AsyncButton>
     </div>
 </form>
+
+<!-- Category Modal -->
+{#if isCategoryModalOpen}
+    <div
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="category-modal-title"
+    >
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-md overflow-hidden text-xs">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div class="flex items-center gap-2">
+                    <div class="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                        {#if categoryModalMode === 'create'}
+                            <FolderPlus class="w-4 h-4" />
+                        {:else}
+                            <FolderEdit class="w-4 h-4" />
+                        {/if}
+                    </div>
+                    <h3 id="category-modal-title" class="font-bold text-gray-900 text-sm">
+                        {categoryModalMode === 'create' ? 'Neue Kategorie erstellen' : 'Kategorie bearbeiten'}
+                    </h3>
+                </div>
+                <button
+                    type="button"
+                    onclick={() => { isCategoryModalOpen = false; }}
+                    class="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                    <X class="w-4 h-4" />
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div>
+                    <label for="cat-modal-name" class="block font-semibold text-gray-700 mb-1">
+                        Kategoriename *
+                    </label>
+                    <input
+                        id="cat-modal-name"
+                        type="text"
+                        bind:value={catFormName}
+                        placeholder="z.B. Abrechnung, Festangestellte, Vertrieb..."
+                        class="w-full px-3.5 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden text-xs"
+                    />
+                </div>
+
+                <div>
+                    <span class="block font-semibold text-gray-700 mb-1.5">
+                        Farbe
+                    </span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        {#each colorPresets as preset}
+                            <button
+                                type="button"
+                                onclick={() => { catFormColor = preset.value; }}
+                                class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-all cursor-pointer {catFormColor === preset.value ? 'border-gray-900 bg-gray-900 text-white font-bold' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}"
+                            >
+                                <span class="w-2.5 h-2.5 rounded-full {preset.bg}"></span>
+                                {preset.name}
+                            </button>
+                        {/each}
+                    </div>
+                </div>
+
+                <div>
+                    <label for="cat-modal-desc" class="block font-semibold text-gray-700 mb-1">
+                        Beschreibung (optional)
+                    </label>
+                    <textarea
+                        id="cat-modal-desc"
+                        bind:value={catFormDescription}
+                        rows="2"
+                        placeholder="Optionale Beschreibung für diese Tag-Kategorie..."
+                        class="w-full px-3.5 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden text-xs"
+                    ></textarea>
+                </div>
+            </div>
+
+            <div class="px-5 py-3.5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                <div>
+                    {#if categoryModalMode === 'edit'}
+                        <AsyncButton
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onclick={handleDeleteCategory}
+                            loading={isSavingCategory}
+                            loadingLabel="Wird gelöscht..."
+                            class="text-rose-600 hover:bg-rose-50 border-rose-200 hover:border-rose-300"
+                        >
+                            <Trash2 class="w-3.5 h-3.5 mr-1" />
+                            Löschen
+                        </AsyncButton>
+                    {/if}
+                </div>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onclick={() => { isCategoryModalOpen = false; }}
+                        disabled={isSavingCategory}
+                        class="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 font-medium text-gray-700 transition-colors cursor-pointer text-xs"
+                    >
+                        Abbrechen
+                    </button>
+                    <AsyncButton
+                        type="button"
+                        size="sm"
+                        onclick={handleSaveCategory}
+                        loading={isSavingCategory}
+                        loadingLabel="Speichern..."
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
+                    >
+                        <Check class="w-3.5 h-3.5 mr-1" />
+                        {categoryModalMode === 'create' ? 'Kategorie erstellen' : 'Übernehmen'}
+                    </AsyncButton>
+                </div>
+            </div>
+        </div>
+    </div>
+{/if}
