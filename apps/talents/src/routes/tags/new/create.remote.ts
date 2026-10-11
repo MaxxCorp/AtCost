@@ -7,7 +7,7 @@ import { readTag } from '../[id]/read.remote.js';
 
 export const createTag = form(createTagSchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'talents');
+    ensureAccess(user, 'tags');
 
     // Check if tag already exists
     const existing = await db.query.tag.findFirst({
@@ -15,7 +15,7 @@ export const createTag = form(createTagSchema, async (input) => {
     });
 
     if (existing) {
-        return { success: true, ...existing };
+        return { success: true, tag: existing, ...existing };
     }
 
     const [newTag] = await db.insert(tag).values({
@@ -34,5 +34,5 @@ export const createTag = form(createTagSchema, async (input) => {
     void listTags().refresh();
     void listTags({}).refresh();
 
-    return { success: true, ...newTag };
+    return { success: true, tag: newTag, ...newTag };
 });

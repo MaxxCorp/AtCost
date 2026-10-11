@@ -86,8 +86,8 @@
             }
         })}
 >
-    {#if isUpdating && initialData?.id}
-        <input {...remoteFunction.fields.id.as("text", initialData.id)} class="hidden" />
+    {#if isUpdating && initialData?.id && remoteFunction.fields.id}
+        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
     {/if}
 
     <div>
@@ -139,7 +139,9 @@
                 </button>
             {/each}
         </div>
-        <input {...remoteFunction.fields.color.as("text", selectedColor)} class="hidden" />
+        {#if remoteFunction.fields.color}
+            <input {...remoteFunction.fields.color.as("hidden", selectedColor)} />
+        {/if}
     </div>
 
     <div>

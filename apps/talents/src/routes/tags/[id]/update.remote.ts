@@ -7,7 +7,7 @@ import { listTags } from '../list.remote.js';
 
 export const updateTag = form(updateTagSchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'talents');
+    ensureAccess(user, 'tags');
 
     const [updatedTag] = await db.update(tag)
         .set({
@@ -27,5 +27,5 @@ export const updateTag = form(updateTagSchema, async (input) => {
     void listTags().refresh();
     void listTags({}).refresh();
 
-    return { success: true, ...updatedTag };
+    return { success: true, tag: updatedTag, ...updatedTag };
 });

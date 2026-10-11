@@ -1,6 +1,6 @@
 import type { UserWithRolesAndClaims } from './auth.d';
 
-export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements' | 'talents' | 'consumables' | 'recipes' | 'prices';
+export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements' | 'talents' | 'consumables' | 'recipes' | 'prices' | 'tags';
 
 export function parseRoles(user: UserWithRolesAndClaims): string[] {
 	const raw = user?.roles;
@@ -49,6 +49,12 @@ export function hasAccess(user: UserWithRolesAndClaims | null | undefined, featu
 	// Consumables, recipes, and prices fall back to events access if not explicitly defined
 	if (claimValue === undefined && (feature === 'consumables' || feature === 'recipes' || feature === 'prices')) {
 		claimValue = claims['events'] ?? claims['multiposter.events'];
+	}
+
+	// Tags feature: allow if explicit claim exists, or default to any authenticated user with access to any tag-using feature
+	if (feature === 'tags') {
+		if (claimValue !== undefined) return !!claimValue;
+		return true;
 	}
 
 	// If the claim is explicitly true, the user has full (admin) access

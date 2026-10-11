@@ -5,7 +5,7 @@ import * as v from 'valibot';
 
 export const readTag = query(v.string(), async (id: string) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'talents');
+    ensureAccess(user, 'tags');
 
     const result = await db.query.tag.findFirst({
         where: eq(tag.id, id),

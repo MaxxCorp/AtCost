@@ -6,7 +6,7 @@ import { ensureDefaultCategoriesAndTags } from '#lib/server/tags/service.js';
 
 export const listTags = query(tagPaginationSchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'talents');
+    ensureAccess(user, 'tags');
 
     await ensureDefaultCategoriesAndTags();
 

@@ -16,14 +16,14 @@ import {
 
 export const listTagCategories = query(tagCategoryPaginationSchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'events');
+    ensureAccess(user, 'tags');
 
     return await listCategories(input);
 });
 
 export const readTagCategory = query(v.object({ id: v.string() }), async ({ id }) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'events');
+    ensureAccess(user, 'tags');
 
     const cat = await db.query.tagCategory.findFirst({
         where: eq(tagCategory.id, id),
@@ -40,7 +40,7 @@ export const readTagCategory = query(v.object({ id: v.string() }), async ({ id }
 
 export const createTagCategoryAction = form(createTagCategorySchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'events');
+    ensureAccess(user, 'tags');
 
     const created = await createCategory(input);
 
@@ -55,7 +55,7 @@ export const createTagCategoryAction = form(createTagCategorySchema, async (inpu
 
 export const createTagCategoryCommand = command(createTagCategorySchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'events');
+    ensureAccess(user, 'tags');
 
     const created = await createCategory(input);
 
@@ -70,7 +70,7 @@ export const createTagCategoryCommand = command(createTagCategorySchema, async (
 
 export const updateTagCategoryAction = form(updateTagCategorySchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'events');
+    ensureAccess(user, 'tags');
 
     const updated = await updateCategory(input);
 
@@ -86,7 +86,7 @@ export const updateTagCategoryAction = form(updateTagCategorySchema, async (inpu
 
 export const updateTagCategoryCommand = command(updateTagCategorySchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'events');
+    ensureAccess(user, 'tags');
 
     const updated = await updateCategory(input);
 
@@ -107,7 +107,7 @@ export const deleteTagCategoryAction = command(
     ]),
     async (input) => {
         const user = getAuthenticatedUser();
-        ensureAccess(user, 'events');
+        ensureAccess(user, 'tags');
 
         const ids = Array.isArray(input) ? input : [input.id];
         for (const id of ids) {

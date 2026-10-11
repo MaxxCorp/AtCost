@@ -206,9 +206,9 @@
             remoteFunction.fields.visibility.set(data.visibility);
             selectedVisibility = data.visibility;
         }
-        if (remoteFunction.fields.categoryId) {
-            remoteFunction.fields.categoryId.set(data.categoryId || null);
-            selectedCategoryId = data.categoryId || "";
+        if (remoteFunction.fields.categoryId && data.categoryId) {
+            remoteFunction.fields.categoryId.set(data.categoryId);
+            selectedCategoryId = data.categoryId;
         }
         if (remoteFunction.fields.color && data.color) {
             remoteFunction.fields.color.set(data.color);
@@ -246,8 +246,8 @@
             }
         })}
 >
-    {#if isUpdating && initialData?.id}
-        <input {...remoteFunction.fields.id.as("text", initialData.id)} class="hidden" />
+    {#if isUpdating && initialData?.id && remoteFunction.fields.id}
+        <input {...remoteFunction.fields.id.as("hidden", initialData.id)} />
     {/if}
 
     <!-- Name -->
@@ -276,17 +276,15 @@
             <label
                 class="flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all {selectedVisibility === 'internal' ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600' : 'border-gray-200 bg-white hover:bg-gray-50'}"
             >
-                <input
-                    type="radio"
-                    name="visibility"
-                    value="internal"
-                    checked={selectedVisibility === 'internal'}
-                    onchange={() => {
-                        selectedVisibility = 'internal';
-                        if (remoteFunction.fields.visibility) remoteFunction.fields.visibility.set('internal');
-                    }}
-                    class="mt-0.5 text-indigo-600 focus:ring-indigo-500"
-                />
+                {#if remoteFunction.fields.visibility}
+                    <input
+                        {...remoteFunction.fields.visibility.as("radio", "internal", selectedVisibility === "internal")}
+                        onchange={() => {
+                            selectedVisibility = 'internal';
+                        }}
+                        class="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                    />
+                {/if}
                 <div>
                     <div class="font-bold text-gray-900 flex items-center gap-1">
                         <Shield class="w-3.5 h-3.5 text-indigo-600" />
@@ -301,17 +299,15 @@
             <label
                 class="flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all {selectedVisibility === 'external' ? 'border-emerald-600 bg-emerald-50/50 ring-1 ring-emerald-600' : 'border-gray-200 bg-white hover:bg-gray-50'}"
             >
-                <input
-                    type="radio"
-                    name="visibility"
-                    value="external"
-                    checked={selectedVisibility === 'external'}
-                    onchange={() => {
-                        selectedVisibility = 'external';
-                        if (remoteFunction.fields.visibility) remoteFunction.fields.visibility.set('external');
-                    }}
-                    class="mt-0.5 text-emerald-600 focus:ring-emerald-500"
-                />
+                {#if remoteFunction.fields.visibility}
+                    <input
+                        {...remoteFunction.fields.visibility.as("radio", "external", selectedVisibility === "external")}
+                        onchange={() => {
+                            selectedVisibility = 'external';
+                        }}
+                        class="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                    />
+                {/if}
                 <div>
                     <div class="font-bold text-gray-900 flex items-center gap-1">
                         <Globe class="w-3.5 h-3.5 text-emerald-600" />
@@ -323,7 +319,6 @@
                 </div>
             </label>
         </div>
-        <input {...remoteFunction.fields.visibility.as("text", selectedVisibility)} class="hidden" />
     </div>
 
     <!-- Category -->
@@ -357,23 +352,22 @@
         </div>
 
         <div class="flex items-center gap-1.5">
-            <select
-                id="tag-category"
-                value={selectedCategoryId}
-                onchange={(e) => {
-                    const val = (e.target as HTMLSelectElement).value;
-                    selectedCategoryId = val;
-                    if (remoteFunction.fields.categoryId) {
-                        remoteFunction.fields.categoryId.set(val || null);
-                    }
-                }}
-                class="flex-1 px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden bg-white"
-            >
-                <option value="">Keine Kategorie (Allgemein)</option>
-                {#each categoriesList as cat}
-                    <option value={cat.id}>{cat.name}</option>
-                {/each}
-            </select>
+            {#if remoteFunction.fields.categoryId}
+                <select
+                    id="tag-category"
+                    {...remoteFunction.fields.categoryId.as("select", selectedCategoryId)}
+                    onchange={(e) => {
+                        const val = (e.target as HTMLSelectElement).value;
+                        selectedCategoryId = val;
+                    }}
+                    class="flex-1 px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden bg-white"
+                >
+                    <option value="">Keine Kategorie (Allgemein)</option>
+                    {#each categoriesList as cat}
+                        <option value={cat.id}>{cat.name}</option>
+                    {/each}
+                </select>
+            {/if}
 
             <button
                 type="button"
@@ -403,10 +397,6 @@
                 {selectedCategory.description}
             </p>
         {/if}
-
-        {#if remoteFunction.fields.categoryId}
-            <input {...remoteFunction.fields.categoryId.as("text", selectedCategoryId)} class="hidden" />
-        {/if}
     </div>
 
     <!-- Color Preset -->
@@ -432,7 +422,7 @@
             {/each}
         </div>
         {#if remoteFunction.fields.color}
-            <input {...remoteFunction.fields.color.as("text", selectedColor)} class="hidden" />
+            <input {...remoteFunction.fields.color.as("hidden", selectedColor)} />
         {/if}
     </div>
 
@@ -443,7 +433,7 @@
         </label>
         <textarea
             id="tag-desc"
-            {...remoteFunction.fields.description.as("text", "")}
+            {...remoteFunction.fields.description.as("text", initialData?.description ?? "")}
             rows="2"
             placeholder="Optionale Beschreibung des Tags..."
             class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden"

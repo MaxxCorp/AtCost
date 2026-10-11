@@ -8,7 +8,7 @@ const deleteTagSchema = v.array(v.pipe(v.string(), v.uuid()));
 
 export const deleteTag = command(deleteTagSchema, async (ids) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, 'talents');
+    ensureAccess(user, 'tags');
 
     await db.delete(tag).where(inArray(tag.id, ids));
 

@@ -6,7 +6,7 @@ import { listTags } from "../list.remote.js";
 
 export const createTag = form(createTagSchema, async (input) => {
     const user = getAuthenticatedUser();
-    ensureAccess(user, "events");
+    ensureAccess(user, "tags");
 
     // Check if tag already exists
     const existing = await db.query.tag.findFirst({
@@ -14,7 +14,7 @@ export const createTag = form(createTagSchema, async (input) => {
     });
 
     if (existing) {
-        return { success: true, tag: existing };
+        return { success: true, tag: existing, ...existing };
     }
 
     const [newTag] = await db.insert(tag).values({
@@ -32,5 +32,5 @@ export const createTag = form(createTagSchema, async (input) => {
     void listTags().refresh();
     void listTags({ limit: 50 }).refresh();
 
-    return { success: true, tag: newTag };
+    return { success: true, tag: newTag, ...newTag };
 });
