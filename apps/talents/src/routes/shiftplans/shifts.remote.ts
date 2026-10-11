@@ -297,6 +297,8 @@ export const createSchedulingGroup = command(createSchedulingGroupSchema, async 
     try {
         await requested(listSchedulingGroups, 20).refreshAll();
     } catch { /* ignore */ }
+    void listSchedulingGroups().refresh();
+    void listSchedulingGroups({}).refresh();
 
     return inserted;
 });
@@ -315,6 +317,12 @@ export const updateSchedulingGroup = command(updateSchedulingGroupSchema, async 
     try {
         await requested(listSchedulingGroups, 20).refreshAll();
     } catch { /* ignore */ }
+    void listSchedulingGroups().refresh();
+    void listSchedulingGroups({}).refresh();
+
+    try {
+        await requested(listShifts, 20).refreshAll();
+    } catch { /* ignore */ }
 
     return updated;
 });
@@ -327,6 +335,12 @@ export const deleteSchedulingGroup = command(deleteSchedulingGroupSchema, async 
 
     try {
         await requested(listSchedulingGroups, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listSchedulingGroups().refresh();
+    void listSchedulingGroups({}).refresh();
+
+    try {
+        await requested(listShifts, 20).refreshAll();
     } catch { /* ignore */ }
 
     return { success: true };

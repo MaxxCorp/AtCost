@@ -101,9 +101,9 @@ export type CopyScheduleInput = v.InferOutput<typeof copyScheduleSchema>;
 
 export const createSchedulingGroupSchema = v.object({
     name: v.pipe(v.string(), v.minLength(1, "Group name is required")),
-    code: v.optional(v.string()),
+    code: v.optional(v.nullable(v.string())),
     color: v.optional(v.string(), "purple"),
-    locationId: v.optional(v.string()),
+    locationId: v.optional(v.nullable(v.string())),
 });
 
 export type CreateSchedulingGroupInput = v.InferOutput<typeof createSchedulingGroupSchema>;
@@ -111,9 +111,9 @@ export type CreateSchedulingGroupInput = v.InferOutput<typeof createSchedulingGr
 export const updateSchedulingGroupSchema = v.object({
     id: v.pipe(v.string(), v.uuid("Invalid group ID")),
     name: v.pipe(v.string(), v.minLength(1, "Group name is required")),
-    code: v.optional(v.string()),
+    code: v.optional(v.nullable(v.string())),
     color: v.optional(v.string(), "purple"),
-    locationId: v.optional(v.string()),
+    locationId: v.optional(v.nullable(v.string())),
 });
 
 export type UpdateSchedulingGroupInput = v.InferOutput<typeof updateSchedulingGroupSchema>;

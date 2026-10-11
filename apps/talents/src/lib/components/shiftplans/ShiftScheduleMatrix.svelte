@@ -5,6 +5,7 @@
     import ShiftCard from "./ShiftCard.svelte";
     import ShiftModal from "./ShiftModal.svelte";
     import CopyScheduleModal from "./CopyScheduleModal.svelte";
+    import SchedulingGroupModal from "./SchedulingGroupModal.svelte";
     import type { ShiftDetail, SchedulingGroupDetail } from "@ac/validations";
     import { Button, AsyncButton } from "@ac/ui";
     import {
@@ -22,7 +23,9 @@
         Sparkles,
         ChevronDown,
         ChevronUp,
-        Filter
+        Filter,
+        Pencil,
+        Layers
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
@@ -79,6 +82,8 @@
     // Modals
     let showShiftModal = $state(false);
     let showCopyModal = $state(false);
+    let showGroupModal = $state(false);
+    let selectedGroupForEdit = $state<SchedulingGroupDetail | null>(null);
     let selectedShiftForEdit = $state<ShiftDetail | null>(null);
     let modalInitialDate = $state<Date | undefined>(undefined);
     let modalInitialTalentId = $state<string | null>(null);
@@ -220,6 +225,29 @@
             [groupId]: !collapsedGroups[groupId],
         };
     }
+
+    function openNewGroup() {
+        selectedGroupForEdit = null;
+        showGroupModal = true;
+    }
+
+    function openEditGroup(grp: SchedulingGroupDetail) {
+        selectedGroupForEdit = grp;
+        showGroupModal = true;
+    }
+
+    const groupColorStyles: Record<string, { dot: string; badge: string }> = {
+        purple: { dot: "bg-purple-500", badge: "bg-purple-50 text-purple-700 border-purple-200" },
+        blue: { dot: "bg-blue-500", badge: "bg-blue-50 text-blue-700 border-blue-200" },
+        green: { dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+        yellow: { dot: "bg-amber-500", badge: "bg-amber-50 text-amber-700 border-amber-200" },
+        pink: { dot: "bg-pink-500", badge: "bg-pink-50 text-pink-700 border-pink-200" },
+        darkBlue: { dot: "bg-indigo-600", badge: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+        darkGreen: { dot: "bg-teal-600", badge: "bg-teal-50 text-teal-700 border-teal-200" },
+        darkPurple: { dot: "bg-fuchsia-600", badge: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200" },
+        darkYellow: { dot: "bg-orange-500", badge: "bg-orange-50 text-orange-700 border-orange-200" },
+        gray: { dot: "bg-slate-500", badge: "bg-slate-100 text-slate-700 border-slate-200" },
+    };
 </script>
 
 <div class="space-y-6">
@@ -300,6 +328,17 @@
             >
                 <Copy size={15} class="mr-1.5 text-purple-500" />
                 Copy Schedule
+            </Button>
+
+            <!-- Add Scheduling Group -->
+            <Button
+                variant="outline"
+                size="sm"
+                onclick={openNewGroup}
+                class="font-bold text-xs border-gray-200 text-gray-700 hover:text-purple-700 hover:border-purple-200 rounded-xl px-3.5 py-2.5"
+            >
+                <Layers size={15} class="mr-1.5 text-purple-500" />
+                Add Group
             </Button>
 
             <!-- Add Shift Button -->
@@ -451,37 +490,49 @@
 
                         <!-- Group Accordion Header -->
                         <div class="bg-gray-100/70 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-                            <button
-                                type="button"
-                                onclick={() => toggleGroupCollapse(grp.id)}
-                                class="flex items-center gap-2 text-left cursor-pointer group"
-                            >
-                                {#if isCollapsed}
-                                    <ChevronRight size={14} class="text-gray-400 group-hover:text-purple-600" />
-                                {:else}
-                                    <ChevronDown size={14} class="text-gray-400 group-hover:text-purple-600" />
-                                {/if}
-                                <span class="text-xs font-black text-gray-800 tracking-tight">
-                                    {grp.name}
-                                </span>
+                            <div class="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onclick={() => toggleGroupCollapse(grp.id)}
+                                    class="flex items-center gap-2 text-left cursor-pointer group"
+                                >
+                                    {#if isCollapsed}
+                                        <ChevronRight size={14} class="text-gray-400 group-hover:text-purple-600" />
+                                    {:else}
+                                        <ChevronDown size={14} class="text-gray-400 group-hover:text-purple-600" />
+                                    {/if}
+                                    <div class="w-2.5 h-2.5 rounded-full shrink-0 {groupColorStyles[grp.color]?.dot ?? 'bg-purple-500'}"></div>
+                                    <span class="text-xs font-black text-gray-800 tracking-tight">
+                                        {grp.name}
+                                    </span>
+                                </button>
                                 {#if grp.code}
                                     <span class="text-[10px] font-bold bg-white text-gray-600 px-1.5 py-0.5 rounded border border-gray-200">
                                         {grp.code}
                                     </span>
                                 {/if}
-                            </button>
+                            </div>
 
-                            <div class="flex items-center gap-3">
-                                <span class="text-[11px] font-bold text-gray-500">
+                            <div class="flex items-center gap-2.5">
+                                <span class="text-[11px] font-bold text-gray-500 mr-1">
                                     Group Total: <strong class="text-purple-700">{groupHours} hrs</strong>
                                 </span>
                                 <button
                                     type="button"
                                     onclick={() => openNewShift(undefined, null, grp.id)}
-                                    class="text-[11px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 bg-white hover:bg-purple-50 px-2 py-0.5 rounded-md border border-gray-200 transition-colors cursor-pointer"
+                                    class="text-[11px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 bg-white hover:bg-purple-50 px-2 py-0.5 rounded-md border border-gray-200 transition-colors cursor-pointer shadow-2xs"
                                 >
                                     <Plus size={11} />
                                     Add to Group
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick={() => openEditGroup(grp)}
+                                    title="Edit or rename group"
+                                    class="text-gray-500 hover:text-purple-700 hover:bg-white p-1 rounded-md border border-transparent hover:border-gray-200 transition-colors cursor-pointer"
+                                    aria-label="Edit {grp.name} group"
+                                >
+                                    <Pencil size={12} />
                                 </button>
                             </div>
                         </div>
@@ -617,3 +668,19 @@
     onclose={() => showCopyModal = false}
     onSuccess={() => void shiftsQuery.refresh()}
 />
+
+<!-- Scheduling Group Modal (Create / Edit / Delete) -->
+{#if showGroupModal}
+    {#key selectedGroupForEdit?.id ?? 'new-group'}
+        <SchedulingGroupModal
+            bind:isOpen={showGroupModal}
+            group={selectedGroupForEdit}
+            {locations}
+            onclose={() => showGroupModal = false}
+            onSuccess={() => {
+                void groupsQuery.refresh();
+                void shiftsQuery.refresh();
+            }}
+        />
+    {/key}
+{/if}
