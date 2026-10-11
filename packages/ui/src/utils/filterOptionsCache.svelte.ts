@@ -114,7 +114,11 @@ export async function loadOptionsForGroup(group: FilterGroup): Promise<void> {
 				try {
 					res = await remoteFn({ limit: 500 });
 				} catch {
-					res = await remoteFn({});
+					try {
+						res = await remoteFn({});
+					} catch {
+						res = [];
+					}
 				}
 			}
 

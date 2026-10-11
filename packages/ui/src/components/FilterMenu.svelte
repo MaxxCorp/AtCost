@@ -176,7 +176,11 @@
 			try {
 				res = await remoteFn({ limit: 500 });
 			} catch {
-				res = await remoteFn({});
+				try {
+					res = await remoteFn({});
+				} catch {
+					res = [];
+				}
 			}
 		}
 		const raw = Array.isArray(res) ? res : (res?.data ?? []);
@@ -359,7 +363,7 @@
 
 						<!-- Options List -->
 						<div class="flex-1 overflow-y-auto space-y-0.5 max-h-[260px] p-0.5">
-							{#if remoteFn}
+							{#if remoteFn && (!group.options || group.options.length === 0)}
 								{#await fetchGroupOptions(group)}
 									<div class="flex items-center justify-center py-6 text-gray-400 gap-2 text-xs">
 										<Loader2 class="h-4 w-4 animate-spin text-blue-500" />

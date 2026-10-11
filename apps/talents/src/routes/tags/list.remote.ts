@@ -1,7 +1,7 @@
 import { query } from '$app/server';
-import { db, tag, tagCategory, eq, and, or, ilike, asc, desc, sql, inArray } from '@ac/db';
+import { db, tag, tagCategory, eq, and, or, ilike, asc, desc, sql, inArray, notInArray, isNull } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { tagPaginationSchema } from '@ac/validations';
+import { tagPaginationSchema, parseFilterValue } from '@ac/validations';
 import { ensureDefaultCategoriesAndTags } from '#lib/server/tags/service.js';
 
 export const listTags = query(tagPaginationSchema, async (input) => {
@@ -26,11 +26,60 @@ export const listTags = query(tagPaginationSchema, async (input) => {
     }
 
     if (visibility) {
-        conditions.push(eq(tag.visibility, visibility as any));
+        const { include, exclude } = parseFilterValue(visibility);
+        if (include.length > 0) {
+            conditions.push(inArray(tag.visibility, include as any));
+        }
+        if (exclude.length > 0) {
+            conditions.push(notInArray(tag.visibility, exclude as any));
+        }
     }
 
     if (categoryId) {
-        conditions.push(eq(tag.categoryId, categoryId));
+        const { include, exclude } = parseFilterValue(categoryId);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (include.length > 0) {
+            const uuidIncludes = include.filter((id) => uuidRegex.test(id));
+            const nameIncludes = include.filter((id) => !uuidRegex.test(id));
+            if (nameIncludes.length > 0) {
+                const matchedCats = await db
+                    .select({ id: tagCategory.id })
+                    .from(tagCategory)
+                    .where(
+                        or(
+                            inArray(tagCategory.name, nameIncludes),
+                            inArray(tagCategory.slug, nameIncludes)
+                        )
+                    );
+                uuidIncludes.push(...matchedCats.map((c) => c.id));
+            }
+            if (uuidIncludes.length > 0) {
+                conditions.push(inArray(tag.categoryId, uuidIncludes));
+            } else {
+                conditions.push(sql`1 = 0`);
+            }
+        }
+
+        if (exclude.length > 0) {
+            const uuidExcludes = exclude.filter((id) => uuidRegex.test(id));
+            const nameExcludes = exclude.filter((id) => !uuidRegex.test(id));
+            if (nameExcludes.length > 0) {
+                const matchedCats = await db
+                    .select({ id: tagCategory.id })
+                    .from(tagCategory)
+                    .where(
+                        or(
+                            inArray(tagCategory.name, nameExcludes),
+                            inArray(tagCategory.slug, nameExcludes)
+                        )
+                    );
+                uuidExcludes.push(...matchedCats.map((c) => c.id));
+            }
+            if (uuidExcludes.length > 0) {
+                conditions.push(or(notInArray(tag.categoryId, uuidExcludes), isNull(tag.categoryId)));
+            }
+        }
     }
 
     if (conditions.length > 0) {

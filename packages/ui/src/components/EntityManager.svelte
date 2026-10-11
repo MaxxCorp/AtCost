@@ -262,6 +262,9 @@
     };
 
     let mounted = true;
+    let searchQuery = $state("");
+    let selectorSearchQuery = $state("");
+    let activeFilters = $state<FilterStateMap>({});
     let initialPrefLoaded = $state(false);
     const effectivePreferenceKey = $derived(
         preferenceKey ?? (title ? `em_filters_${title.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : undefined)
@@ -297,10 +300,6 @@
             void setPreference(effectivePreferenceKey, snap);
         }
     });
-
-    let searchQuery = $state("");
-    let selectorSearchQuery = $state("");
-    let activeFilters = $state<FilterStateMap>({});
 
     const allFilterGroups = $derived<FilterGroup[]>([
         ...(filterGroups || []),
@@ -358,6 +357,13 @@
                 if (item.contact?.tags) {
                     for (const ct of item.contact.tags || []) values.push(String(ct?.id ?? ct?.tagId ?? ct?.tag?.id ?? ct?.name));
                 }
+            } else if (groupId === "categoryId" || groupId === "category" || groupId === "categories") {
+                if (item.categoryId) values.push(String(item.categoryId));
+                if (item.category?.id) values.push(String(item.category.id));
+                if (item.category?.name) values.push(String(item.category.name));
+                if (item.category?.slug) values.push(String(item.category.slug));
+            } else if (groupId === "visibility") {
+                if (item.visibility) values.push(String(item.visibility));
             } else if (groupId === "status") {
                 if (item.status) values.push(String(item.status));
             } else if (groupId === "talentId" || groupId === "talent") {
@@ -516,7 +522,6 @@
         showSelector = !showSelector;
         if (!showSelector) {
             selectorSearchQuery = "";
-            activeFilters = {};
         }
     }
     let showQuickCreate = $state(false);
@@ -966,7 +971,7 @@
                     
                     {#if filteredItems.length === 0}
                         <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
-                            {activeSearch ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
+                            {activeSearch || Object.values(activeFilters).some((f) => (f?.include?.length || 0) + (f?.exclude?.length || 0) > 0) ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
                         </div>
                     {:else}
                         {#await associationsPromise}

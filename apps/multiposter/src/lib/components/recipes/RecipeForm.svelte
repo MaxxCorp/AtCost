@@ -394,6 +394,7 @@
                 readItemRemote={readTagRemote}
                 deleteItemRemote={deleteTagRemote}
                 categories={availableTagCategories}
+                categoriesRemote={listTagCategoriesRemote}
                 createCategoryRemote={createTagCategoryCommand}
                 updateCategoryRemote={updateTagCategoryCommand}
                 deleteCategoryRemote={deleteTagCategoryAction}

@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { PaginationSchema, PaginationBaseSchema } from './pagination.js';
+import { PaginationSchema, PaginationBaseSchema, FilterableIdSchema } from './pagination.js';
 
 export const tagVisibilityPicklist = v.picklist(['internal', 'external']);
 export type TagVisibility = v.InferOutput<typeof tagVisibilityPicklist>;
@@ -68,8 +68,8 @@ export const tagPaginationSchema = v.optional(
     v.object({
         ...PaginationBaseSchema.entries,
         search: v.optional(v.string()),
-        visibility: v.optional(tagVisibilityPicklist),
-        categoryId: v.optional(v.string()),
+        visibility: FilterableIdSchema,
+        categoryId: FilterableIdSchema,
     }),
     {}
 );

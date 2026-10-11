@@ -105,17 +105,12 @@
                 { id: "external", label: "Nur Extern (Multiposter / Kioske)" },
             ]
         },
-        ...(categoriesRemote ? [{
+        ...(categoriesRemote || categories.length > 0 ? [{
             id: "categoryId",
             label: "Kategorie",
             icon: FolderTree,
-            optionsRemote: categoriesRemote,
-            searchable: true,
-        }] : categories.length > 0 ? [{
-            id: "categoryId",
-            label: "Kategorie",
-            icon: FolderTree,
-            options: categories.map(c => ({ id: c.id, label: c.name })),
+            ...(categoriesRemote ? { optionsRemote: categoriesRemote } : {}),
+            ...(categories.length > 0 ? { options: categories.map(c => ({ id: c.id, label: c.name })) } : {}),
             searchable: true,
         }] : [])
     ]);
