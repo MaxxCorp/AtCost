@@ -2,7 +2,7 @@
     import { page } from "$app/state";
     import * as m from "#lib/paraglide/messages.js";
     import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager } from "@ac/ui";
-    import { Calendar, ArrowLeft, ExternalLink, FileText, Layers, TrendingUp, Sparkles, CheckCircle, Shield } from "@lucide/svelte";
+    import { Calendar, ArrowLeft, ExternalLink, FileText, Layers, TrendingUp, Sparkles, CheckCircle, Shield, Scale } from "@lucide/svelte";
     import { 
         readTalent, 
     } from './read.remote';
@@ -20,6 +20,7 @@
     import { contractSchema, updateContractSchema } from "@ac/validations/contracts";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
+    import PayrollProfileForm from "#lib/components/payroll/PayrollProfileForm.svelte";
     import { getContractFilterGroups } from "#lib/filters/index.js";
 
     const talentIdParam = $derived(page.params.id as string);
@@ -273,6 +274,18 @@
                                     />
                                 {/snippet}
                             </EntityManager>
+                        </div>
+
+                        <div class="pt-8 border-t border-gray-100">
+                            <div class="flex items-center gap-2 mb-6">
+                                <Scale class="w-5 h-5 text-indigo-600" />
+                                <h2 class="text-xl font-bold text-gray-900">
+                                    Lohn- & Steuerstammdaten (Payroll)
+                                </h2>
+                            </div>
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+                                <PayrollProfileForm talentId={talentIdParam} />
+                            </div>
                         </div>
                     </div>
                 {:else}

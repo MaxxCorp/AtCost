@@ -18,3 +18,4 @@ export * from './consumables.js';
 export * from './recipes.js';
 export * from './menus.js';
 export * from './event-roles.js';
+export * from './payroll.js';

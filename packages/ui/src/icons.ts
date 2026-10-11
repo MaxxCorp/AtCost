@@ -65,4 +65,9 @@ export const ICONS = {
         path: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8',
         strokeWidth: 2
     } satisfies IconDef,
+    banknote: {
+        path: 'M2 6h20v12H2z M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M6 12h.01 M18 12h.01',
+        strokeWidth: 2
+    } satisfies IconDef,
 } as const;
+

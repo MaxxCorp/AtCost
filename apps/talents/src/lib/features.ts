@@ -64,6 +64,21 @@ export const FEATURES: readonly FeatureMeta[] = [
         category: 'self-service'
     },
     {
+        key: 'my-payroll',
+        title: 'My Payslips',
+        description: 'View your monthly payslips, remuneration breakdowns and tax statements.',
+        href: '/my-payroll',
+        buttonText: 'View Payslips',
+        claim: 'my-payroll',
+        icon: 'banknote',
+        gradientFrom: 'from-emerald-50',
+        gradientTo: 'to-green-50',
+        borderClass: 'border-emerald-100',
+        buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+        order: 4,
+        category: 'self-service'
+    },
+    {
         key: 'talents',
         title: 'Talents',
         description: 'Manage talent records, history timeline, and contact information.',
@@ -151,6 +166,21 @@ export const FEATURES: readonly FeatureMeta[] = [
         borderClass: 'border-cyan-100',
         buttonClass: 'bg-cyan-600 hover:bg-cyan-700',
         order: 15,
+        category: 'management'
+    },
+    {
+        key: 'payroll',
+        title: 'Payroll',
+        description: 'Generate and manage payroll runs, German tax/SV deductions, and payslips.',
+        href: '/payroll',
+        buttonText: 'Manage Payroll',
+        claim: 'payroll',
+        icon: 'banknote',
+        gradientFrom: 'from-emerald-50',
+        gradientTo: 'to-teal-50',
+        borderClass: 'border-emerald-100',
+        buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+        order: 16,
         category: 'management'
     }
 ] as const;

@@ -13,6 +13,7 @@ import { contract, contractFramework, contractFrameworkContract } from "./contra
 import { consumable } from "./consumables";
 import { recipe, recipeConsumable } from "./recipes";
 import { menu, menuItem, eventMenu } from "./menus";
+import { payrollRun, payrollProfile, payslip } from "./payroll";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -163,6 +164,8 @@ export const talentRelations = relations(talent, ({ one, many }) => ({
     tasks: many(task, { relationName: 'assignee' }),
     createdTasks: many(task, { relationName: 'creator' }),
     contracts: many(contract),
+    payrollProfile: one(payrollProfile, { fields: [talent.id], references: [payrollProfile.talentId] }),
+    payslips: many(payslip),
 }));
 
 export const taskRelations = relations(task, ({ one }) => ({
@@ -401,5 +404,19 @@ export const menuItemRelations = relations(menuItem, ({ one }) => ({
 export const eventMenuRelations = relations(eventMenu, ({ one }) => ({
     event: one(event, { fields: [eventMenu.eventId], references: [event.id] }),
     menu: one(menu, { fields: [eventMenu.menuId], references: [menu.id] }),
+}));
+
+export const payrollRunRelations = relations(payrollRun, ({ many }) => ({
+    payslips: many(payslip),
+}));
+
+export const payrollProfileRelations = relations(payrollProfile, ({ one }) => ({
+    talent: one(talent, { fields: [payrollProfile.talentId], references: [talent.id] }),
+}));
+
+export const payslipRelations = relations(payslip, ({ one }) => ({
+    payrollRun: one(payrollRun, { fields: [payslip.payrollRunId], references: [payrollRun.id] }),
+    talent: one(talent, { fields: [payslip.talentId], references: [talent.id] }),
+    contract: one(contract, { fields: [payslip.contractId], references: [contract.id] }),
 }));
 
