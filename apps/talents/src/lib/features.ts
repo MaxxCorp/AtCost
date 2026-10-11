@@ -122,6 +122,36 @@ export const FEATURES: readonly FeatureMeta[] = [
         buttonClass: 'bg-rose-600 hover:bg-rose-700',
         order: 13,
         category: 'management'
+    },
+    {
+        key: 'contracts',
+        title: 'Contracts',
+        description: 'Manage collective bargaining agreements, amendments, and pay scale contracts.',
+        href: '/contracts',
+        buttonText: 'Manage Contracts',
+        claim: 'contracts',
+        icon: 'fileText',
+        gradientFrom: 'from-blue-50',
+        gradientTo: 'to-indigo-50',
+        borderClass: 'border-blue-100',
+        buttonClass: 'bg-blue-600 hover:bg-blue-700',
+        order: 14,
+        category: 'management'
+    },
+    {
+        key: 'contract-frameworks',
+        title: 'Contract Frameworks',
+        description: 'Manage collective agreement frameworks, Tarifwerke (AWO Berlin, TV-L), and defaults.',
+        href: '/contract-frameworks',
+        buttonText: 'Manage Frameworks',
+        claim: 'contract-frameworks',
+        icon: 'briefcase',
+        gradientFrom: 'from-cyan-50',
+        gradientTo: 'to-sky-50',
+        borderClass: 'border-cyan-100',
+        buttonClass: 'bg-cyan-600 hover:bg-cyan-700',
+        order: 15,
+        category: 'management'
     }
 ] as const;
 

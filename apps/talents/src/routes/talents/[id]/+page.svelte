@@ -10,7 +10,11 @@
         invokeAddTimelineEntry, 
         listEmployees 
     } from '../talents.remote';
-    import { listContracts, readContract, deleteContract, createContract, updateContract, readTalentEffectiveContract } from '../../contracts/contracts.remote';
+    import { listContracts, readTalentEffectiveContract } from '../../contracts/list.remote';
+    import { deleteContract } from '../../contracts/delete.remote';
+    import { createContract } from '../../contracts/new/create.remote';
+    import { readContract } from '../../contracts/[id]/read.remote';
+    import { updateContract } from '../../contracts/[id]/update.remote';
     import ContractForm from '../../contracts/ContractForm.svelte';
 
     import { contractSchema, updateContractSchema } from "@ac/validations/contracts";

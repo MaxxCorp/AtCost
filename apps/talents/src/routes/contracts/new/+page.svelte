@@ -1,7 +1,7 @@
 <script lang="ts">
     import * as m from "#lib/paraglide/messages.js";
     import ContractForm from "../ContractForm.svelte";
-    import { createContract } from "../contracts.remote";
+    import { createContract } from "./create.remote";
     import { contractSchema } from "@ac/validations/contracts";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 

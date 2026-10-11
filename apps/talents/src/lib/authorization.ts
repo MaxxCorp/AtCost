@@ -4,7 +4,7 @@ import { hasAccess as sharedHasAccess } from '@ac/auth';
 export { parseRoles, parseClaims } from '@ac/auth';
 export type { UserWithRolesAndClaims, Feature } from '@ac/auth';
 
-export type TalentFeature = 'users' | 'talents' | 'locations' | 'timesheets' | 'my-profile' | 'time-off' | 'shiftplans';
+export type TalentFeature = 'users' | 'talents' | 'locations' | 'timesheets' | 'my-profile' | 'time-off' | 'shiftplans' | 'contracts' | 'contract-frameworks';
 
 export function hasAccess(user: UserWithRolesAndClaims, feature: TalentFeature): boolean {
     if (feature === 'my-profile') return !!user;

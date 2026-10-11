@@ -3,7 +3,11 @@
     import { FileText } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
     import ContractForm from "./ContractForm.svelte";
-    import { listContracts, readContract, createContract, updateContract, deleteContract } from "./contracts.remote";
+    import { listContracts } from "./list.remote";
+    import { deleteContract } from "./delete.remote";
+    import { createContract } from "./new/create.remote";
+    import { readContract } from "./[id]/read.remote";
+    import { updateContract } from "./[id]/update.remote";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { contractSchema, updateContractSchema } from "@ac/validations/contracts";
     import { getContractFilterGroups } from "#lib/filters/index.js";

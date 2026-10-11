@@ -1,7 +1,8 @@
 <script lang="ts">
     import * as m from "#lib/paraglide/messages.js";
     import ContractForm from "../ContractForm.svelte";
-    import { readContract, updateContract } from "../contracts.remote";
+    import { readContract } from "./read.remote";
+    import { updateContract } from "./update.remote";
     import { updateContractSchema } from "@ac/validations/contracts";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { page } from "$app/state";
