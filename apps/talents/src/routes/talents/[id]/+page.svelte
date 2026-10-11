@@ -2,7 +2,7 @@
     import { page } from "$app/state";
     import * as m from "#lib/paraglide/messages.js";
     import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager } from "@ac/ui";
-    import { Calendar, ArrowLeft, ExternalLink, FileText, Layers, TrendingUp, Sparkles, CheckCircle, Shield, Scale } from "@lucide/svelte";
+    import { Calendar, ArrowLeft, ExternalLink, FileText, Layers, TrendingUp, Sparkles, CheckCircle, Shield, Scale, HeartHandshake, ShieldCheck } from "@lucide/svelte";
     import { 
         readTalent, 
     } from './read.remote';
@@ -124,17 +124,30 @@
                                                 {m.effective_terms ? m.effective_terms() : "Effective Contract Terms"} (Konsolidierte Bedingungen)
                                             </h4>
                                         </div>
-                                        {#if effectiveResult.totalActive > 1}
-                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                                                <Layers class="w-3.5 h-3.5" />
-                                                {effectiveResult.totalActive} Verträge aktiv · Rangfolge aktiv
-                                            </span>
-                                        {:else}
-                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                                <CheckCircle class="w-3.5 h-3.5" />
-                                                1 Vertrag aktiv
-                                            </span>
-                                        {/if}
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            {#if effectiveResult.effective?.fundingProgram === 'sgb2_16i'}
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800 border border-teal-200">
+                                                    <HeartHandshake class="w-3.5 h-3.5" />
+                                                    § 16i SGB II (TaAM)
+                                                </span>
+                                            {:else if effectiveResult.effective?.fundingProgram === 'sgb2_16d'}
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                    <ShieldCheck class="w-3.5 h-3.5" />
+                                                    § 16d SGB II (AGH / MAE)
+                                                </span>
+                                            {/if}
+                                            {#if effectiveResult.totalActive > 1}
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                                    <Layers class="w-3.5 h-3.5" />
+                                                    {effectiveResult.totalActive} Verträge aktiv · Rangfolge aktiv
+                                                </span>
+                                            {:else}
+                                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                    <CheckCircle class="w-3.5 h-3.5" />
+                                                    1 Vertrag aktiv
+                                                </span>
+                                            {/if}
+                                        </div>
                                     </div>
 
                                     <!-- KPI Grid -->
@@ -164,6 +177,45 @@
                                             <span class="text-[10px] text-gray-500 block">Auszahlung: Monat {effectiveResult.effective?.yearlyBonusMonth ?? 11}</span>
                                         </div>
                                     </div>
+
+                                    <!-- SGB II Funding Details Banner -->
+                                    {#if effectiveResult.effective?.fundingProgram === 'sgb2_16i'}
+                                        <div class="my-3 p-3.5 rounded-xl border border-teal-200 bg-teal-50/70 text-xs text-teal-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                                            <div class="space-y-1">
+                                                <div class="font-bold flex items-center gap-1.5 text-teal-900">
+                                                    <HeartHandshake class="w-4 h-4 text-teal-600" />
+                                                    <span>SGB II Teilhabe am Arbeitsmarkt (§ 16i)</span>
+                                                </div>
+                                                <p class="text-[11px] text-teal-800">
+                                                    Lohnkostenzuschuss: <strong>{effectiveResult.effective.fundingSubsidyPercentage ?? 100}%</strong> zzgl. pauschalierte AG-SV-Erstattung.
+                                                    Bezahlte Coachingfreistellung: <strong>{effectiveResult.effective.coachingHoursPerMonth ?? 2} Std./Monat</strong>.
+                                                    {effectiveResult.effective.jobcenterReference ? `· AZ: ${effectiveResult.effective.jobcenterReference}` : ''}
+                                                </p>
+                                            </div>
+                                            <div class="shrink-0 bg-white/90 px-3 py-1.5 rounded-lg border border-teal-200 text-right">
+                                                <span class="text-[10px] text-gray-500 block">Weiterbildungsbudget (§ 16i Abs. 5)</span>
+                                                <span class="font-bold text-teal-900 text-xs">
+                                                    €{(Number(effectiveResult.effective.furtherTrainingBudget ?? 3000) - Number(effectiveResult.effective.furtherTrainingUsed ?? 0)).toLocaleString('de-DE')} frei
+                                                </span>
+                                                <span class="text-[10px] text-gray-400 block">von €{Number(effectiveResult.effective.furtherTrainingBudget ?? 3000).toLocaleString('de-DE')}</span>
+                                            </div>
+                                        </div>
+                                    {:else if effectiveResult.effective?.fundingProgram === 'sgb2_16d'}
+                                        <div class="my-3 p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 text-xs text-emerald-950 flex items-center justify-between gap-3 shadow-2xs">
+                                            <div class="space-y-1">
+                                                <div class="font-bold flex items-center gap-1.5 text-emerald-900">
+                                                    <ShieldCheck class="w-4 h-4 text-emerald-600" />
+                                                    <span>SGB II Arbeitsgelegenheit (AGH § 16d)</span>
+                                                </div>
+                                                <p class="text-[11px] text-emerald-800">
+                                                    Mehraufwandsentschädigung (MAE): Vollständig steuer- & sozialversicherungsfrei nach § 3 Nr. 2 EStG (DEÜV BGR 0000, PGR 190). Kein Arbeitsverhältnis i.S.d. Arbeitsrechts.
+                                                </p>
+                                            </div>
+                                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                                                100% gefördert
+                                            </span>
+                                        </div>
+                                    {/if}
 
                                     <!-- Hierarchy & Supersedence Explanation -->
                                     {#if effectiveResult.totalActive > 1}
@@ -237,6 +289,15 @@
                                             <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                                                 {m.order_rank ? m.order_rank({ rank: c.precedence ?? 1 }) : `Rang #${c.precedence ?? 1}`}
                                             </span>
+                                            {#if c.fundingProgram === 'sgb2_16i'}
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-teal-100 text-teal-800 border border-teal-200">
+                                                    § 16i TaAM
+                                                </span>
+                                            {:else if c.fundingProgram === 'sgb2_16d'}
+                                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                    § 16d AGH
+                                                </span>
+                                            {/if}
                                             {#if c.isActive !== false}
                                                 <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                     {m.is_active ? m.is_active() : "Aktiv"}

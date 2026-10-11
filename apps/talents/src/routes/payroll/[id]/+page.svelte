@@ -23,7 +23,8 @@
         Sparkles,
         ShieldCheck,
         Search,
-        Eye
+        Eye,
+        HeartHandshake
     } from "@lucide/svelte";
     import PayslipDetailModal from "#lib/components/payroll/PayslipDetailModal.svelte";
 
@@ -229,7 +230,7 @@
         </div>
 
         <!-- Metrics Grid -->
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 {Number(run.totalJobcenterSubsidy) > 0 ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-4">
             <div class="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-2xs space-y-1">
                 <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Gesamtbrutto</span>
                 <div class="text-xl font-black text-gray-900 tracking-tight">
@@ -247,20 +248,41 @@
             </div>
 
             <div class="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-2xs space-y-1">
-                <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Gesamtaufwand AG</span>
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Brutto-AG-Kosten</span>
                 <div class="text-xl font-black text-indigo-950 tracking-tight">
                     {formatCurrency(run.totalEmployerCost)}
                 </div>
                 <span class="text-[10px] text-gray-500">Brutto + AG-Anteile</span>
             </div>
 
-            <div class="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-2xs space-y-1">
-                <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Abzüge (Gesamt)</span>
-                <div class="text-xl font-black text-rose-800 tracking-tight">
-                    {formatCurrency((run.totalGross || 0) - (run.totalNet || 0))}
+            {#if Number(run.totalJobcenterSubsidy) > 0}
+                <div class="bg-teal-50/70 p-4.5 rounded-2xl border border-teal-200 shadow-2xs space-y-1">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1">
+                        <HeartHandshake class="w-3.5 h-3.5" />
+                        JC-Zuschuss
+                    </span>
+                    <div class="text-xl font-black text-teal-800 tracking-tight">
+                        {formatCurrency(run.totalJobcenterSubsidy)}
+                    </div>
+                    <span class="text-[10px] text-teal-700 font-medium">§ 16i / § 16d Erstattung</span>
                 </div>
-                <span class="text-[10px] text-gray-500">Steuern & SV-Beiträge AN</span>
-            </div>
+
+                <div class="bg-emerald-50/70 p-4.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-900">Netto-AG-Kosten</span>
+                    <div class="text-xl font-black text-emerald-950 tracking-tight">
+                        {formatCurrency(run.totalNetEmployerCost ?? ((run.totalEmployerCost || 0) - (run.totalJobcenterSubsidy || 0)))}
+                    </div>
+                    <span class="text-[10px] text-emerald-700 font-medium">Nach Jobcenter-Abzug</span>
+                </div>
+            {:else}
+                <div class="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-2xs space-y-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Abzüge (Gesamt)</span>
+                    <div class="text-xl font-black text-rose-800 tracking-tight">
+                        {formatCurrency((run.totalGross || 0) - (run.totalNet || 0))}
+                    </div>
+                    <span class="text-[10px] text-gray-500">Steuern & SV-Beiträge AN</span>
+                </div>
+            {/if}
 
             <div class="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-2xs space-y-1 col-span-2 lg:col-span-1">
                 <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Mitarbeiter</span>
@@ -332,11 +354,25 @@
                             {#each filteredPayslips as p (p.id)}
                                 <tr class="hover:bg-slate-50/60 transition-colors">
                                     <td class="py-3 px-3">
-                                        <div class="font-bold text-gray-900">
-                                            {p.talent?.contact?.displayName || `${p.talent?.contact?.givenName ?? ''} ${p.talent?.contact?.familyName ?? ''}`.trim() || 'Mitarbeiter'}
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-bold text-gray-900">
+                                                {p.talent?.contact?.displayName || `${p.talent?.contact?.givenName ?? ''} ${p.talent?.contact?.familyName ?? ''}`.trim() || 'Mitarbeiter'}
+                                            </span>
+                                            {#if p.fundingProgram === 'sgb2_16i'}
+                                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">
+                                                    § 16i TaAM
+                                                </span>
+                                            {:else if p.fundingProgram === 'sgb2_16d'}
+                                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                    § 16d AGH
+                                                </span>
+                                            {/if}
                                         </div>
                                         <div class="text-[10px] text-gray-400">
                                             St.-Kl. {(p.calculationDetails as any)?.taxClass || '1'} · {p.talent?.contact?.role || 'Mitarbeiter'}
+                                            {#if p.deuevBeitragsgruppe}
+                                                · BGR {p.deuevBeitragsgruppe}
+                                            {/if}
                                         </div>
                                     </td>
                                     <td class="py-3 px-3 text-gray-600">
@@ -365,8 +401,18 @@
                                     <td class="py-3 px-3 text-right font-extrabold text-emerald-700 text-sm">
                                         {formatCurrency(p.payoutAmount)}
                                     </td>
-                                    <td class="py-3 px-3 text-right text-indigo-950 font-medium">
-                                        {formatCurrency(p.totalEmployerCost)}
+                                    <td class="py-3 px-3 text-right">
+                                        <div class="font-medium text-indigo-950">
+                                            {formatCurrency(p.totalEmployerCost)}
+                                        </div>
+                                        {#if p.jobcenterSubsidy && Number(p.jobcenterSubsidy) > 0}
+                                            <div class="text-[10px] text-teal-700 font-semibold" title="Jobcenter-Zuschuss">
+                                                -{formatCurrency(p.jobcenterSubsidy)} JC
+                                            </div>
+                                            <div class="text-[10px] text-emerald-800 font-bold" title="Netto-AG-Kosten nach Erstattung">
+                                                Netto: {formatCurrency(p.netEmployerCost ?? ((p.totalEmployerCost || 0) - (p.jobcenterSubsidy || 0)))}
+                                            </div>
+                                        {/if}
                                     </td>
                                     <td class="py-3 px-3 text-center">
                                         <Button

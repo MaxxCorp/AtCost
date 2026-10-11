@@ -55,6 +55,12 @@ export const contract = pgTable("contract", {
     specialLeaveDays: integer("special_leave_days").default(0),
     differentialAdjustments: jsonb("differential_adjustments"),
     notes: text("notes"),
+    fundingProgram: text("funding_program", { enum: ["none", "sgb2_16d", "sgb2_16i"] }).default("none"),
+    fundingSubsidyPercentage: doublePrecision("funding_subsidy_percentage").default(100),
+    furtherTrainingBudget: doublePrecision("further_training_budget").default(3000),
+    furtherTrainingUsed: doublePrecision("further_training_used").default(0),
+    coachingHoursPerMonth: doublePrecision("coaching_hours_per_month").default(2),
+    jobcenterReference: text("jobcenter_reference"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

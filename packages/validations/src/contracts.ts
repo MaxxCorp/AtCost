@@ -65,6 +65,12 @@ export const contractBaseSchema = v.object({
     differentialAdjustments: v.optional(v.any()),
     notes: v.optional(v.string()),
     frameworkIds: v.optional(v.array(v.string())),
+    fundingProgram: v.optional(v.picklist(["none", "sgb2_16d", "sgb2_16i"]), "none"),
+    fundingSubsidyPercentage: v.optional(v.number(), 100),
+    furtherTrainingBudget: v.optional(v.number(), 3000),
+    furtherTrainingUsed: v.optional(v.number(), 0),
+    coachingHoursPerMonth: v.optional(v.number(), 2),
+    jobcenterReference: v.optional(v.string()),
 });
 
 export const contractSchema = contractBaseSchema;
@@ -107,6 +113,12 @@ export const AWO_BERLIN_DEFAULTS = {
     flextimeModel: "standard",
     precedence: 1,
     isActive: true,
+    fundingProgram: "none" as const,
+    fundingSubsidyPercentage: 100,
+    furtherTrainingBudget: 0,
+    furtherTrainingUsed: 0,
+    coachingHoursPerMonth: 0,
+    jobcenterReference: "",
 };
 
 export const TV_L_DEFAULTS = {
@@ -139,6 +151,115 @@ export const TV_L_DEFAULTS = {
     flextimeModel: "standard",
     precedence: 1,
     isActive: true,
+    fundingProgram: "none" as const,
+    fundingSubsidyPercentage: 100,
+    furtherTrainingBudget: 0,
+    furtherTrainingUsed: 0,
+    coachingHoursPerMonth: 0,
+    jobcenterReference: "",
+};
+
+// SGB II § 16i Teilhabe am Arbeitsmarkt (TaAM) Preset
+export const SGB2_16I_DEFAULTS = {
+    contractType: "base_contract" as const,
+    title: "Arbeitsvertrag gem. § 16i SGB II (Teilhabe am Arbeitsmarkt)",
+    fundingProgram: "sgb2_16i" as const,
+    fundingSubsidyPercentage: 100, // 100% in year 1-2, 90% Y3, 80% Y4, 70% Y5
+    furtherTrainingBudget: 3000.0, // Statutory ceiling: up to 3.000 € further training budget
+    furtherTrainingUsed: 0.0,
+    coachingHoursPerMonth: 2.0, // Obligatory paid release for ganzheitliches Coaching
+    jobcenterReference: "Jobcenter Förderung § 16i SGB II",
+    workHoursPerWeek: 39.0,
+    workHoursPerDay: 7.8,
+    workHoursPerMonth: 169.65,
+    workDaysPerWeek: 5,
+    holidayAllotmentDays: 30,
+    specialLeaveDays: 0,
+    probationPeriodMonths: 6,
+    wageType: "monthly" as const,
+    wageTable: "AWO Berlin (E-Tabelle)",
+    entgeltgruppe: "E 2",
+    erfahrungsstufe: 1,
+    wageAmount: 2350.00,
+    stufenlaufzeitMonths: 12,
+    yearlyBonusPercentage: 80,
+    yearlyBonusMonth: 11,
+    yearlyBonusLeaveConversion: false,
+    overtimeSurchargePercent: 30,
+    nightSurchargePercent: 20,
+    sundaySurchargePercent: 25,
+    holidaySurchargePercent: 35,
+    saturdaySurchargePercent: 20,
+    capitalAllowance: 150.0,
+    capitalFormingBenefits: 6.65,
+    eveDaysFree: true,
+    noticePeriodRule: "tv_standard",
+    flextimeModel: "standard",
+    precedence: 1,
+    isActive: true,
+    differentialAdjustments: {
+        fundingProgram: "sgb2_16i",
+        statutoryLegalBasis: "§ 16i SGB II i.V.m. § 27 Abs. 3 Nr. 5 SGB III",
+        subsidySchedule: [
+            { years: "1-2", percent: 100, label: "Monate 1–24: 100% Lohnkostenzuschuss + pauschalierte AG-SV" },
+            { years: "3", percent: 90, label: "Monate 25–36: 90% Lohnkostenzuschuss + pauschalierte AG-SV" },
+            { years: "4", percent: 80, label: "Monate 37–48: 80% Lohnkostenzuschuss + pauschalierte AG-SV" },
+            { years: "5", percent: 70, label: "Monate 49–60: 70% Lohnkostenzuschuss + pauschalierte AG-SV" },
+        ],
+        deuevKeys: {
+            personengruppe: "101",
+            beitragsgruppe: "1101",
+            notice: "Versicherungsfrei in der Arbeitslosenversicherung (ALV-frei)",
+        },
+        coachingNotice: "Verpflichtende bezahlte Freistellung für beschäftigungsbegleitendes Coaching im 1. Beschäftigungsjahr",
+        furtherTrainingGrantMax: 3000.0,
+    },
+};
+
+// SGB II § 16d Arbeitsgelegenheit (AGH / "Ein-Euro-Job") Preset
+export const SGB2_16D_DEFAULTS = {
+    contractType: "base_contract" as const,
+    title: "Maßnahmevereinbarung gem. § 16d SGB II (Arbeitsgelegenheit / AGH)",
+    fundingProgram: "sgb2_16d" as const,
+    fundingSubsidyPercentage: 100,
+    furtherTrainingBudget: 0.0,
+    furtherTrainingUsed: 0.0,
+    coachingHoursPerMonth: 0.0,
+    jobcenterReference: "Jobcenter AGH-Maßnahme § 16d SGB II",
+    workHoursPerWeek: 20.0, // Typischer Umfang 15-30 Std./Woche (Standard 20h)
+    workHoursPerDay: 4.0,
+    workHoursPerMonth: 86.67,
+    workDaysPerWeek: 5,
+    holidayAllotmentDays: 0, // Kein gesetzlicher Urlaub nach BUrlG
+    specialLeaveDays: 20, // Teilnahmeunterbrechung mit MAE-Fortzahlung
+    probationPeriodMonths: 0,
+    wageType: "hourly" as const,
+    wageAmount: 2.00, // Typische Mehraufwandsentschädigung (MAE) 1,50 - 3,00 €/Std.
+    entgeltgruppe: "MAE",
+    wageTable: "Jobcenter MAE",
+    erfahrungsstufe: 1,
+    stufenlaufzeitMonths: 0,
+    yearlyBonusPercentage: 0,
+    yearlyBonusMonth: 0,
+    yearlyBonusLeaveConversion: false,
+    overtimeSurchargePercent: 0,
+    nightSurchargePercent: 0,
+    sundaySurchargePercent: 0,
+    holidaySurchargePercent: 0,
+    saturdaySurchargePercent: 0,
+    capitalAllowance: 0.0,
+    capitalFormingBenefits: 0.0,
+    eveDaysFree: true,
+    noticePeriodRule: "measure_agreement",
+    flextimeModel: "strict_attendance",
+    precedence: 1,
+    isActive: true,
+    differentialAdjustments: {
+        fundingProgram: "sgb2_16d",
+        legalNature: "Kein Arbeitsverhältnis im Sinne des Arbeitsrechts (§ 16d Abs. 7 SGB II)",
+        taxAndSvNotice: "Steuerfrei gem. § 3 Nr. 2 EStG und komplett sozialversicherungsfrei (DEÜV BGR 0000 / PGR 190)",
+        maeCalculationNotice: "Auszahlung erfolgt strikt auf Basis der erfassten Teilnehmer-Anwesenheitsstunden",
+    },
 };
 
 export const AENDERUNGSTARIFVERTRAG_PRESET = {

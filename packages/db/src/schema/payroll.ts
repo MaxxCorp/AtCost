@@ -13,6 +13,8 @@ export const payrollRun = pgTable("payroll_run", {
     totalGross: doublePrecision("total_gross").default(0).notNull(),
     totalNet: doublePrecision("total_net").default(0).notNull(),
     totalEmployerCost: doublePrecision("total_employer_cost").default(0).notNull(),
+    totalJobcenterSubsidy: doublePrecision("total_jobcenter_subsidy").default(0).notNull(),
+    totalNetEmployerCost: doublePrecision("total_net_employer_cost").default(0).notNull(),
     totalEmployees: integer("total_employees").default(0).notNull(),
     notes: text("notes"),
     calculatedAt: timestamp("calculated_at"),
@@ -36,7 +38,17 @@ export const payrollProfile = pgTable("payroll_profile", {
     pensionInsuranceExempt: boolean("pension_insurance_exempt").default(false).notNull(),
     unemploymentInsuranceExempt: boolean("unemployment_insurance_exempt").default(false).notNull(),
     hasChildren: boolean("has_children").default(false).notNull(),
-    employmentType: text("employment_type", { enum: ["regular", "minijob", "midijob", "student", "freelance"] }).default("regular").notNull(),
+    employmentType: text("employment_type", { enum: ["regular", "minijob", "midijob", "student", "freelance", "sgb2_16d", "sgb2_16i"] }).default("regular").notNull(),
+    fundingProgram: text("funding_program", { enum: ["none", "sgb2_16d", "sgb2_16i"] }).default("none"),
+    fundingSubsidyPercentage: doublePrecision("funding_subsidy_percentage").default(100),
+    fundingYear: integer("funding_year").default(1),
+    jobcenterName: text("jobcenter_name"),
+    jobcenterReference: text("jobcenter_reference"),
+    furtherTrainingBudget: doublePrecision("further_training_budget").default(3000),
+    furtherTrainingUsed: doublePrecision("further_training_used").default(0),
+    coachingHoursPerMonth: doublePrecision("coaching_hours_per_month").default(2),
+    deuevPersonengruppe: text("deuev_personengruppe").default("101"),
+    deuevBeitragsgruppe: text("deuev_beitragsgruppe").default("1111"),
     iban: text("iban"),
     bic: text("bic"),
     bankName: text("bank_name"),
@@ -104,6 +116,13 @@ export const payslip = pgTable("payslip", {
     employerLevies: doublePrecision("employer_levies").default(0).notNull(), // U1, U2, Insolvenzgeldumlage
     totalEmployerSocialSecurity: doublePrecision("total_employer_social_security").default(0).notNull(),
     totalEmployerCost: doublePrecision("total_employer_cost").default(0).notNull(),
+
+    // SGB II Subsidies & Net Employer Cost
+    fundingProgram: text("funding_program"),
+    jobcenterSubsidy: doublePrecision("jobcenter_subsidy").default(0).notNull(),
+    netEmployerCost: doublePrecision("net_employer_cost").default(0).notNull(),
+    deuevPersonengruppe: text("deuev_personengruppe").default("101"),
+    deuevBeitragsgruppe: text("deuev_beitragsgruppe").default("1111"),
 
     // Breakdown details
     lineItems: jsonb("line_items"),

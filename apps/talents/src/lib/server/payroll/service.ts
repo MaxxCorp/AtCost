@@ -92,6 +92,8 @@ export async function calculatePayrollRun(runId: string) {
     let totalGross = 0;
     let totalNet = 0;
     let totalEmployerCost = 0;
+    let totalJobcenterSubsidy = 0;
+    let totalNetEmployerCost = 0;
     let totalEmployees = 0;
 
     // Delete existing calculated payslips for this run to regenerate cleanly
@@ -137,6 +139,14 @@ export async function calculatePayrollRun(runId: string) {
             unemploymentInsuranceExempt: false,
             hasChildren: false,
             employmentType: 'regular',
+            fundingProgram: 'none',
+            fundingSubsidyPercentage: 100,
+            fundingYear: 1,
+            furtherTrainingBudget: 3000,
+            furtherTrainingUsed: 0,
+            coachingHoursPerMonth: 2,
+            deuevPersonengruppe: '101',
+            deuevBeitragsgruppe: '1111',
         };
 
         const calcInput: PayrollCalculationInput = {
@@ -209,6 +219,12 @@ export async function calculatePayrollRun(runId: string) {
                 totalEmployerSocialSecurity: result.totalEmployerSocialSecurity,
                 totalEmployerCost: result.totalEmployerCost,
 
+                fundingProgram: result.fundingProgram,
+                jobcenterSubsidy: result.jobcenterSubsidy,
+                netEmployerCost: result.netEmployerCost,
+                deuevPersonengruppe: result.deuevPersonengruppe,
+                deuevBeitragsgruppe: result.deuevBeitragsgruppe,
+
                 lineItems: result.lineItems,
                 calculationDetails: result.calculationDetails,
             });
@@ -216,6 +232,8 @@ export async function calculatePayrollRun(runId: string) {
             totalGross += result.grossSalary;
             totalNet += result.netSalary;
             totalEmployerCost += result.totalEmployerCost;
+            totalJobcenterSubsidy += result.jobcenterSubsidy;
+            totalNetEmployerCost += result.netEmployerCost;
             totalEmployees += 1;
         }
     }
@@ -226,6 +244,8 @@ export async function calculatePayrollRun(runId: string) {
         totalGross: Math.round(totalGross * 100) / 100,
         totalNet: Math.round(totalNet * 100) / 100,
         totalEmployerCost: Math.round(totalEmployerCost * 100) / 100,
+        totalJobcenterSubsidy: Math.round(totalJobcenterSubsidy * 100) / 100,
+        totalNetEmployerCost: Math.round(totalNetEmployerCost * 100) / 100,
         totalEmployees,
         calculatedAt: new Date(),
         updatedAt: new Date(),

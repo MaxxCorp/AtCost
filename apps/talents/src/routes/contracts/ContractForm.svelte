@@ -10,6 +10,8 @@
     import {
         AWO_BERLIN_DEFAULTS,
         TV_L_DEFAULTS,
+        SGB2_16I_DEFAULTS,
+        SGB2_16D_DEFAULTS,
         TARIFEINIGUNG_RAISE_PRESET,
         AENDERUNGSTARIFVERTRAG_PRESET,
     } from "@ac/validations/contracts";
@@ -25,6 +27,8 @@
         Info,
         Shield,
         DollarSign,
+        GraduationCap,
+        HeartHandshake,
     } from "@lucide/svelte";
 
     let {
@@ -146,6 +150,22 @@
                 >
                     <span>🏛️</span>
                     <span>{m.apply_tvl_preset ? m.apply_tvl_preset() : "TV-L Berlin"}</span>
+                </button>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 text-white hover:bg-teal-800 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                    onclick={() => applyPresetValues(SGB2_16I_DEFAULTS)}
+                >
+                    <span>🤝</span>
+                    <span>§ 16i SGB II (TaAM)</span>
+                </button>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                    onclick={() => applyPresetValues(SGB2_16D_DEFAULTS)}
+                >
+                    <span>🛠️</span>
+                    <span>§ 16d SGB II (AGH)</span>
                 </button>
                 <button
                     type="button"
@@ -411,7 +431,153 @@
         </div>
     </div>
 
-    <!-- Section 3: Progressive Disclosure: Advanced Specifications & Tarif Details -->
+    <!-- Section 3: SGB II Funding & Jobcenter Measures (§ 16i & § 16d) -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-xs space-y-4">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div class="flex items-center gap-2">
+                <HeartHandshake class="w-4 h-4 text-teal-600" />
+                <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wide">
+                    3. SGB II Förderprogramm & Jobcenter-Konditionen
+                </h3>
+            </div>
+            <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+                § 16i TaAM · § 16d AGH
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Funding Program Selection -->
+            <label class="block">
+                <span class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Förderprogramm (SGB II)
+                </span>
+                {#if rf?.fields?.fundingProgram}
+                    <select
+                        {...rf.fields.fundingProgram.as("select")}
+                        class="mt-1.5 w-full px-3.5 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 bg-white text-sm border-gray-300 font-medium"
+                    >
+                        <option value="none" selected={defaultData?.fundingProgram === "none" || !defaultData?.fundingProgram}>
+                            Keine Förderung (Regulärer Arbeitsvertrag)
+                        </option>
+                        <option value="sgb2_16i" selected={defaultData?.fundingProgram === "sgb2_16i"}>
+                            🤝 § 16i SGB II (Teilhabe am Arbeitsmarkt / TaAM)
+                        </option>
+                        <option value="sgb2_16d" selected={defaultData?.fundingProgram === "sgb2_16d"}>
+                            🛠️ § 16d SGB II (Arbeitsgelegenheit / AGH / MAE)
+                        </option>
+                    </select>
+                {/if}
+            </label>
+
+            <!-- Jobcenter Reference / Aktenzeichen -->
+            <label class="block">
+                <span class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Jobcenter Referenz / Maßnahmenummer
+                </span>
+                {#if rf?.fields?.jobcenterReference}
+                    <input
+                        {...rf.fields.jobcenterReference.as("text")}
+                        placeholder="z.B. Jobcenter Berlin - Maßnahmenummer / BG-Nummer"
+                        class="mt-1.5 w-full px-3.5 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 text-sm border-gray-300"
+                        value={defaultData?.jobcenterReference ?? ""}
+                    />
+                {/if}
+            </label>
+        </div>
+
+        <!-- § 16i Configuration Card -->
+        <div class="rounded-xl border border-teal-200 bg-linear-to-br from-teal-50/60 via-emerald-50/30 to-white p-4 space-y-4">
+            <div class="flex items-start gap-3">
+                <GraduationCap class="w-5 h-5 text-teal-700 shrink-0 mt-0.5" />
+                <div class="space-y-1">
+                    <div class="font-bold text-teal-950 text-xs sm:text-sm flex items-center gap-2">
+                        <span>Spezifikationen gem. § 16i SGB II (Teilhabe am Arbeitsmarkt)</span>
+                        <span class="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-semibold">ALV-Frei (BGR 1101)</span>
+                    </div>
+                    <p class="text-[11px] text-teal-800 leading-relaxed">
+                        Förderung mit Lohnkostenzuschuss (100% in J. 1–2, 90% in J. 3, 80% in J. 4, 70% in J. 5). Gesetzlicher Anspruch auf Weiterbildungsbudget von bis zu 3.000 € (§ 16i Abs. 5 SGB II) sowie verpflichtende bezahlte Freistellung für ganzheitliches Coaching im 1. Beschäftigungsjahr.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-teal-100">
+                <label class="block">
+                    <span class="text-[11px] font-semibold text-gray-700">Lohnkostenzuschuss (%)</span>
+                    {#if rf?.fields?.fundingSubsidyPercentage}
+                        <input
+                            {...rf.fields.fundingSubsidyPercentage.as("number")}
+                            type="number"
+                            min="0"
+                            max="100"
+                            class="mt-1 w-full px-3 py-1.5 border rounded-lg text-sm border-teal-200 bg-white"
+                            value={defaultData?.fundingSubsidyPercentage ?? 100}
+                        />
+                    {/if}
+                    <span class="text-[10px] text-gray-500 block mt-0.5">J. 1-2: 100%, J. 3: 90%...</span>
+                </label>
+
+                <label class="block">
+                    <span class="text-[11px] font-semibold text-gray-700">Weiterbildungsbudget (€)</span>
+                    {#if rf?.fields?.furtherTrainingBudget}
+                        <input
+                            {...rf.fields.furtherTrainingBudget.as("number")}
+                            type="number"
+                            step="50"
+                            class="mt-1 w-full px-3 py-1.5 border rounded-lg text-sm border-teal-200 bg-white"
+                            value={defaultData?.furtherTrainingBudget ?? 3000.0}
+                        />
+                    {/if}
+                    <span class="text-[10px] text-gray-500 block mt-0.5">Gesamtbudget (§ 16i Abs. 5)</span>
+                </label>
+
+                <label class="block">
+                    <span class="text-[11px] font-semibold text-gray-700">Budget verbraucht (€)</span>
+                    {#if rf?.fields?.furtherTrainingUsed}
+                        <input
+                            {...rf.fields.furtherTrainingUsed.as("number")}
+                            type="number"
+                            step="10"
+                            class="mt-1 w-full px-3 py-1.5 border rounded-lg text-sm border-teal-200 bg-white"
+                            value={defaultData?.furtherTrainingUsed ?? 0.0}
+                        />
+                    {/if}
+                    <span class="text-[10px] text-gray-500 block mt-0.5">Bisherige Qualifizierung</span>
+                </label>
+
+                <label class="block">
+                    <span class="text-[11px] font-semibold text-gray-700">Coaching-Freistellung (Std./Mo)</span>
+                    {#if rf?.fields?.coachingHoursPerMonth}
+                        <input
+                            {...rf.fields.coachingHoursPerMonth.as("number")}
+                            type="number"
+                            step="0.5"
+                            class="mt-1 w-full px-3 py-1.5 border rounded-lg text-sm border-teal-200 bg-white"
+                            value={defaultData?.coachingHoursPerMonth ?? 2.0}
+                        />
+                    {/if}
+                    <span class="text-[10px] text-gray-500 block mt-0.5">Bezahlte Freistellungspflicht</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- § 16d Specification Notice -->
+        <div class="rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50/60 via-teal-50/30 to-white p-3.5 space-y-2">
+            <div class="flex items-start gap-2.5">
+                <Shield class="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                <div class="space-y-0.5">
+                    <div class="font-bold text-emerald-950 text-xs flex items-center gap-2">
+                        <span>Hinweis zu § 16d SGB II (Arbeitsgelegenheiten / AGH):</span>
+                        <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Steuer- & SV-frei (§ 3 Nr. 2 EStG)</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800 leading-relaxed">
+                        Kein Arbeitsverhältnis i.S.d. Arbeitsrechts (§ 16d Abs. 7 SGB II). Die Mehraufwandsentschädigung (MAE, Preset: 2,00 €/Std.) ist steuerfrei und unterliegt keinen SV-Beiträgen (DEÜV BGR 0000, PGR 190). Die Abrechnung erfolgt automatisch anhand der erfassten Teilnehmerstunden.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 4: Progressive Disclosure: Advanced Specifications & Tarif Details -->
     <div class="border border-gray-200 rounded-xl bg-white shadow-xs overflow-hidden">
         <button
             type="button"

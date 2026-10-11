@@ -15,11 +15,51 @@ export type TaxClass = v.InferOutput<typeof taxClassPicklist>;
 export const churchTaxPicklist = v.picklist(['none', 'ev', 'rk']);
 export type ChurchTaxType = v.InferOutput<typeof churchTaxPicklist>;
 
-export const employmentTypePicklist = v.picklist(['regular', 'minijob', 'midijob', 'student', 'freelance']);
+export const employmentTypePicklist = v.picklist(['regular', 'minijob', 'midijob', 'student', 'freelance', 'sgb2_16d', 'sgb2_16i']);
 export type EmploymentType = v.InferOutput<typeof employmentTypePicklist>;
+
+export const fundingProgramPicklist = v.picklist(['none', 'sgb2_16d', 'sgb2_16i']);
+export type FundingProgram = v.InferOutput<typeof fundingProgramPicklist>;
 
 export const healthInsuranceTypePicklist = v.picklist(['statutory', 'private']);
 export type HealthInsuranceType = v.InferOutput<typeof healthInsuranceTypePicklist>;
+
+// --- SGB II PRESETS ---
+export const PAYROLL_PROFILE_SGB2_16I_PRESET = {
+    employmentType: 'sgb2_16i' as const,
+    fundingProgram: 'sgb2_16i' as const,
+    fundingSubsidyPercentage: 100, // 100% in Year 1 & 2
+    fundingYear: 1,
+    jobcenterName: 'Jobcenter Berlin',
+    jobcenterReference: '§ 16i SGB II - TaAM',
+    furtherTrainingBudget: 3000.0,
+    furtherTrainingUsed: 0.0,
+    coachingHoursPerMonth: 2.0,
+    unemploymentInsuranceExempt: true, // ALV-frei gem. § 27 Abs. 3 Nr. 5 SGB III
+    pensionInsuranceExempt: false,
+    deuevPersonengruppe: '101',
+    deuevBeitragsgruppe: '1101',
+    healthInsuranceType: 'statutory' as const,
+    taxClass: '1' as const,
+};
+
+export const PAYROLL_PROFILE_SGB2_16D_PRESET = {
+    employmentType: 'sgb2_16d' as const,
+    fundingProgram: 'sgb2_16d' as const,
+    fundingSubsidyPercentage: 100,
+    fundingYear: 1,
+    jobcenterName: 'Jobcenter Berlin',
+    jobcenterReference: '§ 16d SGB II - AGH',
+    furtherTrainingBudget: 0.0,
+    furtherTrainingUsed: 0.0,
+    coachingHoursPerMonth: 0.0,
+    unemploymentInsuranceExempt: true,
+    pensionInsuranceExempt: true,
+    deuevPersonengruppe: '190',
+    deuevBeitragsgruppe: '0000',
+    healthInsuranceType: 'statutory' as const,
+    taxClass: '1' as const,
+};
 
 // --- VALIDATION SCHEMAS ---
 
@@ -67,6 +107,16 @@ export const payrollProfileSchema = v.object({
     unemploymentInsuranceExempt: v.optional(v.boolean(), false),
     hasChildren: v.optional(v.boolean(), false),
     employmentType: v.optional(employmentTypePicklist, 'regular'),
+    fundingProgram: v.optional(fundingProgramPicklist, 'none'),
+    fundingSubsidyPercentage: v.optional(v.number(), 100),
+    fundingYear: v.optional(v.number(), 1),
+    jobcenterName: v.optional(v.string()),
+    jobcenterReference: v.optional(v.string()),
+    furtherTrainingBudget: v.optional(v.number(), 3000),
+    furtherTrainingUsed: v.optional(v.number(), 0),
+    coachingHoursPerMonth: v.optional(v.number(), 2),
+    deuevPersonengruppe: v.optional(v.string(), '101'),
+    deuevBeitragsgruppe: v.optional(v.string(), '1111'),
     iban: v.optional(v.string()),
     bic: v.optional(v.string()),
     bankName: v.optional(v.string()),
@@ -174,6 +224,17 @@ export interface PayrollCalculationResult {
     employerLevies: number;
     totalEmployerSocialSecurity: number;
     totalEmployerCost: number;
+
+    // SGB II Funding & Subsidies (§ 16d / § 16i)
+    fundingProgram: 'none' | 'sgb2_16d' | 'sgb2_16i';
+    jobcenterSubsidy: number;
+    netEmployerCost: number;
+    furtherTrainingBudget: number;
+    furtherTrainingUsed: number;
+    furtherTrainingRemaining: number;
+    coachingHoursPerMonth: number;
+    deuevPersonengruppe: string;
+    deuevBeitragsgruppe: string;
 
     lineItems: PayrollLineItem[];
     calculationDetails: Record<string, any>;
@@ -472,7 +533,17 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
         const rawSvGross = isSfnSvFree ? taxableGross : grossSalary;
 
         const employmentType = payrollProfile?.employmentType || 'regular';
-        const isMinijob = employmentType === 'minijob' || (grossSalary <= GermanPayrollEngine.MINIJOB_LIMIT && employmentType !== 'regular');
+        const fundingProgram: 'none' | 'sgb2_16d' | 'sgb2_16i' = (
+            payrollProfile?.fundingProgram === 'sgb2_16d' ||
+            payrollProfile?.employmentType === 'sgb2_16d' ||
+            contract?.fundingProgram === 'sgb2_16d'
+        ) ? 'sgb2_16d' : (
+            payrollProfile?.fundingProgram === 'sgb2_16i' ||
+            payrollProfile?.employmentType === 'sgb2_16i' ||
+            contract?.fundingProgram === 'sgb2_16i'
+        ) ? 'sgb2_16i' : 'none';
+
+        const isMinijob = fundingProgram === 'none' && (employmentType === 'minijob' || (grossSalary <= GermanPayrollEngine.MINIJOB_LIMIT && employmentType !== 'regular'));
 
         let wageTax = 0;
         let solidaritySurcharge = 0;
@@ -488,10 +559,29 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
         let employerLongTermCareInsurance = 0;
         let employerLevies = 0;
 
-        const socialSecurityGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_KV_PV_MONTHLY);
-        const pensionGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_RV_AV_MONTHLY);
+        let socialSecurityGross = 0;
+        let pensionGross = 0;
 
-        if (isMinijob) {
+        if (fundingProgram === 'sgb2_16d') {
+            // SGB II § 16d Arbeitsgelegenheit (AGH): Mehraufwandsentschädigung (MAE)
+            // Steuerfrei nach § 3 Nr. 2 EStG und sozialversicherungsfrei (kein Arbeitsverhältnis gem. § 16d Abs. 7 SGB II)
+            socialSecurityGross = 0;
+            pensionGross = 0;
+            wageTax = 0;
+            solidaritySurcharge = 0;
+            churchTax = 0;
+            employeeHealthInsurance = 0;
+            employeePensionInsurance = 0;
+            employeeUnemploymentInsurance = 0;
+            employeeLongTermCareInsurance = 0;
+            employerHealthInsurance = 0;
+            employerPensionInsurance = 0;
+            employerUnemploymentInsurance = 0;
+            employerLongTermCareInsurance = 0;
+            employerLevies = 0;
+        } else if (isMinijob) {
+            socialSecurityGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_KV_PV_MONTHLY);
+            pensionGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_RV_AV_MONTHLY);
             // Minijob rules (§ 8 SGB IV):
             // Employee pays 0% wage tax (pauschal by employer) and 0% SV (if exempt from RV)
             if (payrollProfile?.pensionInsuranceExempt === false) {
@@ -505,7 +595,10 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             const employerFlatTax = Math.round(grossSalary * 0.02 * 100) / 100;
             employerLevies = Math.round(grossSalary * (GermanPayrollEngine.U1_RATE + GermanPayrollEngine.U2_RATE + GermanPayrollEngine.INSOLVENZ_RATE) * 100) / 100 + employerFlatTax;
         } else {
-            // Standard employment taxation & social security
+            socialSecurityGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_KV_PV_MONTHLY);
+            pensionGross = Math.min(rawSvGross, GermanPayrollEngine.BBG_RV_AV_MONTHLY);
+
+            // Standard employment or SGB II § 16i taxation
             const taxClass = (payrollProfile?.taxClass || '1') as TaxClass;
             const churchTaxType = payrollProfile?.churchTax || 'none';
             const childCount = Number(payrollProfile?.childCount || 0);
@@ -541,8 +634,10 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
                 employerPensionInsurance = Math.round(pensionGross * GermanPayrollEngine.RV_RATE_HALF * 100) / 100;
             }
 
-            // Unemployment Insurance (AV): 1.3% each
-            if (!payrollProfile?.unemploymentInsuranceExempt) {
+            // Unemployment Insurance (AV):
+            // CRITICAL: In § 16i SGB II, the employee is EXEMPT from ALV gem. § 27 Abs. 3 Nr. 5 SGB III!
+            const isAvExempt = fundingProgram === 'sgb2_16i' || !!payrollProfile?.unemploymentInsuranceExempt;
+            if (!isAvExempt) {
                 employeeUnemploymentInsurance = Math.round(pensionGross * GermanPayrollEngine.AV_RATE_HALF * 100) / 100;
                 employerUnemploymentInsurance = Math.round(pensionGross * GermanPayrollEngine.AV_RATE_HALF * 100) / 100;
             }
@@ -603,9 +698,67 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
 
         const totalEmployerCost = Math.round((grossSalary + totalEmployerSocialSecurity) * 100) / 100;
 
+        // SGB II Subsidies & DEÜV Classifications
+        let jobcenterSubsidy = 0;
+        let netEmployerCost = totalEmployerCost;
+        let furtherTrainingBudget = 0;
+        let furtherTrainingUsed = 0;
+        let furtherTrainingRemaining = 0;
+        let coachingHoursPerMonth = 0;
+        let deuevPersonengruppe = payrollProfile?.deuevPersonengruppe || '101';
+        let deuevBeitragsgruppe = isMinijob ? '0100' : (payrollProfile?.deuevBeitragsgruppe || '1111');
+
+        if (fundingProgram === 'sgb2_16d') {
+            jobcenterSubsidy = baseSalary;
+            netEmployerCost = 0;
+            deuevPersonengruppe = '190';
+            deuevBeitragsgruppe = '0000';
+            furtherTrainingBudget = 0;
+            furtherTrainingUsed = 0;
+            furtherTrainingRemaining = 0;
+            coachingHoursPerMonth = 0;
+        } else if (fundingProgram === 'sgb2_16i') {
+            const subsidyPercent = Number(payrollProfile?.fundingSubsidyPercentage ?? contract?.fundingSubsidyPercentage ?? 100);
+            const wageSubsidy = Math.round(baseSalary * (subsidyPercent / 100) * 100) / 100;
+            const svSubsidy = Math.round((employerHealthInsurance + employerPensionInsurance + employerLongTermCareInsurance) * (subsidyPercent / 100) * 100) / 100;
+            jobcenterSubsidy = Math.round((wageSubsidy + svSubsidy) * 100) / 100;
+            netEmployerCost = Math.max(0, Math.round((totalEmployerCost - jobcenterSubsidy) * 100) / 100);
+            furtherTrainingBudget = Number(payrollProfile?.furtherTrainingBudget ?? contract?.furtherTrainingBudget ?? 3000);
+            furtherTrainingUsed = Number(payrollProfile?.furtherTrainingUsed ?? contract?.furtherTrainingUsed ?? 0);
+            furtherTrainingRemaining = Math.max(0, Math.round((furtherTrainingBudget - furtherTrainingUsed) * 100) / 100);
+            coachingHoursPerMonth = Number(payrollProfile?.coachingHoursPerMonth ?? contract?.coachingHoursPerMonth ?? 2);
+            deuevPersonengruppe = '101';
+            deuevBeitragsgruppe = '1101'; // KV: 1, RV: 1, AV: 0, PV: 1
+        }
+
         // Assemble line items for detailed payslip display
-        const lineItems: PayrollLineItem[] = [
-            {
+        let lineItems: PayrollLineItem[] = [];
+
+        if (fundingProgram === 'sgb2_16d') {
+            lineItems = [
+                {
+                    code: 'SGB2_16D_MAE',
+                    name: 'Mehraufwandsentschädigung gem. § 16d SGB II (Arbeitsgelegenheit)',
+                    category: 'earning',
+                    hours: workedHours > 0 ? workedHours : contractHours,
+                    rate: hourlyWage,
+                    amount: baseSalary,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: '§ 16d Abs. 7 SGB II / § 3 Nr. 2 EStG',
+                },
+                {
+                    code: 'SGB2_16D_SUBSIDY',
+                    name: 'Jobcenter Erstattung Mehraufwandsentschädigung (100%)',
+                    category: 'employer_contribution',
+                    amount: baseSalary,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: '§ 16d SGB II',
+                },
+            ];
+        } else {
+            lineItems.push({
                 code: 'BASE_SALARY',
                 name: wageType === 'monthly' ? 'Grundvergütung (Monatsgehalt)' : 'Grundvergütung (Stundenlohn)',
                 category: 'earning',
@@ -614,110 +767,132 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
                 amount: baseSalary,
                 taxExempt: false,
                 socialSecurityExempt: false,
-            },
-        ];
+            });
 
-        if (overtimeHours > 0) {
-            if (overtimePay > 0) {
+            if (overtimeHours > 0) {
+                if (overtimePay > 0) {
+                    lineItems.push({
+                        code: 'OVERTIME_BASE',
+                        name: 'Überstunden Grundvergütung',
+                        category: 'earning',
+                        hours: overtimeHours,
+                        rate: hourlyWage,
+                        amount: overtimePay,
+                        taxExempt: false,
+                        socialSecurityExempt: false,
+                    });
+                }
+                if (overtimeSurcharges > 0) {
+                    lineItems.push({
+                        code: 'OVERTIME_SURCHARGE',
+                        name: `Überstundenzuschlag (${overtimePercent}%)`,
+                        category: 'earning',
+                        hours: overtimeHours,
+                        amount: overtimeSurcharges,
+                        taxExempt: false,
+                        socialSecurityExempt: false,
+                    });
+                }
+            }
+
+            if (breakdown.nightHours > 0 && nightSurchargesTaxFree > 0) {
                 lineItems.push({
-                    code: 'OVERTIME_BASE',
-                    name: 'Überstunden Grundvergütung',
+                    code: 'SURCHARGE_NIGHT',
+                    name: `Nachtarbeitszuschlag (${nightPercent}%)`,
                     category: 'earning',
-                    hours: overtimeHours,
+                    hours: breakdown.nightHours,
                     rate: hourlyWage,
-                    amount: overtimePay,
-                    taxExempt: false,
-                    socialSecurityExempt: false,
+                    amount: nightSurchargesTaxFree,
+                    taxExempt: true,
+                    socialSecurityExempt: isSfnSvFree,
+                    legalReference: '§ 3b Abs. 1 Nr. 1 EStG',
                 });
             }
-            if (overtimeSurcharges > 0) {
+
+            if (breakdown.sundayHours > 0 && sundaySurchargesTaxFree > 0) {
                 lineItems.push({
-                    code: 'OVERTIME_SURCHARGE',
-                    name: `Überstundenzuschlag (${overtimePercent}%)`,
+                    code: 'SURCHARGE_SUNDAY',
+                    name: `Sonntagszuschlag (${sundayPercent}%)`,
                     category: 'earning',
-                    hours: overtimeHours,
-                    amount: overtimeSurcharges,
+                    hours: breakdown.sundayHours,
+                    rate: hourlyWage,
+                    amount: sundaySurchargesTaxFree,
+                    taxExempt: true,
+                    socialSecurityExempt: isSfnSvFree,
+                    legalReference: '§ 3b Abs. 1 Nr. 2 EStG',
+                });
+            }
+
+            if (breakdown.holidayHours > 0 && holidaySurchargesTaxFree > 0) {
+                lineItems.push({
+                    code: 'SURCHARGE_HOLIDAY',
+                    name: `Feiertagszuschlag (${holidayPercent}%)`,
+                    category: 'earning',
+                    hours: breakdown.holidayHours,
+                    rate: hourlyWage,
+                    amount: holidaySurchargesTaxFree,
+                    taxExempt: true,
+                    socialSecurityExempt: isSfnSvFree,
+                    legalReference: '§ 3b Abs. 1 Nr. 3 EStG',
+                });
+            }
+
+            if (allowances > 0) {
+                lineItems.push({
+                    code: 'ALLOWANCE_CAPITAL',
+                    name: 'Hauptstadtzulage / Zulage',
+                    category: 'earning',
+                    amount: allowances,
                     taxExempt: false,
                     socialSecurityExempt: false,
                 });
             }
-        }
 
-        if (breakdown.nightHours > 0 && nightSurchargesTaxFree > 0) {
-            lineItems.push({
-                code: 'SURCHARGE_NIGHT',
-                name: `Nachtarbeitszuschlag (${nightPercent}%)`,
-                category: 'earning',
-                hours: breakdown.nightHours,
-                rate: hourlyWage,
-                amount: nightSurchargesTaxFree,
-                taxExempt: true,
-                socialSecurityExempt: isSfnSvFree,
-                legalReference: '§ 3b Abs. 1 Nr. 1 EStG',
-            });
-        }
+            if (employerVl > 0) {
+                lineItems.push({
+                    code: 'VL_EMPLOYER',
+                    name: 'Vermögenswirksame Leistungen (AG-Zuschuss)',
+                    category: 'earning',
+                    amount: employerVl,
+                    taxExempt: false,
+                    socialSecurityExempt: false,
+                    legalReference: '5. VermBG',
+                });
+            }
 
-        if (breakdown.sundayHours > 0 && sundaySurchargesTaxFree > 0) {
-            lineItems.push({
-                code: 'SURCHARGE_SUNDAY',
-                name: `Sonntagszuschlag (${sundayPercent}%)`,
-                category: 'earning',
-                hours: breakdown.sundayHours,
-                rate: hourlyWage,
-                amount: sundaySurchargesTaxFree,
-                taxExempt: true,
-                socialSecurityExempt: isSfnSvFree,
-                legalReference: '§ 3b Abs. 1 Nr. 2 EStG',
-            });
-        }
+            if (bonus > 0) {
+                lineItems.push({
+                    code: 'YEARLY_BONUS',
+                    name: `Jahressonderzahlung (${contract?.yearlyBonusPercentage ?? 80}%)`,
+                    category: 'earning',
+                    amount: bonus,
+                    taxExempt: false,
+                    socialSecurityExempt: false,
+                    legalReference: 'TVöD / AWO MTV § 20',
+                });
+            }
 
-        if (breakdown.holidayHours > 0 && holidaySurchargesTaxFree > 0) {
-            lineItems.push({
-                code: 'SURCHARGE_HOLIDAY',
-                name: `Feiertagszuschlag (${holidayPercent}%)`,
-                category: 'earning',
-                hours: breakdown.holidayHours,
-                rate: hourlyWage,
-                amount: holidaySurchargesTaxFree,
-                taxExempt: true,
-                socialSecurityExempt: isSfnSvFree,
-                legalReference: '§ 3b Abs. 1 Nr. 3 EStG',
-            });
-        }
-
-        if (allowances > 0) {
-            lineItems.push({
-                code: 'ALLOWANCE_CAPITAL',
-                name: 'Hauptstadtzulage / Zulage',
-                category: 'earning',
-                amount: allowances,
-                taxExempt: false,
-                socialSecurityExempt: false,
-            });
-        }
-
-        if (employerVl > 0) {
-            lineItems.push({
-                code: 'VL_EMPLOYER',
-                name: 'Vermögenswirksame Leistungen (AG-Zuschuss)',
-                category: 'earning',
-                amount: employerVl,
-                taxExempt: false,
-                socialSecurityExempt: false,
-                legalReference: '5. VermBG',
-            });
-        }
-
-        if (bonus > 0) {
-            lineItems.push({
-                code: 'YEARLY_BONUS',
-                name: `Jahressonderzahlung (${contract?.yearlyBonusPercentage ?? 80}%)`,
-                category: 'earning',
-                amount: bonus,
-                taxExempt: false,
-                socialSecurityExempt: false,
-                legalReference: 'TVöD / AWO MTV § 20',
-            });
+            if (fundingProgram === 'sgb2_16i') {
+                const subsidyPercent = Number(payrollProfile?.fundingSubsidyPercentage ?? contract?.fundingSubsidyPercentage ?? 100);
+                lineItems.push({
+                    code: 'SGB2_16I_SUBSIDY',
+                    name: `Jobcenter Lohnkostenzuschuss gem. § 16i SGB II (${subsidyPercent}% Lohn + AG-SV)`,
+                    category: 'employer_contribution',
+                    amount: jobcenterSubsidy,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: '§ 16i Abs. 2 SGB II',
+                });
+                lineItems.push({
+                    code: 'SGB2_16I_AV_EXEMPT',
+                    name: 'Arbeitslosenversicherung: Beitragsfrei gem. § 27 Abs. 3 Nr. 5 SGB III (DEÜV BGR 1101)',
+                    category: 'deduction',
+                    amount: 0,
+                    taxExempt: true,
+                    socialSecurityExempt: true,
+                    legalReference: '§ 27 Abs. 3 Nr. 5 SGB III',
+                });
+            }
         }
 
         return {
@@ -769,6 +944,17 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
             totalEmployerSocialSecurity,
             totalEmployerCost,
 
+            // SGB II Funding & Subsidies (§ 16d / § 16i)
+            fundingProgram,
+            jobcenterSubsidy,
+            netEmployerCost,
+            furtherTrainingBudget,
+            furtherTrainingUsed,
+            furtherTrainingRemaining,
+            coachingHoursPerMonth,
+            deuevPersonengruppe,
+            deuevBeitragsgruppe,
+
             lineItems,
             calculationDetails: {
                 taxClass: payrollProfile?.taxClass || '1',
@@ -779,6 +965,14 @@ export class GermanPayrollEngine implements PayrollJurisdictionEngine {
                 effectiveWageAmount,
                 wageType,
                 breakdown,
+                fundingProgram,
+                jobcenterSubsidy,
+                netEmployerCost,
+                furtherTrainingBudget,
+                furtherTrainingRemaining,
+                coachingHoursPerMonth,
+                deuevPersonengruppe,
+                deuevBeitragsgruppe,
             },
         };
     }

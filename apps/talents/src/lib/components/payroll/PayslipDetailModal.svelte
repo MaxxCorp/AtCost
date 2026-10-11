@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { X, Printer, CheckCircle, FileText, Building2, User, Clock, AlertCircle } from "@lucide/svelte";
+    import { X, Printer, CheckCircle, FileText, Building2, User, Clock, AlertCircle, HeartHandshake, Sparkles, GraduationCap, ShieldCheck } from "@lucide/svelte";
     import { Button } from "@ac/ui";
 
     let {
@@ -41,6 +41,15 @@
                 <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 ml-2">
                     {payslip.jurisdiction ?? 'DE'}
                 </span>
+                {#if payslip.fundingProgram === 'sgb2_16i'}
+                    <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-teal-100 text-teal-800 border border-teal-200">
+                        § 16i SGB II (TaAM)
+                    </span>
+                {:else if payslip.fundingProgram === 'sgb2_16d'}
+                    <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        § 16d SGB II (AGH / MAE)
+                    </span>
+                {/if}
             </div>
             <div class="flex items-center gap-2">
                 <Button variant="outline" size="sm" onclick={() => window.print()} class="gap-1.5 text-xs">
@@ -87,6 +96,16 @@
                             <div>Tarif: <strong class="text-indigo-900">{payslip.contract.entgeltgruppe} (Stufe {payslip.contract.erfahrungsstufe ?? 1})</strong></div>
                         {/if}
                         <div>Wochenstunden: <strong class="text-gray-900">{payslip.contract?.workHoursPerWeek ?? 39} h</strong></div>
+                        {#if payslip.deuevPersonengruppe || payslip.deuevBeitragsgruppe}
+                            <div class="col-span-2 text-indigo-900 bg-indigo-50/70 p-1.5 rounded-md border border-indigo-100 text-[11px]">
+                                DEÜV: PGR <strong>{payslip.deuevPersonengruppe ?? '101'}</strong> / BGR <strong>{payslip.deuevBeitragsgruppe ?? '1111'}</strong>
+                                {#if payslip.fundingProgram === 'sgb2_16i'}
+                                    <span class="text-teal-700 font-semibold ml-1">(ALV-frei § 27 SGB III)</span>
+                                {:else if payslip.fundingProgram === 'sgb2_16d'}
+                                    <span class="text-emerald-700 font-semibold ml-1">(Steuer-/SV-frei § 3 EStG)</span>
+                                {/if}
+                            </div>
+                        {/if}
                     </div>
                 </div>
             </div>
@@ -290,6 +309,66 @@
                     <div>U1/U2/Insolvenz: <strong>{formatCurrency(payslip.employerLevies)}</strong></div>
                 </div>
             </div>
+
+            <!-- SGB II Funding & Jobcenter Refund Details -->
+            {#if payslip.fundingProgram === 'sgb2_16i' || (payslip.jobcenterSubsidy && payslip.jobcenterSubsidy > 0)}
+                <div class="p-5 rounded-xl border border-teal-200 bg-teal-50/50 space-y-3 shadow-2xs">
+                    <div class="flex items-center justify-between pb-2 border-b border-teal-100">
+                        <div class="flex items-center gap-2 text-teal-950 font-bold text-sm">
+                            <HeartHandshake class="w-4 h-4 text-teal-600" />
+                            <span>Jobcenter-Zuschuss & Förderabrechnung (§ 16i SGB II)</span>
+                        </div>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">
+                            Förderquote: {calcDetails.fundingSubsidyPercentage ?? 100}% (Jahr {calcDetails.fundingYear ?? 1})
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div class="bg-white p-3 rounded-lg border border-teal-100 shadow-2xs">
+                            <span class="text-gray-500 block text-[11px]">Gesamter Jobcenter-Zuschuss</span>
+                            <strong class="text-base font-bold text-teal-800">{formatCurrency(payslip.jobcenterSubsidy)}</strong>
+                            <span class="text-[10px] text-gray-500 block">Lohnkosten + pauschal. AG-SV-Anteil</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-teal-100 shadow-2xs">
+                            <span class="text-gray-500 block text-[11px]">Effektiver Netto-AG-Aufwand</span>
+                            <strong class="text-base font-bold text-indigo-900">{formatCurrency(payslip.netEmployerCost)}</strong>
+                            <span class="text-[10px] text-gray-500 block">Gesamtkosten abzüglich Erstattung</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-teal-100 shadow-2xs">
+                            <span class="text-gray-500 block text-[11px]">Weiterbildungsbudget (§ 16i Abs. 5)</span>
+                            <strong class="text-base font-bold text-slate-800">{formatCurrency((calcDetails.furtherTrainingBudget ?? 3000) - (calcDetails.furtherTrainingUsed ?? 0))} frei</strong>
+                            <span class="text-[10px] text-teal-700 block">{formatCurrency(calcDetails.furtherTrainingUsed ?? 0)} von {formatCurrency(calcDetails.furtherTrainingBudget ?? 3000)} beansprucht</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-teal-900 pt-1 border-t border-teal-100/60">
+                        <div class="flex items-center gap-1.5">
+                            <Clock class="w-3.5 h-3.5 text-teal-600" />
+                            <span>Monatlich bezahlte Coaching-Freistellung: <strong>{calcDetails.coachingHoursPerMonth ?? 2} Stunden</strong> gem. § 16i Abs. 4 SGB II</span>
+                        </div>
+                        {#if profile.jobcenterReference || calcDetails.jobcenterReference}
+                            <div class="font-mono text-gray-600">
+                                Aktenzeichen: {profile.jobcenterReference || calcDetails.jobcenterReference}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+            {:else if payslip.fundingProgram === 'sgb2_16d'}
+                <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 text-xs text-emerald-950 space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between font-bold">
+                        <div class="flex items-center gap-2">
+                            <ShieldCheck class="w-4 h-4 text-emerald-600" />
+                            <span>Arbeitsgelegenheit mit Mehraufwandsentschädigung (AGH § 16d SGB II)</span>
+                        </div>
+                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold">
+                            100% öffentlich gefördert (Netto-AG: 0,00 €)
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800">
+                        Rechtscharakter: Kein Arbeitsverhältnis im Sinne des Arbeitsrechts (§ 16d Abs. 7 SGB II). Die Mehraufwandsentschädigung (MAE) ist nach § 3 Nr. 2 EStG vollständig einkommensteuerfrei und sozialversicherungsfrei (DEÜV Personengruppe 190, Beitragsgruppe 0000).
+                    </p>
+                </div>
+            {/if}
         </div>
     </div>
 </div>
