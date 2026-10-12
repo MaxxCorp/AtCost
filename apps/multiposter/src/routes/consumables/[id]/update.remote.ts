@@ -1,7 +1,9 @@
 import { form, requested } from '$app/server';
-import { db, consumable, consumableTag, tag, eq } from '@ac/db';
+import { db, consumable, consumableTag, tag, menuItem, eq } from '@ac/db';
 import { listConsumables } from '../list.remote';
 import { readConsumable } from './read.remote';
+import { fetchEntityPrices } from '../../prices/associate.remote';
+import { listPrices } from '../../prices/list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateConsumableSchema } from '@ac/validations';
 
@@ -83,15 +85,53 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
             }
         }
 
+        // Sync linked menu items if any
+        const costPerUnit = amount > 0 ? purchasePrice / amount : purchasePrice;
+        const roundedCost = Math.round(costPerUnit * 100) / 100;
+        try {
+            const linkedMenuItems = await db.select().from(menuItem).where(eq(menuItem.consumableId, data.id));
+            for (const mi of linkedMenuItems) {
+                const newUnitPrice = Math.round(roundedCost * mi.factor * 100) / 100;
+                await db.update(menuItem).set({
+                    name: data.name,
+                    description: data.description || null,
+                    unit: data.unit || 'piece',
+                    costPrice: roundedCost,
+                    unitPrice: newUnitPrice,
+                }).where(eq(menuItem.id, mi.id));
+            }
+        } catch (menuErr) {
+            console.warn('--- updateConsumable menuItem sync warning ---', menuErr);
+        }
+
+        // Fetch refreshed tags
+        const row = await db.query.consumable.findFirst({
+            where: eq(consumable.id, data.id),
+            with: {
+                tags: {
+                    with: {
+                        tag: {
+                            with: {
+                                category: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        const refreshedTags = (row?.tags || []).map((t: any) => t.tag).filter(Boolean);
 
         try {
             await requested(listConsumables, 20).refreshAll();
+            await requested(fetchEntityPrices, 20).refreshAll();
+            await requested(listPrices, 20).refreshAll();
         } catch (e) {
             console.warn('--- updateConsumable requested refresh warning ---', e);
         }
         try {
             await listConsumables().refresh();
             await readConsumable(data.id).refresh();
+            await listPrices().refresh();
         } catch (refreshErr) {
             console.warn('--- updateConsumable refresh warning ---', refreshErr);
         }
@@ -104,6 +144,8 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
                 expirationDate: updated.expirationDate ? updated.expirationDate.toISOString() : null,
                 createdAt: updated.createdAt.toISOString(),
                 updatedAt: updated.updatedAt.toISOString(),
+                costPerUnit: roundedCost,
+                tags: refreshedTags,
             }
         };
     } catch (err: any) {

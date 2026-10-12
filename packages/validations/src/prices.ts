@@ -118,3 +118,14 @@ export const getPriceAssociationsSchema = v.object({
 });
 
 export const getPriceListAssociationsSchema = getPriceAssociationsSchema;
+
+export const removePriceItemSchema = v.object({
+    priceId: v.pipe(v.string(), v.minLength(1)),
+    itemId: v.pipe(v.string(), v.minLength(1)),
+});
+
+export const updatePriceItemSchema = v.object({
+    priceId: v.pipe(v.string(), v.minLength(1)),
+    item: priceItemInputSchema,
+});
+

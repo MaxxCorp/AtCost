@@ -95,6 +95,7 @@
         renderItemLabel?: Snippet<[T]>;
         renderItemBadge?: Snippet<[T]>;
         renderItemDetail?: Snippet<[T]>;
+        renderSubItems?: Snippet<[T]>;
         participationSnippet?: Snippet<[T]>;
         rolesSnippet?: Snippet<[T]>;
         toolbarActions?: Snippet;
@@ -163,6 +164,7 @@
         renderItemLabel,
         renderItemBadge,
         renderItemDetail,
+        renderSubItems = undefined,
         participationSnippet,
         rolesSnippet,
         toolbarActions,
@@ -1308,96 +1310,104 @@
                 <div class="grid gap-2">
                     {#each displayedFilteredItems as item (item.id)}
                         <div
-                            class="flex flex-col sm:flex-row sm:items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
+                            class="flex flex-col transition-all rounded-2xl border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc overflow-hidden"
                         >
-                            <div class="flex-1 min-w-0">
-                                <div
-                                    class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
-                                >
-                                    {#if renderItem}
-                                        {@render renderItem(item)}
-                                    {:else if renderItemLabel}
-                                        {@render renderItemLabel(item)}
-                                    {:else}
-                                        {(item as any).displayName ||
-                                            item.name ||
-                                            (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
-                                            (item as any).company ||
-                                            item.id ||
-                                            "Unnamed Item"}
-                                    {/if}
-                                </div>
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    {#if renderItemBadge}
-                                        {@render renderItemBadge(item)}
-                                    {/if}
-                                    {#if renderItemDetail}
-                                        <div
-                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
-                                        >
-                                            {@render renderItemDetail(item)}
-                                        </div>
-                                    {/if}
-                                </div>
-                            </div>
-
-                            {#if rolesSnippet}
-                                {@render rolesSnippet(item)}
-                            {/if}
-
-                            {#if participationSnippet}
-                                {@render participationSnippet(item)}
-                            {/if}
-
-                            <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start mt-1 sm:mt-0">
-                                {#if updateRemote && renderForm && readItemRemote}
-                                    <button
-                                        type="button"
-                                        class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                        onclick={() => {
-                                            editingItem = item;
-                                        }}
-                                        title={i18n.editLabel}
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-3">
+                                <div class="flex-1 min-w-0">
+                                    <div
+                                        class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
                                     >
-                                        <Pencil size={15} />
-                                    </button>
+                                        {#if renderItem}
+                                            {@render renderItem(item)}
+                                        {:else if renderItemLabel}
+                                            {@render renderItemLabel(item)}
+                                        {:else}
+                                            {(item as any).displayName ||
+                                                item.name ||
+                                                (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
+                                                (item as any).company ||
+                                                item.id ||
+                                                "Unnamed Item"}
+                                        {/if}
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        {#if renderItemBadge}
+                                            {@render renderItemBadge(item)}
+                                        {/if}
+                                        {#if renderItemDetail}
+                                            <div
+                                                class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
+                                            >
+                                                {@render renderItemDetail(item)}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
+
+                                {#if rolesSnippet}
+                                    {@render rolesSnippet(item)}
                                 {/if}
-                                <AsyncButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                    loading={linkingItemId === item.id}
-                                    loadingLabel=""
-                                    onclick={() =>
-                                        toggleAssociation(
-                                            item,
-                                            currentAssociations,
-                                        )}
-                                    title={i18n.confirmUnlinkLabel}
-                                >
-                                    <Unlink size={15} />
-                                </AsyncButton>
-                                {#if deleteItemRemote}
+
+                                {#if participationSnippet}
+                                    {@render participationSnippet(item)}
+                                {/if}
+
+                                <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start mt-1 sm:mt-0">
+                                    {#if updateRemote && renderForm && readItemRemote}
+                                        <button
+                                            type="button"
+                                            class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                            onclick={() => {
+                                                editingItem = item;
+                                            }}
+                                            title={i18n.editLabel}
+                                        >
+                                            <Pencil size={15} />
+                                        </button>
+                                    {/if}
                                     <AsyncButton
                                         type="button"
                                         variant="ghost"
                                         size="sm"
                                         class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                        loading={deletingItemId === item.id}
+                                        loading={linkingItemId === item.id}
                                         loadingLabel=""
-                                        onclick={async () => {
-                                            const confirmed = window.confirm(i18n.deleteConfirmLabel);
-                                            if (confirmed) {
-                                                await deleteItem(item, currentAssociations);
-                                            }
-                                        }}
-                                        title={i18n.deleteForeverLabel}
+                                        onclick={() =>
+                                            toggleAssociation(
+                                                item,
+                                                currentAssociations,
+                                            )}
+                                        title={i18n.confirmUnlinkLabel}
                                     >
-                                        <Trash2 size={15} />
+                                        <Unlink size={15} />
                                     </AsyncButton>
-                                {/if}
+                                    {#if deleteItemRemote}
+                                        <AsyncButton
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                            loading={deletingItemId === item.id}
+                                            loadingLabel=""
+                                            onclick={async () => {
+                                                const confirmed = window.confirm(i18n.deleteConfirmLabel);
+                                                if (confirmed) {
+                                                    await deleteItem(item, currentAssociations);
+                                                }
+                                            }}
+                                            title={i18n.deleteForeverLabel}
+                                        >
+                                            <Trash2 size={15} />
+                                        </AsyncButton>
+                                    {/if}
+                                </div>
                             </div>
+
+                            {#if renderSubItems}
+                                <div class="border-t border-gray-100 bg-gray-50/40">
+                                    {@render renderSubItems(item)}
+                                </div>
+                            {/if}
                         </div>
                     {/each}
                 </div>

@@ -1,7 +1,9 @@
 import { form, requested } from '$app/server';
-import { db, recipe, recipeConsumable, recipeTag, tag, eq } from '@ac/db';
+import { db, recipe, recipeConsumable, recipeTag, tag, menuItem, eq } from '@ac/db';
 import { listRecipes } from '../list.remote';
 import { readRecipe } from './read.remote';
+import { fetchEntityPrices } from '../../prices/associate.remote';
+import { listPrices } from '../../prices/list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateRecipeSchema } from '@ac/validations';
 
@@ -87,15 +89,68 @@ export const updateRecipe = form(updateRecipeSchema, async (data) => {
         return updatedRecipe;
     });
 
+    // Read full recipe with consumables & tags to compute cost and return full structure
+    let totalCost = 0;
+    let costPerPortion = 0;
+    let refreshedTags: any[] = [];
+    try {
+        const fullRecipe = await db.query.recipe.findFirst({
+            where: eq(recipe.id, data.id),
+            with: {
+                consumables: {
+                    with: {
+                        consumable: true,
+                    }
+                },
+                tags: {
+                    with: {
+                        tag: {
+                            with: {
+                                category: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (fullRecipe) {
+            for (const rc of fullRecipe.consumables || []) {
+                const c = rc.consumable;
+                const cpu = c ? (c.amount > 0 ? c.purchasePrice / c.amount : c.purchasePrice) : 0;
+                totalCost += cpu * rc.amount;
+            }
+            const portions = (result.portions && result.portions > 0) ? result.portions : 1;
+            costPerPortion = Math.round((totalCost / portions) * 100) / 100;
+            refreshedTags = (fullRecipe.tags || []).map((t: any) => t.tag).filter(Boolean);
+
+            // Sync linked menu items
+            const linkedMenuItems = await db.select().from(menuItem).where(eq(menuItem.recipeId, data.id));
+            for (const mi of linkedMenuItems) {
+                const newUnitPrice = Math.round(costPerPortion * mi.factor * 100) / 100;
+                await db.update(menuItem).set({
+                    name: data.name,
+                    description: data.description || null,
+                    costPrice: costPerPortion,
+                    unitPrice: newUnitPrice,
+                }).where(eq(menuItem.id, mi.id));
+            }
+        }
+    } catch (e) {
+        console.warn('--- updateRecipe calculations warning ---', e);
+    }
 
     try {
         await requested(listRecipes, 20).refreshAll();
+        await requested(fetchEntityPrices, 20).refreshAll();
+        await requested(listPrices, 20).refreshAll();
     } catch (e) {
         console.warn('--- updateRecipe requested refresh warning ---', e);
     }
     try {
         await listRecipes().refresh();
         await readRecipe(data.id).refresh();
+        await listPrices().refresh();
     } catch (refreshErr) {
         console.warn('--- updateRecipe refresh warning ---', refreshErr);
     }
@@ -106,6 +161,9 @@ export const updateRecipe = form(updateRecipeSchema, async (data) => {
             ...result,
             createdAt: result.createdAt.toISOString(),
             updatedAt: result.updatedAt.toISOString(),
+            totalCost: Math.round(totalCost * 100) / 100,
+            costPerPortion,
+            tags: refreshedTags,
         }
     };
 });
