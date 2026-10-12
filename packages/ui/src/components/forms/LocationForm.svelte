@@ -1,7 +1,7 @@
 <script lang="ts">
     import AsyncButton from "../AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "../button";
+    import { Button } from "../button/index.js";
     import { goto } from "$app/navigation";
     import type { Snippet } from "svelte";
     import { translateIssue } from "../../utils.js";
@@ -31,6 +31,12 @@
         labels?: any;
         m?: any;
     } = $props();
+
+    const rf = $derived(
+        validationSchema
+            ? (remoteFunction as any).preflight(validationSchema)
+            : remoteFunction,
+    );
 
     const i18n = {
         get name() {
@@ -149,121 +155,85 @@
         },
     };
 
-    let submissionTriggered = $state(false);
+    let prevIssuesLength = 0;
     $effect(() => {
-        const issues = (remoteFunction as any).allIssues?.() ?? [];
-        if (submissionTriggered && issues.length > 0) {
+        const issues = (rf as any)?.allIssues?.() ?? (rf as any)?.fields?.allIssues?.() ?? [];
+        if (issues.length > 0 && prevIssuesLength === 0) {
             toast.error(i18n.pleaseFixValidation);
-            submissionTriggered = false;
         }
-    });
-
-    $effect(() => {
-        const data = initialData || {};
-        console.log("LocationForm initialData:", data);
-        console.log("LocationForm validationSchema:", validationSchema);
-        
-        // Extract keys from Valibot schema (handles object, intersect, pipe, etc.)
-        const getKeys = (s: any): string[] => {
-            if (!s) return [];
-            // Handle v.object
-            if (s.entries) return Object.keys(s.entries);
-            // Handle v.intersect, v.union
-            if (s.options) return s.options.flatMap(getKeys);
-            // Handle v.optional, v.nullable, etc.
-            if (s.wrapped) return getKeys(s.wrapped);
-            // Handle v.pipe
-            if (s.pipe && Array.isArray(s.pipe) && s.pipe.length > 0) return getKeys(s.pipe[0]);
-            return [];
-        };
-
-        const schemaKeys = [...new Set(getKeys(validationSchema))];
-        console.log("LocationForm schemaKeys:", schemaKeys);
-        console.log("LocationForm remoteFunction fields:", Object.keys(remoteFunction.fields || {}));
-        
-        for (const key of schemaKeys) {
-            const value = data[key];
-            const defaultValue = key === "isPublic" ? true : "";
-            const finalValue = value ?? defaultValue;
-            
-            if (remoteFunction.fields[key]) {
-                console.log(`Setting field ${key} to:`, finalValue);
-                remoteFunction.fields[key].set(finalValue);
-            } else {
-                console.warn(`Field ${key} not found in remoteFunction.fields`);
-            }
-        }
+        prevIssuesLength = issues.length;
     });
 </script>
 
 <form
     class="space-y-4"
-    {...remoteFunction
-        .preflight(validationSchema)
-        .enhance(async ({ submit }: { submit: any }) => {
-            submissionTriggered = false;
-            try {
-                await submit();
-                const result = (remoteFunction as any).result;
-                const error = (remoteFunction as any).error;
+    {...rf.enhance(async ({ submit }: { submit: any }) => {
+        try {
+            await submit();
+            const result = (rf as any).result;
+            const error = (rf as any).error;
 
-                if (error || (result && result.success === false)) {
-                    submissionTriggered = true;
-                    toast.error(
-                        error?.message ||
-                            result?.error?.message ||
-                            result?.error ||
-                            i18n.errorSomethingWentWrong,
-                    );
-                    return;
-                }
-
-                toast.success(i18n.successfullySaved);
-                if (onSuccess) onSuccess(result);
-                else await goto(cancelHref);
-            } catch (error: unknown) {
-                submissionTriggered = true;
-                const err = error as { message?: string };
-                toast.error(err?.message || i18n.errorSomethingWentWrong);
+            if (error || (result && result.success === false)) {
+                toast.error(
+                    error?.message ||
+                        result?.error?.message ||
+                        result?.error ||
+                        i18n.errorSomethingWentWrong,
+                );
+                return;
             }
-        })}
+
+            toast.success(i18n.successfullySaved);
+            if (onSuccess) onSuccess(result);
+            else await goto(cancelHref);
+        } catch (error: unknown) {
+            const err = error as { message?: string };
+            toast.error(err?.message || i18n.errorSomethingWentWrong);
+        }
+    })}
 >
     {#if isUpdating && initialData?.id}
-        <input {...remoteFunction.fields.id.as("text", initialData.id)} class="hidden" />
+        <input {...rf.fields.id.as("hidden", initialData.id)} />
     {/if}
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.name}</span>
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{i18n.name}</span>
         <input
-            {...remoteFunction.fields.name.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(remoteFunction.fields.name.issues() ?? []).length > 0
+            {...rf.fields.name.as("text", initialData?.name ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.name.issues() ?? []).length > 0
                 ? 'border-red-500'
-                : 'border-gray-300'}"
+                : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
             placeholder={i18n.enterLocationName}
-            onblur={() => remoteFunction.validate()}
+            onblur={() => rf.validate()}
         />
-        {#each remoteFunction.fields.name.issues() ?? [] as issue}
+        {#each rf.fields.name.issues() ?? [] as issue (issue.message)}
             <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.description}</span>
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{i18n.description}</span>
         <textarea
-            {...remoteFunction.fields.description.as("text")}
-            class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            {...rf.fields.description.as("text", initialData?.description ?? "")}
+            class="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Describe the location..."
             rows="2"
         ></textarea>
+        {#each rf.fields.description.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.capacity}</span>
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{i18n.capacity}</span>
         <input
-            {...remoteFunction.fields.capacity.as("text")}
-            class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            {...rf.fields.capacity.as("text", initialData?.capacity ?? "")}
+            class="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="e.g. 50 people"
         />
+        {#each rf.fields.capacity.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
     </label>
 
     {#if heroImageSlot}
@@ -271,151 +241,213 @@
     {/if}
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.street}</span
-        >
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{i18n.street}</span>
         <input
-            {...remoteFunction.fields.street.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            {...rf.fields.street.as("text", initialData?.street ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.street.issues() ?? []).length > 0
+                ? 'border-red-500'
+                : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
             placeholder={i18n.streetName}
         />
+        {#each rf.fields.street.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
     </label>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.houseNumber}</span
             >
             <input
-                {...remoteFunction.fields.houseNumber.as("text")}
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                {...rf.fields.houseNumber.as("text", initialData?.houseNumber ?? "")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.houseNumber.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.houseNumberPlaceholder}
             />
+            {#each rf.fields.houseNumber.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.addressSuffix}</span
             >
             <input
-                {...remoteFunction.fields.addressSuffix.as("text")}
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                {...rf.fields.addressSuffix.as("text", initialData?.addressSuffix ?? "")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.addressSuffix.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.addressSuffixPlaceholder}
             />
+            {#each rf.fields.addressSuffix.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.zip}</span
             >
             <input
-                {...remoteFunction.fields.zip.as("text")}
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                {...rf.fields.zip.as("text", initialData?.zip ?? "")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.zip.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.zipCodePlaceholder}
             />
+            {#each rf.fields.zip.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
         <label class="block col-span-2">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.city}</span
             >
             <input
-                {...remoteFunction.fields.city.as("text")}
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                {...rf.fields.city.as("text", initialData?.city ?? "")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.city.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.cityNamePlaceholder}
             />
+            {#each rf.fields.city.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.state}</span
             >
             <input
-                {...remoteFunction.fields.state.as("text")}
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                {...rf.fields.state.as("text", initialData?.state ?? "")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.state.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.statePlaceholder}
             />
+            {#each rf.fields.state.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.country}</span
             >
             <input
-                {...remoteFunction.fields.country.as("text")}
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                {...rf.fields.country.as("text", initialData?.country ?? "")}
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.country.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.countryPlaceholder}
             />
+            {#each rf.fields.country.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
     </div>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2">{i18n.roomId}</span
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{i18n.roomId}</span
         >
         <input
-            {...remoteFunction.fields.roomId.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            {...rf.fields.roomId.as("text", initialData?.roomId ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.roomId.issues() ?? []).length > 0
+                ? 'border-red-500'
+                : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
             placeholder={i18n.enterRoomId}
         />
+        {#each rf.fields.roomId.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
     </label>
 
     <div class="grid grid-cols-2 gap-4">
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.latitude}</span
             >
             <input
-                {...remoteFunction.fields.latitude.as("text")}
+                {...rf.fields.latitude.as("text", initialData?.latitude != null ? String(initialData.latitude) : "")}
                 type="number"
                 step="any"
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.latitude.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.latitudePlaceholder}
             />
+            {#each rf.fields.latitude.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
         <label class="block">
-            <span class="text-sm font-medium text-gray-700 mb-2"
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >{i18n.longitude}</span
             >
             <input
-                {...remoteFunction.fields.longitude.as("text")}
+                {...rf.fields.longitude.as("text", initialData?.longitude != null ? String(initialData.longitude) : "")}
                 type="number"
                 step="any"
-                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.longitude.issues() ?? []).length > 0
+                    ? 'border-red-500'
+                    : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
                 placeholder={i18n.longitudePlaceholder}
             />
+            {#each rf.fields.longitude.issues() ?? [] as issue (issue.message)}
+                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            {/each}
         </label>
     </div>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2"
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >{i18n.what3words}</span
         >
         <input
-            {...remoteFunction.fields.what3words.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            {...rf.fields.what3words.as("text", initialData?.what3words ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.what3words.issues() ?? []).length > 0
+                ? 'border-red-500'
+                : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
             placeholder={i18n.what3wordsPlaceholder}
         />
+        {#each rf.fields.what3words.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
     </label>
 
     <label class="block">
-        <span class="text-sm font-medium text-gray-700 mb-2"
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >{i18n.inclusivitySupport}</span
         >
         <textarea
-            {...remoteFunction.fields.inclusivitySupport.as("text")}
-            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            {...rf.fields.inclusivitySupport.as("text", initialData?.inclusivitySupport ?? "")}
+            class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.inclusivitySupport.issues() ?? []).length > 0
+                ? 'border-red-500'
+                : 'border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white'}"
             placeholder={i18n.inclusivitySupportPlaceholder}
             rows="3"
         ></textarea>
+        {#each rf.fields.inclusivitySupport.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
     </label>
 
     <label class="flex items-center gap-2 cursor-pointer py-2">
         <input
-            {...remoteFunction.fields.isPublic.as("checkbox", initialData?.isPublic ?? true)}
+            {...rf.fields.isPublic.as("checkbox", initialData?.isPublic ?? true)}
             type="checkbox"
             class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
         />
-        <span class="text-sm font-medium text-gray-700">{i18n.isPublic}</span>
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{i18n.isPublic}</span>
+        {#each rf.fields.isPublic.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
     </label>
 
     {#if children}
@@ -426,7 +458,7 @@
         <AsyncButton
             type="submit"
             loadingLabel={isUpdating ? i18n.saving : i18n.creating}
-            loading={(remoteFunction as any).pending}
+            loading={(rf as any).pending}
         >
             {isUpdating ? i18n.saveChanges : i18n.createLocation}
         </AsyncButton>

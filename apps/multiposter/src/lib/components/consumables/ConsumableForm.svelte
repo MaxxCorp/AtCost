@@ -88,7 +88,7 @@
                         : (m.item_created?.({ item: m.consumable?.() || 'Consumable' }) || 'Consumable created successfully')
                 );
                 if (onSuccess) {
-                    onSuccess(res);
+                    onSuccess(res && typeof res === 'object' ? res : ((rf as any).result || res));
                 } else {
                     await refreshAll();
                     await goto(cancelHref);

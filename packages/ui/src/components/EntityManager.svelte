@@ -480,7 +480,7 @@
     }
 
     function invokeRemote(fn: any, params?: any) {
-        if (!fn) return Promise.resolve(null);
+        if (!fn) return null;
         if (typeof fn.run === "function") {
             return fn.run(params);
         }
@@ -492,29 +492,248 @@
     let showSelector = $state(false);
     let refreshTrigger = $state(0);
 
-    const associationsPromise = $derived.by(() => {
+    const associationsQuery = $derived.by(() => {
         void refreshTrigger;
         if (entityId && type) {
-            return fetchAssociationsRemote
-                ? invokeRemote(fetchAssociationsRemote, { type, entityId }).catch(() => localAssociatedItems)
-                : invokeRemote(listItemsRemote, {
-                      associatedWith: { type, id: entityId },
-                  }).catch(() => localAssociatedItems);
+            if (fetchAssociationsRemote) {
+                return invokeRemote(fetchAssociationsRemote, { type, entityId });
+            }
+            if (listItemsRemote) {
+                return invokeRemote(listItemsRemote, {
+                    associatedWith: { type, id: entityId },
+                });
+            }
         }
-        return Promise.resolve(localAssociatedItems);
+        return null;
     });
 
-    const selectorListPromise = $derived.by(() => {
+    const selectorListQuery = $derived.by(() => {
         void refreshTrigger;
         if (isStandalone || showSelector) {
             return invokeRemote(listItemsRemote, filterState);
         }
-        return Promise.resolve({ data: [], total: 0 });
+        return null;
     });
 
-    const displayedItemsPromise = $derived(
-        isStandalone ? selectorListPromise : associationsPromise
+    let plainAssociationsData = $state<any>(null);
+    let plainAssociationsLoading = $state(false);
+    let plainAssociationsError = $state<any>(null);
+
+    $effect(() => {
+        const q = associationsQuery;
+        if (!q) {
+            plainAssociationsData = null;
+            plainAssociationsLoading = false;
+            plainAssociationsError = null;
+            return;
+        }
+        if ('current' in q) {
+            return;
+        }
+        if (typeof q.then === 'function') {
+            plainAssociationsLoading = true;
+            plainAssociationsError = null;
+            q.then((val: any) => {
+                if (associationsQuery === q) {
+                    plainAssociationsData = val;
+                    plainAssociationsLoading = false;
+                }
+            }).catch((err: any) => {
+                if (associationsQuery === q) {
+                    plainAssociationsError = err;
+                    plainAssociationsLoading = false;
+                }
+            });
+        } else {
+            plainAssociationsData = q;
+            plainAssociationsLoading = false;
+        }
+    });
+
+    let plainSelectorData = $state<any>(null);
+    let plainSelectorLoading = $state(false);
+    let plainSelectorError = $state<any>(null);
+
+    $effect(() => {
+        const q = selectorListQuery;
+        if (!q) {
+            plainSelectorData = null;
+            plainSelectorLoading = false;
+            plainSelectorError = null;
+            return;
+        }
+        if ('current' in q) {
+            return;
+        }
+        if (typeof q.then === 'function') {
+            plainSelectorLoading = true;
+            plainSelectorError = null;
+            q.then((val: any) => {
+                if (selectorListQuery === q) {
+                    plainSelectorData = val;
+                    plainSelectorLoading = false;
+                }
+            }).catch((err: any) => {
+                if (selectorListQuery === q) {
+                    plainSelectorError = err;
+                    plainSelectorLoading = false;
+                }
+            });
+        } else {
+            plainSelectorData = q;
+            plainSelectorLoading = false;
+        }
+    });
+
+    const rawAssociations = $derived.by<T[]>(() => {
+        if (!entityId || !type) {
+            return localAssociatedItems;
+        }
+        let list: T[] = [];
+        if (associationsQuery && 'current' in associationsQuery) {
+            if (associationsQuery.current !== undefined && associationsQuery.current !== null) {
+                list = normalize<T>(associationsQuery.current).data;
+            } else {
+                list = localAssociatedItems;
+            }
+        } else if (plainAssociationsData !== null && plainAssociationsData !== undefined) {
+            list = normalize<T>(plainAssociationsData).data;
+        } else {
+            list = localAssociatedItems;
+        }
+
+        if (localAssociatedItems.length > 0 && list.length > 0) {
+            const listIds = new Set(list.map((i: any) => i?.id).filter(Boolean));
+            const newLocalItems = localAssociatedItems.filter((i: any) => i?.id && !listIds.has(i.id));
+            if (newLocalItems.length > 0) {
+                return [...list, ...newLocalItems];
+            }
+        }
+        return list;
+    });
+
+    const isAssociationsLoading = $derived.by(() => {
+        if (!entityId || !type || !associationsQuery) return false;
+        if ('loading' in associationsQuery) {
+            return Boolean(associationsQuery.loading && associationsQuery.current === undefined && localAssociatedItems.length === 0);
+        }
+        return plainAssociationsLoading && localAssociatedItems.length === 0;
+    });
+
+    const associationsError = $derived.by(() => {
+        if (!entityId || !type || !associationsQuery) return null;
+        if ('error' in associationsQuery) {
+            return associationsQuery.error;
+        }
+        return plainAssociationsError;
+    });
+
+    const rawSelectorData = $derived.by<T[]>(() => {
+        if (!selectorListQuery) return [];
+        if ('current' in selectorListQuery) {
+            if (selectorListQuery.current !== undefined && selectorListQuery.current !== null) {
+                return normalize<T>(selectorListQuery.current).data;
+            }
+            return [];
+        }
+        if (plainSelectorData !== null && plainSelectorData !== undefined) {
+            return normalize<T>(plainSelectorData).data;
+        }
+        return [];
+    });
+
+    const isSelectorLoading = $derived.by(() => {
+        if (!selectorListQuery) return false;
+        if ('loading' in selectorListQuery) {
+            return Boolean(selectorListQuery.loading && selectorListQuery.current === undefined);
+        }
+        return plainSelectorLoading;
+    });
+
+    const selectorError = $derived.by(() => {
+        if (!selectorListQuery) return null;
+        if ('error' in selectorListQuery) {
+            return selectorListQuery.error;
+        }
+        return plainSelectorError;
+    });
+
+    const isDisplayedLoading = $derived(
+        isStandalone ? isSelectorLoading : isAssociationsLoading
     );
+
+    const displayedError = $derived(
+        isStandalone ? selectorError : associationsError
+    );
+
+    const currentAssociations = $derived(
+        sortItemsList<T>(rawAssociations, effectiveSortField, effectiveSortOrder)
+    );
+
+    const displayedSortedItems = $derived(
+        isStandalone
+            ? sortItemsList<T>(rawSelectorData, effectiveSortField, effectiveSortOrder)
+            : currentAssociations
+    );
+
+    const displayedSearchedItems = $derived.by<T[]>(() => {
+        if (!searchQuery) return displayedSortedItems;
+        return displayedSortedItems.filter((i: any) =>
+            searchPredicate
+                ? searchPredicate(i, searchQuery)
+                : (i.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                   i.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                   i.displayName?.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+    });
+
+    const displayedFilteredItems = $derived.by<T[]>(() => {
+        if (isStandalone) {
+            return displayedSearchedItems.filter((i: any) => matchesFilters(i, activeFilters));
+        }
+        return displayedSearchedItems;
+    });
+
+    const selectorSortedItems = $derived(
+        sortItemsList<T>(rawSelectorData, effectiveSelectorSortField, effectiveSelectorSortOrder)
+    );
+
+    const selectorSearchedItems = $derived.by<T[]>(() => {
+        if (!activeSearch) return selectorSortedItems;
+        return selectorSortedItems.filter((i: any) =>
+            searchPredicate
+                ? searchPredicate(i, activeSearch)
+                : (i.name?.toLowerCase().includes(activeSearch.toLowerCase()) ||
+                   i.title?.toLowerCase().includes(activeSearch.toLowerCase()) ||
+                   i.displayName?.toLowerCase().includes(activeSearch.toLowerCase()))
+        );
+    });
+
+    const selectorFilteredItems = $derived.by<T[]>(() => {
+        return selectorSearchedItems.filter((i: any) => matchesFilters(i, activeFilters));
+    });
+
+    async function refreshAssociations() {
+        refreshTrigger++;
+        if (associationsQuery && typeof associationsQuery.refresh === 'function') {
+            try {
+                await associationsQuery.refresh();
+            } catch (e) {
+                console.warn("associationsQuery refresh error:", e);
+            }
+        }
+    }
+
+    async function refreshSelector() {
+        refreshTrigger++;
+        if (selectorListQuery && typeof selectorListQuery.refresh === 'function') {
+            try {
+                await selectorListQuery.refresh();
+            } catch (e) {
+                console.warn("selectorListQuery refresh error:", e);
+            }
+        }
+    }
 
     $effect(() => {
         if (initialItems) {
@@ -562,12 +781,9 @@
                         entityId,
                         itemId: item.id!,
                     });
-                    if (typeof associationsPromise?.refresh === 'function') {
-                        await associationsPromise.refresh();
-                    }
-                } else {
-                    localAssociatedItems = newList;
                 }
+                localAssociatedItems = newList;
+                await refreshAssociations();
                 onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
             } else {
                 if (singleSelect) {
@@ -589,12 +805,9 @@
                             entityId,
                             itemId: item.id!,
                         });
-                        if (typeof associationsPromise?.refresh === 'function') {
-                            await associationsPromise.refresh();
-                        }
-                    } else {
-                        localAssociatedItems = newList;
                     }
+                    localAssociatedItems = newList;
+                    await refreshAssociations();
                     onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
                     showSelector = false;
                 } else {
@@ -605,13 +818,9 @@
                             entityId,
                             itemId: item.id!,
                         });
-                        if (typeof associationsPromise?.refresh === 'function') {
-                            await associationsPromise.refresh();
-                        }
-                    } else {
-                        if (!mounted) return;
-                        localAssociatedItems = newList;
                     }
+                    localAssociatedItems = newList;
+                    await refreshAssociations();
                     onchange?.(
                         newList.map((i) => i.id!).filter(Boolean),
                         newList,
@@ -638,17 +847,10 @@
             if (!success) return;
 
             const newList = currentList.filter((i) => i.id !== item.id);
-            refreshTrigger++;
+            localAssociatedItems = newList;
 
-            if (typeof selectorListPromise?.refresh === 'function') {
-                await selectorListPromise.refresh();
-            }
-
-            if (typeof associationsPromise?.refresh === 'function') {
-                await associationsPromise.refresh();
-            } else {
-                localAssociatedItems = newList;
-            }
+            await refreshAssociations();
+            await refreshSelector();
             onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
 
             if (success && mounted) {
@@ -679,34 +881,40 @@
         }
 
         if (newId) {
-            refreshTrigger++;
-            if (typeof selectorListPromise?.refresh === 'function') {
-                await selectorListPromise.refresh();
+            if (readItemRemote) {
+                try {
+                    const fullItem = await invokeRemote(readItemRemote, newId);
+                    if (fullItem) {
+                        newItem = fullItem?.data ?? fullItem;
+                    }
+                } catch (e) {
+                    console.warn("Failed to fetch full item via readItemRemote:", e);
+                }
             }
 
             if (!newItem) {
-                const res = await selectorListPromise;
-                const { data: items } = normalize(res);
-                newItem = items.find((i: any) => i.id === newId);
+                newItem = { id: newId, ...(result?.data || result || {}) } as any;
             }
-
-            const newList = newItem ? [...currentList, newItem] : currentList;
 
             if (entityId && addAssociationRemote) {
-                await addAssociationRemote({
-                    type,
-                    entityId,
-                    itemId: newId,
-                });
-                
-                if (typeof associationsPromise?.refresh === 'function') {
-                    await associationsPromise.refresh();
-                }
-            } else {
-                if (newItem && mounted) {
-                    localAssociatedItems = newList;
+                try {
+                    await addAssociationRemote({
+                        type,
+                        entityId,
+                        itemId: newId,
+                    });
+                } catch (err: any) {
+                    toast.error(err.message || i18n.updateAssociationFailedLabel);
+                    return;
                 }
             }
+
+            const newList = newItem ? [...currentList.filter(i => i.id !== newId), newItem] : currentList;
+            localAssociatedItems = newList;
+
+            await refreshAssociations();
+            await refreshSelector();
+
             onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
             if (mounted) toast.success(i18n.createSuccessLabel);
         }
@@ -717,32 +925,31 @@
         editingItem = null;
         if (!targetId) return;
 
-        refreshTrigger++;
-
         let updatedItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
         if (!updatedItem && result && typeof result === 'object' && 'id' in result) {
             updatedItem = result;
         }
 
-        if (typeof selectorListPromise?.refresh === 'function') {
-            await selectorListPromise.refresh();
-        }
-
-        if (!updatedItem) {
-            const res = await selectorListPromise;
-            const { data: items } = normalize(res);
-            updatedItem = items.find((i: any) => i.id === targetId);
+        if (readItemRemote) {
+            try {
+                const fullItem = await invokeRemote(readItemRemote, targetId);
+                if (fullItem) {
+                    updatedItem = fullItem?.data ?? fullItem;
+                }
+            } catch (e) {
+                console.warn("Failed to fetch full item via readItemRemote on update:", e);
+            }
         }
 
         const newList = updatedItem
             ? currentList.map((i) => (i.id === targetId ? updatedItem : i))
             : currentList;
 
-        if (typeof associationsPromise?.refresh === 'function') {
-            await associationsPromise.refresh();
-        } else {
-            localAssociatedItems = newList;
-        }
+        localAssociatedItems = newList;
+
+        await refreshAssociations();
+        await refreshSelector();
+
         onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
         if (mounted) toast.success(i18n.updateSuccessLabel);
     }
@@ -793,60 +1000,33 @@
             {/if}
 
             {#if !isStandalone}
-                {#await associationsPromise}
+                {#if isAssociationsLoading}
                     <div class="flex items-center justify-center p-1">
                         <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
                     </div>
-                {:then res}
-                    {@const { data: currentAssociations } = normalize(res)}
-                    {#if !singleSelect || currentAssociations.length === 0}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onclick={toggleSelector}
-                            class="h-9 px-3 rounded-xl {showSelector
-                                ? 'bg-blue-50 text-blue-600'
-                                : 'text-gray-500 hover:bg-gray-100'}"
-                        >
-                            {#if showSelector}
-                                <X size={16} class="mr-1.5" />
-                                <span class="text-sm font-semibold"
-                                    >{i18n.closeSearchLabel}</span
-                                >
-                            {:else}
-                                <Link size={16} class="mr-1.5" />
-                                <span class="text-sm font-semibold"
-                                    >{i18n.linkItemLabel}</span
-                                >
-                            {/if}
-                        </Button>
-                    {/if}
-                {:catch}
-                    {#if !singleSelect || localAssociatedItems.length === 0}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onclick={toggleSelector}
-                            class="h-9 px-3 rounded-xl {showSelector
-                                ? 'bg-blue-50 text-blue-600'
-                                : 'text-gray-500 hover:bg-gray-100'}"
-                        >
-                            {#if showSelector}
-                                <X size={16} class="mr-1.5" />
-                                <span class="text-sm font-semibold"
-                                    >{i18n.closeSearchLabel}</span
-                                >
-                            {:else}
-                                <Link size={16} class="mr-1.5" />
-                                <span class="text-sm font-semibold"
-                                    >{i18n.linkItemLabel}</span
-                                >
-                            {/if}
-                        </Button>
-                    {/if}
-                {/await}
+                {:else if !singleSelect || currentAssociations.length === 0}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onclick={toggleSelector}
+                        class="h-9 px-3 rounded-xl {showSelector
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'text-gray-500 hover:bg-gray-100'}"
+                    >
+                        {#if showSelector}
+                            <X size={16} class="mr-1.5" />
+                            <span class="text-sm font-semibold"
+                                >{i18n.closeSearchLabel}</span
+                            >
+                        {:else}
+                            <Link size={16} class="mr-1.5" />
+                            <span class="text-sm font-semibold"
+                                >{i18n.linkItemLabel}</span
+                            >
+                        {/if}
+                    </Button>
+                {/if}
             {/if}
 
             {#if renderForm && showQuickCreateButton}
@@ -959,154 +1139,133 @@
             {/if}
 
             <div class={["max-h-64 overflow-y-auto space-y-1 p-1 transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
-                {#await selectorListPromise}
+                {#if isSelectorLoading}
                     <div class="flex items-center justify-center py-8 text-gray-500 gap-2 font-medium text-sm">
                         <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
                         <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                     </div>
-                {:then res}
-                    {@const allItems = normalize<T>(res).data}
-                    {@const sortedAllItems = sortItemsList<T>(allItems, effectiveSelectorSortField, effectiveSelectorSortOrder)}
-                    {@const searchedItems = (activeSearch
-                        ? sortedAllItems.filter(
-                              (i: any) =>
-                                  searchPredicate
-                                      ? searchPredicate(i, activeSearch)
-                                      : (i.name?.toLowerCase().includes(activeSearch.toLowerCase()) ||
-                                         i.title?.toLowerCase().includes(activeSearch.toLowerCase()) ||
-                                         i.displayName?.toLowerCase().includes(activeSearch.toLowerCase())),
-                          )
-                        : sortedAllItems) as T[]}
-                    {@const filteredItems = searchedItems.filter((i: any) => matchesFilters(i, activeFilters)) as T[]}
-                    
-                    {#if filteredItems.length === 0}
-                        <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
-                            {activeSearch || Object.values(activeFilters).some((f) => (f?.include?.length || 0) + (f?.exclude?.length || 0) > 0) ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
-                        </div>
-                    {:else}
-                        {#await associationsPromise}
-                            <div class="flex items-center justify-center py-8 text-gray-500 gap-2 font-medium text-sm">
-                                <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
-                                <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
-                            </div>
-                        {:then ares}
-                            {@const currentAssociations = normalize<T>(ares).data}
-
-                            {#snippet renderSelectorItem(item: T)}
-                                {@const isLinked = isAssociated(item, currentAssociations)}
+                {:else if selectorError}
+                    <div class="text-xs text-center py-8 text-red-500 font-medium">
+                        {selectorError?.message || i18n.failedToLoadLabel}
+                    </div>
+                {:else if selectorFilteredItems.length === 0}
+                    <div class="text-xs text-center py-8 text-gray-400 font-medium italic">
+                        {activeSearch || Object.values(activeFilters).some((f) => (f?.include?.length || 0) + (f?.exclude?.length || 0) > 0) ? i18n.noItemsFoundLabel : i18n.noItemsLabel}
+                    </div>
+                {:else}
+                    {#snippet renderSelectorItem(item: T)}
+                        {@const isLinked = isAssociated(item, currentAssociations)}
+                        <div
+                            class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 transition-all rounded-xl p-2 {isLinked
+                                ? 'bg-blue-50/50'
+                                : 'hover:bg-gray-50'}"
+                        >
+                            <div class="flex-1 min-w-0">
                                 <div
-                                    class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 transition-all rounded-xl p-2 {isLinked
-                                        ? 'bg-blue-50/50'
-                                        : 'hover:bg-gray-50'}"
+                                    class="text-sm font-bold {isLinked
+                                        ? 'text-blue-700'
+                                        : 'text-gray-900'} truncate"
                                 >
-                                    <div class="flex-1 min-w-0">
-                                        <div
-                                            class="text-sm font-bold {isLinked
-                                                ? 'text-blue-700'
-                                                : 'text-gray-900'} truncate"
-                                        >
-                                            {#if renderItem}
-                                                {@render renderItem(item)}
-                                            {:else if renderItemLabel}
-                                                {@render renderItemLabel(item)}
-                                            {:else}
-                                                {(item as any).displayName ||
-                                                    item.name ||
-                                                    (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
-                                                    (item as any).company ||
-                                                    item.id ||
-                                                    "Unnamed Item"}
-                                            {/if}
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start">
-                                        {#if updateRemote && renderForm && readItemRemote}
-                                            <button
-                                                type="button"
-                                                class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                onclick={() => {
-                                                    editingItem = item;
-                                                }}
-                                                title={i18n.editLabel}
-                                            >
-                                                <Pencil size={15} />
-                                            </button>
-                                        {/if}
-                                        <AsyncButton
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            class="h-8 w-8 p-0 rounded-lg {isLinked
-                                                ? 'text-blue-600 bg-blue-100/50'
-                                                : 'text-gray-400 hover:text-blue-500'}"
-                                            loading={linkingItemId === item.id}
-                                            loadingLabel=""
-                                            onclick={() => {
-                                                void toggleAssociation(
-                                                    item,
-                                                    currentAssociations,
-                                                );
-                                            }}
-                                            title={isLinked
-                                                ? i18n.confirmUnlinkLabel
-                                                : i18n.linkItemLabel}
-                                        >
-                                            {#if isLinked}
-                                                <Unlink size={16} />
-                                            {:else}
-                                                <Link size={16} />
-                                            {/if}
-                                        </AsyncButton>
-                                        {#if deleteItemRemote}
-                                            <AsyncButton
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                                loading={deletingItemId === item.id}
-                                                loadingLabel=""
-                                                onclick={async () => {
-                                                    const confirmed = window.confirm(i18n.deleteConfirmLabel);
-                                                    if (confirmed) {
-                                                        await deleteItem(item, currentAssociations);
-                                                    }
-                                                }}
-                                                title={i18n.deleteForeverLabel}
-                                            >
-                                                <Trash2 size={15} />
-                                            </AsyncButton>
-                                        {/if}
-                                    </div>
+                                    {#if renderItem}
+                                        {@render renderItem(item)}
+                                    {:else if renderItemLabel}
+                                        {@render renderItemLabel(item)}
+                                    {:else}
+                                        {(item as any).displayName ||
+                                            item.name ||
+                                            (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
+                                            (item as any).company ||
+                                            item.id ||
+                                            "Unnamed Item"}
+                                    {/if}
                                 </div>
-                            {/snippet}
+                            </div>
 
-                            {#if activeSelectorGroupBy}
-                                {@const grouped = groupItems(filteredItems, activeSelectorGroupBy, i18n.unassignedGroupLabel)}
-                                {#each grouped as group (group.name)}
-                                    <div class="pt-2.5 pb-1 px-2 first:pt-1 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xs z-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                                        <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                            <GroupIcon size={13} class="text-gray-400 shrink-0" />
-                                            <span>{group.name}</span>
-                                        </div>
-                                        <span class="text-[11px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-full">
-                                            {group.items.length}
-                                        </span>
-                                    </div>
-                                    <div class="space-y-1">
-                                        {#each group.items as item (group.name + '-' + item.id)}
-                                            {@render renderSelectorItem(item)}
-                                        {/each}
-                                    </div>
-                                {/each}
-                            {:else}
-                                {#each filteredItems as item (item.id)}
+                            <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start">
+                                {#if updateRemote && renderForm && readItemRemote}
+                                    <button
+                                        type="button"
+                                        class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                        onclick={() => {
+                                            editingItem = item;
+                                        }}
+                                        title={i18n.editLabel}
+                                    >
+                                        <Pencil size={15} />
+                                    </button>
+                                {/if}
+                                <AsyncButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="h-8 w-8 p-0 rounded-lg {isLinked
+                                        ? 'text-blue-600 bg-blue-100/50'
+                                        : 'text-gray-400 hover:text-blue-500'}"
+                                    loading={linkingItemId === item.id}
+                                    loadingLabel=""
+                                    onclick={() => {
+                                        void toggleAssociation(
+                                            item,
+                                            currentAssociations,
+                                        );
+                                    }}
+                                    title={isLinked
+                                        ? i18n.confirmUnlinkLabel
+                                        : i18n.linkItemLabel}
+                                >
+                                    {#if isLinked}
+                                        <Unlink size={16} />
+                                    {:else}
+                                        <Link size={16} />
+                                    {/if}
+                                </AsyncButton>
+                                {#if deleteItemRemote}
+                                    <AsyncButton
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                        loading={deletingItemId === item.id}
+                                        loadingLabel=""
+                                        onclick={async () => {
+                                            const confirmed = window.confirm(i18n.deleteConfirmLabel);
+                                            if (confirmed) {
+                                                await deleteItem(item, currentAssociations);
+                                            }
+                                        }}
+                                        title={i18n.deleteForeverLabel}
+                                    >
+                                        <Trash2 size={15} />
+                                    </AsyncButton>
+                                {/if}
+                            </div>
+                        </div>
+                    {/snippet}
+
+                    {#if activeSelectorGroupBy}
+                        {@const grouped = groupItems(selectorFilteredItems, activeSelectorGroupBy, i18n.unassignedGroupLabel)}
+                        {#each grouped as group (group.name)}
+                            <div class="pt-2.5 pb-1 px-2 first:pt-1 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xs z-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                    <GroupIcon size={13} class="text-gray-400 shrink-0" />
+                                    <span>{group.name}</span>
+                                </div>
+                                <span class="text-[11px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-full">
+                                    {group.items.length}
+                                </span>
+                            </div>
+                            <div class="space-y-1">
+                                {#each group.items as item (group.name + '-' + item.id)}
                                     {@render renderSelectorItem(item)}
                                 {/each}
-                            {/if}
-                        {/await}
+                            </div>
+                        {/each}
+                    {:else}
+                        {#each selectorFilteredItems as item (item.id)}
+                            {@render renderSelectorItem(item)}
+                        {/each}
                     {/if}
-                {/await}
+                {/if}
             </div>
 
             {#snippet pending()}
@@ -1134,43 +1293,27 @@
             </div>
         {/if}
         <div class={$effect.pending() ? 'opacity-50 pointer-events-none transition-opacity duration-200' : 'transition-opacity duration-200'}>
-            {#await displayedItemsPromise}
+            {#if isDisplayedLoading}
                 <div class="flex items-center justify-center py-6 text-gray-500 gap-2 font-medium text-sm">
                     <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
                     <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
                 </div>
-            {:then res}
-                {@const { data: rawAssociations } = normalize<T>(res)}
-                {@const currentAssociations = sortItemsList<T>(rawAssociations, effectiveSortField, effectiveSortOrder)}
-                {@const searchedAssoc = (searchQuery
-                    ? currentAssociations.filter(
-                          (i: any) =>
-                              searchPredicate
-                                  ? searchPredicate(i, searchQuery)
-                                  : (i.name
-                                        ?.toLowerCase()
-                                        .includes(searchQuery.toLowerCase()) ||
-                                    i.title
-                                        ?.toLowerCase()
-                                        .includes(searchQuery.toLowerCase()) ||
-                                    i.displayName
-                                        ?.toLowerCase()
-                                        .includes(searchQuery.toLowerCase())),
-                      )
-                    : currentAssociations) as T[]}
-                {@const items = (isStandalone
-                    ? searchedAssoc.filter((i: any) => matchesFilters(i, activeFilters))
-                    : searchedAssoc) as T[]}
-                {#if items.length > 0}
-                    <div class="grid gap-2">
-                        {#each items as item (item.id)}
-                            <div
-                                class="flex flex-col sm:flex-row sm:items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
-                            >
-                                <div class="flex-1 min-w-0">
-                                    <div
-                                        class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
-                                    >
+            {:else if displayedError}
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+                    <p class="text-sm font-medium text-red-600">
+                        {displayedError?.message || i18n.failedToLoadAssociations}
+                    </p>
+                </div>
+            {:else if displayedFilteredItems.length > 0}
+                <div class="grid gap-2">
+                    {#each displayedFilteredItems as item (item.id)}
+                        <div
+                            class="flex flex-col sm:flex-row sm:items-center gap-3 transition-all rounded-2xl p-3 border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc"
+                        >
+                            <div class="flex-1 min-w-0">
+                                <div
+                                    class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
+                                >
                                     {#if renderItem}
                                         {@render renderItem(item)}
                                     {:else if renderItemLabel}
@@ -1183,91 +1326,90 @@
                                             item.id ||
                                             "Unnamed Item"}
                                     {/if}
+                                </div>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    {#if renderItemBadge}
+                                        {@render renderItemBadge(item)}
+                                    {/if}
+                                    {#if renderItemDetail}
+                                        <div
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
+                                        >
+                                            {@render renderItemDetail(item)}
+                                        </div>
+                                    {/if}
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2 mt-0.5">
-                                {#if renderItemBadge}
-                                    {@render renderItemBadge(item)}
-                                {/if}
-                                {#if renderItemDetail}
-                                    <div
-                                        class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
-                                    >
-                                        {@render renderItemDetail(item)}
-                                    </div>
-                                {/if}
-                            </div>
-                        </div>
 
-                        {#if rolesSnippet}
-                            {@render rolesSnippet(item)}
-                        {/if}
-
-                        {#if participationSnippet}
-                            {@render participationSnippet(item)}
-                        {/if}
-
-                        <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start mt-1 sm:mt-0">
-                            {#if updateRemote && renderForm && readItemRemote}
-                                <button
-                                    type="button"
-                                    class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                    onclick={() => {
-                                        editingItem = item;
-                                    }}
-                                    title={i18n.editLabel}
-                                >
-                                    <Pencil size={15} />
-                                </button>
+                            {#if rolesSnippet}
+                                {@render rolesSnippet(item)}
                             {/if}
-                            <AsyncButton
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                loading={linkingItemId === item.id}
-                                loadingLabel=""
-                                onclick={() =>
-                                    toggleAssociation(
-                                        item,
-                                        currentAssociations,
-                                    )}
-                                title={i18n.confirmUnlinkLabel}
-                            >
-                                <Unlink size={15} />
-                            </AsyncButton>
-                            {#if deleteItemRemote}
+
+                            {#if participationSnippet}
+                                {@render participationSnippet(item)}
+                            {/if}
+
+                            <div class="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start mt-1 sm:mt-0">
+                                {#if updateRemote && renderForm && readItemRemote}
+                                    <button
+                                        type="button"
+                                        class="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                        onclick={() => {
+                                            editingItem = item;
+                                        }}
+                                        title={i18n.editLabel}
+                                    >
+                                        <Pencil size={15} />
+                                    </button>
+                                {/if}
                                 <AsyncButton
                                     type="button"
                                     variant="ghost"
                                     size="sm"
                                     class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                    loading={deletingItemId === item.id}
+                                    loading={linkingItemId === item.id}
                                     loadingLabel=""
-                                    onclick={async () => {
-                                        const confirmed = window.confirm(i18n.deleteConfirmLabel);
-                                        if (confirmed) {
-                                            await deleteItem(item, currentAssociations);
-                                        }
-                                    }}
-                                    title={i18n.deleteForeverLabel}
+                                    onclick={() =>
+                                        toggleAssociation(
+                                            item,
+                                            currentAssociations,
+                                        )}
+                                    title={i18n.confirmUnlinkLabel}
                                 >
-                                    <Trash2 size={15} />
+                                    <Unlink size={15} />
                                 </AsyncButton>
-                            {/if}
+                                {#if deleteItemRemote}
+                                    <AsyncButton
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="h-8 w-8 p-0 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                        loading={deletingItemId === item.id}
+                                        loadingLabel=""
+                                        onclick={async () => {
+                                            const confirmed = window.confirm(i18n.deleteConfirmLabel);
+                                            if (confirmed) {
+                                                await deleteItem(item, currentAssociations);
+                                            }
+                                        }}
+                                        title={i18n.deleteForeverLabel}
+                                    >
+                                        <Trash2 size={15} />
+                                    </AsyncButton>
+                                {/if}
+                            </div>
                         </div>
-                    </div>
-                        {/each}
-                    </div>
-                {:else}
-                    <div
-                        class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
-                    >
-                        <p class="text-sm font-medium text-gray-400 italic">
-                            {i18n.noItemsLabel}
-                        </p>
-                    </div>
-                {/if}
-            {/await}
+                    {/each}
+                </div>
+            {:else}
+                <div
+                    class="bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl p-8 text-center"
+                >
+                    <p class="text-sm font-medium text-gray-400 italic">
+                        {i18n.noItemsLabel}
+                    </p>
+                </div>
+            {/if}
         </div>
 
         {#snippet pending()}
@@ -1308,67 +1450,66 @@
             </Dialog.Header>
 
             <div style="overflow-y: auto; flex: 1; min-height: 0;">
-                {#await displayedItemsPromise}
-                    <div class="p-8 flex justify-center">
-                        <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                    </div>
-                {:then res}
-                    {@const currentAssociations = normalize(res).data}
-                    <svelte:boundary>
-                        {#if editingItem && readItemRemote}
-                            {#key editingItem.id}
-                                {#await invokeRemote(readItemRemote, editingItem.id)}
-                                    <div class="p-8 flex flex-col items-center justify-center gap-2">
-                                        <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                        <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
-                                    </div>
-                                {:then fullItem}
-                                    {@render renderForm({
-                                        remoteFunction: updateRemote,
-                                        schema: updateSchema,
-                                        initialData: fullItem,
-                                        isUpdating: true,
-                                        onSuccess: (result) => {
-                                            void handleInPlaceUpdateSuccess(
-                                                result,
-                                                currentAssociations,
-                                            );
-                                        },
-                                        onCancel: () => {
-                                            editingItem = null;
-                                        },
-                                        id: editingItem.id,
-                                    })}
-                                {:catch error}
-                                    <div class="p-8 text-center text-red-500 text-sm">
-                                        {error?.message || i18n.failedToLoadLabel}
-                                    </div>
-                                {/await}
-                            {/key}
-                        {:else if showQuickCreate}
-                            {@render renderForm({
-                                remoteFunction: createRemote,
-                                schema: createSchema,
-                                isUpdating: false,
-                                onSuccess: (result) => {
-                                    void handleQuickCreateSuccess(
-                                        result,
-                                        currentAssociations,
-                                    );
-                                },
-                                onCancel: () => {
-                                    showQuickCreate = false;
-                                },
-                            })}
-                        {/if}
-                        
-                        {#snippet pending()}
-                            <div class="p-8 flex justify-center">
-                                <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                            </div>
-                        {/snippet}
-                    </svelte:boundary>
-                {/await}
+                <svelte:boundary>
+                    {#if editingItem && readItemRemote}
+                        {#key editingItem.id}
+                            {#await invokeRemote(readItemRemote, editingItem.id)}
+                                <div class="p-8 flex flex-col items-center justify-center gap-2">
+                                    <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                    <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                                </div>
+                            {:then fullItem}
+                                {@render renderForm({
+                                    remoteFunction: updateRemote,
+                                    schema: updateSchema,
+                                    initialData: fullItem,
+                                    isUpdating: true,
+                                    onSuccess: (result) => {
+                                        void handleInPlaceUpdateSuccess(
+                                            result,
+                                            currentAssociations,
+                                        );
+                                    },
+                                    onCancel: () => {
+                                        editingItem = null;
+                                    },
+                                    id: editingItem.id,
+                                })}
+                            {:catch error}
+                                <div class="p-8 text-center text-red-500 text-sm">
+                                    {error?.message || i18n.failedToLoadLabel}
+                                </div>
+                            {/await}
+                        {/key}
+                    {:else if showQuickCreate}
+                        {@render renderForm({
+                            remoteFunction: createRemote,
+                            schema: createSchema,
+                            isUpdating: false,
+                            onSuccess: (result) => {
+                                void handleQuickCreateSuccess(
+                                    result,
+                                    currentAssociations,
+                                );
+                            },
+                            onCancel: () => {
+                                showQuickCreate = false;
+                            },
+                        })}
+                    {/if}
+                    
+                    {#snippet pending()}
+                        <div class="p-8 flex justify-center">
+                            <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                        </div>
+                    {/snippet}
+
+                    {#snippet failed(error: any)}
+                        <div class="p-8 text-center text-red-500 text-sm">
+                            {error?.message || i18n.failedToLoadAssociations}
+                        </div>
+                    {/snippet}
+                </svelte:boundary>
             </div>
         </Dialog.Content>
     </Dialog.Root>

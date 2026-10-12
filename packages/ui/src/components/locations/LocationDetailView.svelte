@@ -147,21 +147,23 @@
                 {i18n.editLocation}
             </h2>
 
-            <LocationForm
-                remoteFunction={rf}
-                {validationSchema}
-                initialData={location}
-                isUpdating={true}
-                {cancelHref}
-                {m}
-                {labels}
-            >
-                {#snippet children()}
-                    {#if children}
-                        {@render children({ location })}
-                    {/if}
-                {/snippet}
-            </LocationForm>
+            {#key location.id}
+                <LocationForm
+                    remoteFunction={rf}
+                    {validationSchema}
+                    initialData={location}
+                    isUpdating={true}
+                    {cancelHref}
+                    {m}
+                    {labels}
+                >
+                    {#snippet children()}
+                        {#if children}
+                            {@render children({ location })}
+                        {/if}
+                    {/snippet}
+                </LocationForm>
+            {/key}
         </div>
     {:else}
         <ErrorSection

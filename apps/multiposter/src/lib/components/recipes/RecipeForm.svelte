@@ -1,13 +1,16 @@
 <script lang="ts">
-    import { untrack } from "svelte";
+    import { onMount, untrack } from "svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
     import { goto, refreshAll } from "$app/navigation";
-    import { Euro, ChefHat, Plus, Trash2, Scale, Tag as TagIcon } from "@lucide/svelte";
+    import { Euro, ChefHat, Plus, Trash2, Scale, Tag as TagIcon, Package } from "@lucide/svelte";
     import type { Consumable } from "@ac/validations";
     import { TagManager } from "@ac/ui";
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
+    import { listConsumables } from "../../../routes/consumables/list.remote";
+    import { createConsumable } from "../../../routes/consumables/new/create.remote";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
@@ -19,7 +22,8 @@
         updateTagCategoryCommand,
         deleteTagCategoryAction
     } from "../../../routes/tags/categories.remote";
-    import { createTagSchema, updateTagSchema } from "@ac/validations";
+    import { createTagSchema, updateTagSchema, createConsumableSchema } from "@ac/validations";
+    import ConsumableForm from "../consumables/ConsumableForm.svelte";
 
     let {
         remoteFunction,
@@ -74,9 +78,29 @@
         }));
     }));
 
+    let fetchedConsumables = $state<Consumable[]>([]);
+    let localAddedConsumables = $state<Consumable[]>([]);
+    const consumablesList = $derived([
+        ...localAddedConsumables,
+        ...(allConsumables.length > 0 ? allConsumables : fetchedConsumables),
+    ]);
+
+    let showQuickCreateConsumable = $state(false);
+
+    onMount(async () => {
+        if (allConsumables.length === 0) {
+            try {
+                const res = await listConsumables({ limit: 200 });
+                if (res?.data) fetchedConsumables = res.data;
+            } catch (e) {
+                console.error('Failed to load consumables in RecipeForm:', e);
+            }
+        }
+    });
+
     // Find consumable by ID helper
     function getConsumable(id: string): Consumable | undefined {
-        return allConsumables.find(c => c.id === id);
+        return consumablesList.find(c => c.id === id);
     }
 
     function getCostPerUnit(c?: Consumable | null): number {
@@ -87,11 +111,11 @@
     }
 
     function addIngredientRow() {
-        if (allConsumables.length === 0) {
-            toast.error('No consumables available. Please create consumables first.');
+        if (consumablesList.length === 0) {
+            showQuickCreateConsumable = true;
             return;
         }
-        const first = allConsumables[0];
+        const first = consumablesList[0];
         ingredients = [
             ...ingredients,
             {
@@ -100,6 +124,23 @@
                 unit: first.unit,
             }
         ];
+    }
+
+    function handleConsumableQuickCreated(res: any) {
+        const newConsumable = res?.consumable || res?.data || (res?.id ? res : null);
+        if (newConsumable) {
+            localAddedConsumables = [newConsumable, ...localAddedConsumables];
+            ingredients = [
+                ...ingredients,
+                {
+                    consumableId: newConsumable.id,
+                    amount: 1,
+                    unit: newConsumable.unit || 'piece',
+                }
+            ];
+            toast.success(`Created and added ${newConsumable.name} to ingredients`);
+        }
+        showQuickCreateConsumable = false;
     }
 
     function removeIngredientRow(index: number) {
@@ -149,7 +190,7 @@
                         : (m.item_created?.({ item: m.recipe?.() || 'Recipe' }) || 'Recipe created successfully')
                 );
                 if (onSuccess) {
-                    onSuccess(res);
+                    onSuccess(res && typeof res === 'object' ? res : ((rf as any).result || res));
                 } else {
                     await refreshAll();
                     await goto(cancelHref);
@@ -260,24 +301,47 @@
                     Select consumables needed for this recipe to calculate the cost per portion.
                 </p>
             </div>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onclick={addIngredientRow}
-                class="flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
-            >
-                <Plus size={15} />
-                {m.add_ingredient?.() || 'Add Ingredient'}
-            </Button>
+            <div class="flex items-center gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onclick={() => (showQuickCreateConsumable = true)}
+                    class="flex items-center gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50"
+                >
+                    <Package size={15} />
+                    {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onclick={addIngredientRow}
+                    class="flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                    <Plus size={15} />
+                    {m.add_ingredient?.() || 'Add Ingredient'}
+                </Button>
+            </div>
         </div>
 
         {#if ingredients.length === 0}
-            <div class="py-6 text-center border-2 border-dashed border-gray-200 rounded-xl">
-                <p class="text-sm text-gray-400 mb-2">No ingredients added yet.</p>
-                <Button type="button" variant="outline" size="sm" onclick={addIngredientRow}>
-                    <Plus size={14} class="mr-1" /> {m.add_ingredient?.() || 'Add Ingredient'}
-                </Button>
+            <div class="py-6 text-center border-2 border-dashed border-gray-200 rounded-xl space-y-2">
+                <p class="text-sm text-gray-400">No ingredients added yet.</p>
+                <div class="flex items-center justify-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onclick={() => (showQuickCreateConsumable = true)}
+                        class="text-amber-700 border-amber-200 hover:bg-amber-50"
+                    >
+                        <Package size={14} class="mr-1 text-amber-600" /> {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onclick={addIngredientRow}>
+                        <Plus size={14} class="mr-1" /> {m.add_ingredient?.() || 'Add Ingredient'}
+                    </Button>
+                </div>
             </div>
         {:else}
             <div class="overflow-x-auto">
@@ -307,7 +371,7 @@
                                         }}
                                         class="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
-                                        {#each allConsumables as item (item.id)}
+                                        {#each consumablesList as item (item.id)}
                                             <option value={item.id}>
                                                 {item.name} (€{item.purchasePrice}/{item.amount} {item.unit})
                                             </option>
@@ -423,3 +487,24 @@
         </AsyncButton>
     </div>
 </form>
+
+<!-- Quick Create Consumable Dialog -->
+<Dialog.Root bind:open={showQuickCreateConsumable}>
+    <Dialog.Content class="max-w-2xl max-h-[85vh] overflow-y-auto z-[70]">
+        <Dialog.Header>
+            <Dialog.Title class="text-xl font-bold flex items-center gap-2 text-amber-900">
+                <Package size={22} class="text-amber-600" />
+                {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+            </Dialog.Title>
+        </Dialog.Header>
+        <ConsumableForm
+            remoteFunction={createConsumable}
+            validationSchema={createConsumableSchema}
+            isUpdating={false}
+            onSuccess={handleConsumableQuickCreated}
+            onCancel={() => {
+                showQuickCreateConsumable = false;
+            }}
+        />
+    </Dialog.Content>
+</Dialog.Root>

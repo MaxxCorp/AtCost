@@ -25,7 +25,13 @@
     import { listConsumables } from "../../../routes/consumables/list.remote";
     import { listRecipes } from "../../../routes/recipes/list.remote";
     import { listPrices } from "../../../routes/prices/list.remote";
+    import { createConsumable } from "../../../routes/consumables/new/create.remote";
+    import { createRecipe } from "../../../routes/recipes/new/create.remote";
+    import { createConsumableSchema, createRecipeSchema } from "@ac/validations";
     import type { Consumable, Recipe, PriceItem } from "@ac/validations";
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
+    import ConsumableForm from "../consumables/ConsumableForm.svelte";
+    import RecipeForm from "../recipes/RecipeForm.svelte";
 
     let {
         remoteFunction,
@@ -63,24 +69,36 @@
         prevIssuesLength = issues.length;
     });
 
-    // svelte-ignore state_referenced_locally
-    let consumablesList = $state<Consumable[]>(allConsumables);
-    // svelte-ignore state_referenced_locally
-    let recipesList = $state<Recipe[]>(allRecipes);
+    let localConsumables = $state<Consumable[]>([]);
+    let localRecipes = $state<Recipe[]>([]);
+    let fetchedConsumables = $state<Consumable[]>([]);
+    let fetchedRecipes = $state<Recipe[]>([]);
+
+    const consumablesList = $derived([
+        ...localConsumables,
+        ...(allConsumables.length > 0 ? allConsumables : fetchedConsumables),
+    ]);
+    const recipesList = $derived([
+        ...localRecipes,
+        ...(allRecipes.length > 0 ? allRecipes : fetchedRecipes),
+    ]);
+
+    let showQuickCreateConsumable = $state(false);
+    let showQuickCreateRecipe = $state(false);
 
     onMount(async () => {
-        if (consumablesList.length === 0) {
+        if (allConsumables.length === 0) {
             try {
                 const res = await listConsumables({ limit: 200 });
-                if (res?.data) consumablesList = res.data;
+                if (res?.data) fetchedConsumables = res.data;
             } catch (e) {
                 console.error('Failed to load consumables:', e);
             }
         }
-        if (recipesList.length === 0) {
+        if (allRecipes.length === 0) {
             try {
                 const res = await listRecipes({ limit: 200 });
-                if (res?.data) recipesList = res.data;
+                if (res?.data) fetchedRecipes = res.data;
             } catch (e) {
                 console.error('Failed to load recipes:', e);
             }
@@ -227,6 +245,81 @@
         ];
         selectedRecipeId = '';
         toast.success(`Added ${r.name}`);
+    }
+
+    async function onConsumableQuickCreated(res: any) {
+        const item = res?.consumable || res?.data || (res?.id ? res : null);
+        if (item) {
+            localConsumables = [item, ...localConsumables];
+            const costPerUnit = item.amount > 0 ? (Number(item.purchasePrice) || 0) / item.amount : (Number(item.purchasePrice) || 0);
+            const roundedCost = Math.round(costPerUnit * 100) / 100;
+            const itemFactor = defaultFactor > 0 ? defaultFactor : 2.0;
+            const finalUnitPrice = Math.round(roundedCost * itemFactor * 100) / 100;
+
+            items = [
+                ...items,
+                {
+                    itemType: 'consumable',
+                    consumableId: item.id,
+                    recipeId: null,
+                    name: item.name,
+                    description: item.description || '',
+                    tags: item.tags || [],
+                    portionAmount: 1,
+                    unit: item.unit || 'piece',
+                    costPrice: roundedCost,
+                    factor: itemFactor,
+                    unitPrice: finalUnitPrice,
+                    sortOrder: items.length,
+                }
+            ];
+            toast.success(`Created and added ${item.name}`);
+        }
+        showQuickCreateConsumable = false;
+        try {
+            const refreshed = await listConsumables({ limit: 200 });
+            if (refreshed?.data) fetchedConsumables = refreshed.data;
+        } catch {}
+    }
+
+    async function onRecipeQuickCreated(res: any) {
+        const item = res?.recipe || res?.data || (res?.id ? res : null);
+        let fullRecipe = item;
+        try {
+            const refreshed = await listRecipes({ limit: 200 });
+            if (refreshed?.data) {
+                fetchedRecipes = refreshed.data;
+                const found = refreshed.data.find(r => r.id === item?.id);
+                if (found) fullRecipe = found;
+            }
+        } catch {}
+
+        if (fullRecipe) {
+            localRecipes = [fullRecipe, ...localRecipes];
+            const portionCost = Math.round((Number(fullRecipe.costPerPortion) || 0) * 100) / 100;
+            const itemFactor = defaultFactor > 0 ? defaultFactor : 2.0;
+            const finalUnitPrice = Math.round(portionCost * itemFactor * 100) / 100;
+
+            items = [
+                ...items,
+                {
+                    itemType: 'recipe',
+                    consumableId: null,
+                    recipeId: fullRecipe.id,
+                    name: fullRecipe.name,
+                    description: fullRecipe.description || '',
+                    tags: fullRecipe.tags || [],
+                    portionAmount: 1,
+                    unit: 'portion',
+                    costPrice: portionCost,
+                    factor: itemFactor,
+                    unitPrice: finalUnitPrice,
+                    sortOrder: items.length,
+                }
+            ];
+            toast.success(`Created and added ${fullRecipe.name}`);
+        }
+        showQuickCreateRecipe = false;
     }
 
     function loadFromTemplate(templateId: string) {
@@ -584,14 +677,25 @@
                         {/each}
                     </select>
 
-                    <Button
-                        type="button"
-                        onclick={handleAddFromConsumable}
-                        class="flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs whitespace-nowrap"
-                    >
-                        <Plus size={14} />
-                        {m.add_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'Add Consumable'}
-                    </Button>
+                    <div class="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            onclick={handleAddFromConsumable}
+                            class="flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs whitespace-nowrap"
+                        >
+                            <Plus size={14} />
+                            {m.add_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'Add Consumable'}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onclick={() => (showQuickCreateConsumable = true)}
+                            class="flex items-center justify-center gap-1.5 border-amber-300 text-amber-800 hover:bg-amber-100/60 bg-amber-50/60 text-xs whitespace-nowrap"
+                        >
+                            <Plus size={14} />
+                            {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+                        </Button>
+                    </div>
                 </div>
             {:else}
                 <div class="flex flex-col sm:flex-row gap-2">
@@ -607,14 +711,25 @@
                         {/each}
                     </select>
 
-                    <Button
-                        type="button"
-                        onclick={handleAddFromRecipe}
-                        class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs whitespace-nowrap"
-                    >
-                        <Plus size={14} />
-                        {m.add_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'Add Recipe'}
-                    </Button>
+                    <div class="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            onclick={handleAddFromRecipe}
+                            class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs whitespace-nowrap"
+                        >
+                            <Plus size={14} />
+                            {m.add_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'Add Recipe'}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onclick={() => (showQuickCreateRecipe = true)}
+                            class="flex items-center justify-center gap-1.5 border-emerald-300 text-emerald-800 hover:bg-emerald-100/60 bg-emerald-50/60 text-xs whitespace-nowrap"
+                        >
+                            <Plus size={14} />
+                            {m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}
+                        </Button>
+                    </div>
                 </div>
             {/if}
         </div>
@@ -854,3 +969,46 @@
         </AsyncButton>
     </div>
 </form>
+
+<!-- Quick Create Consumable Dialog -->
+<Dialog.Root bind:open={showQuickCreateConsumable}>
+    <Dialog.Content class="max-w-2xl max-h-[85vh] overflow-y-auto z-[70]">
+        <Dialog.Header>
+            <Dialog.Title class="text-xl font-bold flex items-center gap-2 text-amber-900">
+                <Package size={22} class="text-amber-600" />
+                {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+            </Dialog.Title>
+        </Dialog.Header>
+        <ConsumableForm
+            remoteFunction={createConsumable}
+            validationSchema={createConsumableSchema}
+            isUpdating={false}
+            onSuccess={onConsumableQuickCreated}
+            onCancel={() => {
+                showQuickCreateConsumable = false;
+            }}
+        />
+    </Dialog.Content>
+</Dialog.Root>
+
+<!-- Quick Create Recipe Dialog -->
+<Dialog.Root bind:open={showQuickCreateRecipe}>
+    <Dialog.Content class="max-w-3xl max-h-[85vh] overflow-y-auto z-[70]">
+        <Dialog.Header>
+            <Dialog.Title class="text-xl font-bold flex items-center gap-2 text-emerald-900">
+                <ChefHat size={22} class="text-emerald-600" />
+                {m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}
+            </Dialog.Title>
+        </Dialog.Header>
+        <RecipeForm
+            remoteFunction={createRecipe}
+            validationSchema={createRecipeSchema}
+            isUpdating={false}
+            allConsumables={consumablesList}
+            onSuccess={onRecipeQuickCreated}
+            onCancel={() => {
+                showQuickCreateRecipe = false;
+            }}
+        />
+    </Dialog.Content>
+</Dialog.Root>

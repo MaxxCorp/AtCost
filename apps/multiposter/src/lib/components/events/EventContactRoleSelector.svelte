@@ -18,7 +18,7 @@
     let {
         contact,
         eventId,
-        selectedRoleIds = $bindable([]),
+        selectedRoleIds = $bindable(),
         onchange,
         onopenManager
     }: Props = $props();

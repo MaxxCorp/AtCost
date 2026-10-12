@@ -93,7 +93,10 @@
         Receipt,
         Calculator,
         Shield,
+        Package,
+        ChefHat,
     } from "@lucide/svelte";
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
@@ -108,8 +111,17 @@
     import { updatePrice } from "../../../routes/prices/[id]/update.remote";
     import { readPrice } from "../../../routes/prices/[id]/read.remote";
     import { deletePrices } from "../../../routes/prices/[id]/delete.remote";
-    import { createPriceSchema, updatePriceSchema } from "@ac/validations";
+    import { createConsumable } from "../../../routes/consumables/new/create.remote";
+    import { createRecipe } from "../../../routes/recipes/new/create.remote";
+    import {
+        createPriceSchema,
+        updatePriceSchema,
+        createConsumableSchema,
+        createRecipeSchema,
+    } from "@ac/validations";
     import PriceForm from "#lib/components/prices/PriceForm.svelte";
+    import ConsumableForm from "#lib/components/consumables/ConsumableForm.svelte";
+    import RecipeForm from "#lib/components/recipes/RecipeForm.svelte";
     import * as v from "valibot";
     import { FieldCollaboratorBadge, type CollaborationRoom } from "#lib/client/collaboration/index.js";
 
@@ -589,6 +601,8 @@
     let totalParticipants = $derived(baseline + currentContactIds.length);
     // svelte-ignore state_referenced_locally
     let currentPrices = $state<any[]>(initialData?.prices || []);
+    let showPricesQuickCreateConsumable = $state(false);
+    let showPricesQuickCreateRecipe = $state(false);
 
     function updateBaseline(delta: number) {
         baseline = Math.max(0, baseline + delta);
@@ -1634,7 +1648,7 @@
             <EventContactRoleSelector
                 {contact}
                 eventId={initialData?.id}
-                bind:selectedRoleIds={contactRolesState[contact.id]}
+                selectedRoleIds={contactRolesState[contact.id] ?? []}
                 onchange={(newRoleIds: string[]) => {
                     contactRolesState[contact.id] = newRoleIds;
                     rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
@@ -1942,6 +1956,33 @@
                 selectAllLabel={m.select_all?.() || 'Select All'}
                 deselectAllLabel={m.deselect_all?.() || 'Deselect All'}
             >
+                {#snippet toolbarActions()}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onclick={() => (showPricesQuickCreateConsumable = true)}
+                        class="h-9 px-2.5 text-amber-700 hover:bg-amber-50 hover:text-amber-800 rounded-xl flex items-center gap-1.5 text-xs font-semibold"
+                        title={m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+                    >
+                        <Package size={15} class="text-amber-600" />
+                        <Plus size={13} class="-ml-1" />
+                        <span class="hidden sm:inline">{m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}</span>
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onclick={() => (showPricesQuickCreateRecipe = true)}
+                        class="h-9 px-2.5 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 rounded-xl flex items-center gap-1.5 text-xs font-semibold"
+                        title={m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}
+                    >
+                        <ChefHat size={15} class="text-emerald-600" />
+                        <Plus size={13} class="-ml-1" />
+                        <span class="hidden sm:inline">{m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}</span>
+                    </Button>
+                {/snippet}
+
                 {#snippet renderItemLabel(item: any)}
                     <div class="flex items-center gap-2">
                         <span class="font-semibold text-gray-900">{item.name}</span>
@@ -1999,6 +2040,62 @@
                 {/snippet}
             </EntityManager>
         {/key}
+
+        <!-- Quick Create Consumable Dialog from Prices EntityManager -->
+        <Dialog.Root bind:open={showPricesQuickCreateConsumable}>
+            <Dialog.Content class="max-w-2xl max-h-[85vh] overflow-y-auto z-[70]">
+                <Dialog.Header>
+                    <Dialog.Title class="text-xl font-bold flex items-center gap-2 text-amber-900">
+                        <Package size={22} class="text-amber-600" />
+                        {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+                    </Dialog.Title>
+                </Dialog.Header>
+                <ConsumableForm
+                    remoteFunction={createConsumable}
+                    validationSchema={createConsumableSchema}
+                    isUpdating={false}
+                    onSuccess={(res: any) => {
+                        showPricesQuickCreateConsumable = false;
+                        const item = res?.consumable || res?.data || (res?.id ? res : null);
+                        toast.success(
+                            m.item_created?.({ item: m.consumable?.() || 'Consumable' }) ||
+                            `Created consumable ${item?.name || ''}`
+                        );
+                    }}
+                    onCancel={() => {
+                        showPricesQuickCreateConsumable = false;
+                    }}
+                />
+            </Dialog.Content>
+        </Dialog.Root>
+
+        <!-- Quick Create Recipe Dialog from Prices EntityManager -->
+        <Dialog.Root bind:open={showPricesQuickCreateRecipe}>
+            <Dialog.Content class="max-w-3xl max-h-[85vh] overflow-y-auto z-[70]">
+                <Dialog.Header>
+                    <Dialog.Title class="text-xl font-bold flex items-center gap-2 text-emerald-900">
+                        <ChefHat size={22} class="text-emerald-600" />
+                        {m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}
+                    </Dialog.Title>
+                </Dialog.Header>
+                <RecipeForm
+                    remoteFunction={createRecipe}
+                    validationSchema={createRecipeSchema}
+                    isUpdating={false}
+                    onSuccess={(res: any) => {
+                        showPricesQuickCreateRecipe = false;
+                        const item = res?.recipe || res?.data || (res?.id ? res : null);
+                        toast.success(
+                            m.item_created?.({ item: m.recipe?.() || 'Recipe' }) ||
+                            `Created recipe ${item?.name || ''}`
+                        );
+                    }}
+                    onCancel={() => {
+                        showPricesQuickCreateRecipe = false;
+                    }}
+                />
+            </Dialog.Content>
+        </Dialog.Root>
 
         <input
             {...rf.fields.priceIds.as(
