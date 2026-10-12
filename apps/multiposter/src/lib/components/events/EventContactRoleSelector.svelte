@@ -53,6 +53,7 @@
     let assigned = $derived(allRoles.filter((r) => activeRoleIds.includes(r.id)));
 
     let isUpdating = $state(false);
+    let isDropdownOpen = $state(false);
 
     async function toggleRole(role: EventRole) {
         const id = role.id;
@@ -92,6 +93,11 @@
         if (key === "participant") return m.participant?.() ?? roleName;
         return roleName;
     }
+
+    function handleOpenManager() {
+        isDropdownOpen = false;
+        onopenManager?.();
+    }
 </script>
 
 <div class="inline-flex items-center gap-1.5 flex-wrap">
@@ -112,7 +118,7 @@
         {/each}
 
         <!-- Dropdown to Add / Toggle Roles -->
-        <DropdownMenu.Root onOpenChange={(val) => { if (val) void rolesQuery.refresh(); }}>
+        <DropdownMenu.Root bind:open={isDropdownOpen} onOpenChange={(val) => { if (val) void rolesQuery.refresh(); }}>
             <DropdownMenu.Trigger class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border border-dashed border-gray-300 text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer">
                 {#if isUpdating}
                     <Loader2 size={11} class="animate-spin text-blue-600" />
@@ -158,17 +164,14 @@
 
                 {#if onopenManager}
                     <DropdownMenu.Separator class="my-1" />
-                    <button
-                        type="button"
+                    <DropdownMenu.Item
                         class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer text-left"
-                        onclick={(e) => {
-                            e.preventDefault();
-                            onopenManager?.();
-                        }}
+                        onSelect={handleOpenManager}
+                        onclick={handleOpenManager}
                     >
                         <Settings size={13} />
                         <span>{m.manage_roles?.() ?? "Manage Roles..."}</span>
-                    </button>
+                    </DropdownMenu.Item>
                 {/if}
             </DropdownMenu.Content>
         </DropdownMenu.Root>
