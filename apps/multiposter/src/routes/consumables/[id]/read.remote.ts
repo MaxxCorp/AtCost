@@ -32,7 +32,7 @@ export const readConsumable = query(v.string(), async (id: string): Promise<Cons
         expirationDate: row.expirationDate ? row.expirationDate.toISOString() : null,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
-        costPerUnit: Math.round(costPerUnit * 100) / 100,
+        costPerUnit: costPerUnit > 0 && costPerUnit < 0.01 ? Number(costPerUnit.toFixed(4)) : Math.round(costPerUnit * 100) / 100,
         tags: (row.tags || []).map((t: any) => t.tag).filter(Boolean),
     };
 });

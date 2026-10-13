@@ -150,12 +150,22 @@
         if (!initialData?.items) return [];
         return initialData.items.map((it: any, index: number) => {
             const factor = it.factor !== undefined && it.factor !== null ? Number(it.factor) : 2.0;
-            const costPrice = it.costPrice !== undefined && it.costPrice !== null
+            let costPrice = it.costPrice !== undefined && it.costPrice !== null
                 ? Number(it.costPrice)
                 : (it.unitPrice ? Math.round((Number(it.unitPrice) / (factor || 2)) * 100) / 100 : 0);
-            const unitPrice = it.unitPrice !== undefined && it.unitPrice !== null
+            let unitPrice = it.unitPrice !== undefined && it.unitPrice !== null
                 ? Number(it.unitPrice)
                 : Math.round(costPrice * factor * 100) / 100;
+
+            // If an existing consumable item was zeroed out due to past division precision bug,
+            // recover its cost from the associated consumable purchasePrice if available
+            if (costPrice === 0 && unitPrice === 0 && it.itemType === 'consumable' && it.consumable?.purchasePrice) {
+                const pp = Number(it.consumable.purchasePrice) || 0;
+                if (pp > 0) {
+                    costPrice = pp;
+                    unitPrice = Math.round(costPrice * factor * 100) / 100;
+                }
+            }
 
             return {
                 id: it.id,
@@ -188,10 +198,12 @@
         const c = consumablesList.find(x => x.id === selectedConsumableId);
         if (!c) return;
 
-        const costPerUnit = c.amount > 0 ? c.purchasePrice / c.amount : c.purchasePrice;
-        const roundedCost = Math.round(costPerUnit * 100) / 100;
+        const purchasePrice = Number(c.purchasePrice) || 0;
         const itemFactor = defaultFactor > 0 ? defaultFactor : 2.0;
-        const finalUnitPrice = Math.round(roundedCost * itemFactor * 100) / 100;
+        const finalUnitPrice = Math.round(purchasePrice * itemFactor * 100) / 100;
+        const displayUnit = c.amount > 1 && c.unit && c.unit !== 'piece'
+            ? `${c.amount} ${c.unit}`
+            : (c.unit || 'piece');
 
         items = [
             ...items,
@@ -203,8 +215,8 @@
                 description: c.description || '',
                 tags: c.tags || [],
                 portionAmount: 1,
-                unit: c.unit || 'piece',
-                costPrice: roundedCost,
+                unit: displayUnit,
+                costPrice: purchasePrice,
                 factor: itemFactor,
                 unitPrice: finalUnitPrice,
                 sortOrder: items.length,
@@ -251,10 +263,12 @@
         const item = res?.consumable || res?.data || (res?.id ? res : null);
         if (item) {
             localConsumables = [item, ...localConsumables];
-            const costPerUnit = item.amount > 0 ? (Number(item.purchasePrice) || 0) / item.amount : (Number(item.purchasePrice) || 0);
-            const roundedCost = Math.round(costPerUnit * 100) / 100;
+            const purchasePrice = Number(item.purchasePrice) || 0;
             const itemFactor = defaultFactor > 0 ? defaultFactor : 2.0;
-            const finalUnitPrice = Math.round(roundedCost * itemFactor * 100) / 100;
+            const finalUnitPrice = Math.round(purchasePrice * itemFactor * 100) / 100;
+            const displayUnit = item.amount > 1 && item.unit && item.unit !== 'piece'
+                ? `${item.amount} ${item.unit}`
+                : (item.unit || 'piece');
 
             items = [
                 ...items,
@@ -266,8 +280,8 @@
                     description: item.description || '',
                     tags: item.tags || [],
                     portionAmount: 1,
-                    unit: item.unit || 'piece',
-                    costPrice: roundedCost,
+                    unit: displayUnit,
+                    costPrice: purchasePrice,
                     factor: itemFactor,
                     unitPrice: finalUnitPrice,
                     sortOrder: items.length,
@@ -328,10 +342,18 @@
 
         items = tpl.items.map((it: any, idx: number) => {
             const factor = it.factor !== undefined && it.factor !== null ? Number(it.factor) : defaultFactor;
-            const costPrice = it.costPrice !== undefined && it.costPrice !== null ? Number(it.costPrice) : 0;
-            const unitPrice = it.unitPrice !== undefined && it.unitPrice !== null
+            let costPrice = it.costPrice !== undefined && it.costPrice !== null ? Number(it.costPrice) : 0;
+            let unitPrice = it.unitPrice !== undefined && it.unitPrice !== null
                 ? Number(it.unitPrice)
                 : Math.round(costPrice * factor * 100) / 100;
+
+            if (costPrice === 0 && unitPrice === 0 && it.itemType === 'consumable' && it.consumable?.purchasePrice) {
+                const pp = Number(it.consumable.purchasePrice) || 0;
+                if (pp > 0) {
+                    costPrice = pp;
+                    unitPrice = Math.round(costPrice * factor * 100) / 100;
+                }
+            }
 
             return {
                 id: undefined,
@@ -670,9 +692,9 @@
                     >
                         <option value="">{m.select_consumable?.() || 'Select a consumable...'}</option>
                         {#each consumablesList as c (c.id)}
-                            {@const unitCost = c.amount > 0 ? (c.purchasePrice / c.amount).toFixed(2) : c.purchasePrice.toFixed(2)}
+                            {@const displayUnit = c.amount > 1 && c.unit && c.unit !== 'piece' ? `${c.amount} ${c.unit}` : (c.unit || 'unit')}
                             <option value={c.id}>
-                                {c.name} — €{unitCost} / {c.unit || 'unit'} (Pkg: €{c.purchasePrice.toFixed(2)})
+                                {c.name} — €{Number(c.purchasePrice || 0).toFixed(2)} / {displayUnit}
                             </option>
                         {/each}
                     </select>
@@ -761,9 +783,9 @@
                             {@const calc = calculations.lines[index]}
                             {@const lineMargin = (item.unitPrice || 0) - (item.costPrice || 0)}
                             {@const marginPct = (item.unitPrice || 0) > 0 ? (lineMargin / item.unitPrice) * 100 : 0}
-                            <tr class="hover:bg-gray-50/60 transition-colors">
+                            <tr class="align-top hover:bg-gray-50/60 transition-colors">
                                 <!-- Item name -->
-                                <td class="py-2.5 px-3">
+                                <td class="align-top py-2.5 px-3">
                                     <input
                                         type="text"
                                         bind:value={item.name}
@@ -784,7 +806,7 @@
                                 </td>
 
                                 <!-- Type badge -->
-                                <td class="py-2.5 px-2.5">
+                                <td class="align-top py-2.5 px-2.5 pt-3.5">
                                     {#if item.itemType === 'recipe'}
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
                                             <ChefHat size={12} /> Recipe
@@ -797,7 +819,7 @@
                                 </td>
 
                                 <!-- Base Cost (Purchase Cost) -->
-                                <td class="py-2.5 px-2.5">
+                                <td class="align-top py-2.5 px-2.5">
                                     <div class="relative">
                                         <span class="absolute left-2.5 top-2 text-gray-400 text-xs">€</span>
                                         <input
@@ -813,7 +835,7 @@
                                 </td>
 
                                 <!-- Factor (Multiplier) with quick presets -->
-                                <td class="py-2.5 px-2.5">
+                                <td class="align-top py-2.5 px-2.5">
                                     <div class="space-y-1">
                                         <div class="relative">
                                             <input
@@ -841,7 +863,7 @@
                                 </td>
 
                                 <!-- Selling Price (Bidirectional with factor) -->
-                                <td class="py-2.5 px-2.5">
+                                <td class="align-top py-2.5 px-2.5">
                                     <div class="relative">
                                         <span class="absolute left-2.5 top-2 text-gray-400 text-xs">€</span>
                                         <input
@@ -859,7 +881,7 @@
                                 </td>
 
                                 <!-- Portion Amount -->
-                                <td class="py-2.5 px-2.5">
+                                <td class="align-top py-2.5 px-2.5">
                                     <div class="flex items-center gap-1">
                                         <input
                                             type="number"
@@ -873,8 +895,8 @@
                                 </td>
 
                                 <!-- Total for Participants -->
-                                <td class="py-2.5 px-3 text-right">
-                                    <span class="text-sm font-black text-gray-900">
+                                <td class="align-top py-2.5 px-3 text-right">
+                                    <span class="text-sm font-black text-gray-900 block pt-1">
                                         €{calc?.totalPrice.toFixed(2) ?? '0.00'}
                                     </span>
                                     <span class="text-[10px] text-gray-500 font-normal block leading-tight mt-0.5">
@@ -883,7 +905,7 @@
                                 </td>
 
                                 <!-- Remove -->
-                                <td class="py-2.5 px-2 text-right">
+                                <td class="align-top py-2.5 px-2 text-right pt-2.5">
                                     <button
                                         type="button"
                                         onclick={() => removeItem(index)}

@@ -87,16 +87,18 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
 
         // Sync linked price items if any
         const costPerUnit = amount > 0 ? purchasePrice / amount : purchasePrice;
-        const roundedCost = Math.round(costPerUnit * 100) / 100;
         try {
             const linkedPriceItems = await db.select().from(priceItem).where(eq(priceItem.consumableId, data.id));
+            const displayUnit = amount > 1 && data.unit && data.unit !== 'piece'
+                ? `${amount} ${data.unit}`
+                : (data.unit || 'piece');
             for (const pi of linkedPriceItems) {
-                const newUnitPrice = Math.round(roundedCost * pi.factor * 100) / 100;
+                const newUnitPrice = Math.round(purchasePrice * pi.factor * 100) / 100;
                 await db.update(priceItem).set({
                     name: data.name,
                     description: data.description || null,
-                    unit: data.unit || 'piece',
-                    costPrice: roundedCost,
+                    unit: displayUnit,
+                    costPrice: purchasePrice,
                     unitPrice: newUnitPrice,
                 }).where(eq(priceItem.id, pi.id));
             }
@@ -144,7 +146,7 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
                 expirationDate: updated.expirationDate ? updated.expirationDate.toISOString() : null,
                 createdAt: updated.createdAt.toISOString(),
                 updatedAt: updated.updatedAt.toISOString(),
-                costPerUnit: roundedCost,
+                costPerUnit: costPerUnit > 0 && costPerUnit < 0.01 ? Number(costPerUnit.toFixed(4)) : Math.round(costPerUnit * 100) / 100,
                 tags: refreshedTags,
             }
         };

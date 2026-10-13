@@ -153,21 +153,20 @@
     function handleConsumableUpdated(result: any) {
         const updated = result?.consumable || result?.data || result;
         if (updated && activeItem) {
-            const costPerUnit =
-                Number(updated.amount) > 0
-                    ? (Number(updated.purchasePrice) || 0) / Number(updated.amount)
-                    : Number(updated.purchasePrice) || 0;
-            const roundedCost = Math.round(costPerUnit * 100) / 100;
+            const purchasePrice = Number(updated.purchasePrice) || 0;
             const factor = Number(activeItem.factor) || 2;
-            const unitPrice = Math.round(roundedCost * factor * 100) / 100;
+            const unitPrice = Math.round(purchasePrice * factor * 100) / 100;
+            const displayUnit = Number(updated.amount) > 1 && updated.unit && updated.unit !== 'piece'
+                ? `${updated.amount} ${updated.unit}`
+                : (updated.unit || activeItem.unit || 'piece');
             const updatedTags = (updated.tags || []).map(normalizeTag).filter(Boolean);
 
             const merged = {
                 ...activeItem,
                 name: updated.name || activeItem.name,
                 description: updated.description ?? activeItem.description,
-                unit: updated.unit || activeItem.unit,
-                costPrice: roundedCost,
+                unit: displayUnit,
+                costPrice: purchasePrice,
                 unitPrice,
                 tags: updatedTags.length > 0 ? updatedTags : activeItem.tags,
                 consumable: updated,

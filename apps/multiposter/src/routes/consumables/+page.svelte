@@ -180,6 +180,7 @@
                                     {#each result.data as item (item.id)}
                                         {@const expired = isExpired(item.expirationDate)}
                                         {@const soon = isExpiringSoon(item.expirationDate)}
+                                        {@const cpu = item.costPerUnit ?? 0}
                                         <tr class="hover:bg-gray-50/60 transition-colors">
                                             <td class="py-3 px-4">
                                                 <div class="font-bold text-gray-900">{item.name}</div>
@@ -203,7 +204,7 @@
                                             </td>
                                             <td class="py-3 px-4">
                                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                                    €{(item.costPerUnit ?? 0).toFixed(2)} / {item.unit}
+                                                    €{cpu > 0 && cpu < 0.01 ? cpu.toFixed(4) : cpu.toFixed(2)} / {item.unit}
                                                 </span>
                                             </td>
                                             <td class="py-3 px-4 text-gray-600">

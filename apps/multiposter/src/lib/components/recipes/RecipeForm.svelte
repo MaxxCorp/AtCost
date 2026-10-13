@@ -344,7 +344,8 @@
                     >
                         <option value="">{m.select_consumable?.() || 'Select a consumable...'}</option>
                         {#each consumablesList as c (c.id)}
-                            {@const unitCost = c.amount > 0 ? (c.purchasePrice / c.amount).toFixed(2) : Number(c.purchasePrice).toFixed(2)}
+                            {@const rawCost = c.amount > 0 ? (c.purchasePrice / c.amount) : Number(c.purchasePrice || 0)}
+                            {@const unitCost = rawCost > 0 && rawCost < 0.01 ? rawCost.toFixed(4) : rawCost.toFixed(2)}
                             <option value={c.id}>
                                 {c.name} — €{unitCost} / {c.unit || 'unit'} (Pkg: €{Number(c.purchasePrice).toFixed(2)} / {c.amount} {c.unit || ''})
                             </option>

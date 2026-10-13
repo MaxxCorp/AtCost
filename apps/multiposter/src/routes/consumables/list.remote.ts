@@ -67,7 +67,7 @@ export const listConsumables = query(PaginationSchema, async (input: v.InferOutp
             expirationDate: r.expirationDate ? r.expirationDate.toISOString() : null,
             createdAt: r.createdAt.toISOString(),
             updatedAt: r.updatedAt.toISOString(),
-            costPerUnit: Math.round(costPerUnit * 100) / 100,
+            costPerUnit: costPerUnit > 0 && costPerUnit < 0.01 ? Number(costPerUnit.toFixed(4)) : Math.round(costPerUnit * 100) / 100,
             tags: (r.tags || []).map((t: any) => t.tag).filter(Boolean),
         };
     });

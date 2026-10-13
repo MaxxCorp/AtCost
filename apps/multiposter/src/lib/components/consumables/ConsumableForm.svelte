@@ -62,7 +62,7 @@
         const p = Number(purchasePrice) || 0;
         const a = Number(amount) || 1;
         if (a <= 0) return p;
-        return Math.round((p / a) * 100) / 100;
+        return p / a;
     });
 
     function formatForInput(dateVal: any): string {
@@ -215,7 +215,7 @@
                 {m.cost_per_unit?.() || 'Cost per Unit'}:
             </span>
             <span class="text-base font-bold text-emerald-900">
-                €{calculatedCostPerUnit.toFixed(2)} / {unit || 'unit'}
+                €{calculatedCostPerUnit > 0 && calculatedCostPerUnit < 0.01 ? calculatedCostPerUnit.toFixed(4) : calculatedCostPerUnit.toFixed(2)} / {unit || 'unit'}
             </span>
         </div>
 
