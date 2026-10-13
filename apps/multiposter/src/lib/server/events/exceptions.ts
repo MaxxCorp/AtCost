@@ -52,8 +52,8 @@ export interface VirtualInstanceDiffInput {
 		submittedTags?: string[];
 		masterSyncIds?: string[];
 		submittedSyncIds?: string[];
-		masterMenuIds?: string[];
-		submittedMenuIds?: string[];
+		masterPriceIds?: string[];
+		submittedPriceIds?: string[];
 	};
 }
 
@@ -120,8 +120,8 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			submittedTags,
 			masterSyncIds,
 			submittedSyncIds,
-			masterMenuIds,
-			submittedMenuIds,
+			masterPriceIds,
+			submittedPriceIds,
 		} = associations;
 
 		if (submittedLocationIds !== undefined && masterLocationIds !== undefined) {
@@ -165,9 +165,9 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			if (mSet.size !== sSet.size || [...mSet].some(id => !sSet.has(id))) return true;
 		}
 
-		if (submittedMenuIds !== undefined && masterMenuIds !== undefined) {
-			const mSet = new Set(masterMenuIds);
-			const sSet = new Set(submittedMenuIds);
+		if (submittedPriceIds !== undefined && masterPriceIds !== undefined) {
+			const mSet = new Set(masterPriceIds);
+			const sSet = new Set(submittedPriceIds);
 			if (mSet.size !== sSet.size || [...mSet].some(id => !sSet.has(id))) return true;
 		}
 	}
@@ -175,7 +175,7 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	return false;
 }
 
-import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventMenu, eq, and, or, sql } from '@ac/db';
+import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventPrice, eq, and, or, sql } from '@ac/db';
 import { parseVirtualInstanceId } from '#lib/utils/event-series.js';
 
 /**
@@ -287,10 +287,10 @@ export async function resolveEventIdForAssociations(
 		);
 	}
 
-	const masterMenus = await db.select().from(eventMenu).where(eq(eventMenu.eventId, masterId));
-	if (masterMenus.length > 0) {
-		await db.insert(eventMenu).values(
-			masterMenus.map(m => ({ eventId: created.id, menuId: m.menuId }))
+	const masterPrices = await db.select().from(eventPrice).where(eq(eventPrice.eventId, masterId));
+	if (masterPrices.length > 0) {
+		await db.insert(eventPrice).values(
+			masterPrices.map(p => ({ eventId: created.id, priceId: p.priceId }))
 		);
 	}
 

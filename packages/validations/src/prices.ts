@@ -1,10 +1,11 @@
 import * as v from 'valibot';
-import type { Menu as DbMenu, MenuItem as DbMenuItem } from '@ac/db';
+import type { Price as DbPrice, PriceItem as DbPriceItem } from '@ac/db';
 import type { Consumable } from './consumables.js';
 import type { Recipe } from './recipes.js';
 import type { Tag } from './tags.js';
 
-export type PriceItem = Omit<DbMenuItem, 'createdAt' | 'updatedAt'> & {
+export type PriceItem = Omit<DbPriceItem, 'createdAt' | 'updatedAt'> & {
+    priceId?: string;
     createdAt?: string;
     updatedAt?: string;
     consumable?: Consumable | null;
@@ -14,7 +15,7 @@ export type PriceItem = Omit<DbMenuItem, 'createdAt' | 'updatedAt'> & {
 
 export type PriceListItem = PriceItem;
 
-export type Price = Omit<DbMenu, 'createdAt' | 'updatedAt'> & {
+export type Price = Omit<DbPrice, 'createdAt' | 'updatedAt'> & {
     createdAt: string;
     updatedAt: string;
     items?: PriceItem[];

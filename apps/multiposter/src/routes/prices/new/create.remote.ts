@@ -1,5 +1,5 @@
 import { form, requested } from '$app/server';
-import { db, menu, menuItem } from '@ac/db';
+import { db, price, priceItem } from '@ac/db';
 import { listPrices } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { createPriceSchema } from '@ac/validations';
@@ -10,7 +10,7 @@ export const createPrice = form(createPriceSchema, async (data) => {
         ensureAccess(user, 'prices');
 
         const result = await db.transaction(async (tx) => {
-            const [newMenu] = await tx.insert(menu).values({
+            const [newPrice] = await tx.insert(price).values({
                 userId: user.id,
                 name: data.name,
                 description: data.description || null,
@@ -25,9 +25,9 @@ export const createPrice = form(createPriceSchema, async (data) => {
             }
 
             if (items.length > 0) {
-                await tx.insert(menuItem).values(
+                await tx.insert(priceItem).values(
                     items.map((it: any, index: number) => ({
-                        menuId: newMenu.id,
+                        priceId: newPrice.id,
                         itemType: it.itemType || 'consumable',
                         consumableId: it.itemType === 'consumable' ? (it.consumableId || null) : null,
                         recipeId: it.itemType === 'recipe' ? (it.recipeId || null) : null,
@@ -43,7 +43,7 @@ export const createPrice = form(createPriceSchema, async (data) => {
                 );
             }
 
-            return newMenu;
+            return newPrice;
         });
 
         try {

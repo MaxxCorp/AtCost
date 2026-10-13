@@ -70,9 +70,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
-				menus: {
+				prices: {
 					with: {
-						menu: {
+						price: {
 							with: {
 								items: {
 									with: {
@@ -108,9 +108,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 					contactRoles: { with: { role: true } },
 					tags: { with: { tag: true } },
 					campaign: true,
-					menus: {
+					prices: {
 						with: {
-							menu: {
+							price: {
 								with: {
 									items: {
 										with: {
@@ -180,9 +180,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
-				menus: {
+				prices: {
 					with: {
-						menu: {
+						price: {
 							with: {
 								items: {
 									with: {
@@ -370,12 +370,12 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		return isNaN(parsed.getTime()) ? null : parsed.toISOString();
 	};
 
-	const eventMenus = (result.menus || []).map((em: any) => {
-		const m = em.menu;
-		if (!m) return null;
+	const eventPrices = (result.prices || []).map((ep: any) => {
+		const p = ep.price;
+		if (!p) return null;
 		let totalPricePerPortion = 0;
 		let totalCostPerPortion = 0;
-		const items = (m.items || []).map((it: any) => {
+		const items = (p.items || []).map((it: any) => {
 			const linePrice = (it.unitPrice || 0) * (it.portionAmount || 1);
 			const lineCost = (it.costPrice || 0) * (it.portionAmount || 1);
 			totalPricePerPortion += linePrice;
@@ -391,9 +391,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			};
 		});
 		return {
-			...m,
-			createdAt: toIsoSafe(m.createdAt),
-			updatedAt: toIsoSafe(m.updatedAt),
+			...p,
+			createdAt: toIsoSafe(p.createdAt),
+			updatedAt: toIsoSafe(p.updatedAt),
 			items,
 			totalPricePerPortion: Math.round(totalPricePerPortion * 100) / 100,
 			totalCostPerPortion: Math.round(totalCostPerPortion * 100) / 100,
@@ -432,8 +432,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			resolvedContact,
 			contactIds: [],
 			syncIds: [],
-			prices: eventMenus,
-			priceIds: (result.menus || []).map((m: any) => m.menuId),
+			prices: eventPrices,
+			priceIds: (result.prices || []).map((p: any) => p.priceId),
 			iCalPath,
 			qrCodePath,
 			seriesMaster: seriesMaster ?? undefined,
@@ -459,8 +459,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		locations: allLocations,
 		resources: allResources,
 		contacts: allContacts,
-		prices: eventMenus,
-		priceIds: (result.menus || []).map((m: any) => m.menuId),
+		prices: eventPrices,
+		priceIds: (result.prices || []).map((p: any) => p.priceId),
 		rooms: getEventRooms({ locations: allLocations, resources: allResources }),
 		resourceIds: result.resources.map((r: any) => r.resourceId),
 		contactIds: result.contacts.map((c: any) => c.contactId),

@@ -1,12 +1,12 @@
 import { command, query } from '$app/server';
-import { db, eventMenu, eq } from '@ac/db';
+import { db, eventPrice, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { priceAssociationSchema, getPriceAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 
 const tableMap = {
-    event: eventMenu,
+    event: eventPrice,
 } as const;
 
 const fieldMap = {
@@ -27,7 +27,7 @@ export const addPriceAssociation = command(priceAssociationSchema, async (data) 
         itemId: targetId,
         tableMap,
         fieldMap,
-        itemField: 'menuId',
+        itemField: 'priceId',
         userId: user?.id
     });
 
@@ -49,7 +49,7 @@ export const removePriceAssociation = command(priceAssociationSchema, async (dat
         itemId: targetId,
         tableMap,
         fieldMap,
-        itemField: 'menuId',
+        itemField: 'priceId',
         userId: user?.id
     });
 
@@ -72,10 +72,10 @@ export const fetchEntityPrices = query(getPriceAssociationsSchema, async (data) 
         targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: false });
     }
 
-    const rows = await db.query.eventMenu.findMany({
-        where: eq((eventMenu as any)[entityField], targetEntityId),
+    const rows = await db.query.eventPrice.findMany({
+        where: eq((eventPrice as any)[entityField], targetEntityId),
         with: {
-            menu: {
+            price: {
                 with: {
                     items: {
                         with: {
@@ -102,11 +102,11 @@ export const fetchEntityPrices = query(getPriceAssociationsSchema, async (data) 
     });
 
     return rows.map((r: any) => {
-        const m = r.menu;
-        if (!m) return null;
+        const p = r.price;
+        if (!p) return null;
 
         let totalPricePerPortion = 0;
-        const items = (m.items || []).map((it: any) => {
+        const items = (p.items || []).map((it: any) => {
             const linePricePerPortion = (it.unitPrice || 0) * (it.portionAmount || 1);
             totalPricePerPortion += linePricePerPortion;
 
@@ -116,7 +116,7 @@ export const fetchEntityPrices = query(getPriceAssociationsSchema, async (data) 
 
             return {
                 id: it.id,
-                menuId: it.menuId,
+                priceId: it.priceId,
                 itemType: it.itemType,
                 consumableId: it.consumableId,
                 recipeId: it.recipeId,
@@ -146,13 +146,13 @@ export const fetchEntityPrices = query(getPriceAssociationsSchema, async (data) 
         });
 
         return {
-            id: m.id,
-            userId: m.userId,
-            name: m.name,
-            description: m.description,
-            isTemplate: m.isTemplate,
-            createdAt: m.createdAt.toISOString(),
-            updatedAt: m.updatedAt.toISOString(),
+            id: p.id,
+            userId: p.userId,
+            name: p.name,
+            description: p.description,
+            isTemplate: p.isTemplate,
+            createdAt: p.createdAt.toISOString(),
+            updatedAt: p.updatedAt.toISOString(),
             items,
             totalPricePerPortion: Math.round(totalPricePerPortion * 100) / 100,
         };

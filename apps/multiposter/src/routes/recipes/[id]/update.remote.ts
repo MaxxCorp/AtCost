@@ -1,5 +1,5 @@
 import { form, requested } from '$app/server';
-import { db, recipe, recipeConsumable, recipeTag, tag, menuItem, eq } from '@ac/db';
+import { db, recipe, recipeConsumable, recipeTag, tag, priceItem, eq } from '@ac/db';
 import { listRecipes } from '../list.remote';
 import { readRecipe } from './read.remote';
 import { fetchEntityPrices } from '../../prices/associate.remote';
@@ -124,16 +124,16 @@ export const updateRecipe = form(updateRecipeSchema, async (data) => {
             costPerPortion = Math.round((totalCost / portions) * 100) / 100;
             refreshedTags = (fullRecipe.tags || []).map((t: any) => t.tag).filter(Boolean);
 
-            // Sync linked menu items
-            const linkedMenuItems = await db.select().from(menuItem).where(eq(menuItem.recipeId, data.id));
-            for (const mi of linkedMenuItems) {
-                const newUnitPrice = Math.round(costPerPortion * mi.factor * 100) / 100;
-                await db.update(menuItem).set({
+            // Sync linked price items
+            const linkedPriceItems = await db.select().from(priceItem).where(eq(priceItem.recipeId, data.id));
+            for (const pi of linkedPriceItems) {
+                const newUnitPrice = Math.round(costPerPortion * pi.factor * 100) / 100;
+                await db.update(priceItem).set({
                     name: data.name,
                     description: data.description || null,
                     costPrice: costPerPortion,
                     unitPrice: newUnitPrice,
-                }).where(eq(menuItem.id, mi.id));
+                }).where(eq(priceItem.id, pi.id));
             }
         }
     } catch (e) {

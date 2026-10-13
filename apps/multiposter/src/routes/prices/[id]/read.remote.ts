@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, menu, eq } from '@ac/db';
+import { db, price, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import type { Price } from '@ac/validations';
@@ -8,8 +8,8 @@ export const readPrice = query(v.string(), async (id: string): Promise<Price | n
     const user = getAuthenticatedUser();
     ensureAccess(user, 'prices');
 
-    const m = await db.query.menu.findFirst({
-        where: eq(menu.id, id),
+    const p = await db.query.price.findFirst({
+        where: eq(price.id, id),
         with: {
             items: {
                 with: {
@@ -33,11 +33,11 @@ export const readPrice = query(v.string(), async (id: string): Promise<Price | n
         }
     });
 
-    if (!m) return null;
+    if (!p) return null;
 
     let totalPricePerPortion = 0;
     let totalCostPerPortion = 0;
-    const items = (m.items || []).map((it: any) => {
+    const items = (p.items || []).map((it: any) => {
         const linePricePerPortion = (it.unitPrice || 0) * (it.portionAmount || 1);
         const lineCostPerPortion = (it.costPrice || 0) * (it.portionAmount || 1);
         totalPricePerPortion += linePricePerPortion;
@@ -49,7 +49,7 @@ export const readPrice = query(v.string(), async (id: string): Promise<Price | n
 
         return {
             id: it.id,
-            menuId: it.menuId,
+            priceId: it.priceId,
             itemType: it.itemType,
             consumableId: it.consumableId,
             recipeId: it.recipeId,
@@ -79,13 +79,13 @@ export const readPrice = query(v.string(), async (id: string): Promise<Price | n
     });
 
     return {
-        id: m.id,
-        userId: m.userId,
-        name: m.name,
-        description: m.description,
-        isTemplate: m.isTemplate,
-        createdAt: m.createdAt.toISOString(),
-        updatedAt: m.updatedAt.toISOString(),
+        id: p.id,
+        userId: p.userId,
+        name: p.name,
+        description: p.description,
+        isTemplate: p.isTemplate,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
         items,
         totalPricePerPortion: Math.round(totalPricePerPortion * 100) / 100,
         totalCostPerPortion: Math.round(totalCostPerPortion * 100) / 100,

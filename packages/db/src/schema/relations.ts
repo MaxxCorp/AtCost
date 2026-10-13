@@ -12,7 +12,7 @@ import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion, cmsMedia } from "./cms";
 import { contract, contractFramework, contractFrameworkContract } from "./contracts";
 import { consumable, consumableTag } from "./consumables";
 import { recipe, recipeConsumable, recipeTag } from "./recipes";
-import { menu, menuItem, eventMenu } from "./menus";
+import { price, priceItem, eventPrice } from "./prices";
 import { payrollRun, payrollProfile, payslip } from "./payroll";
 import { hmo } from "./hmos";
 
@@ -34,7 +34,7 @@ export const userRelations = relations(user, ({ many }) => ({
     sessions: many(session),
     consumables: many(consumable),
     recipes: many(recipe),
-    menus: many(menu),
+    prices: many(price),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -105,7 +105,7 @@ export const eventRelations = relations(event, ({ many, one }) => ({
     contactRoles: many(eventContactRole),
     locations: many(eventLocation),
     tags: many(eventTag),
-    menus: many(eventMenu),
+    prices: many(eventPrice),
     series: one(recurringSeries, { fields: [event.seriesId], references: [recurringSeries.id] }),
     user: one(user, { fields: [event.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [event.campaignId], references: [campaign.id] }),
@@ -390,7 +390,7 @@ export const contractFrameworkContractRelations = relations(contractFrameworkCon
 export const consumableRelations = relations(consumable, ({ one, many }) => ({
     user: one(user, { fields: [consumable.userId], references: [user.id] }),
     recipeConsumables: many(recipeConsumable),
-    menuItems: many(menuItem),
+    priceItems: many(priceItem),
     tags: many(consumableTag),
 }));
 
@@ -402,7 +402,7 @@ export const consumableTagRelations = relations(consumableTag, ({ one }) => ({
 export const recipeRelations = relations(recipe, ({ one, many }) => ({
     user: one(user, { fields: [recipe.userId], references: [user.id] }),
     consumables: many(recipeConsumable),
-    menuItems: many(menuItem),
+    priceItems: many(priceItem),
     tags: many(recipeTag),
 }));
 
@@ -416,21 +416,21 @@ export const recipeConsumableRelations = relations(recipeConsumable, ({ one }) =
     consumable: one(consumable, { fields: [recipeConsumable.consumableId], references: [consumable.id] }),
 }));
 
-export const menuRelations = relations(menu, ({ one, many }) => ({
-    user: one(user, { fields: [menu.userId], references: [user.id] }),
-    items: many(menuItem),
-    events: many(eventMenu),
+export const priceRelations = relations(price, ({ one, many }) => ({
+    user: one(user, { fields: [price.userId], references: [user.id] }),
+    items: many(priceItem),
+    events: many(eventPrice),
 }));
 
-export const menuItemRelations = relations(menuItem, ({ one }) => ({
-    menu: one(menu, { fields: [menuItem.menuId], references: [menu.id] }),
-    consumable: one(consumable, { fields: [menuItem.consumableId], references: [consumable.id] }),
-    recipe: one(recipe, { fields: [menuItem.recipeId], references: [recipe.id] }),
+export const priceItemRelations = relations(priceItem, ({ one }) => ({
+    price: one(price, { fields: [priceItem.priceId], references: [price.id] }),
+    consumable: one(consumable, { fields: [priceItem.consumableId], references: [consumable.id] }),
+    recipe: one(recipe, { fields: [priceItem.recipeId], references: [recipe.id] }),
 }));
 
-export const eventMenuRelations = relations(eventMenu, ({ one }) => ({
-    event: one(event, { fields: [eventMenu.eventId], references: [event.id] }),
-    menu: one(menu, { fields: [eventMenu.menuId], references: [menu.id] }),
+export const eventPriceRelations = relations(eventPrice, ({ one }) => ({
+    event: one(event, { fields: [eventPrice.eventId], references: [event.id] }),
+    price: one(price, { fields: [eventPrice.priceId], references: [price.id] }),
 }));
 
 export const payrollRunRelations = relations(payrollRun, ({ many }) => ({

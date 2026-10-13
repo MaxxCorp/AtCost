@@ -218,6 +218,13 @@
       "when": 1791748447807,
       "tag": "0030_fat_jigsaw",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791926406113,
+      "tag": "0031_replace_menu_with_price",
+      "breakpoints": true
     }
   ]
 }

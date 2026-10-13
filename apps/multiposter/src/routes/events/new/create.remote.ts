@@ -1,7 +1,7 @@
 import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, sql, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -279,9 +279,9 @@ export const createEvent = form(createEventSchema, async (data) => {
 			if (priceIds.length > 0) {
 				const associations = (priceIds as string[]).map((priceId: string) => ({
 					eventId: targetEventId,
-					menuId: priceId,
+					priceId,
 				}));
-				await db.insert(eventMenu).values(associations);
+				await db.insert(eventPrice).values(associations);
 			}
 		};
 

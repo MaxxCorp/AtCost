@@ -1,6 +1,6 @@
 import { form, getRequestEvent } from '$app/server';
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventMenu, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
@@ -222,10 +222,10 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							submittedSyncIds = Array.isArray(data.syncIds) ? data.syncIds : (typeof data.syncIds === 'string' ? JSON.parse(data.syncIds) : []);
 						}
 
-						let masterMenuIds: string[] | undefined;
+						let masterPriceIds: string[] | undefined;
 						if (priceIds !== undefined) {
-							const masterMenus = await tx.select({ id: eventMenu.menuId }).from(eventMenu).where(eq(eventMenu.eventId, instMasterId));
-							masterMenuIds = masterMenus.map(m => m.id);
+							const masterPrices = await tx.select({ id: eventPrice.priceId }).from(eventPrice).where(eq(eventPrice.eventId, instMasterId));
+							masterPriceIds = masterPrices.map(m => m.id);
 						}
 
 						const hasChanges = hasVirtualInstanceChanged({
@@ -262,8 +262,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								submittedTags: tagNames,
 								masterSyncIds,
 								submittedSyncIds,
-								masterMenuIds,
-								submittedMenuIds: priceIds,
+								masterPriceIds,
+								submittedPriceIds: priceIds,
 							}
 						});
 
@@ -513,17 +513,17 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 				// Prices
 				if (priceIds !== undefined) {
-					await client.delete(eventMenu).where(eq(eventMenu.eventId, targetEventId));
+					await client.delete(eventPrice).where(eq(eventPrice.eventId, targetEventId));
 					if (priceIds.length > 0) {
-						await client.insert(eventMenu).values(
-							priceIds.map((id: string) => ({ eventId: targetEventId, menuId: id }))
+						await client.insert(eventPrice).values(
+							priceIds.map((id: string) => ({ eventId: targetEventId, priceId: id }))
 						);
 					}
 				} else if (isNewException && instMasterId) {
-					const masterMenus = await client.select().from(eventMenu).where(eq(eventMenu.eventId, instMasterId));
-					if (masterMenus.length > 0) {
-						await client.insert(eventMenu).values(
-							masterMenus.map((m: any) => ({ eventId: targetEventId, menuId: m.menuId }))
+					const masterPrices = await client.select().from(eventPrice).where(eq(eventPrice.eventId, instMasterId));
+					if (masterPrices.length > 0) {
+						await client.insert(eventPrice).values(
+							masterPrices.map((m: any) => ({ eventId: targetEventId, priceId: m.priceId }))
 						);
 					}
 				}

@@ -1,5 +1,5 @@
 import { form, requested } from '$app/server';
-import { db, consumable, consumableTag, tag, menuItem, eq } from '@ac/db';
+import { db, consumable, consumableTag, tag, priceItem, eq } from '@ac/db';
 import { listConsumables } from '../list.remote';
 import { readConsumable } from './read.remote';
 import { fetchEntityPrices } from '../../prices/associate.remote';
@@ -85,23 +85,23 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
             }
         }
 
-        // Sync linked menu items if any
+        // Sync linked price items if any
         const costPerUnit = amount > 0 ? purchasePrice / amount : purchasePrice;
         const roundedCost = Math.round(costPerUnit * 100) / 100;
         try {
-            const linkedMenuItems = await db.select().from(menuItem).where(eq(menuItem.consumableId, data.id));
-            for (const mi of linkedMenuItems) {
-                const newUnitPrice = Math.round(roundedCost * mi.factor * 100) / 100;
-                await db.update(menuItem).set({
+            const linkedPriceItems = await db.select().from(priceItem).where(eq(priceItem.consumableId, data.id));
+            for (const pi of linkedPriceItems) {
+                const newUnitPrice = Math.round(roundedCost * pi.factor * 100) / 100;
+                await db.update(priceItem).set({
                     name: data.name,
                     description: data.description || null,
                     unit: data.unit || 'piece',
                     costPrice: roundedCost,
                     unitPrice: newUnitPrice,
-                }).where(eq(menuItem.id, mi.id));
+                }).where(eq(priceItem.id, pi.id));
             }
-        } catch (menuErr) {
-            console.warn('--- updateConsumable menuItem sync warning ---', menuErr);
+        } catch (priceErr) {
+            console.warn('--- updateConsumable priceItem sync warning ---', priceErr);
         }
 
         // Fetch refreshed tags

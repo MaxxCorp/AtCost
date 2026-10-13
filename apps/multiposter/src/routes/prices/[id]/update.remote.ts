@@ -1,5 +1,5 @@
 import { form, requested, command } from '$app/server';
-import { db, menu, menuItem, eq, and } from '@ac/db';
+import { db, price, priceItem, eq, and } from '@ac/db';
 import { listPrices } from '../list.remote';
 import { readPrice } from './read.remote';
 import { fetchEntityPrices } from '../associate.remote';
@@ -15,22 +15,22 @@ export const updatePrice = form(updatePriceSchema, async (data) => {
     ensureAccess(user, 'prices');
 
     const result = await db.transaction(async (tx) => {
-        const [updatedMenu] = await tx
-            .update(menu)
+        const [updatedPrice] = await tx
+            .update(price)
             .set({
                 name: data.name,
                 description: data.description || null,
                 isTemplate: data.isTemplate !== undefined ? Boolean(data.isTemplate) : true,
             })
-            .where(eq(menu.id, data.id))
+            .where(eq(price.id, data.id))
             .returning();
 
-        if (!updatedMenu) {
+        if (!updatedPrice) {
             throw new Error('Price list not found');
         }
 
         // Delete existing items and re-insert
-        await tx.delete(menuItem).where(eq(menuItem.menuId, data.id));
+        await tx.delete(priceItem).where(eq(priceItem.priceId, data.id));
 
         let items: any[] = [];
         if (typeof data.items === 'string') {
@@ -40,9 +40,9 @@ export const updatePrice = form(updatePriceSchema, async (data) => {
         }
 
         if (items.length > 0) {
-            await tx.insert(menuItem).values(
+            await tx.insert(priceItem).values(
                 items.map((it: any, index: number) => ({
-                    menuId: data.id,
+                    priceId: data.id,
                     itemType: it.itemType || 'consumable',
                     consumableId: it.itemType === 'consumable' ? (it.consumableId || null) : null,
                     recipeId: it.itemType === 'recipe' ? (it.recipeId || null) : null,
@@ -58,7 +58,7 @@ export const updatePrice = form(updatePriceSchema, async (data) => {
             );
         }
 
-        return updatedMenu;
+        return updatedPrice;
     });
 
     try {
@@ -88,8 +88,8 @@ export const removePriceItem = command(removePriceItemSchema, async (data) => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'prices');
 
-    await db.delete(menuItem).where(
-        and(eq(menuItem.menuId, data.priceId), eq(menuItem.id, data.itemId))
+    await db.delete(priceItem).where(
+        and(eq(priceItem.priceId, data.priceId), eq(priceItem.id, data.itemId))
     );
 
     try {
@@ -114,7 +114,7 @@ export const updatePriceItem = command(updatePriceItemSchema, async (data) => {
 
     const it = data.item;
     if (it.id) {
-        await db.update(menuItem).set({
+        await db.update(priceItem).set({
             name: it.name,
             description: it.description || null,
             portionAmount: typeof it.portionAmount === 'number' ? it.portionAmount : parseFloat(String(it.portionAmount)) || 1,
@@ -123,7 +123,7 @@ export const updatePriceItem = command(updatePriceItemSchema, async (data) => {
             factor: typeof it.factor === 'number' ? it.factor : parseFloat(String(it.factor)) || 2,
             unitPrice: typeof it.unitPrice === 'number' ? it.unitPrice : parseFloat(String(it.unitPrice)) || 0,
             sortOrder: it.sortOrder != null ? Number(it.sortOrder) : 0,
-        }).where(and(eq(menuItem.menuId, data.priceId), eq(menuItem.id, it.id)));
+        }).where(and(eq(priceItem.priceId, data.priceId), eq(priceItem.id, it.id)));
     }
 
     try {

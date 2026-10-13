@@ -3,7 +3,7 @@ import { consumable } from "./consumables";
 import { recipe } from "./recipes";
 import { event } from "./events";
 
-export const menu = pgTable("menu", {
+export const price = pgTable("price", {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: text("user_id").notNull(),
     name: text("name").notNull(),
@@ -13,9 +13,9 @@ export const menu = pgTable("menu", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
-export const menuItem = pgTable("menu_item", {
+export const priceItem = pgTable("price_item", {
     id: uuid("id").primaryKey().defaultRandom(),
-    menuId: uuid("menu_id").notNull().references(() => menu.id, { onDelete: "cascade" }),
+    priceId: uuid("price_id").notNull().references(() => price.id, { onDelete: "cascade" }),
     itemType: text("item_type", { enum: ["consumable", "recipe"] }).notNull(),
     consumableId: uuid("consumable_id").references(() => consumable.id, { onDelete: "set null" }),
     recipeId: uuid("recipe_id").references(() => recipe.id, { onDelete: "set null" }),
@@ -31,16 +31,16 @@ export const menuItem = pgTable("menu_item", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
-export const eventMenu = pgTable("event_menu", {
+export const eventPrice = pgTable("event_price", {
     eventId: uuid("event_id").notNull().references(() => event.id, { onDelete: "cascade" }),
-    menuId: uuid("menu_id").notNull().references(() => menu.id, { onDelete: "cascade" }),
+    priceId: uuid("price_id").notNull().references(() => price.id, { onDelete: "cascade" }),
 }, (table) => [
-    primaryKey({ columns: [table.eventId, table.menuId] })
+    primaryKey({ columns: [table.eventId, table.priceId] })
 ]);
 
-export type Menu = typeof menu.$inferSelect;
-export type NewMenu = typeof menu.$inferInsert;
-export type MenuItem = typeof menuItem.$inferSelect;
-export type NewMenuItem = typeof menuItem.$inferInsert;
-export type EventMenu = typeof eventMenu.$inferSelect;
-export type NewEventMenu = typeof eventMenu.$inferInsert;
+export type Price = typeof price.$inferSelect;
+export type NewPrice = typeof price.$inferInsert;
+export type PriceItem = typeof priceItem.$inferSelect;
+export type NewPriceItem = typeof priceItem.$inferInsert;
+export type EventPrice = typeof eventPrice.$inferSelect;
+export type NewEventPrice = typeof eventPrice.$inferInsert;

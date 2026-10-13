@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, menu, and, eq, ilike, desc, asc, count } from '@ac/db';
+import { db, price, and, eq, ilike, desc, asc, count } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { pricePaginationSchema as PaginationSchema, type Price, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
@@ -14,31 +14,31 @@ export const listPrices = query(PaginationSchema, async (input: v.InferOutput<ty
     const conditions: any[] = [];
 
     if (search) {
-        conditions.push(ilike(menu.name, `%${search}%`));
+        conditions.push(ilike(price.name, `%${search}%`));
     }
 
     if (isTemplate !== undefined) {
         const isTpl = typeof isTemplate === 'string' ? isTemplate === 'true' : Boolean(isTemplate);
-        conditions.push(eq(menu.isTemplate, isTpl));
+        conditions.push(eq(price.isTemplate, isTpl));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [countResult] = await db
         .select({ count: count() })
-        .from(menu)
+        .from(price)
         .where(whereClause);
     const total = Number(countResult?.count || 0);
 
-    let orderColumn: any = menu.name;
-    if (sortField === 'isTemplate') orderColumn = menu.isTemplate;
-    else if (sortField === 'createdAt') orderColumn = menu.createdAt;
-    else if (sortField === 'updatedAt') orderColumn = menu.updatedAt;
-    else if (sortField === 'displayName' || sortField === 'name') orderColumn = menu.name;
+    let orderColumn: any = price.name;
+    if (sortField === 'isTemplate') orderColumn = price.isTemplate;
+    else if (sortField === 'createdAt') orderColumn = price.createdAt;
+    else if (sortField === 'updatedAt') orderColumn = price.updatedAt;
+    else if (sortField === 'displayName' || sortField === 'name') orderColumn = price.name;
 
     const orderFn = sortOrder === 'desc' ? desc : asc;
 
-    const rows = await db.query.menu.findMany({
+    const rows = await db.query.price.findMany({
         where: whereClause,
         orderBy: [orderFn(orderColumn)],
         limit,
@@ -61,10 +61,10 @@ export const listPrices = query(PaginationSchema, async (input: v.InferOutput<ty
         }
     });
 
-    const data: Price[] = rows.map((m: any) => {
+    const data: Price[] = rows.map((p: any) => {
         let totalPricePerPortion = 0;
         let totalCostPerPortion = 0;
-        const items = (m.items || []).map((it: any) => {
+        const items = (p.items || []).map((it: any) => {
             const linePricePerPortion = (it.unitPrice || 0) * (it.portionAmount || 1);
             const lineCostPerPortion = (it.costPrice || 0) * (it.portionAmount || 1);
             totalPricePerPortion += linePricePerPortion;
@@ -76,7 +76,7 @@ export const listPrices = query(PaginationSchema, async (input: v.InferOutput<ty
 
             return {
                 id: it.id,
-                menuId: it.menuId,
+                priceId: it.priceId,
                 itemType: it.itemType,
                 consumableId: it.consumableId,
                 recipeId: it.recipeId,
@@ -106,13 +106,13 @@ export const listPrices = query(PaginationSchema, async (input: v.InferOutput<ty
         });
 
         return {
-            id: m.id,
-            userId: m.userId,
-            name: m.name,
-            description: m.description,
-            isTemplate: m.isTemplate,
-            createdAt: m.createdAt.toISOString(),
-            updatedAt: m.updatedAt.toISOString(),
+            id: p.id,
+            userId: p.userId,
+            name: p.name,
+            description: p.description,
+            isTemplate: p.isTemplate,
+            createdAt: p.createdAt.toISOString(),
+            updatedAt: p.updatedAt.toISOString(),
             items,
             totalPricePerPortion: Math.round(totalPricePerPortion * 100) / 100,
             totalCostPerPortion: Math.round(totalCostPerPortion * 100) / 100,

@@ -12,7 +12,7 @@ export * from "./relations";
 export * from "./contracts";
 export * from "./consumables";
 export * from "./recipes";
-export * from "./menus";
+export * from "./prices";
 export * from "./payroll";
 export * from "./conditions";
 export * from "./hmos";
