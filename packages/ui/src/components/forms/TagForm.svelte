@@ -56,12 +56,14 @@
     ];
 
     const effectiveIsUpdating = $derived(isUpdating || !!initialData?.id || !!initialData?.data?.id);
+    // svelte-ignore state_referenced_locally
     let selectedVisibility = $state(initialData?.data?.visibility || initialData?.visibility || "internal");
     // svelte-ignore state_referenced_locally
     let selectedColor = $state(initialData?.data?.color || initialData?.color || "indigo");
     // svelte-ignore state_referenced_locally
     let selectedCategoryId = $state(initialData?.data?.categoryId || initialData?.categoryId || "");
 
+    // svelte-ignore state_referenced_locally
     let lastInitializedId = $state<string | null>(initialData?.data?.id || initialData?.id || null);
     $effect(() => {
         const item = initialData?.data || initialData;

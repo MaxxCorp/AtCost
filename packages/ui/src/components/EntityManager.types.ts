@@ -67,3 +67,23 @@ export interface ListItemContext<T> {
     index: number;
     allItems: T[];
 }
+
+export interface ContactItem {
+    id?: string | null;
+    displayName?: string | null;
+    givenName?: string | null;
+    familyName?: string | null;
+    middleName?: string | null;
+    honorificPrefix?: string | null;
+    honorificSuffix?: string | null;
+    company?: string | null;
+    department?: string | null;
+    role?: string | null;
+    emails?: any[];
+    phones?: any[];
+    addresses?: any[];
+    tags?: any[];
+    locationAssociations?: any[];
+    [key: string]: any;
+}
+

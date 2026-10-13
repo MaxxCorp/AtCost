@@ -7,6 +7,7 @@
         "allowArbitraryExtensions": true,
         "noEmit": true,
         "strict": true,
+        "allowJs": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
@@ -16,7 +17,6 @@
     },
     "include": [
         "src/**/*.ts",
-        "src/**/*.d.ts",
-        "src/**/*.svelte"
+        "src/**/*.d.ts"
     ]
 }

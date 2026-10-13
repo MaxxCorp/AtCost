@@ -30,7 +30,7 @@
         onDeleted = undefined,
         onLocationLoaded = undefined,
         breadcrumb = undefined,
-        children = undefined,
+        children: childrenProp = undefined,
     }: Props = $props();
 
     const locationQuery = $derived(readLocationRemote(locationId));
@@ -157,11 +157,9 @@
                     {m}
                     {labels}
                 >
-                    {#snippet children()}
-                        {#if children}
-                            {@render children({ location })}
-                        {/if}
-                    {/snippet}
+                    {#if childrenProp}
+                        {@render childrenProp({ location })}
+                    {/if}
                 </LocationForm>
             {/key}
         </div>

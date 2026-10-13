@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
-    import { handleDelete, EntityManager, TagManager, LocationForm, translateIssue, matchContactSearch } from "@ac/ui";
+    import { EntityManager, TagManager, ContactManager, LocationForm, translateIssue, matchContactSearch } from "@ac/ui";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import ResourceForm from "#lib/components/resources/ResourceForm.svelte";
@@ -1028,13 +1028,7 @@
                 }}
                 onchange={(ids: string[]) =>
                     rf.fields.resourceIds.set(JSON.stringify(ids))}
-                deleteItemRemote={async (ids: string[]) => {
-                    return await handleDelete({
-                        ids,
-                        deleteFn: deleteResourceRemote,
-                        itemName: m.feature_resources_title().toLowerCase(),
-                    });
-                }}
+                deleteItemRemote={deleteResourceRemote}
                 createRemote={createResource}
                 createSchema={createResourceSchema}
                 updateRemote={updateResource}
@@ -1254,13 +1248,7 @@
                     removeLocationAssociation({ ...p, locationId: p.itemId } as any)}
                 onchange={(ids: string[]) =>
                     rf.fields.locationIds.set(JSON.stringify(ids))}
-                deleteItemRemote={async (ids: string[]) => {
-                    return await handleDelete({
-                        ids,
-                        deleteFn: deleteLocation,
-                        itemName: m.location_label().toLowerCase(),
-                    });
-                }}
+                deleteItemRemote={deleteLocation}
                 createRemote={createLocation}
                 createSchema={createLocationSchema}
                 updateRemote={updateLocation}
@@ -1544,7 +1532,7 @@
         {m.feature_contacts_title()}
     </h3>
     {#key initialData?.id || "new"}
-    <EntityManager {m}
+    <ContactManager {m}
         title={m.feature_contacts_title()}
         icon={User}
         mode="embedded"
@@ -1561,45 +1549,13 @@
             addAssociation({ ...p, contactId: p.itemId } as any)}
         removeAssociationRemote={async (p: any) =>
             removeAssociation({ ...p, contactId: p.itemId } as any)}
-        deleteItemRemote={async (ids: string[]) => {
-            return await handleDelete({
-                ids,
-                deleteFn: deleteContact,
-                itemName: m.contact_label().toLowerCase(),
-            });
-        }}
+        deleteItemRemote={deleteContact}
         createRemote={createContact}
         createSchema={createContactSchema}
         updateRemote={updateContact}
         updateSchema={updateContactSchema}
         readItemRemote={readContact}
         searchPredicate={matchContactSearch}
-        loadingLabel={m.loading_item({ item: m.feature_contacts_title() })}
-        noItemsLabel={m.no_items_associated_label({
-            item: m.feature_contacts_title(),
-        })}
-        noItemsFoundLabel={m.no_items_found({
-            item: m.feature_contacts_title(),
-        })}
-        searchPlaceholder={m.search_placeholder({
-            item: m.feature_contacts_title(),
-        })}
-        linkItemLabel={m.link_item_label({
-            item: m.feature_contacts_title(),
-        })}
-        associatedItemLabel={m.associated_item_label({
-            item: m.feature_contacts_title(),
-        })}
-        quickCreateLabel={m.quick_create()}
-        closeSearchLabel={m.close_search()}
-        editLabel={m.edit()}
-        deleteLabel={m.delete()}
-        unlinkLabel={m.unlink()}
-        deleteForeverLabel={m.delete_forever({ item: m.contact() })}
-        bulkDeleteLabel={m.delete_selected({ count: 0 })}
-        selectAllLabel={m.select_all()}
-        deselectAllLabel={m.deselect_all()}
-        confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
     >
         {#snippet renderItemLabel(contactItem: any)}
             {@const contactName = contactItem.displayName ||
@@ -1746,13 +1702,7 @@
                                     ...p,
                                     locationId: p.itemId,
                                 } as any)}
-                            deleteItemRemote={async (ids: any) => {
-                                return await handleDelete({
-                                    ids: Array.isArray(ids) ? ids : [ids],
-                                    deleteFn: deleteLocation,
-                                    itemName: m.location().toLowerCase(),
-                                });
-                            }}
+                            deleteItemRemote={deleteLocation}
                             createRemote={createLocation}
                             createSchema={createLocationSchema}
                             updateRemote={updateLocation}
@@ -1881,7 +1831,7 @@
                 {/snippet}
             </ContactForm>
         {/snippet}
-    </EntityManager>
+    </ContactManager>
     {/key}
     <input
         {...rf.fields.contactIds.as(
@@ -1934,13 +1884,7 @@
                     currentPrices = items;
                     rf.fields.priceIds.set(JSON.stringify(ids));
                 }}
-                deleteItemRemote={async (ids: string[]) => {
-                    return await handleDelete({
-                        ids,
-                        deleteFn: deletePrices,
-                        itemName: m.price_list?.() || 'price list',
-                    });
-                }}
+                deleteItemRemote={deletePrices}
                 createRemote={createPrice}
                 createSchema={createPriceSchema}
                 updateRemote={updatePrice}

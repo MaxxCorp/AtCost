@@ -213,7 +213,7 @@
     function removeAddress(index: number) {
         addresses = addresses.filter((_, i) => i !== index);
     }
-    const contactFields = $derived(rf?.fields ? (prefix === "contact" ? rf.fields.contact : rf.fields.data?.fields?.contact) : undefined);
+    const contactFields = $derived(rf?.fields ? (prefix === "contact" ? rf.fields.contact : rf.fields.data?.contact) : undefined);
 </script>
 
 <div class="space-y-8">
@@ -230,14 +230,13 @@
                     >{i18n.displayName} <span class="text-red-500">*</span></label
                 >
                 <input
-                    {...contactFields?.fields?.displayName?.as("text")}
-                    name={`${prefix}.displayName`}
+                    {...contactFields?.displayName?.as("text")}
                     type="text"
                     bind:value={contactData.displayName}
                     required
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.displayName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.displayName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.displayName?.issues?.() ?? []) as issue}
+                {#each (contactFields?.displayName?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -248,13 +247,12 @@
                     >{i18n.givenName}</label
                 >
                 <input
-                    {...contactFields?.fields?.givenName?.as("text")}
-                    name={`${prefix}.givenName`}
+                    {...contactFields?.givenName?.as("text")}
                     type="text"
                     bind:value={contactData.givenName}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.givenName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.givenName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.givenName?.issues?.() ?? []) as issue}
+                {#each (contactFields?.givenName?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -265,13 +263,12 @@
                     >{i18n.middleName}</label
                 >
                 <input
-                    {...contactFields?.fields?.middleName?.as("text")}
-                    name={`${prefix}.middleName`}
+                    {...contactFields?.middleName?.as("text")}
                     type="text"
                     bind:value={contactData.middleName}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.middleName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.middleName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.middleName?.issues?.() ?? []) as issue}
+                {#each (contactFields?.middleName?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -282,13 +279,12 @@
                     >{i18n.familyName}</label
                 >
                 <input
-                    {...contactFields?.fields?.familyName?.as("text")}
-                    name={`${prefix}.familyName`}
+                    {...contactFields?.familyName?.as("text")}
                     type="text"
                     bind:value={contactData.familyName}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.familyName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.familyName?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.familyName?.issues?.() ?? []) as issue}
+                {#each (contactFields?.familyName?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -299,14 +295,13 @@
                     >{i18n.honorificPrefix}</label
                 >
                 <input
-                    {...contactFields?.fields?.honorificPrefix?.as("text")}
-                    name={`${prefix}.honorificPrefix`}
+                    {...contactFields?.honorificPrefix?.as("text")}
                     type="text"
                     bind:value={contactData.honorificPrefix}
                     placeholder="e.g. Dr., Prof."
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.honorificPrefix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.honorificPrefix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.honorificPrefix?.issues?.() ?? []) as issue}
+                {#each (contactFields?.honorificPrefix?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -317,14 +312,13 @@
                     >{i18n.honorificSuffix}</label
                 >
                 <input
-                    {...contactFields?.fields?.honorificSuffix?.as("text")}
-                    name={`${prefix}.honorificSuffix`}
+                    {...contactFields?.honorificSuffix?.as("text")}
                     type="text"
                     bind:value={contactData.honorificSuffix}
                     placeholder="e.g. PhD, MD"
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.honorificSuffix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.honorificSuffix?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.honorificSuffix?.issues?.() ?? []) as issue}
+                {#each (contactFields?.honorificSuffix?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -335,10 +329,9 @@
                     >{i18n.gender}</label
                 >
                 <select
-                    {...contactFields?.fields?.gender?.as("select")}
-                    name={`${prefix}.gender`}
+                    {...contactFields?.gender?.as("select")}
                     bind:value={contactData.gender}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.gender?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.gender?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 >
                     <option value="">{m?.select_placeholder?.() ?? "Select..."}</option>
                     <option value="male">{m?.gender_male?.() ?? "Male"}</option>
@@ -347,7 +340,7 @@
                     <option value="prefer-not-to-say">{m?.gender_prefer_not_to_say?.() ?? "Prefer not to say"}</option>
                     <option value="other">{labels?.other ?? "Other"}</option>
                 </select>
-                {#each (contactFields?.fields?.gender?.issues?.() ?? []) as issue}
+                {#each (contactFields?.gender?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -358,13 +351,12 @@
                     >{i18n.birthday}</label
                 >
                 <input
-                    {...contactFields?.fields?.birthday?.as("date")}
-                    name={`${prefix}.birthday`}
+                    {...contactFields?.birthday?.as("date")}
                     type="date"
                     bind:value={contactData.birthday}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.birthday?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.birthday?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.birthday?.issues?.() ?? []) as issue}
+                {#each (contactFields?.birthday?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -375,13 +367,12 @@
                     >{i18n.company}</label
                 >
                 <input
-                    {...contactFields?.fields?.company?.as("text")}
-                    name={`${prefix}.company`}
+                    {...contactFields?.company?.as("text")}
                     type="text"
                     bind:value={contactData.company}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.company?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.company?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.company?.issues?.() ?? []) as issue}
+                {#each (contactFields?.company?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -392,13 +383,12 @@
                     >{i18n.department}</label
                 >
                 <input
-                    {...contactFields?.fields?.department?.as("text")}
-                    name={`${prefix}.department`}
+                    {...contactFields?.department?.as("text")}
                     type="text"
                     bind:value={contactData.department}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.department?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.department?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.department?.issues?.() ?? []) as issue}
+                {#each (contactFields?.department?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -408,13 +398,12 @@
                     class="block text-sm font-medium text-gray-700">{i18n.role}</label
                 >
                 <input
-                    {...contactFields?.fields?.role?.as("text")}
-                    name={`${prefix}.role`}
+                    {...contactFields?.role?.as("text")}
                     type="text"
                     bind:value={contactData.role}
-                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.fields?.role?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
+                    class="mt-1 block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 {(contactFields?.role?.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 />
-                {#each (contactFields?.fields?.role?.issues?.() ?? []) as issue}
+                {#each (contactFields?.role?.issues?.() ?? []) as issue}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
@@ -424,8 +413,7 @@
                 >{i18n.notes}</label
             >
             <textarea
-                {...contactFields?.fields?.notes?.as("textarea")}
-                name={`${prefix}.notes`}
+                {...contactFields?.notes?.as("textarea")}
                 bind:value={contactData.notes}
                 rows="3"
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -434,8 +422,7 @@
 
         <div class="flex items-center gap-2 pt-2">
             <input
-                {...contactFields?.fields?.isPublic?.as("checkbox")}
-                name={`${prefix}.isPublic`}
+                {...contactFields?.isPublic?.as("checkbox")}
                 type="checkbox"
                 bind:checked={contactData.isPublic}
                 class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"

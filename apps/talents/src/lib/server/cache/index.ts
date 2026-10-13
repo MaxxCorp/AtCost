@@ -14,6 +14,7 @@ export {
     hashParams,
     invalidateTalent,
     invalidateLocation,
+    invalidateContact,
     invalidateAllKioskViews,
 } from './invalidation';
 

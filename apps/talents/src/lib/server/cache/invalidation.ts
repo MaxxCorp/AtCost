@@ -5,6 +5,7 @@ export const CACHE_NAMESPACES = {
     TALENTS: 'talents',
     LOCATIONS: 'locations',
     TAGS: 'tags',
+    CONTACTS: 'contacts',
 } as const;
 
 export function hashParams(params: unknown): string {
@@ -16,6 +17,8 @@ export const cacheKeys = {
     talentsList: (version: number, hash: string) => `cache:talent:list:v${version}:${hash}`,
     location: (id: string) => `cache:location:${id}`,
     locationsList: (version: number, hash: string) => `cache:location:list:v${version}:${hash}`,
+    contact: (id: string) => `cache:contact:${id}`,
+    contactsList: (version: number, hash: string) => `cache:contact:list:v${version}:${hash}`,
 };
 
 export async function invalidateTalent(talentIds?: string | string[]): Promise<void> {
@@ -38,6 +41,17 @@ export async function invalidateLocation(locationIds?: string | string[]): Promi
     ]);
 }
 
+export async function invalidateContact(contactIds?: string | string[]): Promise<void> {
+    const ids = contactIds ? (Array.isArray(contactIds) ? contactIds : [contactIds]) : [];
+    const keys = ids.map((id) => cacheKeys.contact(id));
+
+    await Promise.all([
+        keys.length > 0 ? delCache(keys) : Promise.resolve(),
+        bumpNamespaceVersion(CACHE_NAMESPACES.CONTACTS),
+    ]);
+}
+
 export async function invalidateAllKioskViews(): Promise<void> {
     // No-op for talents app
 }
+

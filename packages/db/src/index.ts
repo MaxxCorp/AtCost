@@ -2,6 +2,7 @@ export * from "./schema/index.js";
 export * from "./db.js";
 export * from "./reporting-line.js";
 export * from "./locations.js";
+export * from "./contacts.js";
 
 // Re-export all common Drizzle helpers and types for convenience
 export { 

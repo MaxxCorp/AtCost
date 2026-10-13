@@ -17,6 +17,7 @@
         onCancel?: () => void;
         cancelHref?: string;
         contactId?: string;
+        isUpdating?: boolean;
         loading?: boolean;
 
         tags?: string[];
@@ -93,6 +94,7 @@
         onCancel,
         cancelHref = "/contacts",
         contactId,
+        isUpdating = false,
         loading = false,
         listContactsRemote,
         children,

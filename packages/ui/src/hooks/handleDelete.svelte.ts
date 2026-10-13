@@ -12,14 +12,16 @@ export async function handleDelete({
     ids,
     deleteFn,
     itemName,
+    skipConfirm = false,
 }: {
     ids: string[];
     deleteFn: (ids: string[]) => Promise<any>;
     itemName: string;
+    skipConfirm?: boolean;
 }): Promise<boolean> {
     if (!ids?.length) return false;
     const plural = ids.length === 1 ? '' : 's';
-    if (!confirm(`Delete ${ids.length} ${itemName}${plural}?`)) return false;
+    if (!skipConfirm && !confirm(`Delete ${ids.length} ${itemName}${plural}?`)) return false;
     try {
         const result = await deleteFn(ids);
         // Commands return a result object. If it has success: false, it failed.
