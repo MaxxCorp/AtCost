@@ -47,6 +47,10 @@
 		getEventDurationDays,
 		isMultiDayEvent,
 	} from "#lib/utils/format-event-date.js";
+	import {
+		getAllSeriesOccurrences,
+		getUpcomingOccurrence,
+	} from "#lib/utils/event-series.js";
 
 	function formatDate(dateStr: string | null | undefined) {
 		if (!dateStr) return "";
@@ -67,15 +71,7 @@
 	}
 
 	function getUpcomingInstance(event: any) {
-		if (!event.instances || event.instances.length === 0) return null;
-		const now = Date.now();
-		const upcoming = event.instances.find((inst: any) => {
-			const time = inst.endDateTime
-				? new Date(inst.endDateTime).getTime()
-				: (inst.startDateTime ? new Date(inst.startDateTime).getTime() : 0);
-			return time >= now;
-		});
-		return upcoming || event.instances[0] || null;
+		return getUpcomingOccurrence(event, { excludePast });
 	}
 
 	function isSeriesEvent(event: any): boolean {
@@ -356,7 +352,7 @@
 	}
 
 	function groupEvents(rawEvents: any[]) {
-		return rawEvents
+		const grouped = rawEvents
 			.filter((e: any) => !e.recurringEventId)
 			.map((master: any) => {
 				const existingInstances = master.instances || [];
@@ -377,6 +373,22 @@
 				});
 				return { ...master, instances: combined };
 			});
+
+		if (sortField === "startDateTime") {
+			grouped.sort((a: any, b: any) => {
+				const occA = getUpcomingOccurrence(a, { excludePast });
+				const occB = getUpcomingOccurrence(b, { excludePast });
+				const timeA = occA?.startDateTime
+					? new Date(occA.startDateTime).getTime()
+					: (a.startDateTime ? new Date(a.startDateTime).getTime() : 0);
+				const timeB = occB?.startDateTime
+					? new Date(occB.startDateTime).getTime()
+					: (b.startDateTime ? new Date(b.startDateTime).getTime() : 0);
+				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+			});
+		}
+
+		return grouped;
 	}
 
 	function unrollEvents(rawEvents: any[], isExcludePast: boolean) {
@@ -386,28 +398,29 @@
 		now.setHours(0, 0, 0, 0);
 
 		for (const master of grouped) {
-			const hasInstances = master.instances && master.instances.length > 0;
-			if (!hasInstances) {
+			const isSeries = isSeriesEvent(master);
+			if (!isSeries) {
 				unrolled.push(master);
 			} else {
-				for (const inst of master.instances) {
+				const occurrences = getAllSeriesOccurrences(master);
+				for (const occ of occurrences) {
 					if (isExcludePast) {
-						const iStart = inst.startDateTime ? new Date(inst.startDateTime) : null;
-						const iEnd = inst.endDateTime ? new Date(inst.endDateTime) : null;
+						const iStart = occ.startDateTime ? new Date(occ.startDateTime) : null;
+						const iEnd = occ.endDateTime ? new Date(occ.endDateTime) : null;
 						const isFuture = (iStart ? iStart >= now : false) || (iEnd ? iEnd >= now : false);
 						if (!isFuture) continue;
 					}
 					unrolled.push({
 						...master,
-						...inst,
-						id: inst.id,
-						summary: inst.summary || master.summary,
-						startDateTime: inst.startDateTime,
-						endDateTime: inst.endDateTime,
-						status: inst.status || master.status,
-						isSeriesInstance: true,
-						isSeriesMaster: false,
-						recurringEventId: master.id,
+						...occ,
+						id: occ.id,
+						summary: occ.summary || master.summary,
+						startDateTime: occ.startDateTime,
+						endDateTime: occ.endDateTime,
+						status: occ.status || master.status,
+						isSeriesInstance: !occ.isMaster,
+						isSeriesMaster: Boolean(occ.isMaster),
+						recurringEventId: occ.isMaster ? null : master.id,
 						seriesMaster: master,
 						instances: master.instances,
 						locations: master.locations,
@@ -795,7 +808,7 @@
 								{@const defaultLabel = isInstance ? m.edit_instance() : m.edit_series()}
 								{@const otherHref = isInstance ? `/events/${masterId}` : `/events/${upcomingInst?.id || masterId}`}
 								{@const otherLabel = isInstance ? m.edit_series() : m.edit_instance()}
-								{@const allInstances = event.instances || event.seriesMaster?.instances || []}
+								{@const allInstances = getAllSeriesOccurrences(event.seriesMaster || event)}
 
 								<div class="flex-1 sm:flex-none inline-flex rounded-md shadow-2xs isolate">
 									<Button

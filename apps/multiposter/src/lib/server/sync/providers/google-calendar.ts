@@ -189,7 +189,6 @@ export class GoogleCalendarProvider implements SyncProvider {
 				queryParams.append('syncToken', syncToken);
 			} else {
 				// For full sync, we can use ordering and time filters
-				queryParams.append('singleEvents', 'true');
 				queryParams.append('orderBy', 'updated');
 
 				// For full sync, only get events from the past year to now + 2 years

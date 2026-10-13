@@ -228,7 +228,7 @@ export class SyncService {
 	 * For a series master event, expand its occurrences (master + virtual occurrences + materialized exceptions)
 	 * for providers that do not natively support recurrence rules (like WP The Events Calendar).
 	 */
-	public async getMasterOccurrenceIds(master: typeof eventTable.$inferSelect): Promise<string[]> {
+	public async getMasterOccurrenceIds(master: typeof eventTable.$inferSelect, options?: { windowPastDays?: number }): Promise<string[]> {
 		let rruleStr: string | null = null;
 		const rec = master.recurrence as unknown;
 		if (Array.isArray(rec) && rec[0] && typeof rec[0] === 'string') {
@@ -271,14 +271,21 @@ export class SyncService {
 		}
 
 		const occurrenceIds: string[] = [];
+		const windowPastDays = options?.windowPastDays ?? 14;
+		const cutoff = windowPastDays > 0 ? new Date(Date.now() - windowPastDays * 24 * 60 * 60 * 1000) : null;
 
 		// Occurrence #0: Master event itself
 		if (master.status !== 'cancelled') {
-			occurrenceIds.push(master.id);
+			if (!cutoff || !master.startDateTime || new Date(master.startDateTime) >= cutoff) {
+				occurrenceIds.push(master.id);
+			}
 		}
 
 		// Subsequent occurrences
 		for (const inst of instances) {
+			if (cutoff && inst.date < cutoff) {
+				continue;
+			}
 			const instIso = inst.date.toISOString();
 			const ex = exceptionMap.get(instIso);
 			if (ex) {

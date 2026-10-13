@@ -99,3 +99,138 @@ export function getSeriesRootId(event: any): string | null {
     return event.recurringEventId || event.id || null;
 }
 
+export interface SeriesOccurrenceItem {
+    id: string;
+    summary?: string | null;
+    startDateTime: string | null;
+    endDateTime?: string | null;
+    status?: string | null;
+    isMaster?: boolean;
+    isSeriesInstance?: boolean;
+    recurringEventId?: string | null;
+    seriesMaster?: any;
+    [key: string]: any;
+}
+
+/**
+ * Returns the complete chronological sequence of occurrences for a series master event,
+ * explicitly including Occurrence #1 (the master event entry itself) along with any
+ * child exceptions and projected virtual instances.
+ */
+export function getAllSeriesOccurrences(masterEvent: any): SeriesOccurrenceItem[] {
+    if (!masterEvent) return [];
+
+    const toIso = (d: any): string | null => {
+        if (!d) return null;
+        if (typeof d === "string") return d;
+        if (d instanceof Date) return isNaN(d.getTime()) ? null : d.toISOString();
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    };
+
+    const occurrences: SeriesOccurrenceItem[] = [];
+    const seenTimes = new Set<number>();
+    const seenIds = new Set<string>();
+
+    // 1. Initial occurrence (Occurrence #1 - Master event entry)
+    if (masterEvent.startDateTime) {
+        const masterIso = toIso(masterEvent.startDateTime);
+        const masterTime = masterIso ? new Date(masterIso).getTime() : 0;
+        if (masterIso && !isNaN(masterTime)) {
+            occurrences.push({
+                ...masterEvent,
+                id: masterEvent.id,
+                summary: masterEvent.summary,
+                startDateTime: masterIso,
+                endDateTime: toIso(masterEvent.endDateTime),
+                status: masterEvent.status || 'published',
+                isMaster: true,
+                isSeriesMaster: true,
+                isSeriesInstance: false,
+                recurringEventId: null
+            });
+            seenTimes.add(masterTime);
+            seenIds.add(masterEvent.id);
+        }
+    }
+
+    // 2. Child instances (materialized exceptions and virtual instances)
+    const childInstances = Array.isArray(masterEvent.instances) ? masterEvent.instances : [];
+    for (const inst of childInstances) {
+        if (!inst) continue;
+        const instIso = toIso(inst.startDateTime);
+        const instTime = instIso ? new Date(instIso).getTime() : 0;
+        if (!instIso || isNaN(instTime)) continue;
+
+        if (seenIds.has(inst.id) || seenTimes.has(instTime)) {
+            continue;
+        }
+
+        occurrences.push({
+            ...masterEvent,
+            ...inst,
+            id: inst.id,
+            summary: inst.summary || masterEvent.summary,
+            startDateTime: instIso,
+            endDateTime: toIso(inst.endDateTime || masterEvent.endDateTime),
+            status: inst.status || masterEvent.status || 'published',
+            isMaster: false,
+            isSeriesMaster: false,
+            isSeriesInstance: true,
+            recurringEventId: masterEvent.id,
+            seriesMaster: masterEvent
+        });
+        seenTimes.add(instTime);
+        seenIds.add(inst.id);
+    }
+
+    // Sort chronologically ascending
+    occurrences.sort((a, b) => {
+        const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+        const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+        return timeA - timeB;
+    });
+
+    return occurrences;
+}
+
+/**
+ * Returns the upcoming or most relevant occurrence for an event series,
+ * taking into account Occurrence #1 (master) and all subsequent instances.
+ */
+export function getUpcomingOccurrence(
+    event: any,
+    options?: {
+        now?: number | Date;
+        excludePast?: boolean;
+    }
+): SeriesOccurrenceItem | null {
+    if (!event) return null;
+
+    const occurrences = getAllSeriesOccurrences(event);
+    if (occurrences.length === 0) {
+        return event;
+    }
+
+    const nowTime = options?.now
+        ? (options.now instanceof Date ? options.now.getTime() : options.now)
+        : Date.now();
+
+    const upcoming = occurrences.find((occ) => {
+        const time = occ.endDateTime
+            ? new Date(occ.endDateTime).getTime()
+            : (occ.startDateTime ? new Date(occ.startDateTime).getTime() : 0);
+        return time >= nowTime;
+    });
+
+    if (upcoming) return upcoming;
+
+    // If no future occurrence found and excludePast is active:
+    if (options?.excludePast) {
+        return null;
+    }
+
+    // Return the latest occurrence if all are past, or the first one as fallback
+    return occurrences[occurrences.length - 1] || occurrences[0] || null;
+}
+

@@ -835,6 +835,31 @@ describe('SyncService - Bulk Sync', () => {
 			expect(occIds[1]).toContain('master-uuid_inst_');
 			expect(occIds[2]).toContain('master-uuid_inst_');
 		});
+
+		it('filters out past occurrences beyond windowPastDays for non-native providers', async () => {
+			const service = new SyncService();
+
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([])
+				})
+			});
+
+			const pastMasterEvent: any = {
+				id: 'old-master-uuid',
+				startDateTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+				endDateTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000 + 3600000),
+				recurrence: ['RRULE:FREQ=DAILY;COUNT=35'], // 30 in the past, 5 in current/future
+				status: 'confirmed'
+			};
+
+			const occIds = await service.getMasterOccurrenceIds(pastMasterEvent, { windowPastDays: 14 });
+			// Old master from 30 days ago should be excluded
+			expect(occIds).not.toContain('old-master-uuid');
+			// Only occurrences within the last 14 days and future should be included
+			expect(occIds.length).toBeGreaterThan(0);
+			expect(occIds.length).toBeLessThan(35);
+		});
 	});
 
 	describe('deleteEventMappings', () => {

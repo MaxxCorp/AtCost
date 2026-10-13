@@ -147,18 +147,8 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			// If we have a sync token, use it (delta query)
 			url = syncToken;
 		} else {
-			// Full sync: last year to next 2 years
-			const now = new Date();
-			const pastYear = new Date(now);
-			pastYear.setFullYear(now.getFullYear() - 1);
-			const futureYears = new Date(now);
-			futureYears.setFullYear(now.getFullYear() + 2);
-
-			const start = pastYear.toISOString();
-			const end = futureYears.toISOString();
-
-			// Use delta endpoint for full sync to get a deltaLink at the end
-			url = `${this.getBaseUrl()}/calendarView/delta?startDateTime=${start}&endDateTime=${end}`;
+			// Use events delta endpoint for full sync to get recurring masters and deltaLink at the end
+			url = `${this.getBaseUrl()}/events/delta`;
 		}
 
 		let allEvents: any[] = [];

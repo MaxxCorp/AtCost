@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSeriesItem, isNonSeriesEvent, isVirtualInstanceId, parseVirtualInstanceId, isSeriesMaster, isSeriesInstance, getSeriesRootId } from "./event-series";
+import { isSeriesItem, isNonSeriesEvent, isVirtualInstanceId, parseVirtualInstanceId, isSeriesMaster, isSeriesInstance, getSeriesRootId, getAllSeriesOccurrences, getUpcomingOccurrence } from "./event-series";
 
 describe("event-series helper", () => {
     it("identifies standard single one-off events as non-series events", () => {
@@ -178,6 +178,118 @@ describe("event-series helper", () => {
         expect(getSeriesRootId(virtual)).toBe("master-123");
         expect(getSeriesRootId(exception)).toBe("master-123");
         expect(getSeriesRootId("master-123_inst_2026-10-15T14:00:00.000Z")).toBe("master-123");
+    });
+
+    it("ensures getSeriesRootId matches between a master with seriesId and its virtual instances", () => {
+        const master = {
+            id: "master-uuid",
+            seriesId: "series-legacy-123",
+            recurrence: ["RRULE:FREQ=WEEKLY"]
+        };
+        const virtual = {
+            id: "master-uuid_inst_2026-10-15T14:00:00.000Z",
+            recurringEventId: "master-uuid",
+            seriesId: "series-legacy-123"
+        };
+
+        expect(getSeriesRootId(master)).toBe("master-uuid");
+        expect(getSeriesRootId(virtual)).toBe("master-uuid");
+    });
+
+    it("getAllSeriesOccurrences includes Occurrence #1 (master) and subsequent instances chronologically", () => {
+        const master = {
+            id: "master-1",
+            summary: "Weekly Class",
+            startDateTime: "2026-10-01T10:00:00.000Z",
+            endDateTime: "2026-10-01T11:00:00.000Z",
+            status: "published",
+            instances: [
+                {
+                    id: "master-1_inst_2026-10-08T10:00:00.000Z",
+                    startDateTime: "2026-10-08T10:00:00.000Z",
+                    endDateTime: "2026-10-08T11:00:00.000Z"
+                },
+                {
+                    id: "master-1_inst_2026-10-15T10:00:00.000Z",
+                    startDateTime: "2026-10-15T10:00:00.000Z",
+                    endDateTime: "2026-10-15T11:00:00.000Z"
+                }
+            ]
+        };
+
+        const occurrences = getAllSeriesOccurrences(master);
+        expect(occurrences).toHaveLength(3);
+        expect(occurrences[0].id).toBe("master-1");
+        expect(occurrences[0].isMaster).toBe(true);
+        expect(occurrences[0].startDateTime).toBe("2026-10-01T10:00:00.000Z");
+
+        expect(occurrences[1].id).toBe("master-1_inst_2026-10-08T10:00:00.000Z");
+        expect(occurrences[1].isSeriesInstance).toBe(true);
+
+        expect(occurrences[2].id).toBe("master-1_inst_2026-10-15T10:00:00.000Z");
+    });
+
+    it("getUpcomingOccurrence selects Occurrence #1 if Occurrence #1 is in the future", () => {
+        const master = {
+            id: "master-future",
+            summary: "Future Workshop",
+            startDateTime: "2026-10-20T10:00:00.000Z",
+            endDateTime: "2026-10-20T11:00:00.000Z",
+            instances: [
+                {
+                    id: "master-future_inst_2026-10-27T10:00:00.000Z",
+                    startDateTime: "2026-10-27T10:00:00.000Z",
+                    endDateTime: "2026-10-27T11:00:00.000Z"
+                }
+            ]
+        };
+
+        const now = new Date("2026-10-15T00:00:00.000Z");
+        const next = getUpcomingOccurrence(master, { now });
+        expect(next).not.toBeNull();
+        expect(next?.id).toBe("master-future");
+        expect(next?.startDateTime).toBe("2026-10-20T10:00:00.000Z");
+    });
+
+    it("getUpcomingOccurrence advances to Occurrence #2 if Occurrence #1 is in the past", () => {
+        const master = {
+            id: "master-past",
+            summary: "Past Workshop",
+            startDateTime: "2026-10-01T10:00:00.000Z",
+            endDateTime: "2026-10-01T11:00:00.000Z",
+            instances: [
+                {
+                    id: "master-past_inst_2026-10-20T10:00:00.000Z",
+                    startDateTime: "2026-10-20T10:00:00.000Z",
+                    endDateTime: "2026-10-20T11:00:00.000Z"
+                }
+            ]
+        };
+
+        const now = new Date("2026-10-15T00:00:00.000Z");
+        const next = getUpcomingOccurrence(master, { now, excludePast: true });
+        expect(next).not.toBeNull();
+        expect(next?.id).toBe("master-past_inst_2026-10-20T10:00:00.000Z");
+    });
+
+    it("getUpcomingOccurrence returns null when all occurrences are in the past with excludePast=true", () => {
+        const master = {
+            id: "master-all-past",
+            summary: "Concluded Workshop",
+            startDateTime: "2026-09-01T10:00:00.000Z",
+            endDateTime: "2026-09-01T11:00:00.000Z",
+            instances: [
+                {
+                    id: "master-all-past_inst_2026-09-08T10:00:00.000Z",
+                    startDateTime: "2026-09-08T10:00:00.000Z",
+                    endDateTime: "2026-09-08T11:00:00.000Z"
+                }
+            ]
+        };
+
+        const now = new Date("2026-10-15T00:00:00.000Z");
+        const next = getUpcomingOccurrence(master, { now, excludePast: true });
+        expect(next).toBeNull();
     });
 });
 

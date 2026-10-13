@@ -727,12 +727,14 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				return true;
 			});
 		}
-	} else if (excludePast) {
+	}
+
+	if (excludePast) {
 		const cutoff = new Date();
 		cutoff.setHours(0, 0, 0, 0);
 
 		const instancesByMaster = new Map<string, any[]>();
-		for (const item of rawResults) {
+		for (const item of results) {
 			if (item.recurringEventId) {
 				const list = instancesByMaster.get(item.recurringEventId) || [];
 				list.push(item);
@@ -740,7 +742,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			}
 		}
 
-		results = rawResults.filter((e: any) => {
+		results = results.filter((e: any) => {
 			const start = e.startDateTime ? new Date(e.startDateTime) : null;
 			const end = e.endDateTime ? new Date(e.endDateTime) : null;
 			const isSelfFuture = (start ? start >= cutoff : false) || (end ? end >= cutoff : false);

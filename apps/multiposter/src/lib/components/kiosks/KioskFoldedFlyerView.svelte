@@ -32,7 +32,7 @@
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice } from "#lib/utils/format-ticket-price.js";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
-    import { isSeriesItem, isNonSeriesEvent } from "#lib/utils/event-series.js";
+    import { isSeriesItem, isNonSeriesEvent, getSeriesRootId } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
     import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
@@ -367,10 +367,7 @@
 
         for (const evt of eventList) {
             if (isSeriesItem(evt)) {
-                const anyEvt = evt as any;
-                const sKey = anyEvt.recurringEventId ||
-                    (anyEvt.seriesId ? `series_${anyEvt.seriesId}` : null) ||
-                    (evt.id.includes('_inst_') ? evt.id.split('_inst_')[0] : evt.id);
+                const sKey = getSeriesRootId(evt) || evt.id;
 
                 const group = seriesGroups.get(sKey) || [];
                 group.push(evt);
