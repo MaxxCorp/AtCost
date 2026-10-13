@@ -42,6 +42,7 @@
     function normalizeTag(t: any) {
         if (!t) return null;
         const tagObj = t.tag || t;
+        if (!tagObj || !tagObj.name) return null;
         return {
             id: tagObj.id,
             name: tagObj.name,
@@ -255,36 +256,38 @@
             {#each sections as section (section.id)}
                 <div class="section-group">
                     <!-- Section Header (Acting as section of price list) -->
-                    <div
-                        class="bg-gray-100/75 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200/60"
-                    >
-                        <div class="flex items-center gap-2">
-                            <span
-                                class="w-2.5 h-2.5 rounded-full inline-block shadow-2xs shrink-0"
-                                style="background-color: {section.color};"
-                            ></span>
-                            <span
-                                class="text-[11px] font-bold text-gray-800 uppercase tracking-wider"
-                            >
-                                {section.name}
-                            </span>
-                            <span
-                                class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-200 text-gray-700"
-                            >
-                                {section.items.length} {section.items.length === 1 ? "item" : "items"}
-                            </span>
-                        </div>
-                        <div class="flex items-center gap-2 text-right">
-                            <span class="text-xs font-mono font-semibold text-gray-700">
-                                €{section.subtotal.toFixed(2)} / {m.portion?.() || "portion"}
-                            </span>
-                            {#if participantsCount > 1}
-                                <span class="text-[11px] font-mono text-emerald-700 font-medium">
-                                    • €{(section.subtotal * participantsCount).toFixed(2)} ({participantsCount}p)
+                    {#if sections.length > 1}
+                        <div
+                            class="bg-gray-100/75 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 border-b border-gray-200/60"
+                        >
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="w-2.5 h-2.5 rounded-full inline-block shadow-2xs shrink-0"
+                                    style="background-color: {section.color};"
+                                ></span>
+                                <span
+                                    class="text-[11px] font-bold text-gray-800 uppercase tracking-wider"
+                                >
+                                    {section.name}
                                 </span>
-                            {/if}
+                                <span
+                                    class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-200 text-gray-700"
+                                >
+                                    {section.items.length} {section.items.length === 1 ? "item" : "items"}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2 text-right">
+                                <span class="text-xs font-mono font-semibold text-gray-700">
+                                    €{section.subtotal.toFixed(2)} / {m.portion?.() || "portion"}
+                                </span>
+                                {#if participantsCount > 1}
+                                    <span class="text-[11px] font-mono text-emerald-700 font-medium">
+                                        • €{(section.subtotal * participantsCount).toFixed(2)} ({participantsCount}p)
+                                    </span>
+                                {/if}
+                            </div>
                         </div>
-                    </div>
+                    {/if}
 
                     <!-- Items in Section -->
                     <div class="divide-y divide-gray-100 bg-white">

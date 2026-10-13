@@ -23,11 +23,7 @@
         factor?: number | null;
         unitPrice?: number | null;
         sortOrder?: number | null;
-        tags?: Array<{
-            id?: string;
-            name: string;
-            color?: string | null;
-        }>;
+        tags?: Array<any>;
     }
 
     interface PriceData {
@@ -65,6 +61,23 @@
         costSubtotal: number;
     }
 
+    interface NormalizedTag {
+        id?: string;
+        name: string;
+        color: string;
+    }
+
+    function normalizeTag(t: any): NormalizedTag | null {
+        if (!t) return null;
+        const tagObj = t.tag || t;
+        if (!tagObj || !tagObj.name) return null;
+        return {
+            id: tagObj.id,
+            name: tagObj.name,
+            color: tagObj.color || "#6366f1",
+        };
+    }
+
     // Process each price list and organize items into sections based on their tags
     function computeSections(items: PriceItemData[] = []): SectionGroup[] {
         const sectionMap = new Map<string, SectionGroup>();
@@ -84,9 +97,11 @@
             const linePrice = itemPrice * portion;
             const lineCost = itemCost * portion;
 
-            if (item.tags && item.tags.length > 0) {
+            const tags: NormalizedTag[] = (item.tags || []).map(normalizeTag).filter((t): t is NormalizedTag => t !== null);
+
+            if (tags.length > 0) {
                 // Group by primary tag
-                const primaryTag = item.tags[0];
+                const primaryTag = tags[0];
                 const key = primaryTag.id || primaryTag.name.toLowerCase();
 
                 if (!sectionMap.has(key)) {
@@ -174,7 +189,7 @@
         {#each displayPrices as priceList (priceList.id || priceList.name)}
             {@const sections = computeSections(priceList.items || [])}
             {@const totalItemCount = (priceList.items || []).length}
-            {@const activeSections = activeSectionId === "all" ? sections : sections.filter(s => s.id === activeSectionId)}
+            {@const activeSections = activeSectionId === "all" || !sections.some(s => s.id === activeSectionId) ? sections : sections.filter(s => s.id === activeSectionId)}
 
             <div class="price-list-card border border-gray-200 rounded-xl overflow-hidden shadow-xs bg-white">
                 <!-- Price List Header -->
@@ -247,26 +262,28 @@
                         {#each activeSections as section (section.id)}
                             <div class="section-group">
                                 <!-- Section Subheader -->
-                                <div class="bg-gray-50/60 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <span
-                                            class="w-2.5 h-2.5 rounded-full inline-block shadow-2xs"
-                                            style="background-color: {section.color || '#6366f1'};"
-                                        ></span>
-                                        <h4 class="text-xs font-bold text-gray-800 uppercase tracking-wider">
-                                            {section.name}
-                                        </h4>
-                                        <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-200/70 text-gray-600">
-                                            {section.items.length}
-                                        </span>
-                                    </div>
+                                {#if sections.length > 1}
+                                    <div class="bg-gray-50/60 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <span
+                                                class="w-2.5 h-2.5 rounded-full inline-block shadow-2xs"
+                                                style="background-color: {section.color || '#6366f1'};"
+                                            ></span>
+                                            <h4 class="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                                                {section.name}
+                                            </h4>
+                                            <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-200/70 text-gray-600">
+                                                {section.items.length}
+                                            </span>
+                                        </div>
 
-                                    <div class="text-right">
-                                        <span class="text-xs font-mono font-semibold text-gray-700">
-                                            €{section.subtotal.toFixed(2)}
-                                        </span>
+                                        <div class="text-right">
+                                            <span class="text-xs font-mono font-semibold text-gray-700">
+                                                €{section.subtotal.toFixed(2)}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
+                                {/if}
 
                                 <!-- Items List -->
                                 <div class="divide-y divide-gray-50">
@@ -279,7 +296,8 @@
                                                         {item.itemType === 'recipe' ? (m.recipe?.() || 'Recipe') : (m.consumable?.() || 'Consumable')}
                                                     </span>
                                                     {#if item.tags && item.tags.length > 0}
-                                                        {#each item.tags as t (t.id || t.name)}
+                                                        {@const normalizedItemTags: NormalizedTag[] = item.tags.map(normalizeTag).filter((t): t is NormalizedTag => t !== null)}
+                                                        {#each normalizedItemTags as t (t.id || t.name)}
                                                             <span
                                                                 class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium border"
                                                                 style="background-color: {t.color ? t.color + '15' : '#f1f5f9'}; color: {t.color || '#475569'}; border-color: {t.color ? t.color + '40' : '#cbd5e1'};"
