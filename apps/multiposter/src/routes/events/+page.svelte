@@ -808,7 +808,7 @@
 								{@const defaultLabel = isInstance ? m.edit_instance() : m.edit_series()}
 								{@const otherHref = isInstance ? `/events/${masterId}` : `/events/${upcomingInst?.id || masterId}`}
 								{@const otherLabel = isInstance ? m.edit_series() : m.edit_instance()}
-								{@const allInstances = getAllSeriesOccurrences(event.seriesMaster || event)}
+								{@const allInstances = getAllSeriesOccurrences(event.isSeriesInstance ? (event.seriesMaster || event) : event)}
 
 								<div class="flex-1 sm:flex-none inline-flex rounded-md shadow-2xs isolate">
 									<Button

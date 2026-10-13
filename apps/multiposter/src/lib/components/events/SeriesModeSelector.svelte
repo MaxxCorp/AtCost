@@ -42,7 +42,9 @@
         event?.instances || event?.seriesMaster?.instances || []
     );
     const recurrenceRule = $derived<string | null>(
-        (event?.recurrence?.[0] || event?.seriesMaster?.recurrence?.[0]) ?? null
+        (typeof event?.recurrence === "string" ? event.recurrence : event?.recurrence?.[0]) ||
+        (typeof event?.seriesMaster?.recurrence === "string" ? event.seriesMaster.recurrence : event?.seriesMaster?.recurrence?.[0]) ||
+        null
     );
     const recurrenceDescription = $derived(
         recurrenceRule ? formatRecurrenceText(recurrenceRule) : ""

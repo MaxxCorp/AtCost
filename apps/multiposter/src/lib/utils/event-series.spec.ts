@@ -291,5 +291,92 @@ describe("event-series helper", () => {
         const next = getUpcomingOccurrence(master, { now, excludePast: true });
         expect(next).toBeNull();
     });
+
+    it("getAllSeriesOccurrences resolves instances from seriesMaster.instances fallback", () => {
+        const item = {
+            id: "inst-1",
+            summary: "Instance View",
+            startDateTime: "2026-10-08T10:00:00.000Z",
+            endDateTime: "2026-10-08T11:00:00.000Z",
+            isSeriesInstance: true,
+            seriesMaster: {
+                id: "master-1",
+                summary: "Master Title",
+                startDateTime: "2026-10-01T10:00:00.000Z",
+                endDateTime: "2026-10-01T11:00:00.000Z",
+                instances: [
+                    {
+                        id: "inst-1",
+                        startDateTime: "2026-10-08T10:00:00.000Z",
+                        endDateTime: "2026-10-08T11:00:00.000Z"
+                    },
+                    {
+                        id: "master-1_inst_2026-10-15T10:00:00.000Z",
+                        startDateTime: "2026-10-15T10:00:00.000Z",
+                        endDateTime: "2026-10-15T11:00:00.000Z"
+                    }
+                ]
+            }
+        };
+
+        const occurrences = getAllSeriesOccurrences(item);
+        // Master occurrence + 2 child instances = 3
+        expect(occurrences).toHaveLength(3);
+        expect(occurrences.map((o) => o.id)).toEqual([
+            "master-1",
+            "inst-1",
+            "master-1_inst_2026-10-15T10:00:00.000Z"
+        ]);
+    });
+
+    it("getAllSeriesOccurrences contains all expanded instances when legacy series extends from fixed count to until date", () => {
+        const legacyMaster = {
+            id: "legacy-master-uuid",
+            summary: "Weekly Class",
+            startDateTime: "2026-10-01T10:00:00.000Z",
+            endDateTime: "2026-10-01T11:00:00.000Z",
+            recurrence: ["RRULE:FREQ=WEEKLY;UNTIL=20261105T235959Z"],
+            // Previously had 2 physical instances (fixed count = 2)
+            // Now extended with virtual instances up to UNTIL date (6 total occurrences: 1 master + 5 instances)
+            instances: [
+                {
+                    id: "legacy-physical-inst-1",
+                    startDateTime: "2026-10-08T10:00:00.000Z",
+                    endDateTime: "2026-10-08T11:00:00.000Z"
+                },
+                {
+                    id: "legacy-physical-inst-2",
+                    startDateTime: "2026-10-15T10:00:00.000Z",
+                    endDateTime: "2026-10-15T11:00:00.000Z"
+                },
+                {
+                    id: "legacy-master-uuid_inst_2026-10-22T10:00:00.000Z",
+                    startDateTime: "2026-10-22T10:00:00.000Z",
+                    endDateTime: "2026-10-22T11:00:00.000Z"
+                },
+                {
+                    id: "legacy-master-uuid_inst_2026-10-29T10:00:00.000Z",
+                    startDateTime: "2026-10-29T10:00:00.000Z",
+                    endDateTime: "2026-10-29T11:00:00.000Z"
+                },
+                {
+                    id: "legacy-master-uuid_inst_2026-11-05T10:00:00.000Z",
+                    startDateTime: "2026-11-05T10:00:00.000Z",
+                    endDateTime: "2026-11-05T11:00:00.000Z"
+                }
+            ]
+        };
+
+        const occurrences = getAllSeriesOccurrences(legacyMaster);
+        expect(occurrences).toHaveLength(6);
+        expect(occurrences.map((o) => o.id)).toEqual([
+            "legacy-master-uuid",
+            "legacy-physical-inst-1",
+            "legacy-physical-inst-2",
+            "legacy-master-uuid_inst_2026-10-22T10:00:00.000Z",
+            "legacy-master-uuid_inst_2026-10-29T10:00:00.000Z",
+            "legacy-master-uuid_inst_2026-11-05T10:00:00.000Z"
+        ]);
+    });
 });
 

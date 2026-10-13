@@ -288,6 +288,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						isNewException = true;
 					}
 				}
+			} else if (!isVirtualInstance && oldEvent?.recurringEventId && data.seriesMode === 'series') {
+				targetId = oldEvent.recurringEventId;
 			}
 
 			effectiveTargetId = targetId;
@@ -537,6 +539,12 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 					await tx.update(event).set({ seriesId: null }).where(eq(event.id, targetId));
 					targetRecord.seriesId = null;
 				}
+			} else if (updateData.recurrence && updateData.recurrence[0] && targetRecord.seriesId) {
+				// Sync updated recurrence into legacy recurringSeries table
+				await tx
+					.update(recurringSeries)
+					.set({ rrule: updateData.recurrence[0], updatedAt: new Date() })
+					.where(eq(recurringSeries.id, targetRecord.seriesId));
 			}
 
 			return targetRecord;

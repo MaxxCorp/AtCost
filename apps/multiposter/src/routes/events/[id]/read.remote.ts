@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { event, locationContact, inArray, eq, asc, or, and, sql } from '@ac/db';
+import { event, locationContact, recurringSeries, inArray, eq, asc, or, and, sql } from '@ac/db';
 import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
@@ -321,28 +321,42 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			masterRecord = await db.query.event.findFirst({
 				where: eq(event.id, result.recurringEventId),
 			});
-			if (masterRecord) {
-				seriesMaster = {
-					id: masterRecord.id,
-					summary: masterRecord.summary,
-					startDateTime: masterRecord.startDateTime?.toISOString() ?? null,
-					endDateTime: masterRecord.endDateTime?.toISOString() ?? null,
-					recurrence: masterRecord.recurrence,
-				};
-			}
 		} else {
 			masterRecord = result;
-			seriesMaster = {
-				id: result.id,
-				summary: result.summary,
-				startDateTime: result.startDateTime?.toISOString() ?? null,
-				endDateTime: result.endDateTime?.toISOString() ?? null,
-				recurrence: result.recurrence,
-			};
 		}
 
 		if (masterRecord) {
-			instances = await getSeriesInstances(masterRecord);
+			let masterRrule: string[] | null = masterRecord.recurrence
+				? (Array.isArray(masterRecord.recurrence) ? masterRecord.recurrence : [masterRecord.recurrence])
+				: null;
+
+			if ((!masterRrule || masterRrule.length === 0) && masterRecord.seriesId) {
+				const [seriesRecord] = await db
+					.select({ rrule: recurringSeries.rrule })
+					.from(recurringSeries)
+					.where(eq(recurringSeries.id, masterRecord.seriesId));
+				if (seriesRecord?.rrule) {
+					masterRrule = [seriesRecord.rrule];
+				}
+			}
+
+			instances = await getSeriesInstances({
+				...masterRecord,
+				recurrence: masterRrule,
+			});
+
+			seriesMaster = {
+				id: masterRecord.id,
+				summary: masterRecord.summary,
+				startDateTime: masterRecord.startDateTime ? (masterRecord.startDateTime instanceof Date ? masterRecord.startDateTime.toISOString() : new Date(masterRecord.startDateTime).toISOString()) : null,
+				endDateTime: masterRecord.endDateTime ? (masterRecord.endDateTime instanceof Date ? masterRecord.endDateTime.toISOString() : new Date(masterRecord.endDateTime).toISOString()) : null,
+				recurrence: masterRrule,
+				instances: instances.length > 0 ? instances : undefined,
+			};
+
+			if (!result.recurringEventId && masterRrule && (!result.recurrence || result.recurrence.length === 0)) {
+				result.recurrence = masterRrule;
+			}
 		}
 	}
 

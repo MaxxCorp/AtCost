@@ -120,6 +120,16 @@ export interface SeriesOccurrenceItem {
 export function getAllSeriesOccurrences(masterEvent: any): SeriesOccurrenceItem[] {
     if (!masterEvent) return [];
 
+    // If an instance is passed, resolve to its series master
+    const rootMaster = ((masterEvent.isSeriesInstance || masterEvent.recurringEventId) && masterEvent.seriesMaster)
+        ? {
+            ...masterEvent.seriesMaster,
+            instances: Array.isArray(masterEvent.instances) && masterEvent.instances.length > 0
+                ? masterEvent.instances
+                : masterEvent.seriesMaster.instances
+        }
+        : masterEvent;
+
     const toIso = (d: any): string | null => {
         if (!d) return null;
         if (typeof d === "string") return d;
@@ -133,29 +143,33 @@ export function getAllSeriesOccurrences(masterEvent: any): SeriesOccurrenceItem[
     const seenIds = new Set<string>();
 
     // 1. Initial occurrence (Occurrence #1 - Master event entry)
-    if (masterEvent.startDateTime) {
-        const masterIso = toIso(masterEvent.startDateTime);
+    if (rootMaster.startDateTime) {
+        const masterIso = toIso(rootMaster.startDateTime);
         const masterTime = masterIso ? new Date(masterIso).getTime() : 0;
         if (masterIso && !isNaN(masterTime)) {
             occurrences.push({
-                ...masterEvent,
-                id: masterEvent.id,
-                summary: masterEvent.summary,
+                ...rootMaster,
+                id: rootMaster.id,
+                summary: rootMaster.summary,
                 startDateTime: masterIso,
-                endDateTime: toIso(masterEvent.endDateTime),
-                status: masterEvent.status || 'published',
+                endDateTime: toIso(rootMaster.endDateTime),
+                status: rootMaster.status || 'published',
                 isMaster: true,
                 isSeriesMaster: true,
                 isSeriesInstance: false,
                 recurringEventId: null
             });
             seenTimes.add(masterTime);
-            seenIds.add(masterEvent.id);
+            seenIds.add(rootMaster.id);
         }
     }
 
     // 2. Child instances (materialized exceptions and virtual instances)
-    const childInstances = Array.isArray(masterEvent.instances) ? masterEvent.instances : [];
+    const childInstances = Array.isArray(rootMaster.instances)
+        ? rootMaster.instances
+        : Array.isArray(rootMaster.seriesMaster?.instances)
+            ? rootMaster.seriesMaster.instances
+            : [];
     for (const inst of childInstances) {
         if (!inst) continue;
         const instIso = toIso(inst.startDateTime);

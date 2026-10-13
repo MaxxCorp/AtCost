@@ -587,9 +587,12 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			}
 
 			for (const master of masters) {
+				const rec: any = master.recurrence;
 				let rruleStr: string | null = null;
-				if (master.recurrence && Array.isArray(master.recurrence) && master.recurrence[0]) {
-					rruleStr = master.recurrence[0];
+				if (rec && Array.isArray(rec) && rec[0]) {
+					rruleStr = rec[0];
+				} else if (typeof rec === 'string' && rec.trim().length > 0) {
+					rruleStr = rec.trim();
 				} else if (master.seriesId) {
 					rruleStr = seriesIdToRruleMap.get(master.seriesId) || null;
 				}

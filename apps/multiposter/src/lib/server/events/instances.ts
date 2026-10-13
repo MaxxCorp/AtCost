@@ -15,6 +15,7 @@ export interface SeriesMasterSummary {
 	startDateTime: string | null;
 	endDateTime: string | null;
 	recurrence?: string[] | null;
+	instances?: SeriesInstanceItem[];
 }
 
 function toIsoSafe(d: any): string | null {
@@ -39,7 +40,7 @@ export async function getSeriesInstances(
 		recurringEventId?: string | null;
 		seriesId?: string | null;
 	},
-	maxProjected: number = 20
+	maxProjected: number = 100
 ): Promise<SeriesInstanceItem[]> {
 	const masterId = master.id;
 	if (!masterId) return [];
@@ -57,9 +58,12 @@ export async function getSeriesInstances(
 		status: inst.status,
 	}));
 
+	const rec: any = master.recurrence;
 	let rruleStr: string | null = null;
-	if (master.recurrence && Array.isArray(master.recurrence) && master.recurrence[0]) {
-		rruleStr = master.recurrence[0];
+	if (rec && Array.isArray(rec) && rec[0]) {
+		rruleStr = rec[0];
+	} else if (typeof rec === 'string' && rec.trim().length > 0) {
+		rruleStr = rec.trim();
 	} else if (master.seriesId) {
 		const [seriesRecord] = await db.select().from(recurringSeries).where(eq(recurringSeries.id, master.seriesId));
 		if (seriesRecord?.rrule) rruleStr = seriesRecord.rrule;
@@ -117,13 +121,17 @@ export async function getSeriesInstances(
  * Executes a single DB query for all recurring masters in the list, then calculates
  * recurrence projections in-memory.
  */
-export async function populateSeriesInstances(events: any[], maxProjected: number = 20): Promise<void> {
+export async function populateSeriesInstances(events: any[], maxProjected: number = 100): Promise<void> {
 	if (!events || events.length === 0) return;
 
 	// Find all master events that are recurring series
 	const seriesMasters = events.filter((e) => {
 		const isMaster = !e.recurringEventId;
-		const hasRecurrence = Boolean(e.recurrence && Array.isArray(e.recurrence) && e.recurrence.length > 0);
+		const rec: any = e.recurrence;
+		const hasRecurrence = Boolean(
+			(rec && Array.isArray(rec) && rec.length > 0) ||
+			(typeof rec === 'string' && rec.trim().length > 0)
+		);
 		const hasSeriesId = Boolean(e.seriesId);
 		return isMaster && (hasRecurrence || hasSeriesId || e.isSeries);
 	});
@@ -178,9 +186,12 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 			status: inst.status,
 		}));
 
+		const rec: any = master.recurrence;
 		let rruleStr: string | null = null;
-		if (master.recurrence && Array.isArray(master.recurrence) && master.recurrence[0]) {
-			rruleStr = master.recurrence[0];
+		if (rec && Array.isArray(rec) && rec[0]) {
+			rruleStr = rec[0];
+		} else if (typeof rec === 'string' && rec.trim().length > 0) {
+			rruleStr = rec.trim();
 		} else if (master.seriesId) {
 			rruleStr = seriesMap.get(master.seriesId) || null;
 		}
@@ -236,6 +247,7 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 			startDateTime: toIsoSafe(master.startDateTime),
 			endDateTime: toIsoSafe(master.endDateTime),
 			recurrence: master.recurrence,
+			instances,
 		};
 	}
 }

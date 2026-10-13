@@ -4,14 +4,23 @@ function groupEvents(rawEvents: any[]) {
 	return rawEvents
 		.filter((e: any) => !e.recurringEventId)
 		.map((master: any) => {
-			const instances = rawEvents
-				.filter((e: any) => e.recurringEventId === master.id)
-				.sort((a: any, b: any) => {
-					const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-					const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
-					return dateA - dateB;
-				});
-			return { ...master, instances };
+			const existingInstances = master.instances || [];
+			const rawChildInstances = rawEvents
+				.filter((e: any) => e.recurringEventId === master.id);
+			const combined = [...existingInstances];
+			const existingIds = new Set(combined.map((i: any) => i.id));
+			for (const child of rawChildInstances) {
+				if (!existingIds.has(child.id)) {
+					combined.push(child);
+					existingIds.add(child.id);
+				}
+			}
+			combined.sort((a: any, b: any) => {
+				const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+				const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+				return dateA - dateB;
+			});
+			return { ...master, instances: combined };
 		});
 }
 
@@ -73,5 +82,55 @@ describe('groupEvents instance ordering', () => {
 		const onlySeriesEvents = rawEvents.filter(e => isSeries(e));
 		expect(onlySeriesEvents).toHaveLength(2);
 		expect(onlySeriesEvents.map(e => e.id)).toEqual(['seriesMaster', 'seriesInst1']);
+	});
+
+	it('preserves and unrolls all instances in compact mode when legacy series changes from count to until date', async () => {
+		const { getAllSeriesOccurrences } = await import('#lib/utils/event-series.js');
+
+		// Master event with 2 legacy physical child instances, extended with 3 virtual instances up to until date
+		const legacyMaster = {
+			id: 'master-uuid',
+			summary: 'Weekly Seminar',
+			startDateTime: '2026-10-01T10:00:00Z',
+			endDateTime: '2026-10-01T11:00:00Z',
+			seriesId: 'series-legacy-uuid',
+			recurrence: ['RRULE:FREQ=WEEKLY;UNTIL=20261105T235959Z'],
+			instances: [
+				{ id: 'inst-physical-1', startDateTime: '2026-10-08T10:00:00Z', endDateTime: '2026-10-08T11:00:00Z' },
+				{ id: 'inst-physical-2', startDateTime: '2026-10-15T10:00:00Z', endDateTime: '2026-10-15T11:00:00Z' },
+				{ id: 'master-uuid_inst_2026-10-22T10:00:00.000Z', startDateTime: '2026-10-22T10:00:00.000Z', endDateTime: '2026-10-22T11:00:00.000Z' },
+				{ id: 'master-uuid_inst_2026-10-29T10:00:00.000Z', startDateTime: '2026-10-29T10:00:00.000Z', endDateTime: '2026-10-29T11:00:00.000Z' },
+				{ id: 'master-uuid_inst_2026-11-05T10:00:00.000Z', startDateTime: '2026-11-05T10:00:00.000Z', endDateTime: '2026-11-05T11:00:00.000Z' }
+			],
+			seriesMaster: {
+				id: 'master-uuid',
+				summary: 'Weekly Seminar',
+				startDateTime: '2026-10-01T10:00:00Z',
+				endDateTime: '2026-10-01T11:00:00Z',
+				recurrence: ['RRULE:FREQ=WEEKLY;UNTIL=20261105T235959Z']
+			}
+		};
+
+		const rawEvents = [
+			legacyMaster,
+			{ id: 'inst-physical-1', recurringEventId: 'master-uuid', startDateTime: '2026-10-08T10:00:00Z' },
+			{ id: 'inst-physical-2', recurringEventId: 'master-uuid', startDateTime: '2026-10-15T10:00:00Z' },
+		];
+
+		const grouped = groupEvents(rawEvents);
+		expect(grouped).toHaveLength(1);
+		expect(grouped[0].instances).toHaveLength(5);
+
+		// Compact representation card resolves occurrences for dropdown
+		const event = grouped[0];
+		const allInstances = getAllSeriesOccurrences(event.isSeriesInstance ? (event.seriesMaster || event) : event);
+		// 1 master + 5 instances = 6 total accessible occurrences
+		expect(allInstances).toHaveLength(6);
+		expect(allInstances[0].id).toBe('master-uuid');
+		expect(allInstances[1].id).toBe('inst-physical-1');
+		expect(allInstances[2].id).toBe('inst-physical-2');
+		expect(allInstances[3].id).toBe('master-uuid_inst_2026-10-22T10:00:00.000Z');
+		expect(allInstances[4].id).toBe('master-uuid_inst_2026-10-29T10:00:00.000Z');
+		expect(allInstances[5].id).toBe('master-uuid_inst_2026-11-05T10:00:00.000Z');
 	});
 });
