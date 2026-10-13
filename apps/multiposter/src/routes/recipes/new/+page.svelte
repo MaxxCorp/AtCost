@@ -8,7 +8,8 @@
     import { ChefHat } from "@lucide/svelte";
     import { LoadingSection } from "@ac/ui";
 
-    const consumablesPromise = listConsumables({ limit: 200 });
+    const consumablesQuery = listConsumables({ limit: 200 });
+    const allConsumables = $derived(consumablesQuery.current?.data ?? []);
 </script>
 
 <div class="container mx-auto px-4 py-6 max-w-4xl space-y-6">
@@ -24,15 +25,15 @@
         </p>
     </div>
 
-    {#await consumablesPromise}
+    {#if consumablesQuery.loading && !consumablesQuery.current}
         <LoadingSection message="Loading consumables..." />
-    {:then consumablesResult}
+    {:else}
         <RecipeForm
             remoteFunction={createRecipe}
             validationSchema={createRecipeSchema}
             isUpdating={false}
-            allConsumables={consumablesResult?.data || []}
+            {allConsumables}
             cancelHref="/recipes"
         />
-    {/await}
+    {/if}
 </div>

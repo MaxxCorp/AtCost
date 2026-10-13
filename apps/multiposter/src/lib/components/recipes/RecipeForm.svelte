@@ -110,26 +110,33 @@
         return a > 0 ? p / a : p;
     }
 
-    function addIngredientRow() {
-        if (consumablesList.length === 0) {
-            showQuickCreateConsumable = true;
+    let selectedConsumableId = $state<string>('');
+
+    function handleAddIngredient() {
+        if (!selectedConsumableId) {
+            toast.error(m.select_consumable?.() || 'Please select a consumable');
             return;
         }
-        const first = consumablesList[0];
+        const c = getConsumable(selectedConsumableId);
+        if (!c) return;
+
         ingredients = [
             ...ingredients,
             {
-                consumableId: first.id,
+                consumableId: c.id,
                 amount: 1,
-                unit: first.unit,
+                unit: c.unit || 'piece',
             }
         ];
+        selectedConsumableId = '';
+        toast.success(`Added ${c.name}`);
     }
 
     function handleConsumableQuickCreated(res: any) {
         const newConsumable = res?.consumable || res?.data || (res?.id ? res : null);
         if (newConsumable) {
             localAddedConsumables = [newConsumable, ...localAddedConsumables];
+            selectedConsumableId = newConsumable.id;
             ingredients = [
                 ...ingredients,
                 {
@@ -301,47 +308,66 @@
                     Select consumables needed for this recipe to calculate the cost per portion.
                 </p>
             </div>
-            <div class="flex items-center gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onclick={() => (showQuickCreateConsumable = true)}
-                    class="flex items-center gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50"
-                >
-                    <Package size={15} />
-                    {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onclick={addIngredientRow}
-                    class="flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
-                >
-                    <Plus size={15} />
-                    {m.add_ingredient?.() || 'Add Ingredient'}
-                </Button>
-            </div>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onclick={() => (showQuickCreateConsumable = true)}
+                class="flex items-center gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50"
+            >
+                <Package size={15} />
+                {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
+            </Button>
         </div>
 
-        {#if ingredients.length === 0}
-            <div class="py-6 text-center border-2 border-dashed border-gray-200 rounded-xl space-y-2">
-                <p class="text-sm text-gray-400">No ingredients added yet.</p>
-                <div class="flex items-center justify-center gap-2">
+        <!-- Consumable Selector Bar -->
+        <div class="p-3 bg-gray-50/75 rounded-xl border border-gray-200/70">
+            {#if consumablesList.length === 0}
+                <div class="flex items-center justify-between py-1">
+                    <p class="text-xs text-gray-500">No consumables found in the system yet.</p>
                     <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onclick={() => (showQuickCreateConsumable = true)}
-                        class="text-amber-700 border-amber-200 hover:bg-amber-50"
+                        class="text-amber-700 border-amber-200 hover:bg-amber-50 text-xs"
                     >
-                        <Package size={14} class="mr-1 text-amber-600" /> {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onclick={addIngredientRow}>
-                        <Plus size={14} class="mr-1" /> {m.add_ingredient?.() || 'Add Ingredient'}
+                        <Package size={14} class="mr-1 text-amber-600" />
+                        {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
                     </Button>
                 </div>
+            {:else}
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <select
+                        bind:value={selectedConsumableId}
+                        class="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="">{m.select_consumable?.() || 'Select a consumable...'}</option>
+                        {#each consumablesList as c (c.id)}
+                            {@const unitCost = c.amount > 0 ? (c.purchasePrice / c.amount).toFixed(2) : Number(c.purchasePrice).toFixed(2)}
+                            <option value={c.id}>
+                                {c.name} — €{unitCost} / {c.unit || 'unit'} (Pkg: €{Number(c.purchasePrice).toFixed(2)} / {c.amount} {c.unit || ''})
+                            </option>
+                        {/each}
+                    </select>
+
+                    <Button
+                        type="button"
+                        onclick={handleAddIngredient}
+                        disabled={!selectedConsumableId}
+                        class="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs whitespace-nowrap disabled:opacity-50"
+                    >
+                        <Plus size={14} />
+                        {m.add_ingredient?.() || 'Add Ingredient'}
+                    </Button>
+                </div>
+            {/if}
+        </div>
+
+        {#if ingredients.length === 0}
+            <div class="py-6 text-center border-2 border-dashed border-gray-200 rounded-xl space-y-1">
+                <p class="text-sm text-gray-400">No ingredients added yet.</p>
+                <p class="text-xs text-gray-400">Select a consumable above and click "{m.add_ingredient?.() || 'Add Ingredient'}" to add it to this recipe.</p>
             </div>
         {:else}
             <div class="overflow-x-auto">
