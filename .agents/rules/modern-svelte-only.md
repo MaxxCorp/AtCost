@@ -10,7 +10,13 @@ trigger: always_on
 - **No REST Endpoints for Data Fetching**: Standard API routes (`+server.ts` GET/POST/etc.) are superseded for internal data fetching/mutation and should NOT be used unless explicitly interacting with a non-SvelteKit external client.
 - **Strict Fields API**: 
   - DO NOT assume you know how to work with sveltekit fields values, do consult the full length of the forms block in the documentation https://svelte.dev/docs/kit/remote-functions#form EVERY time
-  - DO NOT manually create HTML `<input type="hidden">` tags for form submissions.
+  - **NEVER use handwritten `name="..."` attributes inside forms**:
+    - Raw HTML `name` attributes on ANY `<input>`, `<select>`, `<textarea>`, radio button, checkbox, or button inside a `<form {...remoteForm}>` are strictly PROHIBITED.
+    - SvelteKit Remote Functions inspects every entry in the submitted `FormData` and expects the key to end with `/${form_id}` produced exclusively by `form.fields.fieldName.as(...)`.
+    - Any handwritten `name` attribute triggers the runtime error `https://svelte.dev/e/kit/form_field_unbound` (`Form contained a field that wasn't created with form.fields.as(...): %name%`) causing an HTTP 500 failure!
+    - **UI-only inputs (radios, toggles, filter/search bars)**: Omit the `name` attribute entirely. Control them declaratively with Svelte reactivity (`checked={state === value}`, `onchange={() => (state = value)}`, `bind:value`). Pass values to the server using official field bindings (e.g., `<input {...fields.fieldName.as("hidden", state)} />` or `{...fields.fieldName.as("radio", value)}`).
+    - **Embedded components & dialogs**: Never nest `<form>` tags. Ensure subcomponents, search filters, and modals embedded inside a form do not introduce named controls, or portal them outside the form DOM (e.g., using `Dialog.Portal`).
+  - DO NOT manually create HTML `<input type="hidden">` tags without `fields.fieldName.as("hidden", ...)`.
   - DO wrap hidden fields that have a chance to empty in {#if ...} blocks to prevent the svelte static analyzer to throw an error
   - DO NOT use proxy helper functions (like a custom `getField` utility) to work around `fields` typings. Fix the underlying typing issues.
 - **Enhance & Preflight Pattern**: Always use `{...remoteForm.preflight(schema).enhance(async ({ submit }) => { ... })}` to bind forms and enable client-side validation.

@@ -21,3 +21,9 @@ trigger: always_on
 ## 4. Interaction Patterns
 - Use `remoteFunction.preflight(schema).enhance(...)` to bind forms.
 - Use the official field API: `{...remoteFunction.fields.fieldName.as('type', value)}`.
+
+## 5. Preventing `form_field_unbound` Errors (No Handwritten `name` Attributes)
+- **Strict Prohibition**: NEVER add handwritten `name="..."` attributes to any `<input>`, `<select>`, `<textarea>`, radio button, or checkbox inside a `<form {...remoteFunction}>`.
+- **Why**: SvelteKit Remote Functions decodes form submissions by validating that every key in `FormData` ends with `/${form_id}` produced by `fields.xxx.as(...)`. A raw `name` attribute bypasses this encoding, triggering `https://svelte.dev/e/kit/form_field_unbound` ("Form contained a field that wasn't created with form.fields.as(...)") and causing an immediate HTTP 500 on submit.
+- **UI State Controls**: Radios, toggles, and filter inputs must be driven purely via Svelte runes (`checked={...}`, `onchange={...}`, `bind:value`) with NO `name` attribute. Their values must be synced to the form submission using `{...fields.fieldName.as(...)}`.
+- **Sub-forms and Dialogs**: Never nest `<form>` elements. Ensure modal dialogs with internal inputs portal to `document.body` (e.g., via `Dialog.Portal`) so their inputs do not pollute the parent form's submission.

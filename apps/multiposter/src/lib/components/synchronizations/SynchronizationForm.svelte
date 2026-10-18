@@ -1066,7 +1066,6 @@
 						>
 							<input
 								type="radio"
-								name="msMailboxTypeRadio"
 								value="user"
 								checked={msMailboxType === "user"}
 								onchange={() => (msMailboxType = "user")}
@@ -1087,7 +1086,6 @@
 						>
 							<input
 								type="radio"
-								name="msMailboxTypeRadio"
 								value="shared"
 								checked={msMailboxType === "shared"}
 								onchange={() => (msMailboxType = "shared")}
@@ -1636,7 +1634,6 @@
 							>
 								<input
 									type="radio"
-									name="msResourceFilterRadio"
 									value="all"
 									checked={msResourceFilter === "all"}
 									onchange={() => (msResourceFilter = "all")}
@@ -1652,7 +1649,6 @@
 							>
 								<input
 									type="radio"
-									name="msResourceFilterRadio"
 									value="room"
 									checked={msResourceFilter === "room"}
 									onchange={() => (msResourceFilter = "room")}
@@ -1668,7 +1664,6 @@
 							>
 								<input
 									type="radio"
-									name="msResourceFilterRadio"
 									value="equipment"
 									checked={msResourceFilter === "equipment"}
 									onchange={() => (msResourceFilter = "equipment")}
