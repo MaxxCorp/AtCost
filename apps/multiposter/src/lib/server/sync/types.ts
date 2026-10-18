@@ -64,6 +64,7 @@ export interface ExternalEvent {
 		title?: string;
 	};
 	ticketPrice?: string;
+	ticketPriceUnknown?: boolean;
 
 	tags?: Array<{ id: string; name: string }>;
 	venueId?: string; // Internal ID reference for mapping lookups

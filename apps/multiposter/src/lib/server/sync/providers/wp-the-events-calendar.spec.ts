@@ -178,4 +178,78 @@ describe('WpTheEventsCalendarProvider', () => {
 			expect(body.description).toBe('\u200B');
 		});
 	});
+
+	describe('ticketPrice / cost field mapping', () => {
+		it('maps numeric ticket prices to cost field', () => {
+			const format = (provider as any).mapEventToWpFormat.bind(provider);
+
+			const formatted = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Paid Concert',
+				ticketPrice: '15'
+			});
+			expect(formatted.cost).toBe('15');
+		});
+
+		it('maps ticketPrice to "Bitte erfragen" when ticketPriceUnknown is true', () => {
+			const format = (provider as any).mapEventToWpFormat.bind(provider);
+
+			const formatted = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Unknown Price Event',
+				ticketPrice: '0',
+				ticketPriceUnknown: true
+			});
+			expect(formatted.cost).toBe('Bitte erfragen');
+		});
+
+		it('maps ticketPrice to "Bitte erfragen" when metadata.ticketPriceUnknown is true', () => {
+			const format = (provider as any).mapEventToWpFormat.bind(provider);
+
+			const formatted = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Unknown Price Event via Metadata',
+				ticketPrice: '0',
+				metadata: { ticketPriceUnknown: true }
+			});
+			expect(formatted.cost).toBe('Bitte erfragen');
+		});
+
+		it('maps ticketPrice to "Bitte erfragen" when ticketPrice is explicitly "Unbekannt" or "Bitte erfragen"', () => {
+			const format = (provider as any).mapEventToWpFormat.bind(provider);
+
+			const withUnbekannt = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Unbekannt Price',
+				ticketPrice: 'Unbekannt'
+			});
+			expect(withUnbekannt.cost).toBe('Bitte erfragen');
+
+			const withBitteErfragen = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Bitte erfragen Price',
+				ticketPrice: 'Bitte erfragen'
+			});
+			expect(withBitteErfragen.cost).toBe('Bitte erfragen');
+		});
+
+		it('maps genuine free admission ("0") to "0" when ticketPriceUnknown is false', () => {
+			const format = (provider as any).mapEventToWpFormat.bind(provider);
+
+			const formatted = format({
+				externalId: '',
+				providerId: 'wp-the-events-calendar',
+				summary: 'Free Workshop',
+				ticketPrice: '0',
+				ticketPriceUnknown: false
+			});
+			expect(formatted.cost).toBe('0');
+		});
+	});
 });
+

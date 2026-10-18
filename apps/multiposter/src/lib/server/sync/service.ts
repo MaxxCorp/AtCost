@@ -2180,6 +2180,7 @@ export class SyncService {
 			reminders: internal.reminders as any ?? undefined,
 			source: internal.source as any ?? undefined,
 			ticketPrice: internal.ticketPrice ?? undefined,
+			ticketPriceUnknown: Boolean(internal.ticketPriceUnknown),
 			venue,
 			venues,
 			venueId,
@@ -2194,7 +2195,8 @@ export class SyncService {
 				app_event_id: internal.id,
 				organizerId,
 				locationId: venueId,
-				categoryBerlinDotDe: internal.categoryBerlinDotDe ?? undefined
+				categoryBerlinDotDe: internal.categoryBerlinDotDe ?? undefined,
+				ticketPriceUnknown: Boolean(internal.ticketPriceUnknown)
 			}
 		};
 

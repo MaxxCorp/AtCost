@@ -771,7 +771,15 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 		}
 
 		// Map Cost/Price
-		if (event.ticketPrice) {
+		const isPriceUnknown = Boolean(
+			event.ticketPriceUnknown ||
+			event.metadata?.ticketPriceUnknown ||
+			(event.ticketPrice && ['unbekannt', 'unknown', 'bitte erfragen'].includes(event.ticketPrice.trim().toLowerCase()))
+		);
+
+		if (isPriceUnknown) {
+			wpEvent.cost = 'Bitte erfragen';
+		} else if (event.ticketPrice) {
 			const { priceValue } = parsePricing(event.ticketPrice);
 			wpEvent.cost = priceValue;
 		}
