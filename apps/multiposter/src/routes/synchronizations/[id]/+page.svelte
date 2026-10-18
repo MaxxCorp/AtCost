@@ -104,6 +104,10 @@
     function getProviderLabel(providerType: string) {
         if (providerType === "google-calendar") return "Google Calendar";
         if (providerType === "microsoft-calendar") return "Microsoft Calendar";
+        if (providerType === "microsoft-contacts") return "Microsoft Contacts";
+        if (providerType === "microsoft-resources") return "Microsoft Resources & Rooms";
+        if (providerType === "email") return "E-Mail (Brevo)";
+        if (providerType === "instagram") return "Instagram";
         return providerType;
     }
 
@@ -367,6 +371,52 @@
                                                                 {/if}
                                                             </div>
                                                         </div>
+                                                        <!-- Itemized Room Bookings (Microsoft Resources) -->
+                                                        {#if (operation.results as any)?.roomBookings && (operation.results as any).roomBookings.length > 0}
+                                                            <div class="mx-3 mb-2 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs">
+                                                                <div class="font-semibold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                                                                    <span>Room Booking Statuses</span>
+                                                                </div>
+                                                                <div class="space-y-1">
+                                                                    {#each (operation.results as any).roomBookings as rb}
+                                                                        <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-blue-100 last:border-b-0">
+                                                                            <span class="font-mono text-gray-700">{rb.roomEmail || rb.roomId}</span>
+                                                                            <div class="flex items-center gap-1.5">
+                                                                                {#if rb.status === "booked"}
+                                                                                    <span class="px-1.5 py-0.2 rounded bg-green-100 text-green-800 font-medium">Booked</span>
+                                                                                {:else if rb.status === "failed"}
+                                                                                    <span class="px-1.5 py-0.2 rounded bg-red-100 text-red-800 font-medium" title={rb.error}>Failed</span>
+                                                                                {:else if rb.status === "unavailable"}
+                                                                                    <span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-medium">Unavailable</span>
+                                                                                {:else}
+                                                                                    <span class="text-gray-500">{rb.status}</span>
+                                                                                {/if}
+                                                                                {#if rb.error}
+                                                                                    <span class="text-red-600 text-[10px]">({rb.error})</span>
+                                                                                {/if}
+                                                                            </div>
+                                                                        </div>
+                                                                    {/each}
+                                                                </div>
+                                                            </div>
+                                                        {/if}
+
+                                                        <!-- Itemized Errors -->
+                                                        {#if (operation.results as any)?.errors && (operation.results as any).errors.length > 0}
+                                                            <div class="mx-3 mb-2 p-3 rounded-lg bg-red-50 border border-red-200 text-xs">
+                                                                <div class="font-semibold text-red-900 mb-1">Item Synchronization Errors:</div>
+                                                                <div class="space-y-1">
+                                                                    {#each (operation.results as any).errors as itemErr}
+                                                                        <div class="text-[11px] text-red-800 border-b border-red-100 last:border-b-0 py-0.5">
+                                                                            <span class="font-mono font-medium">Item {itemErr.itemId}:</span>
+                                                                            <span class="ml-1">{itemErr.error}</span>
+                                                                        </div>
+                                                                    {/each}
+                                                                </div>
+                                                            </div>
+                                                        {/if}
+
+                                                        <!-- General Operation Error -->
                                                         {#if operation.error}
                                                             <div class="mx-3 mb-3 text-sm text-red-700 bg-red-100 p-3 rounded border border-red-200">
                                                                 <div class="font-semibold mb-1">{m.error_details()}</div>

@@ -31,7 +31,9 @@
 		ChevronsRight,
 		Camera,
 		RefreshCw,
-		Database
+		Database,
+		Users,
+		MapPin
 	} from "@lucide/svelte";
 	import { checkMigrationStatus } from "./migration.remote";
 	import MigrationDialog from "#lib/components/sync/MigrationDialog.svelte";
@@ -79,6 +81,9 @@
 
 	function getProviderIcon(providerType: string) {
 		if (providerType === "google-calendar") return Calendar;
+		if (providerType === "microsoft-calendar") return Calendar;
+		if (providerType === "microsoft-contacts") return Users;
+		if (providerType === "microsoft-resources") return MapPin;
 		if (providerType === "email") return Mail;
 		if (providerType === "instagram") return Camera;
 		return Calendar;
@@ -87,6 +92,8 @@
 	function getProviderLabel(providerType: string) {
 		if (providerType === "google-calendar") return m.google_calendar();
 		if (providerType === "microsoft-calendar") return m.microsoft_calendar();
+		if (providerType === "microsoft-contacts") return "Microsoft Contacts";
+		if (providerType === "microsoft-resources") return "Microsoft Resources & Rooms";
 		if (providerType === "berlin-de-main-calendar")
 			return m.berlin_de_main_calendar();
 		if (providerType === "berlin-de-mh-calendar")
@@ -508,8 +515,13 @@
 											{/if}
 										</div>
 									</h3>
-									<p class="text-sm text-gray-500 break-all mt-1">
-										{config.providerId}
+									<p class="text-sm text-gray-500 break-all mt-1 flex items-center gap-1.5 flex-wrap">
+										{#if (config.settings as any)?.mailboxEmail}
+											<span class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300">
+												{(config.settings as any).mailboxEmail}
+											</span>
+										{/if}
+										<span>{config.providerId}</span>
 									</p>
 								</div>
 								<div class={statusColor}>

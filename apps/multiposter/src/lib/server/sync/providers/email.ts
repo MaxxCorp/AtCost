@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import { getEntityContacts } from '../../contacts';
 import { resolveEventContact } from '../../contact-resolution';
+import { shouldSyncContactForEvent } from '../service';
 import { db } from '@ac/db';
 import { contact, emailCampaign, emailEvent } from '@ac/db';
 import { inArray } from '@ac/db';
@@ -42,9 +43,9 @@ export class EmailProvider implements SyncProvider {
 
 		this.selectedTemplate = config.settings?.selectedTemplate || 'standard';
 		
-		const rawInclude = config.settings?.includeEventContacts;
+		const rawInclude = config.settings?.syncParticipants ?? config.settings?.includeEventContacts;
 		this.includeEventContacts =
-			rawInclude === true || rawInclude === 'true' || rawInclude === '1';
+			rawInclude === undefined ? true : (rawInclude === true || rawInclude === 'true' || rawInclude === '1');
 
 		if (this.brevoApiKey) {
 			try {
@@ -369,8 +370,23 @@ export class EmailProvider implements SyncProvider {
 			}
 		}
 
-		// 3. Optional: Add contacts attached to the event/announcement if includeEventContacts is true
-		if (this.includeEventContacts) {
+		// Excluded contact IDs (if user specifically unlinked an event-derived contact)
+		let excludedContactIds: string[] = [];
+		const rawExcludedIds = (this.config!).settings?.excludedRecipientContactIds;
+		if (Array.isArray(rawExcludedIds)) {
+			excludedContactIds = rawExcludedIds.filter(Boolean);
+		} else if (typeof rawExcludedIds === 'string' && rawExcludedIds.trim()) {
+			try {
+				const parsed = JSON.parse(rawExcludedIds);
+				excludedContactIds = Array.isArray(parsed) ? parsed : [rawExcludedIds];
+			} catch {
+				excludedContactIds = [rawExcludedIds];
+			}
+		}
+
+		// 3. Add contacts attached to the event/announcement as per filtering
+		const syncParticipants = (this.config!).settings?.syncParticipants ?? this.includeEventContacts;
+		if (syncParticipants !== false) {
 			const eventId = event.metadata?.eventId;
 			const announcementId = event.metadata?.announcementId;
 			const entityId = eventId || announcementId;
@@ -380,6 +396,13 @@ export class EmailProvider implements SyncProvider {
 				try {
 					const eventContacts = await getEntityContacts(entityType, entityId);
 					for (const c of eventContacts) {
+						const cid = c.id || c.contact?.id;
+						if (cid && excludedContactIds.includes(cid)) {
+							continue;
+						}
+						if (!shouldSyncContactForEvent(c, this.config)) {
+							continue;
+						}
 						const primaryEmail =
 							(c as any).emails?.find((e: any) => e.primary)?.value || (c as any).emails?.[0]?.value;
 						const name =

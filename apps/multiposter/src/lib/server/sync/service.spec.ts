@@ -823,8 +823,8 @@ describe('SyncService - Bulk Sync', () => {
 
 			const masterEvent: any = {
 				id: 'master-uuid',
-				startDateTime: new Date('2026-10-01T10:00:00.000Z'),
-				endDateTime: new Date('2026-10-01T11:00:00.000Z'),
+				startDateTime: new Date('2026-10-18T10:00:00.000Z'),
+				endDateTime: new Date('2026-10-18T11:00:00.000Z'),
 				recurrence: ['RRULE:FREQ=DAILY;COUNT=3'],
 				status: 'confirmed'
 			};
@@ -978,6 +978,359 @@ describe('SyncService - Bulk Sync', () => {
 					})
 				})
 			);
+		});
+	});
+
+	describe('shouldSyncEventForConfig - Fine-grained Sync Filtering', () => {
+		const service = new SyncService();
+		const mockProvider = new MockSyncProvider() as any;
+
+		const baseConfig = {
+			id: 'cfg-1',
+			userId: 'user-1',
+			providerId: 'prov-1',
+			providerType: 'microsoft-calendar' as const,
+			direction: 'push' as const,
+			enabled: true,
+			settings: {},
+			createdAt: new Date(),
+			updatedAt: new Date()
+		};
+
+		const standaloneEvent = {
+			id: 'event-1',
+			summary: 'Single Concert',
+			isPublic: true,
+			status: 'confirmed',
+			startDateTime: new Date(Date.now() + 86400000), // tomorrow
+			endDateTime: new Date(Date.now() + 90000000),
+			locationId: 'loc-1',
+			tags: [{ id: 'tag-music', name: 'Music' }]
+		};
+
+		const seriesMasterEvent = {
+			id: 'series-master-1',
+			summary: 'Weekly Workshop',
+			isPublic: true,
+			status: 'confirmed',
+			recurrence: ['RRULE:FREQ=WEEKLY'],
+			startDateTime: new Date(Date.now() + 86400000),
+			endDateTime: new Date(Date.now() + 90000000),
+			locationId: 'loc-2',
+			tags: [{ id: 'tag-edu', name: 'Education' }]
+		};
+
+		const virtualInstance = {
+			id: 'series-master-1_inst_2026-11-01T10:00:00.000Z',
+			summary: 'Weekly Workshop',
+			isPublic: true,
+			status: 'confirmed',
+			startDateTime: new Date(Date.now() + 7 * 86400000),
+			endDateTime: new Date(Date.now() + 7 * 86400000 + 3600000),
+			locationId: 'loc-2',
+			tags: [{ id: 'tag-edu', name: 'Education' }]
+		};
+
+		const materializedException = {
+			id: 'exc-1',
+			recurringEventId: 'series-master-1',
+			isException: true,
+			summary: 'Weekly Workshop (Special)',
+			isPublic: true,
+			status: 'confirmed',
+			startDateTime: new Date(Date.now() + 14 * 86400000),
+			endDateTime: new Date(Date.now() + 14 * 86400000 + 3600000),
+			locationId: 'loc-2',
+			tags: [{ id: 'tag-edu', name: 'Education' }]
+		};
+
+		it('allows standalone events and series when series are not excluded', () => {
+			expect(service.shouldSyncEventForConfig(standaloneEvent, baseConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, baseConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(virtualInstance, baseConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(materializedException, baseConfig, mockProvider)).toBe(true);
+		});
+
+		it('rejects all series items when excludeSeries is true', () => {
+			const config = { ...baseConfig, settings: { excludeSeries: true } };
+			expect(service.shouldSyncEventForConfig(standaloneEvent, config, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, config, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(virtualInstance, config, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(materializedException, config, mockProvider)).toBe(false);
+		});
+
+		it('rejects all series items when syncSeriesMode is exclude', () => {
+			const config = { ...baseConfig, settings: { syncSeriesMode: 'exclude' } };
+			expect(service.shouldSyncEventForConfig(standaloneEvent, config, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, config, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(virtualInstance, config, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(materializedException, config, mockProvider)).toBe(false);
+		});
+
+		it('allows master event but rejects instances when syncSeriesMode is master_only', () => {
+			const config = { ...baseConfig, settings: { syncSeriesMode: 'master_only' } };
+			expect(service.shouldSyncEventForConfig(standaloneEvent, config, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, config, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(virtualInstance, config, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(materializedException, config, mockProvider)).toBe(false);
+		});
+
+		it('enforces status exclusions (non-public, tentative, cancelled)', () => {
+			const privateEvent = { ...standaloneEvent, isPublic: false };
+			const tentativeEvent = { ...standaloneEvent, status: 'tentative' };
+			const cancelledEvent = { ...standaloneEvent, status: 'cancelled' };
+
+			// By default, non-public, tentative, and cancelled are excluded
+			expect(service.shouldSyncEventForConfig(privateEvent, baseConfig, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(tentativeEvent, baseConfig, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(cancelledEvent, baseConfig, mockProvider)).toBe(false);
+
+			// When explicitly allowed
+			const allowAllConfig = {
+				...baseConfig,
+				settings: {
+					excludeNonPublic: false,
+					excludeTentative: false,
+					excludeCancelled: false
+				}
+			};
+			expect(service.shouldSyncEventForConfig(privateEvent, allowAllConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(tentativeEvent, allowAllConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(cancelledEvent, allowAllConfig, mockProvider)).toBe(true);
+		});
+
+		it('filters by rolling days window', () => {
+			const pastEvent = {
+				...standaloneEvent,
+				startDateTime: new Date(Date.now() - 10 * 86400000),
+				endDateTime: new Date(Date.now() - 10 * 86400000 + 3600000)
+			};
+			const futureFarEvent = {
+				...standaloneEvent,
+				startDateTime: new Date(Date.now() + 60 * 86400000),
+				endDateTime: new Date(Date.now() + 60 * 86400000 + 3600000)
+			};
+			const rollingConfig = {
+				...baseConfig,
+				settings: {
+					rangeMode: 'rolling',
+					lookAheadDays: 30,
+					lookPastDays: 0
+				}
+			};
+
+			expect(service.shouldSyncEventForConfig(standaloneEvent, rollingConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(pastEvent, rollingConfig, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(futureFarEvent, rollingConfig, mockProvider)).toBe(false);
+		});
+
+		it('filters by tag inclusion and exclusion', () => {
+			const musicConfig = {
+				...baseConfig,
+				settings: { includedTags: ['tag-music'] }
+			};
+			expect(service.shouldSyncEventForConfig(standaloneEvent, musicConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, musicConfig, mockProvider)).toBe(false);
+
+			const excludeMusicConfig = {
+				...baseConfig,
+				settings: { excludedTags: ['tag-music'] }
+			};
+			expect(service.shouldSyncEventForConfig(standaloneEvent, excludeMusicConfig, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, excludeMusicConfig, mockProvider)).toBe(true);
+		});
+
+		it('filters by location inclusion and exclusion', () => {
+			const loc1Config = {
+				...baseConfig,
+				settings: { includedLocationIds: ['loc-1'] }
+			};
+			expect(service.shouldSyncEventForConfig(standaloneEvent, loc1Config, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, loc1Config, mockProvider)).toBe(false);
+
+			const excludeLoc1Config = {
+				...baseConfig,
+				settings: { excludedLocationIds: ['loc-1'] }
+			};
+			expect(service.shouldSyncEventForConfig(standaloneEvent, excludeLoc1Config, mockProvider)).toBe(false);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, excludeLoc1Config, mockProvider)).toBe(true);
+		});
+
+		it('respects explicit event inclusion and exclusion overrides', () => {
+			const excludeEventConfig = {
+				...baseConfig,
+				settings: { excludedEventIds: ['event-1'] }
+			};
+			expect(service.shouldSyncEventForConfig(standaloneEvent, excludeEventConfig, mockProvider)).toBe(false);
+
+			const includeEventConfig = {
+				...baseConfig,
+				settings: { includedEventIds: ['event-1'] }
+			};
+			expect(service.shouldSyncEventForConfig(standaloneEvent, includeEventConfig, mockProvider)).toBe(true);
+			expect(service.shouldSyncEventForConfig(seriesMasterEvent, includeEventConfig, mockProvider)).toBe(false);
+		});
+	});
+
+	describe('SyncService - shouldSyncContactForEvent participant filtering', () => {
+		let service: SyncService;
+		const baseConfig = {
+			id: 'config-cal-1',
+			userId: 'user-1',
+			providerType: 'microsoft-calendar',
+			settings: {}
+		} as any;
+
+		const employeeContact = {
+			id: 'ctc-emp-1',
+			displayName: 'Alice Employee',
+			emails: [{ value: 'alice@example.com', primary: true }],
+			tags: [{ tag: { id: 'tag-emp', name: 'Employee' } }],
+			roles: [{ id: 'role-organizer', name: 'Organizer' }]
+		};
+
+		const speakerContact = {
+			id: 'ctc-spk-1',
+			displayName: 'Bob Speaker',
+			emails: [{ value: 'bob@guest.com', primary: true }],
+			tags: [{ tag: { id: 'tag-vip', name: 'VIP Guest' } }],
+			roles: [{ id: 'role-speaker', name: 'Keynote Speaker' }]
+		};
+
+		const volunteerContact = {
+			id: 'ctc-vol-1',
+			displayName: 'Charlie Volunteer',
+			emails: [{ value: 'charlie@volunteer.com', primary: true }],
+			tags: [{ tag: { id: 'tag-vol', name: 'Volunteer' } }],
+			roles: [{ id: 'role-assistant', name: 'Assistant' }]
+		};
+
+		const publicSpeakerContact = {
+			id: 'ctc-pub-1',
+			displayName: 'Diana Public Keynote',
+			isPublic: true,
+			emails: [{ value: 'diana@keynote.com', primary: true }],
+			tags: [{ tag: { id: 'tag-vip', name: 'VIP Guest' } }],
+			roles: [{ id: 'role-speaker', name: 'Keynote Speaker' }]
+		};
+
+		beforeEach(() => {
+			service = new SyncService();
+		});
+
+		it('defaults to internal staff only (non-public and unapproved contacts blocked by default)', () => {
+			expect(service.shouldSyncContactForEvent(employeeContact, baseConfig)).toBe(true);
+			expect(service.shouldSyncContactForEvent(speakerContact, baseConfig)).toBe(false);
+			expect(service.shouldSyncContactForEvent(volunteerContact, baseConfig)).toBe(false);
+			expect(service.shouldSyncContactForEvent(publicSpeakerContact, baseConfig)).toBe(false);
+		});
+
+		it('allows public contacts when includePublicContacts is true, while still blocking non-public contacts', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeEmployeeContacts: true,
+					includePublicContacts: true,
+					includeNonPublicContacts: false
+				}
+			};
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(publicSpeakerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+		});
+
+		it('allows non-public contacts only when includeNonPublicContacts is explicitly true', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeEmployeeContacts: true,
+					includePublicContacts: false,
+					includeNonPublicContacts: true
+				}
+			};
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(publicSpeakerContact, config)).toBe(false);
+		});
+
+		it('blocks all contacts when syncParticipants is false', () => {
+			const config = {
+				...baseConfig,
+				settings: { syncParticipants: false }
+			};
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(publicSpeakerContact, config)).toBe(false);
+		});
+
+		it('restricts to employees when onlyEmployeeContacts is true', () => {
+			const config = {
+				...baseConfig,
+				settings: { onlyEmployeeContacts: true }
+			};
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(publicSpeakerContact, config)).toBe(false);
+		});
+
+		it('filters by includedContactRoles', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeNonPublicContacts: true,
+					participantRoleFilterMode: 'include',
+					includedContactRoles: ['role-speaker']
+				}
+			};
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+		});
+
+		it('filters by excludedContactRoles', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeNonPublicContacts: true,
+					participantRoleFilterMode: 'exclude',
+					excludedContactRoles: ['role-assistant']
+				}
+			};
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+		});
+
+		it('filters by includedContactTags', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeNonPublicContacts: true,
+					participantTagFilterMode: 'include',
+					includedContactTags: ['VIP Guest']
+				}
+			};
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+		});
+
+		it('filters by excludedContactTags', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeNonPublicContacts: true,
+					participantTagFilterMode: 'exclude',
+					excludedContactTags: ['tag-vol']
+				}
+			};
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
 		});
 	});
 });

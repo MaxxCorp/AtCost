@@ -33,7 +33,7 @@ import {
 } from '@ac/db';
 import { getEntityContacts } from '../contacts';
 import { resolveEventContact, isEmployeeContact } from '../contact-resolution';
-import { eq, and, isNull, lt, gt, gte, lte, or, inArray, desc, sql } from '@ac/db';
+import { eq, and, isNull, isNotNull, lt, gt, gte, lte, or, inArray, desc, sql } from '@ac/db';
 import {
 	getCampaignTargetIds,
 	getItemSyncState,
@@ -41,7 +41,11 @@ import {
 	type CampaignContent
 } from '@ac/validations';
 import { GoogleCalendarProvider } from './providers/google-calendar';
-import { MicrosoftCalendarProvider } from './providers/microsoft-calendar';
+import {
+	MicrosoftCalendarProvider,
+	MicrosoftContactsProvider,
+	MicrosoftResourceProvider
+} from './providers/microsoft/index.js';
 import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
 import { BerlinDeMhCalendarProvider } from './providers/berlin-de-mh-calendar';
 import { WpTheEventsCalendarProvider } from './providers/wp-the-events-calendar';
@@ -63,7 +67,8 @@ import {
 import { publishEventChange } from '../realtime';
 import { invalidateEvent } from '#lib/server/cache/index.js';
 import { expandRecurrence } from '#lib/server/events/recurrence.js';
-import { isSeriesItem } from '#lib/utils/event-series.js';
+import { isSeriesItem, getSeriesRootId } from '#lib/utils/event-series.js';
+import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from '#lib/utils/kiosk-dates.js';
 
 export interface SyncBatchContext {
 	eventRecords?: Map<string, typeof eventTable.$inferSelect>;
@@ -82,6 +87,8 @@ export class SyncService {
 		// Register built-in providers
 		this.registerProvider('google-calendar', GoogleCalendarProvider);
 		this.registerProvider('microsoft-calendar', MicrosoftCalendarProvider);
+		this.registerProvider('microsoft-contacts', MicrosoftContactsProvider);
+		this.registerProvider('microsoft-resources', MicrosoftResourceProvider);
 		this.registerProvider('berlin-de-main-calendar', BerlinDeMainCalendarProvider);
 		this.registerProvider('berlin-de-mh-calendar', BerlinDeMhCalendarProvider);
 		this.registerProvider('wp-the-events-calendar', WpTheEventsCalendarProvider);
@@ -222,6 +229,195 @@ export class SyncService {
 		const hasSeriesId = Boolean(event.seriesId);
 
 		return hasRecurrenceArray || hasRecurrenceString || hasSeriesId;
+	}
+
+	/**
+	 * Determines whether an event should be synchronized to a target configuration based on the target's
+	 * fine-grained filter settings (series exclusion, status, date window, tags, locations, event overrides)
+	 * and provider constraints.
+	 */
+	public shouldSyncEventForConfig(
+		event: any,
+		config: SyncConfig,
+		provider: SyncProvider,
+		context?: {
+			locationIds?: string[];
+			tagIds?: string[];
+			tagNames?: string[];
+		}
+	): boolean {
+		if (!event) return false;
+
+		const settings = (config.settings || {}) as Record<string, any>;
+
+		// 1. Explicit Event Inclusion / Exclusion overrides
+		const excludedEventIds = Array.isArray(settings.excludedEventIds)
+			? settings.excludedEventIds
+			: (typeof settings.excludedEventIds === 'string' && settings.excludedEventIds ? JSON.parse(settings.excludedEventIds) : []);
+		const rootId = getSeriesRootId(event) || event.id;
+		if (excludedEventIds.length > 0) {
+			if (excludedEventIds.includes(event.id) || (rootId && excludedEventIds.includes(rootId))) {
+				return false;
+			}
+		}
+
+		const includedEventIds = Array.isArray(settings.includedEventIds)
+			? settings.includedEventIds
+			: (typeof settings.includedEventIds === 'string' && settings.includedEventIds ? JSON.parse(settings.includedEventIds) : []);
+		if (includedEventIds.length > 0) {
+			if (!includedEventIds.includes(event.id) && (!rootId || !includedEventIds.includes(rootId))) {
+				return false;
+			}
+		}
+
+		// 2. Event Series / Recurrence handling
+		const isSeries = isSeriesItem(event);
+		const isMaster = this.isSeriesMaster(event);
+		const excludeSeries = settings.excludeSeries === true || settings.excludeSeries === 'true' || settings.syncSeriesMode === 'exclude';
+		const seriesMode = settings.syncSeriesMode || (excludeSeries ? 'exclude' : 'all');
+
+		if (excludeSeries || seriesMode === 'exclude') {
+			if (isSeries) {
+				return false;
+			}
+		} else if (seriesMode === 'master_only') {
+			// Only allow master event, exclude virtual occurrences and materialized exceptions
+			if (isSeries && !isMaster) {
+				return false;
+			}
+		}
+
+		// 3. Status & Visibility checks
+		const excludeNonPublic = settings.excludeNonPublic !== undefined
+			? (settings.excludeNonPublic === true || settings.excludeNonPublic === 'true')
+			: true; // Default: exclude non-public
+		if (excludeNonPublic && !event.isPublic) {
+			return false;
+		}
+
+		const excludeTentative = settings.excludeTentative !== undefined
+			? (settings.excludeTentative === true || settings.excludeTentative === 'true')
+			: true; // Default: exclude tentative
+		if (excludeTentative && event.status === 'tentative') {
+			return false;
+		}
+
+		const excludeCancelled = settings.excludeCancelled !== undefined
+			? (settings.excludeCancelled === true || settings.excludeCancelled === 'true')
+			: true; // Default: exclude cancelled
+		if (excludeCancelled && event.status === 'cancelled') {
+			return false;
+		}
+
+		// 4. Date & Time Window checks
+		const start = event.startDateTime ? new Date(event.startDateTime) : null;
+		const end = event.endDateTime ? new Date(event.endDateTime) : start;
+		const now = new Date();
+
+		const excludePast = settings.excludePastEvents === true || settings.excludePastEvents === 'true';
+		if (excludePast && end && end.getTime() < now.getTime()) {
+			return false;
+		}
+
+		const rangeMode = settings.rangeMode || 'all';
+		if (rangeMode === 'rolling') {
+			const lookAheadDays = settings.lookAheadDays !== undefined ? Number(settings.lookAheadDays) : 30;
+			const lookPastDays = settings.lookPastDays !== undefined ? Number(settings.lookPastDays) : 0;
+			const windowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - lookPastDays, 0, 0, 0, 0);
+			const windowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + lookAheadDays, 23, 59, 59, 999);
+
+			if (start && end) {
+				if (end.getTime() < windowStart.getTime() || start.getTime() > windowEnd.getTime()) {
+					return false;
+				}
+			}
+		} else if (rangeMode === 'fixed') {
+			if (settings.startDate && start) {
+				const fixedStart = new Date(settings.startDate);
+				if (end && end.getTime() < fixedStart.getTime()) {
+					return false;
+				}
+			}
+			if (settings.endDate && end) {
+				const fixedEnd = new Date(settings.endDate);
+				if (start && start.getTime() > fixedEnd.getTime()) {
+					return false;
+				}
+			}
+		} else if (rangeMode === 'next_week' || rangeMode === 'this_week' || rangeMode === 'next_month' || rangeMode === 'this_month') {
+			let calRange: { start: Date; end: Date } | null = null;
+			if (rangeMode === 'next_week') calRange = getNextWeekRange(now);
+			else if (rangeMode === 'this_week') calRange = getThisWeekRange(now);
+			else if (rangeMode === 'next_month') calRange = getNextMonthRange(now);
+			else if (rangeMode === 'this_month') calRange = getThisMonthRange(now);
+
+			if (calRange && start && end) {
+				if (end.getTime() < calRange.start.getTime() || start.getTime() > calRange.end.getTime()) {
+					return false;
+				}
+			}
+		}
+
+		// 5. Location / Venue filtering
+		const includedLocs = Array.isArray(settings.includedLocationIds)
+			? settings.includedLocationIds
+			: (typeof settings.includedLocationIds === 'string' && settings.includedLocationIds ? JSON.parse(settings.includedLocationIds) : []);
+		const excludedLocs = Array.isArray(settings.excludedLocationIds)
+			? settings.excludedLocationIds
+			: (typeof settings.excludedLocationIds === 'string' && settings.excludedLocationIds ? JSON.parse(settings.excludedLocationIds) : []);
+
+		const eventLocIds: string[] = [];
+		if (context?.locationIds && context.locationIds.length > 0) {
+			eventLocIds.push(...context.locationIds);
+		}
+		if (event.locationId) eventLocIds.push(event.locationId);
+		if (event.venueId) eventLocIds.push(event.venueId);
+		if (event.location?.id) eventLocIds.push(event.location.id);
+		if (event.venue?.id) eventLocIds.push(event.venue.id);
+		if (Array.isArray(event.locationIds)) eventLocIds.push(...event.locationIds);
+
+		if (excludedLocs.length > 0 && eventLocIds.some(id => excludedLocs.includes(id))) {
+			return false;
+		}
+		if (includedLocs.length > 0 && !eventLocIds.some(id => includedLocs.includes(id))) {
+			return false;
+		}
+
+		// 6. Tag filtering
+		const includedTags = Array.isArray(settings.includedTags)
+			? settings.includedTags
+			: (typeof settings.includedTags === 'string' && settings.includedTags ? JSON.parse(settings.includedTags) : []);
+		const excludedTags = Array.isArray(settings.excludedTags)
+			? settings.excludedTags
+			: (typeof settings.excludedTags === 'string' && settings.excludedTags ? JSON.parse(settings.excludedTags) : []);
+
+		const eventTagIdsOrNames: string[] = [];
+		if (context?.tagIds) eventTagIdsOrNames.push(...context.tagIds);
+		if (context?.tagNames) eventTagIdsOrNames.push(...context.tagNames);
+		if (Array.isArray(event.tags)) {
+			for (const t of event.tags) {
+				if (typeof t === 'string') eventTagIdsOrNames.push(t);
+				else if (t?.id) eventTagIdsOrNames.push(t.id);
+				if (t?.name) eventTagIdsOrNames.push(t.name);
+			}
+		}
+		if (Array.isArray(event.tagIds)) eventTagIdsOrNames.push(...event.tagIds);
+
+		if (excludedTags.length > 0 && eventTagIdsOrNames.some(t => excludedTags.includes(t))) {
+			return false;
+		}
+		if (includedTags.length > 0 && !eventTagIdsOrNames.some(t => includedTags.includes(t))) {
+			return false;
+		}
+
+		// 7. Provider-specific additional filtering (e.g. Berlin.de specific constraints)
+		if (provider.shouldSyncEvent) {
+			if (!provider.shouldSyncEvent(event)) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -474,6 +670,53 @@ export class SyncService {
 				}
 			}
 
+			const hasLocationFilters = Boolean(
+				(config.settings?.includedLocationIds && (Array.isArray(config.settings.includedLocationIds) ? config.settings.includedLocationIds.length > 0 : Boolean(config.settings.includedLocationIds))) ||
+				(config.settings?.excludedLocationIds && (Array.isArray(config.settings.excludedLocationIds) ? config.settings.excludedLocationIds.length > 0 : Boolean(config.settings.excludedLocationIds)))
+			);
+			const hasTagFilters = Boolean(
+				(config.settings?.includedTags && (Array.isArray(config.settings.includedTags) ? config.settings.includedTags.length > 0 : Boolean(config.settings.includedTags))) ||
+				(config.settings?.excludedTags && (Array.isArray(config.settings.excludedTags) ? config.settings.excludedTags.length > 0 : Boolean(config.settings.excludedTags)))
+			);
+
+			const eventLocationsMap = new Map<string, string[]>();
+			if (hasLocationFilters) {
+				try {
+					const rows = await db
+						.select({ eventId: eventLocationTable.eventId, locationId: eventLocationTable.locationId })
+						.from(eventLocationTable);
+					if (Array.isArray(rows)) {
+						for (const row of rows) {
+							if (row && row.eventId) {
+								if (!eventLocationsMap.has(row.eventId)) eventLocationsMap.set(row.eventId, []);
+								eventLocationsMap.get(row.eventId)!.push(row.locationId);
+							}
+						}
+					}
+				} catch {
+					// Ignore if not present
+				}
+			}
+
+			const eventTagsMap = new Map<string, string[]>();
+			if (hasTagFilters) {
+				try {
+					const rows = await db
+						.select({ eventId: eventTag.eventId, tagId: eventTag.tagId })
+						.from(eventTag);
+					if (Array.isArray(rows)) {
+						for (const row of rows) {
+							if (row && row.eventId) {
+								if (!eventTagsMap.has(row.eventId)) eventTagsMap.set(row.eventId, []);
+								eventTagsMap.get(row.eventId)!.push(row.tagId);
+							}
+						}
+					}
+				} catch {
+					// Ignore if not present
+				}
+			}
+
 			for (const r of allEventsWithCampaign) {
 				processedEventIds.add(r.event.id);
 				let eventCampaign = r.campaign;
@@ -492,13 +735,18 @@ export class SyncService {
 				const syncIds = getCampaignTargetIds(eventCampaign?.content);
 				let shouldBeSynced = syncIds.includes(config.id);
 
+				const masterId = r.event.recurringEventId || r.event.id;
+				const filterContext = {
+					locationIds: eventLocationsMap.get(r.event.id) || (masterId ? eventLocationsMap.get(masterId) : []) || [],
+					tagIds: eventTagsMap.get(r.event.id) || (masterId ? eventTagsMap.get(masterId) : []) || []
+				};
+
 				if (shouldBeSynced) {
-					if (provider.shouldSyncEvent) {
-						if (!provider.shouldSyncEvent(r.event)) shouldBeSynced = false;
-					} else {
-						if (r.event.status === 'tentative' || !r.event.isPublic) shouldBeSynced = false;
-					}
+					shouldBeSynced = this.shouldSyncEventForConfig(r.event, config, provider, filterContext);
 				}
+
+				const excludeSeries = config.settings?.excludeSeries === true || config.settings?.excludeSeries === 'true' || config.settings?.syncSeriesMode === 'exclude';
+				const syncSeriesMode = config.settings?.syncSeriesMode || (excludeSeries ? 'exclude' : 'all');
 
 				if (provider.supportsNativeRecurrence !== true && this.isSeriesMaster(r.event)) {
 					const occIds = await this.getMasterOccurrenceIds(r.event);
@@ -507,7 +755,8 @@ export class SyncService {
 						const itemSyncState = getItemSyncState(eventCampaign?.content, occId, config.id);
 						const existingExternalId = itemSyncState?.externalId;
 
-						if (shouldBeSynced) {
+						// If series are excluded or master_only, occurrences must NOT be synced!
+						if (shouldBeSynced && !excludeSeries && syncSeriesMode !== 'master_only') {
 							let priority = 2; // Default: brand new / unsynced
 							if (existingExternalId) {
 								const lastSyncedAt = itemSyncState?.lastSyncedAt ? new Date(itemSyncState.lastSyncedAt) : null;
@@ -524,6 +773,30 @@ export class SyncService {
 								_priority: 1
 							} as any);
 						}
+					}
+
+					// If syncSeriesMode === 'master_only', sync the master event itself as a single item!
+					if (shouldBeSynced && syncSeriesMode === 'master_only') {
+						const existingMapping = eventMappingMap.get(r.event.id);
+						const itemSyncState = getItemSyncState(eventCampaign?.content, r.event.id, config.id);
+						const existingExternalId = itemSyncState?.externalId || existingMapping?.externalId;
+
+						let priority = 2;
+						if (existingExternalId) {
+							const lastSyncedAt = itemSyncState?.lastSyncedAt
+								? new Date(itemSyncState.lastSyncedAt)
+								: existingMapping?.lastSyncedAt ? new Date(existingMapping.lastSyncedAt) : null;
+							const isModified = r.event.updatedAt && lastSyncedAt && new Date(r.event.updatedAt) > lastSyncedAt;
+							priority = isModified ? 3 : 4;
+						}
+						itemsToSync.push({
+							id: r.event.id,
+							entityType: 'event',
+							action: 'sync',
+							mappingId: existingMapping?.id,
+							externalId: existingExternalId,
+							_priority: priority
+						} as any);
 					}
 
 					// Also check for previously synced occurrences in campaign content that are no longer active
@@ -1548,13 +1821,28 @@ export class SyncService {
 		return result;
 	}
 
+	private normalizeFilterList(val: any): string[] {
+		return normalizeSyncFilterList(val);
+	}
+
+	/**
+	 * Determines whether a contact linked to an event should be included in synchronization
+	/**
+	 * Determines whether a contact linked to an event should be included in synchronization
+	 * (e.g. as an attendee on Microsoft/Google Calendar, or synced to Microsoft Contacts, or sent via Email).
+	 */
+	public shouldSyncContactForEvent(contact: any, config?: SyncConfig): boolean {
+		return shouldSyncContactForEvent(contact, config);
+	}
+
 	/**
 	 * Map internal event to external event format
 	 */
 	private async mapInternalToExternal(
 		internal: any,
 		providerId: ProviderType,
-		batchContext?: SyncBatchContext
+		batchContext?: SyncBatchContext,
+		config?: SyncConfig
 	): Promise<ExternalEvent> {
 
 		const isEvent = 'summary' in internal;
@@ -1612,12 +1900,9 @@ export class SyncService {
 				associatedContacts = await getEntityContacts(entityType, fallbackMasterId) || [];
 			}
 
-			// Only sync contacts with "Employee" tag to external calendar providers (Google, Microsoft).
-			// External contacts are commented out for data privacy reasons until privacy flows are finalized.
+			// Filter and sync associated contacts based on configuration rules (roles, tags, employee-only)
 			for (const contact of associatedContacts) {
-				const isEmployee = isEmployeeContact(contact);
-
-				if (isEmployee) {
+				if (this.shouldSyncContactForEvent(contact, config)) {
 					// Get primary email
 					const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
 						(contact as any).emails?.[0]?.value;
@@ -1682,12 +1967,35 @@ export class SyncService {
 						calendars = res.allocationCalendars;
 					}
 
+					let foundEmail = false;
 					for (const cal of calendars) {
 						const email = cal.calendarId || cal.email;
 						if (email && typeof email === 'string' && email.includes('@')) {
 							attendees.push({
 								email,
 								displayName: res.name || cal.name || 'Resource',
+								responseStatus: 'accepted',
+								type: 'resource',
+								resourceId: res.id
+							});
+							foundEmail = true;
+						}
+					}
+
+					if (!foundEmail) {
+						const [resMap] = await db
+							.select()
+							.from(syncMappingTable)
+							.where(and(
+								eq(syncMappingTable.resourceId, res.id),
+								isNotNull(syncMappingTable.externalId)
+							))
+							.limit(1);
+
+						if (resMap?.externalId && resMap.externalId.includes('@')) {
+							attendees.push({
+								email: resMap.externalId,
+								displayName: res.name || 'Resource',
 								responseStatus: 'accepted',
 								type: 'resource',
 								resourceId: res.id
@@ -2209,6 +2517,7 @@ export class SyncService {
 				const operationId = operationRow.id;
 				let timedOut = false;
 				let processedCount = 0;
+				const syncErrors: any[] = [];
 
 				try {
 					for (const itemId of itemsToProcess) {
@@ -2221,18 +2530,33 @@ export class SyncService {
 							break;
 						}
 
-						await this.syncSingleItem(config, provider, itemId, entityType, batchContext);
-						processedCount++;
+						try {
+							await this.syncSingleItem(config, provider, itemId, entityType, batchContext);
+							processedCount++;
+						} catch (itemErr: any) {
+							syncErrors.push({ itemId, message: itemErr.message || String(itemErr) });
+						}
 					}
 
 					// Update operation status
 					await db
 						.update(syncOperationTable)
 						.set({
-							status: timedOut && processedCount === 0 ? 'failed' : 'completed',
+							status: (timedOut && processedCount === 0) || (syncErrors.length > 0 && processedCount === 0)
+								? 'failed'
+								: syncErrors.length > 0 ? 'failed' : 'completed',
 							errorMessage: timedOut
 								? `Time budget reached: ${processedCount}/${itemsToProcess.length} items synced before budget limit.`
-								: null,
+								: syncErrors.length > 0
+									? `${syncErrors.length} item(s) failed during synchronization.`
+									: null,
+							error: syncErrors.length > 0 ? JSON.stringify(syncErrors) : null,
+							results: {
+								total: itemsToProcess.length,
+								processed: processedCount + syncErrors.length,
+								pushed: processedCount,
+								errors: syncErrors
+							},
 							completedAt: new Date()
 						})
 						.where(eq(syncOperationTable.id, operationId));
@@ -2245,7 +2569,14 @@ export class SyncService {
 						.set({
 							status: 'failed',
 							completedAt: new Date(),
-							error: `${error.message}\n\nStack:\n${error.stack}`
+							errorMessage: error.message || String(error),
+							error: `${error.message}\n\nStack:\n${error.stack}`,
+							results: {
+								total: itemsToProcess.length,
+								processed: processedCount,
+								pushed: processedCount,
+								errors: [{ message: error.message || String(error) }]
+							}
 						})
 						.where(eq(syncOperationTable.id, operationId));
 				}
@@ -2349,11 +2680,7 @@ export class SyncService {
 
 		if (entityType === 'event' && shouldBeSynced) {
 			try {
-				if (provider.shouldSyncEvent) {
-					if (!provider.shouldSyncEvent(itemRow)) shouldBeSynced = false;
-				} else {
-					if (itemRow.status === 'tentative' || !itemRow.isPublic) shouldBeSynced = false;
-				}
+				shouldBeSynced = this.shouldSyncEventForConfig(itemRow, config, provider);
 			} catch (e) {
 				if (itemRow.status === 'tentative' || !itemRow.isPublic) shouldBeSynced = false;
 			}
@@ -2463,7 +2790,7 @@ export class SyncService {
 		const existingItemSync = campContent.items?.[itemId]?.syncs?.[config.id];
 		const existingExternalId = existingItemSync?.externalId || legacyMapping?.externalId;
 
-		const externalItem = await this.mapInternalToExternal(itemRow, config.providerType, batchContext);
+		const externalItem = await this.mapInternalToExternal(itemRow, config.providerType, batchContext, config);
 
 		let finalExternalId = existingExternalId;
 		let finalEtag: string | null | undefined = existingItemSync?.etag || legacyMapping?.etag;
@@ -2523,6 +2850,179 @@ export class SyncService {
 			if (legacyMapping) {
 				await db.delete(syncMappingTable).where(eq(syncMappingTable.id, legacyMapping.id));
 			}
+
+			// Coordinate with dependent resource sync providers (e.g. microsoft-resources) for room bookings
+			if (entityType === 'event' && externalItem.attendees) {
+				const resourceAttendees = externalItem.attendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
+				if (resourceAttendees.length > 0) {
+					await this.coordinateResourceBooking(itemRow, resourceAttendees, config, batchContext);
+				}
+			}
+
+			// Coordinate with dependent contacts sync providers (e.g. microsoft-contacts) for participants
+			if (entityType === 'event') {
+				await this.coordinateContactsSync(itemRow, config, batchContext);
+			}
+		}
+	}
+
+	/**
+	 * Coordinates room booking with dependent Microsoft resource sync providers.
+	 * Verifies room availability, books rooms, creates sync mappings, and logs results.
+	 */
+	private async coordinateResourceBooking(
+		itemRow: any,
+		resourceAttendees: Array<{ email: string; displayName?: string; resourceId?: string }>,
+		calendarConfig: SyncConfig,
+		batchContext?: SyncBatchContext
+	): Promise<void> {
+		try {
+			// Find active microsoft-resources sync configs
+			const resourceConfigs = await db
+				.select()
+				.from(syncConfigTable)
+				.where(and(
+					eq(syncConfigTable.enabled, true),
+					eq(syncConfigTable.providerType, 'microsoft-resources')
+				));
+
+			if (resourceConfigs.length === 0) return;
+
+			for (const resRow of resourceConfigs) {
+				const resConfig = this.rowToConfig(resRow);
+				const provider = await this.getProviderInstance(resConfig) as any;
+
+				if (typeof provider.bookRoom === 'function') {
+					for (const room of resourceAttendees) {
+						if (!room.resourceId) continue;
+
+						const bookingResult = await provider.bookRoom({
+							eventId: itemRow.id,
+							resourceId: room.resourceId,
+							roomEmail: room.email,
+							roomName: room.displayName || room.email,
+							summary: itemRow.summary || itemRow.title || 'Event',
+							description: itemRow.description,
+							start: itemRow.startDateTime,
+							end: itemRow.endDateTime,
+							startTimeZone: itemRow.startTimeZone || 'UTC',
+							endTimeZone: itemRow.endTimeZone || 'UTC'
+						});
+
+						if (!bookingResult.success) {
+							console.warn(`[SyncService] Room booking failed for ${room.displayName}:`, bookingResult.message);
+							await db.insert(syncOperationTable).values({
+								syncConfigId: resConfig.id,
+								operation: 'push',
+								status: 'failed',
+								entityType: 'resource',
+								entityId: room.resourceId,
+								errorMessage: bookingResult.message,
+								error: bookingResult.message,
+								results: {
+									roomBooking: bookingResult,
+									eventId: itemRow.id
+								},
+								startedAt: new Date(),
+								completedAt: new Date()
+							});
+						} else {
+							console.log(`[SyncService] Room booking successful:`, bookingResult.message);
+							await db.insert(syncOperationTable).values({
+								syncConfigId: resConfig.id,
+								operation: 'push',
+								status: 'completed',
+								entityType: 'resource',
+								entityId: room.resourceId,
+								results: {
+									roomBooking: bookingResult,
+									eventId: itemRow.id
+								},
+								startedAt: new Date(),
+								completedAt: new Date()
+							});
+						}
+					}
+				}
+			}
+		} catch (err: any) {
+			console.error('[SyncService] Failed to coordinate resource bookings:', err);
+		}
+	}
+
+	/**
+	 * Coordinates participant synchronization with active Microsoft Contacts sync providers.
+	 * Pushes or updates associated contacts who meet the sync filter criteria into external contact folders.
+	 */
+	private async coordinateContactsSync(
+		itemRow: any,
+		triggerConfig?: SyncConfig,
+		batchContext?: SyncBatchContext
+	): Promise<void> {
+		try {
+			// Find active microsoft-contacts sync configs
+			const contactConfigs = await db
+				.select()
+				.from(syncConfigTable)
+				.where(and(
+					eq(syncConfigTable.enabled, true),
+					eq(syncConfigTable.providerType, 'microsoft-contacts')
+				));
+
+			if (contactConfigs.length === 0) return;
+
+			const isVirtual = typeof itemRow.id === 'string' && itemRow.id.includes('_inst_');
+			const directEventId = (isVirtual ? itemRow.id.split('_inst_')[0] : itemRow.id) as string;
+			const fallbackMasterId = (itemRow.recurringEventId || (isVirtual ? itemRow.id.split('_inst_')[0] : null)) as string | null;
+
+			let associatedContacts = await getEntityContacts('event', directEventId) || [];
+			if (associatedContacts.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
+				associatedContacts = await getEntityContacts('event', fallbackMasterId) || [];
+			}
+
+			if (associatedContacts.length === 0) return;
+
+			for (const cRow of contactConfigs) {
+				const cConfig = this.rowToConfig(cRow);
+				const provider = await this.getProviderInstance(cConfig) as any;
+				if (typeof provider.pushContact !== 'function') continue;
+
+				for (const contact of associatedContacts) {
+					if (!this.shouldSyncContactForEvent(contact, cConfig)) continue;
+
+					try {
+						const existingMappings = await db
+							.select()
+							.from(syncMappingTable)
+							.where(and(
+								eq(syncMappingTable.syncConfigId, cConfig.id),
+								eq(syncMappingTable.contactId, contact.id)
+							))
+							.limit(1);
+
+						if (existingMappings.length > 0 && existingMappings[0].externalId) {
+							if (typeof provider.updateContact === 'function') {
+								await provider.updateContact(existingMappings[0].externalId, contact);
+							}
+						} else {
+							const { externalId } = await provider.pushContact(contact);
+							if (externalId) {
+								await db.insert(syncMappingTable).values({
+									syncConfigId: cConfig.id,
+									contactId: contact.id,
+									externalId,
+									providerId: cConfig.providerType,
+									lastSyncedAt: new Date()
+								});
+							}
+						}
+					} catch (pushErr: any) {
+						console.warn(`[SyncService] Failed to coordinate contact sync for ${contact.displayName || contact.id}:`, pushErr);
+					}
+				}
+			}
+		} catch (err: any) {
+			console.error('[SyncService] Failed to coordinate contacts sync:', err);
 		}
 	}
 
@@ -2621,11 +3121,10 @@ export class SyncService {
 			let shouldBeSynced = isTargetConfig;
 
 			if (entityType === 'event' && shouldBeSynced) {
-				if (provider.shouldSyncEvent) {
-					if (!provider.shouldSyncEvent(itemRow)) shouldBeSynced = false;
-				} else {
-					const event = itemRow;
-					if (event.status === 'tentative' || !event.isPublic) shouldBeSynced = false;
+				try {
+					shouldBeSynced = this.shouldSyncEventForConfig(itemRow, config, provider);
+				} catch (e) {
+					if (itemRow.status === 'tentative' || !itemRow.isPublic) shouldBeSynced = false;
 				}
 			} else if (entityType === 'announcement' && shouldBeSynced) {
 				const ann = itemRow;
@@ -2641,10 +3140,10 @@ export class SyncService {
 				return;
 			}
 
-			// Only un-publish if explicitly deselected from campaign targets, or if cancelled
+			// Un-publish if explicitly deselected from campaign targets, filtered out by sync rules, or cancelled
 			const isCancelled = itemRow?.status === 'cancelled';
-			if ((!isTargetConfig || isCancelled) && existingExternalId) {
-				console.log(`[SyncService] Un-publishing ${entityType} ${itemId} from provider: deselected or cancelled for config ${config.id}`);
+			if ((!shouldBeSynced || isCancelled) && existingExternalId) {
+				console.log(`[SyncService] Un-publishing ${entityType} ${itemId} from provider: filtered out, deselected or cancelled for config ${config.id}`);
 				try {
 					await provider.deleteEvent(existingExternalId);
 					if (mapping) {
@@ -2678,6 +3177,27 @@ export class SyncService {
 
 		} catch (error: any) {
 			console.error(`[SyncService] Failed to sync ${entityType} ${itemId}:`, error);
+			try {
+				await db.insert(syncOperationTable).values({
+					syncConfigId: config.id,
+					operation: 'push',
+					status: 'failed',
+					entityType,
+					entityId: itemId,
+					errorMessage: error.message || String(error),
+					error: error.message || String(error),
+					results: {
+						itemId,
+						providerType: config.providerType,
+						error: error.message || String(error)
+					},
+					startedAt: new Date(),
+					completedAt: new Date()
+				});
+			} catch (logErr) {
+				console.error('[SyncService] Failed to record sync operation failure:', logErr);
+			}
+			throw error;
 		}
 	}
 
@@ -2848,6 +3368,24 @@ export class SyncService {
 	}
 
 	/**
+	 * Triggered when a contact association to an event changes (link, unlink, status change, or role update).
+	 */
+	async syncContactAssociationsChange(
+		userId: string,
+		eventId: string,
+		contactId: string,
+		action: 'link' | 'unlink' | 'status_update' | 'role_update'
+	): Promise<void> {
+		try {
+			console.log(`[SyncService] Contact association changed (${action}) for event ${eventId}, contact ${contactId}. Triggering event re-sync.`);
+			// Trigger re-sync of the event so external calendar events update their attendees
+			await this.syncItems(userId, [eventId], 'event');
+		} catch (err) {
+			console.error(`[SyncService] Failed to sync contact association change (${action}) for event ${eventId}:`, err);
+		}
+	}
+
+	/**
 	 * Cancel webhook for a sync configuration
 	 * Stops receiving push notifications from the provider
 	 */
@@ -2954,3 +3492,126 @@ export class SyncService {
 
 // Export singleton instance
 export const syncService = new SyncService();
+
+function normalizeSyncFilterList(val: any): string[] {
+	if (!val) return [];
+	if (Array.isArray(val)) return val.map((v) => String(v).trim()).filter(Boolean);
+	if (typeof val === 'string' && val.trim()) {
+		try {
+			const parsed = JSON.parse(val);
+			if (Array.isArray(parsed)) return parsed.map((v) => String(v).trim()).filter(Boolean);
+		} catch {
+			// not JSON
+		}
+		return [val.trim()];
+	}
+	return [];
+}
+
+/**
+ * Determines whether a contact linked to an event should be included in synchronization
+ * (e.g. as an attendee on Microsoft/Google Calendar, or synced to Microsoft Contacts, or sent via Email).
+ */
+export function shouldSyncContactForEvent(contact: any, config?: SyncConfig): boolean {
+	if (!contact) return false;
+	if (!config) {
+		// Default backwards compatibility fallback: sync if contact is an employee
+		return isEmployeeContact(contact);
+	}
+
+	const settings = (config.settings || {}) as Record<string, any>;
+
+	// 1. Master toggle: syncParticipants / includeEventContacts
+	const syncParticipants = settings.syncParticipants ?? settings.includeEventContacts;
+	if (syncParticipants === false) {
+		return false;
+	}
+
+	// 2. Data privacy / Employee, Public, and Non-Public Scope check
+	const isEmployee = isEmployeeContact(contact);
+	const isPublic = contact.isPublic === true || contact.contact?.isPublic === true;
+
+	// Default scope: internal staff only (includeEmployee: true, includePublic: false, includeNonPublic: false)
+	// If legacy onlyEmployeeContacts was explicitly false (and new fields not set), allow all.
+	const isLegacyAllowAll = settings.onlyEmployeeContacts === false &&
+		settings.includeEmployeeContacts === undefined &&
+		settings.includePublicContacts === undefined &&
+		settings.includeNonPublicContacts === undefined;
+
+	const includeEmployee = settings.includeEmployeeContacts !== undefined
+		? settings.includeEmployeeContacts === true
+		: (settings.onlyEmployeeContacts !== false);
+
+	const includePublic = settings.includePublicContacts !== undefined
+		? settings.includePublicContacts === true
+		: isLegacyAllowAll;
+
+	const includeNonPublic = settings.includeNonPublicContacts !== undefined
+		? settings.includeNonPublicContacts === true
+		: isLegacyAllowAll;
+
+	let matchesPrivacyScope = false;
+	if (isEmployee && includeEmployee) {
+		matchesPrivacyScope = true;
+	} else if (isPublic && includePublic) {
+		matchesPrivacyScope = true;
+	} else if (!isEmployee && !isPublic && includeNonPublic) {
+		matchesPrivacyScope = true;
+	}
+
+	if (!matchesPrivacyScope) {
+		return false;
+	}
+
+	// 3. Contact Roles filtering
+	const contactRoles: Array<{ id: string; name: string }> = contact.roles || [];
+	const contactRoleIds = new Set(contactRoles.map((r) => r.id));
+	const contactRoleNames = new Set(contactRoles.map((r) => r.name.toLowerCase().trim()));
+
+	const excludedRoles = normalizeSyncFilterList(settings.excludedContactRoles);
+	if (excludedRoles.length > 0) {
+		const hasExcludedRole = excludedRoles.some(
+			(role) => contactRoleIds.has(role) || contactRoleNames.has(role.toLowerCase().trim())
+		);
+		if (hasExcludedRole) {
+			return false;
+		}
+	}
+
+	const includedRoles = normalizeSyncFilterList(settings.includedContactRoles);
+	if (includedRoles.length > 0) {
+		const hasIncludedRole = includedRoles.some(
+			(role) => contactRoleIds.has(role) || contactRoleNames.has(role.toLowerCase().trim())
+		);
+		if (!hasIncludedRole) {
+			return false;
+		}
+	}
+
+	// 4. Contact Tags filtering
+	const contactTags: Array<{ id: string; name: string }> = (contact.tags || []).map((t: any) => t.tag || t);
+	const contactTagIds = new Set(contactTags.map((t) => t.id).filter(Boolean));
+	const contactTagNames = new Set(contactTags.map((t) => (t.name || '').toLowerCase().trim()).filter(Boolean));
+
+	const excludedTags = normalizeSyncFilterList(settings.excludedContactTags);
+	if (excludedTags.length > 0) {
+		const hasExcludedTag = excludedTags.some(
+			(tag) => contactTagIds.has(tag) || contactTagNames.has(tag.toLowerCase().trim())
+		);
+		if (hasExcludedTag) {
+			return false;
+		}
+	}
+
+	const includedTags = normalizeSyncFilterList(settings.includedContactTags);
+	if (includedTags.length > 0) {
+		const hasIncludedTag = includedTags.some(
+			(tag) => contactTagIds.has(tag) || contactTagNames.has(tag.toLowerCase().trim())
+		);
+		if (!hasIncludedTag) {
+			return false;
+		}
+	}
+
+	return true;
+}

@@ -13,6 +13,7 @@ import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssoci
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
 import { readEvent } from '../events/[id]/read.remote.js';
 import { invalidateEvent } from '#lib/server/cache/index.js';
+import { syncService } from '#lib/server/sync/service.js';
 
 const tableMap = {
     user: userContact,
@@ -56,6 +57,10 @@ export const addAssociation = command(associationSchema, async (data) => {
         userId: user?.id
     });
 
+    if (type === 'event' && user?.id) {
+        await syncService.syncContactAssociationsChange(user.id, entityId, contactId, 'link');
+    }
+
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
 });
@@ -86,6 +91,10 @@ export const removeAssociation = command(associationSchema, async (data) => {
         userId: user?.id
     });
 
+    if (type === 'event' && user?.id) {
+        await syncService.syncContactAssociationsChange(user.id, entityId, contactId, 'unlink');
+    }
+
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
 });
@@ -113,6 +122,10 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
             eq(eventContactTable.eventId, targetEntityId),
             eq(eventContactTable.contactId, contactId)
         ));
+
+    if (type === 'event' && user?.id) {
+        await syncService.syncContactAssociationsChange(user.id, targetEntityId, contactId, 'status_update');
+    }
 
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
@@ -149,6 +162,11 @@ export const updateContactRoles = command(updateContactRolesSchema, async (data)
     await invalidateEvent(targetEntityId);
     void readEvent(targetEntityId).refresh();
     await fetchEntityContacts({ type: 'event', entityId: targetEntityId }).refresh();
+
+    if (user?.id) {
+        await syncService.syncContactAssociationsChange(user.id, targetEntityId, contactId, 'role_update');
+    }
+
     return { success: true };
 });
 

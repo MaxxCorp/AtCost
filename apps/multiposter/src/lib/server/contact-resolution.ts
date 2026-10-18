@@ -41,7 +41,7 @@ export function isEmployeeContact(contactOrAssociation: any): boolean {
 
 	return tags.some((t: any) => {
 		const tagName = (t?.name || t?.tag?.name || (typeof t === 'string' ? t : '')).trim().toLowerCase();
-		return tagName === 'employee' || tagName === 'employees';
+		return tagName === 'employee' || tagName === 'employees' || tagName === 'mitarbeiter' || tagName === 'staff';
 	});
 }
 
