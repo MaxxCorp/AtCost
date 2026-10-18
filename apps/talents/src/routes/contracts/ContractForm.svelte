@@ -1,12 +1,10 @@
 <script lang="ts">
-    import AsyncButton from "@ac/ui/components/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "@ac/ui/components/button";
     import { goto } from "$app/navigation";
     import { untrack, onMount } from "svelte";
     import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
     import * as m from "#lib/paraglide/messages.js";
-    import { translateIssue, getLastListUrl } from "@ac/ui";
+    import { AsyncButton, Button, translateIssue, getLastListUrl } from "@ac/ui";
     import {
         AWO_BERLIN_DEFAULTS,
         TV_L_DEFAULTS,

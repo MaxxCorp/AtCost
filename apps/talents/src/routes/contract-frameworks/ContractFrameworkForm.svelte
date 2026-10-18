@@ -1,11 +1,9 @@
 <script lang="ts">
-    import AsyncButton from "@ac/ui/components/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
-    import { Button } from "@ac/ui/components/button";
     import { goto } from "$app/navigation";
     import { untrack } from "svelte";
     import * as m from "#lib/paraglide/messages.js";
-    import { translateIssue } from "@ac/ui";
+    import { AsyncButton, Button, translateIssue } from "@ac/ui";
 
     let {
         remoteFunction,
