@@ -25,7 +25,11 @@
 		Clock,
 		Globe,
 		Lock,
-		Plus
+		Plus,
+		ChevronDown,
+		Sparkles,
+		Eye,
+		Info
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import * as m from "#lib/paraglide/messages.js";
@@ -446,34 +450,118 @@
 			return val === undefined ? true : (val === true || val === "true" || val === 1);
 		})
 	);
-	let includeEmployeeContacts = $state<boolean>(
-		untrack(() => {
-			const val = initialData?.settings?.includeEmployeeContacts;
-			if (val !== undefined) return val === true || val === "true" || val === 1;
-			const legacyOnlyEmp = initialData?.settings?.onlyEmployeeContacts;
-			if (legacyOnlyEmp !== undefined) return legacyOnlyEmp === true || legacyOnlyEmp === "true" || legacyOnlyEmp === 1;
-			return true; // Default: internal staff only
-		})
-	);
 	let includePublicContacts = $state<boolean>(
 		untrack(() => {
 			const val = initialData?.settings?.includePublicContacts;
 			if (val !== undefined) return val === true || val === "true" || val === 1;
 			if (initialData?.settings?.onlyEmployeeContacts === false) return true;
-			return false; // Default: public contacts not synced unless enabled
+			return false; // Default: public contacts off
 		})
 	);
-	let includeNonPublicContacts = $state<boolean>(
+	let allowNonPublicContacts = $state<boolean>(
 		untrack(() => {
 			const val = initialData?.settings?.includeNonPublicContacts;
-			if (val !== undefined) return val === true || val === "true" || val === 1;
-			if (initialData?.settings?.onlyEmployeeContacts === false && initialData?.settings?.includePublicContacts === undefined) return true;
-			return false; // Default: non-public user NOT synced by default
+			if (val === true || val === "true" || val === 1) return true;
+			const empVal = initialData?.settings?.includeEmployeeContacts ?? initialData?.settings?.onlyEmployeeContacts;
+			if (empVal === false || empVal === "false") {
+				return false;
+			}
+			return true; // Default: allow non-public internal staff
 		})
 	);
-	const onlyEmployeeContactsDerived = $derived(
+	let nonPublicScope = $state<"staff" | "all">(
+		untrack(() => {
+			const val = initialData?.settings?.includeNonPublicContacts;
+			if (val === true || val === "true" || val === 1) return "all";
+			return "staff"; // Default: internal staff only
+		})
+	);
+
+	let showPrivacyFineTuning = $state<boolean>(false);
+
+	const includeEmployeeContacts = $derived<boolean>(allowNonPublicContacts);
+	const includeNonPublicContacts = $derived<boolean>(allowNonPublicContacts && nonPublicScope === "all");
+	const onlyEmployeeContactsDerived = $derived<boolean>(
 		includeEmployeeContacts && !includePublicContacts && !includeNonPublicContacts
 	);
+
+	const activePrivacyPreset = $derived.by<"staff" | "staff_public" | "public_only" | "all" | "none" | "custom">(() => {
+		if (!allowNonPublicContacts && !includePublicContacts) return "none";
+		if (allowNonPublicContacts && nonPublicScope === "staff" && !includePublicContacts) return "staff";
+		if (allowNonPublicContacts && nonPublicScope === "staff" && includePublicContacts) return "staff_public";
+		if (!allowNonPublicContacts && includePublicContacts) return "public_only";
+		if (allowNonPublicContacts && nonPublicScope === "all" && includePublicContacts) return "all";
+		return "custom";
+	});
+
+	function applyPrivacyPreset(preset: "staff" | "staff_public" | "public_only" | "all") {
+		if (preset === "staff") {
+			includePublicContacts = false;
+			allowNonPublicContacts = true;
+			nonPublicScope = "staff";
+		} else if (preset === "staff_public") {
+			includePublicContacts = true;
+			allowNonPublicContacts = true;
+			nonPublicScope = "staff";
+		} else if (preset === "public_only") {
+			includePublicContacts = true;
+			allowNonPublicContacts = false;
+			nonPublicScope = "staff";
+		} else if (preset === "all") {
+			includePublicContacts = true;
+			allowNonPublicContacts = true;
+			nonPublicScope = "all";
+		}
+	}
+
+	const privacyScopeLabel = $derived.by<string>(() => {
+		if (!syncParticipants) return "Sync Disabled";
+		if (activePrivacyPreset === "staff") return "Internal Staff Only";
+		if (activePrivacyPreset === "staff_public") return "Staff & Public Contacts";
+		if (activePrivacyPreset === "public_only") return "Public Contacts Only";
+		if (activePrivacyPreset === "all") return "All Participants (Inc. Private)";
+		if (activePrivacyPreset === "none") return "No Contacts Allowed";
+		return "Custom Privacy Scope";
+	});
+
+	const roleFilterLabel = $derived.by<string>(() => {
+		if (participantRoleFilterMode === "all") return "All Roles";
+		if (participantRoleFilterMode === "include") {
+			return includedContactRoles.length > 0
+				? `Include (${includedContactRoles.length} roles)`
+				: "Include (None selected)";
+		}
+		return excludedContactRoles.length > 0
+			? `Exclude (${excludedContactRoles.length} roles)`
+			: "Exclude (None excluded)";
+	});
+
+	const tagFilterLabel = $derived.by<string>(() => {
+		if (participantTagFilterMode === "all") return "All Tags";
+		if (participantTagFilterMode === "include") {
+			return includedContactTags.length > 0
+				? `Include (${includedContactTags.length} tags)`
+				: "Include (None selected)";
+		}
+		return excludedContactTags.length > 0
+			? `Exclude (${excludedContactTags.length} tags)`
+			: "Exclude (None excluded)";
+	});
+
+	const participantStats = $derived.by(() => {
+		if (!syncParticipants || !events || events.length === 0) {
+			return { totalMatching: 0, eventsCount: events?.length ?? 0 };
+		}
+		try {
+			const derived = getDerivedEventContacts(events, currentSyncSettings);
+			return {
+				totalMatching: derived.length,
+				eventsCount: events.length
+			};
+		} catch {
+			return { totalMatching: 0, eventsCount: events.length };
+		}
+	});
 	let participantRoleFilterMode = $state<"all" | "include" | "exclude">(
 		untrack(() => {
 			const mode = initialData?.settings?.participantRoleFilterMode;
@@ -2596,28 +2684,31 @@
 				</p>
 			</div>
 			<div>
-				<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold {!syncParticipants ? 'bg-gray-100 text-gray-600 border border-gray-300' : onlyEmployeeContactsDerived ? 'bg-amber-100 text-amber-800 border border-amber-300' : (includePublicContacts && !includeNonPublicContacts) ? 'bg-blue-100 text-blue-800 border border-blue-300' : includeNonPublicContacts ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-gray-100 text-gray-600 border border-gray-300'}">
+				<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold {!syncParticipants ? 'bg-gray-100 text-gray-600 border border-gray-300' : activePrivacyPreset === 'staff' ? 'bg-amber-100 text-amber-800 border border-amber-300' : activePrivacyPreset === 'staff_public' ? 'bg-blue-100 text-blue-800 border border-blue-300' : activePrivacyPreset === 'public_only' ? 'bg-indigo-100 text-indigo-800 border border-indigo-300' : activePrivacyPreset === 'all' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-gray-100 text-gray-600 border border-gray-300'}">
 					{#if !syncParticipants}
 						Disabled
-					{:else if onlyEmployeeContactsDerived}
+					{:else if activePrivacyPreset === 'staff'}
 						<ShieldCheck class="w-3.5 h-3.5 text-amber-600" />
-						Internal Staff Only
-					{:else if includePublicContacts && !includeNonPublicContacts}
+						Internal Staff Only (Default)
+					{:else if activePrivacyPreset === 'staff_public'}
 						<Globe class="w-3.5 h-3.5 text-blue-600" />
 						Staff & Public Contacts
-					{:else if includeNonPublicContacts}
+					{:else if activePrivacyPreset === 'public_only'}
+						<Eye class="w-3.5 h-3.5 text-indigo-600" />
+						Public Contacts Only
+					{:else if activePrivacyPreset === 'all'}
 						<Users class="w-3.5 h-3.5 text-emerald-600" />
 						All Participants (Inc. Private)
 					{:else}
 						<AlertCircle class="w-3.5 h-3.5 text-gray-500" />
-						No Scope Selected
+						Custom Privacy Scope
 					{/if}
 				</span>
 			</div>
 		</div>
 
-		<!-- Master Participants Toggle & Privacy Restriction -->
-		<div class="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-5 space-y-4">
+		<!-- Master Participants Toggle -->
+		<div class="bg-indigo-50/40 border border-indigo-200/80 rounded-xl p-4 sm:p-5 space-y-4">
 			<label class="flex items-start gap-3 cursor-pointer">
 				<input
 					type="checkbox"
@@ -2636,86 +2727,244 @@
 			</label>
 
 			{#if syncParticipants}
-				<div class="pt-3 border-t border-indigo-200/60 pl-7 space-y-3">
-					<div>
-						<div class="flex items-center gap-1.5 font-semibold text-xs text-indigo-950 mb-1">
-							<ShieldCheck class="w-4 h-4 text-indigo-600" />
-							<span>{m.sync_participants_privacy_title ? m.sync_participants_privacy_title() : "Contact Privacy & Visibility Scope"}</span>
+				<!-- STEP 1: Privacy & Visibility Scope (Base Audience) -->
+				<div class="pt-4 border-t border-indigo-200/70 space-y-4">
+					<div class="flex items-center justify-between">
+						<div>
+							<div class="flex items-center gap-2">
+								<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-200/70 text-indigo-900 border border-indigo-300">
+									Step 1: Base Audience
+								</span>
+								<h3 class="text-sm font-bold text-indigo-950 flex items-center gap-1.5">
+									<ShieldCheck class="w-4 h-4 text-indigo-600" />
+									Data Privacy & Visibility Scope
+								</h3>
+							</div>
+							<p class="text-xs text-indigo-900/80 mt-1">
+								External services copy attendee personal data. Select who is eligible for synchronization based on privacy classification:
+							</p>
 						</div>
-						<p class="text-xs text-indigo-800/80 mb-3">
-							{m.sync_participants_privacy_desc ? m.sync_participants_privacy_desc() : "Choose which categories of linked contacts are eligible for external calendar and directory synchronization. Non-public contacts are excluded by default to protect personal data."}
-						</p>
+					</div>
 
-						<div class="space-y-2.5">
-							<!-- Option 1: Internal Staff / Employees -->
-							<label class="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-lg border transition-colors {includeEmployeeContacts ? 'bg-amber-50/80 border-amber-300/80 shadow-xs' : 'bg-white/80 border-indigo-100 hover:bg-white'}">
-								<input
-									type="checkbox"
-									checked={includeEmployeeContacts}
-									onchange={(e) => {
-										includeEmployeeContacts = e.currentTarget.checked;
-									}}
-									class="mt-0.5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-								/>
-								<div>
-									<div class="flex items-center gap-1.5 font-medium text-xs text-indigo-950">
-										<ShieldCheck class="w-3.5 h-3.5 text-amber-600" />
-										<span>{m.sync_participants_employees ? m.sync_participants_employees() : "Sync internal staff (Employees)"}</span>
-										<span class="text-[10px] font-semibold uppercase px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded">Default</span>
-									</div>
-									<p class="text-[11px] text-indigo-900/80 mt-0.5">
-										{m.sync_participants_employees_desc ? m.sync_participants_employees_desc() : "Contacts tagged as 'Employee' (internal team, hosts, and organizers)."}
-									</p>
+					<!-- Privacy Scope Preset Cards (Mutually exclusive & instantly clear) -->
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+						<!-- Preset 1: Staff Only -->
+						<button
+							type="button"
+							onclick={() => applyPrivacyPreset('staff')}
+							class="text-left p-3.5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between {activePrivacyPreset === 'staff' ? 'bg-white border-amber-400 ring-2 ring-amber-400/30 shadow-sm' : 'bg-white/70 border-gray-200 hover:bg-white hover:border-gray-300'}"
+						>
+							<div>
+								<div class="flex items-center justify-between gap-1 mb-1.5">
+									<span class="inline-flex items-center gap-1.5 font-bold text-xs text-gray-900">
+										<ShieldCheck class="w-4 h-4 text-amber-600" />
+										Staff Only
+									</span>
+									<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">Default</span>
 								</div>
-							</label>
+								<p class="text-[11px] text-gray-600 leading-relaxed">
+									Only internal team members (organizers, staff). External participants and attendees are blocked.
+								</p>
+							</div>
+							<div class="mt-3 pt-2 border-t border-gray-100 text-[10px] font-medium text-amber-700 flex items-center gap-1">
+								<Lock class="w-3 h-3 text-amber-600" />
+								<span>Safest for GDPR</span>
+							</div>
+						</button>
 
-							<!-- Option 2: Public Contacts -->
-							<label class="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-lg border transition-colors {includePublicContacts ? 'bg-blue-50/80 border-blue-300/80 shadow-xs' : 'bg-white/80 border-indigo-100 hover:bg-white'}">
-								<input
-									type="checkbox"
-									checked={includePublicContacts}
-									onchange={(e) => {
-										includePublicContacts = e.currentTarget.checked;
-									}}
-									class="mt-0.5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-								/>
-								<div>
-									<div class="flex items-center gap-1.5 font-medium text-xs text-indigo-950">
-										<Globe class="w-3.5 h-3.5 text-blue-600" />
-										<span>{m.sync_participants_public ? m.sync_participants_public() : "Sync public contacts"}</span>
-									</div>
-									<p class="text-[11px] text-indigo-900/80 mt-0.5">
-										{m.sync_participants_public_desc ? m.sync_participants_public_desc() : "External contacts explicitly marked as public in the directory (e.g. public speakers, performers, partners)."}
-									</p>
+						<!-- Preset 2: Staff & Public -->
+						<button
+							type="button"
+							onclick={() => applyPrivacyPreset('staff_public')}
+							class="text-left p-3.5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between {activePrivacyPreset === 'staff_public' ? 'bg-white border-blue-500 ring-2 ring-blue-500/30 shadow-sm' : 'bg-white/70 border-gray-200 hover:bg-white hover:border-gray-300'}"
+						>
+							<div>
+								<div class="flex items-center justify-between gap-1 mb-1.5">
+									<span class="inline-flex items-center gap-1.5 font-bold text-xs text-gray-900">
+										<Globe class="w-4 h-4 text-blue-600" />
+										Staff & Public
+									</span>
+									<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded">Standard</span>
 								</div>
-							</label>
+								<p class="text-[11px] text-gray-600 leading-relaxed">
+									Internal team plus contacts explicitly marked public (e.g. speakers, talent). Private attendees remain protected.
+								</p>
+							</div>
+							<div class="mt-3 pt-2 border-t border-gray-100 text-[10px] font-medium text-blue-700 flex items-center gap-1">
+								<Users class="w-3 h-3 text-blue-600" />
+								<span>Public Events</span>
+							</div>
+						</button>
 
-							<!-- Option 3: Non-Public / Private Contacts -->
-							<label class="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-lg border transition-colors {includeNonPublicContacts ? 'bg-purple-50/80 border-purple-300/80 shadow-xs' : 'bg-white/80 border-indigo-100 hover:bg-white'}">
-								<input
-									type="checkbox"
-									checked={includeNonPublicContacts}
-									onchange={(e) => {
-										includeNonPublicContacts = e.currentTarget.checked;
-									}}
-									class="mt-0.5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
-								/>
-								<div>
-									<div class="flex items-center gap-1.5 font-medium text-xs text-indigo-950">
-										<Lock class="w-3.5 h-3.5 text-purple-600" />
-										<span>{m.sync_participants_non_public ? m.sync_participants_non_public() : "Sync non-public / private contacts"}</span>
-									</div>
-									<p class="text-[11px] text-indigo-900/80 mt-0.5">
-										{m.sync_participants_non_public_desc ? m.sync_participants_non_public_desc() : "Private external contacts and unlisted attendees. Disabled by default to protect personal data."}
-									</p>
+						<!-- Preset 3: Public Only -->
+						<button
+							type="button"
+							onclick={() => applyPrivacyPreset('public_only')}
+							class="text-left p-3.5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between {activePrivacyPreset === 'public_only' ? 'bg-white border-indigo-500 ring-2 ring-indigo-500/30 shadow-sm' : 'bg-white/70 border-gray-200 hover:bg-white hover:border-gray-300'}"
+						>
+							<div>
+								<div class="flex items-center justify-between gap-1 mb-1.5">
+									<span class="inline-flex items-center gap-1.5 font-bold text-xs text-gray-900">
+										<Eye class="w-4 h-4 text-indigo-600" />
+										Public Only
+									</span>
 								</div>
-							</label>
-						</div>
+								<p class="text-[11px] text-gray-600 leading-relaxed">
+									Strictly contacts published as public. Zero private staff or attendee personal data is ever shared.
+								</p>
+							</div>
+							<div class="mt-3 pt-2 border-t border-gray-100 text-[10px] font-medium text-indigo-700 flex items-center gap-1">
+								<Lock class="w-3 h-3 text-indigo-600" />
+								<span>Zero Private Data</span>
+							</div>
+						</button>
 
-						{#if !includeEmployeeContacts && !includePublicContacts && !includeNonPublicContacts}
-							<div class="mt-2.5 p-2 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-800 flex items-center gap-1.5">
-								<AlertCircle class="w-3.5 h-3.5 text-amber-600 shrink-0" />
-								<span>{m.sync_participants_none_selected ? m.sync_participants_none_selected() : "No contact categories selected. No linked participants will be synchronized."}</span>
+						<!-- Preset 4: All Contacts -->
+						<button
+							type="button"
+							onclick={() => applyPrivacyPreset('all')}
+							class="text-left p-3.5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between {activePrivacyPreset === 'all' ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/30 shadow-sm' : 'bg-white/70 border-gray-200 hover:bg-white hover:border-gray-300'}"
+						>
+							<div>
+								<div class="flex items-center justify-between gap-1 mb-1.5">
+									<span class="inline-flex items-center gap-1.5 font-bold text-xs text-gray-900">
+										<Users class="w-4 h-4 text-emerald-600" />
+										All Participants
+									</span>
+									<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">Full</span>
+								</div>
+								<p class="text-[11px] text-gray-600 leading-relaxed">
+									All linked participants including unlisted and private external attendees.
+								</p>
+							</div>
+							<div class="mt-3 pt-2 border-t border-gray-100 text-[10px] font-medium text-amber-700 flex items-center gap-1">
+								<AlertCircle class="w-3 h-3 text-amber-600" />
+								<span>Syncs Private Data</span>
+							</div>
+						</button>
+					</div>
+
+					<!-- Fine-tuning disclosure toggle -->
+					<div class="pt-1">
+						<button
+							type="button"
+							onclick={() => { showPrivacyFineTuning = !showPrivacyFineTuning; }}
+							class="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-800 hover:text-indigo-950 cursor-pointer"
+						>
+							<SlidersHorizontal class="w-3.5 h-3.5 text-indigo-600" />
+							<span>{showPrivacyFineTuning ? "Hide Fine-grained Privacy Controls" : "Customize / Fine-tune Privacy Hierarchy"}</span>
+							<ChevronDown class="w-3.5 h-3.5 transition-transform duration-200 {showPrivacyFineTuning ? 'rotate-180' : ''}" />
+						</button>
+
+						{#if showPrivacyFineTuning || activePrivacyPreset === 'custom' || activePrivacyPreset === 'none'}
+							<div class="mt-3 p-4 bg-white rounded-xl border border-indigo-200/80 shadow-xs space-y-4">
+								<div class="text-xs text-gray-600 mb-2">
+									Contacts are evaluated against two visibility tiers. Non-public authorization is the master gate for private data:
+								</div>
+
+								<!-- Tier 1: Public Contacts -->
+								<div class="p-3 rounded-lg border border-gray-200 bg-gray-50/50">
+									<label class="flex items-start gap-3 cursor-pointer">
+										<input
+											type="checkbox"
+											checked={includePublicContacts}
+											onchange={(e) => {
+												includePublicContacts = e.currentTarget.checked;
+											}}
+											class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+										/>
+										<div>
+											<div class="flex items-center gap-1.5 font-semibold text-xs text-gray-900">
+												<Globe class="w-3.5 h-3.5 text-blue-600" />
+												<span>Tier 1: Sync Public Contacts</span>
+											</div>
+											<p class="text-[11px] text-gray-600 mt-0.5">
+												Allows contacts explicitly marked as public in the directory (performers, public speakers, external partners).
+											</p>
+										</div>
+									</label>
+								</div>
+
+								<!-- Tier 2: Non-Public Contacts (Logically Above Staff Selection) -->
+								<div class="p-3.5 rounded-lg border border-gray-200 bg-gray-50/50 space-y-3">
+									<label class="flex items-start gap-3 cursor-pointer">
+										<input
+											type="checkbox"
+											checked={allowNonPublicContacts}
+											onchange={(e) => {
+												allowNonPublicContacts = e.currentTarget.checked;
+											}}
+											class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+										/>
+										<div>
+											<div class="flex items-center gap-1.5 font-semibold text-xs text-gray-900">
+												<Lock class="w-3.5 h-3.5 text-indigo-600" />
+												<span>Tier 2: Allow Non-Public / Private Contacts</span>
+											</div>
+											<p class="text-[11px] text-gray-600 mt-0.5">
+												Permission gate for contacts whose personal data is not publicly published.
+											</p>
+										</div>
+									</label>
+
+									<!-- Nested sub-selection: only relevant when non-public is allowed -->
+									{#if allowNonPublicContacts}
+										<div class="ml-7 pt-2.5 border-t border-gray-200/80 space-y-2">
+											<div class="text-[11px] font-bold text-gray-700 uppercase tracking-wider">
+												Who among non-public contacts is allowed?
+											</div>
+											<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+												<button
+													type="button"
+													onclick={() => { nonPublicScope = 'staff'; }}
+													class="text-left flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors {nonPublicScope === 'staff' ? 'bg-amber-50/80 border-amber-300 text-amber-950 shadow-2xs' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-800'}"
+												>
+													<span class="w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 {nonPublicScope === 'staff' ? 'border-amber-600 bg-amber-600 text-white' : 'border-gray-400 bg-white'}">
+														{#if nonPublicScope === 'staff'}
+															<span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+														{/if}
+													</span>
+													<div>
+														<span class="block font-semibold text-xs">Internal Staff Only</span>
+														<span class="block text-[10px] text-gray-600 mt-0.5">
+															Employees and organizers only. Private attendees remain blocked.
+														</span>
+													</div>
+												</button>
+
+												<button
+													type="button"
+													onclick={() => { nonPublicScope = 'all'; }}
+													class="text-left flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors {nonPublicScope === 'all' ? 'bg-purple-50/80 border-purple-300 text-purple-950 shadow-2xs' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-800'}"
+												>
+													<span class="w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 {nonPublicScope === 'all' ? 'border-purple-600 bg-purple-600 text-white' : 'border-gray-400 bg-white'}">
+														{#if nonPublicScope === 'all'}
+															<span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+														{/if}
+													</span>
+													<div>
+														<span class="block font-semibold text-xs">All Non-Public Contacts</span>
+														<span class="block text-[10px] text-gray-600 mt-0.5">
+															Includes private external attendees and unlisted guests.
+														</span>
+													</div>
+												</button>
+											</div>
+										</div>
+									{:else}
+										<div class="ml-7 p-2 rounded bg-gray-100/80 text-[11px] text-gray-500 italic flex items-center gap-1.5">
+											<Info class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+											<span>Non-public contacts are disabled. Neither staff nor private attendees will be synchronized.</span>
+										</div>
+									{/if}
+								</div>
+
+								{#if !includePublicContacts && !allowNonPublicContacts}
+									<div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+										<AlertCircle class="w-4 h-4 text-amber-600 shrink-0" />
+										<span>No contact categories are selected. Zero participants will be synchronized.</span>
+									</div>
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -2724,168 +2973,236 @@
 		</div>
 
 		{#if syncParticipants}
-			<!-- Filter by Roles Section -->
-			<div class="border border-gray-200 rounded-xl p-5 space-y-4 bg-white shadow-sm">
-				<div class="flex items-center justify-between border-b pb-3">
-					<div>
-						<h3 class="text-sm font-bold text-gray-900 flex items-center gap-2">
-							<Users class="w-4 h-4 text-gray-600" />
-							{m.sync_contact_roles_title()}
-						</h3>
-						<p class="text-xs text-gray-500 mt-0.5">
-							{m.sync_contact_roles_desc()}
-						</p>
-					</div>
-					<div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-						<button
-							type="button"
-							class="px-2.5 py-1 text-xs font-medium rounded-md transition-all {participantRoleFilterMode === 'all' ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'}"
-							onclick={() => { participantRoleFilterMode = 'all'; }}
-						>
-							All Roles
-						</button>
-						<button
-							type="button"
-							class="px-2.5 py-1 text-xs font-medium rounded-md transition-all {participantRoleFilterMode === 'include' ? 'bg-blue-600 text-white shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'}"
-							onclick={() => { participantRoleFilterMode = 'include'; }}
-						>
-							Include Only
-						</button>
-						<button
-							type="button"
-							class="px-2.5 py-1 text-xs font-medium rounded-md transition-all {participantRoleFilterMode === 'exclude' ? 'bg-amber-600 text-white shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'}"
-							onclick={() => { participantRoleFilterMode = 'exclude'; }}
-						>
-							Exclude
-						</button>
-					</div>
+			<!-- Explicit Pipeline Divider (AND connector) -->
+			<div class="relative py-1">
+				<div class="absolute inset-0 flex items-center" aria-hidden="true">
+					<div class="w-full border-t border-gray-200"></div>
 				</div>
-
-				{#if participantRoleFilterMode === 'all'}
-					<div class="p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-						Contacts with <strong>any</strong> assigned event role (or no role assigned) will be included in the synchronization.
-					</div>
-				{:else if participantRoleFilterMode === 'include'}
-					<div class="space-y-3">
-						<p class="text-xs text-gray-600">
-							Only participants who have <strong>at least one</strong> of the selected roles below will be synchronized:
-						</p>
-						<div class="flex flex-wrap gap-2">
-							{#each eventRoles as role}
-								{@const isSelected = includedContactRoles.includes(role.id) || includedContactRoles.includes(role.name)}
-								<button
-									type="button"
-									onclick={() => {
-										if (isSelected) {
-											includedContactRoles = includedContactRoles.filter(r => r !== role.id && r !== role.name);
-										} else {
-											includedContactRoles = [...includedContactRoles, role.id];
-										}
-									}}
-									class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer {isSelected ? 'bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-500/20' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
-								>
-									<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {role.color || '#3b82f6'};"></span>
-									<span>{role.name}</span>
-									{#if isSelected}
-										<Check class="w-3.5 h-3.5 text-blue-600" />
-									{/if}
-								</button>
-							{/each}
-							{#if eventRoles.length === 0}
-								<span class="text-xs text-gray-400 italic">No event roles found in database.</span>
-							{/if}
-						</div>
-					</div>
-				{:else if participantRoleFilterMode === 'exclude'}
-					<div class="space-y-3">
-						<p class="text-xs text-gray-600">
-							Participants with any of the selected roles below will be <strong>omitted</strong> from synchronization:
-						</p>
-						<div class="flex flex-wrap gap-2">
-							{#each eventRoles as role}
-								{@const isSelected = excludedContactRoles.includes(role.id) || excludedContactRoles.includes(role.name)}
-								<button
-									type="button"
-									onclick={() => {
-										if (isSelected) {
-											excludedContactRoles = excludedContactRoles.filter(r => r !== role.id && r !== role.name);
-										} else {
-											excludedContactRoles = [...excludedContactRoles, role.id];
-										}
-									}}
-									class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer {isSelected ? 'bg-red-50 border-red-500 text-red-900 ring-2 ring-red-500/20' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
-								>
-									<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {role.color || '#ef4444'};"></span>
-									<span>{role.name}</span>
-									{#if isSelected}
-										<X class="w-3.5 h-3.5 text-red-600" />
-									{/if}
-								</button>
-							{/each}
-							{#if eventRoles.length === 0}
-								<span class="text-xs text-gray-400 italic">No event roles found in database.</span>
-							{/if}
-						</div>
-					</div>
-				{/if}
+				<div class="relative flex justify-center">
+					<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs">
+						<Filter class="w-3.5 h-3.5 text-indigo-600" />
+						<span>STEP 2: REFINE BY ROLES & TAGS (AND FILTER)</span>
+					</span>
+				</div>
 			</div>
 
-			<!-- Filter by Contact Tags Section -->
-			<div class="border border-gray-200 rounded-xl p-5 space-y-4 bg-white shadow-sm">
-				<div class="flex items-center justify-between border-b pb-3">
-					<div>
-						<h3 class="text-sm font-bold text-gray-900 flex items-center gap-2">
-							<Filter class="w-4 h-4 text-gray-600" />
-							{m.sync_contact_tags_title()}
-						</h3>
-						<p class="text-xs text-gray-500 mt-0.5">
-							{m.sync_contact_tags_desc()}
-						</p>
-					</div>
-					<div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-						<button
-							type="button"
-							class="px-2.5 py-1 text-xs font-medium rounded-md transition-all {participantTagFilterMode === 'all' ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'}"
-							onclick={() => { participantTagFilterMode = 'all'; }}
-						>
-							All Tags
-						</button>
-						<button
-							type="button"
-							class="px-2.5 py-1 text-xs font-medium rounded-md transition-all {participantTagFilterMode === 'include' ? 'bg-blue-600 text-white shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'}"
-							onclick={() => { participantTagFilterMode = 'include'; }}
-						>
-							Include Only
-						</button>
-						<button
-							type="button"
-							class="px-2.5 py-1 text-xs font-medium rounded-md transition-all {participantTagFilterMode === 'exclude' ? 'bg-amber-600 text-white shadow-sm font-semibold' : 'text-gray-600 hover:text-gray-900'}"
-							onclick={() => { participantTagFilterMode = 'exclude'; }}
-						>
-							Exclude
-						</button>
+			<p class="text-xs text-gray-500 text-center -mt-2">
+				Participants must match the <strong>Base Audience</strong> above <strong>AND</strong> satisfy the role/tag criteria below:
+			</p>
+
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+				<!-- Filter by Roles Section -->
+				<div class="border border-gray-200 rounded-xl p-4 sm:p-5 space-y-4 bg-white shadow-xs flex flex-col justify-between">
+					<div class="space-y-3">
+						<div class="flex items-center justify-between border-b pb-3">
+							<div>
+								<h3 class="text-sm font-bold text-gray-900 flex items-center gap-2">
+									<Users class="w-4 h-4 text-gray-600" />
+									{m.sync_contact_roles_title()}
+								</h3>
+								<p class="text-xs text-gray-500 mt-0.5">
+									{m.sync_contact_roles_desc()}
+								</p>
+							</div>
+							<div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg shrink-0">
+								<button
+									type="button"
+									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantRoleFilterMode === 'all' ? 'bg-white text-gray-900 shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
+									onclick={() => { participantRoleFilterMode = 'all'; }}
+								>
+									All Roles
+								</button>
+								<button
+									type="button"
+									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantRoleFilterMode === 'include' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
+									onclick={() => { participantRoleFilterMode = 'include'; }}
+								>
+									Include
+								</button>
+								<button
+									type="button"
+									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantRoleFilterMode === 'exclude' ? 'bg-amber-600 text-white shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
+									onclick={() => { participantRoleFilterMode = 'exclude'; }}
+								>
+									Exclude
+								</button>
+							</div>
+						</div>
+
+						{#if participantRoleFilterMode === 'all'}
+							<div class="p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
+								Contacts with <strong>any</strong> assigned event role (or no role assigned) will be eligible.
+							</div>
+						{:else if participantRoleFilterMode === 'include'}
+							<div class="space-y-3">
+								<p class="text-xs text-gray-600">
+									Only participants who have <strong>at least one</strong> of the selected roles will be synchronized:
+								</p>
+								<div class="flex flex-wrap gap-2">
+									{#each eventRoles as role}
+										{@const isSelected = includedContactRoles.includes(role.id) || includedContactRoles.includes(role.name)}
+										<button
+											type="button"
+											onclick={() => {
+												if (isSelected) {
+													includedContactRoles = includedContactRoles.filter(r => r !== role.id && r !== role.name);
+												} else {
+													includedContactRoles = [...includedContactRoles, role.id];
+												}
+											}}
+											class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer {isSelected ? 'bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-500/20' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
+										>
+											<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {role.color || '#3b82f6'};"></span>
+											<span>{role.name}</span>
+											{#if isSelected}
+												<Check class="w-3.5 h-3.5 text-blue-600" />
+											{/if}
+										</button>
+									{/each}
+									{#if eventRoles.length === 0}
+										<span class="text-xs text-gray-400 italic">No event roles found in database.</span>
+									{/if}
+								</div>
+								{#if includedContactRoles.length === 0}
+									<p class="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
+										No roles selected yet. Select at least one role, or switch to "All Roles".
+									</p>
+								{/if}
+							</div>
+						{:else if participantRoleFilterMode === 'exclude'}
+							<div class="space-y-3">
+								<p class="text-xs text-gray-600">
+									Participants with any of the selected roles will be <strong>omitted</strong>:
+								</p>
+								<div class="flex flex-wrap gap-2">
+									{#each eventRoles as role}
+										{@const isSelected = excludedContactRoles.includes(role.id) || excludedContactRoles.includes(role.name)}
+										<button
+											type="button"
+											onclick={() => {
+												if (isSelected) {
+													excludedContactRoles = excludedContactRoles.filter(r => r !== role.id && r !== role.name);
+												} else {
+													excludedContactRoles = [...excludedContactRoles, role.id];
+												}
+											}}
+											class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer {isSelected ? 'bg-red-50 border-red-500 text-red-900 ring-2 ring-red-500/20' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
+										>
+											<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {role.color || '#ef4444'};"></span>
+											<span>{role.name}</span>
+											{#if isSelected}
+												<X class="w-3.5 h-3.5 text-red-600" />
+											{/if}
+										</button>
+									{/each}
+									{#if eventRoles.length === 0}
+										<span class="text-xs text-gray-400 italic">No event roles found in database.</span>
+									{/if}
+								</div>
+							</div>
+						{/if}
 					</div>
 				</div>
 
-				{#if participantTagFilterMode === 'all'}
-					<div class="p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-						Contacts with <strong>any</strong> profile tags (or no tags) will be eligible for synchronization.
+				<!-- Filter by Contact Tags Section -->
+				<div class="border border-gray-200 rounded-xl p-4 sm:p-5 space-y-4 bg-white shadow-xs flex flex-col justify-between">
+					<div class="space-y-3">
+						<div class="flex items-center justify-between border-b pb-3">
+							<div>
+								<h3 class="text-sm font-bold text-gray-900 flex items-center gap-2">
+									<Filter class="w-4 h-4 text-gray-600" />
+									{m.sync_contact_tags_title()}
+								</h3>
+								<p class="text-xs text-gray-500 mt-0.5">
+									{m.sync_contact_tags_desc()}
+								</p>
+							</div>
+							<div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg shrink-0">
+								<button
+									type="button"
+									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantTagFilterMode === 'all' ? 'bg-white text-gray-900 shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
+									onclick={() => { participantTagFilterMode = 'all'; }}
+								>
+									All Tags
+								</button>
+								<button
+									type="button"
+									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantTagFilterMode === 'include' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
+									onclick={() => { participantTagFilterMode = 'include'; }}
+								>
+									Include
+								</button>
+								<button
+									type="button"
+									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantTagFilterMode === 'exclude' ? 'bg-amber-600 text-white shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
+									onclick={() => { participantTagFilterMode = 'exclude'; }}
+								>
+									Exclude
+								</button>
+							</div>
+						</div>
+
+						{#if participantTagFilterMode === 'all'}
+							<div class="p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
+								Contacts with <strong>any</strong> profile tags (or no tags) will be eligible.
+							</div>
+						{:else if participantTagFilterMode === 'include'}
+							<div class="space-y-2">
+								<p class="text-xs text-gray-600">
+									Only participants who have <strong>at least one</strong> of the selected tags on their contact record will be synced:
+								</p>
+								<KioskMultiSelect title={m.included_contact_tags()} items={tags} bind:selectedIds={includedContactTags} />
+							</div>
+						{:else if participantTagFilterMode === 'exclude'}
+							<div class="space-y-2">
+								<p class="text-xs text-gray-600">
+									Participants who have any of the selected tags on their contact record will be <strong>omitted</strong>:
+								</p>
+								<KioskMultiSelect title={m.excluded_contact_tags()} items={tags} bind:selectedIds={excludedContactTags} />
+							</div>
+						{/if}
 					</div>
-				{:else if participantTagFilterMode === 'include'}
-					<div class="space-y-2">
-						<p class="text-xs text-gray-600">
-							Only participants who have <strong>at least one</strong> of the selected tags on their contact record will be synced:
-						</p>
-						<KioskMultiSelect title={m.included_contact_tags()} items={tags} bind:selectedIds={includedContactTags} />
+				</div>
+			</div>
+
+			<!-- Active Pipeline Rule Formula & Live Preview -->
+			<div class="bg-gradient-to-r from-slate-50 via-indigo-50/25 to-slate-50 border border-indigo-100 rounded-xl p-4 space-y-2.5">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						<Sparkles class="w-4 h-4 text-indigo-600" />
+						<span class="text-xs font-bold text-indigo-950 uppercase tracking-wider">
+							Active Participant Rule Formula
+						</span>
 					</div>
-				{:else if participantTagFilterMode === 'exclude'}
-					<div class="space-y-2">
-						<p class="text-xs text-gray-600">
-							Participants who have any of the selected tags on their contact record will be <strong>omitted</strong>:
-						</p>
-						<KioskMultiSelect title={m.excluded_contact_tags()} items={tags} bind:selectedIds={excludedContactTags} />
+					{#if participantStats}
+						<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white text-indigo-900 border border-indigo-200 shadow-2xs">
+							<Users class="w-3.5 h-3.5 text-indigo-600" />
+							{participantStats.totalMatching} eligible participant{participantStats.totalMatching === 1 ? '' : 's'}
+						</span>
+					{/if}
+				</div>
+
+				<!-- Visual AND pipeline badges -->
+				<div class="flex flex-wrap items-center gap-2 text-xs">
+					<div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg font-semibold text-gray-800 shadow-2xs">
+						<span class="text-[10px] text-gray-400 font-bold uppercase">Scope:</span>
+						<span>{privacyScopeLabel}</span>
 					</div>
-				{/if}
+					<span class="text-indigo-600 font-extrabold text-[11px] px-2 py-0.5 bg-indigo-100/70 border border-indigo-200/50 rounded-md">AND</span>
+					<div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg font-semibold text-gray-800 shadow-2xs">
+						<span class="text-[10px] text-gray-400 font-bold uppercase">Roles:</span>
+						<span>{roleFilterLabel}</span>
+					</div>
+					<span class="text-indigo-600 font-extrabold text-[11px] px-2 py-0.5 bg-indigo-100/70 border border-indigo-200/50 rounded-md">AND</span>
+					<div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg font-semibold text-gray-800 shadow-2xs">
+						<span class="text-[10px] text-gray-400 font-bold uppercase">Tags:</span>
+						<span>{tagFilterLabel}</span>
+					</div>
+				</div>
+
+				<p class="text-[11px] text-gray-500 pt-0.5">
+					Sequential evaluation pipeline: Contacts must pass the <strong>Base Audience</strong> scope, then satisfy the <strong>Role filter</strong>, and finally satisfy the <strong>Tag filter</strong>.
+				</p>
 			</div>
 		{/if}
 
