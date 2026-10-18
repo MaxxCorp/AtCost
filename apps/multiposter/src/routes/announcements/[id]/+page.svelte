@@ -15,9 +15,16 @@
     import { toast } from "svelte-sonner";
 
     import { onMount } from "svelte";
+    import { recordActiveItem } from "@ac/ui";
 
     let id = $derived(page.params.id || "");
     let collab = $state<CollaborationRoom | null>(null);
+
+    $effect(() => {
+        if (id) {
+            recordActiveItem("announcements", id);
+        }
+    });
 
     onMount(() => {
         if (!id) return;

@@ -29,6 +29,7 @@
     import { createRecipe } from "../../../routes/recipes/new/create.remote";
     import { createConsumableSchema, createRecipeSchema } from "@ac/validations";
     import type { Consumable, Recipe, PriceItem } from "@ac/validations";
+    import { getLastListUrl } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import ConsumableForm from "../consumables/ConsumableForm.svelte";
     import RecipeForm from "../recipes/RecipeForm.svelte";
@@ -56,6 +57,8 @@
         onCancel?: () => void;
         cancelHref?: string;
     } = $props();
+
+    const effectiveCancelHref = $derived(getLastListUrl("prices", cancelHref ?? "/prices"));
 
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
@@ -492,7 +495,7 @@
                     onSuccess(res);
                 } else {
                     await refreshAll();
-                    await goto(cancelHref);
+                    await goto(effectiveCancelHref);
                 }
             } else if (res === false) {
                 toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
@@ -981,7 +984,7 @@
                 {m.cancel?.() || 'Cancel'}
             </Button>
         {:else if cancelHref}
-            <Button variant="outline" href={cancelHref}>
+            <Button variant="outline" href={effectiveCancelHref}>
                 {m.cancel?.() || 'Cancel'}
             </Button>
         {/if}

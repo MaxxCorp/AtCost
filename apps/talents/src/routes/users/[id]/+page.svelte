@@ -7,7 +7,7 @@
     import { deleteUser } from "./delete.remote";
     import { updateUserSchema } from "@ac/validations";
 
-    import { ErrorSection, LoadingSection, AsyncButton, UserForm, handleDelete } from "@ac/ui";
+    import { ErrorSection, LoadingSection, AsyncButton, UserForm, handleDelete, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { User as UserIcon } from "@lucide/svelte";
     import { parseRoles } from "#lib/authorization.js";
     import { FEATURES } from "#lib/features.js";
@@ -26,6 +26,12 @@
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
 
     const userId = $derived(page.params.id || "");
+
+    $effect(() => {
+        if (userId) {
+            recordActiveItem("users", userId);
+        }
+    });
 
     const appConfigList = [
         {
@@ -66,7 +72,7 @@
                                                 itemName: "Users",
                                         });
                                         if (confirmed) {
-                                            goto("/users");
+                                            goto(getLastListUrl("users", "/users"));
                                         }
                                     }}
                                     >
@@ -86,8 +92,8 @@
                             canEditRoles={session?.data?.user
                                 ? parseRoles(session.data.user).includes("admin")
                                 : false}
-                            onSuccess={() => goto("/users")}
-                            onCancel={() => goto("/users")}
+                            onSuccess={() => goto(getLastListUrl("users", "/users"))}
+                            onCancel={() => goto(getLastListUrl("users", "/users"))}
                         >
                             {#snippet extraEntities(data: any)}
                                     <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4 mt-8 pt-8 border-t">

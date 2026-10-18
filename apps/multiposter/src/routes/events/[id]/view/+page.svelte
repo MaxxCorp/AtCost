@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { readEvent } from "../read.remote";
@@ -83,6 +83,9 @@
     let pricesDialogOpen = $state(false);
 
     onMount(() => {
+        if (eventId) {
+            recordActiveItem("events", eventId);
+        }
         canShare = typeof navigator !== "undefined" && !!navigator.share;
     });
 
@@ -133,7 +136,7 @@
         deletingSeriesId = event.id;
         try {
             await deleteEvents({ ids: [event.id] });
-            await goto("/events");
+            await goto(getLastListUrl("events", "/events"));
         } catch (err) {
             console.error("Delete series error:", err);
             alert(
@@ -154,7 +157,7 @@
         deletingSeriesId = event.id;
         try {
             await deleteEvents({ ids: [event.id] });
-            await goto("/events");
+            await goto(getLastListUrl("events", "/events"));
         } catch (err) {
             console.error("Delete instance error:", err);
             alert(
@@ -716,14 +719,14 @@
                 <ErrorSection
                     headline={m.event_not_found()}
                     message={m.event_not_found_message()}
-                    href="/events"
+                    href={getLastListUrl("events", "/events")}
                     button={m.back_to_events()}
                 />
             {:else if eventQuery.error}
                 <ErrorSection
                     headline={m.error()}
                     message={eventQuery.error?.message || m.failed_to_load_event()}
-                    href="/events"
+                    href={getLastListUrl("events", "/events")}
                     button={m.back_to_events()}
                 />
             {/if}

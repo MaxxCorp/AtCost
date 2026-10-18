@@ -6,11 +6,17 @@
     import { updateConsumable } from "./update.remote";
     import { updateConsumableSchema } from "@ac/validations";
     import { page } from "$app/state";
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { Package } from "@lucide/svelte";
 
     const id = $derived(page.params.id || '');
     const dataPromise = $derived(readConsumable(id));
+
+    $effect(() => {
+        if (id) {
+            recordActiveItem("consumables", id);
+        }
+    });
 </script>
 
 <div class="container mx-auto px-4 py-6 max-w-4xl space-y-6">
@@ -41,7 +47,7 @@
             <ErrorSection
                 headline={m.item_not_found?.({ item: m.consumable?.() || 'Consumable' }) || 'Consumable not found'}
                 message="The requested consumable could not be found."
-                href="/consumables"
+                href={getLastListUrl("consumables", "/consumables")}
                 button={m.back_to_feature?.({ feature: m.consumables?.() || 'Consumables' }) || 'Back to Consumables'}
             />
         {/if}
@@ -49,7 +55,7 @@
         <ErrorSection
             headline={m.error?.() || 'Error'}
             message={error.message || 'Failed to load consumable'}
-            href="/consumables"
+            href={getLastListUrl("consumables", "/consumables")}
             button={m.back_to_feature?.({ feature: m.consumables?.() || 'Consumables' }) || 'Back to Consumables'}
         />
     {/await}

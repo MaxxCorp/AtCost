@@ -3,8 +3,17 @@
     import { listConsumables } from "./list.remote";
     import { deleteConsumables } from "./[id]/delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
-    import Button from "#lib/components/ui/button/button.svelte";
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { page as pageState } from "$app/state";
+    import { goto } from "$app/navigation";
+    import {
+        LoadingSection,
+        ErrorSection,
+        Button,
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        activeItemAnchor
+    } from "@ac/ui";
     import {
         Package,
         Pencil,
@@ -21,8 +30,19 @@
     let searchQuery = $state("");
     let sortField = $state<"name" | "purchasePrice" | "amount" | "storageLocation" | "expirationDate" | "createdAt" | "updatedAt">("name");
     let sortOrder = $state<"asc" | "desc">("asc");
-    let page = $state(1);
+    let page = $state(initPageFromUrl(pageState.url));
     let limit = $state(50);
+
+    $effect(() => {
+        const urlP = initPageFromUrl(pageState.url);
+        if (urlP !== page) {
+            page = urlP;
+        }
+    });
+
+    $effect(() => {
+        syncPageToUrl("consumables", page, pageState.url, goto);
+    });
 
     const filterState = $derived({
         page,
@@ -181,7 +201,11 @@
                                         {@const expired = isExpired(item.expirationDate)}
                                         {@const soon = isExpiringSoon(item.expirationDate)}
                                         {@const cpu = item.costPerUnit ?? 0}
-                                        <tr class="hover:bg-gray-50/60 transition-colors">
+                                        <tr
+                                            id="item-{item.id}"
+                                            use:activeItemAnchor={{ feature: "consumables", id: item.id }}
+                                            class="hover:bg-gray-50/60 transition-colors"
+                                        >
                                             <td class="py-3 px-4">
                                                 <div class="font-bold text-gray-900">{item.name}</div>
                                                 {#if item.description}
@@ -244,6 +268,7 @@
                                                         variant="ghost"
                                                         size="sm"
                                                         href={`/consumables/${item.id}`}
+                                                        onclick={() => recordActiveItem("consumables", item.id)}
                                                         class="h-8 w-8 p-0"
                                                         title={m.edit?.() || 'Edit'}
                                                     >

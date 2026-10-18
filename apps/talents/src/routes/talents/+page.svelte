@@ -22,11 +22,24 @@
         MapPin,
         Tag
     } from "@lucide/svelte";
+    import { page as pageState } from "$app/state";
+    import { goto } from "$app/navigation";
     import { listTalents } from "./list.remote";
     import { deleteTalent } from "./[id]/delete.remote";
     import { bulkDeleteTalents } from "./talents.remote";
     import { toast } from "svelte-sonner";
-    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+    import {
+        Button,
+        AsyncButton,
+        FilterMenu,
+        ActiveFilterChips,
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        activeItemAnchor,
+        type FilterGroup,
+        type FilterStateMap
+    } from "@ac/ui";
     import { getTalentFilterGroups } from "#lib/filters/index.js";
     
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
@@ -42,8 +55,19 @@
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(1);
+    let page = $state(initPageFromUrl(pageState.url));
     let limit = $state(50);
+
+    $effect(() => {
+        const urlP = initPageFromUrl(pageState.url);
+        if (urlP !== page) {
+            page = urlP;
+        }
+    });
+
+    $effect(() => {
+        syncPageToUrl("talents", page, pageState.url, goto);
+    });
 
     const filterGroups = $derived<FilterGroup[]>(getTalentFilterGroups(m));
 
@@ -143,7 +167,11 @@
         <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
             <div class="grid grid-cols-1 gap-5">
                 {#each (await listTalents(filterState)).data || [] as talent (talent.id)}
-                    <div class="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col md:flex-row items-center gap-6 transition-all hover:shadow-lg hover:border-indigo-100 group">
+                    <div
+                        id="item-{talent.id}"
+                        use:activeItemAnchor={{ feature: "talents", id: talent.id }}
+                        class="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col md:flex-row items-center gap-6 transition-all hover:shadow-lg hover:border-indigo-100 group"
+                    >
                         <div class="flex items-center gap-4 flex-1 w-full">
                             
                             <div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center text-indigo-700 font-black text-lg border border-indigo-200 shrink-0">
@@ -152,7 +180,11 @@
 
                             <div class="flex-1 min-w-0">
                                 <div class="flex flex-wrap items-center gap-2 mb-1">
-                                    <a href="/talents/{talent.id}" class="font-black text-gray-900 hover:text-indigo-600 transition-colors text-lg truncate block">
+                                    <a
+                                        href="/talents/{talent.id}"
+                                        onclick={() => recordActiveItem("talents", talent.id)}
+                                        class="font-black text-gray-900 hover:text-indigo-600 transition-colors text-lg truncate block"
+                                    >
                                         {talent.contact?.displayName}
                                     </a>
                                     
@@ -193,6 +225,7 @@
                             <div class="flex gap-2">
                                 <Button 
                                     href="/talents/{talent.id}" 
+                                    onclick={() => recordActiveItem("talents", talent.id)}
                                     variant="ghost"
                                     class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
                                     title={m.edit_profile ? m.edit_profile() : "Edit Profile"}

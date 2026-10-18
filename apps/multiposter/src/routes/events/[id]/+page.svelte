@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { browser } from '$app/env';
@@ -39,6 +39,7 @@
 
     onMount(() => {
         if (!eventId) return;
+        recordActiveItem("events", eventId);
 
         let isCancelled = false;
         let room: CollaborationRoom | null = null;
@@ -122,7 +123,7 @@
                                                     deleteFn: async (ids) => await deleteEventAction({ ids }),
                                                 itemName: m.instance().toLowerCase(),
                                                 });
-                                                goto("/events");
+                                                goto(getLastListUrl("events", "/events"));
                                             }}
                                         >
                                             <Trash2 size={14} class="mr-2" />
@@ -136,7 +137,7 @@
                                                 try {
                                                     await deleteEventAction({ ids: [event.id], deleteSeries: true });
                                                     toast.success(m.series_deleted());
-                                                    goto("/events");
+                                                    goto(getLastListUrl("events", "/events"));
                                             } catch (err: any) {
                                                 toast.error(
                                                     err.message ||
@@ -162,7 +163,7 @@
                                             deleteFn: async (ids) => await deleteEventAction({ ids }),
                                         itemName: m.event_label(),
                                         });
-                                        goto("/events");
+                                        goto(getLastListUrl("events", "/events"));
                                     }}
                             >
                                 {m.delete()}
@@ -193,7 +194,7 @@
                                         return;
                                     }
                                     toast.success(m.successfully_saved());
-                                    goto("/events");
+                                    goto(getLastListUrl("events", "/events"));
                             } catch (error: any) {
                                     toast.error(error?.message || m.something_went_wrong());
                                 }
@@ -219,7 +220,7 @@
                             >
                                 {m.save_changes()}
                             </AsyncButton>
-                            <Button variant="secondary" href="/events" size="default">
+                            <Button variant="secondary" href={getLastListUrl("events", "/events")} size="default">
                                 {m.cancel()}
                             </Button>
                         </div>
@@ -230,14 +231,14 @@
             <ErrorSection
                 headline={m.event_not_found()}
                 message={m.event_not_found_message()}
-                href="/events"
+                href={getLastListUrl("events", "/events")}
                 button={m.back_to_events()}
             />
         {:else if eventQuery.error}
             <ErrorSection
                 headline={m.event_not_found()}
                 message={eventQuery.error?.message || m.event_not_found_message()}
-                href="/events"
+                href={getLastListUrl("events", "/events")}
                 button={m.back_to_events()}
             />
         {/if}
@@ -245,7 +246,7 @@
             <ErrorSection
                 headline={m.event_not_found()}
                 message={m.event_not_found_message()}
-                href="/events"
+                href={getLastListUrl("events", "/events")}
                 button={m.back_to_events()}
             />
         {/snippet}

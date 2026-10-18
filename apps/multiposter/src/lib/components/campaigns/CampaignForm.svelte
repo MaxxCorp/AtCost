@@ -7,7 +7,7 @@
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
-    import { handleDelete, translateIssue } from "@ac/ui";
+    import { handleDelete, translateIssue, getLastListUrl } from "@ac/ui";
     import type { updateCampaign } from "../../../routes/campaigns/[id]/update.remote";
     import type { createCampaign } from "../../../routes/campaigns/new/create.remote";
 
@@ -76,7 +76,7 @@
                                 deleteFn: deleteCampaigns,
                                 itemName: m.feature_campaigns_title().toLowerCase(),
                             });
-                            goto("/campaigns");
+                            goto(getLastListUrl("campaigns", "/campaigns"));
                         }}
                     >
                         {m.delete()}
@@ -101,7 +101,7 @@
                             return;
                         }
                         toast.success(m.successfully_saved());
-                        goto("/campaigns");
+                        goto(getLastListUrl("campaigns", "/campaigns"));
                     } catch (error: unknown) {
                         const err = error as { message?: string };
                         toast.error(
@@ -165,7 +165,7 @@
                 >
                     {isUpdating ? m.save_changes() : m.create_new({ item: m.campaign_label() })}
                 </AsyncButton>
-                <Button variant="secondary" href="/campaigns" size="default">
+                <Button variant="secondary" href={getLastListUrl("campaigns", "/campaigns")} size="default">
                     {m.cancel()}
                 </Button>
             </div>

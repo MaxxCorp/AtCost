@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { getLastListUrl } from "../../utils/listNavigation.js";
 
     import { toast } from "svelte-sonner";
     import { type Snippet } from "svelte";
@@ -110,6 +111,8 @@
         createTagSchema,
         updateTagSchema,
     }: Props = $props();
+
+    const effectiveCancelHref = $derived(getLastListUrl("contacts", cancelHref ?? "/contacts"));
 
     const i18n = $derived({
         saveContact: labels?.saveContact ?? "Save Contact",
@@ -303,7 +306,7 @@
 
                 toast.success(i18n.successfullySaved);
                 if (onSuccess) onSuccess(result);
-                else goto(cancelHref);
+                else goto(effectiveCancelHref);
             } catch (error: any) {
                 toast.error(error.message || i18n.errorSomethingWentWrong);
             }
@@ -408,7 +411,7 @@
                 >{i18n.cancel}</Button
             >
         {:else}
-            <Button href={cancelHref} variant="secondary" type="button"
+            <Button href={effectiveCancelHref} variant="secondary" type="button"
                 >{i18n.cancel}</Button
             >
         {/if}

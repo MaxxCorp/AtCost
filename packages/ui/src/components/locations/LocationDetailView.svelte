@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { LoadingSection, ErrorSection, AsyncButton, LocationForm, handleDelete } from "../../index.js";
+    import { LoadingSection, ErrorSection, AsyncButton, LocationForm, handleDelete, recordActiveItem, getLastListUrl } from "../../index.js";
     import { goto } from "$app/navigation";
-    import type { Snippet } from "svelte";
+    import { onMount, type Snippet } from "svelte";
 
     interface Props {
         locationId: string;
@@ -32,6 +32,16 @@
         breadcrumb = undefined,
         children: childrenProp = undefined,
     }: Props = $props();
+
+    const effectiveCancelHref = $derived(
+        cancelHref === "/locations" ? getLastListUrl("locations", "/locations") : cancelHref
+    );
+
+    onMount(() => {
+        if (locationId) {
+            recordActiveItem("locations", locationId);
+        }
+    });
 
     const locationQuery = $derived(readLocationRemote(locationId));
     const location = $derived(locationQuery?.current);
@@ -91,7 +101,7 @@
             if (onDeleted) {
                 onDeleted();
             } else {
-                await goto(cancelHref);
+                await goto(effectiveCancelHref);
             }
         } finally {
             isDeleting = false;
@@ -106,7 +116,7 @@
         <ErrorSection
             headline={i18n.notFoundHeadline}
             message={locationQuery.error?.message ?? i18n.notFoundMessage}
-            href={cancelHref}
+            href={effectiveCancelHref}
             button={i18n.backToList}
         />
     {:else if location}
@@ -153,7 +163,7 @@
                     {validationSchema}
                     initialData={location}
                     isUpdating={true}
-                    {cancelHref}
+                    cancelHref={effectiveCancelHref}
                     {m}
                     {labels}
                 >
@@ -167,7 +177,7 @@
         <ErrorSection
             headline={i18n.notFoundHeadline}
             message={i18n.notFoundMessage}
-            href={cancelHref}
+            href={effectiveCancelHref}
             button={i18n.backToList}
         />
     {/if}

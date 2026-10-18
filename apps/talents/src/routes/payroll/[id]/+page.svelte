@@ -7,7 +7,7 @@
         finalizePayrollRunAction 
     } from "../runs.remote.js";
     import { listRunPayslips } from "../payslips.remote.js";
-    import { Button, LoadingSection, ErrorSection } from "@ac/ui";
+    import { Button, LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { toast } from "svelte-sonner";
     import { 
@@ -20,15 +20,21 @@
         Users, 
         Clock, 
         DollarSign, 
-        Sparkles,
-        ShieldCheck,
-        Search,
-        Eye,
-        HeartHandshake
+        Sparkles, 
+        ShieldCheck, 
+        Search, 
+        Eye, 
+        HeartHandshake 
     } from "@lucide/svelte";
     import PayslipDetailModal from "#lib/components/payroll/PayslipDetailModal.svelte";
 
     const runId = $derived(page.params.id as string);
+
+    $effect(() => {
+        if (runId) {
+            recordActiveItem("payroll", runId);
+        }
+    });
 
     const runQuery = $derived(readPayrollRun({ id: runId }));
     const run = $derived(runQuery.current);
@@ -138,7 +144,7 @@
     <!-- Breadcrumb back link -->
     <div>
         <a
-            href="/payroll"
+            href={getLastListUrl("payroll", "/payroll")}
             class="inline-flex items-center text-xs text-gray-500 hover:text-gray-900 transition-colors gap-1"
         >
             <ArrowLeft class="w-3.5 h-3.5" />
@@ -149,7 +155,11 @@
     {#if runQuery.loading && !run}
         <LoadingSection message="Lade Abrechnungslauf..." />
     {:else if runQuery.error || !run}
-        <ErrorSection message={runQuery.error?.message || "Abrechnungslauf nicht gefunden"} />
+        <ErrorSection
+            message={runQuery.error?.message || "Abrechnungslauf nicht gefunden"}
+            href={getLastListUrl("payroll", "/payroll")}
+            button="Zurück zu den Abrechnungsläufen"
+        />
     {:else}
         <!-- Run Top Card with Actions -->
         <div class="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">

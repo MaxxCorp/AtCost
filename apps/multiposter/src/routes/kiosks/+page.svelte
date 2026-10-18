@@ -24,15 +24,37 @@
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
-	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+	import { goto } from "$app/navigation";
+	import { page as pageState } from "$app/state";
+	import {
+		FilterMenu,
+		ActiveFilterChips,
+		type FilterGroup,
+		type FilterStateMap,
+		initPageFromUrl,
+		syncPageToUrl,
+		recordActiveItem,
+		activeItemAnchor,
+	} from "@ac/ui";
 
 	// Filter state
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
 	let filterValues = $state<FilterStateMap>({});
-	let page = $state(1);
+	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
+
+	$effect(() => {
+		const urlPage = Number(pageState.url.searchParams.get("page") || "1");
+		if (urlPage !== page) {
+			page = urlPage;
+		}
+	});
+
+	$effect(() => {
+		syncPageToUrl("kiosks", page, pageState.url, goto);
+	});
 
 	import { getKioskFilterGroups } from "#lib/filters/index.js";
 
@@ -198,6 +220,8 @@
 				<div class="grid grid-cols-1 gap-5">
 					{#each (await listKiosks(filterState)).data || [] as kiosk (kiosk.id)}
 				<div
+					id="item-{kiosk.id}"
+					use:activeItemAnchor={{ feature: "kiosks", id: kiosk.id }}
 					class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
 				>
 					<div class="flex-1 mb-5">
@@ -273,6 +297,7 @@
 							size="sm"
 							href="/kiosks/{kiosk.id}"
 							class="flex-1 sm:flex-none"
+							onclick={() => recordActiveItem("kiosks", kiosk.id)}
 						>
 							<Pencil class="w-4 h-4 mr-2" />
 							{m.edit()}

@@ -40,4 +40,15 @@ export { IsMobile } from "./hooks/is-mobile.svelte.ts";
 export { handleDelete } from "./hooks/handleDelete.svelte.ts";
 export { getCachedOptionLabel, loadOptionsForGroup, registerGroupOptions, normalizeOption } from "./utils/filterOptionsCache.svelte.ts";
 export { openDB, setPreference, getPreference } from "./utils/idb.js";
+export {
+    recordListUrl,
+    getLastListUrl,
+    recordActiveItem,
+    getLastActiveItem,
+    consumeActiveItem,
+    initPageFromUrl,
+    syncPageToUrl,
+    restoreItemScroll,
+    activeItemAnchor,
+} from "./utils/listNavigation.js";
 

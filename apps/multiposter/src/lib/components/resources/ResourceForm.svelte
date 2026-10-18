@@ -9,7 +9,7 @@
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
     import type { AllocationCalendar } from "#lib/validations/resources.js";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
-    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch, getLastListUrl } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
@@ -180,7 +180,7 @@
                 if (onSuccess) {
                     onSuccess(result);
                 } else {
-                    await goto("/resources");
+                    await goto(getLastListUrl("resources", "/resources"));
                 }
             } catch (error: unknown) {
                 const err = error as { message?: string };
@@ -636,7 +636,7 @@
                 {m.cancel()}
             </Button>
         {:else}
-            <Button variant="secondary" href="/resources" size="default">
+            <Button variant="secondary" href={getLastListUrl("resources", "/resources")} size="default">
                 {m.cancel()}
             </Button>
         {/if}

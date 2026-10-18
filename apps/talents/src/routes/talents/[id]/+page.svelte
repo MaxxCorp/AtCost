@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import * as m from "#lib/paraglide/messages.js";
-    import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager, TagManager } from "@ac/ui";
+    import { LoadingSection, ErrorSection, TalentTimeline, Button, EntityManager, TagManager, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { Calendar, ArrowLeft, ExternalLink, FileText, Layers, TrendingUp, Sparkles, CheckCircle, Shield, Scale, HeartHandshake, ShieldCheck } from "@lucide/svelte";
     import { 
         readTalent, 
@@ -44,6 +44,12 @@
     const effectiveResult = $derived(effectiveContractQuery.current?.resolution);
 
     $effect(() => {
+        if (talentIdParam) {
+            recordActiveItem("talents", talentIdParam);
+        }
+    });
+
+    $effect(() => {
         if (talent?.contact) {
             breadcrumbState.set({
                 feature: "talents",
@@ -79,7 +85,7 @@
             {:else if talent}
                     <div class="mb-6">
                         <a
-                            href="/talents"
+                            href={getLastListUrl("talents", "/talents")}
                             class="flex items-center text-sm text-gray-500 hover:text-gray-900 mb-4 transition-colors"
                         >
                             <ArrowLeft size={16} class="mr-1" />

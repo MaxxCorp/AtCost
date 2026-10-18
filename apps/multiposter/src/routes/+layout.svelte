@@ -43,6 +43,8 @@
 		page.url.pathname.includes("/view") || kioskState.isKiosk,
 	);
 
+	import { getLastListUrl } from "@ac/ui";
+
 	const featureMeta = $derived.by(() =>
 		breadcrumbState.feature
 			? FEATURES.find((f) => f.key === breadcrumbState.feature)
@@ -52,7 +54,7 @@
 		() =>
 			breadcrumbState.segments ??
 			(featureMeta
-				? [{ label: featureMeta.title(), href: featureMeta.href }]
+				? [{ label: featureMeta.title(), href: getLastListUrl(featureMeta.key, featureMeta.href) }]
 				: []),
 	);
 </script>

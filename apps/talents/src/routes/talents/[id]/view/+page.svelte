@@ -3,7 +3,7 @@
     import { readTalent } from "../read.remote";
 import TaskList from "#lib/components/tasks/TaskList.svelte";
 
-    import { LoadingSection, ErrorSection, Button } from "@ac/ui";
+    import { LoadingSection, ErrorSection, Button, getLastListUrl, recordActiveItem } from "@ac/ui";
     import {
         Mail,
         Phone,
@@ -21,6 +21,12 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
     const id = $derived(page.params.id as string);
 
     $effect(() => {
+        if (id) {
+            recordActiveItem("talents", id);
+        }
+    });
+
+    $effect(() => {
         readTalent(id).then((t) => {
             if (t?.contact) {
                 breadcrumbState.set({
@@ -35,7 +41,7 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
 <div class="max-w-4xl mx-auto px-4 py-8">
     <div class="mb-6 flex items-center justify-between">
         <a
-            href="/talents"
+            href={getLastListUrl("talents", "/talents")}
             class="flex items-center text-sm text-gray-500 hover:text-gray-900"
         >
             <ArrowLeft size={16} class="mr-1" /> Back to Talents

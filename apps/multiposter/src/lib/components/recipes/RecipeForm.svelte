@@ -7,7 +7,7 @@
     import { goto, refreshAll } from "$app/navigation";
     import { Euro, ChefHat, Plus, Trash2, Scale, Tag as TagIcon, Package } from "@lucide/svelte";
     import type { Consumable } from "@ac/validations";
-    import { TagManager } from "@ac/ui";
+    import { TagManager, getLastListUrl } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import { listConsumables } from "../../../routes/consumables/list.remote";
     import { createConsumable } from "../../../routes/consumables/new/create.remote";
@@ -44,6 +44,8 @@
         onCancel?: () => void;
         cancelHref?: string;
     } = $props();
+
+    const effectiveCancelHref = $derived(getLastListUrl("recipes", cancelHref ?? "/recipes"));
 
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
@@ -200,7 +202,7 @@
                     onSuccess(res && typeof res === 'object' ? res : ((rf as any).result || res));
                 } else {
                     await refreshAll();
-                    await goto(cancelHref);
+                    await goto(effectiveCancelHref);
                 }
             } else if (res === false) {
                 toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
@@ -504,7 +506,7 @@
                 {m.cancel?.() || 'Cancel'}
             </Button>
         {:else if cancelHref}
-            <Button variant="outline" href={cancelHref}>
+            <Button variant="outline" href={effectiveCancelHref}>
                 {m.cancel?.() || 'Cancel'}
             </Button>
         {/if}

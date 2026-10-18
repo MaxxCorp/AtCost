@@ -12,7 +12,7 @@
     import { goto } from "$app/navigation";
 
     import { updateContactSchema } from "#lib/validations/contacts.js";
-    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
     import { getLocationFilterGroups } from "#lib/filters/index.js";
     import { listLocations } from "../../locations/list.remote";
@@ -33,9 +33,15 @@
 
     const contactId = $derived(page.params.id || "");
 
+    $effect(() => {
+        if (contactId) {
+            recordActiveItem("contacts", contactId);
+        }
+    });
+
     function handleSuccess(result: any) {
         // Redirect to list page on success
-        goto(`/contacts`);
+        goto(getLastListUrl("contacts", "/contacts"));
     }
 
     let formComponent: ReturnType<typeof ContactForm> | undefined = $state();
@@ -86,7 +92,7 @@
                                             deleteFn: deleteContact,
                                             itemName: m.contacts().toLowerCase(),
                                         });
-                                        goto("/contacts");
+                                        goto(getLastListUrl("contacts", "/contacts"));
                                     }}
                                 >
                                     {m.delete()}

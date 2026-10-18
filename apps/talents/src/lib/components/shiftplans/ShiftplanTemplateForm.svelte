@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import * as m from "#lib/paraglide/messages.js";
-    import { EntityManager, Button, AsyncButton, translateIssue } from "@ac/ui";
+    import { EntityManager, Button, AsyncButton, translateIssue, getLastListUrl } from "@ac/ui";
     import {
         MapPin,
         Users,
@@ -98,7 +98,7 @@
                     return;
                 }
                 toast.success("Shiftplan template saved successfully");
-                goto("/shiftplans");
+                goto(getLastListUrl("shiftplans", "/shiftplans"));
             })}
         class="space-y-8"
     >
@@ -291,7 +291,7 @@
         {/if}
 
         <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
-            <Button variant="outline" onclick={() => goto("/shiftplans")}
+            <Button variant="outline" onclick={() => goto(getLastListUrl("shiftplans", "/shiftplans"))}
                 >Cancel</Button
             >
             <AsyncButton

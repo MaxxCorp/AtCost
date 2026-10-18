@@ -21,6 +21,14 @@
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
     import { onMount } from "svelte";
+    import {
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        consumeActiveItem,
+        restoreItemScroll,
+        activeItemAnchor,
+    } from "../../utils/listNavigation.js";
 
     interface Props {
         listLocationsRemote: (params?: any) => any;
@@ -175,12 +183,15 @@
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(1);
+    let page = $state(typeof window !== "undefined" ? initPageFromUrl(new URL(window.location.href)) : 1);
     let limit = $state(50);
 
     onMount(() => {
         try {
             if (typeof window !== "undefined") {
+                const urlPage = initPageFromUrl(new URL(window.location.href));
+                if (urlPage > 0) page = urlPage;
+
                 const savedPrefs = localStorage.getItem(preferenceKey);
                 if (savedPrefs) {
                     const prefs = JSON.parse(savedPrefs);
@@ -205,6 +216,21 @@
                 localStorage.setItem(preferenceKey, JSON.stringify(prefsToSave));
             } catch (e) {
                 console.error("Failed to save preferences", e);
+            }
+        }
+    });
+
+    $effect(() => {
+        if (typeof window !== "undefined") {
+            syncPageToUrl("locations", page, window.location);
+        }
+    });
+
+    $effect(() => {
+        if (items && items.length > 0) {
+            const activeId = consumeActiveItem("locations");
+            if (activeId) {
+                restoreItemScroll(activeId);
             }
         }
     });
@@ -359,14 +385,22 @@
             <!-- List -->
             <div class="grid grid-cols-1 gap-5">
                 {#each items as location (location.id)}
-                    <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+                    <div
+                        id="item-{location.id}"
+                        use:activeItemAnchor={{ feature: 'locations', id: location.id }}
+                        class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+                    >
                         <div class="flex-1 mb-5">
                             <div class="flex items-start gap-4">
                                 <div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
                                     <MapPin size={24} />
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <a href={editHref(location.id)} class="block group mb-1">
+                                    <a
+                                        href={editHref(location.id)}
+                                        onclick={() => recordActiveItem("locations", location.id)}
+                                        class="block group mb-1"
+                                    >
                                         <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug truncate transition-colors">
                                             {location.name}
                                         </h3>
@@ -399,7 +433,13 @@
                         </div>
 
                         <div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
-                            <Button variant="outline" size="sm" href={editHref(location.id)} class="flex-1 sm:flex-none">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                href={editHref(location.id)}
+                                onclick={() => recordActiveItem("locations", location.id)}
+                                class="flex-1 sm:flex-none"
+                            >
                                 <Pencil class="w-4 h-4 mr-2" />
                                 {i18n.edit}
                             </Button>

@@ -9,7 +9,7 @@
     import * as m from "#lib/paraglide/messages.js";
     import Button from "#lib/components/ui/button/button.svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
-    import { EntityManager, LocationForm, handleDelete, translateIssue } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue, getLastListUrl } from "@ac/ui";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import {
@@ -214,7 +214,7 @@
                 }
 
                 toast.success(isUpdating ? m.kiosk_updated() : m.kiosk_created());
-                goto(resolve('kiosks'));
+                goto(getLastListUrl("kiosks", "/kiosks"));
             } catch(error: any) {
                 toast.error(error?.message || m.something_went_wrong());
             }
@@ -841,7 +841,7 @@
         </details>
 
         <div class="pt-4 flex justify-end gap-3">
-            <Button href="/kiosks" variant="outline" type="button"
+            <Button href={getLastListUrl("kiosks", "/kiosks")} variant="outline" type="button"
                 >{m.cancel()}</Button
             >
             <AsyncButton type="submit" loading={rf.pending}>

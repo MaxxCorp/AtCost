@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoadingSection, ErrorSection } from "@ac/ui";
+	import { LoadingSection, ErrorSection, recordActiveItem, getLastListUrl } from "@ac/ui";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import KioskForm from "#lib/components/kiosks/KioskForm.svelte";
     import * as m from "#lib/paraglide/messages.js";
@@ -10,6 +10,12 @@
         
     const kioskId = $derived(page.params.id || "");
     const query = $derived(getKiosk(kioskId));
+
+    $effect(() => {
+        if (kioskId) {
+            recordActiveItem("kiosks", kioskId);
+        }
+    });
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -33,7 +39,7 @@
                 <ErrorSection
                     headline={m.kiosk_not_found()}
                     message={m.kiosk_not_found_message()}
-                    href="/kiosks"
+                    href={getLastListUrl("kiosks", "/kiosks")}
                     button={m.back_to_list()}
                 />
             {/if}
@@ -42,7 +48,7 @@
             <ErrorSection
                 headline={m.error_loading_kiosk()}
                 message={err.message}
-                href="/kiosks"
+                href={getLastListUrl("kiosks", "/kiosks")}
                 button={m.back_to_list()}
             />
         {/if}

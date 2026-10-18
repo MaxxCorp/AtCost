@@ -7,7 +7,21 @@
 
 	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 	import { Button } from "@ac/ui/components/button";
-	import { LoadingSection, ErrorSection, EmptyState, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+	import {
+		LoadingSection,
+		ErrorSection,
+		EmptyState,
+		FilterMenu,
+		ActiveFilterChips,
+		type FilterGroup,
+		type FilterStateMap,
+		initPageFromUrl,
+		syncPageToUrl,
+		recordActiveItem,
+		activeItemAnchor,
+	} from "@ac/ui";
+	import { goto } from "$app/navigation";
+	import { page as pageState } from "$app/state";
 	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import {
 		Megaphone,
@@ -35,9 +49,20 @@
 	let sortField = $state<"updatedAt" | "createdAt" | "title">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let page = $state(1);
+	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 	let filterValues = $state<FilterStateMap>({});
+
+	$effect(() => {
+		const urlPage = Number(pageState.url.searchParams.get("page") || "1");
+		if (urlPage !== page) {
+			page = urlPage;
+		}
+	});
+
+	$effect(() => {
+		syncPageToUrl("announcements", page, pageState.url, goto);
+	});
 
 	import { getAnnouncementFilterGroups } from "#lib/filters/index.js";
 
@@ -185,14 +210,22 @@
 				<div class={["transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
 					<div class="grid grid-cols-1 gap-5">
 						{#each (await listAnnouncements(filterState)).data || [] as announcement (announcement.id)}
-						<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+						<div
+							id="item-{announcement.id}"
+							use:activeItemAnchor={{ feature: "announcements", id: announcement.id }}
+							class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+						>
 							<div class="flex-1 mb-5">
 								<div class="flex items-start gap-4">
 									<div class="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
 										<Megaphone size={24} />
 									</div>
 									<div class="flex-1 min-w-0">
-										<a href={`/announcements/${announcement.id}/view`} class="block group mb-2">
+										<a
+											href={`/announcements/${announcement.id}/view`}
+											class="block group mb-2"
+											onclick={() => recordActiveItem("announcements", announcement.id)}
+										>
 											<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-snug truncate transition-colors">
 												{announcement.title}
 											</h3>
@@ -216,7 +249,13 @@
 
 							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
 
-								<Button variant="outline" size="sm" href={`/announcements/${announcement.id}`} class="flex-1 sm:flex-none">
+								<Button
+									variant="outline"
+									size="sm"
+									href={`/announcements/${announcement.id}`}
+									class="flex-1 sm:flex-none"
+									onclick={() => recordActiveItem("announcements", announcement.id)}
+								>
 									<Pencil class="w-4 h-4 mr-2" />
 									{m.edit()}
 								</Button>

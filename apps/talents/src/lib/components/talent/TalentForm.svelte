@@ -41,6 +41,7 @@
         LocationForm,
         handleDelete,
         matchContactSearch,
+        getLastListUrl,
     } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { getLocationFilterGroups, getTalentFilterGroups, getContactFilterGroups } from "#lib/filters/index.js";
@@ -62,6 +63,8 @@
         onCancel,
         remoteFunction = upsertTalent,
     }: Props = $props();
+
+    const effectiveCancelHref = $derived(getLastListUrl("talents", cancelHref));
 
     const rf = $derived(remoteFunction);
 
@@ -354,7 +357,7 @@
             }
             toast.success(talentId ? m.talent_updated() : m.talent_registered());
             if (onSuccess) onSuccess(result);
-            else goto(cancelHref);
+            else goto(effectiveCancelHref);
         } catch (error: any) {
             toast.error(error.message || m.something_went_wrong());
         }
@@ -770,7 +773,7 @@
     >
         <Button
             variant="outline"
-            onclick={() => (onCancel ? onCancel() : goto(cancelHref))}
+            onclick={() => (onCancel ? onCancel() : goto(effectiveCancelHref))}
             >{m.cancel()}</Button
         >
         <AsyncButton type="submit" loading={rf.pending}

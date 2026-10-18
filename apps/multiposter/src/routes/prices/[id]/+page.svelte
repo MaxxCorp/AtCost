@@ -8,13 +8,19 @@
     import { listRecipes } from "../../recipes/list.remote";
     import { updatePriceSchema } from "@ac/validations";
     import { page } from "$app/state";
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { Tag } from "@lucide/svelte";
 
     const id = $derived(page.params.id || '');
     const priceQuery = $derived(readPrice(id));
     const consumablesQuery = listConsumables({ limit: 200 });
     const recipesQuery = listRecipes({ limit: 200 });
+
+    $effect(() => {
+        if (id) {
+            recordActiveItem("prices", id);
+        }
+    });
 
     const priceList = $derived(priceQuery.current);
     const consumables = $derived(consumablesQuery.current?.data ?? []);
@@ -29,7 +35,7 @@
         <ErrorSection
             headline={m.error?.() || 'Error'}
             message={priceQuery.error instanceof Error ? priceQuery.error.message : 'Failed to load price list'}
-            href="/prices"
+            href={getLastListUrl("prices", "/prices")}
             button={m.back_to_feature?.({ feature: m.prices?.() || 'Prices' }) || 'Back to Prices'}
         />
     {:else if priceList}
@@ -58,7 +64,7 @@
         <ErrorSection
             headline={m.item_not_found?.({ item: m.price_list?.() || 'Price List' }) || 'Price list not found'}
             message="The requested price list could not be found."
-            href="/prices"
+            href={getLastListUrl("prices", "/prices")}
             button={m.back_to_feature?.({ feature: m.prices?.() || 'Prices' }) || 'Back to Prices'}
         />
     {/if}

@@ -4,11 +4,17 @@
     import { updateShiftplan } from "./update.remote";
     import { getShiftplan } from "../list.remote";
     import { updateShiftplanSchema } from "@ac/validations";
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { LoadingSection, ErrorSection, recordActiveItem, getLastListUrl } from "@ac/ui";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
     const id = $derived(page.params.id as string);
     const query = $derived(getShiftplan(id));
+
+    $effect(() => {
+        if (id) {
+            recordActiveItem("shiftplans", id);
+        }
+    });
 
     $effect(() => {
         if (query.current && 'name' in query.current) {
@@ -27,7 +33,7 @@
         <ErrorSection 
             headline="Template not found"
             message={query.error?.message || "The requested template could not be loaded."}
-            href="/shiftplans"
+            href={getLastListUrl("shiftplans", "/shiftplans")}
             button="Back to List"
         />
     {:else if query.current}

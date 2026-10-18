@@ -1,6 +1,17 @@
-<script lang="ts">
-    import * as m from "#lib/paraglide/messages.js";
-    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+    import { page as pageState } from "$app/state";
+    import { goto } from "$app/navigation";
+    import {
+        Button,
+        AsyncButton,
+        FilterMenu,
+        ActiveFilterChips,
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        activeItemAnchor,
+        type FilterGroup,
+        type FilterStateMap
+    } from "@ac/ui";
     
     import { listUsers } from "./list.remote";
     import { deleteUser } from "./[id]/delete.remote";
@@ -37,8 +48,19 @@
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(1);
+    let page = $state(initPageFromUrl(pageState.url));
     let limit = $state(50);
+
+    $effect(() => {
+        const urlP = initPageFromUrl(pageState.url);
+        if (urlP !== page) {
+            page = urlP;
+        }
+    });
+
+    $effect(() => {
+        syncPageToUrl("users", page, pageState.url, goto);
+    });
 
     const ROLE_OPTIONS = $derived([
         { id: "admin", label: m.admin ? m.admin() : "Admin" },
@@ -146,10 +168,18 @@
                 <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {#each (await listUsers(filterState)).data || [] as user (user.id)}
-                            <div class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-300">
+                            <div
+                                id="item-{user.id}"
+                                use:activeItemAnchor={{ feature: "users", id: user.id }}
+                                class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-300"
+                            >
                                 <div class="flex flex-col sm:flex-row items-start gap-6">
                                     <div class="flex items-center gap-4 shrink-0">
-                                        <a href={`/users/${user.id}`} class="shrink-0">
+                                        <a
+                                            href={`/users/${user.id}`}
+                                            onclick={() => recordActiveItem("users", user.id)}
+                                            class="shrink-0"
+                                        >
                                             {#if user.image}
                                                 <img
                                                     src={user.image}
@@ -166,7 +196,11 @@
 
                                     <div class="flex-1 min-w-0 space-y-3">
                                         <div>
-                                            <a href={`/users/${user.id}`} class="text-xl font-black text-gray-900 hover:underline group-hover:text-blue-600 transition-colors truncate block">
+                                            <a
+                                                href={`/users/${user.id}`}
+                                                onclick={() => recordActiveItem("users", user.id)}
+                                                class="text-xl font-black text-gray-900 hover:underline group-hover:text-blue-600 transition-colors truncate block"
+                                            >
                                                 {user.name}
                                             </a>
                                             <div class="flex items-center gap-2 text-gray-500 mt-1">
@@ -191,6 +225,7 @@
                                     <div class="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-4 sm:mt-0 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                         <Button
                                             href={`/users/${user.id}`}
+                                            onclick={() => recordActiveItem("users", user.id)}
                                             variant="ghost"
                                             class="flex-1 sm:flex-none justify-start px-4 h-10 hover:bg-blue-50 hover:text-blue-600 rounded-xl"
                                         >

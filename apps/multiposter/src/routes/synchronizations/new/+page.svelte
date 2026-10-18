@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { create } from "./create.remote";
 	import { goto } from "$app/navigation";
+	import { getLastListUrl } from "@ac/ui";
 	import { createSynchronizationSchema } from "#lib/validations/synchronizations.js";
 	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 	import Button from "#lib/components/ui/button/button.svelte";
@@ -38,7 +39,7 @@
 					return;
 				}
 				toast.success("Calendar synchronization created successfully!");
-				await goto("/synchronizations");
+				await goto(getLastListUrl("synchronizations", "/synchronizations"));
 			})}
 		onkeydown={(event) => {
 			if (event.key === "Enter") {
@@ -58,7 +59,7 @@
 		<div class="flex items-center justify-end gap-3 pt-4">
 			<Button
 				variant="secondary"
-				href="/synchronizations"
+				href={getLastListUrl("synchronizations", "/synchronizations")}
 				size="default"
 			>
 				Cancel

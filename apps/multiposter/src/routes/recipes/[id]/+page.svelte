@@ -7,12 +7,18 @@
     import { listConsumables } from "../../consumables/list.remote";
     import { updateRecipeSchema } from "@ac/validations";
     import { page } from "$app/state";
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { ChefHat } from "@lucide/svelte";
 
     const id = $derived(page.params.id || '');
     const recipeQuery = $derived(readRecipe(id));
     const recipe = $derived(recipeQuery.current);
+
+    $effect(() => {
+        if (id) {
+            recordActiveItem("recipes", id);
+        }
+    });
 
     const consumablesQuery = listConsumables({ limit: 200 });
     const allConsumables = $derived(consumablesQuery.current?.data ?? []);
@@ -25,7 +31,7 @@
         <ErrorSection
             headline={m.error?.() || 'Error'}
             message={recipeQuery.error.message || 'Failed to load recipe'}
-            href="/recipes"
+            href={getLastListUrl("recipes", "/recipes")}
             button={m.back_to_feature?.({ feature: m.recipes?.() || 'Recipes' }) || 'Back to Recipes'}
         />
     {:else if recipe}
@@ -57,7 +63,7 @@
         <ErrorSection
             headline={m.item_not_found?.({ item: m.recipe?.() || 'Recipe' }) || 'Recipe not found'}
             message="The requested recipe could not be found."
-            href="/recipes"
+            href={getLastListUrl("recipes", "/recipes")}
             button={m.back_to_feature?.({ feature: m.recipes?.() || 'Recipes' }) || 'Back to Recipes'}
         />
     {/if}

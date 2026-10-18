@@ -3,7 +3,20 @@
     import { listShiftplans } from "./list.remote";
     import { deleteShiftplans } from "./[id]/delete.remote";
     import ShiftScheduleMatrix from "#lib/components/shiftplans/ShiftScheduleMatrix.svelte";
-    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+    import { goto } from "$app/navigation";
+    import { page as pageState } from "$app/state";
+    import {
+        Button,
+        AsyncButton,
+        FilterMenu,
+        ActiveFilterChips,
+        type FilterGroup,
+        type FilterStateMap,
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        activeItemAnchor,
+    } from "@ac/ui";
     
     import { listLocations } from "../locations/list.remote";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
@@ -35,8 +48,19 @@
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(1);
+    let page = $state(initPageFromUrl(pageState.url));
     let limit = $state(50);
+
+    $effect(() => {
+        const urlPage = Number(pageState.url.searchParams.get("page") || "1");
+        if (urlPage !== page) {
+            page = urlPage;
+        }
+    });
+
+    $effect(() => {
+        syncPageToUrl("shiftplans", page, pageState.url, goto);
+    });
 
     const filterGroups = $derived<FilterGroup[]>([
         {
@@ -202,7 +226,11 @@
                 {:else}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {#each templatesList as plan (plan.id)}
-                            <div class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-purple-200 transition-all hover:shadow-lg group flex flex-col justify-between">
+                            <div
+                                id="item-{plan.id}"
+                                use:activeItemAnchor={{ feature: "shiftplans", id: plan.id }}
+                                class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-purple-200 transition-all hover:shadow-lg group flex flex-col justify-between"
+                            >
                                 <div class="flex items-start justify-between mb-4">
                                     <div class="flex items-center gap-3">
                                         <div class="p-3 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 border border-purple-200 shadow-xs">
@@ -216,6 +244,7 @@
                                             variant="ghost"
                                             size="icon"
                                             class="h-9 w-9 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl"
+                                            onclick={() => recordActiveItem("shiftplans", plan.id)}
                                         >
                                             <Pencil size={18} />
                                         </Button>
@@ -230,7 +259,11 @@
                                     </div>
                                 </div>
 
-                                <a href={`/shiftplans/${plan.id}`} class="block space-y-4">
+                                <a
+                                    href={`/shiftplans/${plan.id}`}
+                                    class="block space-y-4"
+                                    onclick={() => recordActiveItem("shiftplans", plan.id)}
+                                >
                                     <div>
                                         <h3 class="text-xl font-black text-gray-900 group-hover:text-purple-600 transition-colors leading-tight">
                                             {plan.name}

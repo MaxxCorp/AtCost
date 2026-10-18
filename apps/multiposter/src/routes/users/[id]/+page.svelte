@@ -7,7 +7,8 @@
     import { deleteUser } from "./delete.remote";
     import { updateUserSchema } from "#lib/validations/users.js";
 
-    import { UserForm, EntityManager, ErrorSection, LoadingSection, AsyncButton, handleDelete, matchContactSearch } from "@ac/ui";
+    import { onMount } from "svelte";
+    import { UserForm, EntityManager, ErrorSection, LoadingSection, AsyncButton, handleDelete, matchContactSearch, getLastListUrl, recordActiveItem } from "@ac/ui";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { FEATURES } from "#lib/features.js";
 
@@ -35,6 +36,12 @@
         }
     ];
 
+
+    onMount(() => {
+        if (userId) {
+            recordActiveItem("users", userId);
+        }
+    });
 
     let sessionPromise = $state(authClient.getSession());
 </script>
@@ -71,7 +78,7 @@
                                                     itemName: m.user ? m.user() : "User",
                                                 });
                                                 if (confirmed) {
-                                                    goto("/users");
+                                                    goto(getLastListUrl("users", "/users"));
                                                 }
                                             }}
                                         >
@@ -91,8 +98,8 @@
                                     canEditRoles={session?.data?.user
                                         ? parseRoles(session.data.user).includes("admin")
                                         : false}
-                                    onSuccess={() => goto("/users")}
-                                    onCancel={() => goto("/users")}
+                                    onSuccess={() => goto(getLastListUrl("users", "/users"))}
+                                    onCancel={() => goto(getLastListUrl("users", "/users"))}
                                 >
                                     {#snippet extraEntities(data: any)}
                                         <EntityManager

@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
-    import { EntityManager, TagManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch } from "@ac/ui";
+    import { EntityManager, TagManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch, getLastListUrl } from "@ac/ui";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -161,7 +161,7 @@
                         deleteFn: deleteAnnouncementAction,
                         itemName: m.announcement().toLowerCase(),
                     });
-                    goto("/announcements");
+                    goto(getLastListUrl("announcements", "/announcements"));
                 }}
             >
                 {m.delete()}
@@ -180,7 +180,7 @@
             }
 
             toast.success(m.successfully_saved());
-            goto("/announcements");
+            goto(getLastListUrl("announcements", "/announcements"));
         } catch (error: any) {
             toast.error(error.message || m.something_went_wrong());
         }
@@ -599,7 +599,7 @@
             </AsyncButton>
             <Button
                 variant="secondary"
-                href="/announcements"
+                href={getLastListUrl("announcements", "/announcements")}
                 size="default"
                 class="ml-3"
             >

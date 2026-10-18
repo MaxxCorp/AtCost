@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoadingSection, ErrorSection } from "@ac/ui";
+	import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { authClient } from "#lib/auth.js";
@@ -22,6 +22,12 @@
 
     const contactId = page.params.id || "";
     let itemsPromise = $state(readContact(contactId));
+
+    $effect(() => {
+        if (contactId) {
+            recordActiveItem("contacts", contactId);
+        }
+    });
 
     const session = authClient.useSession();
     // Check if the user is authorized to edit
@@ -74,7 +80,7 @@
                     <ErrorSection
                         headline={m.not_found({ item: m.contact() })}
                         message={m.not_found_message({ item: m.contact() })}
-                        href="/contacts"
+                        href={getLastListUrl("contacts", "/contacts")}
                         button={m.back_to_list()}
                     />
                 </div>
@@ -387,7 +393,7 @@
                 <ErrorSection
                     headline={m.error_loading_item({ item: m.contact() })}
                     message={error.message}
-                    href="/contacts"
+                    href={getLastListUrl("contacts", "/contacts")}
                     button={m.back_to_list()}
                 />
             </div>

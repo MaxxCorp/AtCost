@@ -85,9 +85,14 @@
 		);
 	}
 
+	import { page as pageState } from "$app/state";
 	import {
 		FilterMenu,
 		ActiveFilterChips,
+		initPageFromUrl,
+		syncPageToUrl,
+		recordActiveItem,
+		activeItemAnchor,
 		type FilterGroup,
 		type FilterStateMap,
 		type RadioFilterGroup,
@@ -129,9 +134,20 @@
 	let excludePast = $state(false);
 	let excludeSeries = $state(false);
 	let onlySeries = $state(false);
-	let page = $state(1);
+	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 	let showMigrationDialog = $state(false);
+
+	$effect(() => {
+		const urlP = initPageFromUrl(pageState.url);
+		if (urlP !== page) {
+			page = urlP;
+		}
+	});
+
+	$effect(() => {
+		syncPageToUrl("events", page, pageState.url, goto);
+	});
 
 	let displayMode = $state<DisplayMode>("compacted");
 	let displayModeOverrides = $state<Record<string, DisplayMode>>({});
@@ -634,11 +650,14 @@
 						endDateTime: upcomingInst.endDateTime,
 					} : event}
 					<div
+						id="item-{event.id}"
+						use:activeItemAnchor={{ feature: 'events', id: event.id }}
 						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow {event.isSeriesInstance ? 'border-l-4 border-l-indigo-500 pl-4 sm:pl-5' : ''}"
 					>
 						<div class="flex-1 mb-5">
 							<a
 								href="/events/{event.id}/view"
+								onclick={() => recordActiveItem("events", event.id)}
 								class="block group mb-2"
 							>
 								<div
@@ -815,6 +834,7 @@
 										variant="outline"
 										size="sm"
 										href={defaultHref}
+										onclick={() => recordActiveItem("events", event.id)}
 										class="flex-1 sm:flex-none rounded-r-none border-r-0 focus:z-10 flex items-center justify-center h-9 px-3 text-xs sm:text-sm font-medium"
 									>
 										<Pencil class="w-3.5 h-3.5 mr-1.5" />
@@ -833,7 +853,10 @@
 										</DropdownMenu.Trigger>
 										<DropdownMenu.Content align="end" class="w-64 sm:w-72 p-1.5 z-50">
 											<DropdownMenu.Item
-												onclick={() => goto(otherHref)}
+												onclick={() => {
+													recordActiveItem("events", event.id);
+													goto(otherHref);
+												}}
 												class="flex items-center gap-2.5 p-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
 											>
 												{#if isInstance}
@@ -865,7 +888,10 @@
 														{#each allInstances as inst (inst.id)}
 															{@const isSelected = isInstance ? inst.id === event.id : inst.id === upcomingInst?.id}
 															<DropdownMenu.Item
-																onclick={() => goto(`/events/${inst.id}`)}
+																onclick={() => {
+																	recordActiveItem("events", event.id);
+																	goto(`/events/${inst.id}`);
+																}}
 																class="flex items-center justify-between p-1.5 text-xs rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 {isSelected ? 'bg-amber-50 dark:bg-amber-950/30 font-medium' : ''}"
 															>
 																<div class="flex items-center gap-2 truncate min-w-0">
@@ -890,6 +916,7 @@
 									variant="outline"
 									size="sm"
 									href="/events/{event.id}"
+									onclick={() => recordActiveItem("events", event.id)}
 									class="flex-1 sm:flex-none h-9 px-3"
 								>
 									<Pencil class="w-4 h-4 mr-2" />

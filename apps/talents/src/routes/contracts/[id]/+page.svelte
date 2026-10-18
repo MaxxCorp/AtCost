@@ -7,10 +7,17 @@
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { page } from "$app/state";
     import { ArrowLeft, Loader2 } from "@lucide/svelte";
+    import { getLastListUrl, recordActiveItem } from "@ac/ui";
 
     const contractId = $derived(page.params.id as string);
     const contractQuery = $derived(readContract({ id: contractId }));
     const contract = $derived(contractQuery.current ?? null);
+
+    $effect(() => {
+        if (contractId) {
+            recordActiveItem("contracts", contractId);
+        }
+    });
 
     $effect(() => {
         if (contract?.title) {
@@ -30,7 +37,7 @@
 <div class="max-w-4xl mx-auto space-y-6">
     <div class="flex items-center gap-4">
         <a
-            href="/contracts"
+            href={getLastListUrl("contracts", "/contracts")}
             class="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
             title="Zurück zur Übersicht"
         >

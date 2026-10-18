@@ -3,8 +3,17 @@
     import { listPrices } from "./list.remote";
     import { deletePrices } from "./[id]/delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
-    import Button from "#lib/components/ui/button/button.svelte";
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { page as pageState } from "$app/state";
+    import { goto } from "$app/navigation";
+    import {
+        LoadingSection,
+        ErrorSection,
+        Button,
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        activeItemAnchor
+    } from "@ac/ui";
     import {
         Tag,
         Receipt,
@@ -24,8 +33,19 @@
     let templateFilter = $state<string>("all");
     let sortField = $state<"name" | "isTemplate" | "createdAt" | "updatedAt">("name");
     let sortOrder = $state<"asc" | "desc">("asc");
-    let page = $state(1);
+    let page = $state(initPageFromUrl(pageState.url));
     let limit = $state(50);
+
+    $effect(() => {
+        const urlP = initPageFromUrl(pageState.url);
+        if (urlP !== page) {
+            page = urlP;
+        }
+    });
+
+    $effect(() => {
+        syncPageToUrl("prices", page, pageState.url, goto);
+    });
 
     const isTemplateParam = $derived(
         templateFilter === "all" ? undefined : templateFilter === "templates" ? "true" : "false"
@@ -167,7 +187,11 @@
     {:else}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {#each result.data as item (item.id)}
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-shadow p-5 flex flex-col justify-between space-y-4">
+                <div
+                    id="item-{item.id}"
+                    use:activeItemAnchor={{ feature: "prices", id: item.id }}
+                    class="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-shadow p-5 flex flex-col justify-between space-y-4"
+                >
                     <div class="space-y-3">
                         <div class="flex items-start justify-between gap-2">
                             <h3 class="text-lg font-bold text-gray-900 leading-snug">{item.name}</h3>
@@ -222,6 +246,7 @@
                                 variant="outline"
                                 size="sm"
                                 href={`/prices/${item.id}`}
+                                onclick={() => recordActiveItem("prices", item.id)}
                                 class="h-8 px-2.5 text-xs font-medium flex items-center gap-1"
                                 title={m.edit?.() || 'Edit'}
                             >

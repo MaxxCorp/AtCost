@@ -239,14 +239,36 @@
 		}
 	}
 
-	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+	import { page as pageState } from "$app/state";
+	import { goto } from "$app/navigation";
+	import {
+		FilterMenu,
+		ActiveFilterChips,
+		type FilterGroup,
+		type FilterStateMap,
+		initPageFromUrl,
+		syncPageToUrl,
+		recordActiveItem,
+		activeItemAnchor
+	} from "@ac/ui";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("createdAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
 	let filterValues = $state<FilterStateMap>({});
-	let page = $state(1);
+	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
+
+	$effect(() => {
+		const urlP = initPageFromUrl(pageState.url);
+		if (urlP !== page) {
+			page = urlP;
+		}
+	});
+
+	$effect(() => {
+		syncPageToUrl("synchronizations", page, pageState.url, goto);
+	});
 
 	import { getSynchronizationFilterGroups } from "#lib/filters/index.js";
 
@@ -491,7 +513,11 @@
 						config.enabled,
 						config.lastSyncAt,
 					)}
-					<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+					<div
+						id="item-{config.id}"
+						use:activeItemAnchor={{ feature: "synchronizations", id: config.id }}
+						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+					>
 						<div class="flex-1 mb-5">
 							<div class="flex items-start justify-between gap-4 mb-2">
 								<div class="flex-1 min-w-0">
@@ -499,6 +525,7 @@
 										<div class="flex items-center gap-2 flex-wrap">
 											<a
 												href={`/synchronizations/${config.id}`}
+												onclick={() => recordActiveItem("synchronizations", config.id)}
 												class="hover:underline text-blue-600 flex items-center gap-2"
 											>
 												<Icon class="h-5 w-5 flex-shrink-0" />
@@ -642,6 +669,7 @@
 								</AsyncButton>
 								<Button
 									href={`/synchronizations/${config.id}`}
+									onclick={() => recordActiveItem("synchronizations", config.id)}
 									variant="outline"
 									size="sm"
 									class="flex-1 sm:flex-none"

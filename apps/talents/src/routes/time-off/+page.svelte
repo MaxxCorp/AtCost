@@ -2,7 +2,20 @@
     import * as m from "#lib/paraglide/messages.js";
     import { listTimeOffRequests, requestTimeOff } from "./time-off.remote";
     import { listTalents } from "../talents/list.remote";
-    import { Button, AsyncButton, FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+    import { goto } from "$app/navigation";
+    import { page as pageState } from "$app/state";
+    import {
+        Button,
+        AsyncButton,
+        FilterMenu,
+        ActiveFilterChips,
+        type FilterGroup,
+        type FilterStateMap,
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        activeItemAnchor,
+    } from "@ac/ui";
     import * as Dialog from "@ac/ui/components/dialog";
     import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, HelpCircle } from "@lucide/svelte";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
@@ -30,9 +43,20 @@
 
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(1);
+    let page = $state(initPageFromUrl(pageState.url));
     let limit = $state(50);
     let showQuickCreate = $state(false);
+
+    $effect(() => {
+        const urlPage = Number(pageState.url.searchParams.get("page") || "1");
+        if (urlPage !== page) {
+            page = urlPage;
+        }
+    });
+
+    $effect(() => {
+        syncPageToUrl("time-off", page, pageState.url, goto);
+    });
 
     const STATUS_OPTIONS = $derived([
         { id: "pending", label: m.status_pending ? m.status_pending() : "Pending" },
@@ -164,7 +188,11 @@
                         {#each (await listTimeOffRequests(filterState)).data || [] as req (req.id)}
                             {@const status = statusMap[req.status] || { label: req.status, color: "text-gray-600 bg-gray-50 border-gray-100", icon: HelpCircle }}
                             {@const StatusIcon = status.icon}
-                            <div class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-amber-200 transition-all hover:shadow-lg group flex flex-col justify-between">
+                            <div
+                                id="item-{req.id}"
+                                use:activeItemAnchor={{ feature: "time-off", id: req.id }}
+                                class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-amber-200 transition-all hover:shadow-lg group flex flex-col justify-between"
+                            >
                                 <div class="flex flex-col sm:flex-row items-start justify-between gap-4">
                                     <div class="flex items-start gap-4 flex-1">
                                         <div class="p-3 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl text-amber-600 border border-amber-200 shadow-sm shrink-0">

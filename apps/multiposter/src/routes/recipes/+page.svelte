@@ -3,8 +3,17 @@
     import { listRecipes } from "./list.remote";
     import { deleteRecipes } from "./[id]/delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
-    import Button from "#lib/components/ui/button/button.svelte";
-    import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { page as pageState } from "$app/state";
+    import { goto } from "$app/navigation";
+    import {
+        Button,
+        LoadingSection,
+        ErrorSection,
+        initPageFromUrl,
+        syncPageToUrl,
+        recordActiveItem,
+        activeItemAnchor
+    } from "@ac/ui";
     import {
         ChefHat,
         Pencil,
@@ -20,8 +29,19 @@
     let searchQuery = $state("");
     let sortField = $state<"name" | "portions" | "createdAt" | "updatedAt">("name");
     let sortOrder = $state<"asc" | "desc">("asc");
-    let page = $state(1);
+    let page = $state(initPageFromUrl(pageState.url));
     let limit = $state(50);
+
+    $effect(() => {
+        const urlP = initPageFromUrl(pageState.url);
+        if (urlP !== page) {
+            page = urlP;
+        }
+    });
+
+    $effect(() => {
+        syncPageToUrl("recipes", page, pageState.url, goto);
+    });
 
     const filterState = $derived({
         page,
@@ -144,7 +164,11 @@
             {:else}
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {#each result.data as item (item.id)}
-                            <div class="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-shadow p-5 flex flex-col justify-between space-y-4">
+                            <div
+                                id="item-{item.id}"
+                                use:activeItemAnchor={{ feature: "recipes", id: item.id }}
+                                class="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-shadow p-5 flex flex-col justify-between space-y-4"
+                            >
                                 <div class="space-y-2">
                                     <div class="flex items-start justify-between gap-2">
                                         <h3 class="text-lg font-bold text-gray-900 leading-snug">{item.name}</h3>
@@ -188,6 +212,7 @@
                                             variant="outline"
                                             size="sm"
                                             href={`/recipes/${item.id}`}
+                                            onclick={() => recordActiveItem("recipes", item.id)}
                                             class="h-8 px-2.5 text-xs font-medium flex items-center gap-1"
                                             title={m.edit?.() || 'Edit'}
                                         >

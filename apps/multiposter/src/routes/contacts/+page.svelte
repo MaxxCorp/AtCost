@@ -29,16 +29,38 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
+	import { page as pageState } from "$app/state";
+	import { goto } from "$app/navigation";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
-	import { FilterMenu, ActiveFilterChips, type FilterGroup, type FilterStateMap } from "@ac/ui";
+	import {
+		FilterMenu,
+		ActiveFilterChips,
+		type FilterGroup,
+		type FilterStateMap,
+		initPageFromUrl,
+		syncPageToUrl,
+		recordActiveItem,
+		activeItemAnchor
+	} from "@ac/ui";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "displayName">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let page = $state(1);
+	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 	let filterValues = $state<FilterStateMap>({});
+
+	$effect(() => {
+		const urlP = initPageFromUrl(pageState.url);
+		if (urlP !== page) {
+			page = urlP;
+		}
+	});
+
+	$effect(() => {
+		syncPageToUrl("contacts", page, pageState.url, goto);
+	});
 
 	import { getContactFilterGroups } from "#lib/filters/index.js";
 
@@ -181,14 +203,22 @@
 				<!-- List -->
 				<div class="grid grid-cols-1 gap-5">
 					{#each (await listContacts(filterState)).data || [] as contact (contact.id)}
-						<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow">
+						<div
+							id="item-{contact.id}"
+							use:activeItemAnchor={{ feature: "contacts", id: contact.id }}
+							class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+						>
 							<div class="flex-1 mb-5">
 								<div class="flex items-start gap-4">
 									<div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
 										<User size={24} />
 									</div>
 									<div class="flex-1 min-w-0">
-										<a href={`/contacts/${contact.id}/view`} class="block group mb-1">
+										<a
+											href={`/contacts/${contact.id}/view`}
+											onclick={() => recordActiveItem("contacts", contact.id)}
+											class="block group mb-1"
+										>
 											<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug truncate transition-colors">
 												{contact.displayName || `${contact.givenName || ""} ${contact.familyName || ""}`.trim() || m.unnamed_contact()}
 											</h3>
@@ -247,7 +277,13 @@
 
 							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
 
-								<Button variant="outline" size="sm" href={`/contacts/${contact.id}`} class="flex-1 sm:flex-none">
+								<Button
+									variant="outline"
+									size="sm"
+									href={`/contacts/${contact.id}`}
+									onclick={() => recordActiveItem("contacts", contact.id)}
+									class="flex-1 sm:flex-none"
+								>
 									<Pencil class="w-4 h-4 mr-2" />
 									{m.edit()}
 								</Button>

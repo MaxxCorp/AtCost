@@ -1,7 +1,7 @@
 <script lang="ts">
     import { listPayrollRuns, createPayrollRunAction, deletePayrollRunAction } from "./runs.remote.js";
     import { createPayrollRunSchema } from "@ac/validations";
-    import { Button, LoadingSection, ErrorSection } from "@ac/ui";
+    import { Button, LoadingSection, ErrorSection, recordActiveItem, activeItemAnchor } from "@ac/ui";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { toast } from "svelte-sonner";
     import { goto } from "$app/navigation";
@@ -252,7 +252,11 @@
     {:else}
         <div class="grid grid-cols-1 gap-4">
             {#each runs as run (run.id)}
-                <div class="bg-white rounded-2xl border border-gray-100 p-6 shadow-2xs hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div
+                    id="item-{run.id}"
+                    use:activeItemAnchor={{ feature: "payroll", id: run.id }}
+                    class="bg-white rounded-2xl border border-gray-100 p-6 shadow-2xs hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-6"
+                >
                     <div class="space-y-2">
                         <div class="flex items-center gap-2.5 flex-wrap">
                             <span class="px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-slate-100 text-slate-800 border border-slate-200">
@@ -325,7 +329,7 @@
                         </div>
 
                         <div class="flex items-center gap-2">
-                            <a href="/payroll/{run.id}">
+                            <a href="/payroll/{run.id}" onclick={() => recordActiveItem("payroll", run.id)}>
                                 <Button size="sm" class="gap-1.5 bg-gray-900 hover:bg-gray-800 text-white">
                                     Details & Abrechnungen
                                     <ArrowRight class="w-4 h-4" />

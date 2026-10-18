@@ -12,7 +12,7 @@
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import SynchronizationForm from "#lib/components/synchronizations/SynchronizationForm.svelte";
-    import { handleDelete } from "@ac/ui";
+    import { handleDelete, getLastListUrl, recordActiveItem } from "@ac/ui";
     import { toast } from "svelte-sonner";
     import {
         Calendar,
@@ -26,6 +26,12 @@
 
     const configId = $derived(page.params.id || "");
     const mainRf = $derived(update.for(configId));
+
+    $effect(() => {
+        if (configId) {
+            recordActiveItem("synchronizations", configId);
+        }
+    });
 
     // Version tracker for re-fetching data after actions
     let version = $state(0);
@@ -225,7 +231,7 @@
                                                     itemName: m.feature_synchronizations_title().toLowerCase(),
                                                 });
                                                 if (success) {
-                                                    await goto("/synchronizations");
+                                                    await goto(getLastListUrl("synchronizations", "/synchronizations"));
                                                 }
                                             }}
                                         >

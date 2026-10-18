@@ -6,7 +6,7 @@
     import { untrack, onMount } from "svelte";
     import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
     import * as m from "#lib/paraglide/messages.js";
-    import { translateIssue } from "@ac/ui";
+    import { translateIssue, getLastListUrl } from "@ac/ui";
     import {
         AWO_BERLIN_DEFAULTS,
         TV_L_DEFAULTS,
@@ -40,6 +40,8 @@
         onCancel = undefined,
         cancelHref = "/contracts",
     }: any = $props();
+
+    const effectiveCancelHref = $derived(getLastListUrl("contracts", cancelHref ?? "/contracts"));
 
     const rf = $derived((typeof remoteFunction === "function" ? remoteFunction() : remoteFunction) as any);
 
@@ -108,7 +110,7 @@
 
             toast.success(m.successfully_saved());
             if (onSuccess) onSuccess(result);
-            else await goto(cancelHref);
+            else await goto(effectiveCancelHref);
         } catch (error: any) {
             toast.error(error?.message || m.something_went_wrong());
         }
@@ -1046,7 +1048,7 @@
                 {m.cancel ? m.cancel() : "Cancel"}
             </Button>
         {:else}
-            <Button variant="secondary" href={cancelHref} size="default">
+            <Button variant="secondary" href={effectiveCancelHref} size="default">
                 {m.cancel ? m.cancel() : "Cancel"}
             </Button>
         {/if}

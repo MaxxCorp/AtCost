@@ -6,7 +6,7 @@
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 
     import { createContactSchema } from "#lib/validations/contacts.js";
-    import { EntityManager, LocationForm, handleDelete } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, getLastListUrl } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
     import { getLocationFilterGroups } from "#lib/filters/index.js";
     import * as m from "#lib/paraglide/messages.js";
@@ -31,7 +31,7 @@
         if (finalId) {
             goto(`/contacts/${finalId}`);
         } else {
-            goto("/contacts");
+            goto(getLastListUrl("contacts", "/contacts"));
         }
     }
 
