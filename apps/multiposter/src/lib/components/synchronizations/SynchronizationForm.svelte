@@ -33,7 +33,7 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import * as m from "#lib/paraglide/messages.js";
-	import { translateIssue, EntityManager, handleDelete, matchContactSearch } from "@ac/ui";
+	import { translateIssue, EntityManager, handleDelete, matchContactSearch, useFormValidationFeedback } from "@ac/ui";
 	import TemplateSelector from "./TemplateSelector.svelte";
 	import ContactForm from "../contacts/ContactForm.svelte";
 	import KioskMultiSelect from "../kiosks/KioskMultiSelect.svelte";
@@ -1013,15 +1013,10 @@
 		}
 	});
 
-	let prevIssuesLength = $state(0);
 	const fields = $derived(remoteFunction.fields as any);
-	
-	$effect(() => {
-		const issues = (remoteFunction as any).allIssues?.() ?? [];
-		if (issues.length > 0 && prevIssuesLength === 0) {
-			toast.error(m.please_fix_validation());
-		}
-		prevIssuesLength = issues.length;
+
+	useFormValidationFeedback(() => remoteFunction, {
+		message: () => m.please_fix_validation(),
 	});
 </script>
 

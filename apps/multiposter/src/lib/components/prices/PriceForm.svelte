@@ -29,7 +29,7 @@
     import { createRecipe } from "../../../routes/recipes/new/create.remote";
     import { createConsumableSchema, createRecipeSchema } from "@ac/validations";
     import type { Consumable, Recipe, PriceItem } from "@ac/validations";
-    import { getLastListUrl } from "@ac/ui";
+    import { getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import ConsumableForm from "../consumables/ConsumableForm.svelte";
     import RecipeForm from "../recipes/RecipeForm.svelte";
@@ -63,13 +63,8 @@
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation?.() || 'Please fix validation errors',
     });
 
     let localConsumables = $state<Consumable[]>([]);
@@ -989,7 +984,7 @@
             </Button>
         {/if}
 
-        <AsyncButton isPending={rf.submitting} type="submit">
+        <AsyncButton loading={rf.pending} type="submit">
             {isUpdating ? (m.save_changes?.() || 'Save Changes') : (m.create?.() || 'Create')}
         </AsyncButton>
     </div>

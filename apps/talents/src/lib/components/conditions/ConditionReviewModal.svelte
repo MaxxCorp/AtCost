@@ -1,7 +1,7 @@
 <script lang="ts">
     import { approveConditionUpdate, rejectConditionUpdate } from '../../../routes/conditions.remote.js';
     import { approveConditionSchema, rejectConditionSchema } from '@ac/validations';
-    import { AsyncButton } from '@ac/ui';
+    import { AsyncButton, useFormValidationFeedback } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { 
         ShieldAlert, 
@@ -32,6 +32,9 @@
 
     const af = approveConditionUpdate.preflight(approveConditionSchema);
     const rf = rejectConditionUpdate.preflight(rejectConditionSchema);
+
+    const approveFeedback = useFormValidationFeedback(() => af);
+    const rejectFeedback = useFormValidationFeedback(() => rf);
 
     const changes = $derived<any[]>(condition?.changesDiff ?? []);
     const hmoList = $derived<any[]>(condition?.hmoRates ?? []);
@@ -286,6 +289,7 @@
                         </label>
                         <textarea 
                             id="rejection-reason-input"
+                            data-field="reason"
                             bind:value={rejectionReason}
                             rows={3}
                             placeholder="z.B. Tarifabschluss ist noch strittig / Rücksprache mit der Geschäftsführung erforderlich..."

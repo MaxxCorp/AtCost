@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
-    import { EntityManager, TagManager, ContactManager, LocationForm, translateIssue, matchContactSearch } from "@ac/ui";
+    import { EntityManager, TagManager, ContactManager, LocationForm, translateIssue, matchContactSearch, useFormValidationFeedback } from "@ac/ui";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import ResourceForm from "#lib/components/resources/ResourceForm.svelte";
@@ -254,15 +254,8 @@
         getInitialEndDateTime(startParsed, endParsed, localNow),
     );
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        untrack(() => {
-            if (issues.length > 0 && prevIssuesLength === 0) {
-                toast.error(m.please_fix_validation());
-            }
-            prevIssuesLength = issues.length;
-        });
+    useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
 
     let showRecurrenceDialog = $state(false);

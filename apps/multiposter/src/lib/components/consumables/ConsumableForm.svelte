@@ -6,7 +6,7 @@
     import { Button } from "#lib/components/ui/button/index.js";
     import { goto, refreshAll } from "$app/navigation";
     import { Euro, Calendar, MapPin, Package, Scale, Tag as TagIcon } from "@lucide/svelte";
-    import { TagManager, getLastListUrl } from "@ac/ui";
+    import { TagManager, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
@@ -47,13 +47,8 @@
     const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
 
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation?.() || 'Please fix validation errors',
     });
 
     let purchasePrice = $state(untrack(() => initialData?.purchasePrice ?? 0));
@@ -298,7 +293,7 @@
             </Button>
         {/if}
 
-        <AsyncButton isPending={rf.submitting} type="submit">
+        <AsyncButton loading={rf.pending} type="submit">
             {isUpdating ? (m.save_changes?.() || 'Save Changes') : (m.create?.() || 'Create')}
         </AsyncButton>
     </div>

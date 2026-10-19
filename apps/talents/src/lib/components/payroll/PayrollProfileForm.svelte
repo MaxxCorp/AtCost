@@ -6,7 +6,7 @@
         PAYROLL_PROFILE_SGB2_16I_PRESET,
         PAYROLL_PROFILE_SGB2_16D_PRESET,
     } from "@ac/validations";
-    import { Button, LoadingSection } from "@ac/ui";
+    import { Button, AsyncButton, LoadingSection, useFormValidationFeedback } from "@ac/ui";
     import { toast } from "svelte-sonner";
     import {
         Shield,
@@ -36,13 +36,8 @@
     const rf = saveTalentPayrollProfile.preflight(payrollProfileSchema);
     let isSubmitting = $state(false);
 
-    let prevIssuesLength = 0;
-    $effect(() => {
-        const issues = rf.fields.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error("Bitte korrigieren Sie die Formularfehler");
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => "Bitte korrigieren Sie die Formularfehler",
     });
 
     let presetValues = $state<Record<string, any>>({});
@@ -971,10 +966,15 @@
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-2">
-            <Button type="submit" disabled={isSubmitting} class="gap-2">
+            <AsyncButton
+                type="submit"
+                loading={rf.pending || isSubmitting}
+                loadingLabel="Speichert..."
+                class="gap-2"
+            >
                 <Save class="w-4 h-4" />
-                {isSubmitting ? "Speichert..." : "Abrechnungsstammdaten speichern"}
-            </Button>
+                Abrechnungsstammdaten speichern
+            </AsyncButton>
         </div>
     </form>
 {/if}

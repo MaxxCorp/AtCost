@@ -1,10 +1,12 @@
 <script lang="ts">
+    // @ts-ignore
     import AsyncButton from "../AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "../button/index.js";
     import { goto } from "$app/navigation";
     import type { Snippet } from "svelte";
     import { translateIssue } from "../../utils.js";
+    import { useFormValidationFeedback } from "../../hooks/formValidationFeedback.svelte.ts";
 
     let {
         remoteFunction,
@@ -155,13 +157,8 @@
         },
     };
 
-    let prevIssuesLength = 0;
-    $effect(() => {
-        const issues = (rf as any)?.allIssues?.() ?? (rf as any)?.fields?.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(i18n.pleaseFixValidation);
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => i18n.pleaseFixValidation,
     });
 </script>
 

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createSchedulingGroup, updateSchedulingGroup, deleteSchedulingGroup } from "../../../routes/shiftplans/shifts.remote";
     import type { SchedulingGroupDetail } from "@ac/validations";
-    import { Button, AsyncButton } from "@ac/ui";
+    import { Button, AsyncButton, highlightAndScrollToElement } from "@ac/ui";
     import { X, Layers, Trash2, Check, AlertTriangle, Building2, Tag } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
@@ -53,6 +53,10 @@
         const trimmedName = name.trim();
         if (!trimmedName) {
             toast.error("Group name is required");
+            const input = document.getElementById("group-name-input");
+            if (input) {
+                highlightAndScrollToElement(input);
+            }
             return;
         }
 

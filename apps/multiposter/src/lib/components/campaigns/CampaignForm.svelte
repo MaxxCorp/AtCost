@@ -7,7 +7,7 @@
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
-    import { handleDelete, translateIssue, getLastListUrl } from "@ac/ui";
+    import { handleDelete, translateIssue, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import type { updateCampaign } from "../../../routes/campaigns/[id]/update.remote";
     import type { createCampaign } from "../../../routes/campaigns/new/create.remote";
 
@@ -29,13 +29,8 @@
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
 </script>
 

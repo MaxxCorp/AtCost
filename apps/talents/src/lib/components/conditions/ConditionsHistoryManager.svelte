@@ -5,7 +5,7 @@
         triggerSync 
     } from '../../../routes/conditions.remote.js';
     import { syncConditionsSchema } from '@ac/validations';
-    import { AsyncButton, LoadingSection } from '@ac/ui';
+    import { AsyncButton, LoadingSection, useFormValidationFeedback } from '@ac/ui';
     import ConditionReviewModal from './ConditionReviewModal.svelte';
     import { toast } from 'svelte-sonner';
     import { 
@@ -32,6 +32,7 @@
     let reviewTarget = $state<{ condition: any; type: 'social_insurance' | 'union_contract' } | null>(null);
 
     const ts = triggerSync.preflight(syncConditionsSchema);
+    const feedback = useFormValidationFeedback(() => ts);
 
     // Filter approved conditions
     const approvedSocial = $derived(historyData.socialConditions.filter(c => c.status === 'approved'));

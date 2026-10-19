@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import * as m from "#lib/paraglide/messages.js";
-    import { EntityManager, Button, AsyncButton, translateIssue, getLastListUrl } from "@ac/ui";
+    import { EntityManager, Button, AsyncButton, translateIssue, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import {
         MapPin,
         Users,
@@ -30,6 +30,9 @@
     }: any = $props();
 
     const rf = $derived(remoteFunction as any);
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => "Bitte korrigieren Sie die Formularfehler",
+    });
 
     // Derived prop shortcuts
     const initialSchedule = $derived(initialData?.schedule);
@@ -296,6 +299,8 @@
             >
             <AsyncButton
                 type="submit"
+                loading={rf.pending}
+                loadingLabel={isUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
                 class="bg-purple-600 hover:bg-purple-700 text-white min-w-[140px]"
             >
                 {isUpdating ? "Update Changes" : "Create Template"}

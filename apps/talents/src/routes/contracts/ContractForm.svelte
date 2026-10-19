@@ -4,7 +4,7 @@
     import { untrack, onMount } from "svelte";
     import { listContractFrameworks } from "../contract-frameworks/frameworks.remote";
     import * as m from "#lib/paraglide/messages.js";
-    import { AsyncButton, Button, translateIssue, getLastListUrl } from "@ac/ui";
+    import { AsyncButton, Button, translateIssue, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import {
         AWO_BERLIN_DEFAULTS,
         TV_L_DEFAULTS,
@@ -66,13 +66,8 @@
         }
     });
 
-    let prevIssuesLength = 0;
-    $effect(() => {
-        const issues = rf?.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
 
     // Preset Applicator: populates form fields with standard Tarifvertrag values

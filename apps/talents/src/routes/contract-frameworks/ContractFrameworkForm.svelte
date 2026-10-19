@@ -3,7 +3,7 @@
     import { goto } from "$app/navigation";
     import { untrack } from "svelte";
     import * as m from "#lib/paraglide/messages.js";
-    import { AsyncButton, Button, translateIssue } from "@ac/ui";
+    import { AsyncButton, Button, translateIssue, useFormValidationFeedback } from "@ac/ui";
 
     let {
         remoteFunction,
@@ -17,16 +17,9 @@
 
     const rf = $derived((typeof remoteFunction === "function" ? remoteFunction() : remoteFunction) as any);
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = rf?.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
-
-
 </script>
 
 <form

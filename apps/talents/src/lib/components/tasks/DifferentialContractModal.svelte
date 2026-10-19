@@ -1,7 +1,8 @@
 <script lang="ts">
     import { issueDifferentialContractUpdate, listTasks, listCompletedTasks } from '../../../routes/tasks.remote.js';
     import { listContracts } from '../../../routes/contracts/list.remote.js';
-    import { AsyncButton } from '@ac/ui';
+    import { issueDifferentialContractUpdateSchema } from '@ac/validations';
+    import { AsyncButton, useFormValidationFeedback } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { X, TrendingUp, Calendar, FileText, CheckCircle2, AlertCircle, Sparkles } from '@lucide/svelte';
     import { format } from 'date-fns';
@@ -11,14 +12,15 @@
         open = false,
         onClose,
         onIssued,
-    } = $props<{
+    }: {
         task: any;
         open: boolean;
         onClose: () => void;
         onIssued?: () => void;
-    }>();
+    } = $props();
 
-    const idcu = issueDifferentialContractUpdate;
+    const idcu = issueDifferentialContractUpdate.preflight(issueDifferentialContractUpdateSchema);
+    const feedback = useFormValidationFeedback(() => idcu);
 
     const taskData = $derived(task?.data || {});
     const talentName = $derived(taskData.talentName || 'Mitarbeiter/in');
@@ -77,7 +79,7 @@
 
             <!-- Body -->
             <form
-                {...idcu.enhance(async ({ submit }) => {
+                {...idcu.preflight(issueDifferentialContractUpdateSchema).enhance(async ({ submit }) => {
                     const res = await submit() as any;
                     if (res?.success) {
                         toast.success('Änderungsvereinbarung erfolgreich erstellt!', {
@@ -149,6 +151,9 @@
                             oninput={(e) => effectiveDate = e.currentTarget.value}
                             class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                         />
+                        {#each idcu.fields.effectiveDate.issues() ?? [] as issue}
+                            <p class="text-[11px] text-rose-600 mt-1">{issue.message}</p>
+                        {/each}
                     </label>
 
                     <!-- New Wage Amount (editable) -->
@@ -165,6 +170,9 @@
                             oninput={(e) => newWageAmount = Number(e.currentTarget.value)}
                             class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                         />
+                        {#each idcu.fields.newWageAmount.issues() ?? [] as issue}
+                            <p class="text-[11px] text-rose-600 mt-1">{issue.message}</p>
+                        {/each}
                     </label>
                 </div>
 

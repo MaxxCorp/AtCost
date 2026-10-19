@@ -7,10 +7,13 @@
 	import EventForm from "#lib/components/events/EventForm.svelte";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
-    import { Button } from "#lib/components/ui/button/index.js";
+    import { Button, useFormValidationFeedback } from "@ac/ui";
 
     const formId = crypto.randomUUID();
     const rf = createEvent.for(formId);
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
+    });
 </script>
 
 <div class="max-w-3xl mx-auto px-4 py-8 text-left">

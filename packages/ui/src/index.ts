@@ -38,6 +38,13 @@ export { default as TagForm } from './components/forms/TagForm.svelte';
 export { default as TagCategoryForm } from './components/forms/TagCategoryForm.svelte';
 export { IsMobile } from "./hooks/is-mobile.svelte.ts";
 export { handleDelete } from "./hooks/handleDelete.svelte.ts";
+export {
+    useFormValidationFeedback,
+    findFirstInvalidElement,
+    highlightAndScrollToElement,
+    extractIssues,
+    type FormValidationFeedbackOptions
+} from "./hooks/formValidationFeedback.svelte.ts";
 export { getCachedOptionLabel, loadOptionsForGroup, registerGroupOptions, normalizeOption } from "./utils/filterOptionsCache.svelte.ts";
 export { openDB, setPreference, getPreference } from "./utils/idb.js";
 export {

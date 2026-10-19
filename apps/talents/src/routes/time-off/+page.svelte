@@ -15,6 +15,7 @@
         syncPageToUrl,
         recordActiveItem,
         activeItemAnchor,
+        useFormValidationFeedback,
     } from "@ac/ui";
     import * as Dialog from "@ac/ui/components/dialog";
     import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, HelpCircle } from "@lucide/svelte";
@@ -31,6 +32,11 @@
     onMount(async () => {
         const session = await authClient.getSession();
         userId = session?.data?.user?.id || null;
+    });
+
+    const timeOffForm = requestTimeOff.preflight(timeOffRequestSchema);
+    const feedback = useFormValidationFeedback(() => timeOffForm, {
+        message: () => m.please_fix_validation?.() ?? "Please fix validation errors",
     });
 
     type TimeOffRequest = Awaited<ReturnType<typeof listTimeOffRequests>>["data"][number];
@@ -343,7 +349,7 @@
         </Dialog.Header>
         
         <form 
-            {...requestTimeOff.preflight(timeOffRequestSchema).enhance(async ({ submit }) => {
+            {...timeOffForm.enhance(async ({ submit }) => {
                 const res = await submit();
                 if (res) {
                     toast.success(m.request_submitted ? m.request_submitted() : "Request submitted");
@@ -354,19 +360,19 @@
             class="space-y-4 pt-4"
         >
             {#if userId}
-                <input type="hidden" name="talentId" value={userId} />
+                <input {...timeOffForm.fields.talentId.as("hidden", userId)} />
             {/if}
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1.5">
                     <label for="type" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.request_type ? m.request_type() : "Request Type"}</label>
                     <select 
-                        name="type" 
+                        id="type"
+                        {...timeOffForm.fields.type.as("select", "vacation")}
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                     >
                         <option value="vacation">{m.leave_vacation()}</option>
                         <option value="sick">{m.leave_sick()}</option>
-                        <option value="unpaid">{m.leave_unpaid()}</option>
                         <option value="other">{m.leave_other()}</option>
                     </select>
                 </div>
@@ -376,16 +382,16 @@
                 <div class="space-y-1.5">
                     <label for="startDate" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.start_date ? m.start_date() : "Start Date"}</label>
                     <input 
-                        type="date" 
-                        name="startDate" 
+                        id="startDate"
+                        {...timeOffForm.fields.startDate.as("date")}
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all" 
                     />
                 </div>
                 <div class="space-y-1.5">
                     <label for="endDate" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.end_date ? m.end_date() : "End Date"}</label>
                     <input 
-                        type="date" 
-                        name="endDate" 
+                        id="endDate"
+                        {...timeOffForm.fields.endDate.as("date")}
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all" 
                     />
                 </div>
@@ -394,7 +400,8 @@
             <div class="space-y-1.5">
                 <label for="reason" class="text-xs font-black uppercase tracking-widest text-gray-400">{m.reason_notes ? m.reason_notes() : "Reason / Notes"}</label>
                 <textarea 
-                    name="reason" 
+                    id="reason"
+                    {...timeOffForm.fields.reason.as("text")}
                     rows="3"
                     class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all resize-none"
                     placeholder={m.reason_placeholder ? m.reason_placeholder() : "Briefly describe the reason for your request..."}
@@ -411,6 +418,7 @@
                 </Button>
                 <AsyncButton 
                     type="submit" 
+                    loading={timeOffForm.pending}
                     class="bg-amber-600 hover:bg-amber-700 text-white"
                 >
                     {m.submit_request ? m.submit_request() : "Submit Request"}

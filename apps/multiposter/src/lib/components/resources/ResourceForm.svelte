@@ -9,7 +9,7 @@
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
     import type { AllocationCalendar } from "#lib/validations/resources.js";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
-    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch, getLastListUrl } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
@@ -66,13 +66,8 @@
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
 
     // Allocation calendars management

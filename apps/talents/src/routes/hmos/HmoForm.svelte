@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { AsyncButton } from "@ac/ui";
+    import { AsyncButton, useFormValidationFeedback } from "@ac/ui";
     import { Button } from "@ac/ui/components/button";
     import { toast } from "svelte-sonner";
     import { untrack } from "svelte";
@@ -24,13 +24,8 @@
         }
     });
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = rf?.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error("Bitte korrigieren Sie die Formularfehler");
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => "Bitte korrigieren Sie die Formularfehler",
     });
 
     function handleCategoryChange(e: Event) {
@@ -547,6 +542,8 @@
 
         <AsyncButton
             type="submit"
+            loading={rf.pending}
+            loadingLabel={isUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
             class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md text-sm cursor-pointer"
         >
             {isUpdating ? "Änderungen speichern" : "Träger anlegen"}

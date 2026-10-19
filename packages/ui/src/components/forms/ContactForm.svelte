@@ -5,9 +5,12 @@
     import { toast } from "svelte-sonner";
     import { type Snippet } from "svelte";
 
-    import Button from "../button/button.svelte";
+    import { Button } from "../button/index.js";
+    // @ts-ignore
     import AsyncButton from "../AsyncButton.svelte";
+    // @ts-ignore
     import ContactFields from "./ContactFields.svelte";
+    import { useFormValidationFeedback } from "../../hooks/formValidationFeedback.svelte.ts";
 
     export interface Props {
         initialData?: any;
@@ -126,13 +129,8 @@
             "Please fix the validation errors in the form.",
     });
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (remoteFunction as any)?.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(i18n.pleaseFixValidation);
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => remoteFunction, {
+        message: () => i18n.pleaseFixValidation,
     });
 
     const d = (val: any, def: any) =>

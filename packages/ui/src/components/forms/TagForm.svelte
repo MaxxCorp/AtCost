@@ -6,6 +6,7 @@
     import { Button } from "../button/index.js";
     import { goto } from "$app/navigation";
     import { translateIssue } from "../../utils.js";
+    import { useFormValidationFeedback } from "../../hooks/formValidationFeedback.svelte.ts";
     import { Shield, Globe, Plus, Pencil, Trash2, FolderPlus, FolderEdit, Check, X, Loader2 } from "@lucide/svelte";
 
     let {
@@ -205,16 +206,9 @@
         }
     }
 
-    let submissionTriggered = $state(false);
-    $effect(() => {
-        const issues = (remoteFunction as any).allIssues?.() ?? [];
-        if (submissionTriggered && issues.length > 0) {
-            toast.error("Bitte korrigieren Sie die Formularfehler");
-            submissionTriggered = false;
-        }
+    const feedback = useFormValidationFeedback(() => remoteFunction, {
+        message: () => "Bitte korrigieren Sie die Formularfehler",
     });
-
-
 </script>
 
 <form
@@ -222,14 +216,12 @@
     {...remoteFunction
         .preflight(validationSchema)
         .enhance(async ({ submit }: { submit: any }) => {
-            submissionTriggered = false;
             try {
                 await submit();
                 const result = (remoteFunction as any).result;
                 const error = (remoteFunction as any).error;
 
                 if (error || (result && result.success === false)) {
-                    submissionTriggered = true;
                     toast.error(error?.message || result?.error || "Fehler beim Speichern");
                     return;
                 }
@@ -238,7 +230,6 @@
                 if (onSuccess) onSuccess(result);
                 else await goto(cancelHref);
             } catch (error: any) {
-                submissionTriggered = true;
                 toast.error(error?.message || "Fehler beim Speichern");
             }
         })}

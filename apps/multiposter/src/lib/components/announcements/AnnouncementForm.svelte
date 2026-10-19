@@ -7,7 +7,7 @@
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import { toast } from "svelte-sonner";
     import { deleteAnnouncements as deleteAnnouncementAction } from "../../../routes/announcements/[id]/delete.remote";
-    import { EntityManager, TagManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch, getLastListUrl } from "@ac/ui";
+    import { EntityManager, TagManager, LocationForm, TagForm, handleDelete, translateIssue, matchContactSearch, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -80,6 +80,10 @@
     // Initialize form state
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
+
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
+    });
 
     const type = "announcement";
 
@@ -169,7 +173,8 @@
         {/if}
     </div>
 
-    <form {...rf.enhance(async ({ submit }: { submit: any }) => {
+    <form
+        {...rf.enhance(async ({ submit }: { submit: any }) => {
         try {
             const result = await submit();
             if (result?.error) {

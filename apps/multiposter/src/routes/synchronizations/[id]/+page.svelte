@@ -12,7 +12,7 @@
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import SynchronizationForm from "#lib/components/synchronizations/SynchronizationForm.svelte";
-    import { handleDelete, getLastListUrl, recordActiveItem } from "@ac/ui";
+    import { handleDelete, getLastListUrl, recordActiveItem, useFormValidationFeedback } from "@ac/ui";
     import { toast } from "svelte-sonner";
     import {
         Calendar,
@@ -38,14 +38,8 @@
     let isSyncing = $state(false);
     let syncProgress = $state<string | null>(null);
     let syncError = $state<string | null>(null);
-
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (mainRf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => mainRf, {
+        message: () => m.please_fix_validation(),
     });
 
     // Derived promises that re-fetch when version changes
@@ -268,7 +262,7 @@
                                                 <AsyncButton
                                                     type="submit"
                                                     loadingLabel="Saving..."
-                                                    loading={update.pending}
+                                                    loading={mainRf.pending}
                                                 >
                                                     Save Changes
                                                 </AsyncButton>

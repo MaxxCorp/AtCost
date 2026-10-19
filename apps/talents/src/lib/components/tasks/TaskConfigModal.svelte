@@ -1,21 +1,23 @@
 <script lang="ts">
     import { listTaskTypeConfigs, updateTaskConfig, listTasks } from '../../../routes/tasks.remote.js';
-    import { AsyncButton } from '@ac/ui';
+    import { updateTaskTypeConfigSchema } from '@ac/validations';
+    import { AsyncButton, useFormValidationFeedback } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { X, SlidersHorizontal, Clock, ShieldCheck, CheckCircle2 } from '@lucide/svelte';
 
     let {
         open = false,
         onClose,
-    } = $props<{
+    }: {
         open: boolean;
         onClose: () => void;
-    }>();
+    } = $props();
 
     const configsQuery = listTaskTypeConfigs();
     const configs = $derived(configsQuery.current || []);
 
-    const utc = updateTaskConfig;
+    const utc = updateTaskConfig.preflight(updateTaskTypeConfigSchema);
+    const feedback = useFormValidationFeedback(() => utc);
 
     let selectedType = $state<string>('experience_step_increase');
     let leadTimeDays = $state<number>(30);
@@ -98,7 +100,7 @@
                     </h3>
 
                     <form
-                        {...utc.enhance(async ({ submit }) => {
+                        {...utc.preflight(updateTaskTypeConfigSchema).enhance(async ({ submit }) => {
                             const res = await submit() as any;
                             if (res?.success) {
                                 toast.success('Vorlaufzeit & Parameter aktualisiert!');
@@ -125,6 +127,9 @@
                                     oninput={(e) => leadTimeDays = Number(e.currentTarget.value)}
                                     class="w-full px-3.5 py-2 rounded-xl border border-gray-300 text-sm font-bold bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                 />
+                                {#each utc.fields.leadTimeDays.issues() ?? [] as issue}
+                                    <p class="text-[11px] text-rose-600 mt-1">{issue.message}</p>
+                                {/each}
                                 <span class="text-[10px] text-gray-400 mt-1 block">
                                     Aufgabe wird {leadTimeDays} Tage vor dem Zieldatum in der Warteschlange platziert.
                                 </span>

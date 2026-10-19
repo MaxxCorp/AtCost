@@ -20,14 +20,16 @@
         Users,
     } from '@lucide/svelte';
     import { toast } from 'svelte-sonner';
-    import { AsyncButton } from '@ac/ui';
+    import { triggerMilestoneCheckSchema } from '@ac/validations';
+    import { AsyncButton, useFormValidationFeedback } from '@ac/ui';
 
-    let { showCompleted = false } = $props<{ showCompleted?: boolean }>();
+    let { showCompleted = false }: { showCompleted?: boolean } = $props();
 
     const activeTasksQuery = listTasks();
     const completedTasksQuery = listCompletedTasks();
 
-    const rtc = runTaskCheck;
+    const rtc = runTaskCheck.preflight(triggerMilestoneCheckSchema);
+    const feedback = useFormValidationFeedback(() => rtc);
 
     const currentQuery = $derived(showCompleted ? completedTasksQuery : activeTasksQuery);
     const rawData = $derived(currentQuery.current);

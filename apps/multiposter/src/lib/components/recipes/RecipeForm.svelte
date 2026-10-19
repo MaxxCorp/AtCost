@@ -7,7 +7,7 @@
     import { goto, refreshAll } from "$app/navigation";
     import { Euro, ChefHat, Plus, Trash2, Scale, Tag as TagIcon, Package } from "@lucide/svelte";
     import type { Consumable } from "@ac/validations";
-    import { TagManager, getLastListUrl } from "@ac/ui";
+    import { TagManager, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import { listConsumables } from "../../../routes/consumables/list.remote";
     import { createConsumable } from "../../../routes/consumables/new/create.remote";
@@ -54,13 +54,8 @@
     const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
 
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation?.() || 'Please fix validation errors',
     });
 
     let portions = $state(untrack(() => initialData?.portions ?? 1));
@@ -511,7 +506,7 @@
             </Button>
         {/if}
 
-        <AsyncButton isPending={rf.submitting} type="submit">
+        <AsyncButton loading={rf.pending} type="submit">
             {isUpdating ? (m.save_changes?.() || 'Save Changes') : (m.create?.() || 'Create')}
         </AsyncButton>
     </div>

@@ -1,7 +1,9 @@
 <script lang="ts">
     import { untrack } from "svelte";
+    // @ts-ignore
     import AsyncButton from "../AsyncButton.svelte";
     import { translateIssue } from "../../utils.js";
+    import { useFormValidationFeedback } from "../../hooks/formValidationFeedback.svelte.ts";
 
     import { toast } from "svelte-sonner";
     import { Button } from "../button";
@@ -52,17 +54,8 @@
             : remoteFunction,
     );
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        const currentIssuesLength = issues.length;
-        if (
-            currentIssuesLength > 0 &&
-            currentIssuesLength !== prevIssuesLength
-        ) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = currentIssuesLength;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
 
     // svelte-ignore state_referenced_locally

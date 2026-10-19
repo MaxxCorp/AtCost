@@ -1,7 +1,7 @@
 <script lang="ts">
     import { listPayrollRuns, createPayrollRunAction, deletePayrollRunAction } from "./runs.remote.js";
     import { createPayrollRunSchema } from "@ac/validations";
-    import { Button, LoadingSection, ErrorSection, recordActiveItem, activeItemAnchor } from "@ac/ui";
+    import { Button, AsyncButton, LoadingSection, ErrorSection, recordActiveItem, activeItemAnchor, useFormValidationFeedback } from "@ac/ui";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { toast } from "svelte-sonner";
     import { goto } from "$app/navigation";
@@ -53,13 +53,8 @@
 
     const createRunForm = createPayrollRunAction.preflight(createPayrollRunSchema);
 
-    let prevIssuesLength = 0;
-    $effect(() => {
-        const issues = createRunForm.fields.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error("Bitte korrigieren Sie die Formularfehler");
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => createRunForm, {
+        message: () => "Bitte korrigieren Sie die Formularfehler"
     });
 
     const query = $derived(
@@ -604,14 +599,15 @@
                     >
                         Abbrechen
                     </Button>
-                    <Button
+                    <AsyncButton
                         type="submit"
                         size="sm"
-                        disabled={isSubmitting}
+                        loading={createRunForm.pending || isSubmitting}
+                        loadingLabel="Wird angelegt..."
                         class="bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
-                        {isSubmitting ? "Wird angelegt..." : "Lauf anlegen"}
-                    </Button>
+                        Lauf anlegen
+                    </AsyncButton>
                 </div>
             </form>
         </div>

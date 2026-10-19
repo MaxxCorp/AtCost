@@ -1,7 +1,7 @@
 <script lang="ts">
     import { manageTimesheets } from '../../../routes/my-timesheet/timesheets.remote';
     import { manageTimesheetsSchema } from '@ac/validations';
-    import { AsyncButton } from '@ac/ui';
+    import { AsyncButton, useFormValidationFeedback } from '@ac/ui';
     import { format } from 'date-fns';
     import { toast } from 'svelte-sonner';
     import { browser } from '$app/env';
@@ -12,7 +12,7 @@
      * Uses a specific handle (manageTimesheetsDashboard) to avoid collisions
      * with other timesheet forms on the same page.
      */
-    let { status, talentId, onRefresh } = $props<{ status: any; talentId: string; onRefresh: () => void }>();
+    let { status, talentId, onRefresh }: { status: any; talentId: string; onRefresh: () => void } = $props();
 
     // Reactive Form Proxy (initialized only in browser)
     const rf = $derived(browser ? manageTimesheets as any : null);
@@ -30,13 +30,8 @@
     let startTimeOverride = $state(getNowLocal());
     let endTimeOverride = $state(getNowLocal());
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any)?.allIssues ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation()
     });
 
 
@@ -139,6 +134,7 @@
                                     <label for="start-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">{m.start_override()}</label>
                                     <input 
                                         id="start-override"
+                                        data-field="startTime"
                                         type="datetime-local" 
                                         bind:value={startTimeOverride}
                                         class="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -154,6 +150,7 @@
                                     <label for="end-override" class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-1">{m.end_override()}</label>
                                     <input 
                                         id="end-override"
+                                        data-field="endTime"
                                         type="datetime-local" 
                                         bind:value={endTimeOverride}
                                         class="w-full bg-rose-50 border border-rose-100 rounded-xl px-3 py-2 text-[10px] font-bold focus:ring-2 focus:ring-rose-500 outline-none"

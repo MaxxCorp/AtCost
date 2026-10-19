@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { create } from "./create.remote";
 	import { goto } from "$app/navigation";
-	import { getLastListUrl } from "@ac/ui";
+	import { getLastListUrl, useFormValidationFeedback } from "@ac/ui";
+	import * as m from "#lib/paraglide/messages.js";
 	import { createSynchronizationSchema } from "#lib/validations/synchronizations.js";
 	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 	import Button from "#lib/components/ui/button/button.svelte";
@@ -11,6 +12,9 @@
 
 	const formId = crypto.randomUUID();
 	const rf = create.for(formId);
+	const feedback = useFormValidationFeedback(() => rf, {
+		message: () => m.please_fix_validation?.() ?? "Please fix validation errors",
+	});
 </script>
 
 <svelte:head>
@@ -67,7 +71,7 @@
 			<AsyncButton
 				type="submit"
 				loadingLabel="Creating..."
-				loading={create.pending}
+				loading={rf.pending}
 			>
 				Create Sync
 			</AsyncButton>

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { LoadingSection, AsyncButton, ErrorSection } from '@ac/ui';
+    import { LoadingSection, AsyncButton, ErrorSection, useFormValidationFeedback } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { format, differenceInMinutes } from 'date-fns';
     import { refreshAll } from "$app/navigation";
@@ -12,7 +12,7 @@
     /**
      * TIMESHEET MANAGER (Native Remote Functions)
      */
-    let { profile, status } = $props<{ profile: any; status: any }>();
+    let { profile, status }: { profile: any; status: any } = $props();
 
     // Dedicated action handle
     const rf = manageTimesheets as any;
@@ -33,13 +33,8 @@
     let startTimeOverride = $state(getNowLocal());
     let endTimeOverride = $state(getNowLocal());
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation()
     });
 
     async function handleRefresh() {
@@ -170,6 +165,7 @@
                                                     <label for="startTime" class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1 mb-1 block">{m.start_time_record()}</label>
                                                 <input
                                                     id="startTime"
+                                                    data-field="startTime"
                                                     type="datetime-local"
                                                     bind:value={startTimeOverride}
                                                     class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm hover:border-gray-200"
@@ -180,6 +176,7 @@
                                                     <label for="endTime" class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1 mb-1 block">{m.end_time_record()}</label>
                                                 <input
                                                     id="endTime"
+                                                    data-field="endTime"
                                                     type="datetime-local"
                                                     bind:value={endTimeOverride}
                                                     class="w-full bg-white/50 backdrop-blur-sm border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all shadow-sm hover:border-gray-200"

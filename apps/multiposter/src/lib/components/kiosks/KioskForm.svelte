@@ -9,7 +9,7 @@
     import * as m from "#lib/paraglide/messages.js";
     import Button from "#lib/components/ui/button/button.svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
-    import { EntityManager, LocationForm, handleDelete, translateIssue, getLastListUrl } from "@ac/ui";
+    import { EntityManager, LocationForm, handleDelete, translateIssue, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import {
@@ -109,13 +109,8 @@
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
 
-    let prevIssuesLength = $state(0);
-    $effect(() => {
-        const issues = (rf as any).allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
 
     function applyNextWeek() {

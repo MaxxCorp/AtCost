@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem } from "@ac/ui";
+    import { LoadingSection, ErrorSection, getLastListUrl, recordActiveItem, useFormValidationFeedback } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { page } from "$app/state";
     import { browser } from '$app/env';
@@ -33,6 +33,9 @@
 
 	const eventId = $derived(page.params.id || "");
     const eventRf = $derived(updateEvent.for(eventId));
+    const feedback = useFormValidationFeedback(() => eventRf, {
+        message: () => m.please_fix_validation(),
+    });
     const eventQuery = $derived(readEvent(eventId));
 
     let collab = $state<CollaborationRoom | null>(null);

@@ -42,6 +42,7 @@
         handleDelete,
         matchContactSearch,
         getLastListUrl,
+        useFormValidationFeedback,
     } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { getLocationFilterGroups, getTalentFilterGroups, getContactFilterGroups } from "#lib/filters/index.js";
@@ -334,12 +335,8 @@
             talentData.onboardingStatus = "not_started";
         }
     }
-    $effect(() => {
-        const issues = (rf as any)?.allIssues?.() ?? [];
-        if (issues.length > 0 && prevIssuesLength === 0) {
-            toast.error(m.please_fix_validation());
-        }
-        prevIssuesLength = issues.length;
+    const feedback = useFormValidationFeedback(() => rf, {
+        message: () => m.please_fix_validation(),
     });
 </script>
 
