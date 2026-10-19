@@ -17,6 +17,7 @@
         Loader2,
         MapPin,
         Folder,
+        Check,
     } from "@lucide/svelte";
 
     // @ts-ignore
@@ -27,6 +28,7 @@
     import { toast } from "svelte-sonner";
     import { getContactDisplayName } from "../utils.js";
     import { getPreference, setPreference } from "../utils/idb.js";
+    import BulkActionToolbar from "./BulkActionToolbar.svelte";
 
     interface Props<T extends { id?: string | null; name?: string }> {
         title: string;
@@ -865,6 +867,34 @@
         }
     }
 
+    let selectedIds = $state<string[]>([]);
+
+    function toggleSelect(id: string) {
+        if (selectedIds.includes(id)) {
+            selectedIds = selectedIds.filter((i) => i !== id);
+        } else {
+            selectedIds = [...selectedIds, id];
+        }
+    }
+
+    async function handleBulkDelete() {
+        if (selectedIds.length === 0 || !deleteItemRemote) return;
+        const confirmMsg = `${i18n.deleteConfirmLabel || "Delete selected items?"} (${selectedIds.length})`;
+        if (!window.confirm(confirmMsg)) return;
+        try {
+            await invokeRemote(deleteItemRemote, selectedIds);
+            toast.success(i18n.deleteSuccessLabel || "Deleted successfully");
+            const idsToDelete = new Set(selectedIds);
+            selectedIds = [];
+            localAssociatedItems = localAssociatedItems.filter((i) => !i.id || !idsToDelete.has(i.id));
+            await refreshAssociations();
+            await refreshSelector();
+            onchange?.(localAssociatedItems.map((i) => i.id!).filter(Boolean), localAssociatedItems);
+        } catch (e: any) {
+            toast.error(e?.message || i18n.deleteFailedLabel || "Failed to delete");
+        }
+    }
+
     async function handleQuickCreateSuccess(result: any, currentList: T[]) {
         showQuickCreate = false;
         let newId = result?.id || result?.data?.id;
@@ -1310,9 +1340,20 @@
                 <div class="grid gap-2">
                     {#each displayedFilteredItems as item (item.id)}
                         <div
-                            class="flex flex-col transition-all rounded-2xl border border-gray-100 hover:border-blue-100 hover:shadow-sm bg-white group/assoc overflow-hidden"
+                            class="flex flex-col transition-all rounded-2xl border bg-white group/assoc overflow-hidden {item.id && selectedIds.includes(item.id)
+                                ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md bg-blue-50/10'
+                                : 'border-gray-100 hover:border-blue-100 hover:shadow-sm'}"
                         >
                             <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-3">
+                                {#if deleteItemRemote && item.id}
+                                    <input
+                                        type="checkbox"
+                                        bind:group={selectedIds}
+                                        value={item.id}
+                                        class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer flex-shrink-0 transition-colors"
+                                        title={selectedIds.includes(item.id) ? "Deselect" : "Select"}
+                                    />
+                                {/if}
                                 <div class="flex-1 min-w-0">
                                     <div
                                         class="text-sm font-bold text-gray-900 group-hover/assoc:text-blue-600 transition-colors truncate"
@@ -1523,4 +1564,17 @@
             </div>
         </Dialog.Content>
     </Dialog.Root>
+{/if}
+
+{#if deleteItemRemote}
+    <BulkActionToolbar
+        {selectedIds}
+        totalCount={displayedFilteredItems.length}
+        onSelectAll={() => (selectedIds = displayedFilteredItems.map((i: any) => i.id).filter(Boolean))}
+        onDeselectAll={() => (selectedIds = [])}
+        onDelete={handleBulkDelete}
+        deleteLabel={i18n.deleteForeverLabel || "Delete"}
+        selectAllLabel={`Select All (${displayedFilteredItems.length})`}
+        deselectAllLabel="Deselect All"
+    />
 {/if}

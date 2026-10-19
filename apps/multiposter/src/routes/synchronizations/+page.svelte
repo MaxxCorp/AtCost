@@ -33,8 +33,10 @@
 		RefreshCw,
 		Database,
 		Users,
-		MapPin
+		MapPin,
+		Check,
 	} from "@lucide/svelte";
+	import { BulkActionToolbar } from "@ac/ui";
 	import { checkMigrationStatus } from "./migration.remote";
 	import MigrationDialog from "#lib/components/sync/MigrationDialog.svelte";
 
@@ -44,6 +46,7 @@
 	import { hasAccess } from "#lib/authorization.js";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
+	import { SvelteSet } from "svelte/reactivity";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	const session = authClient.useSession();
@@ -249,30 +252,29 @@
 		initPageFromUrl,
 		syncPageToUrl,
 		recordActiveItem,
-		activeItemAnchor
+		activeItemAnchor,
+		LoadingSection,
+		ErrorSection,
 	} from "@ac/ui";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("createdAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
 	let filterValues = $state<FilterStateMap>({});
-	let page = $state(initPageFromUrl(pageState.url));
+	const page = $derived(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 
-	$effect(() => {
-		const urlP = initPageFromUrl(pageState.url);
-		if (urlP !== page) {
-			page = urlP;
-		}
-	});
-
-	$effect(() => {
-		syncPageToUrl("synchronizations", page, pageState.url, goto);
-	});
+	function setPage(newPage: number) {
+		syncPageToUrl("synchronizations", newPage, pageState.url, goto);
+	}
 
 	import { getSynchronizationFilterGroups } from "#lib/filters/index.js";
 
 	const filterGroups = $derived<FilterGroup[]>(getSynchronizationFilterGroups(m));
+
+	function savePrefs(sf: typeof sortField, so: typeof sortOrder, fv: FilterStateMap) {
+		setPreference("syncsFilters", JSON.stringify({ sortField: sf, sortOrder: so, filterValues: fv })).catch(console.error);
+	}
 
 	onMount(async () => {
 		try {
@@ -286,17 +288,6 @@
 		} catch (e) {
 			console.error("Failed to load preferences", e);
 		}
-	});
-
-	$effect(() => {
-		const prefsToSave = {
-			sortField,
-			sortOrder,
-			filterValues,
-		};
-		setPreference("syncsFilters", JSON.stringify(prefsToSave)).catch(
-			console.error,
-		);
 	});
 
 	const filterState = $derived({
@@ -353,12 +344,33 @@
 		}
 	}
 
+	let selectedIds = $state<string[]>([]);
+	const syncsQuery = $derived(list(filterState));
+	const syncsRes = $derived(syncsQuery.current);
+	const syncItems = $derived(syncsRes?.data ?? []);
+	const total = $derived(syncsRes?.total ?? 0);
+	const totalPages = $derived(Math.ceil(total / limit));
+
+	async function handleBulkDelete() {
+		if (selectedIds.length === 0) return;
+		const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.feature_synchronizations_title?.() || 'synchronizations'}` }) || `Delete ${selectedIds.length} synchronizations?`;
+		if (!window.confirm(confirmMsg)) return;
+		try {
+			await removeBulk(selectedIds);
+			toast.success(m.delete_successful?.() || 'Deleted successfully');
+			selectedIds = [];
+			await syncsQuery.refresh();
+		} catch (e: any) {
+			toast.error(e?.message || m.something_went_wrong?.() || 'Failed to delete');
+		}
+	}
+
 	async function deleteItem(config: Synchronization) {
 		if (!window.confirm(m.delete_confirm({ item: m.feature_synchronizations_title() }))) return;
 		try {
 			await removeBulk([config.id]);
 			toast.success(m.delete_successful());
-			list(filterState).refresh();
+			await syncsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
@@ -436,7 +448,7 @@
 					type="text"
 					placeholder={m.search_synchronizations()}
 					bind:value={searchQuery}
-					oninput={() => (page = 1)}
+					oninput={() => setPage(1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
@@ -445,7 +457,7 @@
 					groups={filterGroups}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
-					onchange={() => (page = 1)}
+					onchange={() => setPage(1)}
 				/>
 
 				<div
@@ -492,7 +504,7 @@
 						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
 					},
 				};
-				page = 1;
+				setPage(1);
 			}}
 			onclearall={() => {
 				const reset: FilterStateMap = {};
@@ -500,14 +512,18 @@
 					reset[g.id] = { include: [], exclude: [] };
 				}
 				filterValues = reset;
-				page = 1;
+				setPage(1);
 			}}
 		/>
 
 		<!-- List -->
-		{#await list(filterState) then res}
+		{#if syncsQuery.loading && !syncsRes}
+			<LoadingSection message={m.loading ? m.loading() : "Loading synchronizations..."} />
+		{:else if syncsQuery.error}
+			<ErrorSection headline="Error" message={syncsQuery.error.message || "Failed to load"} href="/synchronizations" />
+		{:else}
 			<div class="grid grid-cols-1 gap-5">
-				{#each res?.data || [] as config (config.id)}
+				{#each syncItems as config (config.id)}
 					{@const Icon = getProviderIcon(config.providerType)}
 					{@const statusColor = getStatusColor(
 						config.enabled,
@@ -516,40 +532,53 @@
 					<div
 						id="item-{config.id}"
 						use:activeItemAnchor={{ feature: "synchronizations", id: config.id }}
-						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border p-5 flex flex-col transition-all {selectedIds.includes(config.id)
+							? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md bg-blue-50/10 dark:bg-blue-950/20'
+							: 'border-gray-100 dark:border-gray-800 hover:shadow-md'}"
 					>
 						<div class="flex-1 mb-5">
 							<div class="flex items-start justify-between gap-4 mb-2">
-								<div class="flex-1 min-w-0">
-									<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
-										<div class="flex items-center gap-2 flex-wrap">
-											<a
-												href={`/synchronizations/${config.id}`}
-												onclick={() => recordActiveItem("synchronizations", config.id)}
-												class="hover:underline text-blue-600 flex items-center gap-2"
-											>
-												<Icon class="h-5 w-5 flex-shrink-0" />
-												{#if config.name}
-													{config.name}
-												{:else}
-													{getProviderLabel(config.providerType)}
+								<div class="flex items-start gap-3 flex-1 min-w-0">
+									{#if isAdmin}
+										<input
+											type="checkbox"
+											bind:group={selectedIds}
+											value={config.id}
+											class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer mt-1 flex-shrink-0 transition-colors"
+											title={selectedIds.includes(config.id) ? "Deselect" : "Select"}
+										/>
+									{/if}
+									<div class="flex-1 min-w-0">
+										<h3 class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors">
+											<div class="flex items-center gap-2 flex-wrap">
+												<a
+													href={`/synchronizations/${config.id}`}
+													onclick={() => recordActiveItem("synchronizations", config.id)}
+													class="hover:underline text-blue-600 flex items-center gap-2"
+												>
+													<Icon class="h-5 w-5 flex-shrink-0" />
+													{#if config.name}
+														{config.name}
+													{:else}
+														{getProviderLabel(config.providerType)}
+													{/if}
+												</a>
+												{#if (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
+													<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+														{m.default_badge ? m.default_badge() : "Default"}
+													</span>
 												{/if}
-											</a>
-											{#if (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
-												<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-													{m.default_badge ? m.default_badge() : "Default"}
+											</div>
+										</h3>
+										<p class="text-sm text-gray-500 break-all mt-1 flex items-center gap-1.5 flex-wrap">
+											{#if (config.settings as any)?.mailboxEmail}
+												<span class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300">
+													{(config.settings as any).mailboxEmail}
 												</span>
 											{/if}
-										</div>
-									</h3>
-									<p class="text-sm text-gray-500 break-all mt-1 flex items-center gap-1.5 flex-wrap">
-										{#if (config.settings as any)?.mailboxEmail}
-											<span class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300">
-												{(config.settings as any).mailboxEmail}
-											</span>
-										{/if}
-										<span>{config.providerId}</span>
-									</p>
+											<span>{config.providerId}</span>
+										</p>
+									</div>
 								</div>
 								<div class={statusColor}>
 									{#if config.enabled}
@@ -597,7 +626,7 @@
 											{#if campaignData?.campaigns.length === 0 && !campaignData.loading}
 												<p class="text-sm text-gray-500">{m.no_campaigns_sent()}</p>
 											{:else}
-												{#each campaignData?.campaigns || [] as campaign}
+												{#each campaignData?.campaigns || [] as campaign (campaign.id || campaign.eventSummary)}
 													<div class="border rounded-lg p-3 bg-gray-50">
 														<div class="flex items-center justify-between mb-2">
 															<h4 class="font-medium text-sm">{campaign.eventSummary}</h4>
@@ -607,7 +636,7 @@
 															</span>
 														</div>
 														<div class="space-y-1">
-															{#each campaign.events as event}
+															{#each campaign.events as event (`${event.recipientEmail}-${event.occurredAt}`)}
 																{@const EventIcon = getEventIcon(event.eventType)}
 																<div class="flex items-center gap-2 text-xs">
 																	<EventIcon class={`h-3 w-3 ${getEventColor(event.eventType)}`} />
@@ -725,17 +754,16 @@
 			</div>
 
 			<!-- Pagination -->
-			{#if res && res.total > limit}
-				{@const totalPages = Math.ceil(res.total / limit)}
+			{#if total > limit}
 				<div
 					class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
 				>
 					<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, res.total)} of {res.total}</span>
+						<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</span>
 						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 							<select
 								bind:value={limit}
-								onchange={() => (page = 1)}
+								onchange={() => setPage(1)}
 								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
 							>
 								<option value={10}>{m.items_per_page({ count: 10 })}</option>
@@ -750,7 +778,7 @@
 							variant="outline"
 							size="icon"
 							disabled={page === 1}
-							onclick={() => page = 1}
+							onclick={() => setPage(1)}
 							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 							title="First page"
 						>
@@ -760,7 +788,7 @@
 							variant="outline"
 							size="sm"
 							disabled={page === 1}
-							onclick={() => page > 1 && page--}
+							onclick={() => page > 1 && setPage(page - 1)}
 							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 						>
 							<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
@@ -770,10 +798,11 @@
 							class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
 						>
 							<select
-								bind:value={page}
+								value={page}
+								onchange={(e) => setPage(Number(e.currentTarget.value))}
 								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
 							>
-								{#each Array(totalPages) as _, i}
+								{#each Array(totalPages) as _, i (i)}
 									<option value={i + 1}>{i + 1}</option>
 								{/each}
 							</select>
@@ -783,7 +812,7 @@
 							variant="outline"
 							size="sm"
 							disabled={page === totalPages}
-							onclick={() => page < totalPages && page++}
+							onclick={() => page < totalPages && setPage(page + 1)}
 							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 						>
 							Next
@@ -793,7 +822,7 @@
 							variant="outline"
 							size="icon"
 							disabled={page === totalPages}
-							onclick={() => page = totalPages}
+							onclick={() => setPage(totalPages)}
 							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 							title="Last page"
 						>
@@ -802,6 +831,19 @@
 					</div>
 				</div>
 			{/if}
-		{/await}
+		{/if}
 	</div>
+
+	{#if isAdmin}
+		<BulkActionToolbar
+			{selectedIds}
+			totalCount={syncItems.length}
+			onSelectAll={() => (selectedIds = syncItems.map((c: any) => c.id))}
+			onDeselectAll={() => (selectedIds = [])}
+			onDelete={handleBulkDelete}
+			deleteLabel={m.delete ? m.delete() : "Delete"}
+			selectAllLabel={m.select_all ? m.select_all() : `Select All (${syncItems.length})`}
+			deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+		/>
+	{/if}
 </div>

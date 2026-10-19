@@ -1,6 +1,6 @@
 <script lang="ts">
     import * as m from "#lib/paraglide/messages.js";
-    import { listTimeOffRequests, requestTimeOff } from "./time-off.remote";
+    import { listTimeOffRequests, requestTimeOff, deleteTimeOffRequests } from "./time-off.remote";
     import { listTalents } from "../talents/list.remote";
     import { goto } from "$app/navigation";
     import { page as pageState } from "$app/state";
@@ -9,6 +9,7 @@
         AsyncButton,
         FilterMenu,
         ActiveFilterChips,
+        BulkActionToolbar,
         type FilterGroup,
         type FilterStateMap,
         initPageFromUrl,
@@ -18,7 +19,7 @@
         useFormValidationFeedback,
     } from "@ac/ui";
     import * as Dialog from "@ac/ui/components/dialog";
-    import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, HelpCircle } from "@lucide/svelte";
+    import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, HelpCircle, Check } from "@lucide/svelte";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { timeOffRequestSchema } from "@ac/validations";
     import { authClient } from "#lib/auth.js";
@@ -49,20 +50,13 @@
 
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(initPageFromUrl(pageState.url));
+    const page = $derived(initPageFromUrl(pageState.url));
     let limit = $state(50);
     let showQuickCreate = $state(false);
 
-    $effect(() => {
-        const urlPage = Number(pageState.url.searchParams.get("page") || "1");
-        if (urlPage !== page) {
-            page = urlPage;
-        }
-    });
-
-    $effect(() => {
-        syncPageToUrl("time-off", page, pageState.url, goto);
-    });
+    function setPage(newPage: number) {
+        syncPageToUrl("time-off", newPage, pageState.url, goto);
+    }
 
     const STATUS_OPTIONS = $derived([
         { id: "pending", label: m.status_pending ? m.status_pending() : "Pending" },
@@ -109,6 +103,25 @@
         type: (filterValues.type?.include?.length || filterValues.type?.exclude?.length) ? filterValues.type : undefined,
     });
 
+    const timeOffQuery = $derived(listTimeOffRequests(filterState));
+    const timeOffRes = $derived(timeOffQuery.current);
+    const timeOffItems = $derived(timeOffRes?.data ?? []);
+    let selectedIds = $state<string[]>([]);
+
+    async function handleBulkDelete() {
+        if (selectedIds.length === 0) return;
+        const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} requests` }) || `Delete ${selectedIds.length} requests?`;
+        if (!window.confirm(confirmMsg)) return;
+        try {
+            await deleteTimeOffRequests(selectedIds);
+            toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
+            selectedIds = [];
+            await timeOffQuery.refresh();
+        } catch (e: any) {
+            toast.error(e?.message || (m.something_went_wrong ? m.something_went_wrong() : "Failed to delete"));
+        }
+    }
+
     // TODO: implement actual cancel API if there's one. For now just toast a message.
     async function cancelRequest(req: TimeOffRequest) {
         toast.info("Cancel request not implemented natively yet");
@@ -143,7 +156,7 @@
                         type="text"
                         placeholder={m.search_requests ? m.search_requests() : "Search requests..."}
                         bind:value={searchQuery}
-                        oninput={() => (page = 1)}
+                        oninput={() => setPage(1)}
                         class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all bg-gray-50/50"
                     />
                 </div>
@@ -152,7 +165,7 @@
                         groups={filterGroups}
                         bind:filters={filterValues}
                         buttonLabel={m.filters ? m.filters() : "Filters"}
-                        onchange={() => (page = 1)}
+                        onchange={() => setPage(1)}
                     />
                 </div>
             </div>
@@ -172,7 +185,7 @@
                             exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
                         },
                     };
-                    page = 1;
+                    setPage(1);
                 }}
                 onclearall={() => {
                     const reset: FilterStateMap = {};
@@ -180,27 +193,35 @@
                         reset[g.id] = { include: [], exclude: [] };
                     }
                     filterValues = reset;
-                    page = 1;
+                    setPage(1);
                 }}
             />
 
             <!-- Main List -->
             <svelte:boundary>
-                {#if $effect.pending()}
+                {#if timeOffQuery.loading && !timeOffRes}
                     <div class="py-12 text-center text-gray-500">{m.loading ? m.loading() : "Loading..."}</div>
                 {/if}
-                <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+                <div class={[timeOffQuery.loading && "opacity-60 transition-opacity"]}>
                     <div class="grid grid-cols-1 gap-4">
-                        {#each (await listTimeOffRequests(filterState)).data || [] as req (req.id)}
+                        {#each timeOffItems as req (req.id)}
                             {@const status = statusMap[req.status] || { label: req.status, color: "text-gray-600 bg-gray-50 border-gray-100", icon: HelpCircle }}
                             {@const StatusIcon = status.icon}
                             <div
                                 id="item-{req.id}"
                                 use:activeItemAnchor={{ feature: "time-off", id: req.id }}
-                                class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-amber-200 transition-all hover:shadow-lg group flex flex-col justify-between"
+                                class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-amber-200 transition-all hover:shadow-lg group flex flex-col justify-between {selectedIds.includes(req.id) ? 'ring-2 ring-amber-500/50 border-amber-500 bg-amber-50/10' : ''}"
                             >
                                 <div class="flex flex-col sm:flex-row items-start justify-between gap-4">
-                                    <div class="flex items-start gap-4 flex-1">
+                                    <div class="flex items-start gap-3.5 flex-1">
+                                        <input
+                                            type="checkbox"
+                                            bind:group={selectedIds}
+                                            value={req.id}
+                                            class="mt-1 h-4.5 w-4.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer shrink-0 transition-colors"
+                                            title={selectedIds.includes(req.id) ? "Deselect" : "Select"}
+                                        />
+
                                         <div class="p-3 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl text-amber-600 border border-amber-200 shadow-sm shrink-0">
                                             <Plane size={24} />
                                         </div>
@@ -261,84 +282,94 @@
                     </div>
 
                     <!-- Pagination -->
-                    {#await listTimeOffRequests(filterState) then result}
-                        {#if result && result.total > limit}
-                            {@const totalPages = Math.ceil(result.total / limit)}
-                            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100">
-                                <div class="flex items-center gap-3 text-sm text-gray-500">
-                                    <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
-                                    <div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-                                        <select
-                                            bind:value={limit}
-                                            onchange={() => (page = 1)}
-                                            class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
-                                        >
-                                            <option value={10}>{m.items_per_page({ count: 10 })}</option>
-                                            <option value={20}>{m.items_per_page({ count: 20 })}</option>
-                                            <option value={50}>{m.items_per_page({ count: 50 })}</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1 sm:gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={page === 1}
-                                        onclick={() => page = 1}
-                                        class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                    {#if timeOffRes && timeOffRes.total > limit}
+                        {@const totalPages = Math.ceil(timeOffRes.total / limit)}
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100">
+                            <div class="flex items-center gap-3 text-sm text-gray-500">
+                                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, timeOffRes.total)} of {timeOffRes.total}</span>
+                                <div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                                    <select
+                                        bind:value={limit}
+                                        onchange={() => setPage(1)}
+                                        class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
                                     >
-                                        <ChevronsLeft size={16} />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page === 1}
-                                        onclick={() => page > 1 && page--}
-                                        class="h-9 px-3 border-gray-200 shrink-0"
-                                    >
-                                        <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-                                        Previous
-                                    </Button>
-                                    <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700">
-                                        <select
-                                            bind:value={page}
-                                            class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 rounded px-1 min-w-[2.5rem]"
-                                        >
-                                            {#each Array(totalPages) as _, i}
-                                                <option value={i + 1}>{i + 1}</option>
-                                            {/each}
-                                        </select>
-                                        <span class="text-gray-400">/ {totalPages}</span>
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page === totalPages}
-                                        onclick={() => page < totalPages && page++}
-                                        class="h-9 px-3 border-gray-200 shrink-0"
-                                    >
-                                        Next
-                                        <ArrowRight size={16} class="ml-1.5 hidden sm:block" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={page === totalPages}
-                                        onclick={() => page = totalPages}
-                                        class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-                                    >
-                                        <ChevronsRight size={16} />
-                                    </Button>
+                                        <option value={10}>{m.items_per_page({ count: 10 })}</option>
+                                        <option value={20}>{m.items_per_page({ count: 20 })}</option>
+                                        <option value={50}>{m.items_per_page({ count: 50 })}</option>
+                                    </select>
                                 </div>
                             </div>
-                        {/if}
-                    {/await}
+                            <div class="flex items-center gap-1 sm:gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={page === 1}
+                                    onclick={() => setPage(1)}
+                                    class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                                >
+                                    <ChevronsLeft size={16} />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page === 1}
+                                    onclick={() => page > 1 && setPage(page - 1)}
+                                    class="h-9 px-3 border-gray-200 shrink-0"
+                                >
+                                    <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+                                    Previous
+                                </Button>
+                                <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700">
+                                    <select
+                                        value={page}
+                                        onchange={(e) => setPage(Number((e.currentTarget as HTMLSelectElement).value))}
+                                        class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 rounded px-1 min-w-[2.5rem]"
+                                    >
+                                        {#each Array(totalPages) as _, i (i)}
+                                            <option value={i + 1}>{i + 1}</option>
+                                        {/each}
+                                    </select>
+                                    <span class="text-gray-400">/ {totalPages}</span>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page === totalPages}
+                                    onclick={() => page < totalPages && setPage(page + 1)}
+                                    class="h-9 px-3 border-gray-200 shrink-0"
+                                >
+                                    Next
+                                    <ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={page === totalPages}
+                                    onclick={() => setPage(totalPages)}
+                                    class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                                >
+                                    <ChevronsRight size={16} />
+                                </Button>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
                 {#snippet failed(error: unknown)}
                     <div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
                 {/snippet}
             </svelte:boundary>
         </div>
+
+        <BulkActionToolbar
+            {selectedIds}
+            totalCount={timeOffItems.length}
+            onSelectAll={() => (selectedIds = timeOffItems.map((r: any) => r.id))}
+            onDeselectAll={() => (selectedIds = [])}
+            onDelete={handleBulkDelete}
+            deleteLabel={m.delete ? m.delete() : "Delete"}
+            selectAllLabel={m.select_all ? m.select_all() : `Select All (${timeOffItems.length})`}
+            deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+        />
     </div>
 </div>
 

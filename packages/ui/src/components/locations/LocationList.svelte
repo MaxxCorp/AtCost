@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Button } from "../button/index.js";
+    import BulkActionToolbar from "../BulkActionToolbar.svelte";
     // @ts-ignore
     import FilterMenu from "../FilterMenu.svelte";
     // @ts-ignore
@@ -18,6 +19,7 @@
         ArrowRight,
         ChevronsLeft,
         ChevronsRight,
+        Check,
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
     import { onMount } from "svelte";
@@ -69,6 +71,8 @@
             next?: string;
             lastPage?: string;
             loading?: string;
+            selectAll?: string;
+            deselectAll?: string;
         };
     }
 
@@ -176,15 +180,29 @@
         },
         get city() {
             return m?.cities ? m.cities() : "City";
+        },
+        get selectAll() {
+            return labels?.selectAll ?? m?.select_all?.() ?? "Select All";
+        },
+        get deselectAll() {
+            return labels?.deselectAll ?? m?.deselect_all?.() ?? "Deselect All";
         }
     };
 
+    let selectedIds = $state<string[]>([]);
     let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
     let page = $state(typeof window !== "undefined" ? initPageFromUrl(new URL(window.location.href)) : 1);
     let limit = $state(50);
+
+    function setPage(newPage: number) {
+        page = newPage;
+        if (typeof window !== "undefined") {
+            syncPageToUrl("locations", newPage, window.location);
+        }
+    }
 
     onMount(() => {
         try {
@@ -217,12 +235,6 @@
             } catch (e) {
                 console.error("Failed to save preferences", e);
             }
-        }
-    });
-
-    $effect(() => {
-        if (typeof window !== "undefined") {
-            syncPageToUrl("locations", page, window.location);
         }
     });
 
@@ -276,6 +288,26 @@
                 await deleteLocationRemote([location.id]);
             }
             toast.success(i18n.deleteSuccessful);
+            if (typeof (query as any)?.refresh === 'function') {
+                await (query as any).refresh();
+            } else if (typeof (listLocationsRemote as any)?.refresh === 'function') {
+                await (listLocationsRemote as any)(filterState).refresh();
+            }
+        } catch (error: any) {
+            toast.error(error?.message || i18n.somethingWentWrong);
+        }
+    }
+
+    async function handleBulkDelete() {
+        if (selectedIds.length === 0) return;
+        const confirmMsg = labels?.deleteConfirm ?? (m?.delete_confirm ? m.delete_confirm({ item: `${selectedIds.length} ${i18n.title.toLowerCase()}` }) : `Delete ${selectedIds.length} locations?`);
+        if (!window.confirm(confirmMsg)) return;
+        try {
+            if (deleteLocationRemote) {
+                await deleteLocationRemote(selectedIds);
+            }
+            toast.success(i18n.deleteSuccessful);
+            selectedIds = [];
             if (typeof (query as any)?.refresh === 'function') {
                 await (query as any).refresh();
             } else if (typeof (listLocationsRemote as any)?.refresh === 'function') {
@@ -381,17 +413,24 @@
     {:else if queryError}
         <div class="py-12 text-center text-red-500">{queryError instanceof Error ? queryError.message : i18n.somethingWentWrong}</div>
     {:else}
-        <div class={[isLoading && "opacity-50 pointer-events-none transition-opacity duration-200"]}>
+        <div class={[isLoading && "opacity-60 transition-opacity duration-200"]}>
             <!-- List -->
             <div class="grid grid-cols-1 gap-5">
                 {#each items as location (location.id)}
                     <div
                         id="item-{location.id}"
                         use:activeItemAnchor={{ feature: 'locations', id: location.id }}
-                        class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+                        class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-all {selectedIds.includes(location.id) ? 'ring-2 ring-primary-500/50 border-primary-500 bg-primary-50/15 dark:bg-primary-950/20' : ''}"
                     >
                         <div class="flex-1 mb-5">
-                            <div class="flex items-start gap-4">
+                            <div class="flex items-start gap-3.5">
+                                <input
+                                    type="checkbox"
+                                    bind:group={selectedIds}
+                                    value={location.id}
+                                    class="mt-3.5 h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 cursor-pointer shrink-0 transition-colors"
+                                    title={selectedIds.includes(location.id) ? "Deselect" : "Select"}
+                                />
                                 <div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
                                     <MapPin size={24} />
                                 </div>
@@ -507,7 +546,7 @@
                             variant="outline"
                             size="icon"
                             disabled={page === 1}
-                            onclick={() => page = 1}
+                            onclick={() => setPage(1)}
                             class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
                             title={i18n.firstPage}
                         >
@@ -517,7 +556,7 @@
                             variant="outline"
                             size="sm"
                             disabled={page === 1}
-                            onclick={() => page > 1 && page--}
+                            onclick={() => page > 1 && setPage(page - 1)}
                             class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
                         >
                             <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
@@ -525,10 +564,11 @@
                         </Button>
                         <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
                             <select
-                                bind:value={page}
+                                value={page}
+                                onchange={(e) => setPage(Number((e.currentTarget as HTMLSelectElement).value))}
                                 class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
                             >
-                                {#each Array(totalPages) as _, i}
+                                {#each Array(totalPages) as _, i (i)}
                                     <option value={i + 1}>{i + 1}</option>
                                 {/each}
                             </select>
@@ -538,7 +578,7 @@
                             variant="outline"
                             size="sm"
                             disabled={page === totalPages}
-                            onclick={() => page < totalPages && page++}
+                            onclick={() => page < totalPages && setPage(page + 1)}
                             class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
                         >
                             {i18n.next}
@@ -548,7 +588,7 @@
                             variant="outline"
                             size="icon"
                             disabled={page === totalPages}
-                            onclick={() => page = totalPages}
+                            onclick={() => setPage(totalPages)}
                             class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
                             title={i18n.lastPage}
                         >
@@ -558,6 +598,16 @@
                 </div>
             {/if}
         </div>
+        <BulkActionToolbar
+            {selectedIds}
+            totalCount={items.length}
+            onSelectAll={() => (selectedIds = items.map((i: any) => i.id))}
+            onDeselectAll={() => (selectedIds = [])}
+            onDelete={deleteLocationRemote ? handleBulkDelete : undefined}
+            deleteLabel={i18n.delete}
+            selectAllLabel={i18n.selectAll}
+            deselectAllLabel={i18n.deselectAll}
+        />
     {/if}
     {#snippet failed(error: unknown)}
         <div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : i18n.somethingWentWrong}</div>

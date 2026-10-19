@@ -3,6 +3,7 @@
     import { listShiftplans } from "./list.remote";
     import { deleteShiftplans } from "./[id]/delete.remote";
     import ShiftScheduleMatrix from "#lib/components/shiftplans/ShiftScheduleMatrix.svelte";
+    import { SvelteSet } from "svelte/reactivity";
     import { goto } from "$app/navigation";
     import { page as pageState } from "$app/state";
     import {
@@ -10,6 +11,7 @@
         AsyncButton,
         FilterMenu,
         ActiveFilterChips,
+        BulkActionToolbar,
         type FilterGroup,
         type FilterStateMap,
         initPageFromUrl,
@@ -33,7 +35,8 @@
         ChevronsLeft,
         ChevronsRight,
         Layers,
-        CalendarDays
+        CalendarDays,
+        Check,
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
@@ -48,19 +51,12 @@
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(initPageFromUrl(pageState.url));
+    const page = $derived(initPageFromUrl(pageState.url));
     let limit = $state(50);
 
-    $effect(() => {
-        const urlPage = Number(pageState.url.searchParams.get("page") || "1");
-        if (urlPage !== page) {
-            page = urlPage;
-        }
-    });
-
-    $effect(() => {
-        syncPageToUrl("shiftplans", page, pageState.url, goto);
-    });
+    function setPage(newPage: number) {
+        syncPageToUrl("shiftplans", newPage, pageState.url, goto);
+    }
 
     const filterGroups = $derived<FilterGroup[]>([
         {
@@ -81,10 +77,25 @@
         sortOrder,
     });
 
-    // Reactive Remote Query per modern-svelte-only rules (NEVER use {#await})
     const shiftplansQuery = $derived(listShiftplans(filterState));
     const templatesList = $derived(shiftplansQuery.current?.data ?? []);
     const templatesTotal = $derived(shiftplansQuery.current?.total ?? 0);
+
+    let selectedIds = $state<string[]>([]);
+
+    async function handleBulkDelete() {
+        if (selectedIds.length === 0) return;
+        const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.shiftplans ? m.shiftplans() : 'shift plans'}` }) || `Delete ${selectedIds.length} shift plans?`;
+        if (!window.confirm(confirmMsg)) return;
+        try {
+            await deleteShiftplans(selectedIds);
+            toast.success(m.successfully_saved ? m.successfully_saved() : 'Deleted successfully');
+            selectedIds = [];
+            void shiftplansQuery.refresh();
+        } catch (e: any) {
+            toast.error(e?.message || (m.something_went_wrong ? m.something_went_wrong() : 'Failed to delete'));
+        }
+    }
 
     async function deleteItem(plan: Shiftplan) {
         if (!window.confirm(m.delete_confirm ? m.delete_confirm({ item: m.shiftplans ? m.shiftplans() : "Shift plan" }) : "Delete this shift plan?")) return;
@@ -175,7 +186,7 @@
                             type="text"
                             placeholder={m.search_shift_plans()}
                             bind:value={searchQuery}
-                            oninput={() => (page = 1)}
+                            oninput={() => setPage(1)}
                             class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all bg-gray-50/50"
                         />
                     </div>
@@ -184,7 +195,7 @@
                             groups={filterGroups}
                             bind:filters={filterValues}
                             buttonLabel={m.filters ? m.filters() : "Filters"}
-                            onchange={() => (page = 1)}
+                            onchange={() => setPage(1)}
                         />
                     </div>
                 </div>
@@ -204,7 +215,7 @@
                                 exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
                             },
                         };
-                        page = 1;
+                        setPage(1);
                     }}
                     onclearall={() => {
                         const reset: FilterStateMap = {};
@@ -212,7 +223,7 @@
                             reset[g.id] = { include: [], exclude: [] };
                         }
                         filterValues = reset;
-                        page = 1;
+                        setPage(1);
                     }}
                 />
 
@@ -229,10 +240,19 @@
                             <div
                                 id="item-{plan.id}"
                                 use:activeItemAnchor={{ feature: "shiftplans", id: plan.id }}
-                                class="p-6 rounded-2xl bg-white border border-gray-100 hover:border-purple-200 transition-all hover:shadow-lg group flex flex-col justify-between"
+                                class="p-6 rounded-2xl bg-white border transition-all hover:shadow-lg group flex flex-col justify-between {selectedIds.includes(plan.id)
+                                    ? 'border-purple-500 ring-2 ring-purple-500/20 shadow-md bg-purple-50/10'
+                                    : 'border-gray-100 hover:border-purple-200'}"
                             >
                                 <div class="flex items-start justify-between mb-4">
                                     <div class="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            bind:group={selectedIds}
+                                            value={plan.id}
+                                            class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500 cursor-pointer flex-shrink-0 transition-colors"
+                                            title={selectedIds.includes(plan.id) ? "Deselect" : "Select"}
+                                        />
                                         <div class="p-3 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 border border-purple-200 shadow-xs">
                                             <Calendar size={20} />
                                         </div>
@@ -312,7 +332,7 @@
                                 <div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
                                     <select
                                         bind:value={limit}
-                                        onchange={() => (page = 1)}
+                                        onchange={() => setPage(1)}
                                         class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
                                     >
                                         <option value={10}>10 per page</option>
@@ -326,7 +346,7 @@
                                     variant="outline"
                                     size="icon"
                                     disabled={page === 1}
-                                    onclick={() => page = 1}
+                                    onclick={() => setPage(1)}
                                     class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
                                 >
                                     <ChevronsLeft size={16} />
@@ -335,7 +355,7 @@
                                     variant="outline"
                                     size="sm"
                                     disabled={page === 1}
-                                    onclick={() => page > 1 && page--}
+                                    onclick={() => page > 1 && setPage(page - 1)}
                                     class="h-9 px-3 border-gray-200 shrink-0"
                                 >
                                     <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
@@ -343,7 +363,8 @@
                                 </Button>
                                 <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700">
                                     <select
-                                        bind:value={page}
+                                        value={page}
+                                        onchange={(e) => setPage(Number((e.currentTarget as HTMLSelectElement).value))}
                                         class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 rounded px-1 min-w-[2.5rem]"
                                     >
                                         {#each Array(totalPages) as _, i (i)}
@@ -356,7 +377,7 @@
                                     variant="outline"
                                     size="sm"
                                     disabled={page === totalPages}
-                                    onclick={() => page < totalPages && page++}
+                                    onclick={() => page < totalPages && setPage(page + 1)}
                                     class="h-9 px-3 border-gray-200 shrink-0"
                                 >
                                     Next
@@ -366,7 +387,7 @@
                                     variant="outline"
                                     size="icon"
                                     disabled={page === totalPages}
-                                    onclick={() => page = totalPages}
+                                    onclick={() => setPage(totalPages)}
                                     class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
                                 >
                                     <ChevronsRight size={16} />
@@ -376,6 +397,19 @@
                     {/if}
                 {/if}
             </div>
+        {/if}
+
+        {#if activeTab === "templates"}
+            <BulkActionToolbar
+                {selectedIds}
+                totalCount={templatesList.length}
+                onSelectAll={() => (selectedIds = templatesList.map((p: any) => p.id))}
+                onDeselectAll={() => (selectedIds = [])}
+                onDelete={handleBulkDelete}
+                deleteLabel={m.delete ? m.delete() : "Delete"}
+                selectAllLabel={m.select_all ? m.select_all() : `Select All (${templatesList.length})`}
+                deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+            />
         {/if}
     </div>
 </div>

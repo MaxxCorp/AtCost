@@ -1,28 +1,25 @@
 <script lang="ts">
 	import * as m from "#lib/paraglide/messages.js";
 	import { listAnnouncements } from "./list.remote";
-	import { listLocations } from "../locations/list.remote";
-	import { listTags } from "../tags/list.remote";
 	import { deleteAnnouncements } from "./[id]/delete.remote";
 
 	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
-	import { Button } from "@ac/ui/components/button";
+	import Button from "#lib/components/ui/button/button.svelte";
+	import { goto } from "$app/navigation";
+	import { page as pageState } from "$app/state";
 	import {
-		LoadingSection,
-		ErrorSection,
-		EmptyState,
 		FilterMenu,
 		ActiveFilterChips,
-		type FilterGroup,
-		type FilterStateMap,
 		initPageFromUrl,
 		syncPageToUrl,
 		recordActiveItem,
 		activeItemAnchor,
+		BulkActionToolbar,
+		type FilterGroup,
+		type FilterStateMap,
+		LoadingSection,
+		ErrorSection,
 	} from "@ac/ui";
-	import { goto } from "$app/navigation";
-	import { page as pageState } from "$app/state";
-	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import {
 		Megaphone,
 		Pencil,
@@ -33,40 +30,38 @@
 		Plus,
 		Search,
 		ChevronDown,
-		ChevronRight,
 		ArrowLeft,
 		ArrowRight,
 		ChevronsLeft,
 		ChevronsRight,
 		X,
 		MapPin,
-		Tag as TagIcon
+		Tag as TagIcon,
+		Check,
+		RefreshCw,
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
+	import { getAnnouncementFilterGroups } from "#lib/filters/index.js";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "title">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 	let filterValues = $state<FilterStateMap>({});
 
-	$effect(() => {
-		const urlPage = Number(pageState.url.searchParams.get("page") || "1");
-		if (urlPage !== page) {
-			page = urlPage;
-		}
-	});
+	const page = $derived(initPageFromUrl(pageState.url));
 
-	$effect(() => {
-		syncPageToUrl("announcements", page, pageState.url, goto);
-	});
-
-	import { getAnnouncementFilterGroups } from "#lib/filters/index.js";
+	function setPage(newPage: number) {
+		syncPageToUrl("announcements", newPage, pageState.url, goto);
+	}
 
 	const filterGroups = $derived<FilterGroup[]>(getAnnouncementFilterGroups(m));
+
+	function savePrefs(sf: typeof sortField, so: typeof sortOrder, fv: FilterStateMap) {
+		setPreference("announcementsFilters", JSON.stringify({ sortField: sf, sortOrder: so, filterValues: fv })).catch(console.error);
+	}
 
 	onMount(async () => {
 		try {
@@ -82,15 +77,6 @@
 		}
 	});
 
-	$effect(() => {
-		const prefsToSave = {
-			sortField,
-			sortOrder,
-			filterValues,
-		};
-		setPreference("announcementsFilters", JSON.stringify(prefsToSave)).catch(console.error);
-	});
-
 	const filterState = $derived({
 		page,
 		limit,
@@ -101,17 +87,37 @@
 		sortOrder,
 	});
 
+	let selectedIds = $state<string[]>([]);
+	const announcementsQuery = $derived(listAnnouncements(filterState));
+	const announcementsRes = $derived(announcementsQuery.current);
+	const announcementItems = $derived(announcementsRes?.data ?? []);
+	const total = $derived(announcementsRes?.total ?? 0);
+	const totalPages = $derived(Math.ceil(total / limit));
+
+	async function handleBulkDelete() {
+		if (selectedIds.length === 0) return;
+		const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.feature_announcements_title?.() || 'announcements'}` }) || `Delete ${selectedIds.length} announcements?`;
+		if (!window.confirm(confirmMsg)) return;
+		try {
+			await deleteAnnouncements(selectedIds);
+			toast.success(m.delete_successful?.() || 'Deleted successfully');
+			selectedIds = [];
+			await announcementsQuery.refresh();
+		} catch (e: any) {
+			toast.error(e?.message || m.something_went_wrong?.() || 'Failed to delete');
+		}
+	}
+
 	async function handleDelete(announcement: any) {
 		if (!window.confirm(m.delete_confirm({ item: "Announcement" }))) return;
 		try {
 			await deleteAnnouncements([announcement.id]);
 			toast.success(m.delete_successful());
-			listAnnouncements(filterState).refresh();
+			await announcementsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
 	}
-
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -122,7 +128,7 @@
 		<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
 			<div>
 				<h1 class="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tight">
-					{m.announcements()}
+					{m.feature_announcements_title()}
 				</h1>
 			</div>
 			<Button href="/announcements/new" class="w-full md:w-auto shadow-sm">
@@ -139,7 +145,7 @@
 					type="text"
 					placeholder={m.search_announcements()}
 					bind:value={searchQuery}
-					oninput={() => (page = 1)}
+					oninput={() => setPage(1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
@@ -148,21 +154,32 @@
 					groups={filterGroups}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
-					onchange={() => (page = 1)}
+					onchange={() => {
+						savePrefs(sortField, sortOrder, filterValues);
+						setPage(1);
+					}}
 				/>
 
 				<div class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1">
 					<select
 						bind:value={sortField}
+						onchange={() => {
+							savePrefs(sortField, sortOrder, filterValues);
+							setPage(1);
+						}}
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
 						<option value="updatedAt">{m.sort_last_updated()}</option>
 						<option value="createdAt">{m.sort_created_date()}</option>
-						<option value="title">{m.title()}</option>
+						<option value="title">{m.sort_title()}</option>
 					</select>
 					<button
-						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-						onclick={() => (sortOrder = sortOrder === "desc" ? "asc" : "desc")}
+						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+						onclick={() => {
+							sortOrder = sortOrder === "desc" ? "asc" : "desc";
+							savePrefs(sortField, sortOrder, filterValues);
+							setPage(1);
+						}}
 						title={sortOrder === "desc" ? m.descending() : m.ascending()}
 					>
 						<ChevronDown size={14} class="transition-transform duration-200 {sortOrder === 'asc' ? 'rotate-180' : ''}" />
@@ -186,7 +203,8 @@
 						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
 					},
 				};
-				page = 1;
+				savePrefs(sortField, sortOrder, filterValues);
+				setPage(1);
 			}}
 			onclearall={() => {
 				const reset: FilterStateMap = {};
@@ -194,190 +212,202 @@
 					reset[g.id] = { include: [], exclude: [] };
 				}
 				filterValues = reset;
-				page = 1;
+				savePrefs(sortField, sortOrder, filterValues);
+				setPage(1);
 			}}
 		/>
 
 		<!-- List -->
 		<div class="relative min-h-[200px]">
 			<svelte:boundary>
-				{#if $effect.pending()}
-					<div class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] rounded-xl">
-						<LoadingSection />
+				{#if announcementsQuery.loading && !announcementsRes}
+					<div class="py-12 text-center text-gray-500 flex items-center justify-center gap-2">
+						<RefreshCw size={18} class="animate-spin text-amber-600" />
+						<span>Loading...</span>
 					</div>
-				{/if}
-
-				<div class={["transition-opacity duration-200", $effect.pending() && "opacity-50 pointer-events-none"]}>
-					<div class="grid grid-cols-1 gap-5">
-						{#each (await listAnnouncements(filterState)).data || [] as announcement (announcement.id)}
-						<div
-							id="item-{announcement.id}"
-							use:activeItemAnchor={{ feature: "announcements", id: announcement.id }}
-							class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
-						>
-							<div class="flex-1 mb-5">
-								<div class="flex items-start gap-4">
-									<div class="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-										<Megaphone size={24} />
-									</div>
-									<div class="flex-1 min-w-0">
-										<a
-											href={`/announcements/${announcement.id}/view`}
-											class="block group mb-2"
-											onclick={() => recordActiveItem("announcements", announcement.id)}
-										>
-											<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-snug truncate transition-colors">
-												{announcement.title}
-											</h3>
-										</a>
-										
-										<div class="flex flex-col gap-1 mt-1">
-											{#if announcement.isPublic}
-												<div class="flex items-center gap-2">
-													<Earth size={14} class="text-green-500" />
-													<span class="text-xs text-green-600 font-medium">{m.public()}</span>
+				{:else if announcementsQuery.error}
+					<div class="py-12 text-center text-red-500">
+						{announcementsQuery.error instanceof Error ? announcementsQuery.error.message : "Failed to load."}
+					</div>
+				{:else if announcementItems.length === 0}
+					<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+						<Megaphone class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+						<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+							{m.no_items({ items: m.feature_announcements_title() })}
+						</h3>
+						<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+							Try adjusting your search or filters.
+						</p>
+					</div>
+				{:else}
+					<div class={[announcementsQuery.loading && "opacity-60 transition-opacity"]}>
+						<div class="grid grid-cols-1 gap-5">
+							{#each announcementItems as announcement (announcement.id)}
+								<div
+									id="item-{announcement.id}"
+									use:activeItemAnchor={{ feature: "announcements", id: announcement.id }}
+									class="bg-white dark:bg-gray-900 rounded-xl border p-5 flex flex-col transition-all {selectedIds.includes(announcement.id)
+										? 'border-amber-500 ring-2 ring-amber-500/20 shadow-md bg-amber-50/10 dark:bg-amber-950/20'
+										: 'border-gray-100 dark:border-gray-800 hover:shadow-md'}"
+								>
+									<div class="flex-1 mb-5">
+										<div class="flex items-start gap-3">
+											<input
+												type="checkbox"
+												bind:group={selectedIds}
+												value={announcement.id}
+												class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500 cursor-pointer shrink-0 transition-colors mt-3.5"
+												title={selectedIds.includes(announcement.id) ? "Deselect" : "Select"}
+											/>
+											<div class="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+												<Megaphone size={24} />
+											</div>
+											<div class="flex-1 min-w-0">
+												<a
+													href={`/announcements/${announcement.id}/view`}
+													class="block group mb-2"
+													onclick={() => recordActiveItem("announcements", announcement.id)}
+												>
+													<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-snug truncate transition-colors">
+														{announcement.title}
+													</h3>
+												</a>
+												
+												<div class="flex flex-col gap-1 mt-1">
+													{#if announcement.isPublic}
+														<div class="flex items-center gap-2">
+															<Earth size={14} class="text-green-500" />
+															<span class="text-xs text-green-600 font-medium">{m.public()}</span>
+														</div>
+													{:else}
+														<div class="flex items-center gap-2">
+															<span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{m.draft()}</span>
+														</div>
+													{/if}
 												</div>
-											{:else}
-												<div class="flex items-center gap-2">
-													<span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{m.draft()}</span>
-												</div>
-											{/if}
+											</div>
 										</div>
 									</div>
+
+									<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
+										<Button
+											variant="outline"
+											size="sm"
+											href={`/announcements/${announcement.id}`}
+											class="flex-1 sm:flex-none"
+											onclick={() => recordActiveItem("announcements", announcement.id)}
+										>
+											<Pencil class="w-4 h-4 mr-2" />
+											{m.edit()}
+										</Button>
+										<button
+											class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500 cursor-pointer"
+											onclick={() => handleDelete(announcement)}
+										>
+											<Trash2 class="w-4 h-4 mr-2" />
+											{m.delete()}
+										</button>
+									</div>
+									<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
+										{m.updated_on({
+											date: new Date(announcement.updatedAt).toLocaleString([], {
+												year: "numeric",
+												month: "2-digit",
+												day: "2-digit",
+												hour: "2-digit",
+												minute: "2-digit",
+											}),
+										})}
+										{#if announcement.user}
+											| <a
+												href="/users/{announcement.user.id}"
+												class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+												>{announcement.user.name ||
+													announcement.user.email ||
+													"User"}</a
+											>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+
+						<!-- Pagination -->
+						{#if totalPages > 1}
+							<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+								<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+									<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</span>
+									<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+										<select
+											bind:value={limit}
+											onchange={() => setPage(1)}
+											class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
+										>
+											<option value={10}>{m.items_per_page({ count: 10 })}</option>
+											<option value={20}>{m.items_per_page({ count: 20 })}</option>
+											<option value={50}>{m.items_per_page({ count: 50 })}</option>
+											<option value={100}>{m.items_per_page({ count: 100 })}</option>
+										</select>
+									</div>
+								</div>
+								<div class="flex items-center gap-1 sm:gap-2">
+									<Button
+										variant="outline"
+										size="icon"
+										disabled={page === 1}
+										onclick={() => setPage(1)}
+										class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+										title="First page"
+									>
+										<ChevronsLeft size={16} />
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={page === 1}
+										onclick={() => page > 1 && setPage(page - 1)}
+										class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+									>
+										<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+										Previous
+									</Button>
+									<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
+										<select
+											value={page}
+											onchange={(e) => setPage(Number(e.currentTarget.value))}
+											class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
+										>
+											{#each Array(totalPages) as _, i (i)}
+												<option value={i + 1}>{i + 1}</option>
+											{/each}
+										</select>
+										<span class="text-gray-400">/ {totalPages}</span>
+									</div>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={page === totalPages}
+										onclick={() => page < totalPages && setPage(page + 1)}
+										class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
+									>
+										Next
+										<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+									</Button>
+									<Button
+										variant="outline"
+										size="icon"
+										disabled={page === totalPages}
+										onclick={() => setPage(totalPages)}
+										class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+										title="Last page"
+									>
+										<ChevronsRight size={16} />
+									</Button>
 								</div>
 							</div>
-
-							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
-
-								<Button
-									variant="outline"
-									size="sm"
-									href={`/announcements/${announcement.id}`}
-									class="flex-1 sm:flex-none"
-									onclick={() => recordActiveItem("announcements", announcement.id)}
-								>
-									<Pencil class="w-4 h-4 mr-2" />
-									{m.edit()}
-								</Button>
-								<button
-									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-									onclick={() => handleDelete(announcement)}
-								>
-									<Trash2 class="w-4 h-4 mr-2" />
-									{m.delete()}
-								</button>
-							</div>
-							<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
-								{m.updated_on({
-									date: new Date(announcement.updatedAt).toLocaleString([], {
-										year: "numeric",
-										month: "2-digit",
-										day: "2-digit",
-										hour: "2-digit",
-										minute: "2-digit",
-									}),
-								})}
-								{#if announcement.user}
-									| <a
-										href="/users/{announcement.user.id}"
-										class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-									>{announcement.user.name || announcement.user.email || "User"}</a>
-								{/if}
-							</div>
-						</div>
-						{:else}
-							<div class="col-span-full">
-								<EmptyState 
-									icon={Megaphone}
-									title="No announcements found"
-									description="Get started by creating a new announcement"
-									actionLabel="Create Announcement"
-									actionHref="/announcements/new"
-								/>
-							</div>
-						{/each}
+						{/if}
 					</div>
-
-					<!-- Pagination -->
-					{#if ((await listAnnouncements(filterState)).total || 0) > limit}
-						{@const totalCount = ((await listAnnouncements(filterState)).total || 0)}
-						{@const totalPages = Math.ceil(totalCount / limit)}
-						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalCount)} of {totalCount}</span>
-								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-									<select
-										bind:value={limit}
-										onchange={() => (page = 1)}
-										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
-									>
-										<option value={10}>{m.items_per_page({ count: 10 })}</option>
-										<option value={20}>{m.items_per_page({ count: 20 })}</option>
-										<option value={50}>{m.items_per_page({ count: 50 })}</option>
-										<option value={100}>{m.items_per_page({ count: 100 })}</option>
-									</select>
-								</div>
-							</div>
-							<div class="flex items-center gap-1 sm:gap-2">
-								<Button
-									variant="outline"
-									size="icon"
-									disabled={page === 1}
-									onclick={() => page = 1}
-									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-									title="First page"
-								>
-									<ChevronsLeft size={16} />
-								</Button>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={page === 1}
-									onclick={() => page > 1 && page--}
-									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-								>
-									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-									Previous
-								</Button>
-								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
-									<select
-										bind:value={page}
-										class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
-									>
-										{#each Array(totalPages) as _, i}
-											<option value={i + 1}>{i + 1}</option>
-										{/each}
-									</select>
-									<span class="text-gray-400">/ {totalPages}</span>
-								</div>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={page === totalPages}
-									onclick={() => page < totalPages && page++}
-									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
-								>
-									Next
-									<ArrowRight size={16} class="ml-1.5 hidden sm:block" />
-								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									disabled={page === totalPages}
-									onclick={() => page = totalPages}
-									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-									title="Last page"
-								>
-									<ChevronsRight size={16} />
-								</Button>
-							</div>
-						</div>
-					{/if}
-				</div>
-
-				{#snippet pending()}
-					<LoadingSection />
-				{/snippet}
+				{/if}
 
 				{#snippet failed(error: any, reset: () => void)}
 					<ErrorSection {error} onRetry={reset} />
@@ -385,4 +415,17 @@
 			</svelte:boundary>
 		</div>
 	</div>
+
+	<BulkActionToolbar
+		{selectedIds}
+		totalCount={announcementItems.length}
+		onSelectAll={() => {
+			selectedIds = announcementItems.map((a: any) => a.id);
+		}}
+		onDeselectAll={() => (selectedIds = [])}
+		onDelete={handleBulkDelete}
+		deleteLabel={m.delete ? m.delete() : "Delete"}
+		selectAllLabel={m.select_all ? m.select_all() : `Select All (${announcementItems.length})`}
+		deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+	/>
 </div>

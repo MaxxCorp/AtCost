@@ -1,4 +1,4 @@
-import { query, form } from '$app/server';
+import { query, form, command } from '$app/server';
 import { 
     db, timeOffRequest, timeOffBalance, talent, 
     eq, and, desc, or, ilike, sql, inArray, notInArray
@@ -163,4 +163,13 @@ export const requestTimeOff = form(timeOffRequestSchema, async (data) => {
     }
 
     return { success: true, request: newRequest };
+});
+
+export const deleteTimeOffRequests = command(v.array(v.string()), async (ids) => {
+    ensureAccess(getAuthenticatedUser(), 'timesheets');
+    if (!ids || ids.length === 0) return { success: true };
+    await db.delete(timeOffRequest).where(inArray(timeOffRequest.id, ids));
+    void listTimeOffRequests().refresh();
+    void listTimeOffRequests({}).refresh();
+    return { success: true };
 });

@@ -1,3 +1,5 @@
+<script lang="ts">
+    import * as m from "#lib/paraglide/messages.js";
     import { page as pageState } from "$app/state";
     import { goto } from "$app/navigation";
     import {
@@ -5,6 +7,7 @@
         AsyncButton,
         FilterMenu,
         ActiveFilterChips,
+        BulkActionToolbar,
         initPageFromUrl,
         syncPageToUrl,
         recordActiveItem,
@@ -30,7 +33,8 @@
         ArrowRight,
         ChevronsLeft,
         ChevronsRight,
-        X
+        X,
+        Check
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
@@ -48,19 +52,12 @@
     let sortOrder = $state<"asc" | "desc">("desc");
     let searchQuery = $state("");
     let filterValues = $state<FilterStateMap>({});
-    let page = $state(initPageFromUrl(pageState.url));
+    const page = $derived(initPageFromUrl(pageState.url));
     let limit = $state(50);
 
-    $effect(() => {
-        const urlP = initPageFromUrl(pageState.url);
-        if (urlP !== page) {
-            page = urlP;
-        }
-    });
-
-    $effect(() => {
-        syncPageToUrl("users", page, pageState.url, goto);
-    });
+    function setPage(newPage: number) {
+        syncPageToUrl("users", newPage, pageState.url, goto);
+    }
 
     const ROLE_OPTIONS = $derived([
         { id: "admin", label: m.admin ? m.admin() : "Admin" },
@@ -87,12 +84,32 @@
         sortOrder,
     });
 
+    let selectedIds = $state<string[]>([]);
+    const usersQuery = $derived(listUsers(filterState));
+    const usersRes = $derived(usersQuery.current);
+    const userItems = $derived(usersRes?.data ?? []);
+
+    async function handleBulkDelete() {
+        if (selectedIds.length === 0) return;
+        const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.users ? m.users() : 'users'}` }) || `Delete ${selectedIds.length} users?`;
+        if (!window.confirm(confirmMsg)) return;
+        try {
+            await deleteUser(selectedIds);
+            toast.success(m.successfully_saved ? m.successfully_saved() : 'Deleted successfully');
+            selectedIds = [];
+            await usersQuery.refresh();
+        } catch (e: any) {
+            toast.error(e?.message || (m.something_went_wrong ? m.something_went_wrong() : 'Failed to delete'));
+        }
+    }
+
     async function deleteItem(user: User) {
         if (!window.confirm(m.delete_confirm ? m.delete_confirm({ item: m.role_user ? m.role_user() : "User" }) : "Delete this user?")) return;
         try {
             await deleteUser([user.id]);
             toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
-            listUsers(filterState).refresh();
+            selectedIds = selectedIds.filter(id => id !== user.id);
+            await usersQuery.refresh();
         } catch (error: any) {
             toast.error(error?.message || (m.something_went_wrong ? m.something_went_wrong() : "Something went wrong"));
         }
@@ -119,7 +136,7 @@
                         type="text"
                         placeholder={m.search_users()}
                         bind:value={searchQuery}
-                        oninput={() => (page = 1)}
+                        oninput={() => setPage(1)}
                         class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all bg-gray-50/50"
                     />
                 </div>
@@ -128,7 +145,7 @@
                         groups={filterGroups}
                         bind:filters={filterValues}
                         buttonLabel={m.filters ? m.filters() : "Filters"}
-                        onchange={() => (page = 1)}
+                        onchange={() => setPage(1)}
                     />
                 </div>
             </div>
@@ -148,7 +165,7 @@
                             exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
                         },
                     };
-                    page = 1;
+                    setPage(1);
                 }}
                 onclearall={() => {
                     const reset: FilterStateMap = {};
@@ -156,24 +173,34 @@
                         reset[g.id] = { include: [], exclude: [] };
                     }
                     filterValues = reset;
-                    page = 1;
+                    setPage(1);
                 }}
             />
 
             <!-- Main List -->
             <svelte:boundary>
-                {#if $effect.pending()}
+                {#if usersQuery.loading && !usersRes}
                     <div class="py-12 text-center text-gray-500">Loading...</div>
                 {/if}
-                <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+                <div class={[usersQuery.loading && "opacity-60 transition-opacity"]}>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {#each (await listUsers(filterState)).data || [] as user (user.id)}
+                        {#each userItems as user (user.id)}
                             <div
                                 id="item-{user.id}"
                                 use:activeItemAnchor={{ feature: "users", id: user.id }}
-                                class="group relative bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-300"
+                                class="group relative bg-white rounded-2xl p-6 border transition-all duration-300 {selectedIds.includes(user.id)
+                                    ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md bg-blue-50/10'
+                                    : 'border-gray-100 hover:shadow-xl hover:border-blue-200'}"
                             >
-                                <div class="flex flex-col sm:flex-row items-start gap-6">
+                                <div class="flex flex-col sm:flex-row items-start gap-4">
+                                    <input
+                                        type="checkbox"
+                                        bind:group={selectedIds}
+                                        value={user.id}
+                                        class="mt-1 h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0 transition-colors"
+                                        title={selectedIds.includes(user.id) ? "Deselect" : "Select"}
+                                    />
+
                                     <div class="flex items-center gap-4 shrink-0">
                                         <a
                                             href={`/users/${user.id}`}
@@ -254,84 +281,94 @@
                     </div>
 
                     <!-- Pagination -->
-                    {#await listUsers(filterState) then result}
-                        {#if result && result.total > limit}
-                            {@const totalPages = Math.ceil(result.total / limit)}
-                            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100">
-                                <div class="flex items-center gap-3 text-sm text-gray-500">
-                                    <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
-                                    <div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-                                        <select
-                                            bind:value={limit}
-                                            onchange={() => (page = 1)}
-                                            class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
-                                        >
-                                            <option value={10}>{m.items_per_page({ count: 10 })}</option>
-                                            <option value={20}>{m.items_per_page({ count: 20 })}</option>
-                                            <option value={50}>{m.items_per_page({ count: 50 })}</option>
-                                            <option value={100}>{m.items_per_page({ count: 100 })}</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1 sm:gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={page === 1}
-                                        onclick={() => page = 1}
-                                        class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                    {#if usersRes && usersRes.total > limit}
+                        {@const totalPages = Math.ceil(usersRes.total / limit)}
+                        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100">
+                            <div class="flex items-center gap-3 text-sm text-gray-500">
+                                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, usersRes.total)} of {usersRes.total}</span>
+                                <div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                                    <select
+                                        bind:value={limit}
+                                        onchange={() => setPage(1)}
+                                        class="text-xs bg-transparent border-gray-200 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
                                     >
-                                        <ChevronsLeft size={16} />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page === 1}
-                                        onclick={() => page > 1 && page--}
-                                        class="h-9 px-3 border-gray-200 shrink-0"
-                                    >
-                                        <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
-                                        Previous
-                                    </Button>
-                                    <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700">
-                                        <select
-                                            bind:value={page}
-                                            class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 rounded px-1 min-w-[2.5rem]"
-                                        >
-                                            {#each Array(totalPages) as _, i}
-                                                <option value={i + 1}>{i + 1}</option>
-                                            {/each}
-                                        </select>
-                                        <span class="text-gray-400">/ {totalPages}</span>
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page === totalPages}
-                                        onclick={() => page < totalPages && page++}
-                                        class="h-9 px-3 border-gray-200 shrink-0"
-                                    >
-                                        Next
-                                        <ArrowRight size={16} class="ml-1.5 hidden sm:block" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        disabled={page === totalPages}
-                                        onclick={() => page = totalPages}
-                                        class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
-                                    >
-                                        <ChevronsRight size={16} />
-                                    </Button>
+                                        <option value={10}>{m.items_per_page({ count: 10 })}</option>
+                                        <option value={20}>{m.items_per_page({ count: 20 })}</option>
+                                        <option value={50}>{m.items_per_page({ count: 50 })}</option>
+                                        <option value={100}>{m.items_per_page({ count: 100 })}</option>
+                                    </select>
                                 </div>
                             </div>
-                        {/if}
-                    {/await}
+                            <div class="flex items-center gap-1 sm:gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={page === 1}
+                                    onclick={() => setPage(1)}
+                                    class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                                >
+                                    <ChevronsLeft size={16} />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page === 1}
+                                    onclick={() => page > 1 && setPage(page - 1)}
+                                    class="h-9 px-3 border-gray-200 shrink-0"
+                                >
+                                    <ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
+                                    Previous
+                                </Button>
+                                <div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700">
+                                    <select
+                                        value={page}
+                                        onchange={(e) => setPage(Number((e.currentTarget as HTMLSelectElement).value))}
+                                        class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 rounded px-1 min-w-[2.5rem]"
+                                    >
+                                        {#each Array(totalPages) as _, i (i)}
+                                            <option value={i + 1}>{i + 1}</option>
+                                        {/each}
+                                    </select>
+                                    <span class="text-gray-400">/ {totalPages}</span>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page === totalPages}
+                                    onclick={() => page < totalPages && setPage(page + 1)}
+                                    class="h-9 px-3 border-gray-200 shrink-0"
+                                >
+                                    Next
+                                    <ArrowRight size={16} class="ml-1.5 hidden sm:block" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    disabled={page === totalPages}
+                                    onclick={() => setPage(totalPages)}
+                                    class="h-9 w-9 border-gray-200 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
+                                >
+                                    <ChevronsRight size={16} />
+                                </Button>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
                 {#snippet failed(error: unknown)}
                     <div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
                 {/snippet}
             </svelte:boundary>
         </div>
+
+        <BulkActionToolbar
+            {selectedIds}
+            totalCount={userItems.length}
+            onSelectAll={() => (selectedIds = userItems.map((u: any) => u.id))}
+            onDeselectAll={() => (selectedIds = [])}
+            onDelete={handleBulkDelete}
+            deleteLabel={m.delete ? m.delete() : "Delete"}
+            selectAllLabel={m.select_all ? m.select_all() : `Select All (${userItems.length})`}
+            deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+        />
     </div>
 </div>

@@ -12,6 +12,7 @@
 		syncPageToUrl,
 		recordActiveItem,
 		activeItemAnchor,
+		BulkActionToolbar,
 	} from "@ac/ui";
 	import {
 		Megaphone,
@@ -20,32 +21,27 @@
 		Plus,
 		Search,
 		ChevronDown,
-		ChevronRight,
 		ArrowLeft,
 		ArrowRight,
 		ChevronsLeft,
-		ChevronsRight
+		ChevronsRight,
+		Check,
+		RefreshCw,
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let page = $state(initPageFromUrl(pageState.url));
+	let isInitialized = $state(false);
+	const page = $derived(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 
-	$effect(() => {
-		const urlPage = Number(pageState.url.searchParams.get("page") || "1");
-		if (urlPage !== page) {
-			page = urlPage;
-		}
-	});
-
-	$effect(() => {
-		syncPageToUrl("campaigns", page, pageState.url, goto);
-	});
+	function setPage(newPage: number) {
+		syncPageToUrl("campaigns", newPage, pageState.url, goto);
+	}
 
 	onMount(async () => {
 		try {
@@ -57,36 +53,54 @@
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
+		} finally {
+			isInitialized = true;
 		}
 	});
 
-	$effect(() => {
-		const prefsToSave = {
-			sortField,
-			sortOrder,
-		};
-		setPreference("campaignsFilters", JSON.stringify(prefsToSave)).catch(console.error);
-	});
+	function saveSortPrefs(sf: typeof sortField, so: typeof sortOrder) {
+		setPreference("campaignsFilters", JSON.stringify({ sortField: sf, sortOrder: so })).catch(console.error);
+	}
 
 	const filterState = $derived({
 		page,
 		limit,
-		search: searchQuery,
+		search: searchQuery || undefined,
 		sortField,
 		sortOrder,
 	});
+
+	let selectedIds = $state<string[]>([]);
+	const campaignsQuery = $derived(listCampaigns(filterState));
+	const campaignsRes = $derived(campaignsQuery.current);
+	const campaignItems = $derived(campaignsRes?.data ?? []);
+	const total = $derived(campaignsRes?.total ?? 0);
+	const totalPages = $derived(Math.ceil(total / limit));
+
+	async function handleBulkDelete() {
+		if (selectedIds.length === 0) return;
+		const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.feature_campaigns_title?.() || 'campaigns'}` }) || `Delete ${selectedIds.length} campaigns?`;
+		if (!window.confirm(confirmMsg)) return;
+		try {
+			await deleteCampaigns(selectedIds);
+			toast.success(m.delete_successful?.() || 'Deleted successfully');
+			selectedIds = [];
+			await campaignsQuery.refresh();
+		} catch (e: any) {
+			toast.error(e?.message || m.something_went_wrong?.() || 'Failed to delete');
+		}
+	}
 
 	async function handleDelete(campaign: any) {
 		if (!window.confirm(m.delete_confirm({ item: "Campaign" }))) return;
 		try {
 			await deleteCampaigns([campaign.id]);
 			toast.success(m.delete_successful());
-			listCampaigns(filterState).refresh();
+			await campaignsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
 	}
-
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -114,7 +128,7 @@
 					type="text"
 					placeholder={m.search_campaigns()}
 					bind:value={searchQuery}
-					oninput={() => (page = 1)}
+					oninput={() => setPage(1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
@@ -122,6 +136,10 @@
 				<div class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1">
 					<select
 						bind:value={sortField}
+						onchange={() => {
+							saveSortPrefs(sortField, sortOrder);
+							setPage(1);
+						}}
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
 						<option value="updatedAt">{m.sort_last_updated()}</option>
@@ -129,8 +147,12 @@
 						<option value="name">{m.sort_name()}</option>
 					</select>
 					<button
-						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-						onclick={() => (sortOrder = sortOrder === "desc" ? "asc" : "desc")}
+						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+						onclick={() => {
+							sortOrder = sortOrder === "desc" ? "asc" : "desc";
+							saveSortPrefs(sortField, sortOrder);
+							setPage(1);
+						}}
 						title={sortOrder === "desc" ? m.descending() : m.ascending()}
 					>
 						<ChevronDown size={14} class="transition-transform duration-200 {sortOrder === 'asc' ? 'rotate-180' : ''}" />
@@ -140,101 +162,115 @@
 		</div>
 
 		<svelte:boundary>
-			{#if $effect.pending()}
-				<div class="py-12 text-center text-gray-500">Loading...</div>
-			{/if}
-			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-				<!-- List -->
-				<div class="grid grid-cols-1 gap-5">
-					{#each (await listCampaigns(filterState)).data || [] as campaign (campaign.id)}
-						<div
-							id="item-{campaign.id}"
-							use:activeItemAnchor={{ feature: "campaigns", id: campaign.id }}
-							class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
-						>
-							<div class="flex-1 mb-5">
-								<div class="flex items-start gap-4">
-									<div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
-										<Megaphone size={24} />
-									</div>
-									<div class="flex-1 min-w-0">
-										<a
-											href={`/campaigns/${campaign.id}`}
-											class="block group mb-1"
-											onclick={() => recordActiveItem("campaigns", campaign.id)}
-										>
-											<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug truncate transition-colors">
-												{campaign.name}
-											</h3>
-										</a>
+			{#if campaignsQuery.loading && !campaignsRes}
+				<div class="py-12 text-center text-gray-500 flex items-center justify-center gap-2">
+					<RefreshCw size={18} class="animate-spin text-primary-600" />
+					<span>Loading...</span>
+				</div>
+			{:else if campaignsQuery.error}
+				<div class="py-12 text-center text-red-500">
+					{campaignsQuery.error instanceof Error ? campaignsQuery.error.message : "Failed to load."}
+				</div>
+			{:else if campaignItems.length === 0}
+				<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+					<Megaphone class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+					<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+						{m.no_items({ items: m.feature_campaigns_title() })}
+					</h3>
+					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+						Try adjusting your search or filters.
+					</p>
+				</div>
+			{:else}
+				<div class={[campaignsQuery.loading && "opacity-60 transition-opacity"]}>
+					<!-- List -->
+					<div class="grid grid-cols-1 gap-5">
+						{#each campaignItems as campaign (campaign.id)}
+							<div
+								id="item-{campaign.id}"
+								use:activeItemAnchor={{ feature: "campaigns", id: campaign.id }}
+								class="bg-white dark:bg-gray-900 rounded-xl border p-5 flex flex-col transition-all {selectedIds.includes(campaign.id)
+									? 'border-primary-500 ring-2 ring-primary-500/20 shadow-md bg-primary-50/10 dark:bg-primary-950/20'
+									: 'border-gray-100 dark:border-gray-800 hover:shadow-md'}"
+							>
+								<div class="flex-1 mb-5">
+									<div class="flex items-start gap-3">
+										<input
+											type="checkbox"
+											bind:group={selectedIds}
+											value={campaign.id}
+											class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 cursor-pointer shrink-0 transition-colors mt-3.5"
+											title={selectedIds.includes(campaign.id) ? "Deselect" : "Select"}
+										/>
+										<div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
+											<Megaphone size={24} />
+										</div>
+										<div class="flex-1 min-w-0">
+											<a
+												href={`/campaigns/${campaign.id}`}
+												class="block group mb-1"
+												onclick={() => recordActiveItem("campaigns", campaign.id)}
+											>
+												<h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug truncate transition-colors">
+													{campaign.name}
+												</h3>
+											</a>
+										</div>
 									</div>
 								</div>
-							</div>
 
-							<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
-								<Button
-									variant="outline"
-									size="sm"
-									href={`/campaigns/${campaign.id}`}
-									class="flex-1 sm:flex-none"
-									onclick={() => recordActiveItem("campaigns", campaign.id)}
-								>
-									<Pencil class="w-4 h-4 mr-2" />
-									{m.edit()}
-								</Button>
-								<button
-									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-									onclick={() => handleDelete(campaign)}
-								>
-									<Trash2 class="w-4 h-4 mr-2" />
-									{m.delete()}
-								</button>
-							</div>
-							<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
-								{m.updated_on({
-									date: new Date(campaign.updatedAt).toLocaleString([], {
-										year: "numeric",
-										month: "2-digit",
-										day: "2-digit",
-										hour: "2-digit",
-										minute: "2-digit",
-									}),
-								})}
-								{#if campaign.user}
-									| <a
-										href="/users/{campaign.user.id}"
-										class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-										>{campaign.user.name ||
-											campaign.user.email ||
-											"User"}</a
+								<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto">
+									<Button
+										variant="outline"
+										size="sm"
+										href={`/campaigns/${campaign.id}`}
+										class="flex-1 sm:flex-none"
+										onclick={() => recordActiveItem("campaigns", campaign.id)}
 									>
-								{/if}
+										<Pencil class="w-4 h-4 mr-2" />
+										{m.edit()}
+									</Button>
+									<button
+										class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500 cursor-pointer"
+										onclick={() => handleDelete(campaign)}
+									>
+										<Trash2 class="w-4 h-4 mr-2" />
+										{m.delete()}
+									</button>
+								</div>
+								<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
+									{m.updated_on({
+										date: new Date(campaign.updatedAt).toLocaleString([], {
+											year: "numeric",
+											month: "2-digit",
+											day: "2-digit",
+											hour: "2-digit",
+											minute: "2-digit",
+										}),
+									})}
+									{#if campaign.user}
+										| <a
+											href="/users/{campaign.user.id}"
+											class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+											>{campaign.user.name ||
+												campaign.user.email ||
+												"User"}</a
+										>
+									{/if}
+								</div>
 							</div>
-						</div>
-						{:else}
-						<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-							<Megaphone class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-							<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-								{m.no_items({ items: m.feature_campaigns_title() })}
-							</h3>
-							<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-								Try adjusting your search or filters.
-							</p>
-						</div>
 						{/each}
 					</div>
 
 					<!-- Pagination -->
-					{#await listCampaigns(filterState) then result}
-					{#if result && result.total > limit}
-						{@const totalPages = Math.ceil(result.total / limit)}
+					{#if totalPages > 1}
 						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
 							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
+								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</span>
 								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 									<select
 										bind:value={limit}
-										onchange={() => (page = 1)}
+										onchange={() => setPage(1)}
 										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
 									>
 										<option value={10}>{m.items_per_page({ count: 10 })}</option>
@@ -249,7 +285,7 @@
 									variant="outline"
 									size="icon"
 									disabled={page === 1}
-									onclick={() => page = 1}
+									onclick={() => setPage(1)}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 									title="First page"
 								>
@@ -259,7 +295,7 @@
 									variant="outline"
 									size="sm"
 									disabled={page === 1}
-									onclick={() => page > 1 && page--}
+									onclick={() => page > 1 && setPage(page - 1)}
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
 									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
@@ -267,10 +303,11 @@
 								</Button>
 								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
 									<select
-										bind:value={page}
+										value={page}
+										onchange={(e) => setPage(Number(e.currentTarget.value))}
 										class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
 									>
-										{#each Array(totalPages) as _, i}
+										{#each Array(totalPages) as _, i (i)}
 											<option value={i + 1}>{i + 1}</option>
 										{/each}
 									</select>
@@ -280,7 +317,7 @@
 									variant="outline"
 									size="sm"
 									disabled={page === totalPages}
-									onclick={() => page < totalPages && page++}
+									onclick={() => page < totalPages && setPage(page + 1)}
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
 									Next
@@ -290,7 +327,7 @@
 									variant="outline"
 									size="icon"
 									disabled={page === totalPages}
-									onclick={() => page = totalPages}
+									onclick={() => setPage(totalPages)}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 									title="Last page"
 								>
@@ -299,11 +336,24 @@
 							</div>
 						</div>
 					{/if}
-					{/await}
 				</div>
+			{/if}
 			{#snippet failed(error: unknown)}
 				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
 			{/snippet}
 		</svelte:boundary>
 	</div>
+
+	<BulkActionToolbar
+		{selectedIds}
+		totalCount={campaignItems.length}
+		onSelectAll={() => {
+			selectedIds = campaignItems.map((c: any) => c.id);
+		}}
+		onDeselectAll={() => (selectedIds = [])}
+		onDelete={handleBulkDelete}
+		deleteLabel={m.delete ? m.delete() : "Delete"}
+		selectAllLabel={m.select_all ? m.select_all() : `Select All (${campaignItems.length})`}
+		deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+	/>
 </div>

@@ -76,3 +76,9 @@ export const updateEventSchema = v.object({
     id: v.pipe(v.string(), v.minLength(1)),
     seriesMode: v.optional(v.string()),
 });
+
+export const updateEventsStatusSchema = v.object({
+	ids: v.array(v.string()),
+	status: v.picklist(['confirmed', 'tentative', 'cancelled', 'draft']),
+	updateSeries: v.optional(v.boolean()),
+});

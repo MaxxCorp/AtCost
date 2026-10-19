@@ -25,7 +25,8 @@
 		ArrowRight,
 		ChevronsLeft,
 		ChevronsRight,
-		Tag as TagIcon
+		Tag as TagIcon,
+		Check,
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
@@ -36,6 +37,7 @@
 	import {
 		FilterMenu,
 		ActiveFilterChips,
+		BulkActionToolbar,
 		type FilterGroup,
 		type FilterStateMap,
 		initPageFromUrl,
@@ -47,24 +49,19 @@
 	let sortField = $state<"updatedAt" | "createdAt" | "displayName">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
-	let page = $state(initPageFromUrl(pageState.url));
+	const page = $derived(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 	let filterValues = $state<FilterStateMap>({});
 
-	$effect(() => {
-		const urlP = initPageFromUrl(pageState.url);
-		if (urlP !== page) {
-			page = urlP;
-		}
-	});
-
-	$effect(() => {
-		syncPageToUrl("contacts", page, pageState.url, goto);
-	});
+	function setPage(newPage: number) {
+		syncPageToUrl("contacts", newPage, pageState.url, goto);
+	}
 
 	import { getContactFilterGroups } from "#lib/filters/index.js";
 
 	const filterGroups = $derived<FilterGroup[]>(getContactFilterGroups(m));
+
+	let isInitialized = $state(false);
 
 	onMount(async () => {
 		try {
@@ -77,10 +74,13 @@
 			}
 		} catch (e) {
 			console.error("Failed to load preferences", e);
+		} finally {
+			isInitialized = true;
 		}
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		const prefsToSave = {
 			sortField,
 			sortOrder,
@@ -99,17 +99,35 @@
 		sortOrder,
 	});
 
+	let selectedIds = $state<string[]>([]);
+
+	const contactsQuery = $derived(listContacts(filterState));
+	const contactsRes = $derived(contactsQuery.current);
+	const contactItems = $derived(contactsRes?.data ?? []);
+
 	async function handleDelete(contact: any) {
 		if (!window.confirm(m.delete_confirm({ item: m.contact() }))) return;
 		try {
 			await deleteContact([contact.id]);
 			toast.success(m.delete_successful());
-			listContacts(filterState).refresh();
+			await contactsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
 	}
 
+	async function handleBulkDelete() {
+		if (selectedIds.length === 0) return;
+		if (!window.confirm(m.delete_confirm({ item: `${selectedIds.length} ${m.feature_contacts_title()}` }))) return;
+		try {
+			await deleteContact(selectedIds);
+			toast.success(m.delete_successful());
+			selectedIds = [];
+			await contactsQuery.refresh();
+		} catch (error: any) {
+			toast.error(error?.message || m.something_went_wrong());
+		}
+	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -136,7 +154,7 @@
 					type="text"
 					placeholder={m.search_contacts()}
 					bind:value={searchQuery}
-					oninput={() => (page = 1)}
+					oninput={() => setPage(1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
@@ -145,7 +163,7 @@
 					groups={filterGroups}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
-					onchange={() => (page = 1)}
+					onchange={() => setPage(1)}
 				/>
 
 				<div class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1">
@@ -183,7 +201,7 @@
 						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
 					},
 				};
-				page = 1;
+				setPage(1);
 			}}
 			onclearall={() => {
 				const reset: FilterStateMap = {};
@@ -191,25 +209,32 @@
 					reset[g.id] = { include: [], exclude: [] };
 				}
 				filterValues = reset;
-				page = 1;
+				setPage(1);
 			}}
 		/>
 
 		<svelte:boundary>
-			{#if $effect.pending()}
+			{#if contactsQuery.loading && !contactsRes}
 				<div class="py-12 text-center text-gray-500">Loading...</div>
 			{/if}
-			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+			<div class={[contactsQuery.loading && "opacity-60 transition-opacity"]}>
 				<!-- List -->
 				<div class="grid grid-cols-1 gap-5">
-					{#each (await listContacts(filterState)).data || [] as contact (contact.id)}
+					{#each contactItems as contact (contact.id)}
 						<div
 							id="item-{contact.id}"
 							use:activeItemAnchor={{ feature: "contacts", id: contact.id }}
-							class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
+							class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-all {selectedIds.includes(contact.id) ? 'ring-2 ring-primary-500/50 border-primary-500 bg-primary-50/15 dark:bg-primary-950/20' : ''}"
 						>
 							<div class="flex-1 mb-5">
-								<div class="flex items-start gap-4">
+								<div class="flex items-start gap-3.5">
+									<input
+										type="checkbox"
+										bind:group={selectedIds}
+										value={contact.id}
+										class="mt-3.5 h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 cursor-pointer shrink-0 transition-colors"
+										title={selectedIds.includes(contact.id) ? "Deselect" : "Select"}
+									/>
 									<div class="w-12 h-12 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
 										<User size={24} />
 									</div>
@@ -234,7 +259,7 @@
 												<div class="flex items-start gap-2">
 													<Mail size={16} class="text-gray-400 mt-1" />
 													<div class="flex flex-col">
-														{#each contact.emails as email}
+														{#each contact.emails as email (email.value || email.id || email)}
 															<span class="text-sm text-gray-700 dark:text-gray-300">
 																{email.value}
 																<span class="text-xs text-gray-400">({email.type})</span>
@@ -248,7 +273,7 @@
 												<div class="flex items-start gap-2">
 													<Phone size={16} class="text-gray-400 mt-1" />
 													<div class="flex flex-col">
-														{#each contact.phones as phone}
+														{#each contact.phones as phone (phone.value || phone.id || phone)}
 															<span class="text-sm text-gray-700 dark:text-gray-300">
 																{phone.value}
 																<span class="text-xs text-gray-400">({phone.type})</span>
@@ -263,7 +288,7 @@
 											<div class="flex items-start gap-2 mt-4">
 												<MapPin size={16} class="text-gray-400 mt-1 shrink-0" />
 												<div class="flex flex-col">
-													{#each contact.addresses as addr}
+													{#each contact.addresses as addr (addr.id || [addr.street, addr.city].join('-'))}
 														<span class="text-sm text-gray-700 dark:text-gray-300 break-words">
 															{[addr.street, addr.houseNumber, addr.zip, addr.city].filter(Boolean).join(" ")}
 														</span>
@@ -329,16 +354,15 @@
 					{/each}
 
 					<!-- Pagination -->
-					{#await listContacts(filterState) then res}
-					{#if res && res.total > limit}
-						{@const totalPages = Math.ceil(res.total / limit)}
+					{#if contactsRes && contactsRes.total > limit}
+						{@const totalPages = Math.ceil(contactsRes.total / limit)}
 						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
 							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-								<span>{m.showing_range({ from: (page - 1) * limit + 1, to: Math.min(page * limit, res.total), total: res.total })}</span>
+								<span>{m.showing_range({ from: (page - 1) * limit + 1, to: Math.min(page * limit, contactsRes.total), total: contactsRes.total })}</span>
 								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 									<select
 										bind:value={limit}
-										onchange={() => (page = 1)}
+										onchange={() => setPage(1)}
 										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
 									>
 										<option value={10}>{m.items_per_page({ count: 10 })}</option>
@@ -353,7 +377,7 @@
 									variant="outline"
 									size="icon"
 									disabled={page === 1}
-									onclick={() => page = 1}
+									onclick={() => setPage(1)}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 									title={m.first_page()}
 								>
@@ -363,7 +387,7 @@
 									variant="outline"
 									size="sm"
 									disabled={page === 1}
-									onclick={() => page > 1 && page--}
+									onclick={() => page > 1 && setPage(page - 1)}
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
 									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
@@ -371,10 +395,11 @@
 								</Button>
 								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
 									<select
-										bind:value={page}
+										value={page}
+										onchange={(e) => setPage(Number(e.currentTarget.value))}
 										class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
 									>
-										{#each Array(totalPages) as _, i}
+										{#each Array(totalPages) as _, i (i)}
 											<option value={i + 1}>{i + 1}</option>
 										{/each}
 									</select>
@@ -384,7 +409,7 @@
 									variant="outline"
 									size="sm"
 									disabled={page === totalPages}
-									onclick={() => page < totalPages && page++}
+									onclick={() => page < totalPages && setPage(page + 1)}
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
 									{m.next()}
@@ -394,7 +419,7 @@
 									variant="outline"
 									size="icon"
 									disabled={page === totalPages}
-									onclick={() => page = totalPages}
+									onclick={() => setPage(totalPages)}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 									title={m.last_page()}
 								>
@@ -403,13 +428,23 @@
 							</div>
 						</div>
 					{/if}
-					{/await}
 				</div>
 			</div>
 			{#snippet failed(error: unknown)}
 				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
 			{/snippet}
 		</svelte:boundary>
+
+		<BulkActionToolbar
+			{selectedIds}
+			totalCount={contactItems.length}
+			onSelectAll={() => (selectedIds = contactItems.map((c: any) => c.id))}
+			onDeselectAll={() => (selectedIds = [])}
+			onDelete={handleBulkDelete}
+			deleteLabel={m.delete()}
+			selectAllLabel={m.select_all()}
+			deselectAllLabel={m.deselect_all()}
+		/>
 	</div>
 </div>
 

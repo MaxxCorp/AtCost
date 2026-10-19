@@ -19,7 +19,8 @@
 		ArrowLeft,
 		ArrowRight,
 		ChevronsLeft,
-		ChevronsRight
+		ChevronsRight,
+		Check,
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
@@ -30,10 +31,13 @@
 	import {
 		FilterMenu,
 		ActiveFilterChips,
+		BulkActionToolbar,
 		initPageFromUrl,
 		syncPageToUrl,
 		recordActiveItem,
 		activeItemAnchor,
+		LoadingSection,
+		ErrorSection,
 		type FilterGroup,
 		type FilterStateMap
 	} from "@ac/ui";
@@ -42,23 +46,20 @@
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
 	let filterValues = $state<FilterStateMap>({});
-	let page = $state(initPageFromUrl(pageState.url));
+	const page = $derived(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 
-	$effect(() => {
-		const urlP = initPageFromUrl(pageState.url);
-		if (urlP !== page) {
-			page = urlP;
-		}
-	});
-
-	$effect(() => {
-		syncPageToUrl("users", page, pageState.url, goto);
-	});
+	function setPage(newPage: number) {
+		syncPageToUrl("users", newPage, pageState.url, goto);
+	}
 
 	import { getUserFilterGroups } from "#lib/filters/index.js";
 
 	const filterGroups = $derived<FilterGroup[]>(getUserFilterGroups(m));
+
+	function savePrefs(sf: typeof sortField, so: typeof sortOrder, fv: FilterStateMap) {
+		setPreference("usersFilters", JSON.stringify({ sortField: sf, sortOrder: so, filterValues: fv })).catch(console.error);
+	}
 
 	onMount(async () => {
 		try {
@@ -74,15 +75,6 @@
 		}
 	});
 
-	$effect(() => {
-		const prefsToSave = {
-			sortField,
-			sortOrder,
-			filterValues,
-		};
-		setPreference("usersFilters", JSON.stringify(prefsToSave)).catch(console.error);
-	});
-
 	const filterState = $derived({
 		page,
 		limit,
@@ -92,12 +84,33 @@
 		sortOrder,
 	});
 
+	let selectedIds = $state<string[]>([]);
+	const usersQuery = $derived(listUsers(filterState));
+	const usersRes = $derived(usersQuery.current);
+	const userItems = $derived(usersRes?.data ?? []);
+	const total = $derived(usersRes?.total ?? 0);
+	const totalPages = $derived(Math.ceil(total / limit));
+
+	async function handleBulkDelete() {
+		if (selectedIds.length === 0) return;
+		const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.user ? m.user() : 'users'}` }) || `Delete ${selectedIds.length} users?`;
+		if (!window.confirm(confirmMsg)) return;
+		try {
+			await deleteUser(selectedIds);
+			toast.success(m.delete_successful?.() || 'Deleted successfully');
+			selectedIds = [];
+			await usersQuery.refresh();
+		} catch (e: any) {
+			toast.error(e?.message || m.something_went_wrong?.() || 'Failed to delete');
+		}
+	}
+
 	async function handleDelete(user: any) {
 		if (!window.confirm(m.delete_confirm({ item: m.user ? m.user() : "User" }))) return;
 		try {
 			await deleteUser([user.id]);
 			toast.success(m.delete_successful());
-			await listUsers(filterState).refresh();
+			await usersQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
@@ -132,7 +145,7 @@
 					type="text"
 					placeholder={m.search_users()}
 					bind:value={searchQuery}
-					oninput={() => (page = 1)}
+					oninput={() => setPage(1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
@@ -141,12 +154,13 @@
 					groups={filterGroups}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
-					onchange={() => (page = 1)}
+					onchange={() => setPage(1)}
 				/>
 
 				<div class="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-1">
 					<select
 						bind:value={sortField}
+						onchange={() => savePrefs(sortField, sortOrder, filterValues)}
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
 						<option value="createdAt">{m.sort_joined_date()}</option>
@@ -155,7 +169,10 @@
 					</select>
 					<button
 						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-						onclick={() => (sortOrder = sortOrder === "desc" ? "asc" : "desc")}
+						onclick={() => {
+							sortOrder = sortOrder === "desc" ? "asc" : "desc";
+							savePrefs(sortField, sortOrder, filterValues);
+						}}
 						title={sortOrder === "desc" ? m.descending() : m.ascending()}
 					>
 						<ChevronDown size={14} class="transition-transform duration-200 {sortOrder === 'asc' ? 'rotate-180' : ''}" />
@@ -179,7 +196,7 @@
 						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
 					},
 				};
-				page = 1;
+				setPage(1);
 			}}
 			onclearall={() => {
 				const reset: FilterStateMap = {};
@@ -187,25 +204,37 @@
 					reset[g.id] = { include: [], exclude: [] };
 				}
 				filterValues = reset;
-				page = 1;
+				setPage(1);
 			}}
 		/>
 
-		<svelte:boundary>
-			{#if $effect.pending()}
-				<div class="py-12 text-center text-gray-500">Loading...</div>
-			{/if}
-			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-					<!-- List -->
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-						{#each (await listUsers(filterState)).data || [] as user (user.id)}
-						<div
-							id="item-{user.id}"
-							use:activeItemAnchor={{ feature: 'users', id: user.id }}
-							class="group relative bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 hover:shadow-xl hover:border-blue-200 transition-all duration-300"
-						>
-							<div class="flex flex-col sm:flex-row items-start gap-6">
-								<div class="flex items-center gap-4 shrink-0">
+		{#if usersQuery.loading && !usersRes}
+			<LoadingSection message={m.loading ? m.loading() : "Loading users..."} />
+		{:else if usersQuery.error}
+			<ErrorSection
+				headline="Error"
+				message={usersQuery.error.message || "Failed to load users"}
+				href="/users"
+			/>
+		{:else}
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+				{#each userItems as user (user.id)}
+					<div
+						id="item-{user.id}"
+						use:activeItemAnchor={{ feature: 'users', id: user.id }}
+						class="group relative bg-white dark:bg-gray-900 rounded-2xl p-6 border transition-all duration-300 {selectedIds.includes(user.id)
+							? 'border-blue-500 ring-2 ring-blue-500/20 shadow-xl bg-blue-50/10 dark:bg-blue-950/20'
+							: 'border-gray-100 dark:border-gray-800 hover:shadow-xl hover:border-blue-200'}"
+					>
+							<div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+								<div class="flex items-center gap-3 shrink-0">
+									<input
+										type="checkbox"
+										bind:group={selectedIds}
+										value={user.id}
+										class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 cursor-pointer mt-1 flex-shrink-0 transition-colors"
+										title={selectedIds.includes(user.id) ? "Deselect" : "Select"}
+									/>
 									<a
 										href={`/users/${user.id}`}
 										onclick={() => recordActiveItem("users", user.id)}
@@ -287,16 +316,14 @@
 					</div>
 
 					<!-- Pagination -->
-					{#await listUsers(filterState) then result}
-					{#if result && result.total > limit}
-						{@const totalPages = Math.ceil(result.total / limit)}
+					{#if total > limit}
 						<div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
 							<div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
+								<span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</span>
 								<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 									<select
 										bind:value={limit}
-										onchange={() => (page = 1)}
+										onchange={() => setPage(1)}
 										class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
 									>
 										<option value={10}>{m.items_per_page({ count: 10 })}</option>
@@ -311,7 +338,7 @@
 									variant="outline"
 									size="icon"
 									disabled={page === 1}
-									onclick={() => page = 1}
+									onclick={() => setPage(1)}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 									title="First page"
 								>
@@ -321,7 +348,7 @@
 									variant="outline"
 									size="sm"
 									disabled={page === 1}
-									onclick={() => page > 1 && page--}
+									onclick={() => page > 1 && setPage(page - 1)}
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
 									<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
@@ -329,10 +356,11 @@
 								</Button>
 								<div class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300">
 									<select
-										bind:value={page}
+										value={page}
+										onchange={(e) => setPage(Number(e.currentTarget.value))}
 										class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
 									>
-										{#each Array(totalPages) as _, i}
+										{#each Array(totalPages) as _, i (i)}
 											<option value={i + 1}>{i + 1}</option>
 										{/each}
 									</select>
@@ -342,7 +370,7 @@
 									variant="outline"
 									size="sm"
 									disabled={page === totalPages}
-									onclick={() => page < totalPages && page++}
+									onclick={() => page < totalPages && setPage(page + 1)}
 									class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 								>
 									Next
@@ -352,7 +380,7 @@
 									variant="outline"
 									size="icon"
 									disabled={page === totalPages}
-									onclick={() => page = totalPages}
+									onclick={() => setPage(totalPages)}
 									class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 									title="Last page"
 								>
@@ -361,12 +389,18 @@
 							</div>
 						</div>
 					{/if}
-					{/await}
-			</div>
-			{#snippet failed(error: unknown)}
-				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : "Failed to load."}</div>
-			{/snippet}
-		</svelte:boundary>
+				{/if}
+
+		<BulkActionToolbar
+			{selectedIds}
+			totalCount={userItems.length}
+			onSelectAll={() => (selectedIds = userItems.map((u: any) => u.id))}
+			onDeselectAll={() => (selectedIds = [])}
+			onDelete={handleBulkDelete}
+			deleteLabel={m.delete ? m.delete() : "Delete"}
+			selectAllLabel={m.select_all ? m.select_all() : `Select All (${userItems.length})`}
+			deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+		/>
 	</div>
 </div>
 

@@ -1,34 +1,31 @@
 <script lang="ts">
 	import { listKiosks } from "./list.remote";
-	import { listLocations } from "../locations/list.remote";
 	import { deleteKiosk } from "./[id]/delete.remote";
 	import * as m from "#lib/paraglide/messages.js";
 	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 	import Button from "#lib/components/ui/button/button.svelte";
 	import {
+		Monitor,
 		Pencil,
 		Trash2,
 		Plus,
-		MapPin,
-		Monitor,
-		ChevronDown,
-		Filter as FilterIcon,
 		Search,
+		ChevronDown,
 		ArrowLeft,
 		ArrowRight,
-		X,
-		Clock,
+		Check,
+		RefreshCw,
+		MapPin,
 	} from "@lucide/svelte";
-	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
-
 	import { goto } from "$app/navigation";
 	import { page as pageState } from "$app/state";
 	import {
 		FilterMenu,
 		ActiveFilterChips,
+		BulkActionToolbar,
 		type FilterGroup,
 		type FilterStateMap,
 		initPageFromUrl,
@@ -36,29 +33,26 @@
 		recordActiveItem,
 		activeItemAnchor,
 	} from "@ac/ui";
+	import { getKioskFilterGroups } from "#lib/filters/index.js";
 
 	// Filter state
 	let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
 	let searchQuery = $state("");
 	let filterValues = $state<FilterStateMap>({});
-	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 
-	$effect(() => {
-		const urlPage = Number(pageState.url.searchParams.get("page") || "1");
-		if (urlPage !== page) {
-			page = urlPage;
-		}
-	});
+	const page = $derived(initPageFromUrl(pageState.url));
 
-	$effect(() => {
-		syncPageToUrl("kiosks", page, pageState.url, goto);
-	});
-
-	import { getKioskFilterGroups } from "#lib/filters/index.js";
+	function setPage(newPage: number) {
+		syncPageToUrl("kiosks", newPage, pageState.url, goto);
+	}
 
 	const filterGroups = $derived<FilterGroup[]>(getKioskFilterGroups(m));
+
+	function savePrefs(sf: typeof sortField, so: typeof sortOrder, fv: FilterStateMap) {
+		setPreference("kiosksFilters", JSON.stringify({ sortField: sf, sortOrder: so, filterValues: fv })).catch(console.error);
+	}
 
 	onMount(async () => {
 		try {
@@ -74,17 +68,6 @@
 		}
 	});
 
-	$effect(() => {
-		const prefsToSave = {
-			sortField,
-			sortOrder,
-			filterValues,
-		};
-		setPreference("kiosksFilters", JSON.stringify(prefsToSave)).catch(
-			console.error,
-		);
-	});
-
 	const filterState = $derived({
 		page,
 		limit,
@@ -95,19 +78,42 @@
 		sortOrder,
 	});
 
-	async function handleDelete(kiosk: any) {
+	let selectedIds = $state<string[]>([]);
+	const query = $derived(listKiosks(filterState));
+	const res = $derived(query.current);
+	const kioskItems = $derived(res?.data ?? []);
+	const total = $derived(res?.total ?? 0);
+	const totalPages = $derived(Math.ceil(total / limit));
+
+	async function handleBulkDelete() {
+		if (selectedIds.length === 0) return;
+		const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.feature_kiosks_title?.() || 'kiosks'}` }) || `Delete ${selectedIds.length} kiosks?`;
+		if (!window.confirm(confirmMsg)) return;
 		try {
-			if (!window.confirm(m.delete_confirm({ item: m.kiosks() }))) return;
+			await deleteKiosk(selectedIds);
+			toast.success(m.delete_successful?.() || 'Deleted successfully');
+			selectedIds = [];
+			await query.refresh();
+		} catch (e: any) {
+			toast.error(e?.message || m.something_went_wrong?.() || 'Failed to delete');
+		}
+	}
+
+	async function handleDelete(kiosk: any) {
+		if (
+			!window.confirm(
+				m.delete_confirm({ item: kiosk.name }),
+			)
+		)
+			return;
+		try {
 			await deleteKiosk([kiosk.id]);
 			toast.success(m.delete_successful());
-			listKiosks(filterState).refresh();
+			await query.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
 	}
-
-	let query = $derived(listKiosks(filterState));
-	let res = $derived(query.current);
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -122,12 +128,12 @@
 				<h1
 					class="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tight"
 				>
-					{m.kiosks()}
+					{m.feature_kiosks_title()}
 				</h1>
 			</div>
 			<Button href="/kiosks/new" class="w-full md:w-auto shadow-sm">
 				<Plus class="w-4 h-4 mr-2" />
-				{m.create_item({ item: "Kiosk" })}
+				{m.new_kiosk()}
 			</Button>
 		</div>
 
@@ -142,7 +148,7 @@
 					type="text"
 					placeholder={m.search_kiosks()}
 					bind:value={searchQuery}
-					oninput={() => (page = 1)}
+					oninput={() => setPage(1)}
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
@@ -151,7 +157,10 @@
 					groups={filterGroups}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
-					onchange={() => (page = 1)}
+					onchange={() => {
+						savePrefs(sortField, sortOrder, filterValues);
+						setPage(1);
+					}}
 				/>
 
 				<div
@@ -159,6 +168,10 @@
 				>
 					<select
 						bind:value={sortField}
+						onchange={() => {
+							savePrefs(sortField, sortOrder, filterValues);
+							setPage(1);
+						}}
 						class="text-sm bg-transparent border-none focus:ring-0 py-2 pl-2 pr-6 cursor-pointer text-gray-700 dark:text-gray-300"
 					>
 						<option value="updatedAt">{m.sort_last_updated()}</option>
@@ -166,9 +179,12 @@
 						<option value="name">{m.sort_name()}</option>
 					</select>
 					<button
-						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-						onclick={() =>
-							(sortOrder = sortOrder === "desc" ? "asc" : "desc")}
+						class="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+						onclick={() => {
+							sortOrder = sortOrder === "desc" ? "asc" : "desc";
+							savePrefs(sortField, sortOrder, filterValues);
+							setPage(1);
+						}}
 						title={sortOrder === "desc"
 							? m.descending()
 							: m.ascending()}
@@ -200,7 +216,8 @@
 						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
 					},
 				};
-				page = 1;
+				savePrefs(sortField, sortOrder, filterValues);
+				setPage(1);
 			}}
 			onclearall={() => {
 				const reset: FilterStateMap = {};
@@ -208,184 +225,224 @@
 					reset[g.id] = { include: [], exclude: [] };
 				}
 				filterValues = reset;
-				page = 1;
+				savePrefs(sortField, sortOrder, filterValues);
+				setPage(1);
 			}}
 		/>
 
 		<svelte:boundary>
-			{#if $effect.pending()}
-				<div class="py-12 text-center text-gray-500">{m.loading()}</div>
-			{/if}
-			<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-				<div class="grid grid-cols-1 gap-5">
-					{#each (await listKiosks(filterState)).data || [] as kiosk (kiosk.id)}
-				<div
-					id="item-{kiosk.id}"
-					use:activeItemAnchor={{ feature: "kiosks", id: kiosk.id }}
-					class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow"
-				>
-					<div class="flex-1 mb-5">
-						<a
-							href="/kiosks/{kiosk.id}/view"
-							target="_blank"
-							class="block group mb-2"
-						>
+			{#if query.loading && !res}
+				<div class="py-12 text-center text-gray-500 flex items-center justify-center gap-2">
+					<RefreshCw size={18} class="animate-spin text-primary-600" />
+					<span>{m.loading()}</span>
+				</div>
+			{:else if query.error}
+				<div class="py-12 text-center text-red-500">
+					{query.error instanceof Error ? query.error.message : m.load_error()}
+				</div>
+			{:else if kioskItems.length === 0}
+				<div class="text-center py-12 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+					<Monitor class="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+					<h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+						{m.no_items({ items: m.feature_kiosks_title() })}
+					</h3>
+					<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+						Try adjusting your search or filters.
+					</p>
+				</div>
+			{:else}
+				<div class={[query.loading && "opacity-60 transition-opacity"]}>
+					<div class="grid grid-cols-1 gap-5">
+						{#each kioskItems as kiosk (kiosk.id)}
 							<div
-								class="flex items-start justify-between gap-4"
+								id="item-{kiosk.id}"
+								use:activeItemAnchor={{ feature: "kiosks", id: kiosk.id }}
+								class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border p-5 flex flex-col transition-all {selectedIds.includes(kiosk.id)
+									? 'border-primary-500 ring-2 ring-primary-500/20 shadow-md bg-primary-50/10 dark:bg-primary-950/20'
+									: 'border-gray-100 dark:border-gray-800 hover:shadow-md'}"
 							>
-								<h3
-									class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors flex items-center gap-2"
-								>
-									<Monitor class="w-5 h-5 text-gray-400" />
-									{kiosk.name}
-									{#if kiosk.uiMode === "folded_flyer"}
-										<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
-											{m.folded_flyer_badge()}
-										</span>
-									{:else if kiosk.uiMode === "flat_list"}
-										<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-											Flat List
-										</span>
+								<div class="flex-1 mb-5 flex items-start gap-3">
+									<input
+										type="checkbox"
+										bind:group={selectedIds}
+										value={kiosk.id}
+										class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 cursor-pointer mt-1 flex-shrink-0 transition-colors"
+										title={selectedIds.includes(kiosk.id) ? "Deselect" : "Select"}
+									/>
+									<div class="flex-1 min-w-0">
+										<a
+											href="/kiosks/{kiosk.id}/view"
+											target="_blank"
+											class="block group mb-2"
+										>
+										<div
+											class="flex items-start justify-between gap-4"
+										>
+											<h3
+												class="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 leading-snug line-clamp-2 transition-colors flex items-center gap-2"
+											>
+												<Monitor class="w-5 h-5 text-gray-400" />
+												{kiosk.name}
+												{#if kiosk.uiMode === "folded_flyer"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:purple-300">
+														{m.folded_flyer_badge()}
+													</span>
+												{:else if kiosk.uiMode === "flat_list"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+														Flat List
+													</span>
+												{/if}
+											</h3>
+										</div>
+									</a>
+
+									{#if kiosk.description}
+										<p
+											class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-3"
+										>
+											{kiosk.description}
+										</p>
 									{/if}
-								</h3>
+
+									{#if kiosk.locations && kiosk.locations.length > 0}
+										<div
+											class="flex items-center flex-wrap gap-2 text-sm text-gray-500 dark:text-gray-400 mt-2 mb-3"
+										>
+											{#each kiosk.locations as l, i (l.id || i)}
+												<div class="flex items-center bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-100 dark:border-gray-700">
+													<MapPin
+														class="w-3.5 h-3.5 mr-1.5 text-primary-500 shrink-0"
+													/>
+													<span class="truncate font-medium">{l.name}</span>
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
 							</div>
-						</a>
 
-						{#if kiosk.description}
-							<p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
-								{kiosk.description}
-							</p>
-						{/if}
-
-						{#if kiosk.locations && kiosk.locations.length > 0}
 							<div
-								class="flex items-center flex-wrap gap-2 text-sm text-gray-500 dark:text-gray-400 mt-2 mb-3"
+								class="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto"
 							>
-								{#each kiosk.locations as l, i (l.id || i)}
-									<div class="flex items-center bg-gray-50 dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-100 dark:border-gray-700">
-										<MapPin
-											class="w-3.5 h-3.5 mr-1.5 text-primary-500 shrink-0"
-										/>
-										<span class="truncate font-medium">{l.name}</span>
-									</div>
-								{/each}
+								<Button
+									variant="outline"
+									size="sm"
+									href="/kiosks/{kiosk.id}/view"
+									target="_blank"
+									class="flex-1 sm:flex-none"
+								>
+									{m.view()}
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									href="/kiosks/{kiosk.id}"
+									class="flex-1 sm:flex-none"
+									onclick={() => recordActiveItem("kiosks", kiosk.id)}
+								>
+									<Pencil class="w-4 h-4 mr-2" />
+									{m.edit()}
+								</Button>
+								<button
+									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500 cursor-pointer"
+									onclick={() => handleDelete(kiosk)}
+								>
+									<Trash2 class="w-4 h-4 mr-2" />
+									{m.delete()}
+								</button>
 							</div>
-						{/if}
-
-						<div class="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-sm bg-gray-50/50 dark:bg-gray-800/30 p-3 rounded-lg border border-gray-100/50 dark:border-gray-700/50">
-							<div class="flex items-center">
-								<Clock class="w-3.5 h-3.5 mr-1.5 text-gray-400" />
-								<span class="text-gray-500 dark:text-gray-400 mr-1.5">{m.loop_label()}:</span>
-								<span class="font-medium text-gray-900 dark:text-gray-200">{kiosk.loopDuration}s</span>
-							</div>
-							<div class="flex items-center">
-								<span class="text-gray-500 dark:text-gray-400 mr-1.5">{m.look_ahead_label()}:</span>
-								<span class="font-medium text-gray-900 dark:text-gray-200">{m.days_count({ count: Math.round(kiosk.lookAhead / 86400) })}</span>
-							</div>
-							<div class="flex items-center">
-								<span class="text-gray-500 dark:text-gray-400 mr-1.5">{m.look_past_label()}:</span>
-								<span class="font-medium text-gray-900 dark:text-gray-200">{m.days_count({ count: Math.round(kiosk.lookPast / 86400) })}</span>
+							
+							<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
+								{m.updated_on({
+									date: new Date(kiosk.updatedAt).toLocaleString([], {
+										year: "numeric",
+										month: "2-digit",
+										day: "2-digit",
+										hour: "2-digit",
+										minute: "2-digit",
+									}),
+								})}
+								{#if kiosk.user}
+									| <a
+										href="/users/{kiosk.user.id}"
+										class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+										>{kiosk.user.name ||
+											kiosk.user.email ||
+											"User"}</a
+									>
+								{/if}
 							</div>
 						</div>
-					</div>
-
-					<div
-						class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 w-full sm:w-auto"
-					>
-						<Button
-							variant="outline"
-							size="sm"
-							href="/kiosks/{kiosk.id}"
-							class="flex-1 sm:flex-none"
-							onclick={() => recordActiveItem("kiosks", kiosk.id)}
-						>
-							<Pencil class="w-4 h-4 mr-2" />
-							{m.edit()}
-						</Button>
-						<button
-							class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-							onclick={() => handleDelete(kiosk)}
-						>
-							<Trash2 class="w-4 h-4 mr-2" />
-							{m.delete()}
-						</button>
-					</div>
-					
-					<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
-						{m.updated_on({
-							date: new Date(kiosk.updatedAt).toLocaleString([], {
-								year: "numeric",
-								month: "2-digit",
-								day: "2-digit",
-								hour: "2-digit",
-								minute: "2-digit",
-							}),
-						})}
-						{#if kiosk.user}
-							| <a
-								href="/users/{kiosk.user.id}"
-								class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-								>{kiosk.user.name ||
-									kiosk.user.email ||
-									"User"}</a
-							>
-						{/if}
-					</div>
-				</div>
 					{/each}
 				</div>
 
 				<!-- Pagination -->
-				{#await listKiosks(filterState) then result}
-				{#if result && result.total > limit}
-					{@const totalPages = Math.ceil(result.total / limit)}
-				<div
-					class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
-				>
-					<div class="text-sm text-gray-500 dark:text-gray-400">
-						{m.showing_range({
-							from: (page - 1) * limit + 1,
-							to: Math.min(page * limit, result.total),
-							total: result.total
-						})}
-					</div>
-					<div class="flex items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === 1}
-							onclick={() => page > 1 && page--}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700"
-						>
-							<ArrowLeft size={16} class="mr-1.5" />
-							{m.previous()}
-						</Button>
-						<div
-							class="flex items-center gap-1 px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
-						>
-							{page} / {totalPages}
+				{#if totalPages > 1}
+					<div
+						class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-gray-800"
+					>
+						<div class="text-sm text-gray-500 dark:text-gray-400">
+							{m.showing_range({
+								from: (page - 1) * limit + 1,
+								to: Math.min(page * limit, total),
+								total: total
+							})}
 						</div>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={page === totalPages}
-							onclick={() => page < totalPages && page++}
-							class="h-9 px-3 border-gray-200 dark:border-gray-700"
-						>
-							{m.next()}
-							<ArrowRight size={16} class="ml-1.5" />
-						</Button>
+						<div class="flex items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={page === 1}
+								onclick={() => page > 1 && setPage(page - 1)}
+								class="h-9 px-3 border-gray-200 dark:border-gray-700"
+							>
+								<ArrowLeft size={16} class="mr-1.5" />
+								{m.previous()}
+							</Button>
+							<div
+								class="flex items-center gap-1 px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
+							>
+								<select
+									value={page}
+									onchange={(e) => setPage(Number(e.currentTarget.value))}
+									class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
+								>
+									{#each Array(totalPages) as _, i (i)}
+										<option value={i + 1}>{i + 1}</option>
+									{/each}
+								</select>
+								<span class="text-gray-400">/ {totalPages}</span>
+							</div>
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={page === totalPages}
+								onclick={() => page < totalPages && setPage(page + 1)}
+								class="h-9 px-3 border-gray-200 dark:border-gray-700"
+							>
+								{m.next()}
+								<ArrowRight size={16} class="ml-1.5" />
+							</Button>
+						</div>
 					</div>
-				</div>
 				{/if}
-				{/await}
 			</div>
+			{/if}
 
 			{#snippet failed(error: unknown)}
 				<div class="py-12 text-center text-red-500">{error instanceof Error ? error.message : m.load_error()}</div>
 			{/snippet}
 		</svelte:boundary>
 	</div>
+
+	<BulkActionToolbar
+		{selectedIds}
+		totalCount={kioskItems.length}
+		onSelectAll={() => (selectedIds = kioskItems.map((k: any) => k.id))}
+		onDeselectAll={() => (selectedIds = [])}
+		onDelete={handleBulkDelete}
+		deleteLabel={m.delete ? m.delete() : "Delete"}
+		selectAllLabel={m.select_all ? m.select_all() : `Select All (${kioskItems.length})`}
+		deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+	/>
 </div>
-
-

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { listEvents } from "./list.remote";
+	import { updateEventsStatus } from "./status.remote";
 	import { checkSeriesMigrationStatus } from "./series-migration.remote";
 	import { listTags } from "../tags/list.remote";
 	import { listLocations } from "../locations/list.remote";
@@ -28,11 +29,12 @@
 		X,
 		RefreshCw,
 		Tag as TagIcon,
+		Check,
 	} from "@lucide/svelte";
 	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import { toast } from "svelte-sonner";
 	import { onMount, untrack } from "svelte";
-	import { SvelteDate, SvelteSet } from "svelte/reactivity";
+	import { SvelteDate } from "svelte/reactivity";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 	import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
 	import { getEventRooms } from "#lib/utils/format-rooms.js";
@@ -89,6 +91,7 @@
 	import {
 		FilterMenu,
 		ActiveFilterChips,
+		BulkActionToolbar,
 		initPageFromUrl,
 		syncPageToUrl,
 		recordActiveItem,
@@ -120,13 +123,19 @@
 	let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 	let isInitialized = $state(false);
 
+	const page = $derived(initPageFromUrl(pageState.url));
+
+	function setPage(newPage: number) {
+		syncPageToUrl("events", newPage, pageState.url, goto);
+	}
+
 	function handleSearchInput(e: Event) {
 		const val = (e.currentTarget as HTMLInputElement).value;
 		searchInput = val;
 		clearTimeout(searchDebounceTimer);
 		searchDebounceTimer = setTimeout(() => {
 			searchQuery = val;
-			page = 1;
+			setPage(1);
 		}, 300);
 	}
 
@@ -134,20 +143,8 @@
 	let excludePast = $state(false);
 	let excludeSeries = $state(false);
 	let onlySeries = $state(false);
-	let page = $state(initPageFromUrl(pageState.url));
 	let limit = $state(50);
 	let showMigrationDialog = $state(false);
-
-	$effect(() => {
-		const urlP = initPageFromUrl(pageState.url);
-		if (urlP !== page) {
-			page = urlP;
-		}
-	});
-
-	$effect(() => {
-		syncPageToUrl("events", page, pageState.url, goto);
-	});
 
 	let displayMode = $state<DisplayMode>("compacted");
 	let displayModeOverrides = $state<Record<string, DisplayMode>>({});
@@ -174,7 +171,7 @@
 		} else if (newMode === "unrolled" && sortField === "startDateTime") {
 			sortOrder = "asc";
 		}
-		page = 1;
+		setPage(1);
 	}
 
 	function handleSortFieldChange(newSortField: "updatedAt" | "startDateTime" | "createdAt") {
@@ -187,7 +184,7 @@
 		} else {
 			setDisplayMode("compacted", false);
 		}
-		page = 1;
+		setPage(1);
 	}
 
 	const radioGroups = $derived<RadioFilterGroup[]>([
@@ -226,7 +223,7 @@
 			checked: excludePast,
 			onchange: (val: boolean) => {
 				excludePast = val;
-				page = 1;
+				setPage(1);
 			},
 		},
 		{
@@ -236,7 +233,7 @@
 			onchange: (val: boolean) => {
 				excludeSeries = val;
 				if (excludeSeries) onlySeries = false;
-				page = 1;
+				setPage(1);
 			},
 		},
 		{
@@ -246,7 +243,7 @@
 			onchange: (val: boolean) => {
 				onlySeries = val;
 				if (onlySeries) excludeSeries = false;
-				page = 1;
+				setPage(1);
 			},
 		},
 	]);
@@ -296,6 +293,7 @@
 	});
 
 	$effect(() => {
+		if (!isInitialized) return;
 		// Capture reactive dependencies to track
 		const currentMode = displayMode;
 		const currentFilterValues = filterValues;
@@ -375,7 +373,7 @@
 				const rawChildInstances = rawEvents
 					.filter((e: any) => e.recurringEventId === master.id);
 				const combined = [...existingInstances];
-				const existingIds = new SvelteSet(combined.map((i: any) => i.id));
+				const existingIds = new Set(combined.map((i: any) => i.id));
 				for (const child of rawChildInstances) {
 					if (!existingIds.has(child.id)) {
 						combined.push(child);
@@ -410,7 +408,7 @@
 	function unrollEvents(rawEvents: any[], isExcludePast: boolean) {
 		const grouped = groupEvents(rawEvents);
 		const unrolled: any[] = [];
-		const now = new SvelteDate();
+		const now = new Date();
 		now.setHours(0, 0, 0, 0);
 
 		for (const master of grouped) {
@@ -468,6 +466,89 @@
 		});
 
 		return unrolled;
+	}
+
+	let selectedIds = $state<string[]>([]);
+	let isBulkUpdatingStatus = $state(false);
+
+	const eventsQuery = $derived(listEvents(filterState));
+	const eventsRes = $derived(eventsQuery.current);
+	const rawEvents = $derived(eventsRes?.data ?? []);
+	const displayedEvents = $derived(
+		displayMode === "unrolled"
+			? unrollEvents(rawEvents, excludePast)
+			: groupEvents(rawEvents),
+	);
+
+	const selectedEvents = $derived(
+		displayedEvents.filter((e: any) => selectedIds.includes(e.id)),
+	);
+	const selectedCount = $derived(selectedIds.length);
+
+	const selectedSeriesCount = $derived(
+		selectedEvents.filter((e: any) => isSeriesEvent(e) && !e.isSeriesInstance).length,
+	);
+	const selectedOccurrencesCount = $derived(
+		selectedEvents.reduce((acc: number, e: any) => acc + (e.instances?.length || 1), 0),
+	);
+	const extraInfo = $derived(
+		selectedSeriesCount > 0
+			? displayMode === "compacted"
+				? `${selectedSeriesCount} series (${selectedOccurrencesCount} occurrences)`
+				: undefined
+			: undefined,
+	);
+
+	function selectAllEvents() {
+		selectedIds = displayedEvents.map((e: any) => e.id);
+	}
+
+	function deselectAllEvents() {
+		selectedIds = [];
+	}
+
+	async function handleBulkStatusChange(newStatus: 'confirmed' | 'tentative' | 'cancelled' | 'draft') {
+		if (selectedIds.length === 0) return;
+		isBulkUpdatingStatus = true;
+		try {
+			await updateEventsStatus({
+				ids: selectedIds,
+				status: newStatus,
+				updateSeries: displayMode === 'compacted',
+			});
+			toast.success(m.successfully_saved ? m.successfully_saved() : "Status updated successfully");
+			selectedIds = [];
+			await eventsQuery.refresh();
+		} catch (error: any) {
+			toast.error(error?.message || m.something_went_wrong());
+		} finally {
+			isBulkUpdatingStatus = false;
+		}
+	}
+
+	async function handleBulkDelete() {
+		if (selectedIds.length === 0) return;
+		const isCompacted = displayMode === "compacted";
+		const seriesCount = selectedSeriesCount;
+
+		const confirmMsg =
+			seriesCount > 0 && isCompacted
+				? `${m.delete_confirm({ item: `${selectedIds.length} events` })}\n\n${m.delete_series_confirm()}`
+				: m.delete_confirm({ item: `${selectedIds.length} events` });
+
+		if (!window.confirm(confirmMsg)) return;
+
+		try {
+			await deleteEvents({
+				ids: selectedIds,
+				deleteSeries: isCompacted,
+			});
+			toast.success(m.delete_successful());
+			selectedIds = [];
+			await eventsQuery.refresh();
+		} catch (error: any) {
+			toast.error(error?.message || m.something_went_wrong());
+		}
 	}
 </script>
 
@@ -561,7 +642,7 @@
 					radioGroups={radioGroups}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
-					onchange={() => (page = 1)}
+					onchange={() => setPage(1)}
 				/>
 
 				<div
@@ -612,7 +693,7 @@
 						exclude: type === "exclude" ? current.exclude.filter((id) => id !== optId) : current.exclude,
 					},
 				};
-				page = 1;
+				setPage(1);
 			}}
 			onclearall={() => {
 				const reset: FilterStateMap = {};
@@ -625,22 +706,20 @@
 				onlySeries = false;
 				searchInput = "";
 				searchQuery = "";
-				page = 1;
+				setPage(1);
 			}}
 		/>
 
 		{#if isInitialized}
 			<svelte:boundary>
-				{@const eventsRes = await listEvents(filterState)}
-				{@const displayedEvents = displayMode === "unrolled" ? unrollEvents(eventsRes?.data || [], excludePast) : groupEvents(eventsRes?.data || [])}
-				{#if $effect.pending()}
+				{#if eventsQuery.loading && !eventsRes}
 					<div class="grid grid-cols-1 gap-5">
 						<div class="p-12 text-center bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
 							<RefreshCw class="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
 						</div>
 					</div>
 				{/if}
-				<div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
+				<div class={[eventsQuery.loading && "opacity-60 transition-opacity"]}>
 					<div class="grid grid-cols-1 gap-5">
 				{#each displayedEvents as event (event.id)}
 					{@const upcomingInst = getUpcomingInstance(event)}
@@ -652,14 +731,23 @@
 					<div
 						id="item-{event.id}"
 						use:activeItemAnchor={{ feature: 'events', id: event.id }}
-						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-shadow {event.isSeriesInstance ? 'border-l-4 border-l-indigo-500 pl-4 sm:pl-5' : ''}"
+						class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 flex flex-col hover:shadow-md transition-all {selectedIds.includes(event.id) ? 'ring-2 ring-primary-500/50 border-primary-500 bg-primary-50/15 dark:bg-primary-950/20' : ''} {event.isSeriesInstance ? 'border-l-4 border-l-indigo-500 pl-4 sm:pl-5' : ''}"
 					>
-						<div class="flex-1 mb-5">
-							<a
-								href="/events/{event.id}/view"
-								onclick={() => recordActiveItem("events", event.id)}
-								class="block group mb-2"
-							>
+						<div class="flex items-start gap-3.5 flex-1 mb-5">
+							<input
+								type="checkbox"
+								bind:group={selectedIds}
+								value={event.id}
+								class="mt-1 h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 cursor-pointer shrink-0 transition-colors"
+								title={selectedIds.includes(event.id) ? "Deselect" : "Select"}
+							/>
+
+							<div class="flex-1 min-w-0">
+								<a
+									href="/events/{event.id}/view"
+									onclick={() => recordActiveItem("events", event.id)}
+									class="block group mb-2"
+								>
 								<div
 									class="flex items-start justify-between gap-4"
 								>
@@ -815,6 +903,7 @@
 									/>
 								</div>
 							{/if}
+						</div>
 						</div>
 
 						<div
@@ -986,7 +1075,7 @@
 						<div class="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
 							<select
 								bind:value={limit}
-								onchange={() => (page = 1)}
+								onchange={() => setPage(1)}
 								class="text-xs bg-transparent border-gray-200 dark:border-gray-700 rounded-md py-1 pl-2 pr-6 text-gray-500 cursor-pointer focus:ring-0"
 							>
 								<option value={10}>{m.items_per_page({ count: 10 })}</option>
@@ -1001,7 +1090,7 @@
 							variant="outline"
 							size="icon"
 							disabled={page === 1}
-							onclick={() => page = 1}
+							onclick={() => setPage(1)}
 							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 							title="First page"
 						>
@@ -1011,7 +1100,7 @@
 							variant="outline"
 							size="sm"
 							disabled={page === 1}
-							onclick={() => page > 1 && page--}
+							onclick={() => page > 1 && setPage(page - 1)}
 							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 						>
 							<ArrowLeft size={16} class="mr-1.5 hidden sm:block" />
@@ -1021,7 +1110,8 @@
 							class="flex items-center gap-1 px-1 sm:px-2 font-medium text-sm text-gray-700 dark:text-gray-300"
 						>
 							<select
-								bind:value={page}
+								value={page}
+								onchange={(e) => setPage(Number(e.currentTarget.value))}
 								class="text-sm bg-transparent border-none font-medium p-0 focus:ring-0 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 min-w-[2.5rem]"
 							>
 								{#each Array(totalPages) as _, i (i)}
@@ -1034,7 +1124,7 @@
 							variant="outline"
 							size="sm"
 							disabled={page === totalPages}
-							onclick={() => page < totalPages && page++}
+							onclick={() => page < totalPages && setPage(page + 1)}
 							class="h-9 px-3 border-gray-200 dark:border-gray-700 shrink-0"
 						>
 							Next
@@ -1044,7 +1134,7 @@
 							variant="outline"
 							size="icon"
 							disabled={page === totalPages}
-							onclick={() => page = totalPages}
+							onclick={() => setPage(totalPages)}
 							class="h-9 w-9 border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100 hidden sm:flex shrink-0"
 							title="Last page"
 						>
@@ -1067,5 +1157,70 @@
 				</div>
 			</div>
 		{/if}
+
+		<BulkActionToolbar
+			{selectedIds}
+			totalCount={displayedEvents.length}
+			onSelectAll={selectAllEvents}
+			onDeselectAll={deselectAllEvents}
+			onDelete={handleBulkDelete}
+			deleteLabel={m.delete()}
+			extraInfo={extraInfo}
+			selectAllLabel={m.select_all()}
+			deselectAllLabel={m.deselect_all()}
+		>
+			{#snippet actions()}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						class="h-8 px-2.5 text-xs font-semibold gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 inline-flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:pointer-events-none transition-colors"
+						disabled={isBulkUpdatingStatus}
+					>
+						{#if isBulkUpdatingStatus}
+							<RefreshCw size={13} class="animate-spin text-primary-600" />
+							<span>Updating...</span>
+						{:else}
+							<TagIcon size={13} class="text-primary-600 dark:text-primary-400" />
+							<span>Status</span>
+							<ChevronDown size={13} class="opacity-70" />
+						{/if}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="center" class="w-44 p-1.5 z-50">
+						<DropdownMenu.Group>
+							<DropdownMenu.GroupHeading class="text-[10px] font-semibold text-gray-400 px-2 py-1 uppercase tracking-wider">
+								Change Status
+							</DropdownMenu.GroupHeading>
+							<DropdownMenu.Item
+								onclick={() => handleBulkStatusChange('confirmed')}
+								class="flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 transition-colors"
+							>
+								<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+								<span>{m.confirmed ? m.confirmed() : "Confirmed"}</span>
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								onclick={() => handleBulkStatusChange('tentative')}
+								class="flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs font-medium hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-700 transition-colors"
+							>
+								<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+								<span>{m.tentative ? m.tentative() : "Tentative"}</span>
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								onclick={() => handleBulkStatusChange('draft')}
+								class="flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-900/60 hover:text-slate-700 transition-colors"
+							>
+								<span class="w-2 h-2 rounded-full bg-slate-400"></span>
+								<span>{m.draft ? m.draft() : "Draft"}</span>
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								onclick={() => handleBulkStatusChange('cancelled')}
+								class="flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 transition-colors"
+							>
+								<span class="w-2 h-2 rounded-full bg-rose-500"></span>
+								<span>{m.cancelled ? m.cancelled() : "Cancelled"}</span>
+							</DropdownMenu.Item>
+						</DropdownMenu.Group>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			{/snippet}
+		</BulkActionToolbar>
 	</div>
 </div>

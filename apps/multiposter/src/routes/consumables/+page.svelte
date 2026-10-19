@@ -9,6 +9,7 @@
         LoadingSection,
         ErrorSection,
         Button,
+        BulkActionToolbar,
         initPageFromUrl,
         syncPageToUrl,
         recordActiveItem,
@@ -24,25 +25,19 @@
         Calendar,
         ArrowUpDown,
         RefreshCw,
+        Check,
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
     let searchQuery = $state("");
     let sortField = $state<"name" | "purchasePrice" | "amount" | "storageLocation" | "expirationDate" | "createdAt" | "updatedAt">("name");
     let sortOrder = $state<"asc" | "desc">("asc");
-    let page = $state(initPageFromUrl(pageState.url));
+    const page = $derived(initPageFromUrl(pageState.url));
     let limit = $state(50);
 
-    $effect(() => {
-        const urlP = initPageFromUrl(pageState.url);
-        if (urlP !== page) {
-            page = urlP;
-        }
-    });
-
-    $effect(() => {
-        syncPageToUrl("consumables", page, pageState.url, goto);
-    });
+    function setPage(newPage: number) {
+        syncPageToUrl("consumables", newPage, pageState.url, goto);
+    }
 
     const filterState = $derived({
         page,
@@ -70,15 +65,35 @@
         return new Date(dateStr).toLocaleDateString();
     }
 
+    let selectedIds = $state<string[]>([]);
+
+    const consumablesQuery = $derived(listConsumables(filterState));
+    const consumablesRes = $derived(consumablesQuery.current);
+    const consumableItems = $derived(consumablesRes?.data ?? []);
+
+    async function handleBulkDelete() {
+        if (selectedIds.length === 0) return;
+        const confirmMsg = m.delete_confirm?.({ item: `${selectedIds.length} ${m.feature_consumables_title?.() || 'consumables'}` }) || `Delete ${selectedIds.length} consumables?`;
+        if (!window.confirm(confirmMsg)) return;
+        try {
+            await deleteConsumables(selectedIds);
+            toast.success(m.delete_successful?.() || 'Deleted successfully');
+            selectedIds = [];
+            await consumablesQuery.refresh();
+        } catch (e: any) {
+            toast.error(e?.message || m.something_went_wrong?.() || 'Failed to delete');
+        }
+    }
+
     async function onDelete(item: { id: string; name: string }, currentCount: number) {
         if (!window.confirm(m.delete_confirm?.({ item: item.name }) || `Are you sure you want to delete ${item.name}?`)) return;
         try {
             await deleteConsumables([item.id]);
             toast.success(m.delete_successful?.() || `${item.name} deleted successfully`);
             if (currentCount <= 1 && page > 1) {
-                page = page - 1;
+                setPage(page - 1);
             } else {
-                await listConsumables(filterState).refresh();
+                await consumablesQuery.refresh();
             }
         } catch (e: any) {
             toast.error(e?.message || m.something_went_wrong?.() || 'Failed to delete');
@@ -117,7 +132,7 @@
             <input
                 type="text"
                 bind:value={searchQuery}
-                oninput={() => (page = 1)}
+                oninput={() => setPage(1)}
                 placeholder={m.search_placeholder?.({ item: m.consumables?.() || 'Consumables' }) || 'Search consumables...'}
                 class="w-full pl-9 pr-3.5 py-2 rounded-lg border border-gray-300 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
@@ -129,7 +144,7 @@
             </span>
             <select
                 bind:value={sortField}
-                onchange={() => (page = 1)}
+                onchange={() => setPage(1)}
                 class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
                 <option value="name">Name</option>
@@ -143,7 +158,7 @@
                 type="button"
                 onclick={() => {
                     sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-                    page = 1;
+                    setPage(1);
                 }}
                 class="px-2 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold bg-white hover:bg-gray-50 cursor-pointer"
             >
@@ -151,7 +166,7 @@
             </button>
             <button
                 type="button"
-                onclick={() => listConsumables(filterState).refresh()}
+                onclick={() => consumablesQuery.refresh()}
                 title={m.refresh?.() || "Refresh"}
                 class="p-2 rounded-lg border border-gray-300 text-xs bg-white hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
             >
@@ -162,15 +177,14 @@
 
     <!-- Content Table -->
     <svelte:boundary>
-        {@const result = await listConsumables(filterState)}
-        {#if $effect.pending()}
+        {#if consumablesQuery.loading && !consumablesRes}
             <div class="py-12 text-center text-gray-500 flex items-center justify-center gap-2">
                 <RefreshCw size={18} class="animate-spin text-amber-600" />
                 <span>{m.loading?.() || 'Loading consumables...'}</span>
             </div>
         {/if}
-        <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-            {#if !result?.data || result.data.length === 0}
+        <div class={[consumablesQuery.loading && "opacity-60 transition-opacity"]}>
+            {#if !consumableItems || consumableItems.length === 0}
                 <div class="bg-white p-12 text-center rounded-2xl border border-gray-100 shadow-xs space-y-3">
                     <Package size={40} class="mx-auto text-gray-300" />
                     <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.consumables?.() || 'Consumables' }) || 'No consumables found'}</h3>
@@ -188,6 +202,21 @@
                             <table class="w-full text-sm text-left border-collapse">
                                 <thead class="bg-gray-50/75 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     <tr>
+                                        <th class="py-3 px-3 w-10 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={consumableItems.length > 0 && selectedIds.length === consumableItems.length}
+                                                onchange={(e) => {
+                                                    if (e.currentTarget.checked) {
+                                                        selectedIds = consumableItems.map((i: any) => i.id);
+                                                    } else {
+                                                        selectedIds = [];
+                                                    }
+                                                }}
+                                                class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500 cursor-pointer mx-auto transition-colors"
+                                                title="Select all"
+                                            />
+                                        </th>
                                         <th class="py-3 px-4">Item</th>
                                         <th class="py-3 px-4">Price / Package</th>
                                         <th class="py-3 px-4">Cost per Unit</th>
@@ -197,15 +226,24 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
-                                    {#each result.data as item (item.id)}
+                                    {#each consumableItems as item (item.id)}
                                         {@const expired = isExpired(item.expirationDate)}
                                         {@const soon = isExpiringSoon(item.expirationDate)}
                                         {@const cpu = item.costPerUnit ?? 0}
                                         <tr
                                             id="item-{item.id}"
                                             use:activeItemAnchor={{ feature: "consumables", id: item.id }}
-                                            class="hover:bg-gray-50/60 transition-colors"
+                                            class="hover:bg-gray-50/60 transition-colors {selectedIds.includes(item.id) ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}"
                                         >
+                                            <td class="py-3 px-3 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    bind:group={selectedIds}
+                                                    value={item.id}
+                                                    class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500 cursor-pointer mx-auto transition-colors"
+                                                    title={selectedIds.includes(item.id) ? "Deselect" : "Select"}
+                                                />
+                                            </td>
                                             <td class="py-3 px-4">
                                                 <div class="font-bold text-gray-900">{item.name}</div>
                                                 {#if item.description}
@@ -277,7 +315,7 @@
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onclick={() => onDelete(item, result.data.length)}
+                                                        onclick={() => onDelete(item, consumableItems.length)}
                                                         disabled={Boolean(deleteConsumables.pending)}
                                                         class="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-40 cursor-pointer"
                                                         title={m.delete?.() || 'Delete'}
@@ -293,14 +331,14 @@
                         </div>
 
                         <!-- Pagination footer -->
-                        {#if Math.ceil((result.total || 0) / limit) > 1}
-                            {@const totalPages = Math.ceil((result.total || 0) / limit)}
+                        {#if consumablesRes && Math.ceil((consumablesRes.total || 0) / limit) > 1}
+                            {@const totalPages = Math.ceil((consumablesRes.total || 0) / limit)}
                             <div class="p-3 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, result.total)} of {result.total}</span>
+                                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, consumablesRes.total)} of {consumablesRes.total}</span>
                                 <div class="flex items-center gap-1">
                                     <button
                                         disabled={page <= 1}
-                                        onclick={() => page--}
+                                        onclick={() => setPage(page - 1)}
                                         class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                                     >
                                         Prev
@@ -308,7 +346,7 @@
                                     <span>Page {page} of {totalPages}</span>
                                     <button
                                         disabled={page >= totalPages}
-                                        onclick={() => page++}
+                                        onclick={() => setPage(page + 1)}
                                         class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                                     >
                                         Next
@@ -328,4 +366,15 @@
                 />
             {/snippet}
         </svelte:boundary>
+
+        <BulkActionToolbar
+            {selectedIds}
+            totalCount={consumableItems.length}
+            onSelectAll={() => (selectedIds = consumableItems.map((i: any) => i.id))}
+            onDeselectAll={() => (selectedIds = [])}
+            onDelete={handleBulkDelete}
+            deleteLabel={m.delete ? m.delete() : "Delete"}
+            selectAllLabel={m.select_all ? m.select_all() : `Select All (${consumableItems.length})`}
+            deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+        />
 </div>
