@@ -42,6 +42,11 @@ export default defineConfig({
 			strategy: ['cookie', 'preferredLanguage', 'baseLocale']
 		})
 	] as any,
-	optimizeDeps: { include: ['ckeditor5'] },
+	optimizeDeps: { include: ['ckeditor5', 'rrule'] },
+	server: {
+		fs: {
+			allow: ['../../']
+		}
+	},
 	ssr: { noExternal: ['@ac/ui', '@ac/validations', '@ac/db'] }
 });

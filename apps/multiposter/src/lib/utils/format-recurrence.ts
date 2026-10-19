@@ -1,5 +1,4 @@
-import { RRule } from "rrule";
-import ENGLISH from "rrule/dist/esm/nlp/i18n.js";
+import { RRule } from "#lib/utils/rrule-compat.js";
 import * as m from "#lib/paraglide/messages.js";
 import { getLocale } from "#lib/paraglide/runtime.js";
 
@@ -88,7 +87,7 @@ export function formatRecurrenceText(
             };
             
             // "on Monday" -> "am Montag"
-            textDe = textDe.replace(/on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/gi, (match, day) => {
+            textDe = textDe.replace(/on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/gi, (_match: string, day: string) => {
                 // match might have different casing, so we capitalize first letter
                 const d = day.charAt(0).toUpperCase() + day.slice(1).toLowerCase();
                 return `am ${daysMap[d]}`;
