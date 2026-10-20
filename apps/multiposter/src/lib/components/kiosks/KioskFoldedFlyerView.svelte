@@ -1196,7 +1196,7 @@
                             </div>
                             <span class="text-[8.5px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
                                 <Calendar class="w-2.5 h-2.5 text-indigo-600" />
-                                <span>{durationDays} {m.days_count({ count: durationDays })}</span>
+                                <span>{m.days_count({ count: durationDays })}</span>
                             </span>
                         {:else}
                             <div class="{isSpecialNonSeries ? 'bg-amber-600 text-white shadow-2xs font-black' : 'bg-slate-900 text-white'} px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight">

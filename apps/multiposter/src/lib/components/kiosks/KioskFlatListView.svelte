@@ -203,25 +203,54 @@
     // Helper functions for associated contacts
     function getAllEventContacts(event: Event): any[] {
         const contactsList: any[] = [];
-        const seen = new Set<string>();
+        const seenIds: string[] = [];
+        const seenNames: string[] = [];
+
+        function registerAndAdd(c: any) {
+            if (!c) return;
+            const cObj = c.contact || c;
+            const id = cObj.id;
+            const name = getContactName(cObj).trim().toLowerCase();
+
+            const hasSeenId = Boolean(id && seenIds.includes(id));
+            const hasSeenName = Boolean(name && seenNames.includes(name));
+
+            if (hasSeenId || hasSeenName) {
+                // Already present - enrich the existing entry if it is missing fields
+                const existing = contactsList.find((item) => {
+                    const itemId = item.id;
+                    const itemName = getContactName(item).trim().toLowerCase();
+                    return (id && itemId && id === itemId) || (name && itemName && name === itemName);
+                });
+                if (existing) {
+                    if (!existing.email && (cObj.email || c.email)) {
+                        existing.email = cObj.email || c.email;
+                    }
+                    if (!existing.phone && (cObj.phone || c.phone)) {
+                        existing.phone = cObj.phone || c.phone;
+                    }
+                    const newRoles = getContactRoles(cObj).concat(getContactRoles(c));
+                    if ((!existing.roles || existing.roles.length === 0) && newRoles.length > 0) {
+                        existing.roles = Array.from(new Set(newRoles));
+                    }
+                }
+                return;
+            }
+
+            if (id) seenIds.push(id);
+            if (name) seenNames.push(name);
+
+            contactsList.push(cObj);
+        }
 
         if (Array.isArray((event as any).contacts)) {
             for (const c of (event as any).contacts) {
-                const cObj = c.contact || c;
-                const id = cObj.id || cObj.name || cObj.displayName;
-                if (id && !seen.has(id)) {
-                    seen.add(id);
-                    contactsList.push(cObj);
-                }
+                registerAndAdd(c);
             }
         }
 
         if (event.resolvedContact) {
-            const rc = event.resolvedContact;
-            const rcId = (rc as any).id || rc.name;
-            if (!rcId || !seen.has(rcId)) {
-                contactsList.push(rc);
-            }
+            registerAndAdd(event.resolvedContact);
         }
 
         return contactsList;
@@ -245,7 +274,8 @@
         if (!c) return null;
         if (c.email) return c.email;
         if (Array.isArray(c.emails) && c.emails[0]) {
-            return c.emails.find((e: any) => e.isPrimary)?.email || c.emails[0].email || null;
+            const primary = c.emails.find((e: any) => e.primary || e.isPrimary);
+            return primary?.value || primary?.email || c.emails[0].value || c.emails[0].email || null;
         }
         return null;
     }
@@ -254,7 +284,8 @@
         if (!c) return null;
         if (c.phone) return c.phone;
         if (Array.isArray(c.phones) && c.phones[0]) {
-            return c.phones.find((p: any) => p.isPrimary)?.phone || c.phones[0].phone || null;
+            const primary = c.phones.find((p: any) => p.primary || p.isPrimary);
+            return primary?.value || primary?.phone || c.phones[0].value || c.phones[0].phone || null;
         }
         return null;
     }
@@ -1448,7 +1479,7 @@
                         {dateParts.startDay}–{dateParts.endDay}
                     </span>
                     <span class="text-[8px] font-bold text-indigo-600 print:text-slate-700 leading-none uppercase">
-                        {durationDays} {m.days_count({ count: durationDays })}
+                        {m.days_count({ count: durationDays })}
                     </span>
                 </div>
             {:else}
@@ -1475,7 +1506,7 @@
                 {:else if multiDay}
                     {#if event.isAllDay}
                         <span class="inline-block px-1.5 py-0.5 bg-indigo-100/80 text-indigo-800 print:bg-slate-100 print:text-black rounded text-[11px] font-bold">
-                            {m.all_day_label()} • {durationDays} {m.days_count({ count: durationDays })}
+                            {m.all_day_label()} • {m.days_count({ count: durationDays })}
                         </span>
                     {:else}
                         <div class="flex items-center gap-1 font-bold text-slate-900">
@@ -1693,7 +1724,7 @@
                             <span>{m.component_contacts()} ({allContacts.length})</span>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                            {#each allContacts as c}
+                            {#each allContacts as c (c.id || c.name || c.displayName || getContactName(c))}
                                 {@const cName = getContactName(c)}
                                 {@const cRoles = getContactRoles(c)}
                                 {@const cEmail = getContactEmail(c)}
@@ -1702,7 +1733,7 @@
                                     <User class="w-3 h-3 text-slate-400 shrink-0" />
                                     <span class="font-medium text-slate-800 dark:text-slate-200 print:text-black">{cName}</span>
                                     {#if cRoles.length > 0}
-                                        {#each cRoles as r}
+                                        {#each cRoles as r (r)}
                                             <span class="px-1.5 py-0.2 bg-blue-100 dark:bg-blue-900/40 print:bg-slate-200 text-blue-800 dark:text-blue-300 print:text-black rounded text-[9.5px] font-semibold">
                                                 {r}
                                             </span>

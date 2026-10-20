@@ -3,6 +3,7 @@ import { getEntityContacts } from './contacts';
 import type { ExternalEvent } from './sync/types';
 
 export interface ResolvedContact {
+	id?: string;
 	name: string;
 	email: string;
 	phone: string;
@@ -78,6 +79,7 @@ export function extractContactDetails(contactOrAssociation: any, options: { filt
 	const role = roles.length > 0 ? roles.join(', ') : (c.role || undefined);
 
 	return {
+		id: c.id || undefined,
 		name: fullName,
 		email,
 		phone,

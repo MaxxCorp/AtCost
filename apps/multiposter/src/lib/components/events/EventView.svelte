@@ -84,6 +84,18 @@
         !!(event as any).categoryBerlinDotDe ||
         (((event as any).inclusivityInformation) && (event as any).inclusivityInformation.length > 0)
     );
+
+    const otherContacts = $derived.by(() => {
+        if (!Array.isArray((event as any)?.contacts)) return [];
+        return (event as any).contacts.filter((c: any) => {
+            const cObj = c.contact || c;
+            const cId = cObj.id || c.id;
+            if (event.resolvedContact?.id && cId && cId === event.resolvedContact.id) return false;
+            const cName = (cObj.displayName || `${cObj.givenName || ''} ${cObj.familyName || ''}`.trim() || cObj.company || cObj.name || '').trim().toLowerCase();
+            if (event.resolvedContact?.name && cName && cName === event.resolvedContact.name.trim().toLowerCase()) return false;
+            return true;
+        });
+    });
 </script>
 
 <div
@@ -111,7 +123,7 @@
             {#if multiDay}
                 <span class="bg-white/20 text-white text-xs sm:text-sm font-semibold px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs flex items-center gap-1 shadow-xs">
                     <Calendar class="w-3.5 h-3.5 text-blue-200" />
-                    <span>{m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})</span>
+                    <span>{m.multi_day_badge()} ({m.days_count({ count: durationDays })})</span>
                 </span>
             {/if}
             {#if event.status === 'cancelled'}
@@ -237,18 +249,19 @@
                             </div>
                         {/if}
 
-                        {#if (event as any).contacts && (event as any).contacts.length > 1}
+                        {#if otherContacts.length > 0}
                             <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-1.5">
                                 <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     {m.feature_contacts_title?.() ?? "Contacts"}
                                 </h4>
                                 <div class="space-y-1">
-                                    {#each (event as any).contacts.filter((c: any) => c.name !== event.resolvedContact?.name && c.id !== (event.resolvedContact as any)?.id) as otherContact}
+                                    {#each otherContacts as otherContact}
+                                        {@const cObj = otherContact.contact || otherContact}
                                         <div class="flex items-center justify-between text-xs text-gray-700">
-                                            <span class="font-medium">{otherContact.displayName || `${otherContact.givenName || ''} ${otherContact.familyName || ''}`.trim() || otherContact.company || otherContact.name}</span>
-                                            {#if otherContact.roles && otherContact.roles.length > 0}
+                                            <span class="font-medium">{cObj.displayName || `${cObj.givenName || ''} ${cObj.familyName || ''}`.trim() || cObj.company || cObj.name}</span>
+                                            {#if cObj.roles && cObj.roles.length > 0}
                                                 <div class="flex items-center gap-1">
-                                                    {#each otherContact.roles as role}
+                                                    {#each cObj.roles as role}
                                                         <span class="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">
                                                             {role.name || role}
                                                         </span>

@@ -37,6 +37,7 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	participationStatuses?: Record<string, string>;
 	maxOccupancy?: number | null;
 	resolvedContact?: {
+		id?: string | null;
 		name: string;
 		email: string;
 		phone: string;

@@ -23,6 +23,7 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
         isPublic: boolean;
     }[];
     resolvedContact?: {
+        id?: string | null;
         name: string;
         email: string;
         phone: string;

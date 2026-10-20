@@ -768,7 +768,7 @@
 												title={m.multi_day_event()}
 											>
 												<CalendarDays class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-												<span>{m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})</span>
+												<span>{m.multi_day_badge()} ({m.days_count({ count: durationDays })})</span>
 											</span>
 										{/if}
 										{#if event.isSeriesInstance}

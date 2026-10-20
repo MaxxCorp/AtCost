@@ -213,7 +213,7 @@
                                             {dateParts.startDay}.–{dateParts.endDay}.
                                         </div>
                                         <div class="text-xs font-bold uppercase tracking-wider text-indigo-300">
-                                            {dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? ` / ${dateParts.endMonth}` : ''} • {durationDays} {m.days_count({ count: durationDays })}
+                                            {dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? ` / ${dateParts.endMonth}` : ''} • {m.days_count({ count: durationDays })}
                                         </div>
                                     {:else}
                                         <div class="text-3xl font-black whitespace-nowrap {isSpecialNonSeries ? 'text-amber-400' : ''}">{formatDate(item.startDateTime)}</div>
@@ -239,7 +239,7 @@
                                             {#if multiDay}
                                                 <span class="inline-flex items-center gap-1.5 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 self-center">
                                                     <Calendar class="w-3.5 h-3.5" />
-                                                    {m.multi_day_badge()} ({durationDays} {m.days_count({ count: durationDays })})
+                                                    {m.multi_day_badge()} ({m.days_count({ count: durationDays })})
                                                 </span>
                                             {/if}
                                             {#if (item as any).status === 'cancelled'}

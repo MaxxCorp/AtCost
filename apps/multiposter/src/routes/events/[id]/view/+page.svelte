@@ -183,6 +183,14 @@
                 {@const hasContact = !!event.resolvedContact}
                 {@const hasStaffNotes = !!(checkCanEdit(event) && event.internalNotes && event.internalNotes.trim().length > 0)}
                 {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
+                {@const otherContacts = ((event as any).contacts || []).filter((c: any) => {
+                    const cObj = c.contact || c;
+                    const cId = cObj.id || c.id;
+                    if (event.resolvedContact?.id && cId && cId === event.resolvedContact.id) return false;
+                    const cName = (cObj.displayName || `${cObj.givenName || ''} ${cObj.familyName || ''}`.trim() || cObj.company || cObj.name || '').trim().toLowerCase();
+                    if (event.resolvedContact?.name && cName && cName === event.resolvedContact.name.trim().toLowerCase()) return false;
+                    return true;
+                })}
 
                 <Breadcrumb feature="events" current={event.summary} />
 
@@ -349,18 +357,19 @@
                                             </a>
                                         </div>
 
-                                        {#if (event as any).contacts && (event as any).contacts.length > 1}
+                                        {#if otherContacts.length > 0}
                                             <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-1.5">
                                                 <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                                     {m.feature_contacts_title?.() ?? "Contacts"}
                                                 </h4>
                                                 <div class="space-y-1">
-                                                    {#each (event as any).contacts.filter((c: any) => c.name !== event.resolvedContact?.name && c.id !== (event.resolvedContact as any)?.id) as otherContact}
+                                                    {#each otherContacts as otherContact}
+                                                        {@const cObj = otherContact.contact || otherContact}
                                                         <div class="flex items-center justify-between text-xs text-gray-700">
-                                                            <span class="font-medium">{otherContact.displayName || `${otherContact.givenName || ''} ${otherContact.familyName || ''}`.trim() || otherContact.company || otherContact.name}</span>
-                                                            {#if otherContact.roles && otherContact.roles.length > 0}
+                                                            <span class="font-medium">{cObj.displayName || `${cObj.givenName || ''} ${cObj.familyName || ''}`.trim() || cObj.company || cObj.name}</span>
+                                                            {#if cObj.roles && cObj.roles.length > 0}
                                                                 <div class="flex items-center gap-1">
-                                                                    {#each otherContact.roles as role}
+                                                                    {#each cObj.roles as role}
                                                                         <span class="px-1.5 py-0.2 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">
                                                                             {role.name || role}
                                                                         </span>

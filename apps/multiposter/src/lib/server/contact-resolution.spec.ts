@@ -83,6 +83,7 @@ describe('Contact Resolution Engine', () => {
 		it('should extract primary details in standard mode', () => {
 			const details = extractContactDetails(nonEmployeeContact);
 			expect(details).toEqual({
+				id: 'c1',
 				name: 'Alice Visitor',
 				email: 'alice.home@example.com',
 				phone: '+987654321',
@@ -94,6 +95,7 @@ describe('Contact Resolution Engine', () => {
 		it('should extract work details in filterWorkOnly mode', () => {
 			const details = extractContactDetails(nonEmployeeContact, { filterWorkOnly: true });
 			expect(details).toEqual({
+				id: 'c1',
 				name: 'Alice Visitor',
 				email: 'alice.work@example.com',
 				phone: '+123456789',
@@ -159,6 +161,7 @@ describe('Contact Resolution Engine', () => {
 			const result = resolveEventContactSync(eventData);
 			expect(result?.name).toBe('Bob Staff');
 			expect(result?.email).toBe('bob.staff@org.com');
+			expect(result?.id).toBe('c2');
 		});
 
 		it('Priority 2: Should fall back to Location Employee contact when event has no Employee-tagged contacts', () => {
@@ -183,6 +186,7 @@ describe('Contact Resolution Engine', () => {
 			const result = resolveEventContactSync(eventData);
 			expect(result?.name).toBe('Charlie Caretaker');
 			expect(result?.email).toBe('charlie.caretaker@venue.com');
+			expect(result?.id).toBe('c3');
 		});
 
 		it('Priority 2 (from resource location): Should check resource locations for Employee contact', () => {
@@ -205,6 +209,7 @@ describe('Contact Resolution Engine', () => {
 
 			const result = resolveEventContactSync(eventData);
 			expect(result?.name).toBe('Charlie Caretaker');
+			expect(result?.id).toBe('c3');
 		});
 
 		it('Priority 3 (Fallback): Should fall back to event contact when neither event nor location has Employee tags', () => {
@@ -223,6 +228,7 @@ describe('Contact Resolution Engine', () => {
 
 			const result = resolveEventContactSync(eventData);
 			expect(result?.name).toBe('Alice Visitor');
+			expect(result?.id).toBe('c1');
 		});
 
 		it('Priority 3 (Fallback): Should fall back to location contact when event has no contacts and no Employee tags', () => {
@@ -241,6 +247,7 @@ describe('Contact Resolution Engine', () => {
 
 			const result = resolveEventContactSync(eventData);
 			expect(result?.name).toBe('Venue Front Desk');
+			expect(result?.id).toBe('c4');
 		});
 
 		it('should return null when no contacts exist anywhere', () => {
