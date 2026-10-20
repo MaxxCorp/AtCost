@@ -427,7 +427,13 @@
                         <option value="table">{m.table_view_list()}</option>
                         <option value="flat_list">{m.flat_list_print_export()}</option>
                         <option value="folded_flyer">{m.folded_flyer_print_template()}</option>
+                        <option value="poster">{m.poster_print_template()}</option>
                     </select>
+                    {#if uiMode === "poster"}
+                        <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                            {m.poster_print_template()} – Shows all events on one A4/A3 portrait page with location & sponsor logos and letterhead support.
+                        </p>
+                    {/if}
                 </div>
 
                 <div class="space-y-2">

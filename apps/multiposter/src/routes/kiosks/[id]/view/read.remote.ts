@@ -121,7 +121,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
     } else {
         const lookPast = Math.max(0, Math.min(Number(kioskData.lookPast || 0), 315360000));
         let lookAheadSeconds = Math.max(0, Math.min(Number(kioskData.lookAhead || 0), 315360000));
-        if ((kioskData.uiMode === 'flat_list' || kioskData.uiMode === 'folded_flyer') && lookAheadSeconds <= 604800) {
+        if ((kioskData.uiMode === 'flat_list' || kioskData.uiMode === 'folded_flyer' || kioskData.uiMode === 'poster') && lookAheadSeconds <= 604800) {
             lookAheadSeconds = 2592000; // 30 days default for monthly listings
         }
         startDate = new Date(now.getTime() - (lookPast * 1000)).toISOString();

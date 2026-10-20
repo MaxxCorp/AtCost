@@ -291,6 +291,10 @@
 													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
 														Flat List
 													</span>
+												{:else if kiosk.uiMode === "poster"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+														{m.poster_badge()}
+													</span>
 												{/if}
 											</h3>
 										</div>

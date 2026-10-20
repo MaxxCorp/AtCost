@@ -51,7 +51,7 @@ export const createKioskSchema = v.object({
         v.minValue(0, 'Look past cannot be negative'),
         v.maxValue(3650, 'Look past cannot exceed 10 years')
     ), 0),
-    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list'), v.literal('folded_flyer')])),
+    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list'), v.literal('folded_flyer'), v.literal('poster')])),
     rangeMode: v.optional(v.union([
         v.literal('rolling'),
         v.literal('fixed'),
@@ -96,7 +96,7 @@ export const updateKioskSchema = v.object({
         v.minValue(0, 'Look past cannot be negative'),
         v.maxValue(3650, 'Look past cannot exceed 10 years')
     )),
-    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list'), v.literal('folded_flyer')])),
+    uiMode: v.optional(v.union([v.literal('carousel'), v.literal('table'), v.literal('flat_list'), v.literal('folded_flyer'), v.literal('poster')])),
     rangeMode: v.optional(v.union([
         v.literal('rolling'),
         v.literal('fixed'),
