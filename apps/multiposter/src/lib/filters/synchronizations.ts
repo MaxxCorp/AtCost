@@ -80,47 +80,74 @@ export function matchesContactParticipantRules(contactOrAssoc: any, settings: Re
         matchesPrivacyScope = true;
     }
 
-    if (!matchesPrivacyScope) return false;
-
-    // Role filtering
+    // Role filtering evaluation
+    const roleFilterMode = settings.participantRoleFilterMode || 'all';
     const rawRoles: Array<{ id: string; name: string }> = contactOrAssoc.roles || c.roles || contactOrAssoc.eventRoles || [];
     const roleIds = new Set(rawRoles.map((r: any) => String(r.id || r.role?.id || '').toLowerCase()));
     const roleNames = new Set(rawRoles.map((r: any) => String(r.name || r.role?.name || '').toLowerCase().trim()));
 
     const excludedRoles = normalizeArray(settings.excludedContactRoles);
-    if (excludedRoles.length > 0) {
-        if (excludedRoles.some(r => roleIds.has(r.toLowerCase()) || roleNames.has(r.toLowerCase().trim()))) {
-            return false;
-        }
-    }
-
     const includedRoles = normalizeArray(settings.includedContactRoles);
-    if (includedRoles.length > 0) {
-        if (!includedRoles.some(r => roleIds.has(r.toLowerCase()) || roleNames.has(r.toLowerCase().trim()))) {
-            return false;
-        }
+
+    let roleFilterActive = false;
+    let roleMatches = true;
+
+    if (roleFilterMode === 'include' && includedRoles.length > 0) {
+        roleFilterActive = true;
+        roleMatches = includedRoles.some(r => roleIds.has(r.toLowerCase()) || roleNames.has(r.toLowerCase().trim()));
+    } else if (roleFilterMode === 'exclude' && excludedRoles.length > 0) {
+        roleFilterActive = true;
+        roleMatches = !excludedRoles.some(r => roleIds.has(r.toLowerCase()) || roleNames.has(r.toLowerCase().trim()));
     }
 
-    // Tag filtering
+    // Tag filtering evaluation
+    const tagFilterMode = settings.participantTagFilterMode || 'all';
     const rawTags: Array<{ id: string; name: string }> = (c.tags || contactOrAssoc.tags || []).map((t: any) => t.tag || t);
     const tagIds = new Set(rawTags.map((t: any) => String(t?.id || '').toLowerCase()));
     const tagNames = new Set(rawTags.map((t: any) => String(t?.name || '').toLowerCase().trim()));
 
     const excludedTags = normalizeArray(settings.excludedContactTags);
-    if (excludedTags.length > 0) {
-        if (excludedTags.some(t => tagIds.has(t.toLowerCase()) || tagNames.has(t.toLowerCase().trim()))) {
-            return false;
-        }
-    }
-
     const includedTags = normalizeArray(settings.includedContactTags);
-    if (includedTags.length > 0) {
-        if (!includedTags.some(t => tagIds.has(t.toLowerCase()) || tagNames.has(t.toLowerCase().trim()))) {
-            return false;
-        }
+
+    let tagFilterActive = false;
+    let tagMatches = true;
+
+    if (tagFilterMode === 'include' && includedTags.length > 0) {
+        tagFilterActive = true;
+        tagMatches = includedTags.some(t => tagIds.has(t.toLowerCase()) || tagNames.has(t.toLowerCase().trim()));
+    } else if (tagFilterMode === 'exclude' && excludedTags.length > 0) {
+        tagFilterActive = true;
+        tagMatches = !excludedTags.some(t => tagIds.has(t.toLowerCase()) || tagNames.has(t.toLowerCase().trim()));
     }
 
-    return true;
+    // Role and Tag logic chaining
+    const filterLogic = (settings.participantFilterLogic || 'AND').toUpperCase();
+    const refinementActive = roleFilterActive || tagFilterActive;
+    let refinementMatches = true;
+
+    if (roleFilterActive && tagFilterActive) {
+        if (filterLogic === 'OR') {
+            refinementMatches = roleMatches || tagMatches;
+        } else {
+            refinementMatches = roleMatches && tagMatches;
+        }
+    } else if (roleFilterActive) {
+        refinementMatches = roleMatches;
+    } else if (tagFilterActive) {
+        refinementMatches = tagMatches;
+    }
+
+    // Scope and Refinement logic chaining
+    if (!refinementActive) {
+        return matchesPrivacyScope;
+    }
+
+    const scopeLogic = (settings.participantScopeLogic || 'AND').toUpperCase();
+    if (scopeLogic === 'OR') {
+        return matchesPrivacyScope || refinementMatches;
+    } else {
+        return matchesPrivacyScope && refinementMatches;
+    }
 }
 
 /**

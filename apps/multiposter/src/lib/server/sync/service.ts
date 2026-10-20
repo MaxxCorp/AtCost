@@ -3561,59 +3561,80 @@ export function shouldSyncContactForEvent(contact: any, config?: SyncConfig): bo
 		matchesPrivacyScope = true;
 	}
 
-	if (!matchesPrivacyScope) {
-		return false;
-	}
-
 	// 3. Contact Roles filtering
-	const contactRoles: Array<{ id: string; name: string }> = contact.roles || [];
-	const contactRoleIds = new Set(contactRoles.map((r) => r.id));
-	const contactRoleNames = new Set(contactRoles.map((r) => r.name.toLowerCase().trim()));
+	const roleFilterMode = settings.participantRoleFilterMode || 'all';
+	const contactRoles: Array<{ id: string; name: string }> = contact.roles || contact.contact?.roles || contact.eventRoles || [];
+	const contactRoleIds = new Set(contactRoles.map((r: any) => String(r.id || r.role?.id || '').toLowerCase()));
+	const contactRoleNames = new Set(contactRoles.map((r: any) => String(r.name || r.role?.name || '').toLowerCase().trim()));
 
 	const excludedRoles = normalizeSyncFilterList(settings.excludedContactRoles);
-	if (excludedRoles.length > 0) {
-		const hasExcludedRole = excludedRoles.some(
-			(role) => contactRoleIds.has(role) || contactRoleNames.has(role.toLowerCase().trim())
-		);
-		if (hasExcludedRole) {
-			return false;
-		}
-	}
-
 	const includedRoles = normalizeSyncFilterList(settings.includedContactRoles);
-	if (includedRoles.length > 0) {
-		const hasIncludedRole = includedRoles.some(
-			(role) => contactRoleIds.has(role) || contactRoleNames.has(role.toLowerCase().trim())
+
+	let roleFilterActive = false;
+	let roleMatches = true;
+
+	if (roleFilterMode === 'include' && includedRoles.length > 0) {
+		roleFilterActive = true;
+		roleMatches = includedRoles.some(
+			(role) => contactRoleIds.has(role.toLowerCase()) || contactRoleNames.has(role.toLowerCase().trim())
 		);
-		if (!hasIncludedRole) {
-			return false;
-		}
+	} else if (roleFilterMode === 'exclude' && excludedRoles.length > 0) {
+		roleFilterActive = true;
+		roleMatches = !excludedRoles.some(
+			(role) => contactRoleIds.has(role.toLowerCase()) || contactRoleNames.has(role.toLowerCase().trim())
+		);
 	}
 
 	// 4. Contact Tags filtering
-	const contactTags: Array<{ id: string; name: string }> = (contact.tags || []).map((t: any) => t.tag || t);
-	const contactTagIds = new Set(contactTags.map((t) => t.id).filter(Boolean));
-	const contactTagNames = new Set(contactTags.map((t) => (t.name || '').toLowerCase().trim()).filter(Boolean));
+	const tagFilterMode = settings.participantTagFilterMode || 'all';
+	const contactTags: Array<{ id: string; name: string }> = (contact.tags || contact.contact?.tags || []).map((t: any) => t.tag || t);
+	const contactTagIds = new Set(contactTags.map((t: any) => String(t?.id || '').toLowerCase()).filter(Boolean));
+	const contactTagNames = new Set(contactTags.map((t: any) => String(t?.name || '').toLowerCase().trim()).filter(Boolean));
 
 	const excludedTags = normalizeSyncFilterList(settings.excludedContactTags);
-	if (excludedTags.length > 0) {
-		const hasExcludedTag = excludedTags.some(
-			(tag) => contactTagIds.has(tag) || contactTagNames.has(tag.toLowerCase().trim())
-		);
-		if (hasExcludedTag) {
-			return false;
-		}
-	}
-
 	const includedTags = normalizeSyncFilterList(settings.includedContactTags);
-	if (includedTags.length > 0) {
-		const hasIncludedTag = includedTags.some(
-			(tag) => contactTagIds.has(tag) || contactTagNames.has(tag.toLowerCase().trim())
+
+	let tagFilterActive = false;
+	let tagMatches = true;
+
+	if (tagFilterMode === 'include' && includedTags.length > 0) {
+		tagFilterActive = true;
+		tagMatches = includedTags.some(
+			(tag) => contactTagIds.has(tag.toLowerCase()) || contactTagNames.has(tag.toLowerCase().trim())
 		);
-		if (!hasIncludedTag) {
-			return false;
-		}
+	} else if (tagFilterMode === 'exclude' && excludedTags.length > 0) {
+		tagFilterActive = true;
+		tagMatches = !excludedTags.some(
+			(tag) => contactTagIds.has(tag.toLowerCase()) || contactTagNames.has(tag.toLowerCase().trim())
+		);
 	}
 
-	return true;
+	// 5. Role and Tag logic chaining
+	const filterLogic = (settings.participantFilterLogic || 'AND').toUpperCase();
+	const refinementActive = roleFilterActive || tagFilterActive;
+	let refinementMatches = true;
+
+	if (roleFilterActive && tagFilterActive) {
+		if (filterLogic === 'OR') {
+			refinementMatches = roleMatches || tagMatches;
+		} else {
+			refinementMatches = roleMatches && tagMatches;
+		}
+	} else if (roleFilterActive) {
+		refinementMatches = roleMatches;
+	} else if (tagFilterActive) {
+		refinementMatches = tagMatches;
+	}
+
+	// 6. Scope and Refinement logic chaining
+	if (!refinementActive) {
+		return matchesPrivacyScope;
+	}
+
+	const scopeLogic = (settings.participantScopeLogic || 'AND').toUpperCase();
+	if (scopeLogic === 'OR') {
+		return matchesPrivacyScope || refinementMatches;
+	} else {
+		return matchesPrivacyScope && refinementMatches;
+	}
 }

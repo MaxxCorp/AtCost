@@ -80,6 +80,8 @@ export const synchronizationBaseSchema = v.object({
         participantTagFilterMode: v.optional(v.union([v.literal('all'), v.literal('include'), v.literal('exclude'), v.string()])),
         includedContactTags: v.optional(v.union([v.array(v.string()), v.string()])),
         excludedContactTags: v.optional(v.union([v.array(v.string()), v.string()])),
+        participantScopeLogic: v.optional(v.union([v.literal('AND'), v.literal('OR'), v.string()])),
+        participantFilterLogic: v.optional(v.union([v.literal('AND'), v.literal('OR'), v.string()])),
     })),
 });
 
@@ -170,6 +172,41 @@ export function normalizeSyncSettings(settings: Record<string, any>): Record<str
         settings.excludeSeries = true;
     } else if (settings.excludeSeries === true) {
         settings.syncSeriesMode = 'exclude';
+    }
+
+    // Normalize participant logic operators
+    if (settings.participantScopeLogic !== undefined) {
+        const psl = String(settings.participantScopeLogic).toUpperCase().trim();
+        settings.participantScopeLogic = psl === 'OR' ? 'OR' : 'AND';
+    } else {
+        settings.participantScopeLogic = 'AND';
+    }
+
+    if (settings.participantFilterLogic !== undefined) {
+        const pfl = String(settings.participantFilterLogic).toUpperCase().trim();
+        settings.participantFilterLogic = pfl === 'OR' ? 'OR' : 'AND';
+    } else {
+        settings.participantFilterLogic = 'AND';
+    }
+
+    // Role filter mode array cleanup
+    if (settings.participantRoleFilterMode === 'all') {
+        settings.includedContactRoles = [];
+        settings.excludedContactRoles = [];
+    } else if (settings.participantRoleFilterMode === 'include') {
+        settings.excludedContactRoles = [];
+    } else if (settings.participantRoleFilterMode === 'exclude') {
+        settings.includedContactRoles = [];
+    }
+
+    // Tag filter mode array cleanup
+    if (settings.participantTagFilterMode === 'all') {
+        settings.includedContactTags = [];
+        settings.excludedContactTags = [];
+    } else if (settings.participantTagFilterMode === 'include') {
+        settings.excludedContactTags = [];
+    } else if (settings.participantTagFilterMode === 'exclude') {
+        settings.includedContactTags = [];
     }
 
     return settings;

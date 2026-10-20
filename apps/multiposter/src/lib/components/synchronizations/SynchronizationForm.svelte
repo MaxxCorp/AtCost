@@ -565,7 +565,7 @@
 	let participantRoleFilterMode = $state<"all" | "include" | "exclude">(
 		untrack(() => {
 			const mode = initialData?.settings?.participantRoleFilterMode;
-			if (mode === "include" || mode === "exclude") return mode;
+			if (mode === "all" || mode === "include" || mode === "exclude") return mode;
 			if (initialData?.settings?.includedContactRoles?.length) return "include";
 			if (initialData?.settings?.excludedContactRoles?.length) return "exclude";
 			return "all";
@@ -594,7 +594,7 @@
 	let participantTagFilterMode = $state<"all" | "include" | "exclude">(
 		untrack(() => {
 			const mode = initialData?.settings?.participantTagFilterMode;
-			if (mode === "include" || mode === "exclude") return mode;
+			if (mode === "all" || mode === "include" || mode === "exclude") return mode;
 			if (initialData?.settings?.includedContactTags?.length) return "include";
 			if (initialData?.settings?.excludedContactTags?.length) return "exclude";
 			return "all";
@@ -618,6 +618,18 @@
 				try { const p = JSON.parse(val); return Array.isArray(p) ? p : [val]; } catch { return [val]; }
 			}
 			return [];
+		})
+	);
+	let participantScopeLogic = $state<"AND" | "OR">(
+		untrack(() => {
+			const logic = initialData?.settings?.participantScopeLogic;
+			return logic === "OR" ? "OR" : "AND";
+		})
+	);
+	let participantFilterLogic = $state<"AND" | "OR">(
+		untrack(() => {
+			const logic = initialData?.settings?.participantFilterLogic;
+			return logic === "OR" ? "OR" : "AND";
 		})
 	);
 
@@ -890,11 +902,13 @@
 		includeNonPublicContacts,
 		onlyEmployeeContacts: onlyEmployeeContactsDerived,
 		participantRoleFilterMode,
-		includedContactRoles,
-		excludedContactRoles,
+		includedContactRoles: participantRoleFilterMode === 'include' ? includedContactRoles : [],
+		excludedContactRoles: participantRoleFilterMode === 'exclude' ? excludedContactRoles : [],
 		participantTagFilterMode,
-		includedContactTags,
-		excludedContactTags,
+		includedContactTags: participantTagFilterMode === 'include' ? includedContactTags : [],
+		excludedContactTags: participantTagFilterMode === 'exclude' ? excludedContactTags : [],
+		participantScopeLogic,
+		participantFilterLogic,
 	});
 
 	const eventDerivedContacts = $derived.by<DerivedRecipientContact[]>(() => {
@@ -2643,25 +2657,59 @@
 		</details>
 
 		<!-- Hidden serialized inputs for Remote Form submission -->
-		<input {...fields.settings.excludeSeries.as("text", String(excludeSeries))} class="hidden" />
-		<input {...fields.settings.syncSeriesMode.as("text", syncSeriesMode)} class="hidden" />
-		<input {...fields.settings.excludeNonPublic.as("text", String(excludeNonPublic))} class="hidden" />
-		<input {...fields.settings.excludeTentative.as("text", String(excludeTentative))} class="hidden" />
-		<input {...fields.settings.excludeCancelled.as("text", String(excludeCancelled))} class="hidden" />
-		<input {...fields.settings.excludePastEvents.as("text", String(excludePastEvents))} class="hidden" />
+		{#if fields?.settings?.excludeSeries}
+			<input {...fields.settings.excludeSeries.as("hidden", String(excludeSeries))} />
+		{/if}
+		{#if fields?.settings?.syncSeriesMode}
+			<input {...fields.settings.syncSeriesMode.as("hidden", syncSeriesMode)} />
+		{/if}
+		{#if fields?.settings?.excludeNonPublic}
+			<input {...fields.settings.excludeNonPublic.as("hidden", String(excludeNonPublic))} />
+		{/if}
+		{#if fields?.settings?.excludeTentative}
+			<input {...fields.settings.excludeTentative.as("hidden", String(excludeTentative))} />
+		{/if}
+		{#if fields?.settings?.excludeCancelled}
+			<input {...fields.settings.excludeCancelled.as("hidden", String(excludeCancelled))} />
+		{/if}
+		{#if fields?.settings?.excludePastEvents}
+			<input {...fields.settings.excludePastEvents.as("hidden", String(excludePastEvents))} />
+		{/if}
 
-		<input {...fields.settings.rangeMode.as("text", rangeMode)} class="hidden" />
-		<input {...fields.settings.lookAheadDays.as("number", lookAheadDays)} class="hidden" />
-		<input {...fields.settings.lookPastDays.as("number", lookPastDays)} class="hidden" />
-		<input {...fields.settings.startDate.as("text", startDate)} class="hidden" />
-		<input {...fields.settings.endDate.as("text", endDate)} class="hidden" />
+		{#if fields?.settings?.rangeMode}
+			<input {...fields.settings.rangeMode.as("hidden", rangeMode)} />
+		{/if}
+		{#if fields?.settings?.lookAheadDays}
+			<input {...fields.settings.lookAheadDays.as("hidden", String(lookAheadDays))} />
+		{/if}
+		{#if fields?.settings?.lookPastDays}
+			<input {...fields.settings.lookPastDays.as("hidden", String(lookPastDays))} />
+		{/if}
+		{#if fields?.settings?.startDate}
+			<input {...fields.settings.startDate.as("hidden", startDate)} />
+		{/if}
+		{#if fields?.settings?.endDate}
+			<input {...fields.settings.endDate.as("hidden", endDate)} />
+		{/if}
 
-		<input {...fields.settings.includedTags.as("text", JSON.stringify(includedTags))} class="hidden" />
-		<input {...fields.settings.excludedTags.as("text", JSON.stringify(excludedTags))} class="hidden" />
-		<input {...fields.settings.includedLocationIds.as("text", JSON.stringify(includedLocationIds))} class="hidden" />
-		<input {...fields.settings.excludedLocationIds.as("text", JSON.stringify(excludedLocationIds))} class="hidden" />
-		<input {...fields.settings.includedEventIds.as("text", JSON.stringify(includedEventIds))} class="hidden" />
-		<input {...fields.settings.excludedEventIds.as("text", JSON.stringify(excludedEventIds))} class="hidden" />
+		{#if fields?.settings?.includedTags}
+			<input {...fields.settings.includedTags.as("hidden", JSON.stringify(includedTags))} />
+		{/if}
+		{#if fields?.settings?.excludedTags}
+			<input {...fields.settings.excludedTags.as("hidden", JSON.stringify(excludedTags))} />
+		{/if}
+		{#if fields?.settings?.includedLocationIds}
+			<input {...fields.settings.includedLocationIds.as("hidden", JSON.stringify(includedLocationIds))} />
+		{/if}
+		{#if fields?.settings?.excludedLocationIds}
+			<input {...fields.settings.excludedLocationIds.as("hidden", JSON.stringify(excludedLocationIds))} />
+		{/if}
+		{#if fields?.settings?.includedEventIds}
+			<input {...fields.settings.includedEventIds.as("hidden", JSON.stringify(includedEventIds))} />
+		{/if}
+		{#if fields?.settings?.excludedEventIds}
+			<input {...fields.settings.excludedEventIds.as("hidden", JSON.stringify(excludedEventIds))} />
+		{/if}
 	</div>
 {/if}
 
@@ -2968,7 +3016,7 @@
 		</div>
 
 		{#if syncParticipants}
-			<!-- Explicit Pipeline Divider (AND connector) -->
+			<!-- Explicit Pipeline Divider -->
 			<div class="relative py-1">
 				<div class="absolute inset-0 flex items-center" aria-hidden="true">
 					<div class="w-full border-t border-gray-200"></div>
@@ -2976,14 +3024,68 @@
 				<div class="relative flex justify-center">
 					<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs">
 						<Filter class="w-3.5 h-3.5 text-indigo-600" />
-						<span>STEP 2: REFINE BY ROLES & TAGS (AND FILTER)</span>
+						<span>STEP 2: REFINE BY ROLES & TAGS ({participantScopeLogic} FILTER)</span>
 					</span>
 				</div>
 			</div>
 
-			<p class="text-xs text-gray-500 text-center -mt-2">
-				Participants must match the <strong>Base Audience</strong> above <strong>AND</strong> satisfy the role/tag criteria below:
-			</p>
+			<!-- Chaining Scope & Criteria Controller -->
+			<div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+				<div class="flex items-center gap-2.5">
+					<div class="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+						<ArrowLeftRight class="w-4 h-4 text-indigo-700" />
+					</div>
+					<div>
+						<span class="font-bold text-gray-900 block">{m.sync_chaining_scope_title()}</span>
+						<span class="text-gray-500 text-[11px] block">{m.sync_chaining_scope_desc()}</span>
+					</div>
+				</div>
+				<div class="flex items-center gap-1 bg-white p-1 rounded-lg border border-indigo-200 shadow-2xs shrink-0">
+					<button
+						type="button"
+						onclick={() => { participantScopeLogic = 'AND'; }}
+						class="px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer {participantScopeLogic === 'AND' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-gray-600 hover:text-gray-900'}"
+					>
+						{m.sync_logic_and_both()}
+					</button>
+					<button
+						type="button"
+						onclick={() => { participantScopeLogic = 'OR'; }}
+						class="px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer {participantScopeLogic === 'OR' ? 'bg-amber-600 text-white shadow-2xs' : 'text-gray-600 hover:text-gray-900'}"
+					>
+						{m.sync_logic_or_either()}
+					</button>
+				</div>
+			</div>
+
+			<!-- Chaining Roles & Tags Controller -->
+			<div class="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shadow-2xs">
+				<div class="flex items-center gap-2.5">
+					<div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+						<SlidersHorizontal class="w-4 h-4 text-slate-700" />
+					</div>
+					<div>
+						<span class="font-bold text-gray-900 block">{m.sync_chaining_role_tag_title()}</span>
+						<span class="text-gray-500 text-[11px] block">{m.sync_chaining_role_tag_desc()}</span>
+					</div>
+				</div>
+				<div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg shrink-0">
+					<button
+						type="button"
+						onclick={() => { participantFilterLogic = 'AND'; }}
+						class="px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer {participantFilterLogic === 'AND' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-gray-600 hover:text-gray-900'}"
+					>
+						{m.sync_logic_role_and_tag()}
+					</button>
+					<button
+						type="button"
+						onclick={() => { participantFilterLogic = 'OR'; }}
+						class="px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer {participantFilterLogic === 'OR' ? 'bg-amber-600 text-white shadow-2xs' : 'text-gray-600 hover:text-gray-900'}"
+					>
+						{m.sync_logic_role_or_tag()}
+					</button>
+				</div>
+			</div>
 
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 				<!-- Filter by Roles Section -->
@@ -3003,9 +3105,13 @@
 								<button
 									type="button"
 									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantRoleFilterMode === 'all' ? 'bg-white text-gray-900 shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
-									onclick={() => { participantRoleFilterMode = 'all'; }}
+									onclick={() => {
+										participantRoleFilterMode = 'all';
+										includedContactRoles = [];
+										excludedContactRoles = [];
+									}}
 								>
-									All Roles
+									{m.all_roles?.() ?? 'All Roles'}
 								</button>
 								<button
 									type="button"
@@ -3116,7 +3222,11 @@
 								<button
 									type="button"
 									class="px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer {participantTagFilterMode === 'all' ? 'bg-white text-gray-900 shadow-xs font-bold' : 'text-gray-600 hover:text-gray-900'}"
-									onclick={() => { participantTagFilterMode = 'all'; }}
+									onclick={() => {
+										participantTagFilterMode = 'all';
+										includedContactTags = [];
+										excludedContactTags = [];
+									}}
 								>
 									All Tags
 								</button>
@@ -3177,18 +3287,38 @@
 					{/if}
 				</div>
 
-				<!-- Visual AND pipeline badges -->
+				<!-- Visual interactive pipeline badges with clickable operator toggles -->
 				<div class="flex flex-wrap items-center gap-2 text-xs">
 					<div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg font-semibold text-gray-800 shadow-2xs">
 						<span class="text-[10px] text-gray-400 font-bold uppercase">Scope:</span>
 						<span>{privacyScopeLabel}</span>
 					</div>
-					<span class="text-indigo-600 font-extrabold text-[11px] px-2 py-0.5 bg-indigo-100/70 border border-indigo-200/50 rounded-md">AND</span>
+
+					<button
+						type="button"
+						onclick={() => { participantScopeLogic = participantScopeLogic === 'AND' ? 'OR' : 'AND'; }}
+						title="Click to toggle operator between Scope and Filters (Current: {participantScopeLogic})"
+						class="font-extrabold text-[11px] px-2.5 py-0.5 rounded-md border transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 {participantScopeLogic === 'OR' ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600' : 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'}"
+					>
+						<span>{participantScopeLogic}</span>
+						<ArrowLeftRight class="w-2.5 h-2.5 opacity-80" />
+					</button>
+
 					<div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg font-semibold text-gray-800 shadow-2xs">
 						<span class="text-[10px] text-gray-400 font-bold uppercase">Roles:</span>
 						<span>{roleFilterLabel}</span>
 					</div>
-					<span class="text-indigo-600 font-extrabold text-[11px] px-2 py-0.5 bg-indigo-100/70 border border-indigo-200/50 rounded-md">AND</span>
+
+					<button
+						type="button"
+						onclick={() => { participantFilterLogic = participantFilterLogic === 'AND' ? 'OR' : 'AND'; }}
+						title="Click to toggle operator between Roles and Tags (Current: {participantFilterLogic})"
+						class="font-extrabold text-[11px] px-2.5 py-0.5 rounded-md border transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 {participantFilterLogic === 'OR' ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600' : 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'}"
+					>
+						<span>{participantFilterLogic}</span>
+						<ArrowLeftRight class="w-2.5 h-2.5 opacity-80" />
+					</button>
+
 					<div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg font-semibold text-gray-800 shadow-2xs">
 						<span class="text-[10px] text-gray-400 font-bold uppercase">Tags:</span>
 						<span>{tagFilterLabel}</span>
@@ -3196,23 +3326,59 @@
 				</div>
 
 				<p class="text-[11px] text-gray-500 pt-0.5">
-					Sequential evaluation pipeline: Contacts must pass the <strong>Base Audience</strong> scope, then satisfy the <strong>Role filter</strong>, and finally satisfy the <strong>Tag filter</strong>.
+					{#if participantScopeLogic === 'AND' && participantFilterLogic === 'AND'}
+						Sequential evaluation pipeline: Contacts must pass the <strong>Base Audience</strong> scope, <strong>AND</strong> satisfy the <strong>Role filter</strong>, <strong>AND</strong> satisfy the <strong>Tag filter</strong>.
+					{:else if participantScopeLogic === 'AND' && participantFilterLogic === 'OR'}
+						Scope-guarded alternative criteria: Contacts must pass the <strong>Base Audience</strong> scope, <strong>AND</strong> satisfy either the <strong>Role filter</strong> <em>OR</em> the <strong>Tag filter</strong>.
+					{:else if participantScopeLogic === 'OR' && participantFilterLogic === 'AND'}
+						Expanded reach: Contacts will be synchronized if they match the <strong>Base Audience</strong> scope <em>OR</em> satisfy (<strong>Role filter</strong> <strong>AND</strong> <strong>Tag filter</strong>).
+					{:else}
+						Inclusive union: Contacts will be synchronized if they match the <strong>Base Audience</strong> scope <em>OR</em> the <strong>Role filter</strong> <em>OR</em> the <strong>Tag filter</strong>.
+					{/if}
 				</p>
 			</div>
 		{/if}
 
 		<!-- Hidden serialized inputs for Participant settings -->
-		<input {...fields.settings.syncParticipants.as("text", String(syncParticipants))} class="hidden" />
-		<input {...fields.settings.onlyEmployeeContacts.as("text", String(onlyEmployeeContactsDerived))} class="hidden" />
-		<input {...fields.settings.includeEmployeeContacts.as("text", String(includeEmployeeContacts))} class="hidden" />
-		<input {...fields.settings.includePublicContacts.as("text", String(includePublicContacts))} class="hidden" />
-		<input {...fields.settings.includeNonPublicContacts.as("text", String(includeNonPublicContacts))} class="hidden" />
-		<input {...fields.settings.participantRoleFilterMode.as("text", participantRoleFilterMode)} class="hidden" />
-		<input {...fields.settings.includedContactRoles.as("text", JSON.stringify(includedContactRoles))} class="hidden" />
-		<input {...fields.settings.excludedContactRoles.as("text", JSON.stringify(excludedContactRoles))} class="hidden" />
-		<input {...fields.settings.participantTagFilterMode.as("text", participantTagFilterMode)} class="hidden" />
-		<input {...fields.settings.includedContactTags.as("text", JSON.stringify(includedContactTags))} class="hidden" />
-		<input {...fields.settings.excludedContactTags.as("text", JSON.stringify(excludedContactTags))} class="hidden" />
+		{#if fields?.settings?.syncParticipants}
+			<input {...fields.settings.syncParticipants.as("hidden", String(syncParticipants))} />
+		{/if}
+		{#if fields?.settings?.onlyEmployeeContacts}
+			<input {...fields.settings.onlyEmployeeContacts.as("hidden", String(onlyEmployeeContactsDerived))} />
+		{/if}
+		{#if fields?.settings?.includeEmployeeContacts}
+			<input {...fields.settings.includeEmployeeContacts.as("hidden", String(includeEmployeeContacts))} />
+		{/if}
+		{#if fields?.settings?.includePublicContacts}
+			<input {...fields.settings.includePublicContacts.as("hidden", String(includePublicContacts))} />
+		{/if}
+		{#if fields?.settings?.includeNonPublicContacts}
+			<input {...fields.settings.includeNonPublicContacts.as("hidden", String(includeNonPublicContacts))} />
+		{/if}
+		{#if fields?.settings?.participantRoleFilterMode}
+			<input {...fields.settings.participantRoleFilterMode.as("hidden", participantRoleFilterMode)} />
+		{/if}
+		{#if fields?.settings?.includedContactRoles}
+			<input {...fields.settings.includedContactRoles.as("hidden", JSON.stringify(participantRoleFilterMode === 'include' ? includedContactRoles : []))} />
+		{/if}
+		{#if fields?.settings?.excludedContactRoles}
+			<input {...fields.settings.excludedContactRoles.as("hidden", JSON.stringify(participantRoleFilterMode === 'exclude' ? excludedContactRoles : []))} />
+		{/if}
+		{#if fields?.settings?.participantTagFilterMode}
+			<input {...fields.settings.participantTagFilterMode.as("hidden", participantTagFilterMode)} />
+		{/if}
+		{#if fields?.settings?.includedContactTags}
+			<input {...fields.settings.includedContactTags.as("hidden", JSON.stringify(participantTagFilterMode === 'include' ? includedContactTags : []))} />
+		{/if}
+		{#if fields?.settings?.excludedContactTags}
+			<input {...fields.settings.excludedContactTags.as("hidden", JSON.stringify(participantTagFilterMode === 'exclude' ? excludedContactTags : []))} />
+		{/if}
+		{#if fields?.settings?.participantScopeLogic}
+			<input {...fields.settings.participantScopeLogic.as("hidden", participantScopeLogic)} />
+		{/if}
+		{#if fields?.settings?.participantFilterLogic}
+			<input {...fields.settings.participantFilterLogic.as("hidden", participantFilterLogic)} />
+		{/if}
 	</div>
 {/if}
 {/if}

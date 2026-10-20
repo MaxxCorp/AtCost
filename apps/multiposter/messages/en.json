@@ -1048,6 +1048,14 @@
 	"included_roles": "Included Roles",
 	"excluded_roles": "Excluded Roles",
 	"included_contact_tags": "Included Contact Tags",
-	"excluded_contact_tags": "Excluded Contact Tags"
+	"excluded_contact_tags": "Excluded Contact Tags",
+	"sync_chaining_scope_title": "Base Scope & Filter Chaining",
+	"sync_chaining_scope_desc": "How should base audience and role/tag criteria combine?",
+	"sync_chaining_role_tag_title": "Role & Tag Chaining",
+	"sync_chaining_role_tag_desc": "When both role and tag filters are active, require:",
+	"sync_logic_and_both": "AND (Must match both)",
+	"sync_logic_or_either": "OR (Match either)",
+	"sync_logic_role_and_tag": "AND (Role AND Tag)",
+	"sync_logic_role_or_tag": "OR (Role OR Tag)"
 }
 

@@ -1048,6 +1048,14 @@
 	"included_roles": "Eingeschlossene Rollen",
 	"excluded_roles": "Ausgeschlossene Rollen",
 	"included_contact_tags": "Eingeschlossene Kontakt-Tags",
-	"excluded_contact_tags": "Ausgeschlossene Kontakt-Tags"
+	"excluded_contact_tags": "Ausgeschlossene Kontakt-Tags",
+	"sync_chaining_scope_title": "Basisbereich & Filter-Verknüpfung",
+	"sync_chaining_scope_desc": "Wie sollen Basiszielgruppe und Rollen-/Tag-Kriterien verknüpft werden?",
+	"sync_chaining_role_tag_title": "Rollen- & Tag-Verknüpfung",
+	"sync_chaining_role_tag_desc": "Wenn sowohl Rollen- als auch Tag-Filter aktiv sind:",
+	"sync_logic_and_both": "UND (Muss beides erfüllen)",
+	"sync_logic_or_either": "ODER (Eines genügt)",
+	"sync_logic_role_and_tag": "UND (Rolle UND Tag)",
+	"sync_logic_role_or_tag": "ODER (Rolle ODER Tag)"
 }
 

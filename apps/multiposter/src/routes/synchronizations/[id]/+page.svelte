@@ -253,11 +253,13 @@
                                             })}
                                             class="space-y-4"
                                         >
-                                            <SynchronizationForm
-                                                remoteFunction={mainRf}
-                                                isUpdating={true}
-                                                initialData={config}
-                                            />
+                                            {#key version}
+                                                <SynchronizationForm
+                                                    remoteFunction={mainRf}
+                                                    isUpdating={true}
+                                                    initialData={config}
+                                                />
+                                            {/key}
                                             <div class="flex items-center justify-end gap-3 pt-4">
                                                 <AsyncButton
                                                     type="submit"

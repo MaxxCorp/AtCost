@@ -1332,6 +1332,64 @@ describe('SyncService - Bulk Sync', () => {
 			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
 			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
 		});
+
+		it('allows all roles when participantRoleFilterMode is "all" even if stale role lists exist', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeNonPublicContacts: true,
+					participantRoleFilterMode: 'all',
+					includedContactRoles: ['role-speaker']
+				}
+			};
+			// All roles should be accepted since mode is 'all'
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(true);
+		});
+
+		it('supports OR chaining between roles and tags using participantFilterLogic: OR', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeNonPublicContacts: true,
+					participantRoleFilterMode: 'include',
+					includedContactRoles: ['role-speaker'],
+					participantTagFilterMode: 'include',
+					includedContactTags: ['Volunteer'],
+					participantFilterLogic: 'OR'
+				}
+			};
+			// speakerContact has role-speaker (role match)
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			// volunteerContact has tag Volunteer (tag match)
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(true);
+			// employeeContact has neither
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(false);
+		});
+
+		it('supports OR chaining between base scope and filter criteria using participantScopeLogic: OR', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					// Base scope: staff only
+					includeEmployeeContacts: true,
+					includePublicContacts: false,
+					includeNonPublicContacts: false,
+					// Role filter: speaker
+					participantRoleFilterMode: 'include',
+					includedContactRoles: ['role-speaker'],
+					// Scope OR Filters
+					participantScopeLogic: 'OR'
+				}
+			};
+			// employeeContact matches base scope (Staff)
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
+			// speakerContact is non-employee, but matches role filter in OR logic
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
+			// volunteerContact matches neither
+			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+		});
 	});
 });
 
