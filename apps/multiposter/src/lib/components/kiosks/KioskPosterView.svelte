@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, untrack } from "svelte";
+    import { onMount } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
     import { type Event, type Announcement } from "@ac/validations";
     import {
@@ -8,13 +8,15 @@
         RotateCcw,
         MapPin,
         Calendar,
+        CalendarDays,
         Clock,
         Phone,
         Mail,
         FileText,
         ZoomIn,
         ZoomOut,
-        Maximize2,
+        SlidersHorizontal,
+        ChevronDown,
         QrCode,
         Ticket,
         Settings2,
@@ -25,21 +27,44 @@
         AlertCircle,
         Image as ImageIcon,
         Layers,
-        Eye,
-        EyeOff,
         Upload,
         CheckCircle2,
-        Globe
+        Globe,
+        Lock,
+        Tag,
+        RefreshCw,
+        User,
+        Users,
+        UserCheck,
+        FileImage
     } from "@lucide/svelte";
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
-    import { isSeriesItem, getSeriesRootId } from "#lib/utils/event-series.js";
-    import { isMultiDayEvent } from "#lib/utils/format-event-date.js";
+    import { isSeriesItem, isNonSeriesEvent, getSeriesRootId } from "#lib/utils/event-series.js";
+    import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
     import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
     import { browser } from '$app/env';
+    import {
+        type SeriesInstanceInfo,
+        type EnrichedEvent,
+        type EnrichedAnnouncement,
+        type VisibleComponentsState,
+        defaultVisibleComponents,
+        getAllEventContacts,
+        getContactName,
+        getContactRoles,
+        getContactEmail,
+        getContactPhone,
+        compressSeriesEvents,
+        formatDateDay,
+        formatDateMonth,
+        formatDateWeekday,
+        formatTimeRange,
+        formatFullDate
+    } from "#lib/utils/kiosk-flat-helpers.js";
 
     interface LocationContact {
         name: string;
@@ -73,14 +98,7 @@
         logoUrl: string;
     }
 
-    type PosterDisplayItem = (Event | Announcement) & {
-        isCompressedSeries?: boolean;
-        seriesDates?: string[];
-        recurrenceText?: string;
-        instanceCount?: number;
-        qrCodePath?: string | null;
-        qrCodeDataUrl?: string | null;
-    };
+    type PosterDisplayItem = EnrichedEvent | EnrichedAnnouncement;
 
     let { items = [], kiosk }: {
         items: (Event | Announcement)[],
@@ -140,6 +158,7 @@
 
     // --- State: Logos & Sponsors ---
     let showLocationLogo = $state<boolean>(true);
+    let locationLogoPosition = $state<"left" | "right">("right");
     let customLocationLogoUrl = $state<string>("");
     let locationLogoHeight = $state<number>(42); // in pixels
 
@@ -151,7 +170,6 @@
     let sponsorSectionTitle = $state<string>("Gefördert durch / Partner");
     let sponsorPosition = $state<"footer" | "header">("footer");
     let sponsors = $state<SponsorItem[]>([
-        // Helpful default sample sponsor if empty
         {
             id: "sample-1",
             name: "Bezirkskulturfonds",
@@ -163,18 +181,47 @@
     let isLetterheadMode = $state<boolean>(false);
     let letterheadBlankHeight = $state<number>(38); // mm
     let letterheadMonochrome = $state<boolean>(false);
+    let letterheadShowLogo = $state<boolean>(true);
 
-    // --- State: Content toggles ---
-    let showDescriptions = $state<boolean>(true);
+    // --- State: Series Mode & Content Selection ---
+    let compressSeries = $state<boolean>(true);
     let descriptionStyle = $state<"short" | "full" | "none">("short");
     let showTimes = $state<boolean>(true);
-    let showRooms = $state<boolean>(true);
-    let showPrices = $state<boolean>(true);
-    let showTags = $state<boolean>(false);
     let showLocationQr = $state<boolean>(true);
-    let compressSeries = $state<boolean>(true);
     let customProgrammeTitle = $state<string>("");
     let customProgrammeSubtitle = $state<string>("");
+
+    // Visible Components (Ported from Flat List)
+    let visibleComponents = $state<VisibleComponentsState>({
+        ...defaultVisibleComponents
+    });
+    let isComponentsMenuOpen = $state<boolean>(false);
+
+    function toggleComponent(key: keyof VisibleComponentsState) {
+        visibleComponents[key] = !visibleComponents[key];
+        savePrefs();
+    }
+
+    function selectAllComponents() {
+        visibleComponents = {
+            contacts: true,
+            participants: true,
+            publicStatus: true,
+            descriptions: true,
+            qrCodes: true,
+            ticketPrice: true,
+            rooms: true,
+            tags: true,
+            internalNotes: true,
+            heroImage: true,
+        };
+        savePrefs();
+    }
+
+    function resetComponentsToDefault() {
+        visibleComponents = { ...defaultVisibleComponents };
+        savePrefs();
+    }
 
     // Settings Modal
     let isSettingsOpen = $state<boolean>(false);
@@ -197,6 +244,7 @@
                 if (prefs.columns !== undefined) columns = prefs.columns;
                 if (prefs.density !== undefined) density = prefs.density;
                 if (prefs.showLocationLogo !== undefined) showLocationLogo = prefs.showLocationLogo;
+                if (prefs.locationLogoPosition !== undefined) locationLogoPosition = prefs.locationLogoPosition;
                 if (prefs.customLocationLogoUrl !== undefined) customLocationLogoUrl = prefs.customLocationLogoUrl;
                 if (prefs.locationLogoHeight !== undefined) locationLogoHeight = prefs.locationLogoHeight;
                 if (prefs.showSponsors !== undefined) showSponsors = prefs.showSponsors;
@@ -206,18 +254,21 @@
                 if (prefs.isLetterheadMode !== undefined) isLetterheadMode = prefs.isLetterheadMode;
                 if (prefs.letterheadBlankHeight !== undefined) letterheadBlankHeight = prefs.letterheadBlankHeight;
                 if (prefs.letterheadMonochrome !== undefined) letterheadMonochrome = prefs.letterheadMonochrome;
-                if (prefs.showDescriptions !== undefined) showDescriptions = prefs.showDescriptions;
+                if (prefs.letterheadShowLogo !== undefined) letterheadShowLogo = prefs.letterheadShowLogo;
                 if (prefs.descriptionStyle !== undefined) descriptionStyle = prefs.descriptionStyle;
                 if (prefs.showTimes !== undefined) showTimes = prefs.showTimes;
-                if (prefs.showRooms !== undefined) showRooms = prefs.showRooms;
-                if (prefs.showPrices !== undefined) showPrices = prefs.showPrices;
-                if (prefs.showTags !== undefined) showTags = prefs.showTags;
                 if (prefs.showLocationQr !== undefined) showLocationQr = prefs.showLocationQr;
                 if (prefs.compressSeries !== undefined) compressSeries = prefs.compressSeries;
                 if (prefs.customProgrammeTitle !== undefined) customProgrammeTitle = prefs.customProgrammeTitle;
                 if (prefs.customProgrammeSubtitle !== undefined) customProgrammeSubtitle = prefs.customProgrammeSubtitle;
                 if (prefs.activeLocationId && posterLocations.some(l => l.id === prefs.activeLocationId)) {
                     activeLocationId = prefs.activeLocationId;
+                }
+                if (prefs.visibleComponents && typeof prefs.visibleComponents === "object") {
+                    visibleComponents = {
+                        ...visibleComponents,
+                        ...prefs.visibleComponents
+                    };
                 }
             }
         } catch (e) {
@@ -233,6 +284,7 @@
                 columns,
                 density,
                 showLocationLogo,
+                locationLogoPosition,
                 customLocationLogoUrl,
                 locationLogoHeight,
                 showSponsors,
@@ -242,17 +294,15 @@
                 isLetterheadMode,
                 letterheadBlankHeight,
                 letterheadMonochrome,
-                showDescriptions,
+                letterheadShowLogo,
                 descriptionStyle,
                 showTimes,
-                showRooms,
-                showPrices,
-                showTags,
                 showLocationQr,
                 compressSeries,
                 customProgrammeTitle,
                 customProgrammeSubtitle,
-                activeLocationId
+                activeLocationId,
+                visibleComponents
             };
             localStorage.setItem(storageKey, JSON.stringify(prefs));
         } catch (e) {
@@ -262,14 +312,16 @@
 
     // Auto-save on relevant changes
     $effect(() => {
-        // Track state variables
         const _ = [
-            paperSize, columns, density, showLocationLogo, customLocationLogoUrl,
-            locationLogoHeight, showSponsors, sponsorSectionTitle, sponsorPosition,
-            sponsors, isLetterheadMode, letterheadBlankHeight, letterheadMonochrome,
-            showDescriptions, descriptionStyle, showTimes, showRooms, showPrices,
-            showTags, showLocationQr, compressSeries, customProgrammeTitle,
-            customProgrammeSubtitle, activeLocationId
+            paperSize, columns, density, showLocationLogo, locationLogoPosition,
+            customLocationLogoUrl, locationLogoHeight, showSponsors, sponsorSectionTitle,
+            sponsorPosition, sponsors, isLetterheadMode, letterheadBlankHeight,
+            letterheadMonochrome, letterheadShowLogo, descriptionStyle, showTimes,
+            showLocationQr, compressSeries, customProgrammeTitle, customProgrammeSubtitle,
+            activeLocationId, visibleComponents.contacts, visibleComponents.participants,
+            visibleComponents.publicStatus, visibleComponents.descriptions, visibleComponents.qrCodes,
+            visibleComponents.ticketPrice, visibleComponents.rooms, visibleComponents.tags,
+            visibleComponents.internalNotes, visibleComponents.heroImage
         ];
         savePrefs();
     });
@@ -316,98 +368,13 @@
         return items.filter(item => itemBelongsToLocation(item, locId));
     });
 
-    // Compress repeating series
-    function compressSeriesEvents(eventList: Event[]): PosterDisplayItem[] {
-        if (!compressSeries) return eventList;
-
-        const seriesGroups = new Map<string, Event[]>();
-        const nonSeriesEvents: Event[] = [];
-
-        for (const evt of eventList) {
-            if (isSeriesItem(evt)) {
-                const sKey = getSeriesRootId(evt) || evt.id;
-                const group = seriesGroups.get(sKey) || [];
-                group.push(evt);
-                seriesGroups.set(sKey, group);
-            } else {
-                nonSeriesEvents.push(evt);
-            }
-        }
-
-        const compressed: PosterDisplayItem[] = [...nonSeriesEvents];
-
-        for (const [sKey, group] of seriesGroups) {
-            group.sort((a, b) => {
-                const tA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-                const tB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
-                return tA - tB;
-            });
-
-            const first = group[0];
-            const dateSet = new Set<string>();
-            const dates: string[] = [];
-
-            for (const g of group) {
-                if (g.startDateTime) {
-                    const d = new Date(g.startDateTime);
-                    if (!isNaN(d.getTime())) {
-                        const iso = d.toISOString();
-                        const dTime = d.getTime();
-                        if (!dateSet.has(String(dTime))) {
-                            dateSet.add(String(dTime));
-                            dates.push(iso);
-                        }
-                    }
-                }
-            }
-
-            let rruleStr: string | null = null;
-            for (const g of group) {
-                if (g.recurrence && Array.isArray(g.recurrence) && g.recurrence[0]) {
-                    rruleStr = g.recurrence[0];
-                    break;
-                } else if (typeof (g as any).recurrence === 'string' && (g as any).recurrence.length > 0) {
-                    rruleStr = (g as any).recurrence;
-                    break;
-                }
-            }
-
-            const recText = formatRecurrenceText(rruleStr, undefined, { omitLength: true });
-
-            if (dates.length > 1) {
-                compressed.push({
-                    ...first,
-                    id: sKey,
-                    isCompressedSeries: true,
-                    seriesDates: dates,
-                    recurrenceText: recText,
-                    instanceCount: dates.length,
-                    qrCodePath: `/api/events/${sKey}/qr.png`
-                });
-            } else {
-                compressed.push({
-                    ...first,
-                    recurrenceText: recText
-                });
-            }
-        }
-
-        compressed.sort((a, b) => {
-            const timeA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-            const timeB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
-            return timeA - timeB;
-        });
-
-        return compressed;
-    }
-
     // Processed final display items
     let displayItems = $derived.by<PosterDisplayItem[]>(() => {
-        const events = locationFilteredItems.filter(i => "startDateTime" in i) as Event[];
-        const announcements = locationFilteredItems.filter(i => !("startDateTime" in i)) as Announcement[];
-        const processedEvents = compressSeries ? compressSeriesEvents(events) : events;
+        const rawEvents = locationFilteredItems.filter(i => "startDateTime" in i) as EnrichedEvent[];
+        const rawAnnouncements = locationFilteredItems.filter(i => !("startDateTime" in i)) as EnrichedAnnouncement[];
+        const processedEvents = compressSeries ? compressSeriesEvents(rawEvents, "none") : rawEvents;
 
-        const combined: PosterDisplayItem[] = [...processedEvents, ...announcements];
+        const combined: PosterDisplayItem[] = [...processedEvents, ...rawAnnouncements];
         combined.sort((a, b) => {
             const timeA = "startDateTime" in a && a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
             const timeB = "startDateTime" in b && b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
@@ -478,44 +445,6 @@
         return parts.join(", ");
     });
 
-    // Formatting date helpers
-    function formatDayNum(dateStr?: string | null): string {
-        if (!dateStr) return "--";
-        const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? "--" : d.toLocaleDateString(undefined, { day: "2-digit" });
-    }
-
-    function formatWeekday(dateStr?: string | null): string {
-        if (!dateStr) return "";
-        const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase();
-    }
-
-    function formatMonth(dateStr?: string | null): string {
-        if (!dateStr) return "";
-        const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short" }).toUpperCase();
-    }
-
-    function formatTime(startStr?: string | null, endStr?: string | null, isAllDay = false): string {
-        if (isAllDay) return "Ganztägig";
-        if (!startStr) return "";
-        const s = new Date(startStr);
-        if (isNaN(s.getTime())) return "";
-        const sStr = s.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-        if (!endStr) return sStr;
-        const e = new Date(endStr);
-        if (isNaN(e.getTime())) return sStr;
-        const eStr = e.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-        return `${sStr} – ${eStr} Uhr`;
-    }
-
-    function formatPillDate(dateStr: string): string {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return "";
-        return d.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" });
-    }
-
     // Check overflow
     function checkPageOverflow() {
         if (!posterContentElement || !browser) return;
@@ -535,8 +464,13 @@
     }
 
     $effect(() => {
-        // Trigger check when items, density, columns or letterhead change
-        const _ = [displayItems.length, density, effectiveColumns, isLetterheadMode, paperSize, showDescriptions, descriptionStyle];
+        // Trigger check when items, density, columns, letterhead, or visible components change
+        const _ = [
+            displayItems.length, density, effectiveColumns, isLetterheadMode, paperSize,
+            descriptionStyle, compressSeries, visibleComponents.descriptions,
+            visibleComponents.contacts, visibleComponents.participants, visibleComponents.heroImage,
+            visibleComponents.internalNotes, visibleComponents.rooms, visibleComponents.ticketPrice
+        ];
         // Wait for DOM update
         setTimeout(checkPageOverflow, 150);
     });
@@ -596,7 +530,6 @@
             reader.readAsDataURL(file);
             reader.onload = async () => {
                 const base64 = reader.result as string;
-                // Attempt remote upload if possible, otherwise use base64 data URL
                 try {
                     const res = await uploadMedia({
                         filename: file.name,
@@ -612,7 +545,6 @@
                     }
                     toast.success("Logo erfolgreich hinzugefügt");
                 } catch {
-                    // Fallback to data URL
                     if (target === "location") {
                         customLocationLogoUrl = base64;
                     } else {
@@ -682,7 +614,7 @@
             </div>
         </div>
 
-        <!-- Center: Quick Toggles (Logos, Letterhead, Density, Paper) -->
+        <!-- Center: Quick Toggles (Paper, Columns, Density, Series Mode, Visible Components, Logos) -->
         <div class="flex items-center flex-wrap gap-2">
             <!-- Paper Size -->
             <div class="inline-flex rounded-md shadow-sm border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
@@ -761,6 +693,271 @@
                 >
                     Großzügig
                 </button>
+            </div>
+
+            <!-- Series Mode Toggle: Compacted vs Unrolled (Feature Ported from Flat List) -->
+            <div class="inline-flex rounded-md shadow-sm border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800">
+                <button
+                    type="button"
+                    onclick={() => (compressSeries = true)}
+                    class="px-2 py-1 text-xs font-medium rounded transition flex items-center gap-1 {compressSeries ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400'}"
+                    title={m.series_compacted_desc()}
+                >
+                    <RefreshCw class="w-3 h-3" />
+                    <span>{m.series_compacted()}</span>
+                </button>
+                <button
+                    type="button"
+                    onclick={() => (compressSeries = false)}
+                    class="px-2 py-1 text-xs font-medium rounded transition flex items-center gap-1 {!compressSeries ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400'}"
+                    title={m.series_unrolled_desc()}
+                >
+                    <Layers class="w-3 h-3" />
+                    <span>{m.series_unrolled()}</span>
+                </button>
+            </div>
+
+            <!-- Visible Components Dropdown (Feature Ported from Flat List) -->
+            <div class="relative">
+                <button
+                    type="button"
+                    onclick={() => (isComponentsMenuOpen = !isComponentsMenuOpen)}
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition {isComponentsMenuOpen ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 shadow-xs' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900'}"
+                    title={m.visible_components_desc()}
+                    aria-expanded={isComponentsMenuOpen}
+                >
+                    <SlidersHorizontal class="w-3.5 h-3.5 text-slate-500" />
+                    <span>{m.visible_components()}</span>
+                    <span class="px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-full text-[10px] font-bold">
+                        {Object.values(visibleComponents).filter(Boolean).length}
+                    </span>
+                    <ChevronDown class="w-3 h-3 text-slate-400 transition-transform {isComponentsMenuOpen ? 'rotate-180' : ''}" />
+                </button>
+
+                {#if isComponentsMenuOpen}
+                    <!-- Click outside backdrop -->
+                    <div
+                        class="fixed inset-0 z-40"
+                        onclick={() => (isComponentsMenuOpen = false)}
+                        aria-hidden="true"
+                    ></div>
+
+                    <!-- Dropdown panel -->
+                    <div
+                        class="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 z-50 space-y-2 text-xs"
+                    >
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700">
+                            <span class="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                                {m.visible_components()}
+                            </span>
+                            <div class="flex items-center gap-2 text-[11px]">
+                                <button
+                                    type="button"
+                                    onclick={selectAllComponents}
+                                    class="text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                                >
+                                    {m.select_all()}
+                                </button>
+                                <span class="text-slate-300 dark:text-slate-600">•</span>
+                                <button
+                                    type="button"
+                                    onclick={resetComponentsToDefault}
+                                    class="text-slate-500 hover:underline font-medium"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- List of component toggles -->
+                        <div class="space-y-1 max-h-80 overflow-y-auto pr-1">
+                            <!-- Associated Contacts -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('contacts')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.contacts ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <Users class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                                    <div>
+                                        <div class="font-semibold text-xs leading-tight">{m.component_contacts()}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_contacts_desc()}</div>
+                                    </div>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.contacts ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.contacts}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Participants Count -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('participants')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.participants ? 'bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <UserCheck class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                    <div>
+                                        <div class="font-semibold text-xs leading-tight">{m.component_participants()}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_participants_desc()}</div>
+                                    </div>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.participants ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.participants}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Visibility / Public Status -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('publicStatus')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.publicStatus ? 'bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-950 dark:text-indigo-200' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <Globe class="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                    <div>
+                                        <div class="font-semibold text-xs leading-tight">{m.component_visibility()}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_visibility_desc()}</div>
+                                    </div>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.publicStatus ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.publicStatus}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Descriptions -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('descriptions')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.descriptions ? 'bg-slate-100 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <FileText class="w-4 h-4 text-slate-500 shrink-0" />
+                                    <span class="font-semibold text-xs">{m.show_descriptions()}</span>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.descriptions ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.descriptions}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- QR Codes -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('qrCodes')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.qrCodes ? 'bg-slate-100 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <QrCode class="w-4 h-4 text-slate-500 shrink-0" />
+                                    <span class="font-semibold text-xs">{m.show_qr_codes()}</span>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.qrCodes ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.qrCodes}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Ticket Prices -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('ticketPrice')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.ticketPrice ? 'bg-slate-100 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <Ticket class="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span class="font-semibold text-xs">{m.ticket_price()}</span>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.ticketPrice ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.ticketPrice}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Rooms & Location -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('rooms')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.rooms ? 'bg-slate-100 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <MapPin class="w-4 h-4 text-red-500 shrink-0" />
+                                    <span class="font-semibold text-xs">{m.room()} / {m.location()}</span>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.rooms ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.rooms}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Tags -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('tags')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.tags ? 'bg-slate-100 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <Tag class="w-4 h-4 text-amber-500 shrink-0" />
+                                    <span class="font-semibold text-xs">{m.tags()}</span>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.tags ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.tags}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Hero Image -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('heroImage')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.heroImage ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-200' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <FileImage class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                                    <div>
+                                        <div class="font-semibold text-xs leading-tight">{m.component_hero_image()}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_hero_image_desc()}</div>
+                                    </div>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.heroImage ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.heroImage}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+
+                            <!-- Internal Notes -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('internalNotes')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.internalNotes ? 'bg-amber-50/70 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <Lock class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <div>
+                                        <div class="font-semibold text-xs leading-tight">{m.component_internal_notes()}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_internal_notes_desc()}</div>
+                                    </div>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.internalNotes ? 'bg-amber-600 border-amber-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.internalNotes}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                {/if}
             </div>
 
             <!-- Quick Toggle: Location Logo -->
@@ -875,8 +1072,8 @@
                 <header class="poster-header px-8 pt-6 pb-4 border-b-2 border-slate-900 flex justify-between items-start gap-6">
                     <!-- Left: Location Branding & Venue Info -->
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-4 mb-2">
-                            {#if showLocationLogo && !isLetterheadMode && effectiveLocationLogo}
+                        <div class="flex items-start gap-4 mb-2">
+                            {#if showLocationLogo && locationLogoPosition === "left" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
                                 <div class="location-logo-wrap shrink-0">
                                     <img
                                         src={effectiveLocationLogo}
@@ -887,13 +1084,59 @@
                                 </div>
                             {/if}
 
-                            <div>
+                            <div class="space-y-1">
                                 <h2 class="text-xl sm:text-2xl font-black tracking-tight text-slate-900 uppercase">
                                     {currentLocation?.name || "Kultur- & Begegnungszentrum"}
                                 </h2>
-                                <p class="text-xs text-slate-600 font-medium">
-                                    {programmeLocationSubtitle}
-                                </p>
+
+                                <!-- Location Subtitle, Contact & Location QR Code (placed near location, like Animated List View) -->
+                                <div class="flex items-start gap-3 mt-1.5 text-xs text-slate-600">
+                                    {#if showLocationQr}
+                                        <div class="bg-white p-1 border border-slate-200 rounded-lg shadow-2xs shrink-0 mt-0.5 self-start">
+                                            {#if currentLocation?.contact?.qrCodeDataUrl || currentLocation?.contact?.qrCodePath}
+                                                <img
+                                                    src={currentLocation.contact.qrCodeDataUrl || currentLocation.contact.qrCodePath}
+                                                    alt="Location QR"
+                                                    class="w-13 h-13 object-contain"
+                                                />
+                                            {:else}
+                                                <div class="w-13 h-13 bg-slate-50 flex items-center justify-center text-slate-600">
+                                                    <QrCode class="w-7 h-7" />
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/if}
+
+                                    <div class="space-y-0.5 leading-snug">
+                                        {#if programmeLocationSubtitle}
+                                            <p class="font-medium text-slate-700">{programmeLocationSubtitle}</p>
+                                        {/if}
+                                        {#if currentLocation?.contact}
+                                            <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5 pt-0.5">
+                                                {#if currentLocation.contact.name}
+                                                    <span class="font-semibold text-slate-800">{currentLocation.contact.name}</span>
+                                                {/if}
+                                                {#if currentLocation.contact.role}
+                                                    <span class="px-1.5 py-0.2 bg-slate-100 rounded text-[10px] text-slate-600 border border-slate-200">
+                                                        {currentLocation.contact.role}
+                                                    </span>
+                                                {/if}
+                                                {#if currentLocation.contact.phone}
+                                                    <span class="inline-flex items-center gap-1">
+                                                        <Phone class="w-2.5 h-2.5 text-slate-400" />
+                                                        {currentLocation.contact.phone}
+                                                    </span>
+                                                {/if}
+                                                {#if currentLocation.contact.email}
+                                                    <span class="inline-flex items-center gap-1">
+                                                        <Mail class="w-2.5 h-2.5 text-slate-400" />
+                                                        {currentLocation.contact.email}
+                                                    </span>
+                                                {/if}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -903,10 +1146,27 @@
                                 {programmeMonthTitle}
                             </h1>
                         </div>
+
+                        {#if kiosk?.description}
+                            <div class="rich-description text-xs text-slate-600 max-w-2xl leading-relaxed mt-2">
+                                {@html kiosk.description}
+                            </div>
+                        {/if}
                     </div>
 
-                    <!-- Right Header: Location QR Code or Top Sponsors -->
+                    <!-- Right Header: Location Logo (placed where QR code was previously) or Top Sponsors -->
                     <div class="flex flex-col items-end gap-3 shrink-0">
+                        {#if showLocationLogo && locationLogoPosition === "right" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
+                            <div class="location-logo-wrap shrink-0 text-right">
+                                <img
+                                    src={effectiveLocationLogo}
+                                    alt={currentLocation?.name || "Logo"}
+                                    class="object-contain max-w-[200px]"
+                                    style="height: {locationLogoHeight}px;"
+                                />
+                            </div>
+                        {/if}
+
                         {#if showSponsors && sponsorPosition === "header" && sponsors.length > 0}
                             <div class="text-right">
                                 <span class="text-[9px] uppercase tracking-wider font-semibold text-slate-500 block mb-1">
@@ -925,31 +1185,11 @@
                                 </div>
                             </div>
                         {/if}
-
-                        {#if showLocationQr}
-                            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded p-1.5 print:bg-transparent">
-                                {#if currentLocation?.contact?.qrCodeDataUrl || currentLocation?.contact?.qrCodePath}
-                                    <img
-                                        src={currentLocation.contact.qrCodeDataUrl || currentLocation.contact.qrCodePath}
-                                        alt="QR Code"
-                                        class="w-12 h-12 shrink-0 object-contain"
-                                    />
-                                {:else}
-                                    <div class="w-12 h-12 bg-slate-100 flex items-center justify-center border border-slate-200 rounded shrink-0">
-                                        <QrCode class="w-8 h-8 text-slate-700" />
-                                    </div>
-                                {/if}
-                                <div class="text-[10px] leading-tight text-slate-600 hidden sm:block">
-                                    <span class="font-bold block text-slate-800">Online-Programm</span>
-                                    <span>Aktuelle Infos & Termine</span>
-                                </div>
-                            </div>
-                        {/if}
                     </div>
                 </header>
             </div>
 
-            <!-- Middle Section: Programme Event Grid (Single Page Flow) -->
+            <!-- Middle Section: Programme Event Grid (Single Page Multi-Column Flow) -->
             <div
                 class="poster-events-grid flex-1 px-8 py-5"
                 style="column-count: {effectiveColumns}; column-gap: 2rem; {effectiveColumns > 1 ? 'column-rule: 1px solid #e2e8f0;' : ''}"
@@ -957,104 +1197,343 @@
                 {#if displayItems.length === 0}
                     <div class="py-16 text-center text-slate-400">
                         <Calendar class="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p class="font-medium text-base">Keine Termine für diesen Monat ausgewählt.</p>
+                        <p class="font-medium text-base">Keine Termine für diesen Zeitraum ausgewählt.</p>
                         <p class="text-xs">Prüfen Sie den Datumsbereich oder die Filtereinstellungen des Kiosks.</p>
                     </div>
                 {:else}
                     {#each displayItems as item, idx (item.id || idx)}
                         {@const isEvt = "startDateTime" in item}
-                        {@const evt = item as PosterDisplayItem}
+                        {@const evt = item as EnrichedEvent}
+                        {@const isSpecialNonSeries = isEvt && isNonSeriesEvent(item)}
+                        {@const isCompressed = Boolean(isEvt && evt.isCompressedSeries && ((evt.seriesInstances && evt.seriesInstances.length > 1) || (evt.seriesDates && evt.seriesDates.length > 1)))}
+                        {@const multiDay = isEvt && isMultiDayEvent(item as Event)}
+                        {@const durationDays = multiDay ? getEventDurationDays(item as Event) : 1}
+                        {@const dateParts = isEvt ? getEventDateParts(item as Event) : null}
                         {@const dateStr = isEvt ? (item as Event).startDateTime : (item as Announcement).createdAt}
-                        {@const durationDays = isEvt ? isMultiDayEvent(item as Event) : false}
                         {@const rooms = isEvt ? getEventRooms(item as Event) : []}
                         {@const priceStr = isEvt ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown) : ""}
                         {@const isFree = isEvt ? isEventFree((item as Event).ticketPrice, (item as Event).ticketPriceUnknown) : false}
+                        {@const cancelledCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'cancelled').length : 0}
+                        {@const tentativeCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'tentative').length : 0}
+                        {@const totalInstances = evt.seriesInstances ? evt.seriesInstances.length : (evt.seriesDates ? evt.seriesDates.length : 1)}
 
                         <!-- Single Programme Entry (Avoid breaking inside columns) -->
-                        <div class="poster-event-item mb-4 pb-3 border-b border-slate-100 break-inside-avoid {density === 'compact' ? 'mb-2.5 pb-2 text-[11px]' : density === 'relaxed' ? 'mb-5 pb-4 text-[13px]' : 'text-xs'}">
+                        <div class="poster-event-item mb-4 pb-3 border-b border-slate-100 break-inside-avoid transition-all {density === 'compact' ? 'mb-2.5 pb-2 text-[11px]' : density === 'relaxed' ? 'mb-5 pb-4 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 pl-2.5 bg-gradient-to-r from-amber-50/70 via-amber-50/20 to-transparent rounded-r-md' : isCompressed ? 'border-l-4 border-l-indigo-500 pl-2.5 bg-gradient-to-r from-indigo-50/50 via-indigo-50/15 to-transparent rounded-r-md' : ''}">
                             <div class="flex items-start gap-3">
                                 <!-- Date Badge Block -->
-                                <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center w-11 py-1 rounded bg-slate-900 text-white font-mono text-center">
-                                    <span class="text-[9px] font-bold tracking-wider uppercase text-emerald-300 leading-none">
-                                        {formatWeekday(dateStr)}
-                                    </span>
-                                    <span class="text-base font-black leading-none my-0.5">
-                                        {formatDayNum(dateStr)}
-                                    </span>
-                                    <span class="text-[8px] uppercase tracking-wider text-slate-300 leading-none">
-                                        {formatMonth(dateStr)}
-                                    </span>
-                                </div>
+                                {#if isCompressed}
+                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-indigo-950 text-white font-mono text-center">
+                                        <RefreshCw class="w-3.5 h-3.5 text-indigo-400 mb-0.5" />
+                                        <span class="text-sm font-black leading-tight text-white">{totalInstances}×</span>
+                                        <span class="text-[7.5px] uppercase tracking-wider text-indigo-300 leading-none">{m.series_badge()}</span>
+                                    </div>
+                                {:else if multiDay && dateParts}
+                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-slate-900 text-white font-mono text-center">
+                                        <span class="text-[8px] font-extrabold uppercase text-emerald-300 leading-none">
+                                            {dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? `/${dateParts.endMonth}` : ''}
+                                        </span>
+                                        <span class="text-xs font-black leading-tight my-0.5">
+                                            {dateParts.startDay}–{dateParts.endDay}
+                                        </span>
+                                        <span class="text-[7.5px] uppercase tracking-wider text-slate-300 leading-none">
+                                            {m.days_count({ count: durationDays })}
+                                        </span>
+                                    </div>
+                                {:else}
+                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded {isSpecialNonSeries ? 'bg-amber-950 ring-1 ring-amber-400/50' : 'bg-slate-900'} text-white font-mono text-center">
+                                        <span class="text-[8.5px] font-bold tracking-wider uppercase {isSpecialNonSeries ? 'text-amber-300' : 'text-emerald-300'} leading-none">
+                                            {formatDateWeekday(dateStr)}
+                                        </span>
+                                        <span class="text-base font-black leading-none my-0.5">
+                                            {formatDateDay(dateStr)}
+                                        </span>
+                                        <span class="text-[8px] uppercase tracking-wider text-slate-300 leading-none">
+                                            {formatDateMonth(dateStr)}
+                                        </span>
+                                    </div>
+                                {/if}
 
                                 <!-- Event Details -->
                                 <div class="flex-1 min-w-0">
-                                    <!-- Meta: Time, Rooms, Price -->
-                                    <div class="flex items-center flex-wrap gap-2 text-slate-500 font-medium mb-0.5 text-[10px]">
-                                        {#if showTimes && isEvt}
-                                            <span class="inline-flex items-center gap-1 font-bold text-slate-800">
-                                                <Clock class="w-3 h-3 text-emerald-600 shrink-0" />
-                                                {formatTime((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}
+                                    <!-- Meta Badges & Time Row -->
+                                    <div class="flex items-center flex-wrap gap-1.5 text-slate-500 font-medium mb-0.5 text-[10px]">
+                                        <!-- Series Recurrence or Multi-day Badge -->
+                                        {#if isCompressed}
+                                            <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-900 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                <RefreshCw class="w-2.5 h-2.5" />
+                                                {evt.recurrenceText || m.series_badge()}
+                                            </span>
+                                        {:else if multiDay}
+                                            <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-900 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                <Calendar class="w-2.5 h-2.5" />
+                                                {m.multi_day_badge()}
                                             </span>
                                         {/if}
 
-                                        {#if showRooms && rooms.length > 0}
+                                        <!-- Status Badges -->
+                                        {#if evt.status === 'cancelled'}
+                                            <span class="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                {m.cancelled()}
+                                            </span>
+                                        {:else if evt.status === 'tentative'}
+                                            <span class="bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                {m.tentative()}
+                                            </span>
+                                        {/if}
+
+                                        <!-- Partial cancelled/tentative count for compressed series -->
+                                        {#if isCompressed && cancelledCount > 0 && cancelledCount < totalInstances}
+                                            <span class="bg-red-100 text-red-700 border border-red-300 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                {cancelledCount} {m.cancelled()}
+                                            </span>
+                                        {/if}
+                                        {#if isCompressed && tentativeCount > 0 && tentativeCount < totalInstances}
+                                            <span class="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                {tentativeCount} {m.tentative()}
+                                            </span>
+                                        {/if}
+
+                                        <!-- Public / Internal Visibility Badge -->
+                                        {#if visibleComponents.publicStatus && isEvt}
+                                            {#if (item as Event).isPublic}
+                                                <span class="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                    <Globe class="w-2.5 h-2.5 text-emerald-600" />
+                                                    <span>{m.public_label()}</span>
+                                                </span>
+                                            {:else}
+                                                <span class="inline-flex items-center gap-0.5 bg-slate-100 text-slate-700 border border-slate-300 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                                    <Lock class="w-2.5 h-2.5 text-slate-500" />
+                                                    <span>{m.private_label()}</span>
+                                                </span>
+                                            {/if}
+                                        {/if}
+
+                                        <!-- Time Range -->
+                                        {#if showTimes && isEvt}
+                                            <span class="inline-flex items-center gap-1 font-bold text-slate-800">
+                                                <Clock class="w-3 h-3 text-emerald-600 shrink-0" />
+                                                {formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}
+                                            </span>
+                                        {/if}
+
+                                        <!-- Rooms / Venue -->
+                                        {#if visibleComponents.rooms && rooms.length > 0}
                                             <span class="inline-flex items-center gap-1 text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
                                                 <MapPin class="w-2.5 h-2.5 text-slate-400" />
                                                 {rooms.join(", ")}
                                             </span>
                                         {/if}
 
-                                        {#if showPrices && priceStr}
-                                            <span class="inline-flex items-center gap-0.5 font-semibold {isFree ? 'text-emerald-700 bg-emerald-50' : 'text-slate-700 bg-slate-100'} px-1.5 py-0.2 rounded text-[9px]">
+                                        <!-- Ticket Price -->
+                                        {#if visibleComponents.ticketPrice && priceStr && !isFree}
+                                            <span class="inline-flex items-center gap-0.5 font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
                                                 <Ticket class="w-2.5 h-2.5" />
                                                 {priceStr}
+                                            </span>
+                                        {/if}
+
+                                        <!-- Participants -->
+                                        {#if visibleComponents.participants && isEvt}
+                                            {@const pCount = (item as any).participantsCount}
+                                            {@const maxOcc = (item as any).maxOccupancy}
+                                            {#if pCount != null || maxOcc != null}
+                                                <span class="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded text-[9px] font-semibold">
+                                                    <UserCheck class="w-2.5 h-2.5 text-amber-600" />
+                                                    <span>
+                                                        {#if pCount != null && maxOcc != null}
+                                                            {pCount} / {maxOcc} {m.participants()}
+                                                        {:else if pCount != null}
+                                                            {pCount} {m.participants()}
+                                                        {:else}
+                                                            Max: {maxOcc}
+                                                        {/if}
+                                                    </span>
+                                                </span>
+                                            {/if}
+                                        {/if}
+
+                                        <!-- Recurrence text for unrolled series -->
+                                        {#if !isCompressed && isEvt && (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
+                                            <span class="inline-flex items-center gap-1 text-slate-600 font-medium text-[9px]">
+                                                <RefreshCw class="w-2.5 h-2.5 text-slate-500" />
+                                                {formatRecurrenceText((item as any).recurrence, undefined, { omitLength: true })}
                                             </span>
                                         {/if}
                                     </div>
 
                                     <!-- Title -->
-                                    <h3 class="font-bold text-slate-900 leading-snug tracking-tight {density === 'compact' ? 'text-xs' : density === 'relaxed' ? 'text-sm' : 'text-[13px]'}">
+                                    <h3 class="font-bold text-slate-900 leading-snug tracking-tight {density === 'compact' ? 'text-xs' : density === 'relaxed' ? 'text-sm' : 'text-[13px]'} {evt.status === 'cancelled' ? 'line-through text-slate-400' : ''}">
                                         {isEvt ? (item as Event).summary : (item as Announcement).title}
                                     </h3>
 
-                                    <!-- Compressed Series Recurring Dates Pill -->
-                                    {#if evt.isCompressedSeries && evt.seriesDates && evt.seriesDates.length > 1}
-                                        <div class="mt-1 flex items-center flex-wrap gap-1">
-                                            {#if evt.recurrenceText}
-                                                <span class="text-[9px] font-bold text-emerald-800 uppercase tracking-wide bg-emerald-50 px-1.5 py-0.5 rounded">
-                                                    {evt.recurrenceText}
-                                                </span>
-                                            {/if}
-                                            <span class="text-[9px] text-slate-500">Termine:</span>
+                                    <!-- Compressed Series Dates Pills with per-instance status -->
+                                    {#if isCompressed && evt.seriesInstances && evt.seriesInstances.length > 1}
+                                        <div class="mt-1 flex items-center gap-1 flex-wrap">
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                                <Calendar class="w-2.5 h-2.5 text-indigo-500" />
+                                                <span>{m.all_instances_count?.({ count: evt.seriesInstances.length }) ?? `${evt.seriesInstances.length} Termine`}:</span>
+                                            </span>
+                                            {#each evt.seriesInstances as inst (inst.id || inst.startDateTime)}
+                                                {#if inst.status === 'cancelled'}
+                                                    <span
+                                                        class="inline-flex items-center gap-0.5 bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight"
+                                                        title="{formatFullDate(inst.startDateTime)} – {m.cancelled()}"
+                                                    >
+                                                        <span class="line-through opacity-75">{formatDateWeekday(inst.startDateTime)}</span>
+                                                        <span class="line-through opacity-75">{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
+                                                        <span class="bg-red-600 text-white text-[7.5px] font-black px-0.5 rounded uppercase ml-0.5">{m.cancelled()}</span>
+                                                    </span>
+                                                {:else if inst.status === 'tentative'}
+                                                    <span
+                                                        class="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight"
+                                                        title="{formatFullDate(inst.startDateTime)} – {m.tentative()}"
+                                                    >
+                                                        <span class="text-amber-700 font-medium">{formatDateWeekday(inst.startDateTime)}</span>
+                                                        <span>{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
+                                                        <span class="bg-amber-500 text-white text-[7.5px] font-black px-0.5 rounded uppercase ml-0.5">{m.tentative()}</span>
+                                                    </span>
+                                                {:else}
+                                                    <span class="inline-flex items-center gap-0.5 bg-slate-900 text-white px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
+                                                        <span class="text-slate-300 font-medium">{formatDateWeekday(inst.startDateTime)}</span>
+                                                        <span>{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
+                                                    </span>
+                                                {/if}
+                                            {/each}
+                                        </div>
+                                    {:else if isCompressed && evt.seriesDates && evt.seriesDates.length > 1}
+                                        <div class="mt-1 flex items-center gap-1 flex-wrap">
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                                <Calendar class="w-2.5 h-2.5 text-indigo-500" />
+                                                <span>{m.all_instances_count?.({ count: evt.seriesDates.length }) ?? `${evt.seriesDates.length} Termine`}:</span>
+                                            </span>
                                             {#each evt.seriesDates as sDate}
-                                                <span class="text-[9px] font-mono px-1 py-0.2 bg-slate-100 border border-slate-200 rounded text-slate-700">
-                                                    {formatPillDate(sDate)}
+                                                <span class="inline-flex items-center gap-0.5 bg-slate-900 text-white px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
+                                                    <span class="text-slate-300 font-medium">{formatDateWeekday(sDate)}</span>
+                                                    <span>{formatDateDay(sDate)} {formatDateMonth(sDate)}</span>
                                                 </span>
                                             {/each}
+                                        </div>
+                                    {/if}
+
+                                    <!-- Associated Contacts List (if enabled in visibleComponents) -->
+                                    {#if visibleComponents.contacts && isEvt}
+                                        {@const allContacts = getAllEventContacts(item as Event)}
+                                        {#if allContacts.length > 0}
+                                            <div class="mt-1 pt-1 border-t border-slate-100 space-y-0.5">
+                                                <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                                    <Users class="w-2.5 h-2.5 text-slate-400" />
+                                                    <span>{m.component_contacts()} ({allContacts.length})</span>
+                                                </div>
+                                                <div class="flex flex-wrap items-center gap-1">
+                                                    {#each allContacts as c (c.id || c.name || getContactName(c))}
+                                                        {@const cName = getContactName(c)}
+                                                        {@const cRoles = getContactRoles(c)}
+                                                        {@const cEmail = getContactEmail(c)}
+                                                        {@const cPhone = getContactPhone(c)}
+                                                        <div class="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 px-1.5 py-0.2 rounded text-[9.5px]">
+                                                            <User class="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                                            <span class="font-medium text-slate-800">{cName}</span>
+                                                            {#if cRoles.length > 0}
+                                                                {#each cRoles as r}
+                                                                    <span class="px-1 py-0.1 bg-blue-100 text-blue-800 rounded text-[8.5px] font-semibold">{r}</span>
+                                                                {/each}
+                                                            {/if}
+                                                            {#if cEmail}
+                                                                <a href="mailto:{cEmail}" class="text-slate-400 hover:text-blue-600 text-[9px]" title={cEmail}>• {cEmail}</a>
+                                                            {/if}
+                                                            {#if cPhone}
+                                                                <a href="tel:{cPhone}" class="text-slate-400 hover:text-blue-600 text-[9px]" title={cPhone}>• {cPhone}</a>
+                                                            {/if}
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            </div>
+                                        {/if}
+                                    {:else if !visibleComponents.contacts && isEvt && (item as Event).resolvedContact}
+                                        <!-- Inline single contact if Associated Contacts full list is NOT toggled -->
+                                        <div class="mt-0.5 text-[9.5px] text-slate-600 flex items-center gap-1">
+                                            <User class="w-2.5 h-2.5 text-slate-400" />
+                                            <span class="font-medium text-slate-700">{(item as Event).resolvedContact?.name}</span>
+                                            {#if (item as Event).resolvedContact?.roles && (item as Event).resolvedContact!.roles!.length > 0}
+                                                {#each (item as Event).resolvedContact!.roles! as roleName}
+                                                    <span class="px-1 py-0.1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[8.5px] font-semibold">{roleName}</span>
+                                                {/each}
+                                            {:else if (item as Event).resolvedContact?.role}
+                                                <span class="px-1 py-0.1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[8.5px] font-semibold">{(item as Event).resolvedContact?.role}</span>
+                                            {/if}
                                         </div>
                                     {/if}
 
                                     <!-- Description -->
-                                    {#if showDescriptions && descriptionStyle !== "none"}
+                                    {#if visibleComponents.descriptions && descriptionStyle !== "none"}
                                         {@const rawDesc = isEvt ? (item as Event).description : (item as Announcement).content}
                                         {#if rawDesc && rawDesc.trim()}
-                                            <p class="mt-0.5 text-slate-600 leading-relaxed font-normal {descriptionStyle === 'short' ? 'line-clamp-1' : 'line-clamp-3'} text-[10px]">
-                                                {rawDesc.trim()}
-                                            </p>
+                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {descriptionStyle === 'short' ? 'line-clamp-2' : ''} text-[10px]">
+                                                {@html rawDesc}
+                                            </div>
                                         {/if}
                                     {/if}
 
-                                    <!-- Optional tags -->
-                                    {#if showTags && (item as any).tags && (item as any).tags.length > 0}
+                                    <!-- Staff Internal Notes -->
+                                    {#if visibleComponents.internalNotes && isEvt && (item as Event).internalNotes}
+                                        <div class="mt-1 p-1.5 rounded bg-amber-50/80 border border-amber-200 text-amber-900 text-[10px]">
+                                            <div class="flex items-center gap-1 font-bold text-[8.5px] uppercase tracking-wider text-amber-700 mb-0.5">
+                                                <Lock class="w-2.5 h-2.5 text-amber-600" />
+                                                <span>{m.internal_notes()}</span>
+                                            </div>
+                                            <div class="rich-description text-[9.5px] leading-relaxed">
+                                                {@html (item as Event).internalNotes}
+                                            </div>
+                                        </div>
+                                    {/if}
+
+                                    <!-- Tags & Free Admission Pill -->
+                                    {#if (visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0) || (visibleComponents.ticketPrice && isFree)}
                                         <div class="mt-1 flex items-center gap-1 flex-wrap">
-                                            {#each (item as any).tags as t}
-                                                <span class="text-[8px] px-1 py-0.2 bg-slate-100 text-slate-500 rounded">
-                                                    #{t.name || t.tag?.name || t}
+                                            {#if visibleComponents.ticketPrice && isFree}
+                                                <span class="px-1.5 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[9px] font-bold inline-flex items-center gap-0.5">
+                                                    <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                                    {m.ticket_price_free?.() || 'Free'}
                                                 </span>
-                                            {/each}
+                                            {/if}
+                                            {#if visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0}
+                                                {#each (item as any).tags as t}
+                                                    <span class="text-[8.5px] px-1 py-0.2 bg-slate-100 text-slate-500 rounded border border-slate-200">
+                                                        #{typeof t === 'string' ? t : t.name || t.tag?.name}
+                                                    </span>
+                                                {/each}
+                                            {/if}
                                         </div>
                                     {/if}
                                 </div>
+
+                                <!-- Right Side Visuals (Hero Image & QR Code) -->
+                                {#if (visibleComponents.heroImage && (item as any).heroImage) || (visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath))}
+                                    <div class="shrink-0 flex items-center gap-1.5 self-start pt-1">
+                                        <!-- Hero Image -->
+                                        {#if visibleComponents.heroImage && (item as any).heroImage}
+                                            <div class="overflow-hidden rounded-md border border-slate-200 bg-slate-100 shrink-0">
+                                                <img
+                                                    src={(item as any).heroImage}
+                                                    alt={evt.summary || "Event"}
+                                                    class="{density === 'compact' ? 'w-14 h-10' : 'w-20 h-14'} object-cover"
+                                                    loading="lazy"
+                                                />
+                                            </div>
+                                        {/if}
+
+                                        <!-- Scannable Event QR Code -->
+                                        {#if visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath)}
+                                            <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0">
+                                                <img
+                                                    src={evt.qrCodeDataUrl || evt.qrCodePath}
+                                                    alt="QR"
+                                                    class="{density === 'compact' ? 'w-9 h-9' : 'w-11 h-11'} object-contain"
+                                                />
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/if}
                             </div>
                         </div>
                     {/each}
@@ -1181,6 +1660,26 @@
                                 placeholder="https://example.com/logo.svg"
                                 class="w-full text-xs p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-1 focus:ring-emerald-500 mb-2"
                             />
+
+                            <div class="flex items-center justify-between text-xs mb-2">
+                                <span class="font-semibold text-slate-600 dark:text-slate-400">{m.poster_logo_position()}:</span>
+                                <div class="inline-flex rounded border border-slate-300 dark:border-slate-600 p-0.5 bg-white dark:bg-slate-800 text-[11px]">
+                                    <button
+                                        type="button"
+                                        onclick={() => (locationLogoPosition = "right")}
+                                        class="px-2 py-0.5 rounded transition {locationLogoPosition === 'right' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
+                                    >
+                                        {m.poster_logo_position_right()}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onclick={() => (locationLogoPosition = "left")}
+                                        class="px-2 py-0.5 rounded transition {locationLogoPosition === 'left' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
+                                    >
+                                        {m.poster_logo_position_left()}
+                                    </button>
+                                </div>
+                            </div>
 
                             <div class="flex items-center justify-between text-xs">
                                 <span>Logo-Höhe ({locationLogoHeight}px):</span>
@@ -1362,6 +1861,40 @@
                                 />
                                 <span>Reiner Text / Monochrom (Keine farbigen Füllflächen, ideal für farbiges Papier)</span>
                             </label>
+
+                            <!-- Letterhead Logo Placement (top-right QR code area or left) -->
+                            <div class="space-y-2 pt-2 border-t border-purple-200 dark:border-purple-800/40">
+                                <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-purple-950 dark:text-purple-200">
+                                    <input
+                                        type="checkbox"
+                                        bind:checked={letterheadShowLogo}
+                                        class="rounded text-purple-600 focus:ring-purple-500"
+                                    />
+                                    <span>{m.poster_letterhead_show_logo()}</span>
+                                </label>
+
+                                {#if letterheadShowLogo}
+                                    <div class="flex items-center justify-between text-xs pl-6">
+                                        <span class="text-slate-600 dark:text-slate-400">{m.poster_logo_position()}:</span>
+                                        <div class="inline-flex rounded border border-purple-300 dark:border-purple-700 p-0.5 bg-white dark:bg-slate-800 text-[11px]">
+                                            <button
+                                                type="button"
+                                                onclick={() => (locationLogoPosition = "right")}
+                                                class="px-2 py-0.5 rounded transition {locationLogoPosition === 'right' ? 'bg-purple-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
+                                            >
+                                                {m.poster_logo_position_right()}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() => (locationLogoPosition = "left")}
+                                                class="px-2 py-0.5 rounded transition {locationLogoPosition === 'left' ? 'bg-purple-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
+                                            >
+                                                {m.poster_logo_position_left()}
+                                            </button>
+                                        </div>
+                                    </div>
+                                {/if}
+                            </div>
                         </div>
                     {/if}
                 </section>
@@ -1410,11 +1943,11 @@
                             <span>Uhrzeiten anzeigen</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" bind:checked={showRooms} class="rounded text-emerald-600" />
+                            <input type="checkbox" bind:checked={visibleComponents.rooms} class="rounded text-emerald-600" />
                             <span>Räume / Säle</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" bind:checked={showPrices} class="rounded text-emerald-600" />
+                            <input type="checkbox" bind:checked={visibleComponents.ticketPrice} class="rounded text-emerald-600" />
                             <span>Eintrittspreise</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
@@ -1422,12 +1955,36 @@
                             <span>Standort-QR-Code</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" bind:checked={compressSeries} class="rounded text-emerald-600" />
-                            <span>Wöchentliche Serien komprimieren</span>
+                            <input type="checkbox" bind:checked={visibleComponents.qrCodes} class="rounded text-emerald-600" />
+                            <span>Termin-QR-Codes</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" bind:checked={showTags} class="rounded text-emerald-600" />
+                            <input type="checkbox" bind:checked={compressSeries} class="rounded text-emerald-600" />
+                            <span>Serien komprimieren</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.tags} class="rounded text-emerald-600" />
                             <span>Schlagwörter / Tags</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.contacts} class="rounded text-emerald-600" />
+                            <span>Beteiligte Personen / Kontakte</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.participants} class="rounded text-emerald-600" />
+                            <span>Teilnehmerzahl / Auslastung</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.publicStatus} class="rounded text-emerald-600" />
+                            <span>Öffentlich / Intern Status</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.heroImage} class="rounded text-emerald-600" />
+                            <span>Titelbild (Vorschaubild)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.internalNotes} class="rounded text-emerald-600" />
+                            <span>Interne Notizen</span>
                         </label>
                     </div>
 
@@ -1440,7 +1997,7 @@
                             bind:value={descriptionStyle}
                             class="text-xs p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
                         >
-                            <option value="short">1 Zeile (Kompakt)</option>
+                            <option value="short">1–2 Zeilen (Kompakt)</option>
                             <option value="full">Mehrzeilig</option>
                             <option value="none">Keine Beschreibung (Nur Titel)</option>
                         </select>
@@ -1506,6 +2063,78 @@
         border-color: #000000 !important;
     }
 
+    .monochrome-mode .rich-description :global(*) {
+        color: #000000 !important;
+    }
+
+    /* CKEDITOR RICH TEXT HTML RENDERING */
+    .rich-description :global(p) {
+        margin-top: 0;
+        margin-bottom: 0.25rem;
+    }
+    .rich-description :global(p:last-child) {
+        margin-bottom: 0;
+    }
+    .rich-description :global(ul),
+    .rich-description :global(ol) {
+        margin: 0.2rem 0 0.25rem 1rem;
+        padding: 0;
+    }
+    .rich-description :global(ul) {
+        list-style-type: disc;
+    }
+    .rich-description :global(ol) {
+        list-style-type: decimal;
+    }
+    .rich-description :global(li) {
+        margin-bottom: 0.1rem;
+    }
+    .rich-description :global(a) {
+        color: #059669;
+        text-decoration: underline;
+    }
+    .rich-description :global(strong),
+    .rich-description :global(b) {
+        font-weight: 700;
+    }
+    .rich-description :global(em),
+    .rich-description :global(i) {
+        font-style: italic;
+    }
+    .rich-description :global(u) {
+        text-decoration: underline;
+    }
+    .rich-description :global(s),
+    .rich-description :global(strike) {
+        text-decoration: line-through;
+    }
+    .rich-description :global(h1),
+    .rich-description :global(h2),
+    .rich-description :global(h3),
+    .rich-description :global(h4) {
+        font-weight: 700;
+        margin-top: 0.25rem;
+        margin-bottom: 0.15rem;
+        line-height: 1.25;
+    }
+    .rich-description :global(blockquote) {
+        border-left: 2px solid #10b981;
+        padding-left: 0.5rem;
+        margin: 0.25rem 0;
+        font-style: italic;
+    }
+    .rich-description :global(table) {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.25rem 0;
+    }
+    .rich-description :global(th),
+    .rich-description :global(td) {
+        border: 1px solid #e2e8f0;
+        padding: 0.15rem 0.35rem;
+        font-size: 0.85em;
+    }
+
     /* ZERO-OVERFLOW GUARANTEED PRINT STYLES */
     @media print {
         @page {
@@ -1568,6 +2197,15 @@
         .poster-event-item {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+        }
+
+        .rich-description :global(a) {
+            color: #000000 !important;
+            text-decoration: none !important;
+        }
+
+        .rich-description :global(*) {
+            color: #000000 !important;
         }
     }
 </style>
