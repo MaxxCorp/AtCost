@@ -1224,7 +1224,7 @@
 						{:else}
 							<!-- Selected Mailbox Banner (if selected) -->
 							{#if msMailboxEmail}
-								<div class="p-3 bg-blue-50/80 border border-blue-200 rounded-lg flex items-center justify-between">
+								<div class="p-3 bg-blue-50/80 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 									<div class="flex items-center gap-3 min-w-0">
 										<div class="p-2 bg-blue-100 text-blue-700 rounded-lg shrink-0">
 											{#if selectedMailboxObj?.type === "room"}
@@ -1236,10 +1236,10 @@
 											{/if}
 										</div>
 										<div class="min-w-0">
-											<div class="font-medium text-sm text-blue-950 truncate">
+											<div class="font-medium text-sm text-blue-950 break-words">
 												{selectedMailboxObj?.displayName || msMailboxEmail}
 											</div>
-											<div class="text-xs text-blue-700 font-mono truncate">
+											<div class="text-xs text-blue-700 font-mono break-all">
 												{msMailboxEmail}
 											</div>
 										</div>
@@ -1247,7 +1247,7 @@
 									<button
 										type="button"
 										onclick={() => (msMailboxEmail = "")}
-										class="shrink-0 ml-3 text-xs px-2.5 py-1 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 rounded-md font-medium shadow-sm"
+										class="self-start sm:self-center shrink-0 text-xs px-2.5 py-1 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 rounded-md font-medium shadow-sm"
 									>
 										Change
 									</button>
@@ -1367,10 +1367,10 @@
 													msCalendarId = "primary";
 													void calendarsQuery?.refresh();
 												}}
-												class="w-full text-left p-2 rounded-md flex items-center justify-between gap-2 transition-colors {isSelected ? 'bg-blue-50 border border-blue-300 ring-1 ring-blue-400/30' : 'hover:bg-gray-50'}"
+												class="w-full text-left p-2 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-colors {isSelected ? 'bg-blue-50 border border-blue-300 ring-1 ring-blue-400/30' : 'hover:bg-gray-50'}"
 											>
-												<div class="flex items-center gap-2.5 min-w-0">
-													<div class="p-1.5 rounded shrink-0 {isSelected ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-500'}">
+												<div class="flex items-start sm:items-center gap-2.5 min-w-0">
+													<div class="p-1.5 rounded shrink-0 mt-0.5 sm:mt-0 {isSelected ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-500'}">
 														{#if mb.type === 'room'}
 															<MapPin class="h-3.5 w-3.5" />
 														{:else if mb.type === 'user'}
@@ -1380,15 +1380,15 @@
 														{/if}
 													</div>
 													<div class="min-w-0">
-														<div class="text-xs font-medium {isSelected ? 'text-blue-900' : 'text-gray-900'} truncate">
+														<div class="text-xs font-medium {isSelected ? 'text-blue-900' : 'text-gray-900'} break-words">
 															{mb.displayName}
 														</div>
-														<div class="text-[11px] font-mono {isSelected ? 'text-blue-700' : 'text-gray-500'} truncate">
+														<div class="text-[11px] font-mono {isSelected ? 'text-blue-700' : 'text-gray-500'} break-all">
 															{mb.email}
 														</div>
 													</div>
 												</div>
-												<div class="flex items-center gap-1.5 shrink-0">
+												<div class="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
 													<span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded {mb.type === 'room' ? 'bg-emerald-100 text-emerald-800' : mb.type === 'shared' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}">
 														{mb.type}
 													</span>

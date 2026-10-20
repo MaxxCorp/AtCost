@@ -64,7 +64,7 @@
 </script>
 
 {#if count > 0}
-	<div class="fixed bottom-6 inset-x-0 z-50 flex justify-center pointer-events-none px-4">
+	<div class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] inset-x-0 z-50 flex justify-center pointer-events-none px-4">
 		<aside
 			aria-label="Bulk actions"
 			transition:fly={{ y: 24, duration: 200 }}

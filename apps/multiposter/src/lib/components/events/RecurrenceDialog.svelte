@@ -301,13 +301,13 @@
             {/if}
         </Dialog.Header>
         <div class="grid gap-6 py-4">
-            <div class="grid grid-cols-4 items-center gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
                 <label
                     for="freq"
-                    class="text-right text-sm font-medium leading-none"
+                    class="text-left sm:text-right text-sm font-medium leading-none"
                     >{m.repeat()}</label
                 >
-                <div class="col-span-3">
+                <div class="col-span-1 sm:col-span-3">
                     <select
                         id="freq"
                         bind:value={freq}
@@ -320,13 +320,13 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-4 items-center gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
                 <label
                     for="interval"
-                    class="text-right text-sm font-medium leading-none"
+                    class="text-left sm:text-right text-sm font-medium leading-none"
                     >{m.every()}</label
                 >
-                <div class="col-span-3 flex items-center gap-2">
+                <div class="col-span-1 sm:col-span-3 flex items-center gap-2">
                     <input
                         id="interval"
                         type="number"
@@ -347,9 +347,9 @@
             </div>
 
             {#if freq === RRule.WEEKLY}
-                <div class="grid grid-cols-4 items-start gap-4">
-                    <span class="text-right text-sm font-medium leading-none mt-2">{m.on_days()}</span>
-                    <div class="col-span-3 flex flex-wrap gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-4 items-start gap-2 sm:gap-4">
+                    <span class="text-left sm:text-right text-sm font-medium leading-none sm:mt-2">{m.on_days()}</span>
+                    <div class="col-span-1 sm:col-span-3 flex flex-wrap gap-2">
                         {#each weekdays as day}
                             <button
                                 type="button"
@@ -364,9 +364,9 @@
             {/if}
 
             {#if freq === RRule.MONTHLY}
-                <div class="grid grid-cols-4 items-start gap-4">
-                    <span class="text-right text-sm font-medium leading-none mt-2">{m.mode()}</span>
-                    <div class="col-span-3 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-4 items-start gap-2 sm:gap-4">
+                    <span class="text-left sm:text-right text-sm font-medium leading-none sm:mt-2">{m.mode()}</span>
+                    <div class="col-span-1 sm:col-span-3 space-y-4">
                         <div class="flex items-center gap-3">
                             <input type="radio" id="monthly-day" value="day" bind:group={monthlyType} class="h-4 w-4" />
                             <label for="monthly-day" class="text-sm">{m.day_relative()}</label>
@@ -406,9 +406,9 @@
             {/if}
 
             {#if freq === RRule.YEARLY}
-                <div class="grid grid-cols-4 items-start gap-4">
-                    <span class="text-right text-sm font-medium leading-none mt-2">{m.in_month()}</span>
-                    <div class="col-span-3 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-4 items-start gap-2 sm:gap-4">
+                    <span class="text-left sm:text-right text-sm font-medium leading-none sm:mt-2">{m.in_month()}</span>
+                    <div class="col-span-1 sm:col-span-3 space-y-4">
                         <div class="flex items-center gap-3">
                             <select bind:value={bymonth} class="h-8 rounded-md border text-sm px-1 w-32">
                                 {#each months as month}
@@ -454,12 +454,12 @@
             {/if}
 
             <div class="border-t pt-4">
-                <div class="grid grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 sm:gap-4">
                     <span
-                        class="text-right mt-2 text-sm font-medium leading-none"
+                        class="text-left sm:text-right sm:mt-2 text-sm font-medium leading-none"
                         >{m.end()}</span
                     >
-                    <div class="col-span-3 space-y-3">
+                    <div class="col-span-1 sm:col-span-3 space-y-3">
                         <div class="flex items-center space-x-2">
                             <input
                                 type="radio"

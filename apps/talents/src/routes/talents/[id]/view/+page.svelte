@@ -144,16 +144,16 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {#each contact.emails || [] as email}
                                             <div
-                                                class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100"
+                                                class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 min-w-0"
                                             >
                                                 <div
-                                                    class="p-2 bg-white rounded-md shadow-sm text-blue-600"
+                                                    class="p-2 bg-white rounded-md shadow-sm text-blue-600 shrink-0"
                                                 >
                                                     <Mail size={18} />
                                                 </div>
-                                                <div>
+                                                <div class="min-w-0 flex-1">
                                                     <p
-                                                        class="text-sm font-medium text-gray-900"
+                                                        class="text-sm font-medium text-gray-900 break-all"
                                                     >
                                                         {email.value}
                                                     </p>
@@ -168,16 +168,16 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
 
                                         {#each contact.phones || [] as phone}
                                             <div
-                                                class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100"
+                                                class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 min-w-0"
                                             >
                                                 <div
-                                                    class="p-2 bg-white rounded-md shadow-sm text-green-600"
+                                                    class="p-2 bg-white rounded-md shadow-sm text-green-600 shrink-0"
                                                 >
                                                     <Phone size={18} />
                                                 </div>
-                                                <div>
+                                                <div class="min-w-0 flex-1">
                                                     <p
-                                                        class="text-sm font-medium text-gray-900"
+                                                        class="text-sm font-medium text-gray-900 break-all"
                                                     >
                                                         {phone.value}
                                                     </p>

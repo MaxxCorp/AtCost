@@ -226,13 +226,13 @@
                                             <a
                                                 href={`/users/${user.id}`}
                                                 onclick={() => recordActiveItem("users", user.id)}
-                                                class="text-xl font-black text-gray-900 hover:underline group-hover:text-blue-600 transition-colors truncate block"
+                                                class="text-xl font-black text-gray-900 hover:underline group-hover:text-blue-600 transition-colors break-words block"
                                             >
                                                 {user.name}
                                             </a>
-                                            <div class="flex items-center gap-2 text-gray-500 mt-1">
-                                                <Mail size={14} class="text-blue-400" />
-                                                <span class="text-sm font-medium truncate">{user.email}</span>
+                                            <div class="flex items-start gap-2 text-gray-500 mt-1 min-w-0">
+                                                <Mail size={14} class="text-blue-400 shrink-0 mt-1" />
+                                                <span class="text-sm font-medium break-all">{user.email}</span>
                                             </div>
                                         </div>
 
@@ -249,7 +249,7 @@
                                         </div>
                                     </div>
 
-                                    <div class="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-4 sm:mt-0 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                    <div class="flex sm:flex-col gap-2 shrink-0 w-full sm:w-auto mt-4 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all transform translate-x-0 sm:translate-x-2 sm:group-hover:translate-x-0">
                                         <Button
                                             href={`/users/${user.id}`}
                                             onclick={() => recordActiveItem("users", user.id)}

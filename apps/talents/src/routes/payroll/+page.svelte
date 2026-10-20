@@ -354,8 +354,8 @@
 <!-- Modal: Neuer Abrechnungslauf -->
 {#if isCreateModalOpen}
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden max-h-[90dvh] flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                 <div class="flex items-center gap-2">
                     <Calendar class="w-5 h-5 text-indigo-600" />
                     <h2 class="text-base font-bold text-gray-900">Neuen Abrechnungslauf anlegen</h2>
@@ -386,7 +386,7 @@
                             isSubmitting = false;
                         }
                     })}
-                class="p-6 space-y-4 text-xs"
+                class="p-6 space-y-4 text-xs overflow-y-auto flex-1"
             >
                 <div>
                     <label for="period" class="block font-semibold text-gray-700 mb-1">
@@ -590,7 +590,7 @@
                     {/each}
                 </div>
 
-                <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 shrink-0">
                     <Button
                         type="button"
                         variant="outline"

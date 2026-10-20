@@ -64,7 +64,8 @@
         </div>
     {:else}
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <table class="w-full text-left border-collapse">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[640px]">
                 <thead class="bg-gray-50 text-gray-500 text-xs font-bold uppercase tracking-wider">
                     <tr>
                         <th class="px-6 py-4">Employee</th>
@@ -135,6 +136,7 @@
                     {/each}
                 </tbody>
             </table>
+            </div>
         </div>
     {/if}
 </div>

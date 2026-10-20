@@ -91,13 +91,13 @@
                             <ArrowLeft size={16} class="mr-1" />
                             Back to Talents
                         </a>
-                        <div class="flex items-center justify-between">
-                            <h1 class="text-3xl font-bold text-gray-900 tracking-tight">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
                                 Edit Talent Profile
                             </h1>
-                            <div class="flex gap-2">
-                                <a href="/talents/{talentIdParam}/view">
-                                    <Button variant="outline" size="sm">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <a href="/talents/{talentIdParam}/view" class="w-full sm:w-auto">
+                                    <Button variant="outline" size="sm" class="w-full sm:w-auto">
                                         <ExternalLink size={16} class="mr-2" />
                                         View Public Profile
                                     </Button>

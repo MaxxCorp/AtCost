@@ -161,14 +161,14 @@
 
                             <div class="space-y-4">
                                 <!-- Header -->
-                                <div class="bg-white shadow rounded-lg p-6 flex items-start justify-between">
-                                    <div class="flex items-center gap-4">
-                                        <div class="rounded-lg bg-blue-100 p-3">
+                                <div class="bg-white shadow rounded-lg p-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                    <div class="flex items-center gap-4 min-w-0">
+                                        <div class="rounded-lg bg-blue-100 p-3 shrink-0">
                                             <Calendar class="h-8 w-8 text-blue-600" />
                                         </div>
-                                        <div>
-                                            <div class="flex items-center gap-3">
-                                                <h1 class="text-3xl font-bold">
+                                        <div class="min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                                                <h1 class="text-2xl sm:text-3xl font-bold">
                                                     {getProviderLabel(config.providerType)}
                                                 </h1>
                                                 {#if (config.settings as any)?.isDefault === true || (config.settings as any)?.isDefault === 'true' || (config.settings as any)?.isDefault === 1}
@@ -177,10 +177,10 @@
                                                     </span>
                                                 {/if}
                                             </div>
-                                            <p class="text-gray-600">{config.providerId}</p>
+                                            <p class="text-gray-600 break-all">{config.providerId}</p>
                                         </div>
                                     </div>
-                                    <div class="flex gap-2">
+                                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                                         <AsyncButton
                                             variant="default"
                                             loading={isSyncing}
@@ -345,11 +345,11 @@
                                                     {@const Icon = getStatusIcon(operation.status)}
                                                     {@const statusColor = getStatusColor(operation.status)}
                                                     <div class="border rounded-lg {operation.status === 'failed' ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'}">
-                                                        <div class="flex items-center justify-between p-3">
-                                                            <div class="flex items-center gap-3">
-                                                                <Icon class="h-5 w-5 {statusColor}" />
-                                                                <div>
-                                                                    <div class="font-medium">
+                                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3">
+                                                            <div class="flex items-center gap-3 min-w-0">
+                                                                <Icon class="h-5 w-5 {statusColor} shrink-0" />
+                                                                <div class="min-w-0">
+                                                                    <div class="font-medium break-words">
                                                                         {getOperationLabel(operation.operation)} {operation.entityType}
                                                                     </div>
                                                                     <div class="text-xs text-gray-500">
@@ -360,7 +360,7 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div class="text-sm">
+                                                            <div class="text-sm shrink-0">
                                                                 <span class={`font-medium ${statusColor}`}>
                                                                     {formatStatus(operation.status)}
                                                                 </span>
@@ -379,8 +379,8 @@
                                                                 </div>
                                                                 <div class="space-y-1">
                                                                     {#each (operation.results as any).roomBookings as rb}
-                                                                        <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-blue-100 last:border-b-0">
-                                                                            <span class="font-mono text-gray-700">{rb.roomEmail || rb.roomId}</span>
+                                                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] py-1 border-b border-blue-100 last:border-b-0">
+                                                                            <span class="font-mono text-gray-700 break-all">{rb.roomEmail || rb.roomId}</span>
                                                                             <div class="flex items-center gap-1.5">
                                                                                 {#if rb.status === "booked"}
                                                                                     <span class="px-1.5 py-0.2 rounded bg-green-100 text-green-800 font-medium">Booked</span>
@@ -420,7 +420,7 @@
                                                         {#if operation.error}
                                                             <div class="mx-3 mb-3 text-sm text-red-700 bg-red-100 p-3 rounded border border-red-200">
                                                                 <div class="font-semibold mb-1">{m.error_details()}</div>
-                                                                <pre class="whitespace-pre-wrap font-mono text-xs">{operation.error}</pre>
+                                                                <pre class="whitespace-pre-wrap font-mono text-xs break-all">{operation.error}</pre>
                                                             </div>
                                                         {/if}
                                                     </div>

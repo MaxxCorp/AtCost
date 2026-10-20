@@ -258,7 +258,7 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                    <div class="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all transform translate-x-0 sm:translate-x-2 sm:group-hover:translate-x-0">
                                         <Button
                                             href={`/shiftplans/${plan.id}`}
                                             variant="ghost"

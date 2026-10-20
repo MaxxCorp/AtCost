@@ -259,13 +259,13 @@
 										<a
 											href={`/users/${user.id}`}
 											onclick={() => recordActiveItem("users", user.id)}
-											class="text-xl font-black text-gray-900 dark:text-gray-100 hover:underline group-hover:text-blue-600 transition-colors truncate block"
+											class="text-xl font-black text-gray-900 dark:text-gray-100 hover:underline group-hover:text-blue-600 transition-colors break-words block"
 										>
 											{user.name}
 										</a>
-										<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 mt-1">
-											<Mail size={14} class="text-blue-400" />
-											<span class="text-sm font-medium truncate">{user.email}</span>
+										<div class="flex items-start gap-2 text-gray-500 dark:text-gray-400 mt-1 min-w-0">
+											<Mail size={14} class="text-blue-400 shrink-0 mt-1" />
+											<span class="text-sm font-medium break-all">{user.email}</span>
 										</div>
 									</div>
 

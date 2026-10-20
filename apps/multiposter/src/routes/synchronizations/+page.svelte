@@ -452,7 +452,7 @@
 					class="pl-9 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all bg-gray-50/50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
 				/>
 			</div>
-			<div class="flex items-center gap-2 shrink-0">
+			<div class="flex flex-wrap items-center gap-2 shrink-0">
 				<FilterMenu
 					groups={filterGroups}
 					bind:filters={filterValues}
@@ -572,11 +572,11 @@
 										</h3>
 										<p class="text-sm text-gray-500 break-all mt-1 flex items-center gap-1.5 flex-wrap">
 											{#if (config.settings as any)?.mailboxEmail}
-												<span class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300">
+												<span class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300 break-all">
 													{(config.settings as any).mailboxEmail}
 												</span>
 											{/if}
-											<span>{config.providerId}</span>
+											<span class="break-all">{config.providerId}</span>
 										</p>
 									</div>
 								</div>
@@ -638,13 +638,13 @@
 														<div class="space-y-1">
 															{#each campaign.events as event (`${event.recipientEmail}-${event.occurredAt}`)}
 																{@const EventIcon = getEventIcon(event.eventType)}
-																<div class="flex items-center gap-2 text-xs">
-																	<EventIcon class={`h-3 w-3 ${getEventColor(event.eventType)}`} />
-																	<span class="text-gray-600">{event.recipientEmail}</span>
-																	<span class={`font-medium ${getEventColor(event.eventType)}`}>
+																<div class="flex items-center gap-2 text-xs flex-wrap">
+																	<EventIcon class={`h-3 w-3 shrink-0 ${getEventColor(event.eventType)}`} />
+																	<span class="text-gray-600 break-all">{event.recipientEmail}</span>
+																	<span class={`font-medium shrink-0 ${getEventColor(event.eventType)}`}>
 																		{formatEventType(event.eventType)}
 																	</span>
-																	<span class="text-gray-400 ml-auto">{new Date(event.occurredAt).toLocaleString()}</span>
+																	<span class="text-gray-400 text-[11px] sm:ml-auto shrink-0">{new Date(event.occurredAt).toLocaleString()}</span>
 																</div>
 															{/each}
 														</div>
@@ -673,8 +673,8 @@
 							{/if}
 						</div>
 
-						<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex justify-end items-center gap-2 w-full sm:w-auto">
-							<div class="flex-1">
+						<div class="pt-4 mt-auto border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+							<div class="w-full sm:w-auto">
 								<WebhookToggleButton
 									configId={config.id}
 									providerType={config.providerType}
@@ -684,36 +684,38 @@
 							</div>
 							
 							{#if isAdmin}
-								<AsyncButton
-									variant="outline"
-									size="sm"
-									class="flex-1 sm:flex-none"
-									loading={syncingConfigId === config.id}
-									loadingLabel={syncProgress || m.bulk_syncing()}
-									disabled={!config.enabled || (syncingConfigId !== null && syncingConfigId !== config.id)}
-									onclick={() => handleBulkSync(config.id)}
-								>
-									<RefreshCw class="w-4 h-4 mr-2 {syncingConfigId === config.id ? 'animate-spin' : ''}" />
-									{m.bulk_sync()}
-								</AsyncButton>
-								<Button
-									href={`/synchronizations/${config.id}`}
-									onclick={() => recordActiveItem("synchronizations", config.id)}
-									variant="outline"
-									size="sm"
-									class="flex-1 sm:flex-none"
-								>
-									<Pencil class="w-4 h-4 mr-2" /> {m.edit()}
-								</Button>
-								<button
-									class="flex-1 sm:flex-none inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500"
-									onclick={() => deleteItem(config)}
-								>
-									<Trash2 class="w-4 h-4 mr-2" /> {m.delete()}
-								</button>
+								<div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
+									<AsyncButton
+										variant="outline"
+										size="sm"
+										class="flex-1 sm:flex-initial"
+										loading={syncingConfigId === config.id}
+										loadingLabel={syncProgress || m.bulk_syncing()}
+										disabled={!config.enabled || (syncingConfigId !== null && syncingConfigId !== config.id)}
+										onclick={() => handleBulkSync(config.id)}
+									>
+										<RefreshCw class="w-4 h-4 mr-2 {syncingConfigId === config.id ? 'animate-spin' : ''}" />
+										{m.bulk_sync()}
+									</AsyncButton>
+									<Button
+										href={`/synchronizations/${config.id}`}
+										onclick={() => recordActiveItem("synchronizations", config.id)}
+										variant="outline"
+										size="sm"
+										class="flex-1 sm:flex-initial"
+									>
+										<Pencil class="w-4 h-4 mr-2" /> {m.edit()}
+									</Button>
+									<button
+										class="flex-1 sm:flex-initial inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-red-50 hover:text-red-600 h-9 px-3 text-red-500 cursor-pointer"
+										onclick={() => deleteItem(config)}
+									>
+										<Trash2 class="w-4 h-4 mr-2" /> {m.delete()}
+									</button>
+								</div>
 							{/if}
 						</div>
-						<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2">
+						<div class="text-[11px] text-gray-400 dark:text-gray-500 text-right px-1 mt-2 break-all">
 							{m.updated_on({
 								date: new Date(config.updatedAt).toLocaleString([], {
 									year: "numeric",

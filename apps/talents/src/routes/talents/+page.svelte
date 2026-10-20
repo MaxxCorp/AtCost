@@ -205,7 +205,7 @@
                                     <a
                                         href="/talents/{talent.id}"
                                         onclick={() => recordActiveItem("talents", talent.id)}
-                                        class="font-black text-gray-900 hover:text-indigo-600 transition-colors text-lg truncate block"
+                                        class="font-black text-gray-900 hover:text-indigo-600 transition-colors text-lg break-words block"
                                     >
                                         {talent.contact?.displayName}
                                     </a>
@@ -226,7 +226,7 @@
                                 </div>
                                 
                                 <p class="text-sm font-bold text-indigo-600 italic mb-1">{talent.jobTitle || "Professional Talent"}</p>
-                                <p class="text-xs text-gray-400 font-medium">{talent.contact?.emails?.[0]?.value || "No contact email provided"}</p>
+                                <p class="text-xs text-gray-400 font-medium break-all">{talent.contact?.emails?.[0]?.value || "No contact email provided"}</p>
                             </div>
                         </div>
 
@@ -244,7 +244,7 @@
                                 {/if}
                             </div>
 
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <Button 
                                     href="/talents/{talent.id}" 
                                     onclick={() => recordActiveItem("talents", talent.id)}
