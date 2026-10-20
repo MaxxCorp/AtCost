@@ -182,13 +182,17 @@
             }
 
             const storageKey = `kiosk_items_${kioskId}`;
-            localStorage.setItem(storageKey, JSON.stringify(enrichedItems));
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(enrichedItems));
 
-            // Also cache kiosk details
-            localStorage.setItem(
-                `kiosk_details_${kioskId}`,
-                JSON.stringify(kiosk),
-            );
+                // Also cache kiosk details
+                localStorage.setItem(
+                    `kiosk_details_${kioskId}`,
+                    JSON.stringify(kiosk),
+                );
+            } catch (storageErr) {
+                console.warn("Could not cache kiosk data to localStorage (quota exceeded)", storageErr);
+            }
 
             isOffline = false;
         } catch (e) {
@@ -313,30 +317,33 @@
             // @ts-ignore
             import("ably")
                 .then((AblyModule) => {
-                const Ably = AblyModule.default;
+                    const Ably = AblyModule.default;
 
-                realtime = new Ably.Realtime("N_sNCA.u0wYQw:Z-pG0k2QoH0_8L4h2X4Z0k2QoH0_8L4h2X4Z0k2QoH0");
-                const eventsChannel = realtime.channels.get("event-changes");
-                eventsChannel.subscribe("change", (message: any) => {
+                    realtime = new Ably.Realtime({ authUrl: "/api/ably/auth" });
+                    realtime.connection.on("failed", (err: any) => {
+                        console.warn("[Ably] Realtime connection not available:", err?.message || err);
+                    });
+                    const eventsChannel = realtime.channels.get("event-changes");
+                    eventsChannel.subscribe("change", (message: any) => {
                         console.log(
                             "Kiosk Event update received:",
                             message.data,
                         );
-                    refreshAll();
-                });
+                        refreshAll();
+                    });
 
                     const announcementChannel = realtime.channels.get(
                         "announcement-changes",
                     );
-                announcementChannel.subscribe("change", (message: any) => {
+                    announcementChannel.subscribe("change", (message: any) => {
                         console.log(
                             "Kiosk Announcement update received:",
                             message.data,
                         );
-                    refreshAll();
-                });
+                        refreshAll();
+                    });
                 })
-                .catch((e) => console.error(e));
+                .catch((e) => console.warn("[Ably] Failed to initialize Ably:", e));
         }
     });
 

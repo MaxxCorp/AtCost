@@ -216,24 +216,6 @@
             const hasSeenName = Boolean(name && seenNames.includes(name));
 
             if (hasSeenId || hasSeenName) {
-                // Already present - enrich the existing entry if it is missing fields
-                const existing = contactsList.find((item) => {
-                    const itemId = item.id;
-                    const itemName = getContactName(item).trim().toLowerCase();
-                    return (id && itemId && id === itemId) || (name && itemName && name === itemName);
-                });
-                if (existing) {
-                    if (!existing.email && (cObj.email || c.email)) {
-                        existing.email = cObj.email || c.email;
-                    }
-                    if (!existing.phone && (cObj.phone || c.phone)) {
-                        existing.phone = cObj.phone || c.phone;
-                    }
-                    const newRoles = getContactRoles(cObj).concat(getContactRoles(c));
-                    if ((!existing.roles || existing.roles.length === 0) && newRoles.length > 0) {
-                        existing.roles = Array.from(new Set(newRoles));
-                    }
-                }
                 return;
             }
 
