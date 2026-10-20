@@ -68,19 +68,9 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			throw new Error('Provider not initialized');
 		}
 
-		const calendarId = (this as any).calendarId ?? this.client.getCalendarId();
-
+		const calendarId = this.calendarId;
 		const isPrimary = calendarId === 'primary';
-		const isUserEmail = typeof calendarId === 'string' && calendarId.includes('@');
-		let url = '';
-
-		if (isPrimary) {
-			url = this.client.getCalendarBaseUrl();
-		} else if (isUserEmail) {
-			url = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(calendarId)}/calendar`;
-		} else {
-			url = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(calendarId)}`;
-		}
+		const url = this.getBaseUrl();
 
 		try {
 			await this.makeRequest(url, { method: 'GET' });
@@ -239,13 +229,19 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		const url = 'https://graph.microsoft.com/v1.0/subscriptions';
 
 		let resource = 'me/events';
-		const calId = this.client.getCalendarId();
+		const calId = this.calendarId;
 		const mbEmail = this.client.getMailboxEmail();
 
 		if (mbEmail) {
-			resource = `users/${encodeURIComponent(mbEmail)}/events`;
+			resource = calId && calId !== 'primary'
+				? `users/${encodeURIComponent(mbEmail)}/calendars/${encodeURIComponent(calId)}/events`
+				: `users/${encodeURIComponent(mbEmail)}/events`;
 		} else if (calId !== 'primary') {
-			resource = `me/calendars/${encodeURIComponent(calId)}/events`;
+			if (calId.includes('@')) {
+				resource = `users/${encodeURIComponent(calId)}/events`;
+			} else {
+				resource = `me/calendars/${encodeURIComponent(calId)}/events`;
+			}
 		}
 
 		const response = await this.client.makeRequest<any>(url, {

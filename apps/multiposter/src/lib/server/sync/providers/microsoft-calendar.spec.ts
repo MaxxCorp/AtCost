@@ -573,6 +573,57 @@ describe('MicrosoftCalendarProvider', () => {
 			);
 		});
 
+		it('should validate specific calendar under shared/app mailbox without calling /me', async () => {
+			(provider as any).config = {
+				...mockConfig,
+				settings: {
+					authMode: 'app',
+					mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+				}
+			};
+			(provider as any).client.config = {
+				authMode: 'app',
+				mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+			};
+			(provider as any).client.resolvedAuthMode = 'app';
+			(provider as any).calendarId =
+				'AAMkADdmNjAzYmIyLTY0YjUtNDA4NC1iYTA0LWJhNzAwZTVjYmQxNABGAAAAAAC4cX361Ef_Q4YceBIYjUZSBwCqKer79ILfRJgPErzQHYLNAAAAAAEGAACqKer79ILfRJgPErzQHYLNAAABO86jAAA=';
+
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({ id: 'AAMkADdm...' });
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.validateCalendarAccess()).resolves.toBeUndefined();
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/users/veranstaltung.bhs%40ballev.onmicrosoft.com/calendars/AAMkADdmNjAzYmIyLTY0YjUtNDA4NC1iYTA0LWJhNzAwZTVjYmQxNABGAAAAAAC4cX361Ef_Q4YceBIYjUZSBwCqKer79ILfRJgPErzQHYLNAAAAAAEGAACqKer79ILfRJgPErzQHYLNAAABO86jAAA%3D',
+				{ method: 'GET' }
+			);
+		});
+
+		it('should validate primary calendar under shared/app mailbox without calling /me', async () => {
+			(provider as any).config = {
+				...mockConfig,
+				settings: {
+					authMode: 'app',
+					mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+				}
+			};
+			(provider as any).client.config = {
+				authMode: 'app',
+				mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+			};
+			(provider as any).client.resolvedAuthMode = 'app';
+			(provider as any).calendarId = 'primary';
+
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({ id: 'primary-cal' });
+			(provider as any).makeRequest = makeRequestMock;
+
+			await expect(provider.validateCalendarAccess()).resolves.toBeUndefined();
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/users/veranstaltung.bhs%40ballev.onmicrosoft.com/calendar',
+				{ method: 'GET' }
+			);
+		});
+
 		it('should throw explicit error and fail without fallback when primary calendar is unavailable', async () => {
 			(provider as any).calendarId = 'primary';
 			const makeRequestMock = vi.fn().mockRejectedValueOnce(new Error('ResourceNotFound: 404'));
@@ -644,4 +695,91 @@ describe('MicrosoftCalendarProvider', () => {
 			expect(validateSpy).not.toHaveBeenCalled();
 		});
 	});
+
+	describe('setupWebhook', () => {
+		it('should create subscription on me/events by default', async () => {
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({
+				id: 'sub-1',
+				expirationDateTime: '2026-10-22T00:00:00Z'
+			});
+			(provider.getClient() as any).makeRequest = makeRequestMock;
+
+			await provider.setupWebhook('https://example.com/webhook');
+
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/subscriptions',
+				expect.objectContaining({
+					method: 'POST',
+					body: expect.stringContaining('"resource":"me/events"')
+				})
+			);
+		});
+
+		it('should create subscription on users/{email}/calendars/{id}/events when mailbox and specific calendar configured', async () => {
+			(provider as any).config = {
+				...mockConfig,
+				settings: {
+					authMode: 'app',
+					mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+				}
+			};
+			(provider as any).client.config = {
+				authMode: 'app',
+				mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+			};
+			(provider as any).calendarId = 'custom-cal-456';
+
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({
+				id: 'sub-2',
+				expirationDateTime: '2026-10-22T00:00:00Z'
+			});
+			(provider.getClient() as any).makeRequest = makeRequestMock;
+
+			await provider.setupWebhook('https://example.com/webhook');
+
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/subscriptions',
+				expect.objectContaining({
+					method: 'POST',
+					body: expect.stringContaining(
+						'"resource":"users/veranstaltung.bhs%40ballev.onmicrosoft.com/calendars/custom-cal-456/events"'
+					)
+				})
+			);
+		});
+
+		it('should create subscription on users/{email}/events when mailbox is configured and calendar is primary', async () => {
+			(provider as any).config = {
+				...mockConfig,
+				settings: {
+					authMode: 'app',
+					mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+				}
+			};
+			(provider as any).client.config = {
+				authMode: 'app',
+				mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+			};
+			(provider as any).calendarId = 'primary';
+
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({
+				id: 'sub-3',
+				expirationDateTime: '2026-10-22T00:00:00Z'
+			});
+			(provider.getClient() as any).makeRequest = makeRequestMock;
+
+			await provider.setupWebhook('https://example.com/webhook');
+
+			expect(makeRequestMock).toHaveBeenCalledWith(
+				'https://graph.microsoft.com/v1.0/subscriptions',
+				expect.objectContaining({
+					method: 'POST',
+					body: expect.stringContaining(
+						'"resource":"users/veranstaltung.bhs%40ballev.onmicrosoft.com/events"'
+					)
+				})
+			);
+		});
+	});
 });
+
