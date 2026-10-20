@@ -1945,61 +1945,64 @@ export class SyncService {
 
 			// Resolve Attached Resources
 			if (isEvent) {
-				let linkedResources = await db
-					.select({ resource: resourceTable })
-					.from(eventResourceTable)
-					.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
-					.where(eq(eventResourceTable.eventId, directEventId));
-
-				if (linkedResources.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
-					linkedResources = await db
+				const includeRoomBookings = config?.settings?.includeRoomBookings !== false && (config?.settings?.autoBookOnCalendar !== false);
+				if (includeRoomBookings) {
+					let linkedResources = await db
 						.select({ resource: resourceTable })
 						.from(eventResourceTable)
 						.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
-						.where(eq(eventResourceTable.eventId, fallbackMasterId));
-				}
+						.where(eq(eventResourceTable.eventId, directEventId));
 
-				for (const { resource: res } of linkedResources) {
-					let calendars: any[] = [];
-					if (typeof res.allocationCalendars === 'string') {
-						try { calendars = JSON.parse(res.allocationCalendars); } catch { calendars = []; }
-					} else if (Array.isArray(res.allocationCalendars)) {
-						calendars = res.allocationCalendars;
+					if (linkedResources.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
+						linkedResources = await db
+							.select({ resource: resourceTable })
+							.from(eventResourceTable)
+							.innerJoin(resourceTable, eq(eventResourceTable.resourceId, resourceTable.id))
+							.where(eq(eventResourceTable.eventId, fallbackMasterId));
 					}
 
-					let foundEmail = false;
-					for (const cal of calendars) {
-						const email = cal.calendarId || cal.email;
-						if (email && typeof email === 'string' && email.includes('@')) {
-							attendees.push({
-								email,
-								displayName: res.name || cal.name || 'Resource',
-								responseStatus: 'accepted',
-								type: 'resource',
-								resourceId: res.id
-							});
-							foundEmail = true;
+					for (const { resource: res } of linkedResources) {
+						let calendars: any[] = [];
+						if (typeof res.allocationCalendars === 'string') {
+							try { calendars = JSON.parse(res.allocationCalendars); } catch { calendars = []; }
+						} else if (Array.isArray(res.allocationCalendars)) {
+							calendars = res.allocationCalendars;
 						}
-					}
 
-					if (!foundEmail) {
-						const [resMap] = await db
-							.select()
-							.from(syncMappingTable)
-							.where(and(
-								eq(syncMappingTable.resourceId, res.id),
-								isNotNull(syncMappingTable.externalId)
-							))
-							.limit(1);
+						let foundEmail = false;
+						for (const cal of calendars) {
+							const email = cal.calendarId || cal.email;
+							if (email && typeof email === 'string' && email.includes('@')) {
+								attendees.push({
+									email,
+									displayName: res.name || cal.name || 'Resource',
+									responseStatus: 'accepted',
+									type: 'resource',
+									resourceId: res.id
+								});
+								foundEmail = true;
+							}
+						}
 
-						if (resMap?.externalId && resMap.externalId.includes('@')) {
-							attendees.push({
-								email: resMap.externalId,
-								displayName: res.name || 'Resource',
-								responseStatus: 'accepted',
-								type: 'resource',
-								resourceId: res.id
-							});
+						if (!foundEmail) {
+							const [resMap] = await db
+								.select()
+								.from(syncMappingTable)
+								.where(and(
+									eq(syncMappingTable.resourceId, res.id),
+									isNotNull(syncMappingTable.externalId)
+								))
+								.limit(1);
+
+							if (resMap?.externalId && resMap.externalId.includes('@')) {
+								attendees.push({
+									email: resMap.externalId,
+									displayName: res.name || 'Resource',
+									responseStatus: 'accepted',
+									type: 'resource',
+									resourceId: res.id
+								});
+							}
 						}
 					}
 				}
@@ -2854,7 +2857,8 @@ export class SyncService {
 			}
 
 			// Coordinate with dependent resource sync providers (e.g. microsoft-resources) for room bookings
-			if (entityType === 'event' && externalItem.attendees) {
+			const includeRoomBookings = config.settings?.includeRoomBookings !== false && (config.settings?.autoBookOnCalendar !== false);
+			if (includeRoomBookings && entityType === 'event' && externalItem.attendees) {
 				const resourceAttendees = externalItem.attendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
 				if (resourceAttendees.length > 0) {
 					await this.coordinateResourceBooking(itemRow, resourceAttendees, config, batchContext);
@@ -2862,7 +2866,8 @@ export class SyncService {
 			}
 
 			// Coordinate with dependent contacts sync providers (e.g. microsoft-contacts) for participants
-			if (entityType === 'event') {
+			const includeContacts = config.settings?.includeContacts !== false && (config.settings?.syncParticipants !== false);
+			if (includeContacts && entityType === 'event') {
 				await this.coordinateContactsSync(itemRow, config, batchContext);
 			}
 		}
@@ -3523,8 +3528,8 @@ export function shouldSyncContactForEvent(contact: any, config?: SyncConfig): bo
 
 	const settings = (config.settings || {}) as Record<string, any>;
 
-	// 1. Master toggle: syncParticipants / includeEventContacts
-	const syncParticipants = settings.syncParticipants ?? settings.includeEventContacts;
+	// 1. Master toggle: syncParticipants / includeEventContacts / includeContacts
+	const syncParticipants = settings.syncParticipants ?? settings.includeEventContacts ?? settings.includeContacts;
 	if (syncParticipants === false) {
 		return false;
 	}

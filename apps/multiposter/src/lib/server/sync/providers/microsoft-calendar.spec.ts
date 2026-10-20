@@ -116,6 +116,55 @@ describe('MicrosoftCalendarProvider', () => {
 			expect(mapped.end.dateTime).toBeDefined();
 			expect(mapped.transactionId).toBe('internal-id-123');
 		});
+
+		it('should include resource attendees and conference room locations by default when includeRoomBookings is not false', () => {
+			(provider as any).config = {
+				id: 'test-config',
+				providerType: 'microsoft-calendar',
+				settings: { includeRoomBookings: true }
+			};
+
+			const event: ExternalEvent = {
+				externalId: 'ext-5',
+				providerId: 'microsoft-calendar',
+				summary: 'Room Review',
+				attendees: [
+					{ email: 'john@example.com', displayName: 'John Doe', type: 'required' },
+					{ email: 'room-a@example.com', displayName: 'Conference Room A', type: 'resource' }
+				]
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.attendees).toHaveLength(2);
+			expect(mapped.locations).toBeDefined();
+			expect(mapped.locations[0].displayName).toBe('Conference Room A');
+			expect(mapped.locations[0].locationType).toBe('conferenceRoom');
+		});
+
+		it('should exclude resource attendees and conference room locations when includeRoomBookings is false', () => {
+			(provider as any).config = {
+				id: 'test-config',
+				providerType: 'microsoft-calendar',
+				settings: { includeRoomBookings: false }
+			};
+
+			const event: ExternalEvent = {
+				externalId: 'ext-6',
+				providerId: 'microsoft-calendar',
+				summary: 'Room Review Disabled',
+				attendees: [
+					{ email: 'john@example.com', displayName: 'John Doe', type: 'required' },
+					{ email: 'room-a@example.com', displayName: 'Conference Room A', type: 'resource' }
+				]
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.attendees).toHaveLength(1);
+			expect(mapped.attendees[0].emailAddress.address).toBe('john@example.com');
+			expect(mapped.locations).toBeUndefined();
+		});
 	});
 
 	describe('updateEvent', () => {

@@ -301,19 +301,13 @@
 	let msResourceFilter = $state<"all" | "room" | "equipment">(untrack(() => initialData?.settings?.resourceFilter || "room"));
 	let msIncludeRoomBookings = $state<boolean>(
 		untrack(() => {
-			const val = initialData?.settings?.includeRoomBookings;
+			const val = initialData?.settings?.includeRoomBookings ?? initialData?.settings?.autoBookOnCalendar;
 			return val === undefined ? true : (val === true || val === "true" || val === 1);
 		})
 	);
 	let msIncludeContacts = $state<boolean>(
 		untrack(() => {
 			const val = initialData?.settings?.includeContacts;
-			return val === undefined ? true : (val === true || val === "true" || val === 1);
-		})
-	);
-	let msAutoBookOnCalendar = $state<boolean>(
-		untrack(() => {
-			const val = initialData?.settings?.autoBookOnCalendar;
 			return val === undefined ? true : (val === true || val === "true" || val === 1);
 		})
 	);
@@ -1603,23 +1597,6 @@
 								</span>
 							</div>
 						</label>
-
-						<label class="flex items-start gap-3 cursor-pointer">
-							<input
-								type="checkbox"
-								checked={msAutoBookOnCalendar}
-								onchange={(e) => (msAutoBookOnCalendar = e.currentTarget.checked)}
-								class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-							/>
-							<div>
-								<span class="text-sm font-medium text-gray-900 block">
-									Direct Room Calendar Booking
-								</span>
-								<span class="text-xs text-gray-500 block">
-									Write reservation events directly into room mailboxes in addition to conference room location metadata.
-								</span>
-							</div>
-						</label>
 					</div>
 				{/if}
 
@@ -1881,9 +1858,12 @@
 					<input {...fields.settings.resourceFilter.as("hidden", msResourceFilter)} />
 				{/if}
 				{#if selectedProvider === "microsoft-calendar"}
-					<input {...fields.settings.includeRoomBookings.as("hidden", msIncludeRoomBookings ? "true" : "false")} />
-					<input {...fields.settings.includeContacts.as("hidden", msIncludeContacts ? "true" : "false")} />
-					<input {...fields.settings.autoBookOnCalendar.as("hidden", msAutoBookOnCalendar ? "true" : "false")} />
+					{#if fields?.settings?.includeRoomBookings}
+						<input {...fields.settings.includeRoomBookings.as("hidden", msIncludeRoomBookings ? "true" : "false")} />
+					{/if}
+					{#if fields?.settings?.includeContacts}
+						<input {...fields.settings.includeContacts.as("hidden", msIncludeContacts ? "true" : "false")} />
+					{/if}
 				{/if}
 			</div>
 		{/if}

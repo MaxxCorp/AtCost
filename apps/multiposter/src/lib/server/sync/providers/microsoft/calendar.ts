@@ -402,25 +402,34 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 
 		// Map attendees (including resource attendees)
 		if (event.attendees && event.attendees.length > 0) {
-			msEvent.attendees = event.attendees.map((a) => ({
-				emailAddress: { address: a.email, name: a.displayName },
-				type: a.type || 'required'
-			}));
+			const includeRoomBookings = this.config?.settings?.includeRoomBookings !== false && (this.config?.settings?.autoBookOnCalendar !== false);
+			const eligibleAttendees = includeRoomBookings
+				? event.attendees
+				: event.attendees.filter((a) => a.type !== 'resource');
 
-			// Map conference room locations for Exchange room booking
-			const roomAttendees = event.attendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
-			if (roomAttendees.length > 0) {
-				msEvent.locations = roomAttendees.map((r) => ({
-					displayName: r.displayName || r.email,
-					locationEmailAddress: r.email,
-					locationType: 'conferenceRoom'
+			if (eligibleAttendees.length > 0) {
+				msEvent.attendees = eligibleAttendees.map((a) => ({
+					emailAddress: { address: a.email, name: a.displayName },
+					type: a.type || 'required'
 				}));
-				if (!msEvent.location && roomAttendees.length === 1) {
-					msEvent.location = {
-						displayName: roomAttendees[0].displayName || roomAttendees[0].email,
-						locationEmailAddress: roomAttendees[0].email,
+			}
+
+			if (includeRoomBookings) {
+				// Map conference room locations for Exchange room booking
+				const roomAttendees = event.attendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
+				if (roomAttendees.length > 0) {
+					msEvent.locations = roomAttendees.map((r) => ({
+						displayName: r.displayName || r.email,
+						locationEmailAddress: r.email,
 						locationType: 'conferenceRoom'
-					};
+					}));
+					if (!msEvent.location && roomAttendees.length === 1) {
+						msEvent.location = {
+							displayName: roomAttendees[0].displayName || roomAttendees[0].email,
+							locationEmailAddress: roomAttendees[0].email,
+							locationType: 'conferenceRoom'
+						};
+					}
 				}
 			}
 		}

@@ -115,6 +115,10 @@ export function normalizeSyncSettings(settings: Record<string, any>): Record<str
         }
     }
 
+    if (settings.includeRoomBookings === undefined && settings.autoBookOnCalendar !== undefined) {
+        settings.includeRoomBookings = settings.autoBookOnCalendar;
+    }
+
     // Default contact privacy scope: internal staff only, public off by default, non-public off by default
     if (settings.includeEmployeeContacts === undefined) {
         if (settings.onlyEmployeeContacts !== undefined) {

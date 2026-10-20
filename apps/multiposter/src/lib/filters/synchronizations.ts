@@ -55,7 +55,7 @@ function normalizeArray(val: any): string[] {
 export function matchesContactParticipantRules(contactOrAssoc: any, settings: Record<string, any>): boolean {
     if (!contactOrAssoc) return false;
 
-    const syncParticipants = settings.syncParticipants ?? settings.includeEventContacts;
+    const syncParticipants = settings.syncParticipants ?? settings.includeEventContacts ?? settings.includeContacts;
     if (syncParticipants === false || syncParticipants === 'false') {
         return false;
     }

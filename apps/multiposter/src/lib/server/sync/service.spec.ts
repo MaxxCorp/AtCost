@@ -1,6 +1,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SyncService } from './service';
+import type { SyncConfig } from './types';
 import { db } from '@ac/db';
 import {
 	syncMapping as syncMappingTable,
@@ -1389,6 +1390,31 @@ describe('SyncService - Bulk Sync', () => {
 			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(true);
 			// volunteerContact matches neither
 			expect(service.shouldSyncContactForEvent(volunteerContact, config)).toBe(false);
+		});
+
+		it('should return false for all contacts when includeContacts is explicitly false', () => {
+			const config = {
+				id: 'cfg-no-contacts',
+				providerType: 'microsoft-calendar',
+				settings: {
+					includeContacts: false
+				}
+			} as any;
+
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(false);
+		});
+
+		it('should return true for eligible contacts when includeContacts is true', () => {
+			const config = {
+				id: 'cfg-contacts',
+				providerType: 'microsoft-calendar',
+				settings: {
+					includeContacts: true
+				}
+			} as any;
+
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
 		});
 	});
 });
