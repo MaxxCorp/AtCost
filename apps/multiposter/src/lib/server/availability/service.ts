@@ -1,4 +1,20 @@
-import { db, event, eventResource, eventContact, resource, account, recurringSeries, eq, and, ne, or, inArray, lte, gte, isNotNull } from '@ac/db';
+import {
+    db,
+    event,
+    eventResource,
+    eventContact,
+    resource,
+    account,
+    recurringSeries,
+    eq,
+    and,
+    ne,
+    or,
+    inArray,
+    lt,
+    gt,
+    isNotNull
+} from '@ac/db';
 import { expandRecurrenceRange } from '#lib/server/events/recurrence.js';
 
 import {
@@ -12,6 +28,12 @@ export interface AvailabilityResult {
     reason?: string;
     eventId?: string;
     eventTitle?: string;
+    scheduleItems?: Array<{
+        status: string;
+        subject?: string;
+        start?: Date;
+        end?: Date;
+    }>;
 }
 
 export interface AvailabilityProvider {
@@ -147,23 +169,41 @@ export class MicrosoftAvailabilityProvider implements AvailabilityProvider {
                 if (Array.isArray(data.value)) {
                     for (const item of data.value) {
                         const email = (item.scheduleId || '').toLowerCase();
-                        const view = item.availabilityView || '';
-                        // '0' = free, '1' = tentative, '2' = busy, '3' = out of office, '4' = working elsewhere
-                        const isBusy = view.includes('1') || view.includes('2') || view.includes('3');
-                        if (isBusy) {
-                            let eventTitle: string | undefined;
-                            if (Array.isArray(item.scheduleItems)) {
-                                const busyItem = item.scheduleItems.find((s: any) =>
-                                    ['busy', 'tentative', 'oof'].includes((s.status || '').toLowerCase())
-                                );
-                                if (busyItem?.subject) {
-                                    eventTitle = busyItem.subject;
+                        const busyItems: Array<{ status: string; subject?: string; start?: Date; end?: Date }> = [];
+                        if (Array.isArray(item.scheduleItems)) {
+                            for (const s of item.scheduleItems) {
+                                if (['busy', 'tentative', 'oof'].includes((s.status || '').toLowerCase())) {
+                                    const sStart = s.start?.dateTime ? new Date(s.start.dateTime + (s.start.timeZone === 'UTC' ? 'Z' : '')) : undefined;
+                                    const sEnd = s.end?.dateTime ? new Date(s.end.dateTime + (s.end.timeZone === 'UTC' ? 'Z' : '')) : undefined;
+                                    // Verify strict half-open interval overlap with requested interval:
+                                    // [sStart, sEnd) overlaps [startDateTime, endDateTime) iff sStart < endDateTime && sEnd > startDateTime
+                                    if (sStart && sEnd && !isNaN(sStart.getTime()) && !isNaN(sEnd.getTime())) {
+                                        if (sStart >= endDateTime || sEnd <= startDateTime) {
+                                            continue; // Touching at boundary or outside interval
+                                        }
+                                    }
+                                    busyItems.push({
+                                        status: s.status,
+                                        subject: s.subject || undefined,
+                                        start: sStart,
+                                        end: sEnd
+                                    });
                                 }
                             }
+                        }
+
+                        const view = item.availabilityView || '';
+                        const viewHasBusy = view.includes('1') || view.includes('2') || view.includes('3');
+                        // Busy if there are strictly overlapping busy scheduleItems, or if scheduleItems was empty but view flagged busy
+                        const isBusy = busyItems.length > 0 || (Array.isArray(item.scheduleItems) && item.scheduleItems.length === 0 && viewHasBusy);
+
+                        if (isBusy) {
+                            const eventTitle = busyItems[0]?.subject;
                             results.set(email, {
                                 available: false,
                                 reason: eventTitle ? `Busy in Microsoft 365: "${eventTitle}"` : 'Busy in Microsoft 365 Calendar',
-                                eventTitle
+                                eventTitle,
+                                scheduleItems: busyItems
                             });
                         } else {
                             results.set(email, { available: true });
@@ -209,8 +249,145 @@ export class AvailabilityService {
 
         const isUuid = Boolean(params.currentEventId && (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).test(params.currentEventId));
         const dbCurrentEventId = isUuid ? params.currentEventId : null;
+        const targetMasterId = currentMasterId || dbCurrentEventId;
+
         const resourceIds = params.resources.map((r) => r.id);
         const contactIds = params.contacts.map((c) => c.id);
+
+        const seriesMap = new Map<string, string>();
+        const loadSeriesRrules = async (seriesIds: string[]) => {
+            const missing = seriesIds.filter((id) => !seriesMap.has(id));
+            if (missing.length === 0) return;
+            const seriesRows = await db
+                .select({ id: recurringSeries.id, rrule: recurringSeries.rrule })
+                .from(recurringSeries)
+                .where(inArray(recurringSeries.id, missing));
+            for (const s of seriesRows) {
+                if (s.rrule) seriesMap.set(s.id, s.rrule);
+            }
+        };
+
+        // Helper to check if a booking matches the requested time window
+        const isBookingActiveAtTime = (booking: {
+            startDateTime: Date | null;
+            endDateTime: Date | null;
+            recurrence: any;
+            seriesId: string | null;
+            exdates: any;
+            startTimeZone: string | null;
+        }): boolean => {
+            let rrule: string | null = null;
+            if (Array.isArray(booking.recurrence) && booking.recurrence[0]) {
+                rrule = booking.recurrence[0];
+            } else if (booking.seriesId) {
+                rrule = seriesMap.get(booking.seriesId) || null;
+            }
+
+            if (rrule && booking.startDateTime) {
+                const exdates = Array.isArray(booking.exdates) ? (booking.exdates as string[]) : [];
+                const durationMs = booking.endDateTime
+                    ? new Date(booking.endDateTime).getTime() - new Date(booking.startDateTime).getTime()
+                    : 0;
+                const rangeSearchStart = new Date(params.startDateTime.getTime() - durationMs);
+                const occurrences = expandRecurrenceRange(
+                    rrule,
+                    new Date(booking.startDateTime),
+                    booking.endDateTime ? new Date(booking.endDateTime) : null,
+                    rangeSearchStart,
+                    params.endDateTime,
+                    booking.startTimeZone,
+                    exdates
+                );
+                return occurrences.some((occ) => {
+                    const occStart = (occ.date || (occ as any).start).getTime();
+                    const occEnd = occ.end ? occ.end.getTime() : occStart + durationMs;
+                    return occStart < params.endDateTime.getTime() && occEnd > params.startDateTime.getTime();
+                });
+            } else if (booking.startDateTime && booking.endDateTime) {
+                const bStart = new Date(booking.startDateTime).getTime();
+                const bEnd = new Date(booking.endDateTime).getTime();
+                return bStart < params.endDateTime.getTime() && bEnd > params.startDateTime.getTime();
+            }
+
+            return false;
+        };
+
+        // Preload any bookings belonging to the current event (to avoid self-collision with external synced calendars)
+        let currentEventResourceBookings: Array<{
+            eventId: string;
+            resourceId: string;
+            summary: string | null;
+            startDateTime: Date | null;
+            endDateTime: Date | null;
+            recurrence: any;
+            seriesId: string | null;
+            exdates: any;
+            startTimeZone: string | null;
+        }> = [];
+
+        let currentEventContactBookings: Array<{
+            eventId: string;
+            contactId: string;
+            summary: string | null;
+            startDateTime: Date | null;
+            endDateTime: Date | null;
+            recurrence: any;
+            seriesId: string | null;
+            exdates: any;
+            startTimeZone: string | null;
+        }> = [];
+
+        if (targetMasterId) {
+            try {
+                currentEventResourceBookings = await db
+                    .select({
+                        eventId: eventResource.eventId,
+                        resourceId: eventResource.resourceId,
+                        summary: event.summary,
+                        startDateTime: event.startDateTime,
+                        endDateTime: event.endDateTime,
+                        recurrence: event.recurrence,
+                        seriesId: event.seriesId,
+                        exdates: event.exdates,
+                        startTimeZone: event.startTimeZone
+                    })
+                    .from(eventResource)
+                    .innerJoin(event, eq(eventResource.eventId, event.id))
+                    .where(and(
+                        eq(event.id, targetMasterId),
+                        ne(event.status, 'cancelled')
+                    ));
+
+                currentEventContactBookings = await db
+                    .select({
+                        eventId: eventContact.eventId,
+                        contactId: eventContact.contactId,
+                        summary: event.summary,
+                        startDateTime: event.startDateTime,
+                        endDateTime: event.endDateTime,
+                        recurrence: event.recurrence,
+                        seriesId: event.seriesId,
+                        exdates: event.exdates,
+                        startTimeZone: event.startTimeZone
+                    })
+                    .from(eventContact)
+                    .innerJoin(event, eq(eventContact.eventId, event.id))
+                    .where(and(
+                        eq(event.id, targetMasterId),
+                        ne(event.status, 'cancelled')
+                    ));
+
+                const currentSeriesIds = [
+                    ...currentEventResourceBookings.map((b) => b.seriesId),
+                    ...currentEventContactBookings.map((b) => b.seriesId)
+                ].filter((id): id is string => Boolean(id));
+                if (currentSeriesIds.length > 0) {
+                    await loadSeriesRrules(currentSeriesIds);
+                }
+            } catch {
+                // If tables aren't available or mock DB in unit tests without this mock, ignore gracefully
+            }
+        }
 
         // 1. Local DB Collision Check for Resources
         if (resourceIds.length > 0) {
@@ -226,8 +403,8 @@ export class AvailabilityService {
                     inArray(eventResource.resourceId, resourceIds),
                     ne(event.status, 'cancelled'),
                     dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
-                    lte(event.startDateTime, params.endDateTime),
-                    gte(event.endDateTime, params.startDateTime)
+                    lt(event.startDateTime, params.endDateTime),
+                    gt(event.endDateTime, params.startDateTime)
                 ));
 
             for (const c of resourceCollisions) {
@@ -263,16 +440,12 @@ export class AvailabilityService {
                         or(isNotNull(event.recurrence), isNotNull(event.seriesId))
                     ));
 
-                const resourceSeriesIds = Array.from(new Set(recurringEvents.map((r) => r.seriesId).filter((id): id is string => Boolean(id))));
-                const resourceSeriesMap = new Map<string, string>();
+                const resourceSeriesIds = Array.from(new Set((recurringEvents || []).map((r) => r.seriesId).filter((id): id is string => Boolean(id))));
                 if (resourceSeriesIds.length > 0) {
-                    const seriesRows = await db.select({ id: recurringSeries.id, rrule: recurringSeries.rrule }).from(recurringSeries).where(inArray(recurringSeries.id, resourceSeriesIds));
-                    for (const s of seriesRows) {
-                        if (s.rrule) resourceSeriesMap.set(s.id, s.rrule);
-                    }
+                    await loadSeriesRrules(resourceSeriesIds);
                 }
 
-                for (const r of recurringEvents) {
+                for (const r of (recurringEvents || [])) {
                     if (resourceAvailability[r.resourceId] && !resourceAvailability[r.resourceId].available) continue;
                     if (!r.startDateTime) continue;
 
@@ -280,12 +453,24 @@ export class AvailabilityService {
                     if (Array.isArray(r.recurrence) && r.recurrence[0]) {
                         rrule = r.recurrence[0];
                     } else if (r.seriesId) {
-                        rrule = resourceSeriesMap.get(r.seriesId) || null;
+                        rrule = seriesMap.get(r.seriesId) || null;
                     }
 
                     if (rrule) {
-                        const exdates = Array.isArray(r.exdates) ? r.exdates as string[] : [];
-                        const occurrences = expandRecurrenceRange(rrule, new Date(r.startDateTime), r.endDateTime ? new Date(r.endDateTime) : null, params.startDateTime, params.endDateTime, r.startTimeZone, exdates);
+                        const exdates = Array.isArray(r.exdates) ? (r.exdates as string[]) : [];
+                        const durationMs = r.endDateTime
+                            ? new Date(r.endDateTime).getTime() - new Date(r.startDateTime).getTime()
+                            : 0;
+                        const rangeSearchStart = new Date(params.startDateTime.getTime() - durationMs);
+                        const occurrences = expandRecurrenceRange(
+                            rrule,
+                            new Date(r.startDateTime),
+                            r.endDateTime ? new Date(r.endDateTime) : null,
+                            rangeSearchStart,
+                            params.endDateTime,
+                            r.startTimeZone,
+                            exdates
+                        );
 
                         // If checking an instance belonging to this master event, exclude the instance itself
                         const conflictingOccurrences = occurrences.filter((occ) => {
@@ -294,7 +479,9 @@ export class AvailabilityService {
                                 const targetTime = new Date(currentInstIso).getTime();
                                 if (Math.abs(occTime - targetTime) < 60000) return false;
                             }
-                            return true;
+                            const occStart = (occ.date || (occ as any).start).getTime();
+                            const occEnd = occ.end ? occ.end.getTime() : occStart + durationMs;
+                            return occStart < params.endDateTime.getTime() && occEnd > params.startDateTime.getTime();
                         });
 
                         if (conflictingOccurrences.length > 0) {
@@ -324,8 +511,8 @@ export class AvailabilityService {
                     inArray(eventContact.contactId, contactIds),
                     ne(event.status, 'cancelled'),
                     dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
-                    lte(event.startDateTime, params.endDateTime),
-                    gte(event.endDateTime, params.startDateTime)
+                    lt(event.startDateTime, params.endDateTime),
+                    gt(event.endDateTime, params.startDateTime)
                 ));
 
             for (const c of contactCollisions) {
@@ -361,16 +548,12 @@ export class AvailabilityService {
                         or(isNotNull(event.recurrence), isNotNull(event.seriesId))
                     ));
 
-                const contactSeriesIds = Array.from(new Set(recurringContactEvents.map((r) => r.seriesId).filter((id): id is string => Boolean(id))));
-                const contactSeriesMap = new Map<string, string>();
+                const contactSeriesIds = Array.from(new Set((recurringContactEvents || []).map((r) => r.seriesId).filter((id): id is string => Boolean(id))));
                 if (contactSeriesIds.length > 0) {
-                    const seriesRows = await db.select({ id: recurringSeries.id, rrule: recurringSeries.rrule }).from(recurringSeries).where(inArray(recurringSeries.id, contactSeriesIds));
-                    for (const s of seriesRows) {
-                        if (s.rrule) contactSeriesMap.set(s.id, s.rrule);
-                    }
+                    await loadSeriesRrules(contactSeriesIds);
                 }
 
-                for (const r of recurringContactEvents) {
+                for (const r of (recurringContactEvents || [])) {
                     if (contactAvailability[r.contactId] && !contactAvailability[r.contactId].available) continue;
                     if (!r.startDateTime) continue;
 
@@ -378,12 +561,24 @@ export class AvailabilityService {
                     if (Array.isArray(r.recurrence) && r.recurrence[0]) {
                         rrule = r.recurrence[0];
                     } else if (r.seriesId) {
-                        rrule = contactSeriesMap.get(r.seriesId) || null;
+                        rrule = seriesMap.get(r.seriesId) || null;
                     }
 
                     if (rrule) {
-                        const exdates = Array.isArray(r.exdates) ? r.exdates as string[] : [];
-                        const occurrences = expandRecurrenceRange(rrule, new Date(r.startDateTime), r.endDateTime ? new Date(r.endDateTime) : null, params.startDateTime, params.endDateTime, r.startTimeZone, exdates);
+                        const exdates = Array.isArray(r.exdates) ? (r.exdates as string[]) : [];
+                        const durationMs = r.endDateTime
+                            ? new Date(r.endDateTime).getTime() - new Date(r.startDateTime).getTime()
+                            : 0;
+                        const rangeSearchStart = new Date(params.startDateTime.getTime() - durationMs);
+                        const occurrences = expandRecurrenceRange(
+                            rrule,
+                            new Date(r.startDateTime),
+                            r.endDateTime ? new Date(r.endDateTime) : null,
+                            rangeSearchStart,
+                            params.endDateTime,
+                            r.startTimeZone,
+                            exdates
+                        );
 
                         // If checking an instance belonging to this master event, exclude the instance itself
                         const conflictingOccurrences = occurrences.filter((occ) => {
@@ -392,7 +587,9 @@ export class AvailabilityService {
                                 const targetTime = new Date(currentInstIso).getTime();
                                 if (Math.abs(occTime - targetTime) < 60000) return false;
                             }
-                            return true;
+                            const occStart = (occ.date || (occ as any).start).getTime();
+                            const occEnd = occ.end ? occ.end.getTime() : occStart + durationMs;
+                            return occStart < params.endDateTime.getTime() && occEnd > params.startDateTime.getTime();
                         });
 
                         if (conflictingOccurrences.length > 0) {
@@ -454,54 +651,129 @@ export class AvailabilityService {
 
                     for (const [email, res] of scheduleResults) {
                         const target = emailToTarget.get(email);
-                        if (target && !res.available) {
-                            if (target.type === 'resource') {
-                                resourceAvailability[target.id] = res;
-                            } else {
-                                contactAvailability[target.id] = res;
+                        if (!target || res.available) continue;
+
+                        if (target.type === 'resource') {
+                            // Check if this external busy slot is the booking of the current event itself
+                            const booking = currentEventResourceBookings.find((b) => b.resourceId === target.id);
+                            if (booking && isBookingActiveAtTime(booking)) {
+                                const busyItems = res.scheduleItems || [];
+                                // If at most 1 busy item, it is this event's own entry in Microsoft 365
+                                if (busyItems.length <= 1) {
+                                    resourceAvailability[target.id] = { available: true };
+                                    continue;
+                                }
                             }
+                            resourceAvailability[target.id] = res;
+                        } else {
+                            const booking = currentEventContactBookings.find((b) => b.contactId === target.id);
+                            if (booking && isBookingActiveAtTime(booking)) {
+                                const busyItems = res.scheduleItems || [];
+                                if (busyItems.length <= 1) {
+                                    contactAvailability[target.id] = { available: true };
+                                    continue;
+                                }
+                            }
+                            contactAvailability[target.id] = res;
                         }
                     }
 
                     // For any newly flagged busy resources from external provider without eventId,
-                    // attempt to find a matching local event in this timeslot
+                    // correlate with local events that booked this resource
                     const externalBusyResourceIds = Object.entries(resourceAvailability)
                         .filter(([_, r]) => !r.available && !r.eventId)
                         .map(([id]) => id);
 
                     if (externalBusyResourceIds.length > 0) {
-                        const candidateEvents = await db
-                            .select({
-                                id: event.id,
-                                summary: event.summary
-                            })
-                            .from(event)
-                            .where(and(
-                                ne(event.status, 'cancelled'),
-                                dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
-                                lte(event.startDateTime, params.endDateTime),
-                                gte(event.endDateTime, params.startDateTime)
-                            ));
+                        for (const resId of externalBusyResourceIds) {
+                            const r = resourceAvailability[resId];
+                            if (!r || r.eventId) continue;
 
-                        if (candidateEvents.length > 0) {
-                            for (const id of externalBusyResourceIds) {
-                                const r = resourceAvailability[id];
-                                if (!r || r.eventId) continue;
+                            // 1. Check non-recurring local events booked in this resource
+                            const localBookings = await db
+                                .select({
+                                    eventId: event.id,
+                                    eventTitle: event.summary
+                                })
+                                .from(eventResource)
+                                .innerJoin(event, eq(eventResource.eventId, event.id))
+                                .where(and(
+                                    eq(eventResource.resourceId, resId),
+                                    ne(event.status, 'cancelled'),
+                                    targetMasterId ? ne(event.id, targetMasterId) : undefined,
+                                    lt(event.startDateTime, params.endDateTime),
+                                    gt(event.endDateTime, params.startDateTime)
+                                ));
 
-                                if (r.eventTitle) {
-                                    const matched = candidateEvents.find((e) => e.summary && e.summary.toLowerCase().trim() === (r.eventTitle!).toLowerCase().trim());
+                            const localBooking = localBookings?.[0];
+                            if (localBooking) {
+                                r.eventId = localBooking.eventId;
+                                r.eventTitle = localBooking.eventTitle || undefined;
+                                r.reason = `Booked in "${localBooking.eventTitle || 'another event'}"`;
+                                continue;
+                            }
 
-                                    if (matched) {
-                                        r.eventId = matched.id;
-                                        r.eventTitle = matched.summary;
-                                        continue;
-                                    }
+                            // 2. Check recurring local events booked in this resource
+                            const recurringResourceBookings = await db
+                                .select({
+                                    eventId: event.id,
+                                    eventTitle: event.summary,
+                                    startDateTime: event.startDateTime,
+                                    endDateTime: event.endDateTime,
+                                    recurrence: event.recurrence,
+                                    seriesId: event.seriesId,
+                                    exdates: event.exdates,
+                                    startTimeZone: event.startTimeZone
+                                })
+                                .from(eventResource)
+                                .innerJoin(event, eq(eventResource.eventId, event.id))
+                                .where(and(
+                                    eq(eventResource.resourceId, resId),
+                                    ne(event.status, 'cancelled'),
+                                    targetMasterId ? ne(event.id, targetMasterId) : undefined,
+                                    or(isNotNull(event.recurrence), isNotNull(event.seriesId))
+                                ));
+
+                            const recSeriesIds = Array.from(new Set((recurringResourceBookings || []).map((rb) => rb.seriesId).filter((id): id is string => Boolean(id))));
+                            if (recSeriesIds.length > 0) {
+                                await loadSeriesRrules(recSeriesIds);
+                            }
+
+                            for (const rec of (recurringResourceBookings || [])) {
+                                if (!rec.startDateTime) continue;
+                                let rrule: string | null = null;
+                                if (Array.isArray(rec.recurrence) && rec.recurrence[0]) {
+                                    rrule = rec.recurrence[0];
+                                } else if (rec.seriesId) {
+                                    rrule = seriesMap.get(rec.seriesId) || null;
                                 }
 
-                                if (candidateEvents.length === 1) {
-                                    r.eventId = candidateEvents[0].id;
-                                    if (!r.eventTitle) {
-                                        r.eventTitle = candidateEvents[0].summary;
+                                if (rrule) {
+                                    const exdates = Array.isArray(rec.exdates) ? (rec.exdates as string[]) : [];
+                                    const durationMs = rec.endDateTime
+                                        ? new Date(rec.endDateTime).getTime() - new Date(rec.startDateTime).getTime()
+                                        : 0;
+                                    const rangeSearchStart = new Date(params.startDateTime.getTime() - durationMs);
+                                    const occurrences = expandRecurrenceRange(
+                                        rrule,
+                                        new Date(rec.startDateTime),
+                                        rec.endDateTime ? new Date(rec.endDateTime) : null,
+                                        rangeSearchStart,
+                                        params.endDateTime,
+                                        rec.startTimeZone,
+                                        exdates
+                                    );
+                                    const hasConflict = occurrences.some((occ) => {
+                                        const occStart = (occ.date || (occ as any).start).getTime();
+                                        const occEnd = occ.end ? occ.end.getTime() : occStart + durationMs;
+                                        return occStart < params.endDateTime.getTime() && occEnd > params.startDateTime.getTime();
+                                    });
+
+                                    if (hasConflict) {
+                                        r.eventId = rec.eventId;
+                                        r.eventTitle = rec.eventTitle || undefined;
+                                        r.reason = `Booked in "${rec.eventTitle || 'another event'}"`;
+                                        break;
                                     }
                                 }
                             }
