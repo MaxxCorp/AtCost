@@ -1305,7 +1305,7 @@
                 {/if}
 
                 <!-- Poster Editorial Header -->
-                <header class="poster-header px-8 pt-6 pb-4 border-b-2 border-slate-900 flex flex-col gap-3">
+                <header class="poster-header px-8 pt-5 pb-1 flex flex-col gap-2">
                     <!-- Top Row: Location Branding / Venue Info & Right Logo / Sponsors -->
                     <div class="flex items-start justify-between gap-6">
                         <!-- Left: Location Info Block -->
@@ -1438,12 +1438,12 @@
                         </div>
                     </div>
 
-                    <!-- Main Programme Headline Row (Full width underneath location block & logo with Friedenshort Gold Accent Bar) -->
-                    <div class="mt-1 pt-2.5 border-t border-slate-100">
+                    <!-- Main Programme Headline Row (Full width underneath location block & logo with single Yellow Accent Line) -->
+                    <div class="mt-0.5 pt-1.5">
                         <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 border-l-4 border-[#fbc707] pl-3">
                             {programmeMonthTitle}
                         </h1>
-                        <div class="h-1 bg-[#fbc707] mt-2 rounded-full w-full"></div>
+                        <div class="h-1 bg-[#fbc707] mt-1.5 rounded-full w-full"></div>
                     </div>
                 </header>
             </div>
@@ -1459,7 +1459,7 @@
 
             <!-- Middle Section: Programme Event Grid (Single Page Multi-Column Flow) -->
             <div
-                class="poster-events-grid flex-1 px-8 py-5"
+                class="poster-events-grid flex-1 px-8 py-3.5"
                 style="column-count: {effectiveColumns}; column-gap: 2rem; {effectiveColumns > 1 ? 'column-rule: 1px solid #e2e8f0;' : ''}"
             >
                 <!-- Optional Grid Top Slot for Custom Sections -->
@@ -1492,8 +1492,8 @@
                         {@const tentativeCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'tentative').length : 0}
                         {@const totalInstances = evt.seriesInstances ? evt.seriesInstances.length : (evt.seriesDates ? evt.seriesDates.length : 1)}
 
-                        <!-- Single Programme Entry (Avoid breaking inside columns - Corporate Muted Style with distinct accent lines) -->
-                        <div class="poster-event-item mb-3.5 pb-2.5 border-b border-slate-200/70 break-inside-avoid transition-all rounded-r-md border-y border-r border-slate-200/50 p-2 shadow-2xs {density === 'compact' ? 'mb-2 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4.5 pb-3 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-[3.5px] border-l-[#dc2626] bg-red-50/20' : 'border-l-[3.5px] border-l-slate-400 bg-[#f8fafc]'}">
+                        <!-- Single Programme Entry (Avoid breaking inside columns - Highlight for Non-Repeating One-Offs) -->
+                        <div class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60'}">
                             <div class="flex items-start gap-3">
                                 <!-- Date Badge Block -->
                                 {#if isCompressed}
@@ -1515,14 +1515,14 @@
                                         </span>
                                     </div>
                                 {:else}
-                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-slate-900 text-white font-mono text-center">
-                                        <span class="text-[8.5px] font-bold tracking-wider uppercase {isSpecialNonSeries ? 'text-red-400 font-black' : 'text-amber-300'} leading-none">
+                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded {isSpecialNonSeries ? 'bg-amber-950 text-white ring-1 ring-amber-500/50' : 'bg-slate-900 text-white'} font-mono text-center">
+                                        <span class="text-[8.5px] font-bold tracking-wider uppercase {isSpecialNonSeries ? 'text-amber-400 font-black' : 'text-amber-300'} leading-none">
                                             {formatDateWeekday(dateStr)}
                                         </span>
-                                        <span class="text-base font-black leading-none my-0.5 {isSpecialNonSeries ? 'text-red-100' : 'text-white'}">
+                                        <span class="text-base font-black leading-none my-0.5 text-white">
                                             {formatDateDay(dateStr)}
                                         </span>
-                                        <span class="text-[8px] uppercase tracking-wider text-slate-300 leading-none">
+                                        <span class="text-[8px] uppercase tracking-wider {isSpecialNonSeries ? 'text-amber-200/90' : 'text-slate-300'} leading-none">
                                             {formatDateMonth(dateStr)}
                                         </span>
                                     </div>
@@ -1585,8 +1585,8 @@
 
                                         <!-- Time Range -->
                                         {#if showTimes && isEvt}
-                                            <span class="inline-flex items-center gap-1 font-bold {isSpecialNonSeries ? 'text-red-600' : 'text-slate-800'}">
-                                                <Clock class="w-3 h-3 {isSpecialNonSeries ? 'text-red-500' : 'text-amber-500'} shrink-0" />
+                                            <span class="inline-flex items-center gap-1 font-bold {isSpecialNonSeries ? 'text-amber-900' : 'text-slate-800'}">
+                                                <Clock class="w-3 h-3 {isSpecialNonSeries ? 'text-amber-600' : 'text-slate-500'} shrink-0" />
                                                 {formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}
                                             </span>
                                         {/if}
@@ -1599,12 +1599,19 @@
                                             </span>
                                         {/if}
 
-                                        <!-- Ticket Price -->
-                                        {#if visibleComponents.ticketPrice && priceStr && !isFree}
-                                            <span class="inline-flex items-center gap-0.5 font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
-                                                <Ticket class="w-2.5 h-2.5" />
-                                                {priceStr}
-                                            </span>
+                                        <!-- Ticket Price or Free Badge -->
+                                        {#if visibleComponents.ticketPrice}
+                                            {#if isFree}
+                                                <span class="inline-flex items-center gap-0.5 font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-1.5 py-0.2 rounded text-[9px]">
+                                                    <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                                    {m.ticket_price_free?.() || 'Kostenlos'}
+                                                </span>
+                                            {:else if priceStr}
+                                                <span class="inline-flex items-center gap-0.5 font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
+                                                    <Ticket class="w-2.5 h-2.5" />
+                                                    {priceStr}
+                                                </span>
+                                            {/if}
                                         {/if}
 
                                         <!-- Participants -->
@@ -1762,22 +1769,14 @@
                                         </div>
                                     {/if}
 
-                                    <!-- Tags & Free Admission Pill -->
-                                    {#if (visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0) || (visibleComponents.ticketPrice && isFree)}
-                                        <div class="mt-1 flex items-center gap-1 flex-wrap">
-                                            {#if visibleComponents.ticketPrice && isFree}
-                                                <span class="px-1.5 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[9px] font-bold inline-flex items-center gap-0.5">
-                                                    <Ticket class="w-2.5 h-2.5 text-emerald-600" />
-                                                    {m.ticket_price_free?.() || 'Free'}
+                                    <!-- Tags -->
+                                    {#if visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0}
+                                        <div class="mt-0.5 flex items-center gap-1 flex-wrap">
+                                            {#each (item as any).tags as t}
+                                                <span class="text-[8.5px] px-1 py-0.2 bg-slate-100 text-slate-500 rounded border border-slate-200">
+                                                    #{typeof t === 'string' ? t : t.name || t.tag?.name}
                                                 </span>
-                                            {/if}
-                                            {#if visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0}
-                                                {#each (item as any).tags as t}
-                                                    <span class="text-[8.5px] px-1 py-0.2 bg-slate-100 text-slate-500 rounded border border-slate-200">
-                                                        #{typeof t === 'string' ? t : t.name || t.tag?.name}
-                                                    </span>
-                                                {/each}
-                                            {/if}
+                                            {/each}
                                         </div>
                                     {/if}
                                 </div>
