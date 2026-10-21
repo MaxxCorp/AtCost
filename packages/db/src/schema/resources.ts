@@ -1,6 +1,44 @@
-import { pgTable, text, timestamp, boolean, uuid, integer, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, integer, doublePrecision, jsonb } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { contact } from "./contacts";
+
+// --- GRANULAR OPENING HOURS TYPES ---
+
+export type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+
+export interface OpeningTimeSlot {
+    open: string;  // "09:00"
+    close: string; // "17:30"
+    label?: string; // e.g. "Kernzeit", "Beratung"
+}
+
+export interface DaySchedule {
+    closed?: boolean;
+    slots?: OpeningTimeSlot[];
+    note?: string; // e.g. "Nur nach Voranmeldung"
+}
+
+export interface SpecialDaySchedule {
+    date: string; // YYYY-MM-DD
+    closed?: boolean;
+    slots?: OpeningTimeSlot[];
+    note?: string; // e.g. "Heiligabend", "Betriebsruhe"
+}
+
+export interface SeasonalSchedule {
+    name: string;
+    startDate: string; // YYYY-MM-DD or MM-DD
+    endDate: string;   // YYYY-MM-DD or MM-DD
+    days?: Partial<Record<DayOfWeek, DaySchedule>>;
+}
+
+export interface OpeningHoursData {
+    days?: Partial<Record<DayOfWeek, DaySchedule>>;
+    specialHours?: SpecialDaySchedule[];
+    seasonalHours?: SeasonalSchedule[];
+    notes?: string; // General remarks, e.g. "Barrierefreier Zugang, Telefonische Sprechzeiten"
+    raw?: string;   // Optional manual override or legacy free-text fallback
+}
 
 // --- RESOURCE TABLES ---
 
@@ -20,6 +58,7 @@ export const location = pgTable("location", {
     country: text("country"),
     isPublic: boolean("is_public").default(false).notNull(),
     inclusivitySupport: text("inclusivity_support"),
+    openingHours: jsonb("opening_hours").$type<OpeningHoursData>(),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
     what3words: text("what3words"),
@@ -43,7 +82,7 @@ export const resource = pgTable("resource", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
-import { primaryKey, jsonb } from "drizzle-orm/pg-core";
+import { primaryKey } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const resourceContact = pgTable("resource_contact", {

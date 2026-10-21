@@ -4,7 +4,7 @@
     import { type Announcement } from "@ac/validations";
 
 
-    let { announcement } = $props<{ announcement: any }>();
+    let { announcement }: { announcement: any } = $props();
 </script>
 
 <div class="space-y-8">

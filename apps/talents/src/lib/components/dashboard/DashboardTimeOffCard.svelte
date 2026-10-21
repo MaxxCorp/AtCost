@@ -2,7 +2,7 @@
     import { Umbrella, Plus, History, Clock } from "@lucide/svelte";
     import { Button } from "@ac/ui/components/button";
 
-    let { balances, requests, talentId, onRefresh } = $props<{ balances: any[], requests: any[], talentId: string, onRefresh: () => void }>();
+    let { balances, requests, talentId, onRefresh }: { balances: any[], requests: any[], talentId: string, onRefresh: () => void } = $props();
 
     const vacationBalance = $derived(balances.find((b: any) => b.year === new Date().getFullYear()) || { totalDays: 25, usedDays: 0, pendingDays: 0 });
     const remainingDays = $derived(vacationBalance.totalDays - vacationBalance.usedDays - vacationBalance.pendingDays);

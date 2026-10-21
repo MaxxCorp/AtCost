@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { type Event, type Announcement } from "@ac/validations";
+    import { type Event, type Announcement, formatOpeningHours, type OpeningHoursData } from "@ac/validations";
     import { 
         Printer, 
         Calendar, 
@@ -66,6 +66,8 @@
         zip: string | null;
         city: string | null;
         country: string | null;
+        openingHours?: OpeningHoursData | string | null;
+        inclusivitySupport?: string | null;
         contact: {
             name: string;
             email?: string;
@@ -116,6 +118,7 @@
         tags: true,           // Tags
         internalNotes: false, // Staff internal notes
         heroImage: false,     // Hero image
+        openingHours: true,   // Location opening hours
     });
 
     const storageKey = $derived(`kiosk_flat_list_prefs_${kiosk?.id || 'default'}`);
@@ -187,6 +190,7 @@
             tags: true,
             internalNotes: true,
             heroImage: true,
+            openingHours: true,
         };
         savePrefs();
     }
@@ -203,6 +207,7 @@
             tags: true,
             internalNotes: false,
             heroImage: false,
+            openingHours: true,
         };
         savePrefs();
     }
@@ -805,6 +810,26 @@
                                         {/if}
                                     </div>
                                 </button>
+
+                                <!-- Opening Hours -->
+                                <button
+                                    type="button"
+                                    onclick={() => toggleComponent('openingHours')}
+                                    class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.openingHours ? 'bg-amber-50/70 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                                >
+                                    <div class="flex items-center gap-2.5">
+                                        <Clock class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                        <div>
+                                            <div class="font-semibold text-xs leading-tight">{m.component_opening_hours?.() ?? "Öffnungszeiten"}</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_opening_hours_desc?.() ?? "Öffnungszeiten des Standorts anzeigen"}</div>
+                                        </div>
+                                    </div>
+                                    <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.openingHours ? 'bg-amber-600 border-amber-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                        {#if visibleComponents.openingHours}
+                                            <Check class="w-3 h-3 stroke-[3]" />
+                                        {/if}
+                                    </div>
+                                </button>
                             </div>
                         </div>
                     {/if}
@@ -853,14 +878,32 @@
                     {#if kiosk?.locations && kiosk.locations.length > 0}
                         <div class="flex flex-wrap items-center gap-4 pt-2 text-xs text-slate-700 font-medium">
                             {#each kiosk.locations as loc (loc.id)}
-                                <div class="inline-flex items-center gap-1.5 bg-slate-100 print:bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
-                                    <MapPin class="w-3.5 h-3.5 text-slate-700" />
-                                    <span>
-                                        {loc.name}
-                                        {#if loc.street}
-                                            • {loc.street} {loc.houseNumber || ''}, {loc.zip || ''} {loc.city || ''}
-                                        {/if}
-                                    </span>
+                                <div class="inline-flex flex-col gap-1 bg-slate-100 print:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                                    <div class="inline-flex items-center gap-1.5 font-semibold">
+                                        <MapPin class="w-3.5 h-3.5 text-slate-700 shrink-0" />
+                                        <span>
+                                            {loc.name}
+                                            {#if loc.street}
+                                                • {loc.street} {loc.houseNumber || ''}, {loc.zip || ''} {loc.city || ''}
+                                            {/if}
+                                        </span>
+                                    </div>
+                                    {#if visibleComponents.openingHours && (loc.openingHours || loc.inclusivitySupport)}
+                                        <div class="pl-5 text-[11px] text-slate-600 space-y-0.5">
+                                            {#if loc.openingHours}
+                                                <div class="flex items-start gap-1">
+                                                    <Clock class="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
+                                                    <span class="whitespace-pre-line font-mono text-[10.5px]">{formatOpeningHours(loc.openingHours)}</span>
+                                                </div>
+                                            {/if}
+                                            {#if loc.inclusivitySupport}
+                                                <div class="text-[10px] text-emerald-700 flex items-center gap-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                                    <span>{loc.inclusivitySupport}</span>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/if}
                                 </div>
                             {/each}
                         </div>

@@ -3,7 +3,7 @@
     import { fetchTalentTimeOff } from "../../../routes/shiftplans/associate.remote";
     import { AlertTriangle, CheckCircle2, Clock } from "@lucide/svelte";
 
-    let { talent } = $props<{ talent: any }>();
+    let { talent }: { talent: any } = $props();
 
     let timeOffRequests = $state<any[]>([]);
     let loading = $state(true);

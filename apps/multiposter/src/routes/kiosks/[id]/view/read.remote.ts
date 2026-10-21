@@ -79,6 +79,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             roomId: loc.roomId,
             capacity: loc.capacity,
             inclusivitySupport: loc.inclusivitySupport,
+            openingHours: loc.openingHours,
             what3words: loc.what3words,
             latitude: loc.latitude,
             longitude: loc.longitude,

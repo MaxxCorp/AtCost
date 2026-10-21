@@ -21,7 +21,7 @@
         remoteDelete,
         remoteList, // New prop
         remoteRename, // New prop
-    } = $props<{
+    }: {
         slotName: string;
         currentResult: ReadResult;
         remoteRead: any;
@@ -31,7 +31,7 @@
         remoteDelete: any;
         remoteList?: any;
         remoteRename?: any;
-    }>();
+    } = $props();
 
     // Initialize state from props immediately
     let isEditing = $state(false);

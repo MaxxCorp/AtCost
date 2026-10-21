@@ -7,8 +7,29 @@ import {
     announcementLocation,
     locationContact,
     talent,
+    type OpeningHoursData,
 } from './schema/index.js';
 import { eq, and, or, inArray, notInArray, ilike, sql } from 'drizzle-orm';
+
+function normalizeOpeningHours(val: OpeningHoursData | string | null | undefined): OpeningHoursData | null {
+    if (!val) return null;
+    if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed) return null;
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (typeof parsed === 'object' && parsed !== null) {
+                    return parsed as OpeningHoursData;
+                }
+            } catch {
+                // fall through
+            }
+        }
+        return { raw: trimmed };
+    }
+    return val;
+}
 
 function parseFilterValueHelper(val: any): { include: string[]; exclude: string[] } {
     if (!val) return { include: [], exclude: [] };
@@ -171,6 +192,7 @@ export interface LocationInsertData {
     longitude?: string | number | null;
     what3words?: string | null;
     inclusivitySupport?: string | null;
+    openingHours?: OpeningHoursData | string | null;
     isPublic?: boolean;
     heroImage?: string | null;
 }
@@ -193,6 +215,7 @@ export async function createLocation(data: LocationInsertData, userId?: string) 
         longitude: data.longitude ? parseFloat(String(data.longitude)) : null,
         what3words: data.what3words || null,
         inclusivitySupport: data.inclusivitySupport || null,
+        openingHours: normalizeOpeningHours(data.openingHours),
         isPublic: data.isPublic ?? false,
         heroImage: data.heroImage || null,
     };
@@ -229,6 +252,7 @@ export async function updateLocation(id: string, data: Partial<LocationInsertDat
         longitude: data.longitude ? parseFloat(String(data.longitude)) : null,
         what3words: data.what3words || null,
         inclusivitySupport: data.inclusivitySupport || null,
+        openingHours: normalizeOpeningHours(data.openingHours),
         isPublic: data.isPublic ?? false,
         heroImage: data.heroImage || null,
         updatedAt: new Date(),

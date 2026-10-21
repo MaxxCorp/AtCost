@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
-    import { type Event, type Announcement } from "@ac/validations";
+    import { type Event, type Announcement, formatOpeningHours, type OpeningHoursData } from "@ac/validations";
     import {
         Printer,
         Sparkles,
@@ -36,7 +36,8 @@
         User,
         Users,
         UserCheck,
-        FileImage
+        FileImage,
+        LayoutTemplate
     } from "@lucide/svelte";
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
@@ -88,9 +89,21 @@
         country?: string | null;
         roomId?: string | null;
         capacity?: string | null;
+        inclusivitySupport?: string | null;
+        openingHours?: OpeningHoursData | string | null;
         heroImage?: string | null;
         description?: string | null;
         contact?: LocationContact | null;
+    }
+
+    export interface CustomSectionItem {
+        id: string;
+        title: string;
+        content: string;
+        imageUrl?: string;
+        slot: "banner" | "grid_top" | "grid_bottom" | "footer";
+        accentColor?: "gold" | "red" | "slate" | "emerald";
+        enabled: boolean;
     }
 
     interface SponsorItem {
@@ -227,6 +240,48 @@
         savePrefs();
     }
 
+    // --- State: Custom Sections / Content Slot Editor ---
+    let customSections = $state<CustomSectionItem[]>([]);
+
+    function addCustomSection(slot: CustomSectionItem["slot"] = "banner") {
+        customSections = [
+            ...customSections,
+            {
+                id: `sec-${Date.now()}`,
+                title: "Neuer Hinweis / Abschnitt",
+                content: "",
+                imageUrl: "",
+                slot,
+                accentColor: "gold",
+                enabled: true
+            }
+        ];
+        savePrefs();
+    }
+
+    function removeCustomSection(id: string) {
+        customSections = customSections.filter(s => s.id !== id);
+        savePrefs();
+    }
+
+    function addOpeningHoursSection() {
+        if (!currentLocation?.openingHours) return;
+        const formatted = formatOpeningHours(currentLocation.openingHours);
+        customSections = [
+            ...customSections,
+            {
+                id: `sec-hours-${Date.now()}`,
+                title: "Öffnungszeiten & Beratung",
+                content: `${formatted}${currentLocation.inclusivitySupport ? '\n♿ ' + currentLocation.inclusivitySupport : ''}`,
+                slot: "banner",
+                accentColor: "gold",
+                enabled: true
+            }
+        ];
+        savePrefs();
+        toast.success("Öffnungszeiten als Banner hinzugefügt");
+    }
+
     function selectAllComponents() {
         visibleComponents = {
             contacts: true,
@@ -239,6 +294,7 @@
             tags: true,
             internalNotes: true,
             heroImage: true,
+            openingHours: true,
         };
         savePrefs();
     }
@@ -298,6 +354,9 @@
                         ...prefs.visibleComponents
                     };
                 }
+                if (Array.isArray(prefs.customSections)) {
+                    customSections = prefs.customSections;
+                }
             }
         } catch (e) {
             console.error("Failed to load poster preferences", e);
@@ -333,7 +392,8 @@
                 customProgrammeTitle,
                 customProgrammeSubtitle,
                 activeLocationId,
-                visibleComponents
+                visibleComponents,
+                customSections
             };
             localStorage.setItem(storageKey, JSON.stringify(prefs));
         } catch (e) {
@@ -353,7 +413,8 @@
             activeLocationId, visibleComponents.contacts, visibleComponents.participants,
             visibleComponents.publicStatus, visibleComponents.descriptions, visibleComponents.qrCodes,
             visibleComponents.ticketPrice, visibleComponents.rooms, visibleComponents.tags,
-            visibleComponents.internalNotes, visibleComponents.heroImage
+            visibleComponents.internalNotes, visibleComponents.heroImage, visibleComponents.openingHours,
+            customSections
         ];
         savePrefs();
     });
@@ -579,11 +640,12 @@
         }
     }
 
-    // Image Upload helper for Sponsor or Location Logo
-    async function handleImageUpload(e: globalThis.Event, target: "location" | { sponsorId: string }) {
-        const input = e.target as HTMLInputElement;
-        if (!input.files || input.files.length === 0) return;
-        const file = input.files[0];
+    // Image Upload helper for Sponsor, Location Logo, or Custom Section
+    async function handleImageUpload(inputOrEvent: globalThis.Event | File, target: "location" | { sponsorId: string } | { sectionId: string }) {
+        const file = inputOrEvent instanceof File
+            ? inputOrEvent
+            : ((inputOrEvent.target as HTMLInputElement)?.files?.[0]);
+        if (!file) return;
         if (!file.type.startsWith("image/") && !file.name.toLowerCase().endsWith(".svg")) {
             toast.error("Nur Bilddateien (PNG, JPG, SVG, WebP) erlaubt");
             return;
@@ -601,11 +663,14 @@
                     const dataUrl = "data:image/svg+xml;utf8," + encodeURIComponent(svgText);
                     if (target === "location") {
                         customLocationLogoUrl = dataUrl;
-                    } else {
+                    } else if ("sponsorId" in target) {
                         const s = sponsors.find(sp => sp.id === target.sponsorId);
                         if (s) s.logoUrl = dataUrl;
+                    } else if ("sectionId" in target) {
+                        const sec = customSections.find(sc => sc.id === target.sectionId);
+                        if (sec) sec.imageUrl = dataUrl;
                     }
-                    toast.success("SVG Logo optimiert und hinzugefügt");
+                    toast.success("Bild optimiert und hinzugefügt");
                     savePrefs();
                 };
             } else {
@@ -622,19 +687,25 @@
                         const url = res.success && res.urls?.default ? res.urls.default : base64;
                         if (target === "location") {
                             customLocationLogoUrl = url;
-                        } else {
+                        } else if ("sponsorId" in target) {
                             const s = sponsors.find(sp => sp.id === target.sponsorId);
                             if (s) s.logoUrl = url;
+                        } else if ("sectionId" in target) {
+                            const sec = customSections.find(sc => sc.id === target.sectionId);
+                            if (sec) sec.imageUrl = url;
                         }
-                        toast.success("Logo erfolgreich hinzugefügt");
+                        toast.success("Bild erfolgreich hinzugefügt");
                     } catch {
                         if (target === "location") {
                             customLocationLogoUrl = base64;
-                        } else {
+                        } else if ("sponsorId" in target) {
                             const s = sponsors.find(sp => sp.id === target.sponsorId);
                             if (s) s.logoUrl = base64;
+                        } else if ("sectionId" in target) {
+                            const sec = customSections.find(sc => sc.id === target.sectionId);
+                            if (sec) sec.imageUrl = base64;
                         }
-                        toast.success("Logo gespeichert");
+                        toast.success("Bild gespeichert");
                     }
                     savePrefs();
                 };
@@ -665,6 +736,30 @@
         }
     </style>
 </svelte:head>
+
+{#snippet customSectionCard(sec: CustomSectionItem, slotContext: string)}
+    {@const colorBorder = sec.accentColor === 'red' ? 'border-l-red-600' : sec.accentColor === 'gold' ? 'border-l-[#fbc707]' : sec.accentColor === 'emerald' ? 'border-l-emerald-600' : 'border-l-slate-400'}
+    {@const colorBg = sec.accentColor === 'red' ? 'bg-red-50/25' : sec.accentColor === 'gold' ? 'bg-amber-50/25' : sec.accentColor === 'emerald' ? 'bg-emerald-50/25' : 'bg-slate-50/80'}
+    <div class="custom-section-item p-2.5 rounded-r-md border border-slate-200/60 border-l-[3.5px] {colorBorder} {colorBg} break-inside-avoid {slotContext === 'banner' ? 'mb-2' : 'mb-3.5'}">
+        <div class="flex items-start gap-3">
+            {#if sec.imageUrl}
+                <img src={sec.imageUrl} alt={sec.title} class="max-h-16 max-w-[120px] object-contain rounded shrink-0 bg-white p-1 border border-slate-200" />
+            {/if}
+            <div class="flex-1 min-w-0">
+                {#if sec.title}
+                    <h4 class="font-bold text-slate-900 text-xs sm:text-sm tracking-tight leading-snug mb-0.5">
+                        {sec.title}
+                    </h4>
+                {/if}
+                {#if sec.content}
+                    <div class="text-[11px] text-slate-700 leading-relaxed whitespace-pre-line rich-description">
+                        {@html sec.content}
+                    </div>
+                {/if}
+            </div>
+        </div>
+    </div>
+{/snippet}
 
 <!-- Screen Toolbar -->
 <header class="print:hidden sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm px-4 py-2.5">
@@ -1060,6 +1155,26 @@
                                     {/if}
                                 </div>
                             </button>
+
+                            <!-- Opening Hours -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('openingHours')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.openingHours ? 'bg-amber-50/70 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <Clock class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <div>
+                                        <div class="font-semibold text-xs leading-tight">{m.component_opening_hours?.() ?? "Öffnungszeiten"}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_opening_hours_desc?.() ?? "Öffnungszeiten des Standorts anzeigen"}</div>
+                                    </div>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.openingHours ? 'bg-amber-600 border-amber-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.openingHours}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
                         </div>
                     </div>
                 {/if}
@@ -1096,6 +1211,22 @@
             >
                 <FileText class="w-3.5 h-3.5 text-purple-600" />
                 <span>{m.poster_letterhead_mode()}</span>
+            </button>
+
+            <!-- Quick Button: Modifiable Sections Editor -->
+            <button
+                type="button"
+                onclick={() => (isSettingsOpen = true)}
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition {customSections.filter(s => s.enabled).length > 0 ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-300' : 'bg-slate-50 dark:bg-slate-800 text-slate-700 border-slate-200 hover:text-slate-900'}"
+                title="Modifizierbare Abschnitte & Infoblöcke bearbeiten"
+            >
+                <LayoutTemplate class="w-3.5 h-3.5 text-amber-600" />
+                <span>{m.custom_sections?.() ?? "Abschnitte"}</span>
+                {#if customSections.filter(s => s.enabled).length > 0}
+                    <span class="px-1.5 py-0.2 bg-amber-200/80 dark:bg-amber-800/80 text-amber-900 dark:text-amber-100 rounded-full text-[9px] font-bold">
+                        {customSections.filter(s => s.enabled).length}
+                    </span>
+                {/if}
             </button>
         </div>
 
@@ -1248,6 +1379,22 @@
                                                     {/if}
                                                 </div>
                                             {/if}
+
+                                            <!-- Location Opening Hours (Öffnungszeiten) & Inclusivity -->
+                                            {#if visibleComponents.openingHours && currentLocation?.openingHours}
+                                                <div class="mt-1.5 pt-1.5 border-t border-slate-200/70 flex items-start gap-1.5 text-[10.5px] text-slate-700">
+                                                    <Clock class="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                                                    <div class="leading-tight whitespace-pre-line font-medium">
+                                                        <span class="font-bold text-slate-900">{m.opening_hours?.() || 'Öffnungszeiten'}:</span> {formatOpeningHours(currentLocation.openingHours)}
+                                                    </div>
+                                                </div>
+                                            {/if}
+                                            {#if currentLocation?.inclusivitySupport}
+                                                <div class="text-[10px] text-emerald-800 flex items-center gap-1 font-medium pt-0.5">
+                                                    <CheckCircle2 class="w-2.5 h-2.5 text-emerald-600" />
+                                                    <span>{currentLocation.inclusivitySupport}</span>
+                                                </div>
+                                            {/if}
                                         </div>
                                     </div>
                                 </div>
@@ -1291,20 +1438,37 @@
                         </div>
                     </div>
 
-                    <!-- Main Programme Headline Row (Full width underneath location block & logo) -->
+                    <!-- Main Programme Headline Row (Full width underneath location block & logo with Friedenshort Gold Accent Bar) -->
                     <div class="mt-1 pt-2.5 border-t border-slate-100">
-                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-emerald-800 dark:text-emerald-900 border-l-4 border-emerald-600 pl-3">
+                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 border-l-4 border-[#fbc707] pl-3">
                             {programmeMonthTitle}
                         </h1>
+                        <div class="h-1 bg-[#fbc707] mt-2 rounded-full w-full"></div>
                     </div>
                 </header>
             </div>
+
+            <!-- Optional Top Banner Slot for Custom Sections -->
+            {#if customSections.some(s => s.enabled && s.slot === "banner")}
+                <div class="px-8 pt-2 pb-1 space-y-2">
+                    {#each customSections.filter(s => s.enabled && s.slot === "banner") as sec (sec.id)}
+                        {@render customSectionCard(sec, "banner")}
+                    {/each}
+                </div>
+            {/if}
 
             <!-- Middle Section: Programme Event Grid (Single Page Multi-Column Flow) -->
             <div
                 class="poster-events-grid flex-1 px-8 py-5"
                 style="column-count: {effectiveColumns}; column-gap: 2rem; {effectiveColumns > 1 ? 'column-rule: 1px solid #e2e8f0;' : ''}"
             >
+                <!-- Optional Grid Top Slot for Custom Sections -->
+                {#if customSections.some(s => s.enabled && s.slot === "grid_top")}
+                    {#each customSections.filter(s => s.enabled && s.slot === "grid_top") as sec (sec.id)}
+                        {@render customSectionCard(sec, "grid_top")}
+                    {/each}
+                {/if}
+
                 {#if displayItems.length === 0}
                     <div class="py-16 text-center text-slate-400">
                         <Calendar class="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -1328,19 +1492,19 @@
                         {@const tentativeCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'tentative').length : 0}
                         {@const totalInstances = evt.seriesInstances ? evt.seriesInstances.length : (evt.seriesDates ? evt.seriesDates.length : 1)}
 
-                        <!-- Single Programme Entry (Avoid breaking inside columns) -->
-                        <div class="poster-event-item mb-4 pb-3 border-b border-slate-100 break-inside-avoid transition-all {density === 'compact' ? 'mb-2.5 pb-2 text-[11px]' : density === 'relaxed' ? 'mb-5 pb-4 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 pl-2.5 bg-gradient-to-r from-amber-50/70 via-amber-50/20 to-transparent rounded-r-md' : isCompressed ? 'border-l-4 border-l-indigo-500 pl-2.5 bg-gradient-to-r from-indigo-50/50 via-indigo-50/15 to-transparent rounded-r-md' : ''}">
+                        <!-- Single Programme Entry (Avoid breaking inside columns - Corporate Muted Style with distinct accent lines) -->
+                        <div class="poster-event-item mb-3.5 pb-2.5 border-b border-slate-200/70 break-inside-avoid transition-all rounded-r-md border-y border-r border-slate-200/50 p-2 shadow-2xs {density === 'compact' ? 'mb-2 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4.5 pb-3 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-[3.5px] border-l-[#dc2626] bg-red-50/20' : 'border-l-[3.5px] border-l-slate-400 bg-[#f8fafc]'}">
                             <div class="flex items-start gap-3">
                                 <!-- Date Badge Block -->
                                 {#if isCompressed}
-                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-indigo-950 text-white font-mono text-center">
-                                        <RefreshCw class="w-3.5 h-3.5 text-indigo-400 mb-0.5" />
-                                        <span class="text-sm font-black leading-tight text-white">{totalInstances}×</span>
-                                        <span class="text-[7.5px] uppercase tracking-wider text-indigo-300 leading-none">{m.series_badge()}</span>
+                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-slate-900 text-white font-mono text-center">
+                                        <RefreshCw class="w-3.5 h-3.5 text-amber-400 mb-0.5" />
+                                        <span class="text-sm font-black leading-tight text-amber-400">{totalInstances}×</span>
+                                        <span class="text-[7.5px] uppercase tracking-wider text-slate-300 leading-none">{m.series_badge()}</span>
                                     </div>
                                 {:else if multiDay && dateParts}
                                     <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-slate-900 text-white font-mono text-center">
-                                        <span class="text-[8px] font-extrabold uppercase text-emerald-300 leading-none">
+                                        <span class="text-[8px] font-extrabold uppercase text-amber-300 leading-none">
                                             {dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? `/${dateParts.endMonth}` : ''}
                                         </span>
                                         <span class="text-xs font-black leading-tight my-0.5">
@@ -1351,11 +1515,11 @@
                                         </span>
                                     </div>
                                 {:else}
-                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded {isSpecialNonSeries ? 'bg-amber-950 ring-1 ring-amber-400/50' : 'bg-slate-900'} text-white font-mono text-center">
-                                        <span class="text-[8.5px] font-bold tracking-wider uppercase {isSpecialNonSeries ? 'text-amber-300' : 'text-emerald-300'} leading-none">
+                                    <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-slate-900 text-white font-mono text-center">
+                                        <span class="text-[8.5px] font-bold tracking-wider uppercase {isSpecialNonSeries ? 'text-red-400 font-black' : 'text-amber-300'} leading-none">
                                             {formatDateWeekday(dateStr)}
                                         </span>
-                                        <span class="text-base font-black leading-none my-0.5">
+                                        <span class="text-base font-black leading-none my-0.5 {isSpecialNonSeries ? 'text-red-100' : 'text-white'}">
                                             {formatDateDay(dateStr)}
                                         </span>
                                         <span class="text-[8px] uppercase tracking-wider text-slate-300 leading-none">
@@ -1421,8 +1585,8 @@
 
                                         <!-- Time Range -->
                                         {#if showTimes && isEvt}
-                                            <span class="inline-flex items-center gap-1 font-bold text-slate-800">
-                                                <Clock class="w-3 h-3 text-emerald-600 shrink-0" />
+                                            <span class="inline-flex items-center gap-1 font-bold {isSpecialNonSeries ? 'text-red-600' : 'text-slate-800'}">
+                                                <Clock class="w-3 h-3 {isSpecialNonSeries ? 'text-red-500' : 'text-amber-500'} shrink-0" />
                                                 {formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}
                                             </span>
                                         {/if}
@@ -1649,7 +1813,23 @@
                         </div>
                     {/each}
                 {/if}
+
+                <!-- Optional Grid Bottom Slot for Custom Sections -->
+                {#if customSections.some(s => s.enabled && s.slot === "grid_bottom")}
+                    {#each customSections.filter(s => s.enabled && s.slot === "grid_bottom") as sec (sec.id)}
+                        {@render customSectionCard(sec, "grid_bottom")}
+                    {/each}
+                {/if}
             </div>
+
+            <!-- Optional Footer Slot for Custom Sections -->
+            {#if customSections.some(s => s.enabled && s.slot === "footer")}
+                <div class="px-8 py-2 bg-slate-50 border-t border-slate-200 space-y-2">
+                    {#each customSections.filter(s => s.enabled && s.slot === "footer") as sec (sec.id)}
+                        {@render customSectionCard(sec, "footer")}
+                    {/each}
+                </div>
+            {/if}
 
             <!-- Bottom Section: Footer & Sponsors Bar -->
             <footer class="poster-footer px-8 py-3.5 border-t border-slate-200 shrink-0 bg-slate-50/50 print:bg-transparent">
@@ -2202,6 +2382,10 @@
                             <input type="checkbox" bind:checked={visibleComponents.internalNotes} class="rounded text-emerald-600" />
                             <span>Interne Notizen</span>
                         </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.openingHours} class="rounded text-emerald-600" />
+                            <span>{m.component_opening_hours?.() || "Öffnungszeiten"}</span>
+                        </label>
                     </div>
 
                     <div class="pt-2">
@@ -2218,6 +2402,156 @@
                             <option value="none">Keine Beschreibung (Nur Titel)</option>
                         </select>
                     </div>
+                </section>
+
+                <!-- 6. Modifiable Sections & Content Slot Editor -->
+                <section class="space-y-4 border-t border-slate-200 dark:border-slate-800 pt-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <LayoutTemplate class="w-4 h-4 text-amber-500" />
+                                <span>{m.custom_sections?.() ?? "Abschnitte & Zusatzbereiche"}</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                {m.custom_sections_desc?.() ?? "Eigene Infoblöcke, Öffnungszeiten oder Bilder in freie Bereiche des Posters platzieren."}
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {#if currentLocation?.openingHours}
+                                <button
+                                    type="button"
+                                    onclick={addOpeningHoursSection}
+                                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-100"
+                                    title="Öffnungszeiten als Banner/Block einfügen"
+                                >
+                                    <Clock class="w-3.5 h-3.5 text-amber-600" />
+                                    <span>+ Öffnungszeiten</span>
+                                </button>
+                            {/if}
+                            <button
+                                type="button"
+                                onclick={() => addCustomSection("banner")}
+                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                            >
+                                <Plus class="w-3.5 h-3.5" />
+                                <span>{m.add?.() ?? "Abschnitt hinzufügen"}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {#if customSections.length === 0}
+                        <div class="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-center text-xs text-slate-400">
+                            <LayoutTemplate class="w-8 h-8 mx-auto mb-1.5 opacity-40" />
+                            <p>Noch keine benutzerdefinierten Abschnitte vorhanden.</p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Erstellen Sie Infoblöcke für wichtige Hinweise, Öffnungszeiten oder Sponsorenhinweise.</p>
+                        </div>
+                    {:else}
+                        <div class="space-y-3">
+                            {#each customSections as sec (sec.id)}
+                                <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 space-y-2.5">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                                            <input
+                                                type="checkbox"
+                                                bind:checked={sec.enabled}
+                                                onchange={savePrefs}
+                                                class="rounded text-emerald-600 shrink-0"
+                                                title="Aktivieren / Deaktivieren"
+                                            />
+                                            <input
+                                                type="text"
+                                                bind:value={sec.title}
+                                                oninput={savePrefs}
+                                                placeholder="Titel des Abschnitts (z. B. Öffnungszeiten, Wichtiger Hinweis)"
+                                                class="text-xs font-bold p-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 flex-1 min-w-0"
+                                            />
+                                        </div>
+
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <!-- Position / Slot selector -->
+                                            <select
+                                                bind:value={sec.slot}
+                                                onchange={savePrefs}
+                                                class="text-[11px] p-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+                                                title="Platzierung auf dem Poster"
+                                            >
+                                                <option value="banner">Oben (Banner unter Titel)</option>
+                                                <option value="grid_top">Vor den Terminen (Spaltenkopf)</option>
+                                                <option value="grid_bottom">Nach den Terminen</option>
+                                                <option value="footer">Unten (Über der Fußzeile)</option>
+                                            </select>
+
+                                            <!-- Accent Color selector -->
+                                            <select
+                                                bind:value={sec.accentColor}
+                                                onchange={savePrefs}
+                                                class="text-[11px] p-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+                                                title="Akzentfarbe"
+                                            >
+                                                <option value="gold">Gold (Friedenshort)</option>
+                                                <option value="red">Rot (Besonderes)</option>
+                                                <option value="slate">Klassisch Grau</option>
+                                                <option value="emerald">Grün</option>
+                                            </select>
+
+                                            <!-- Delete Section button -->
+                                            <button
+                                                type="button"
+                                                onclick={() => removeCustomSection(sec.id)}
+                                                class="p-1 text-slate-400 hover:text-red-600 transition"
+                                                title="Abschnitt löschen"
+                                            >
+                                                <Trash2 class="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Content textarea -->
+                                    <div>
+                                        <textarea
+                                            bind:value={sec.content}
+                                            oninput={savePrefs}
+                                            rows="2"
+                                            placeholder="Inhalt / Text / Öffnungszeiten (HTML oder mehrzeiliger Text wird unterstützt)..."
+                                            class="w-full text-xs p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 leading-relaxed font-mono"
+                                        ></textarea>
+                                    </div>
+
+                                    <!-- Image / Media Attachment -->
+                                    <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-200 dark:border-slate-700/60 text-xs">
+                                        <div class="flex items-center gap-2">
+                                            {#if sec.imageUrl}
+                                                <img src={sec.imageUrl} alt="Vorschau" class="h-7 w-12 object-contain bg-white rounded border border-slate-200 p-0.5" />
+                                                <button
+                                                    type="button"
+                                                    onclick={() => { sec.imageUrl = ""; savePrefs(); }}
+                                                    class="text-[10px] text-red-500 hover:underline"
+                                                >
+                                                    Bild entfernen
+                                                </button>
+                                            {:else}
+                                                <span class="text-[11px] text-slate-400">Kein Bild angehängt</span>
+                                            {/if}
+                                        </div>
+
+                                        <label class="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 font-medium text-slate-700 dark:text-slate-200">
+                                            <Upload class="w-3 h-3 text-slate-400" />
+                                            <span>{sec.imageUrl ? "Bild ersetzen" : "Bild hochladen"}</span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                class="hidden"
+                                                onchange={(e) => {
+                                                    const f = e.currentTarget.files?.[0];
+                                                    if (f) handleImageUpload(f, { sectionId: sec.id });
+                                                }}
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
                 </section>
             </div>
 

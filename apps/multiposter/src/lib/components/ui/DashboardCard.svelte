@@ -14,7 +14,7 @@
     icon,
     iconClass,
     children,
-  } = $props<{
+  }: {
     title?: string;
     description?: string;
     href?: string;
@@ -27,7 +27,7 @@
     icon?: keyof typeof ICONS;
     iconClass?: string;
     children?: any;
-  }>();
+  } = $props();
 
   const iconDef = $derived(icon ? ICONS[icon as keyof typeof ICONS] : null);
 </script>

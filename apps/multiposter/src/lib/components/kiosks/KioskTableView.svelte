@@ -1,7 +1,5 @@
 <script lang="ts">
-    import { type Event } from "@ac/validations";
-
-    import { type Announcement } from "@ac/validations";
+    import { type Event, type Announcement, formatOpeningHours, type OpeningHoursData } from "@ac/validations";
 
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
@@ -21,6 +19,8 @@
         zip: string | null;
         city: string | null;
         country: string | null;
+        openingHours?: OpeningHoursData | string | null;
+        inclusivitySupport?: string | null;
         contact: {
             name: string;
             email?: string;
@@ -136,6 +136,21 @@
                         </div>
                     {/if}
                     
+                    {#if currentPageData.location.openingHours}
+                        <div class="border-l border-gray-800 pl-8 space-y-1">
+                            <span class="text-amber-400 uppercase text-xs font-bold tracking-widest block mb-1">{m.opening_hours?.() ?? "Öffnungszeiten"}</span>
+                            <div class="text-gray-300 text-lg font-medium whitespace-pre-line leading-snug">
+                                {formatOpeningHours(currentPageData.location.openingHours)}
+                            </div>
+                            {#if currentPageData.location.inclusivitySupport}
+                                <div class="text-emerald-400 text-sm font-semibold flex items-center gap-1.5 mt-1">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                    <span>{currentPageData.location.inclusivitySupport}</span>
+                                </div>
+                            {/if}
+                        </div>
+                    {/if}
+
                     {#if currentPageData.location.contact}
                         <div class="border-l border-gray-800 pl-8 space-y-1">
                             <span class="text-blue-400 uppercase text-xs font-bold tracking-widest block mb-1">{m.contact()}</span>

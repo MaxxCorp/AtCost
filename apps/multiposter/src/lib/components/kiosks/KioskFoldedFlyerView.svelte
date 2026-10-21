@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, untrack } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
-    import { type Event, type Announcement } from "@ac/validations";
+    import { type Event, type Announcement, formatOpeningHours, type OpeningHoursData } from "@ac/validations";
     import {
         Printer,
         Sparkles,
@@ -61,6 +61,7 @@
         roomId?: string | null;
         capacity?: string | null;
         inclusivitySupport?: string | null;
+        openingHours?: OpeningHoursData | string | null;
         what3words?: string | null;
         latitude?: number | null;
         longitude?: number | null;
@@ -914,6 +915,21 @@
                                             {#if loc.roomId}
                                                 <div class="text-[9.5px] font-medium text-blue-300 bg-blue-900/60 px-1.5 py-0.5 rounded inline-block mt-0.5">
                                                     {m.room_label({ room: loc.roomId })}
+                                                </div>
+                                            {/if}
+                                            {#if loc.openingHours}
+                                                <div class="flex items-start gap-1.5 pt-1 border-t border-slate-700/60">
+                                                    <Clock class="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                                                    <div class="text-[10px] text-slate-300">
+                                                        <span class="font-bold text-white block text-[9.5px] uppercase">{m.opening_hours?.() ?? "Öffnungszeiten"}:</span>
+                                                        <span class="whitespace-pre-line leading-tight">{formatOpeningHours(loc.openingHours)}</span>
+                                                    </div>
+                                                </div>
+                                            {/if}
+                                            {#if loc.inclusivitySupport}
+                                                <div class="text-[9.5px] text-emerald-300 flex items-center gap-1 pt-0.5">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                    <span>{loc.inclusivitySupport}</span>
                                                 </div>
                                             {/if}
                                         </div>

@@ -36,6 +36,7 @@ export interface VisibleComponentsState {
     tags: boolean;          // Tags
     internalNotes: boolean; // Staff internal notes
     heroImage: boolean;     // Hero image
+    openingHours: boolean;  // Location opening hours & accessibility notes
 }
 
 export const defaultVisibleComponents: VisibleComponentsState = {
@@ -49,6 +50,7 @@ export const defaultVisibleComponents: VisibleComponentsState = {
     tags: true,
     internalNotes: false,
     heroImage: false,
+    openingHours: true,
 };
 
 // --- Contact resolution helpers ---

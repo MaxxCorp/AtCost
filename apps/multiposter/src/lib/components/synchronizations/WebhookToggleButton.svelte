@@ -11,12 +11,12 @@
     import BellOff from "#lib/components/icons/bell-off.svelte";
     import { refreshAll } from "$app/navigation";
 
-    let { configId, providerType, direction, disabled = false } = $props<{
+    let { configId, providerType, direction, disabled = false }: {
         configId: string;
         providerType: string;
         direction: string;
         disabled?: boolean;
-    }>();
+    } = $props();
 
     let status = $state<{ active: boolean; expiresAt?: Date } | null>(null);
     let isLoadingStatus = $state(true);

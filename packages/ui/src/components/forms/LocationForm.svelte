@@ -7,6 +7,14 @@
     import type { Snippet } from "svelte";
     import { translateIssue } from "../../utils.js";
     import { useFormValidationFeedback } from "../../hooks/formValidationFeedback.svelte.ts";
+    import {
+        Clock,
+        Plus,
+        Trash2,
+        Calendar,
+        Copy,
+        Sparkles
+    } from "@lucide/svelte";
 
     let {
         remoteFunction,
@@ -86,6 +94,9 @@
         get inclusivitySupport() {
             return labels?.inclusivitySupport ?? m?.inclusivity_support?.() ?? "Inclusivity Support";
         },
+        get openingHours() {
+            return labels?.openingHours ?? m?.opening_hours?.() ?? "Opening Hours / Öffnungszeiten";
+        },
         get isPublic() {
             return labels?.isPublic ?? m?.public?.() ?? "Public";
         },
@@ -159,6 +170,184 @@
 
     const feedback = useFormValidationFeedback(() => rf, {
         message: () => i18n.pleaseFixValidation,
+    });
+
+    // --- GRANULAR OPENING HOURS STATE & HELPERS ---
+    const DAYS = [
+        { key: "monday", label: "Montag", short: "Mo" },
+        { key: "tuesday", label: "Dienstag", short: "Di" },
+        { key: "wednesday", label: "Mittwoch", short: "Mi" },
+        { key: "thursday", label: "Donnerstag", short: "Do" },
+        { key: "friday", label: "Freitag", short: "Fr" },
+        { key: "saturday", label: "Samstag", short: "Sa" },
+        { key: "sunday", label: "Sonntag", short: "So" },
+    ] as const;
+
+    function initOpeningHours() {
+        const defaultDays: Record<string, { closed: boolean; slots: { open: string; close: string; label?: string }[]; note?: string }> = {
+            monday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+            tuesday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+            wednesday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+            thursday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+            friday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+            saturday: { closed: true, slots: [] },
+            sunday: { closed: true, slots: [] },
+        };
+
+        const rawVal = initialData?.openingHours;
+        if (!rawVal) {
+            return {
+                days: defaultDays,
+                specialHours: [] as { date: string; closed: boolean; slots?: { open: string; close: string }[]; note?: string }[],
+                notes: '',
+            };
+        }
+
+        if (typeof rawVal === 'object') {
+            return {
+                days: rawVal.days ? { ...defaultDays, ...rawVal.days } : defaultDays,
+                specialHours: Array.isArray(rawVal.specialHours) ? [...rawVal.specialHours] : [],
+                notes: rawVal.notes || '',
+            };
+        }
+
+        if (typeof rawVal === 'string') {
+            const trimmed = rawVal.trim();
+            if (trimmed.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    return {
+                        days: parsed.days ? { ...defaultDays, ...parsed.days } : defaultDays,
+                        specialHours: Array.isArray(parsed.specialHours) ? [...parsed.specialHours] : [],
+                        notes: parsed.notes || '',
+                    };
+                } catch {
+                    // fall through
+                }
+            }
+        }
+
+        return {
+            days: defaultDays,
+            specialHours: [],
+            notes: '',
+        };
+    }
+
+    let ohState = $state(initOpeningHours());
+
+    function applyPreset(preset: 'office' | 'copyMonday' | 'clear') {
+        if (preset === 'office') {
+            ohState.days = {
+                monday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+                tuesday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+                wednesday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+                thursday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+                friday: { closed: false, slots: [{ open: "09:00", close: "17:00" }] },
+                saturday: { closed: true, slots: [] },
+                sunday: { closed: true, slots: [] },
+            };
+            toast.success("Standard Bürozeiten (Mo–Fr 9–17 Uhr) angewendet");
+        } else if (preset === 'copyMonday') {
+            const mon = ohState.days.monday;
+            if (mon) {
+                ohState.days.tuesday = JSON.parse(JSON.stringify(mon));
+                ohState.days.wednesday = JSON.parse(JSON.stringify(mon));
+                ohState.days.thursday = JSON.parse(JSON.stringify(mon));
+                ohState.days.friday = JSON.parse(JSON.stringify(mon));
+                toast.success("Montagszeiten auf Di–Fr übertragen");
+            }
+        } else if (preset === 'clear') {
+            for (const d of DAYS) {
+                ohState.days[d.key] = { closed: true, slots: [] };
+            }
+            toast.success("Alle Tage auf geschlossen gesetzt");
+        }
+    }
+
+    function addSlot(dayKey: string) {
+        if (!ohState.days[dayKey]) {
+            ohState.days[dayKey] = { closed: false, slots: [] };
+        }
+        ohState.days[dayKey].closed = false;
+        ohState.days[dayKey].slots.push({ open: "14:00", close: "17:30" });
+    }
+
+    function removeSlot(dayKey: string, index: number) {
+        if (ohState.days[dayKey]?.slots) {
+            ohState.days[dayKey].slots.splice(index, 1);
+            if (ohState.days[dayKey].slots.length === 0) {
+                ohState.days[dayKey].closed = true;
+            }
+        }
+    }
+
+    function addSpecialHour() {
+        ohState.specialHours.push({
+            date: new Date().toISOString().slice(0, 10),
+            closed: true,
+            note: "Feiertag / Sonderzeit"
+        });
+    }
+
+    function removeSpecialHour(index: number) {
+        ohState.specialHours.splice(index, 1);
+    }
+
+    const serializedOpeningHours = $derived.by<string>(() => {
+        const data = {
+            days: ohState.days,
+            specialHours: ohState.specialHours.length > 0 ? ohState.specialHours : undefined,
+            notes: ohState.notes.trim() ? ohState.notes.trim() : undefined,
+        };
+        return JSON.stringify(data);
+    });
+
+    const liveFormattedLines = $derived.by<string[]>(() => {
+        const lines: string[] = [];
+        const formattedDays = DAYS.map((d) => {
+            const sched = ohState.days[d.key];
+            if (!sched || sched.closed || !sched.slots || sched.slots.length === 0) {
+                return { key: d.key, short: d.short, text: 'Geschlossen', isClosed: true };
+            }
+            const slotsText = sched.slots.map(s => `${s.open}–${s.close} Uhr${s.label ? ` (${s.label})` : ''}`).join(', ');
+            const noteText = sched.note ? ` (${sched.note})` : '';
+            return { key: d.key, short: d.short, text: `${slotsText}${noteText}`, isClosed: false };
+        });
+
+        let groupStart = 0;
+        while (groupStart < formattedDays.length) {
+            let groupEnd = groupStart;
+            while (
+                groupEnd + 1 < formattedDays.length &&
+                formattedDays[groupEnd + 1].text === formattedDays[groupStart].text
+            ) {
+                groupEnd++;
+            }
+            const current = formattedDays[groupStart];
+            if (!current.isClosed) {
+                let range = '';
+                if (groupStart === groupEnd) {
+                    range = current.short;
+                } else if (groupEnd === groupStart + 1) {
+                    range = `${current.short}, ${formattedDays[groupEnd].short}`;
+                } else {
+                    range = `${current.short}–${formattedDays[groupEnd].short}`;
+                }
+                lines.push(`${range} ${current.text}`);
+            }
+            groupStart = groupEnd + 1;
+        }
+
+        if (ohState.specialHours && ohState.specialHours.length > 0) {
+            for (const sp of ohState.specialHours) {
+                lines.push(`Ausnahme ${sp.date}: ${sp.closed ? 'Geschlossen' : 'Geöffnet'}${sp.note ? ` (${sp.note})` : ''}`);
+            }
+        }
+        if (ohState.notes && ohState.notes.trim()) {
+            lines.push(ohState.notes.trim());
+        }
+        return lines.length > 0 ? lines : ["Keine regulären Öffnungszeiten hinterlegt"];
     });
 </script>
 
@@ -434,6 +623,217 @@
             <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </label>
+
+    <!-- Granular Opening Hours Section -->
+    <div class="border border-slate-200 dark:border-slate-700/80 rounded-xl p-4 bg-slate-50/50 dark:bg-slate-800/40 space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
+            <div class="flex items-center gap-2">
+                <Clock class="w-4 h-4 text-amber-500 shrink-0" />
+                <span class="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    {i18n.openingHours}
+                </span>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="flex items-center gap-2 flex-wrap text-xs">
+                <span class="text-slate-400 font-medium text-[11px]">Schnellvorlagen:</span>
+                <button
+                    type="button"
+                    onclick={() => applyPreset('office')}
+                    class="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-200 hover:border-amber-400 font-medium transition text-[11px]"
+                >
+                    <Sparkles class="w-3 h-3 text-amber-500" />
+                    <span>Mo–Fr 9–17 Uhr</span>
+                </button>
+                <button
+                    type="button"
+                    onclick={() => applyPreset('copyMonday')}
+                    class="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-200 hover:border-amber-400 font-medium transition text-[11px]"
+                    title="Mo-Zeiten auf Di–Fr übertragen"
+                >
+                    <Copy class="w-3 h-3 text-slate-400" />
+                    <span>Mo auf Di–Fr</span>
+                </button>
+                <button
+                    type="button"
+                    onclick={() => applyPreset('clear')}
+                    class="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-200 hover:border-red-400 font-medium transition text-[11px]"
+                    title="Alle Tage auf geschlossen setzen"
+                >
+                    <span>Zurücksetzen</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Weekly Days List -->
+        <div class="space-y-2 pt-1">
+            {#each DAYS as day (day.key)}
+                {@const dayData = ohState.days[day.key] || { closed: false, slots: [] }}
+                <div class="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-700/60 bg-white dark:bg-slate-900 transition-all {dayData.closed ? 'opacity-70 bg-slate-50/50' : ''}">
+                    <div class="flex items-start justify-between gap-3 flex-wrap">
+                        <!-- Day label & Closed toggle -->
+                        <div class="flex items-center gap-2.5 min-w-[120px] pt-1">
+                            <label class="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
+                                <input
+                                    type="checkbox"
+                                    checked={!dayData.closed}
+                                    onchange={(e) => {
+                                        const open = e.currentTarget.checked;
+                                        dayData.closed = !open;
+                                        if (open && (!dayData.slots || dayData.slots.length === 0)) {
+                                            dayData.slots = [{ open: "09:00", close: "17:00" }];
+                                        }
+                                    }}
+                                    class="rounded text-amber-600 focus:ring-amber-500"
+                                />
+                                <span>{day.label}</span>
+                            </label>
+                        </div>
+
+                        <!-- Slots or Closed Badge -->
+                        <div class="flex-1 min-w-[240px] space-y-1.5">
+                            {#if dayData.closed}
+                                <span class="text-xs text-slate-400 font-medium italic">
+                                    Geschlossen
+                                </span>
+                            {:else}
+                                {#each dayData.slots as slot, sIdx (sIdx)}
+                                    <div class="flex items-center gap-1.5 flex-wrap text-xs">
+                                        <span class="text-[11px] text-slate-400 font-medium">von</span>
+                                        <input
+                                            type="time"
+                                            bind:value={slot.open}
+                                            class="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono"
+                                        />
+                                        <span class="text-[11px] text-slate-400 font-medium">bis</span>
+                                        <input
+                                            type="time"
+                                            bind:value={slot.close}
+                                            class="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono"
+                                        />
+                                        <input
+                                            type="text"
+                                            bind:value={slot.label}
+                                            placeholder="z. B. Kernzeit / Beratung"
+                                            class="px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-1 min-w-[100px]"
+                                        />
+                                        {#if dayData.slots.length > 1}
+                                            <button
+                                                type="button"
+                                                onclick={() => removeSlot(day.key, sIdx)}
+                                                class="p-1 text-slate-400 hover:text-red-500 transition"
+                                                title="Zeitraum entfernen"
+                                            >
+                                                <Trash2 class="w-3.5 h-3.5" />
+                                            </button>
+                                        {/if}
+                                    </div>
+                                {/each}
+
+                                <div class="flex items-center gap-3 pt-0.5">
+                                    <button
+                                        type="button"
+                                        onclick={() => addSlot(day.key)}
+                                        class="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-medium"
+                                    >
+                                        <Plus class="w-3 h-3" />
+                                        <span>Weiterer Zeitraum (z. B. Nachmittag)</span>
+                                    </button>
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            {/each}
+        </div>
+
+        <!-- Special Days & Holidays Exceptions -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-700/80 space-y-2">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Calendar class="w-3.5 h-3.5 text-amber-500" />
+                    <span>Sonderöffnungszeiten & Feiertage (Ausnahmen)</span>
+                </span>
+                <button
+                    type="button"
+                    onclick={addSpecialHour}
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-amber-400"
+                >
+                    <Plus class="w-3 h-3 text-amber-600" />
+                    <span>Ausnahme hinzufügen</span>
+                </button>
+            </div>
+
+            {#if ohState.specialHours.length > 0}
+                <div class="space-y-1.5">
+                    {#each ohState.specialHours as sp, idx (idx)}
+                        <div class="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs flex-wrap">
+                            <input
+                                type="date"
+                                bind:value={sp.date}
+                                class="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                            />
+                            <label class="flex items-center gap-1 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+                                <input
+                                    type="checkbox"
+                                    bind:checked={sp.closed}
+                                    class="rounded text-amber-600"
+                                />
+                                <span>Geschlossen</span>
+                            </label>
+                            <input
+                                type="text"
+                                bind:value={sp.note}
+                                placeholder="Grund (z. B. Heiligabend, Feiertag, Betriebsruhe)"
+                                class="px-2 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex-1 min-w-[120px]"
+                            />
+                            <button
+                                type="button"
+                                onclick={() => removeSpecialHour(idx)}
+                                class="p-1 text-slate-400 hover:text-red-500 transition"
+                                title="Ausnahme entfernen"
+                            >
+                                <Trash2 class="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+        </div>
+
+        <!-- General Notes -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-700/80">
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Zusatzhinweise (z. B. Telefonische Erreichbarkeit, Barrierefreier Zugang)
+            </label>
+            <input
+                type="text"
+                bind:value={ohState.notes}
+                placeholder="z. B. Telefonische Erreichbarkeit • Barrierefreier Zugang"
+                class="w-full px-3 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+            />
+        </div>
+
+        <!-- Formatted Live Preview -->
+        <div class="p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 text-xs">
+            <div class="flex items-center gap-1.5 text-amber-900 dark:text-amber-200 font-bold mb-1 text-[11px] uppercase tracking-wider">
+                <Sparkles class="w-3 h-3 text-amber-600" />
+                <span>Automatisch formatierte Anzeige (für Kioske, Plakate & Web):</span>
+            </div>
+            <div class="font-mono text-slate-800 dark:text-slate-200 whitespace-pre-line text-xs leading-relaxed">
+                {liveFormattedLines.join('\n')}
+            </div>
+        </div>
+
+        <!-- Hidden Input strictly bound to SvelteKit Remote Functions -->
+        {#if serializedOpeningHours !== undefined}
+            <input {...rf.fields.openingHours.as("hidden", serializedOpeningHours)} />
+        {/if}
+
+        {#each rf.fields.openingHours.issues() ?? [] as issue (issue.message)}
+            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+        {/each}
+    </div>
 
     <label class="flex items-center gap-2 cursor-pointer py-2">
         <input

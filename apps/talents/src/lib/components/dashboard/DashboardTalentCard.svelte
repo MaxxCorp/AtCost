@@ -2,7 +2,7 @@
     import { User, Edit, Briefcase, Calendar } from "@lucide/svelte";
     import { Button } from "@ac/ui/components/button";
 
-    let { talent } = $props<{ talent: any }>();
+    let { talent }: { talent: any } = $props();
 
     const displayName = $derived(
         talent?.contact?.displayName || 

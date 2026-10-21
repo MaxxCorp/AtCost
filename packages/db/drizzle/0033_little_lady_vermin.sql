@@ -1,0 +1,1 @@
+ALTER TABLE "location" ALTER COLUMN "opening_hours" SET DATA TYPE jsonb USING CASE WHEN "opening_hours" IS NULL THEN NULL WHEN "opening_hours" ~ '^\s*[\{\[]' THEN "opening_hours"::jsonb ELSE to_jsonb("opening_hours") END;

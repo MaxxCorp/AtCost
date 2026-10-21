@@ -91,6 +91,8 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
                 zip: l.zip,
                 city: l.city,
                 country: l.country,
+                openingHours: l.openingHours,
+                inclusivitySupport: l.inclusivitySupport,
                 contact: resolveLocationContactSync(l, { filterWorkOnly: true, fallbackToFirst: true })
             })),
         };

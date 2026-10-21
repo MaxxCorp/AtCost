@@ -8,7 +8,7 @@
     import { toast } from 'svelte-sonner';
     import { ShieldAlert, TrendingUp, Award, Clock } from '@lucide/svelte';
 
-    let { task } = $props<{ task: any }>();
+    let { task }: { task: any } = $props();
 
     let isReviewModalOpen = $state(false);
     let isDifferentialModalOpen = $state(false);

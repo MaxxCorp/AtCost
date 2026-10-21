@@ -7,13 +7,13 @@
         title = "Items",
         labelKey = "name",
         idKey = "id"
-    } = $props<{
-        items: any[];
-        selectedIds: string[];
-        title: string;
+    }: {
+        items?: any[];
+        selectedIds?: string[];
+        title?: string;
         labelKey?: string;
         idKey?: string;
-    }>();
+    } = $props();
 
     let search = $state("");
     let filteredItems = $derived(

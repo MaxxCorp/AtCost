@@ -225,6 +225,20 @@
       "when": 1791926406113,
       "tag": "0031_replace_menu_with_price",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792580422340,
+      "tag": "0032_careless_maximus",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792581203524,
+      "tag": "0033_little_lady_vermin",
+      "breakpoints": true
     }
   ]
 }
