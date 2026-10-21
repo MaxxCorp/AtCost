@@ -63,7 +63,8 @@
         formatDateMonth,
         formatDateWeekday,
         formatTimeRange,
-        formatFullDate
+        formatFullDate,
+        formatPosterProgrammeHeadline
     } from "#lib/utils/kiosk-flat-helpers.js";
 
     interface LocationContact {
@@ -404,34 +405,7 @@
 
     // Month & Date Range derivation for Programme Title
     let programmeMonthTitle = $derived.by<string>(() => {
-        if (customProgrammeTitle.trim()) return customProgrammeTitle.trim();
-
-        // Check if kiosk dates provided
-        if (kiosk.startDate) {
-            const d = new Date(kiosk.startDate);
-            if (!isNaN(d.getTime())) {
-                const monthName = d.toLocaleDateString(undefined, { month: "long" });
-                const year = d.getFullYear();
-                return `${m.poster_monthly_programme()} • ${monthName} ${year}`;
-            }
-        }
-
-        // Try to get month from earliest event
-        if (displayItems.length > 0) {
-            const firstEvt = displayItems.find(i => "startDateTime" in i && i.startDateTime);
-            if (firstEvt && "startDateTime" in firstEvt && firstEvt.startDateTime) {
-                const d = new Date(firstEvt.startDateTime);
-                if (!isNaN(d.getTime())) {
-                    const monthName = d.toLocaleDateString(undefined, { month: "long" });
-                    const year = d.getFullYear();
-                    return `${m.poster_monthly_programme()} • ${monthName} ${year}`;
-                }
-            }
-        }
-
-        const now = new Date();
-        const monthName = now.toLocaleDateString(undefined, { month: "long" });
-        return `${m.poster_monthly_programme()} • ${monthName} ${now.getFullYear()}`;
+        return formatPosterProgrammeHeadline(kiosk, displayItems, customProgrammeTitle);
     });
 
     let programmeLocationSubtitle = $derived.by<string>(() => {
@@ -1092,16 +1066,16 @@
                                 <!-- Location Subtitle, Contact & Location QR Code (placed near location, like Animated List View) -->
                                 <div class="flex items-start gap-3 mt-1.5 text-xs text-slate-600">
                                     {#if showLocationQr}
-                                        <div class="bg-white p-1 border border-slate-200 rounded-lg shadow-2xs shrink-0 mt-0.5 self-start">
+                                        <div class="bg-white p-1.5 border border-slate-200 rounded-lg shadow-2xs shrink-0 mt-0.5 self-start">
                                             {#if currentLocation?.contact?.qrCodeDataUrl || currentLocation?.contact?.qrCodePath}
                                                 <img
                                                     src={currentLocation.contact.qrCodeDataUrl || currentLocation.contact.qrCodePath}
                                                     alt="Location QR"
-                                                    class="w-13 h-13 object-contain"
+                                                    class="w-20 h-20 object-contain"
                                                 />
                                             {:else}
-                                                <div class="w-13 h-13 bg-slate-50 flex items-center justify-center text-slate-600">
-                                                    <QrCode class="w-7 h-7" />
+                                                <div class="w-20 h-20 bg-slate-50 flex items-center justify-center text-slate-600">
+                                                    <QrCode class="w-10 h-10" />
                                                 </div>
                                             {/if}
                                         </div>
@@ -1146,12 +1120,6 @@
                                 {programmeMonthTitle}
                             </h1>
                         </div>
-
-                        {#if kiosk?.description}
-                            <div class="rich-description text-xs text-slate-600 max-w-2xl leading-relaxed mt-2">
-                                {@html kiosk.description}
-                            </div>
-                        {/if}
                     </div>
 
                     <!-- Right Header: Location Logo (placed where QR code was previously) or Top Sponsors -->
@@ -1205,7 +1173,7 @@
                         {@const isEvt = "startDateTime" in item}
                         {@const evt = item as EnrichedEvent}
                         {@const isSpecialNonSeries = isEvt && isNonSeriesEvent(item)}
-                        {@const isCompressed = Boolean(isEvt && evt.isCompressedSeries && ((evt.seriesInstances && evt.seriesInstances.length > 1) || (evt.seriesDates && evt.seriesDates.length > 1)))}
+                        {@const isCompressed = Boolean(isEvt && evt.isCompressedSeries && ((evt.seriesInstances && evt.seriesInstances.length >= 1) || (evt.seriesDates && evt.seriesDates.length >= 1)))}
                         {@const multiDay = isEvt && isMultiDayEvent(item as Event)}
                         {@const durationDays = multiDay ? getEventDurationDays(item as Event) : 1}
                         {@const dateParts = isEvt ? getEventDateParts(item as Event) : null}
@@ -1367,7 +1335,7 @@
                                     </h3>
 
                                     <!-- Compressed Series Dates Pills with per-instance status -->
-                                    {#if isCompressed && evt.seriesInstances && evt.seriesInstances.length > 1}
+                                    {#if isCompressed && evt.seriesInstances && evt.seriesInstances.length >= 1}
                                         <div class="mt-1 flex items-center gap-1 flex-wrap">
                                             <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                                                 <Calendar class="w-2.5 h-2.5 text-indigo-500" />
@@ -1400,7 +1368,7 @@
                                                 {/if}
                                             {/each}
                                         </div>
-                                    {:else if isCompressed && evt.seriesDates && evt.seriesDates.length > 1}
+                                    {:else if isCompressed && evt.seriesDates && evt.seriesDates.length >= 1}
                                         <div class="mt-1 flex items-center gap-1 flex-wrap">
                                             <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                                                 <Calendar class="w-2.5 h-2.5 text-indigo-500" />
@@ -1448,20 +1416,20 @@
                                                     {/each}
                                                 </div>
                                             </div>
+                                        {:else if (item as Event).resolvedContact}
+                                            <!-- Fallback single contact if allContacts array is empty -->
+                                            <div class="mt-0.5 text-[9.5px] text-slate-600 flex items-center gap-1">
+                                                <User class="w-2.5 h-2.5 text-slate-400" />
+                                                <span class="font-medium text-slate-700">{(item as Event).resolvedContact?.name}</span>
+                                                {#if (item as Event).resolvedContact?.roles && (item as Event).resolvedContact!.roles!.length > 0}
+                                                    {#each (item as Event).resolvedContact!.roles! as roleName}
+                                                        <span class="px-1 py-0.1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[8.5px] font-semibold">{roleName}</span>
+                                                    {/each}
+                                                {:else if (item as Event).resolvedContact?.role}
+                                                    <span class="px-1 py-0.1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[8.5px] font-semibold">{(item as Event).resolvedContact?.role}</span>
+                                                {/if}
+                                            </div>
                                         {/if}
-                                    {:else if !visibleComponents.contacts && isEvt && (item as Event).resolvedContact}
-                                        <!-- Inline single contact if Associated Contacts full list is NOT toggled -->
-                                        <div class="mt-0.5 text-[9.5px] text-slate-600 flex items-center gap-1">
-                                            <User class="w-2.5 h-2.5 text-slate-400" />
-                                            <span class="font-medium text-slate-700">{(item as Event).resolvedContact?.name}</span>
-                                            {#if (item as Event).resolvedContact?.roles && (item as Event).resolvedContact!.roles!.length > 0}
-                                                {#each (item as Event).resolvedContact!.roles! as roleName}
-                                                    <span class="px-1 py-0.1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[8.5px] font-semibold">{roleName}</span>
-                                                {/each}
-                                            {:else if (item as Event).resolvedContact?.role}
-                                                <span class="px-1 py-0.1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[8.5px] font-semibold">{(item as Event).resolvedContact?.role}</span>
-                                            {/if}
-                                        </div>
                                     {/if}
 
                                     <!-- Description -->
@@ -1524,11 +1492,11 @@
 
                                         <!-- Scannable Event QR Code -->
                                         {#if visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath)}
-                                            <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0">
+                                            <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0 shadow-2xs">
                                                 <img
                                                     src={evt.qrCodeDataUrl || evt.qrCodePath}
                                                     alt="QR"
-                                                    class="{density === 'compact' ? 'w-9 h-9' : 'w-11 h-11'} object-contain"
+                                                    class="{density === 'compact' ? 'w-16 h-16' : density === 'relaxed' ? 'w-22 h-22' : 'w-18 h-18'} object-contain"
                                                 />
                                             </div>
                                         {/if}
@@ -1907,7 +1875,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label for="posterCustomProgTitle" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                                Hauptüberschrift (z. B. Monatsprogramm)
+                                Hauptüberschrift (z. B. Programm • 10 2026)
                             </label>
                             <input
                                 id="posterCustomProgTitle"

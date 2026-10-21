@@ -907,7 +907,7 @@
                                     <img 
                                         src={contact.qrCodeDataUrl || contact.qrCodePath} 
                                         alt="Contact QR" 
-                                        class="w-12 h-12 bg-white p-0.5 rounded border border-slate-200 shrink-0" 
+                                        class="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 shrink-0 shadow-2xs" 
                                     />
                                     <span class="text-[10px] text-slate-500 leading-tight">
                                         {m.scan_location_qr()}
@@ -1024,13 +1024,13 @@
                                             </div>
                                         {/if}
                                         {#if visibleComponents.qrCodes && ((announcement as any).qrCodeDataUrl || (announcement as any).qrCodePath)}
-                                            <div class="flex flex-col items-center justify-center p-2 bg-white border border-slate-200 rounded-xl">
+                                            <div class="flex flex-col items-center justify-center p-2 bg-white border border-slate-200 rounded-xl shadow-2xs">
                                                 <img 
                                                     src={(announcement as any).qrCodeDataUrl || (announcement as any).qrCodePath} 
                                                     alt="Announcement QR" 
-                                                    class="w-14 h-14" 
+                                                    class={density === 'standard' ? 'w-20 h-20' : 'w-16 h-16'} 
                                                 />
-                                                <span class="text-[9px] font-semibold text-slate-500 mt-1 uppercase tracking-tight">
+                                                <span class="text-[8.5px] font-semibold text-slate-500 mt-1 uppercase tracking-tight">
                                                     {m.scan_event_qr()}
                                                 </span>
                                             </div>
@@ -1152,13 +1152,13 @@
     {@const eventRooms = getEventRooms(event)}
     {@const displayPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
     {@const isSpecialNonSeries = isNonSeriesEvent(event)}
-    {@const isCompressed = Boolean(event.isCompressedSeries && ((event.seriesInstances && event.seriesInstances.length > 1) || (event.seriesDates && event.seriesDates.length > 1)))}
+    {@const isCompressed = Boolean(event.isCompressedSeries && ((event.seriesInstances && event.seriesInstances.length >= 1) || (event.seriesDates && event.seriesDates.length >= 1)))}
     {@const multiDay = isMultiDayEvent(event)}
     {@const durationDays = multiDay ? getEventDurationDays(event) : 1}
     {@const dateParts = getEventDateParts(event)}
     {@const cancelledCount = event.seriesInstances ? event.seriesInstances.filter(i => i.status === 'cancelled').length : 0}
     {@const tentativeCount = event.seriesInstances ? event.seriesInstances.filter(i => i.status === 'tentative').length : 0}
-    {@const totalInstances = event.seriesInstances ? event.seriesInstances.length : (event.seriesDates ? event.seriesDates.length : 1)}
+    {@const totalInstances = event.seriesInstances ? event.seriesInstances.length : (event.seriesDates ? event.seriesDates.length : (event.instanceCount ?? 1))}
     <article class="{density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid transition-all {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 pl-3 sm:pl-4 bg-linear-to-r from-amber-50/60 via-amber-50/20 to-transparent print:bg-slate-50/60 rounded-r-xl my-1.5' : isCompressed ? 'border-l-4 border-l-indigo-500 pl-3 sm:pl-4 bg-linear-to-r from-indigo-50/40 via-indigo-50/10 to-transparent print:bg-slate-50/40 rounded-r-xl my-1.5' : ''}">
         <!-- Left Date & Time Column -->
         <div class="flex items-center gap-3 shrink-0 min-w-[130px]">
@@ -1167,7 +1167,7 @@
                 <div class="flex flex-col items-center justify-center min-w-[56px] px-1.5 h-12 bg-indigo-50/90 dark:bg-indigo-950/40 print:bg-slate-50 border-indigo-200 dark:border-indigo-800 print:border-slate-300 border rounded-xl text-center shadow-xs">
                     <RefreshCw class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 print:text-black mb-0.5" />
                     <span class="text-sm font-black text-indigo-950 dark:text-indigo-200 print:text-black leading-tight tracking-tight">
-                        {event.instanceCount}×
+                        {totalInstances}×
                     </span>
                     <span class="text-[8px] font-bold text-indigo-600 dark:text-indigo-400 print:text-slate-700 leading-none uppercase">
                         {m.series_badge()}
@@ -1301,7 +1301,7 @@
             </div>
 
             <!-- Multiple dates list if Compressed Series (Feature 3: per-instance cancelled and tentative status) -->
-            {#if isCompressed && event.seriesInstances && event.seriesInstances.length > 1}
+            {#if isCompressed && event.seriesInstances && event.seriesInstances.length >= 1}
                 <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
                     <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
                         <Calendar class="w-3 h-3 text-indigo-500" />
@@ -1334,7 +1334,7 @@
                         {/if}
                     {/each}
                 </div>
-            {:else if isCompressed && event.seriesDates && event.seriesDates.length > 1}
+            {:else if isCompressed && event.seriesDates && event.seriesDates.length >= 1}
                 <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
                     <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
                         <Calendar class="w-3 h-3 text-indigo-500" />
@@ -1397,24 +1397,6 @@
                     </span>
                 {/if}
 
-                <!-- Inline single contact if Associated Contacts full list is NOT toggled -->
-                {#if !visibleComponents.contacts && event.resolvedContact}
-                    <span class="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300 print:text-black">
-                        <User class="w-3.5 h-3.5 text-slate-500 print:text-black" />
-                        <span>{event.resolvedContact.name}</span>
-                        {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
-                            {#each event.resolvedContact.roles as roleName}
-                                <span class="px-1.5 py-0.2 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded text-[10px] font-semibold print:border-black print:text-black">
-                                    {roleName}
-                                </span>
-                            {/each}
-                        {:else if event.resolvedContact.role}
-                            <span class="px-1.5 py-0.2 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded text-[10px] font-semibold print:border-black print:text-black">
-                                {event.resolvedContact.role}
-                            </span>
-                        {/if}
-                    </span>
-                {/if}
             </div>
 
             <!-- Associated Contacts List (if enabled in visibleComponents) -->
@@ -1455,6 +1437,22 @@
                                 </div>
                             {/each}
                         </div>
+                    </div>
+                {:else if event.resolvedContact}
+                    <div class="mt-2 pt-1 flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
+                        <User class="w-3.5 h-3.5 text-slate-500 print:text-black" />
+                        <span class="font-semibold">{event.resolvedContact.name}</span>
+                        {#if event.resolvedContact.roles && event.resolvedContact.roles.length > 0}
+                            {#each event.resolvedContact.roles as roleName}
+                                <span class="px-1.5 py-0.2 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded text-[10px] font-semibold print:border-black print:text-black">
+                                    {roleName}
+                                </span>
+                            {/each}
+                        {:else if event.resolvedContact.role}
+                            <span class="px-1.5 py-0.2 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded text-[10px] font-semibold print:border-black print:text-black">
+                                {event.resolvedContact.role}
+                            </span>
+                        {/if}
                     </div>
                 {/if}
             {/if}
@@ -1516,13 +1514,13 @@
 
                 <!-- Right Scannable QR Code -->
                 {#if visibleComponents.qrCodes && (event.qrCodeDataUrl || event.qrCodePath)}
-                    <div class="flex flex-col items-center justify-center p-1.5 bg-white border border-slate-200 rounded-xl">
+                    <div class="flex flex-col items-center justify-center p-2 bg-white border border-slate-200 rounded-xl shadow-2xs">
                         <img
                             src={event.qrCodeDataUrl || event.qrCodePath}
                             alt="Event QR"
-                            class={density === 'standard' ? 'w-14 h-14' : 'w-10 h-10'}
+                            class={density === 'standard' ? 'w-20 h-20' : 'w-16 h-16'}
                         />
-                        <span class="text-[8px] font-semibold text-slate-500 mt-0.5 uppercase tracking-tight">
+                        <span class="text-[8.5px] font-semibold text-slate-500 mt-1 uppercase tracking-tight">
                             {m.scan_event_qr()}
                         </span>
                     </div>

@@ -125,7 +125,7 @@
                 <div class="flex gap-8 text-xl text-gray-400 font-medium pl-6">
                     {#if currentPageData.location.contact?.qrCodePath || currentPageData.location.contact?.qrCodeDataUrl}
                         <div class="bg-white p-1 rounded-lg shadow-lg shrink-0 mt-0.5 self-start">
-                            <img src={currentPageData.location.contact.qrCodeDataUrl || currentPageData.location.contact.qrCodePath} alt="Location QR" class="w-16 h-16" />
+                            <img src={currentPageData.location.contact.qrCodeDataUrl || currentPageData.location.contact.qrCodePath} alt="Location QR" class="w-20 h-20" />
                         </div>
                     {/if}
 
@@ -305,7 +305,7 @@
                                 <td class="py-3 px-6 align-middle text-right shrink-0">
                                     {#if (item as any).qrCodeDataUrl || (item as any).qrCodePath}
                                         <div class="inline-block bg-white p-1 rounded-lg shadow-lg transform hover:scale-105 transition-transform shadow-blue-500/10">
-                                            <img src={(item as any).qrCodeDataUrl || (item as any).qrCodePath} alt="QR" class="w-16 h-16 md:w-20 md:h-20" />
+                                            <img src={(item as any).qrCodeDataUrl || (item as any).qrCodePath} alt="QR" class="w-20 h-20 md:w-24 md:h-24" />
                                         </div>
                                     {/if}
                                 </td>

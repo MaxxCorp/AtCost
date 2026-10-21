@@ -1,6 +1,7 @@
 import { type Event, type Announcement } from "@ac/validations";
 import { formatRecurrenceText } from "./format-recurrence.js";
 import { isSeriesItem, getSeriesRootId } from "./event-series.js";
+import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from "./kiosk-dates.js";
 import * as m from "#lib/paraglide/messages.js";
 
 export type SeriesInstanceInfo = {
@@ -309,14 +310,16 @@ export function compressSeriesEvents(
 
         const recText = formatRecurrenceText(rruleStr, undefined, { omitLength: true });
 
-        if (instances.length > 1) {
+        if (instances.length >= 1) {
             const allCancelled = instances.every(i => i.status === 'cancelled');
             const allTentative = instances.every(i => i.status === 'tentative');
             const overallStatus = allCancelled ? 'cancelled' : allTentative ? 'tentative' : (first.status === 'cancelled' || first.status === 'tentative' ? 'confirmed' : first.status);
 
             compressed.push({
                 ...first,
-                id: `${sKey}_${groupKey}`,
+                id: instances.length > 1 ? `${sKey}_${groupKey}` : (instances[0].id || `${sKey}_${groupKey}`),
+                startDateTime: instances[0].startDateTime || first.startDateTime,
+                endDateTime: instances[0].endDateTime || first.endDateTime,
                 status: overallStatus,
                 isCompressedSeries: true,
                 seriesDates: dates,
@@ -325,15 +328,6 @@ export function compressSeriesEvents(
                 instanceCount: instances.length,
                 qrCodePath: `/api/events/${sKey}/qr.png`,
                 qrCodeDataUrl: undefined
-            });
-        } else if (instances.length === 1) {
-            compressed.push({
-                ...first,
-                id: instances[0].id || first.id,
-                startDateTime: instances[0].startDateTime,
-                status: instances[0].status || first.status,
-                seriesInstances: instances,
-                recurrenceText: recText
             });
         } else {
             compressed.push({
@@ -351,3 +345,155 @@ export function compressSeriesEvents(
 
     return compressed;
 }
+
+/**
+ * Calculates the ISO calendar week number (1-53) for a given date.
+ */
+export function getISOWeekNumber(d: Date): number {
+    const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNr = (target.getUTCDay() + 6) % 7; // Monday = 0, Sunday = 6
+    target.setUTCDate(target.getUTCDate() + 4 - dayNr); // Nearest Thursday
+    const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+    return Math.ceil((((target.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+/**
+ * Calculates the poster programme headline by determining the closest time range of the kiosk selection:
+ * 1) roughly a week: "Programm • KW<Weeknumber>"
+ * 2) roughly a month: "Programm • <Month in numbers> <Year>"
+ * 3) roughly a quarter: "Programm • Q<Quarter> <Year>"
+ * 4) roughly a year: "Programm • <Year>"
+ */
+export function formatPosterProgrammeHeadline(
+    kiosk: any,
+    items?: any[],
+    customTitle?: string
+): string {
+    if (customTitle && customTitle.trim()) {
+        return customTitle.trim();
+    }
+
+    const now = new Date();
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+    const rangeMode = kiosk?.rangeMode;
+
+    // 1. Direct rangeMode shortcuts
+    if (rangeMode === 'this_week') {
+        const range = getThisWeekRange(now);
+        startDate = range.start;
+        endDate = range.end;
+    } else if (rangeMode === 'next_week') {
+        const range = getNextWeekRange(now);
+        startDate = range.start;
+        endDate = range.end;
+    } else if (rangeMode === 'this_month') {
+        const range = getThisMonthRange(now);
+        startDate = range.start;
+        endDate = range.end;
+    } else if (rangeMode === 'next_month') {
+        const range = getNextMonthRange(now);
+        startDate = range.start;
+        endDate = range.end;
+    }
+
+    // 2. Kiosk explicit start/end dates
+    if (!startDate && kiosk?.startDate) {
+        const s = new Date(kiosk.startDate);
+        if (!isNaN(s.getTime())) {
+            startDate = s;
+            if (kiosk.endDate) {
+                const e = new Date(kiosk.endDate);
+                if (!isNaN(e.getTime())) {
+                    endDate = e;
+                }
+            }
+        }
+    }
+
+    // 3. Rolling lookAhead/lookPast (only when explicitly set on kiosk)
+    const hasExplicitRolling = (kiosk?.lookAhead !== undefined && kiosk?.lookAhead !== null) ||
+        (kiosk?.lookAheadDays !== undefined && kiosk?.lookAheadDays !== null);
+
+    if (!startDate && (rangeMode === 'rolling' || rangeMode === 'relative') && hasExplicitRolling) {
+        const lookPastSec = Number(kiosk.lookPast || (kiosk.lookPastDays ? kiosk.lookPastDays * 86400 : 0));
+        const lookAheadSec = Number(kiosk.lookAhead || (kiosk.lookAheadDays ? kiosk.lookAheadDays * 86400 : 0));
+        startDate = new Date(now.getTime() - lookPastSec * 1000);
+        endDate = new Date(now.getTime() + lookAheadSec * 1000);
+    }
+
+    // 4. Inspect items if available
+    const eventDates: number[] = [];
+    if (Array.isArray(items)) {
+        for (const it of items) {
+            if (it && typeof it === 'object' && 'startDateTime' in it && it.startDateTime) {
+                const t = new Date(it.startDateTime).getTime();
+                if (!isNaN(t)) eventDates.push(t);
+            }
+        }
+    }
+
+    if (eventDates.length > 0) {
+        eventDates.sort((a, b) => a - b);
+        if (!startDate) {
+            startDate = new Date(eventDates[0]);
+            if (!endDate) {
+                endDate = new Date(eventDates[eventDates.length - 1]);
+            }
+        } else if (!endDate) {
+            endDate = new Date(eventDates[eventDates.length - 1]);
+        }
+    }
+
+    if (!startDate) {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    if (!endDate) {
+        endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    }
+
+    const durationDays = Math.max(1, Math.round(Math.abs(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Target durations:
+    // Week: 7 days
+    // Month: 30 days
+    // Quarter: 91 days
+    // Year: 365 days
+    const targets = [
+        { type: 'week', days: 7 },
+        { type: 'month', days: 30 },
+        { type: 'quarter', days: 91 },
+        { type: 'year', days: 365 }
+    ] as const;
+
+    let closest: (typeof targets)[number] = targets[1];
+    let minDiff = Infinity;
+    for (const t of targets) {
+        const diff = Math.abs(durationDays - t.days);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closest = t;
+        }
+    }
+
+    const refDate = startDate;
+    const year = refDate.getFullYear();
+
+    if (closest.type === 'week') {
+        const kw = getISOWeekNumber(refDate);
+        return `Programm • KW${kw}`;
+    }
+
+    if (closest.type === 'month') {
+        const monthNum = refDate.getMonth() + 1;
+        return `Programm • ${monthNum} ${year}`;
+    }
+
+    if (closest.type === 'quarter') {
+        const quarter = Math.floor(refDate.getMonth() / 3) + 1;
+        return `Programm • Q${quarter} ${year}`;
+    }
+
+    return `Programm • ${year}`;
+}
+

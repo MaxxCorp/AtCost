@@ -416,10 +416,10 @@
 
             const recText = formatRecurrenceText(rruleStr, undefined, { omitLength: true });
 
-            if (dates.length > 1) {
+            if (dates.length >= 1) {
                 compressed.push({
                     ...first,
-                    id: sKey,
+                    id: dates.length > 1 ? sKey : (first.id || sKey),
                     isCompressedSeries: true,
                     seriesDates: dates,
                     recurrenceText: recText,
@@ -1138,7 +1138,7 @@
             : 'border border-slate-200/90 bg-white hover:border-slate-300'}"
     >
         <!-- Date Badge & Meta Row -->
-        {#if isEvent && item.isCompressedSeries && item.seriesDates && item.seriesDates.length > 1}
+        {#if isEvent && item.isCompressedSeries && item.seriesDates && item.seriesDates.length >= 1}
             <!-- Compressed Series View: Recurrence pattern + multiple date tags -->
             <div class="space-y-1">
                 <div class="flex items-center justify-between gap-1.5 flex-wrap">
@@ -1291,7 +1291,7 @@
                         <img
                             src={eventQr}
                             alt="Event QR"
-                            class="w-10 h-10 print:w-9 print:h-9 object-contain image-pixelated"
+                            class="w-14 h-14 print:w-12 print:h-12 object-contain image-pixelated"
                             loading="lazy"
                         />
                     </div>
