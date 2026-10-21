@@ -172,6 +172,8 @@
 	"please_fix_validation": "Please fix the validation errors in the form.",
 	"start_date": "Start Date",
 	"end_date": "End Date",
+	"add_end_date": "Add End Date",
+	"same_day": "Same day",
 	"start_time": "Start Time",
 	"end_time": "End Time",
 	"timezone": "Timezone",

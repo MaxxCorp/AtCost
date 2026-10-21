@@ -37,7 +37,10 @@ async function createEvent(page: Page, details: { summary: string; ticketPrice: 
 	const today = new Date().toISOString().split('T')[0];
 	await page.locator('input[name="startDate"]').fill(today);
 	await page.locator('input[name="startTime"]').fill('10:00');
-	await page.locator('input[name="endDate"]').fill(today);
+	const endDateInput = page.locator('input[name="endDate"]');
+	if (await endDateInput.isVisible()) {
+		await endDateInput.fill(today);
+	}
 	await page.locator('input[name="endTime"]').fill('12:00');
 
 	if (details.recurring) {

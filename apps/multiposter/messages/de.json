@@ -172,6 +172,8 @@
 	"please_fix_validation": "Bitte beheben Sie die Validierungsfehler im Formular.",
 	"start_date": "Startdatum",
 	"end_date": "Enddatum",
+	"add_end_date": "Enddatum hinzufügen",
+	"same_day": "Am selben Tag",
 	"start_time": "Startzeit",
 	"end_time": "Endzeit",
 	"timezone": "Zeitzone",
