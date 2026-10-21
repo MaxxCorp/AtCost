@@ -161,11 +161,35 @@
     let showLocationLogo = $state<boolean>(true);
     let locationLogoPosition = $state<"left" | "right">("right");
     let customLocationLogoUrl = $state<string>("");
-    let locationLogoHeight = $state<number>(42); // in pixels
+    let locationLogoSizeMode = $state<"match_block" | "manual">("match_block");
+    let locationLogoHeight = $state<number>(110); // in pixels (when manual)
+    let locationLogoMaxWidth = $state<number>(340); // in pixels
+    let locationLogoOffsetY = $state<number>(0); // vertical offset in pixels (-40 to +40)
+    let locationBlockHeight = $state<number>(110); // clientHeight of location info block
 
-    let effectiveLocationLogo = $derived(
-        customLocationLogoUrl.trim() || currentLocation?.heroImage || ""
+    let effectiveLogoHeight = $derived(
+        locationLogoSizeMode === "match_block" ? (locationBlockHeight || 110) : locationLogoHeight
     );
+
+    let effectiveLocationLogo = $derived.by(() => {
+        const logo = customLocationLogoUrl.trim() || currentLocation?.heroImage || "";
+        if (logo.includes("inkscape-gs-2254515253") || (logo.includes("data:image/svg+xml") && logo.includes("matrix(1.3333333"))) {
+            try {
+                if (logo.includes("data:image/svg+xml;utf8,")) {
+                    const rawSvg = decodeURIComponent(logo.replace("data:image/svg+xml;utf8,", ""));
+                    const trimmed = normalizeSvgContent(rawSvg);
+                    return "data:image/svg+xml;utf8," + encodeURIComponent(trimmed);
+                } else if (logo.includes("data:image/svg+xml;base64,")) {
+                    const rawSvg = atob(logo.replace("data:image/svg+xml;base64,", ""));
+                    const trimmed = normalizeSvgContent(rawSvg);
+                    return "data:image/svg+xml;utf8," + encodeURIComponent(trimmed);
+                }
+            } catch (e) {
+                console.error("Auto-crop on effectiveLocationLogo error", e);
+            }
+        }
+        return logo;
+    });
 
     let showSponsors = $state<boolean>(true);
     let sponsorSectionTitle = $state<string>("Gefördert durch / Partner");
@@ -247,7 +271,10 @@
                 if (prefs.showLocationLogo !== undefined) showLocationLogo = prefs.showLocationLogo;
                 if (prefs.locationLogoPosition !== undefined) locationLogoPosition = prefs.locationLogoPosition;
                 if (prefs.customLocationLogoUrl !== undefined) customLocationLogoUrl = prefs.customLocationLogoUrl;
+                if (prefs.locationLogoSizeMode !== undefined) locationLogoSizeMode = prefs.locationLogoSizeMode;
                 if (prefs.locationLogoHeight !== undefined) locationLogoHeight = prefs.locationLogoHeight;
+                if (prefs.locationLogoMaxWidth !== undefined) locationLogoMaxWidth = prefs.locationLogoMaxWidth;
+                if (prefs.locationLogoOffsetY !== undefined) locationLogoOffsetY = prefs.locationLogoOffsetY;
                 if (prefs.showSponsors !== undefined) showSponsors = prefs.showSponsors;
                 if (prefs.sponsorSectionTitle !== undefined) sponsorSectionTitle = prefs.sponsorSectionTitle;
                 if (prefs.sponsorPosition !== undefined) sponsorPosition = prefs.sponsorPosition;
@@ -287,7 +314,10 @@
                 showLocationLogo,
                 locationLogoPosition,
                 customLocationLogoUrl,
+                locationLogoSizeMode,
                 locationLogoHeight,
+                locationLogoMaxWidth,
+                locationLogoOffsetY,
                 showSponsors,
                 sponsorSectionTitle,
                 sponsorPosition,
@@ -315,7 +345,8 @@
     $effect(() => {
         const _ = [
             paperSize, columns, density, showLocationLogo, locationLogoPosition,
-            customLocationLogoUrl, locationLogoHeight, showSponsors, sponsorSectionTitle,
+            customLocationLogoUrl, locationLogoSizeMode, locationLogoHeight, locationLogoMaxWidth,
+            locationLogoOffsetY, showSponsors, sponsorSectionTitle,
             sponsorPosition, sponsors, isLetterheadMode, letterheadBlankHeight,
             letterheadMonochrome, letterheadShowLogo, descriptionStyle, showTimes,
             showLocationQr, compressSeries, customProgrammeTitle, customProgrammeSubtitle,
@@ -489,45 +520,120 @@
         sponsors = sponsors.filter(s => s.id !== id);
     }
 
+    function normalizeSvgContent(content: string): string {
+        // Detect Inkscape PDF export matrix and clipPath (e.g. FH Logo)
+        const matrixMatch = content.match(/transform="matrix\(([\d.]+),\s*0,\s*0,\s*(-?[\d.]+),\s*0,\s*([\d.]+)\)"/);
+        const scaleMatch = content.match(/transform="scale\(([\d.]+)\)"/);
+        const clipMatch = content.match(/clipPath[^>]*>\s*<path[^>]*d="M\s*0[, ]0\s*H\s*([\d.]+)\s*V\s*([\d.]+)\s*H\s*0\s*Z"/i);
+
+        if (matrixMatch && clipMatch) {
+            const sx = parseFloat(matrixMatch[1]);
+            const sy = Math.abs(parseFloat(matrixMatch[2]));
+            const ty = parseFloat(matrixMatch[3]);
+            const scale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+            const clipW = parseFloat(clipMatch[1]);
+            const clipH = parseFloat(clipMatch[2]);
+
+            const realW = clipW * scale * sx;
+            const realH = clipH * scale * sy;
+            const realY = ty - realH;
+
+            return content.replace(/<svg\b([^>]*?)>/s, (_, attrs) => {
+                const cleaned = attrs
+                    .replace(/\bwidth="[^"]*"/g, '')
+                    .replace(/\bheight="[^"]*"/g, '')
+                    .replace(/\bviewBox="[^"]*"/g, '')
+                    .trim();
+                return `<svg ${cleaned} width="${realW.toFixed(2)}" height="${realH.toFixed(2)}" viewBox="0 ${realY.toFixed(2)} ${realW.toFixed(2)} ${realH.toFixed(2)}">`;
+            });
+        }
+        return content;
+    }
+
+    function autoCropCurrentLogo() {
+        if (!customLocationLogoUrl) return;
+        try {
+            if (customLocationLogoUrl.includes("data:image/svg+xml;utf8,")) {
+                const rawSvg = decodeURIComponent(customLocationLogoUrl.replace("data:image/svg+xml;utf8,", ""));
+                const optimized = normalizeSvgContent(rawSvg);
+                customLocationLogoUrl = "data:image/svg+xml;utf8," + encodeURIComponent(optimized);
+                toast.success("SVG-Zuschnitt optimiert");
+                savePrefs();
+            } else if (customLocationLogoUrl.includes("data:image/svg+xml;base64,")) {
+                const rawSvg = atob(customLocationLogoUrl.replace("data:image/svg+xml;base64,", ""));
+                const optimized = normalizeSvgContent(rawSvg);
+                customLocationLogoUrl = "data:image/svg+xml;utf8," + encodeURIComponent(optimized);
+                toast.success("SVG-Zuschnitt optimiert");
+                savePrefs();
+            } else {
+                toast.info("Tipp: Nutzen Sie 'Datei hochladen' für automatisches Zuschneiden");
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Konnte SVG nicht automatisch zuschneiden");
+        }
+    }
+
     // Image Upload helper for Sponsor or Location Logo
     async function handleImageUpload(e: globalThis.Event, target: "location" | { sponsorId: string }) {
         const input = e.target as HTMLInputElement;
         if (!input.files || input.files.length === 0) return;
         const file = input.files[0];
-        if (!file.type.startsWith("image/")) {
+        if (!file.type.startsWith("image/") && !file.name.toLowerCase().endsWith(".svg")) {
             toast.error("Nur Bilddateien (PNG, JPG, SVG, WebP) erlaubt");
             return;
         }
 
+        const isSvg = file.name.toLowerCase().endsWith(".svg") || file.type.includes("svg");
+
         try {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const base64 = reader.result as string;
-                try {
-                    const res = await uploadMedia({
-                        filename: file.name,
-                        contentType: file.type,
-                        content: base64
-                    });
-                    const url = res.success && res.urls?.default ? res.urls.default : base64;
+            if (isSvg) {
+                const reader = new FileReader();
+                reader.readAsText(file);
+                reader.onload = async () => {
+                    let svgText = reader.result as string;
+                    svgText = normalizeSvgContent(svgText);
+                    const dataUrl = "data:image/svg+xml;utf8," + encodeURIComponent(svgText);
                     if (target === "location") {
-                        customLocationLogoUrl = url;
+                        customLocationLogoUrl = dataUrl;
                     } else {
                         const s = sponsors.find(sp => sp.id === target.sponsorId);
-                        if (s) s.logoUrl = url;
+                        if (s) s.logoUrl = dataUrl;
                     }
-                    toast.success("Logo erfolgreich hinzugefügt");
-                } catch {
-                    if (target === "location") {
-                        customLocationLogoUrl = base64;
-                    } else {
-                        const s = sponsors.find(sp => sp.id === target.sponsorId);
-                        if (s) s.logoUrl = base64;
+                    toast.success("SVG Logo optimiert und hinzugefügt");
+                    savePrefs();
+                };
+            } else {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = async () => {
+                    const base64 = reader.result as string;
+                    try {
+                        const res = await uploadMedia({
+                            filename: file.name,
+                            contentType: file.type,
+                            content: base64
+                        });
+                        const url = res.success && res.urls?.default ? res.urls.default : base64;
+                        if (target === "location") {
+                            customLocationLogoUrl = url;
+                        } else {
+                            const s = sponsors.find(sp => sp.id === target.sponsorId);
+                            if (s) s.logoUrl = url;
+                        }
+                        toast.success("Logo erfolgreich hinzugefügt");
+                    } catch {
+                        if (target === "location") {
+                            customLocationLogoUrl = base64;
+                        } else {
+                            const s = sponsors.find(sp => sp.id === target.sponsorId);
+                            if (s) s.logoUrl = base64;
+                        }
+                        toast.success("Logo gespeichert");
                     }
-                    toast.success("Logo gespeichert");
-                }
-            };
+                    savePrefs();
+                };
+            }
         } catch (err) {
             console.error(err);
             toast.error("Upload fehlgeschlagen");
@@ -1043,116 +1149,128 @@
                 {/if}
 
                 <!-- Poster Editorial Header -->
-                <header class="poster-header px-8 pt-6 pb-4 border-b-2 border-slate-900 flex justify-between items-start gap-6">
-                    <!-- Left: Location Branding & Venue Info -->
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-start gap-4 mb-2">
-                            {#if showLocationLogo && locationLogoPosition === "left" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
-                                <div class="location-logo-wrap shrink-0">
-                                    <img
-                                        src={effectiveLocationLogo}
-                                        alt={currentLocation?.name || "Logo"}
-                                        class="object-contain max-w-[180px]"
-                                        style="height: {locationLogoHeight}px;"
-                                    />
-                                </div>
-                            {/if}
+                <header class="poster-header px-8 pt-6 pb-4 border-b-2 border-slate-900 flex flex-col gap-3">
+                    <!-- Top Row: Location Branding / Venue Info & Right Logo / Sponsors -->
+                    <div class="flex items-start justify-between gap-6">
+                        <!-- Left: Location Info Block -->
+                        <div
+                            bind:clientHeight={locationBlockHeight}
+                            class="location-info-block flex-1 min-w-0"
+                        >
+                            <div class="flex items-start gap-4">
+                                {#if showLocationLogo && locationLogoPosition === "left" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
+                                    <div
+                                        class="location-logo-wrap shrink-0"
+                                        style="transform: translateY({locationLogoOffsetY}px);"
+                                    >
+                                        <img
+                                            src={effectiveLocationLogo}
+                                            alt={currentLocation?.name || "Logo"}
+                                            class="object-contain object-top object-left transition-all"
+                                            style="height: {effectiveLogoHeight}px; max-width: {locationLogoMaxWidth}px;"
+                                        />
+                                    </div>
+                                {/if}
 
-                            <div class="space-y-1">
-                                <h2 class="text-xl sm:text-2xl font-black tracking-tight text-slate-900 uppercase">
-                                    {currentLocation?.name || "Kultur- & Begegnungszentrum"}
-                                </h2>
+                                <div class="space-y-1">
+                                    <h2 class="text-xl sm:text-2xl font-black tracking-tight text-slate-900 uppercase leading-none">
+                                        {currentLocation?.name || "Kultur- & Begegnungszentrum"}
+                                    </h2>
 
-                                <!-- Location Subtitle, Contact & Location QR Code (placed near location, like Animated List View) -->
-                                <div class="flex items-start gap-3 mt-1.5 text-xs text-slate-600">
-                                    {#if showLocationQr}
-                                        <div class="bg-white p-1.5 border border-slate-200 rounded-lg shadow-2xs shrink-0 mt-0.5 self-start">
-                                            {#if currentLocation?.contact?.qrCodeDataUrl || currentLocation?.contact?.qrCodePath}
-                                                <img
-                                                    src={currentLocation.contact.qrCodeDataUrl || currentLocation.contact.qrCodePath}
-                                                    alt="Location QR"
-                                                    class="w-20 h-20 object-contain"
-                                                />
-                                            {:else}
-                                                <div class="w-20 h-20 bg-slate-50 flex items-center justify-center text-slate-600">
-                                                    <QrCode class="w-10 h-10" />
-                                                </div>
-                                            {/if}
-                                        </div>
-                                    {/if}
-
-                                    <div class="space-y-0.5 leading-snug">
-                                        {#if programmeLocationSubtitle}
-                                            <p class="font-medium text-slate-700">{programmeLocationSubtitle}</p>
-                                        {/if}
-                                        {#if currentLocation?.contact}
-                                            <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5 pt-0.5">
-                                                {#if currentLocation.contact.name}
-                                                    <span class="font-semibold text-slate-800">{currentLocation.contact.name}</span>
-                                                {/if}
-                                                {#if currentLocation.contact.role}
-                                                    <span class="px-1.5 py-0.2 bg-slate-100 rounded text-[10px] text-slate-600 border border-slate-200">
-                                                        {currentLocation.contact.role}
-                                                    </span>
-                                                {/if}
-                                                {#if currentLocation.contact.phone}
-                                                    <span class="inline-flex items-center gap-1">
-                                                        <Phone class="w-2.5 h-2.5 text-slate-400" />
-                                                        {currentLocation.contact.phone}
-                                                    </span>
-                                                {/if}
-                                                {#if currentLocation.contact.email}
-                                                    <span class="inline-flex items-center gap-1">
-                                                        <Mail class="w-2.5 h-2.5 text-slate-400" />
-                                                        {currentLocation.contact.email}
-                                                    </span>
+                                    <!-- Location Subtitle, Contact & Location QR Code (placed near location, like Animated List View) -->
+                                    <div class="flex items-start gap-3 mt-1.5 text-xs text-slate-600">
+                                        {#if showLocationQr}
+                                            <div class="bg-white p-1.5 border border-slate-200 rounded-lg shadow-2xs shrink-0 mt-0.5 self-start">
+                                                {#if currentLocation?.contact?.qrCodeDataUrl || currentLocation?.contact?.qrCodePath}
+                                                    <img
+                                                        src={currentLocation.contact.qrCodeDataUrl || currentLocation.contact.qrCodePath}
+                                                        alt="Location QR"
+                                                        class="w-20 h-20 object-contain"
+                                                    />
+                                                {:else}
+                                                    <div class="w-20 h-20 bg-slate-50 flex items-center justify-center text-slate-600">
+                                                        <QrCode class="w-10 h-10" />
+                                                    </div>
                                                 {/if}
                                             </div>
                                         {/if}
+
+                                        <div class="space-y-0.5 leading-snug">
+                                            {#if programmeLocationSubtitle}
+                                                <p class="font-medium text-slate-700">{programmeLocationSubtitle}</p>
+                                            {/if}
+                                            {#if currentLocation?.contact}
+                                                <div class="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5 pt-0.5">
+                                                    {#if currentLocation.contact.name}
+                                                        <span class="font-semibold text-slate-800">{currentLocation.contact.name}</span>
+                                                    {/if}
+                                                    {#if currentLocation.contact.role}
+                                                        <span class="px-1.5 py-0.2 bg-slate-100 rounded text-[10px] text-slate-600 border border-slate-200">
+                                                            {currentLocation.contact.role}
+                                                        </span>
+                                                    {/if}
+                                                    {#if currentLocation.contact.phone}
+                                                        <span class="inline-flex items-center gap-1">
+                                                            <Phone class="w-2.5 h-2.5 text-slate-400" />
+                                                            {currentLocation.contact.phone}
+                                                        </span>
+                                                    {/if}
+                                                    {#if currentLocation.contact.email}
+                                                        <span class="inline-flex items-center gap-1">
+                                                            <Mail class="w-2.5 h-2.5 text-slate-400" />
+                                                            {currentLocation.contact.email}
+                                                        </span>
+                                                    {/if}
+                                                </div>
+                                            {/if}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Main Programme Headline -->
-                        <div class="mt-3">
-                            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-emerald-800 dark:text-emerald-900 border-l-4 border-emerald-600 pl-3">
-                                {programmeMonthTitle}
-                            </h1>
+                        <!-- Right Header: Location Logo (top-right, aligned with Location Name) & Top Sponsors -->
+                        <div class="flex flex-col items-end gap-2.5 shrink-0 self-start">
+                            {#if showLocationLogo && locationLogoPosition === "right" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
+                                <div
+                                    class="location-logo-wrap shrink-0 text-right flex items-start justify-end"
+                                    style="transform: translateY({locationLogoOffsetY}px);"
+                                >
+                                    <img
+                                        src={effectiveLocationLogo}
+                                        alt={currentLocation?.name || "Logo"}
+                                        class="object-contain object-top object-right transition-all"
+                                        style="height: {effectiveLogoHeight}px; max-width: {locationLogoMaxWidth}px;"
+                                    />
+                                </div>
+                            {/if}
+
+                            {#if showSponsors && sponsorPosition === "header" && sponsors.length > 0}
+                                <div class="text-right">
+                                    <span class="text-[9px] uppercase tracking-wider font-semibold text-slate-500 block mb-1">
+                                        {sponsorSectionTitle}
+                                    </span>
+                                    <div class="flex items-center gap-3 flex-wrap justify-end">
+                                        {#each sponsors as s (s.id)}
+                                            {#if s.logoUrl}
+                                                <img src={s.logoUrl} alt={s.name} class="h-8 max-w-[90px] object-contain" />
+                                            {:else}
+                                                <span class="text-[10px] font-bold text-slate-700 px-1.5 py-0.5 border border-slate-300 rounded">
+                                                    {s.name}
+                                                </span>
+                                            {/if}
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/if}
                         </div>
                     </div>
 
-                    <!-- Right Header: Location Logo (placed where QR code was previously) or Top Sponsors -->
-                    <div class="flex flex-col items-end gap-3 shrink-0">
-                        {#if showLocationLogo && locationLogoPosition === "right" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
-                            <div class="location-logo-wrap shrink-0 text-right">
-                                <img
-                                    src={effectiveLocationLogo}
-                                    alt={currentLocation?.name || "Logo"}
-                                    class="object-contain max-w-[200px]"
-                                    style="height: {locationLogoHeight}px;"
-                                />
-                            </div>
-                        {/if}
-
-                        {#if showSponsors && sponsorPosition === "header" && sponsors.length > 0}
-                            <div class="text-right">
-                                <span class="text-[9px] uppercase tracking-wider font-semibold text-slate-500 block mb-1">
-                                    {sponsorSectionTitle}
-                                </span>
-                                <div class="flex items-center gap-3 flex-wrap justify-end">
-                                    {#each sponsors as s (s.id)}
-                                        {#if s.logoUrl}
-                                            <img src={s.logoUrl} alt={s.name} class="h-8 max-w-[90px] object-contain" />
-                                        {:else}
-                                            <span class="text-[10px] font-bold text-slate-700 px-1.5 py-0.5 border border-slate-300 rounded">
-                                                {s.name}
-                                            </span>
-                                        {/if}
-                                    {/each}
-                                </div>
-                            </div>
-                        {/if}
+                    <!-- Main Programme Headline Row (Full width underneath location block & logo) -->
+                    <div class="mt-1 pt-2.5 border-t border-slate-100">
+                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-emerald-800 dark:text-emerald-900 border-l-4 border-emerald-600 pl-3">
+                            {programmeMonthTitle}
+                        </h1>
                     </div>
                 </header>
             </div>
@@ -1621,43 +1739,148 @@
                             <label for="posterCustomLogoUrl" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
                                 Oder Logo-URL eingeben
                             </label>
-                            <input
-                                id="posterCustomLogoUrl"
-                                type="url"
-                                bind:value={customLocationLogoUrl}
-                                placeholder="https://example.com/logo.svg"
-                                class="w-full text-xs p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-1 focus:ring-emerald-500 mb-2"
-                            />
+                            <div class="flex gap-2 mb-2">
+                                <input
+                                    id="posterCustomLogoUrl"
+                                    type="url"
+                                    bind:value={customLocationLogoUrl}
+                                    placeholder="https://example.com/logo.svg oder /logos/..."
+                                    class="flex-1 text-xs p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-1 focus:ring-emerald-500"
+                                />
+                                {#if customLocationLogoUrl && customLocationLogoUrl.includes("svg")}
+                                    <button
+                                        type="button"
+                                        onclick={autoCropCurrentLogo}
+                                        class="px-2.5 py-1 text-xs font-medium rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 shrink-0 transition-colors"
+                                        title="Entfernt überflüssige Ränder aus dem SVG für passgenaue Skalierung"
+                                    >
+                                        Auto-Crop
+                                    </button>
+                                {/if}
+                            </div>
 
-                            <div class="flex items-center justify-between text-xs mb-2">
+                            <!-- Preset: FH Logo Shortcut -->
+                            <div class="flex items-center gap-2 mb-3">
+                                <button
+                                    type="button"
+                                    onclick={() => {
+                                        customLocationLogoUrl = "/logos/FH_Logo_2015_CMYK.svg";
+                                        locationLogoPosition = "right";
+                                        locationLogoSizeMode = "match_block";
+                                        savePrefs();
+                                        toast.success("FH Logo aktiviert");
+                                    }}
+                                    class="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline font-semibold flex items-center gap-1"
+                                >
+                                    <span>🏛️ FH Logo laden</span>
+                                </button>
+                            </div>
+
+                            <!-- Position: Rechts / Links -->
+                            <div class="flex items-center justify-between text-xs mb-3">
                                 <span class="font-semibold text-slate-600 dark:text-slate-400">{m.poster_logo_position()}:</span>
                                 <div class="inline-flex rounded border border-slate-300 dark:border-slate-600 p-0.5 bg-white dark:bg-slate-800 text-[11px]">
                                     <button
                                         type="button"
                                         onclick={() => (locationLogoPosition = "right")}
-                                        class="px-2 py-0.5 rounded transition {locationLogoPosition === 'right' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
+                                        class="px-2.5 py-1 rounded transition {locationLogoPosition === 'right' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
                                     >
-                                        {m.poster_logo_position_right()}
+                                        {m.poster_logo_position_right()} (oben rechts)
                                     </button>
                                     <button
                                         type="button"
                                         onclick={() => (locationLogoPosition = "left")}
-                                        class="px-2 py-0.5 rounded transition {locationLogoPosition === 'left' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
+                                        class="px-2.5 py-1 rounded transition {locationLogoPosition === 'left' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-300'}"
                                     >
                                         {m.poster_logo_position_left()}
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="flex items-center justify-between text-xs">
-                                <span>Logo-Höhe ({locationLogoHeight}px):</span>
-                                <input
-                                    type="range"
-                                    min="24"
-                                    max="70"
-                                    bind:value={locationLogoHeight}
-                                    class="w-28 accent-emerald-600"
-                                />
+                            <!-- Sizing & Placement Fine-Tuning Box -->
+                            <div class="space-y-2.5 mb-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="font-semibold text-slate-700 dark:text-slate-300">Skalierung / Höhe:</span>
+                                    <div class="inline-flex rounded border border-slate-300 dark:border-slate-600 p-0.5 bg-white dark:bg-slate-900 text-[11px]">
+                                        <button
+                                            type="button"
+                                            onclick={() => (locationLogoSizeMode = "match_block")}
+                                            class="px-2 py-0.5 rounded transition {locationLogoSizeMode === 'match_block' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-400'}"
+                                        >
+                                            An Block anpassen
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onclick={() => (locationLogoSizeMode = "manual")}
+                                            class="px-2 py-0.5 rounded transition {locationLogoSizeMode === 'manual' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-600 dark:text-slate-400'}"
+                                        >
+                                            Manuell
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {#if locationLogoSizeMode === "match_block"}
+                                    <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                                        ✓ Automatisch so hoch wie der Standort-Block links (~{Math.round(locationBlockHeight || 110)}px, proportional)
+                                    </p>
+                                {:else}
+                                    <div class="flex items-center justify-between text-xs pt-1">
+                                        <span class="text-slate-600 dark:text-slate-400">Höhe ({locationLogoHeight}px):</span>
+                                        <div class="flex items-center gap-2">
+                                            <input
+                                                type="range"
+                                                min="24"
+                                                max="240"
+                                                bind:value={locationLogoHeight}
+                                                class="w-28 accent-emerald-600"
+                                            />
+                                            <span class="font-mono text-[11px] w-8 text-right">{locationLogoHeight}px</span>
+                                        </div>
+                                    </div>
+                                {/if}
+
+                                <!-- Max Width limit -->
+                                <div class="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200 dark:border-slate-700">
+                                    <span class="text-slate-600 dark:text-slate-400">Max. Breite ({locationLogoMaxWidth}px):</span>
+                                    <div class="flex items-center gap-2">
+                                        <input
+                                            type="range"
+                                            min="120"
+                                            max="500"
+                                            step="10"
+                                            bind:value={locationLogoMaxWidth}
+                                            class="w-28 accent-emerald-600"
+                                        />
+                                        <span class="font-mono text-[11px] w-8 text-right">{locationLogoMaxWidth}px</span>
+                                    </div>
+                                </div>
+
+                                <!-- Vertical Offset fine tuning -->
+                                <div class="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200 dark:border-slate-700">
+                                    <span class="text-slate-600 dark:text-slate-400">
+                                        Feinjustierung oben ({locationLogoOffsetY > 0 ? '+' : ''}{locationLogoOffsetY}px):
+                                    </span>
+                                    <div class="flex items-center gap-1.5">
+                                        <input
+                                            type="range"
+                                            min="-30"
+                                            max="30"
+                                            step="1"
+                                            bind:value={locationLogoOffsetY}
+                                            class="w-24 accent-emerald-600"
+                                        />
+                                        {#if locationLogoOffsetY !== 0}
+                                            <button
+                                                type="button"
+                                                onclick={() => (locationLogoOffsetY = 0)}
+                                                class="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-1 font-bold"
+                                                title="Auf 0 zurücksetzen"
+                                            >
+                                                ✕
+                                            </button>
+                                        {/if}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1667,7 +1890,7 @@
                                 <img
                                     src={effectiveLocationLogo}
                                     alt="Logo Vorschau"
-                                    class="max-h-10 object-contain p-1 bg-white border border-slate-200 rounded"
+                                    class="max-h-12 max-w-[120px] object-contain p-1 bg-white border border-slate-200 rounded"
                                 />
                                 {#if customLocationLogoUrl}
                                     <button
