@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
     import { type Event, type Announcement } from "@ac/validations";
     import {
@@ -498,10 +498,15 @@
     }
 
     // Trigger Print
-    function triggerPrint() {
-        if (browser) {
-            window.print();
-        }
+    async function triggerPrint() {
+        if (!browser) return;
+        const prevZoom = zoomLevel;
+        zoomLevel = 1;
+        await tick();
+        window.print();
+        setTimeout(() => {
+            zoomLevel = prevZoom;
+        }, 500);
     }
 
     // Sponsor Management
@@ -640,6 +645,26 @@
         }
     }
 </script>
+
+<svelte:head>
+    <style>
+        @media print {
+            @page {
+                size: {paperSize === 'A3' ? '297mm 420mm' : '210mm 297mm'};
+                margin: 0 !important;
+            }
+            :global(html),
+            :global(body) {
+                width: {paperSize === 'A3' ? '297mm' : '210mm'} !important;
+                max-width: {paperSize === 'A3' ? '297mm' : '210mm'} !important;
+                height: {paperSize === 'A3' ? '420mm' : '297mm'} !important;
+                max-height: {paperSize === 'A3' ? '420mm' : '297mm'} !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+        }
+    </style>
+</svelte:head>
 
 <!-- Screen Toolbar -->
 <header class="print:hidden sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm px-4 py-2.5">
@@ -1124,15 +1149,15 @@
 </header>
 
 <!-- Main Canvas / Workbench -->
-<main class="w-full min-h-[calc(100vh-60px)] bg-slate-200 dark:bg-slate-950 p-4 sm:p-8 flex justify-center items-start overflow-auto print:p-0 print:m-0 print:bg-white print:min-h-0">
+<main class="w-full min-h-[calc(100vh-60px)] bg-slate-200 dark:bg-slate-950 p-4 sm:p-8 flex justify-center items-start overflow-auto print:block print:w-auto print:p-0 print:m-0 print:bg-white print:min-h-0 print:overflow-visible">
     <div
-        class="poster-preview-scaler transition-transform duration-150 origin-top flex justify-center print:transform-none print:w-full"
+        class="poster-preview-scaler transition-transform duration-150 origin-top flex justify-center print:block print:w-auto print:m-0 print:p-0 print:transform-none"
         style="transform: scale({zoomLevel});"
     >
         <!-- The Poster Document Sheet (Single Page A4 or A3) -->
         <article
             bind:this={posterContentElement}
-            class="poster-sheet {paperSize === 'A3' ? 'paper-a3' : 'paper-a4'} {letterheadMonochrome ? 'monochrome-mode' : ''} bg-white text-slate-900 shadow-2xl print:shadow-none print:border-none relative flex flex-col justify-between"
+            class="poster-sheet {paperSize === 'A3' ? 'paper-a3' : 'paper-a4'} {letterheadMonochrome ? 'monochrome-mode' : ''} bg-white text-slate-900 shadow-2xl print:shadow-none print:border-none print:m-0 print:p-0 relative flex flex-col justify-between"
         >
             <!-- Top Section: Header or Blank Letterhead Space -->
             <div class="poster-top-container shrink-0">
@@ -2330,7 +2355,7 @@
     @media print {
         @page {
             size: portrait;
-            margin: 0;
+            margin: 0 !important;
         }
 
         :global(html),
@@ -2339,25 +2364,40 @@
             padding: 0 !important;
             background: #ffffff !important;
             color: #000000 !important;
+            overflow: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
 
-        main {
-            padding: 0 !important;
-            margin: 0 !important;
-            background: #ffffff !important;
-            overflow: visible !important;
-        }
-
+        /* Neutralize all parent containers to prevent flex-centering or horizontal displacement */
+        :global(body > *),
+        :global(main),
+        main,
         .poster-preview-scaler {
-            transform: none !important;
-            width: 100% !important;
+            display: block !important;
+            float: none !important;
+            position: static !important;
             margin: 0 !important;
             padding: 0 !important;
+            width: auto !important;
+            max-width: none !important;
+            height: auto !important;
+            min-height: 0 !important;
+            background: #ffffff !important;
+            transform: none !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
         }
 
         .poster-sheet {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            position: relative !important;
+            left: 0 !important;
+            top: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
             box-shadow: none !important;
             border: none !important;
             border-radius: 0 !important;
@@ -2371,14 +2411,22 @@
 
         .paper-a4 {
             width: 210mm !important;
+            min-width: 210mm !important;
+            max-width: 210mm !important;
             height: 297mm !important;
+            min-height: 297mm !important;
             max-height: 297mm !important;
+            margin: 0 !important;
         }
 
         .paper-a3 {
             width: 297mm !important;
+            min-width: 297mm !important;
+            max-width: 297mm !important;
             height: 420mm !important;
+            min-height: 420mm !important;
             max-height: 420mm !important;
+            margin: 0 !important;
         }
 
         .letterhead-blank-area {

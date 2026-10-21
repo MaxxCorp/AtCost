@@ -76,7 +76,7 @@
 			<AuthHeader />
 		</div>
 	{/if}
-	<main class="min-h-screen bg-gray-50 print:bg-white print:min-h-0 print:p-0 print:m-0">
+	<main class="min-h-screen bg-gray-50 print:bg-white print:min-h-0 print:p-0 print:m-0 print:w-auto print:block">
 		{#key page.url.pathname}
 			{@render children()}
 		{/key}

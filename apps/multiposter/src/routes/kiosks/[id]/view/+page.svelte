@@ -379,7 +379,7 @@
     ><KioskFoldedFlyerView items={items} kiosk={kiosk} /></div>
 {:else if kiosk?.uiMode === "poster"}
     <div
-        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto"
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible print:block print:w-auto print:h-auto print:m-0 print:p-0 overflow-y-auto"
     ><KioskPosterView items={items} kiosk={kiosk} /></div>
 {:else}
     <div
