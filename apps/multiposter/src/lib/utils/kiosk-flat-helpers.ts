@@ -360,7 +360,7 @@ export function getISOWeekNumber(d: Date): number {
 /**
  * Calculates the poster programme headline by determining the closest time range of the kiosk selection:
  * 1) roughly a week: "Programm • KW<Weeknumber>"
- * 2) roughly a month: "Programm • <Month in numbers> <Year>"
+ * 2) roughly a month: "Programm • <Month in numbers>/<Year>"
  * 3) roughly a quarter: "Programm • Q<Quarter> <Year>"
  * 4) roughly a year: "Programm • <Year>"
  */
@@ -486,7 +486,7 @@ export function formatPosterProgrammeHeadline(
 
     if (closest.type === 'month') {
         const monthNum = refDate.getMonth() + 1;
-        return `Programm • ${monthNum} ${year}`;
+        return `Programm • ${monthNum}/${year}`;
     }
 
     if (closest.type === 'quarter') {

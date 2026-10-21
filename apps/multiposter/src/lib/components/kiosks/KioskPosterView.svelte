@@ -1875,7 +1875,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label for="posterCustomProgTitle" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                                Hauptüberschrift (z. B. Programm • 10 2026)
+                                Hauptüberschrift (z. B. Programm • 10/2026)
                             </label>
                             <input
                                 id="posterCustomProgTitle"

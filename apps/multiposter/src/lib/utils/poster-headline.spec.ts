@@ -25,14 +25,14 @@ describe("formatPosterProgrammeHeadline", () => {
         expect(result).toBe("Programm • KW42");
     });
 
-    it("formats month range with <Month in numbers> <Year> when rangeMode is this_month", () => {
+    it("formats month range with <Month in numbers>/<Year> when rangeMode is this_month", () => {
         const kiosk = {
             rangeMode: "fixed",
             startDate: "2026-10-01T00:00:00Z",
             endDate: "2026-10-31T23:59:59Z"
         };
         const result = formatPosterProgrammeHeadline(kiosk, []);
-        expect(result).toBe("Programm • 10 2026");
+        expect(result).toBe("Programm • 10/2026");
     });
 
     it("formats quarter range with Q<quarter> <year> when ~90 days is selected", () => {
