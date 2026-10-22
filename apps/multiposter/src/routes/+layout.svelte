@@ -34,7 +34,7 @@
 	});
 
 	let isAuthPage = $derived(
-		page.url.pathname === "/login" || page.url.pathname === "/signup",
+		page.url.pathname === "/login" || page.url.pathname === "/signup" || page.url.pathname.startsWith("/gdpr-self-service"),
 	);
 	let isKioskPage = $derived(
 		page.url.pathname.startsWith("/kiosks/") || kioskState.isKiosk,

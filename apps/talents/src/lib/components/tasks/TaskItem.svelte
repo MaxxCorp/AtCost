@@ -1,12 +1,12 @@
 <script lang="ts">
     import { format } from 'date-fns';
-    import { completeTask, listTasks, listCompletedTasks } from '../../../routes/tasks.remote.js';
+    import { completeTask, listTasks, listCompletedTasks, executeGdprObfuscationTask } from '../../../routes/tasks.remote.js';
     import { invokeManageTimesheets } from '../../../routes/my-timesheet/timesheets.remote.js';
     import { readCondition } from '../../../routes/conditions.remote.js';
     import ConditionReviewModal from '../conditions/ConditionReviewModal.svelte';
     import DifferentialContractModal from './DifferentialContractModal.svelte';
     import { toast } from 'svelte-sonner';
-    import { ShieldAlert, TrendingUp, Award, Clock } from '@lucide/svelte';
+    import { ShieldAlert, TrendingUp, Award, Clock, UserX } from '@lucide/svelte';
 
     let { task }: { task: any } = $props();
 
@@ -45,7 +45,8 @@
         timesheet_approval: 'bg-amber-50 text-amber-700 border-amber-100',
         profile_update: 'bg-blue-50 text-blue-700 border-blue-100',
         correction: 'bg-rose-50 text-rose-700 border-rose-100',
-        manual: 'bg-gray-50 text-gray-700 border-gray-100'
+        manual: 'bg-gray-50 text-gray-700 border-gray-100',
+        gdpr_obfuscation: 'bg-rose-50 text-rose-800 border-rose-200'
     };
 
     const typeLabels: Record<string, string> = {
@@ -56,6 +57,7 @@
         profile_update: 'Profilaktualisierung',
         correction: 'Korrektur',
         manual: 'Aufgabe',
+        gdpr_obfuscation: 'DSGVO Anonymisierung'
     };
 </script>
 
@@ -81,6 +83,8 @@
                     <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 {:else if task.type === 'correction'}
                     <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                {:else if task.type === 'gdpr_obfuscation'}
+                    <UserX class="w-6 h-6 text-rose-600" />
                 {:else}
                     <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                 {/if}
@@ -210,6 +214,39 @@
                     class="w-full px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
                 >
                     {isRejectingTimesheet ? 'Laden...' : 'Ablehnen'}
+                </button>
+            {:else if task.type === 'gdpr_obfuscation'}
+                <button
+                    type="button"
+                    disabled={isCompleting}
+                    onclick={async () => {
+                        if (!task.data?.contactId) {
+                            toast.error('Kontakt-ID fehlt in dieser Aufgabe.');
+                            return;
+                        }
+                        if (!confirm('Möchten Sie diesen Kontakt jetzt wirklich unwiderruflich obfuskieren / anonymisieren?')) {
+                            return;
+                        }
+                        isCompleting = true;
+                        try {
+                            await executeGdprObfuscationTask({
+                                contactId: task.data.contactId,
+                                gdprRequestId: task.data.gdprRequestId,
+                                notes: 'Über Objective Center (Task Manager) freigegeben und obfuskiert'
+                            });
+                            toast.success('Kontakt erfolgreich obfuskiert und Aufgabe erledigt');
+                            void listTasks().refresh();
+                            void listCompletedTasks().refresh();
+                        } catch (err: any) {
+                            toast.error(err?.message || 'Fehler bei der Obfuskierung');
+                        } finally {
+                            isCompleting = false;
+                        }
+                    }}
+                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap shadow-sm hover:shadow disabled:opacity-50 flex items-center gap-1.5"
+                >
+                    <UserX class="w-3.5 h-3.5" />
+                    {isCompleting ? 'Wird obfuskiert...' : 'Jetzt Obfuskieren'}
                 </button>
             {:else}
                 <button

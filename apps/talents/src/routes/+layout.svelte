@@ -23,7 +23,7 @@
 	});
 
 	let isAuthPage = $derived(
-		page.url.pathname === "/login" || page.url.pathname === "/signup",
+		page.url.pathname === "/login" || page.url.pathname === "/signup" || page.url.pathname.startsWith("/gdpr-self-service"),
 	);
 
 	import { getLastListUrl } from "@ac/ui";

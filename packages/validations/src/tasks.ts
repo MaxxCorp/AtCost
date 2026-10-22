@@ -10,6 +10,7 @@ export const taskTypePicklist = v.picklist([
     'profile_update',
     'correction',
     'manual',
+    'gdpr_obfuscation',
 ]);
 
 export type TaskType = v.InferOutput<typeof taskTypePicklist>;

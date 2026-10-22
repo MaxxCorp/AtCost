@@ -22,3 +22,4 @@ export * from './payroll.js';
 export * from './conditions.js';
 export * from './tasks.js';
 export * from './hmos.js';
+export * from './gdpr.js';

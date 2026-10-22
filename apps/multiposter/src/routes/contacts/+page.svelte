@@ -27,6 +27,7 @@
 		ChevronsRight,
 		Tag as TagIcon,
 		Check,
+		UserX,
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
@@ -140,10 +141,16 @@
 				<h1 class="text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tight">{m.feature_contacts_title()}</h1>
 				<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{m.feature_contacts_description()}</p>
 			</div>
-			<Button href="/contacts/new" class="w-full md:w-auto shadow-sm">
-				<Plus class="w-4 h-4 mr-2" />
-				{m.new_item({ item: m.contact() })}
-			</Button>
+			<div class="flex items-center gap-3 w-full md:w-auto">
+				<Button variant="outline" href="/contacts/obfuscations" class="w-full md:w-auto shadow-sm border-rose-200 text-rose-700 hover:bg-rose-50">
+					<UserX class="w-4 h-4 mr-2 text-rose-600" />
+					DSGVO Obfuskierung
+				</Button>
+				<Button href="/contacts/new" class="w-full md:w-auto shadow-sm">
+					<Plus class="w-4 h-4 mr-2" />
+					{m.new_item({ item: m.contact() })}
+				</Button>
+			</div>
 		</div>
 
 		<!-- Action Bar -->

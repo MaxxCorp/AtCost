@@ -15,6 +15,7 @@ import { recipe, recipeConsumable, recipeTag } from "./recipes";
 import { price, priceItem, eventPrice } from "./prices";
 import { payrollRun, payrollProfile, payslip } from "./payroll";
 import { hmo } from "./hmos";
+import { gdprRequest } from "./gdpr";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -60,6 +61,11 @@ export const contactRelations = relations(contact, ({ many, one }) => ({
     relatedTo: many(contactRelation, { relationName: 'toRelations' }),
     tags: many(contactTag),
     talents: many(talent),
+    gdprRequests: many(gdprRequest),
+}));
+
+export const gdprRequestRelations = relations(gdprRequest, ({ one }) => ({
+    contact: one(contact, { fields: [gdprRequest.contactId], references: [contact.id] }),
 }));
 
 export const contactEmailRelations = relations(contactEmail, ({ one }) => ({

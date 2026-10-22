@@ -58,6 +58,15 @@ export const DEFAULT_TASK_TYPE_CONFIGS: Array<Omit<TaskTypeConfig, 'id' | 'creat
         isEnabled: true,
         autoPromptDifferentialUpdate: false,
     },
+    {
+        taskType: 'gdpr_obfuscation',
+        name: 'DSGVO Selbstauskunft & Anonymisierung',
+        description: 'Antrag auf Löschung / Anonymisierung personenbezogener Daten (Art. 17 DSGVO).',
+        leadTimeDays: 30,
+        targetRoles: ['admin', 'hr_manager', 'top_management'],
+        isEnabled: true,
+        autoPromptDifferentialUpdate: false,
+    },
 ];
 
 export const DEFAULT_STUFENLAUFZEIT_MAP: Record<number, number> = {

@@ -1385,7 +1385,7 @@
                                                 <div class="mt-1.5 pt-1.5 border-t border-slate-200/70 flex items-start gap-1.5 text-[10.5px] text-slate-700">
                                                     <Clock class="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                                                     <div class="leading-tight whitespace-pre-line font-medium">
-                                                        <span class="font-bold text-slate-900">{m.opening_hours?.() || 'Öffnungszeiten'}:</span> {formatOpeningHours(currentLocation.openingHours)}
+                                                        {formatOpeningHours(currentLocation.openingHours)}
                                                     </div>
                                                 </div>
                                             {/if}

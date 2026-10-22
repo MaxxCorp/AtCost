@@ -3,6 +3,7 @@ export * from "./db.js";
 export * from "./reporting-line.js";
 export * from "./locations.js";
 export * from "./contacts.js";
+export * from "./gdpr.js";
 
 // Re-export all common Drizzle helpers and types for convenience
 export { 

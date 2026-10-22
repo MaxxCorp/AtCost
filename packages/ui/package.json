@@ -11,6 +11,7 @@
             "default": "./src/index.ts"
         },
         "./components/*.svelte": "./src/components/*.svelte",
+        "./components/gdpr/*.svelte": "./src/components/gdpr/*.svelte",
         "./components/forms/*.svelte": "./src/components/forms/*.svelte",
         "./components/forms/ContactForm.svelte": "./src/components/forms/ContactForm.svelte",
         "./components/forms/LocationForm.svelte": "./src/components/forms/LocationForm.svelte",

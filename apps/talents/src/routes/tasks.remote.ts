@@ -1,12 +1,13 @@
 import { query, form, command } from '$app/server';
-import { db, task, getSubordinateTree, getDirectReports, eq, and, or, desc, asc, inArray, isNull } from '@ac/db';
+import { db, task, getSubordinateTree, getDirectReports, eq, and, or, desc, asc, inArray, isNull, obfuscateContact } from '@ac/db';
 import { getAuthenticatedUser, getOptionalUser, parseRoles } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { getMyTalentIdCore } from '#lib/server/timesheets/service.js';
 import {
     updateTaskTypeConfigSchema,
     issueDifferentialContractUpdateSchema,
-    triggerMilestoneCheckSchema
+    triggerMilestoneCheckSchema,
+    executeObfuscationSchema
 } from '@ac/validations';
 import {
     getOrSeedTaskTypeConfigs,
@@ -37,6 +38,7 @@ export const listTasks = query(v.undefined_(), async (): Promise<{
                     eq(task.type, 'condition_update_approval'),
                     eq(task.type, 'experience_step_increase'),
                     eq(task.type, 'tenure_anniversary'),
+                    eq(task.type, 'gdpr_obfuscation'),
                     isNull(task.assigneeId)
                 )
             ),
@@ -97,6 +99,7 @@ export const listCompletedTasks = query(v.undefined_(), async (): Promise<any[]>
         conditions.push(eq(task.type, 'condition_update_approval'));
         conditions.push(eq(task.type, 'experience_step_increase'));
         conditions.push(eq(task.type, 'tenure_anniversary'));
+        conditions.push(eq(task.type, 'gdpr_obfuscation'));
         conditions.push(isNull(task.assigneeId));
     }
 
@@ -213,6 +216,22 @@ export const issueDifferentialContractUpdate = form(issueDifferentialContractUpd
         userId: user.id,
         userName: user.name || user.email || 'Management User',
     });
+
+    void listTasks().refresh();
+    void listCompletedTasks().refresh();
+
+    return result;
+});
+
+export const executeGdprObfuscationTask = command(executeObfuscationSchema, async (data) => {
+    const user = getAuthenticatedUser();
+    const roles = parseRoles(user);
+    const isAuthorized = roles.includes('admin') || roles.includes('hr_manager') || roles.includes('top_management');
+    if (!isAuthorized) {
+        throw new Error('Forbidden: Only Admins, HR Managers and Top Management can execute GDPR obfuscation.');
+    }
+
+    const result = await obfuscateContact(data.contactId, user.id, data.notes);
 
     void listTasks().refresh();
     void listCompletedTasks().refresh();

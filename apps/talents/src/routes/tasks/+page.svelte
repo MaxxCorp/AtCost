@@ -48,22 +48,32 @@
             </p>
         </div>
         
-        <!-- Status Switcher -->
-        <div class="flex bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200/80 shadow-inner">
-            <button 
-                type="button"
-                onclick={() => showCompleted = false}
-                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 {!showCompleted ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}"
+        <div class="flex items-center gap-3 flex-wrap">
+            <a 
+                href="/contacts/obfuscations"
+                class="px-5 py-2.5 rounded-2xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm"
             >
-                Offen ({totalPendingCount})
-            </button>
-            <button 
-                type="button"
-                onclick={() => showCompleted = true}
-                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 {showCompleted ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}"
-            >
-                Erledigt ({completedCount})
-            </button>
+                <ShieldAlert class="w-4 h-4 text-rose-600" />
+                DSGVO Obfuskierungen
+            </a>
+
+            <!-- Status Switcher -->
+            <div class="flex bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200/80 shadow-inner">
+                <button 
+                    type="button"
+                    onclick={() => showCompleted = false}
+                    class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 {!showCompleted ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}"
+                >
+                    Offen ({totalPendingCount})
+                </button>
+                <button 
+                    type="button"
+                    onclick={() => showCompleted = true}
+                    class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 {showCompleted ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}"
+                >
+                    Erledigt ({completedCount})
+                </button>
+            </div>
         </div>
     </header>
 
