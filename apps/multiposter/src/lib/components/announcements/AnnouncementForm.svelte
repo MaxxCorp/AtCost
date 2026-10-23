@@ -58,9 +58,10 @@
     } from "@ac/validations";
     import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { onMount, untrack } from "svelte";
-    import { MapPin, User } from "@lucide/svelte";
+    import { MapPin, User, Folder } from "@lucide/svelte";
 
     import RichTextEditor from "#lib/components/cms/RichTextEditor.svelte";
+    import EmbeddedFileManager from "#lib/components/files/EmbeddedFileManager.svelte";
     import { FieldCollaboratorBadge, type CollaborationRoom } from "#lib/client/collaboration/index.js";
 
     let {
@@ -115,6 +116,8 @@
     let isPublic = $state(untrack(() => initialData?.isPublic ?? false));
     // svelte-ignore state_referenced_locally
     let selectedLocationIds = $state<string[]>(untrack(() => initialData?.locationIds || []));
+    // svelte-ignore state_referenced_locally
+    let selectedFileIds = $state<string[]>(untrack(() => initialData?.fileIds || []));
 
 
 
@@ -586,6 +589,28 @@
                 </EntityManager>
             {/key}
     </div>
+
+        <div class="bg-white shadow rounded-lg p-6 space-y-4">
+            <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+                <Folder size={18} class="text-blue-600" />
+                {m.feature_files_title?.() || 'Files & Documents'}
+            </h3>
+            {#key initialData?.id || "new"}
+                <EmbeddedFileManager
+                    type="announcement"
+                    entityId={initialData?.id}
+                    initialItems={initialData?.files || []}
+                    onchange={(ids: string[]) => (selectedFileIds = ids)}
+                />
+            {/key}
+            <input
+                {...rf.fields.fileIds.as(
+                    "text",
+                    JSON.stringify(selectedFileIds),
+                )}
+                class="hidden"
+            />
+        </div>
 
         <SyncCheckboxBlock
             syncFieldConfig={rf.fields.syncIds}

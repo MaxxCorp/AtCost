@@ -70,6 +70,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
+				files: { with: { file: true } },
 				prices: {
 					with: {
 						price: {
@@ -108,6 +109,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 					contactRoles: { with: { role: true } },
 					tags: { with: { tag: true } },
 					campaign: true,
+					files: { with: { file: true } },
 					prices: {
 						with: {
 							price: {
@@ -180,6 +182,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
+				files: { with: { file: true } },
 				prices: {
 					with: {
 						price: {
@@ -461,6 +464,14 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		contacts: allContacts,
 		prices: eventPrices,
 		priceIds: (result.prices || []).map((p: any) => p.priceId),
+		files: (result.files || []).map((ef: any) => ef.file).filter(Boolean).map((f: any) => ({
+			...f,
+			createdAt: toIsoSafe(f.createdAt),
+			updatedAt: toIsoSafe(f.updatedAt),
+			lastSyncedAt: toIsoSafe(f.lastSyncedAt),
+			remoteChildren: Array.isArray(f.metadata?.remoteChildren) ? f.metadata.remoteChildren : undefined,
+		})),
+		fileIds: (result.files || []).map((ef: any) => ef.fileId),
 		rooms: getEventRooms({ locations: allLocations, resources: allResources }),
 		resourceIds: result.resources.map((r: any) => r.resourceId),
 		contactIds: result.contacts.map((c: any) => c.contactId),

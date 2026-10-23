@@ -47,6 +47,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 				}
 			},
 			tags: { with: { tag: true } },
+			files: { with: { file: true } },
 			campaign: true,
 		}
 	});
@@ -143,6 +144,14 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         contactIds: result.contacts.map(c => c.contactId),
         locationIds: result.locations.map(l => l.locationId),
         locations: result.locations.map(l => l.location),
+        files: (result.files || []).map((af: any) => af.file).filter(Boolean).map((f: any) => ({
+            ...f,
+            createdAt: f.createdAt instanceof Date ? f.createdAt.toISOString() : String(f.createdAt),
+            updatedAt: f.updatedAt instanceof Date ? f.updatedAt.toISOString() : String(f.updatedAt),
+            lastSyncedAt: f.lastSyncedAt instanceof Date ? f.lastSyncedAt.toISOString() : (f.lastSyncedAt ? String(f.lastSyncedAt) : null),
+            remoteChildren: Array.isArray(f.metadata?.remoteChildren) ? f.metadata.remoteChildren : undefined,
+        })),
+        fileIds: (result.files || []).map((af: any) => af.fileId),
         syncIds: getCampaignTargetIds(result.campaign?.content),
         resolvedContact,
     } as any;

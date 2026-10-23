@@ -55,6 +55,8 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	priceIds?: string[];
 	priceLists?: any[];
 	priceListIds?: string[];
+	files?: any[];
+	fileIds?: string[];
 };
 
 

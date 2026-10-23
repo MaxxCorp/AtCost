@@ -1079,6 +1079,9 @@
 	"sync_logic_and_both": "UND (Muss beides erfüllen)",
 	"sync_logic_or_either": "ODER (Eines genügt)",
 	"sync_logic_role_and_tag": "UND (Rolle UND Tag)",
-	"sync_logic_role_or_tag": "ODER (Rolle ODER Tag)"
+	"sync_logic_role_or_tag": "ODER (Rolle ODER Tag)",
+	"feature_files_title": "Dateien & Dokumente",
+	"feature_files_description": "Verwalten Sie Veranstaltungs- und Ankündigungsdateien in Teams, SharePoint und OneDrive.",
+	"feature_files_button": "Dateien verwalten"
 }
 

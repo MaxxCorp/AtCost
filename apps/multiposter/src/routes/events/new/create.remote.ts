@@ -1,7 +1,7 @@
 import { form, getRequestEvent } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, eventFile, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, sql, inArray } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -9,6 +9,7 @@ import { createEventSchema } from '#lib/validations/events.js';
 import { generateEventAssets } from '#lib/server/events/assets.js';
 import { publishEventChange } from '#lib/server/realtime.js';
 import { syncService } from '#lib/server/sync/service.js';
+import { fileStorageService } from '#lib/server/files/index.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '#lib/server/cache/index.js';
@@ -283,6 +284,22 @@ export const createEvent = form(createEventSchema, async (data) => {
 				}));
 				await db.insert(eventPrice).values(associations);
 			}
+
+			// Files
+			const rawFileIds = data.fileIds;
+			let fileIds: string[] = [];
+			if (typeof rawFileIds === 'string') {
+				try { fileIds = JSON.parse(rawFileIds); } catch { fileIds = []; }
+			} else if (Array.isArray(rawFileIds)) {
+				fileIds = rawFileIds;
+			}
+			if (fileIds.length > 0) {
+				const associations = fileIds.map((fileId: string) => ({
+					eventId: targetEventId,
+					fileId,
+				}));
+				await db.insert(eventFile).values(associations).onConflictDoNothing();
+			}
 		};
 
 		// Link associations for master event
@@ -306,6 +323,16 @@ export const createEvent = form(createEventSchema, async (data) => {
 			await syncService.syncItems(user.id, [newEvent.id], 'event');
 		} catch (err) {
 			console.error('[Create Remote] Sync error:', err);
+		}
+
+		try {
+			await fileStorageService.ensureAndSyncEntityFolder({
+				type: 'event',
+				entityId: newEvent.id,
+				userId: user.id
+			});
+		} catch (err) {
+			console.warn('[Create Remote] File folder sync warning:', err);
 		}
 
 		await invalidateEvent([newEvent.id]);

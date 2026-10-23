@@ -16,6 +16,8 @@
         RefreshCw,
         Info,
         Ticket,
+        Folder,
+        ExternalLink,
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
@@ -273,6 +275,44 @@
                                 </div>
                             </div>
                         {/if}
+                    </div>
+                </div>
+            {/if}
+
+            {#if event.files && event.files.length > 0}
+                <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <Folder class="w-6 h-6 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div class="min-w-0 flex-1">
+                        <h3 class="font-semibold text-gray-900 text-sm">
+                            {m.feature_files_title?.() || "Files & Documents"}
+                        </h3>
+                        <div class="mt-2 space-y-1.5">
+                            {#each event.files as file (file.id || file.name)}
+                                {@const href = file.webUrl || file.targetUrl}
+                                <div class="flex items-center justify-between gap-2 text-sm">
+                                    <div class="flex items-center gap-1.5 min-w-0">
+                                        {#if href}
+                                            <a
+                                                {href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="text-blue-600 hover:text-blue-800 hover:underline font-medium truncate inline-flex items-center gap-1"
+                                            >
+                                                <span class="truncate">{file.name}</span>
+                                                <ExternalLink class="w-3.5 h-3.5 flex-shrink-0" />
+                                            </a>
+                                        {:else}
+                                            <span class="text-gray-800 font-medium truncate">{file.name}</span>
+                                        {/if}
+                                        {#if file.isShortcut}
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 flex-shrink-0">
+                                                Shortcut
+                                            </span>
+                                        {/if}
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
                     </div>
                 </div>
             {/if}

@@ -54,6 +54,8 @@ export interface VirtualInstanceDiffInput {
 		submittedSyncIds?: string[];
 		masterPriceIds?: string[];
 		submittedPriceIds?: string[];
+		masterFileIds?: string[];
+		submittedFileIds?: string[];
 	};
 }
 
@@ -122,6 +124,8 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			submittedSyncIds,
 			masterPriceIds,
 			submittedPriceIds,
+			masterFileIds,
+			submittedFileIds,
 		} = associations;
 
 		if (submittedLocationIds !== undefined && masterLocationIds !== undefined) {
@@ -170,12 +174,18 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 			const sSet = new Set(submittedPriceIds);
 			if (mSet.size !== sSet.size || [...mSet].some(id => !sSet.has(id))) return true;
 		}
+
+		if (submittedFileIds !== undefined && masterFileIds !== undefined) {
+			const mSet = new Set(masterFileIds);
+			const sSet = new Set(submittedFileIds);
+			if (mSet.size !== sSet.size || [...mSet].some(id => !sSet.has(id))) return true;
+		}
 	}
 
 	return false;
 }
 
-import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventPrice, eq, and, or, sql } from '@ac/db';
+import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventPrice, eventFile, eq, and, or, sql } from '@ac/db';
 import { parseVirtualInstanceId } from '#lib/utils/event-series.js';
 
 /**
@@ -291,6 +301,13 @@ export async function resolveEventIdForAssociations(
 	if (masterPrices.length > 0) {
 		await db.insert(eventPrice).values(
 			masterPrices.map(p => ({ eventId: created.id, priceId: p.priceId }))
+		);
+	}
+
+	const masterFiles = await db.select().from(eventFile).where(eq(eventFile.eventId, masterId));
+	if (masterFiles.length > 0) {
+		await db.insert(eventFile).values(
+			masterFiles.map(f => ({ eventId: created.id, fileId: f.fileId }))
 		);
 	}
 

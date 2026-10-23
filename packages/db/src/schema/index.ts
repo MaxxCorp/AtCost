@@ -17,4 +17,5 @@ export * from "./payroll";
 export * from "./conditions";
 export * from "./hmos";
 export * from "./gdpr";
+export * from "./files";
 

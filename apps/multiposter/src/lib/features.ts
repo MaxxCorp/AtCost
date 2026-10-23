@@ -185,6 +185,20 @@ export const FEATURES: readonly FeatureMeta[] = [
     borderClass: 'border-purple-100',
     buttonClass: 'bg-purple-600 hover:bg-purple-700',
     order: 12
+  },
+  {
+    key: 'files',
+    title: () => m.feature_files_title?.() || 'Files & Documents',
+    description: () => m.feature_files_description?.() || 'Manage event & announcement files in Teams, SharePoint, and OneDrive.',
+    href: '/files',
+    buttonText: () => m.feature_files_button?.() || 'Manage Files',
+    claim: 'files',
+    icon: 'folder',
+    gradientFrom: 'from-sky-50',
+    gradientTo: 'to-blue-50',
+    borderClass: 'border-sky-100',
+    buttonClass: 'bg-sky-600 hover:bg-sky-700',
+    order: 13
   }
 ] as const;
 

@@ -12,6 +12,8 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
     syncIds?: string[];
     contactIds?: string[];
     locationIds?: string[];
+    files?: any[];
+    fileIds?: string[];
     locations?: {
         id: string;
         name: string;

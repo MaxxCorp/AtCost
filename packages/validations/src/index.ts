@@ -23,3 +23,4 @@ export * from './conditions.js';
 export * from './tasks.js';
 export * from './hmos.js';
 export * from './gdpr.js';
+export * from './files.js';

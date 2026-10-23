@@ -1,6 +1,6 @@
 import type { UserWithRolesAndClaims } from './auth.d';
 
-export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements' | 'talents' | 'consumables' | 'recipes' | 'prices' | 'tags';
+export type Feature = 'synchronizations' | 'events' | 'campaigns' | 'locations' | 'resources' | 'users' | 'contacts' | 'kiosks' | 'announcements' | 'talents' | 'consumables' | 'recipes' | 'prices' | 'tags' | 'files';
 
 export function parseRoles(user: UserWithRolesAndClaims): string[] {
 	const raw = user?.roles;
@@ -46,9 +46,9 @@ export function hasAccess(user: UserWithRolesAndClaims | null | undefined, featu
 
 	let claimValue = claims[feature] ?? claims[`multiposter.${feature}`];
 
-	// Consumables, recipes, and prices fall back to events access if not explicitly defined
-	if (claimValue === undefined && (feature === 'consumables' || feature === 'recipes' || feature === 'prices')) {
-		claimValue = claims['events'] ?? claims['multiposter.events'];
+	// Consumables, recipes, prices, and files fall back to events/announcements access if not explicitly defined
+	if (claimValue === undefined && (feature === 'consumables' || feature === 'recipes' || feature === 'prices' || feature === 'files')) {
+		claimValue = claims['events'] ?? claims['multiposter.events'] ?? claims['announcements'] ?? claims['multiposter.announcements'];
 	}
 
 	// Tags feature: allow if explicit claim exists, or default to any authenticated user with access to any tag-using feature

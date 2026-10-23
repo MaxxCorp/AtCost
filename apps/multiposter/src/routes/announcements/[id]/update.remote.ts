@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '@ac/db';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, announcementFile, campaign } from '@ac/db';
 import { updateAnnouncementSchema } from '#lib/validations/announcements.js';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { publishAnnouncementChange } from '#lib/server/realtime.js';
@@ -8,6 +8,7 @@ import { listAnnouncements } from '../list.remote';
 import { readAnnouncement } from './read.remote';
 import { eq } from '@ac/db';
 import { syncService } from '#lib/server/sync/service.js';
+import { fileStorageService } from '#lib/server/files/index.js';
 import { type Announcement, createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 import { invalidateAnnouncement } from '#lib/server/cache/index.js';
 
@@ -173,6 +174,23 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
                 }
             }
 
+            // Update Files if provided
+            if (input.fileIds !== undefined) {
+                let fileIds: string[] = [];
+                if (input.fileIds) {
+                    fileIds = typeof input.fileIds === 'string' ? JSON.parse(input.fileIds) : input.fileIds;
+                }
+                await tx.delete(announcementFile).where(eq(announcementFile.announcementId, announcementId));
+                if (fileIds.length > 0) {
+                    await tx.insert(announcementFile).values(
+                        fileIds.map(fileId => ({
+                            announcementId: announcementId,
+                            fileId: fileId
+                        }))
+                    ).onConflictDoNothing();
+                }
+            }
+
             return { updatedAnnouncement, finalTags };
         });
 
@@ -193,6 +211,16 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
 
         // Trigger background sync to external providers
         await syncService.triggerPushSync(user.id, announcementId, 'announcement');
+
+        try {
+            await fileStorageService.ensureAndSyncEntityFolder({
+                type: 'announcement',
+                entityId: announcementId,
+                userId: user.id
+            });
+        } catch (err) {
+            console.warn('[Update Announcement] File folder sync warning:', err);
+        }
 
         return {
             success: true,

@@ -1,11 +1,12 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign, syncConfig } from '@ac/db';
+import { announcement, announcementTag, announcementContact, tag, announcementLocation, announcementFile, campaign, syncConfig } from '@ac/db';
 import { createAnnouncementSchema } from '#lib/validations/announcements.js';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { publishAnnouncementChange } from '#lib/server/realtime.js';
 import { listAnnouncements } from '../list.remote';
 import { syncService } from '#lib/server/sync/service.js';
+import { fileStorageService } from '#lib/server/files/index.js';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 import { eq, and, sql } from '@ac/db';
 import { invalidateAnnouncement } from '#lib/server/cache/index.js';
@@ -146,6 +147,20 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
                     }))
                 );
             }
+
+            // Insert Files
+            let fileIds: string[] = [];
+            if (input.fileIds) {
+                fileIds = typeof input.fileIds === 'string' ? JSON.parse(input.fileIds) : input.fileIds;
+            }
+            if (fileIds.length > 0) {
+                await tx.insert(announcementFile).values(
+                    fileIds.map(fileId => ({
+                        announcementId: announcementId,
+                        fileId: fileId
+                    }))
+                ).onConflictDoNothing();
+            }
         });
 
         // Notify listeners
@@ -157,6 +172,16 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
 
         // Trigger background sync to external providers
         await syncService.triggerPushSync(user.id, announcementId, 'announcement');
+
+        try {
+            await fileStorageService.ensureAndSyncEntityFolder({
+                type: 'announcement',
+                entityId: announcementId,
+                userId: user.id
+            });
+        } catch (err) {
+            console.warn('[Create Announcement] File folder sync warning:', err);
+        }
 
         return {
             success: true,

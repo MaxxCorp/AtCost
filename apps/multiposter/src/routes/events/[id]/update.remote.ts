@@ -1,6 +1,6 @@
 import { form, getRequestEvent } from '$app/server';
 import { db } from '@ac/db';
-import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
+import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, eventFile, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { readEvent } from './read.remote';
@@ -10,6 +10,7 @@ import { error } from '@sveltejs/kit';
 import { generateEventAssets } from '#lib/server/events/assets.js';
 import { publishEventChange } from '#lib/server/realtime.js';
 import { syncService } from '#lib/server/sync/service.js';
+import { fileStorageService } from '#lib/server/files/index.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '#lib/server/cache/index.js';
@@ -144,6 +145,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		const resourceIds = data.resourceIds ? (typeof data.resourceIds === 'string' ? JSON.parse(data.resourceIds) : data.resourceIds) : undefined;
 		const contactIds = data.contactIds ? (typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds) : undefined;
 		const priceIds = data.priceIds ? (typeof data.priceIds === 'string' ? JSON.parse(data.priceIds) : data.priceIds) : undefined;
+		const fileIds = data.fileIds ? (typeof data.fileIds === 'string' ? JSON.parse(data.fileIds) : data.fileIds) : undefined;
 
 		let tagNames: string[] | undefined = undefined;
 		if (data.tags !== undefined) {
@@ -228,6 +230,12 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							masterPriceIds = masterPrices.map(m => m.id);
 						}
 
+						let masterFileIds: string[] | undefined;
+						if (fileIds !== undefined) {
+							const masterFiles = await tx.select({ id: eventFile.fileId }).from(eventFile).where(eq(eventFile.eventId, instMasterId));
+							masterFileIds = masterFiles.map(f => f.id);
+						}
+
 						const hasChanges = hasVirtualInstanceChanged({
 							master,
 							submitted: {
@@ -264,6 +272,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								submittedSyncIds,
 								masterPriceIds,
 								submittedPriceIds: priceIds,
+								masterFileIds,
+								submittedFileIds: fileIds,
 							}
 						});
 
@@ -527,6 +537,23 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						);
 					}
 				}
+
+				// Files
+				if (fileIds !== undefined) {
+					await client.delete(eventFile).where(eq(eventFile.eventId, targetEventId));
+					if (fileIds.length > 0) {
+						await client.insert(eventFile).values(
+							fileIds.map((id: string) => ({ eventId: targetEventId, fileId: id }))
+						).onConflictDoNothing();
+					}
+				} else if (isNewException && instMasterId) {
+					const masterFiles = await client.select().from(eventFile).where(eq(eventFile.eventId, instMasterId));
+					if (masterFiles.length > 0) {
+						await client.insert(eventFile).values(
+							masterFiles.map((f: any) => ({ eventId: targetEventId, fileId: f.fileId }))
+						).onConflictDoNothing();
+					}
+				}
 			};
 
 			// Update Associations for Target Event
@@ -580,6 +607,16 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			await syncService.syncItems(user.id, [effectiveTargetId], 'event');
 		} catch (err) {
 			console.error('[Update Remote] Sync error:', err);
+		}
+
+		try {
+			await fileStorageService.ensureAndSyncEntityFolder({
+				type: 'event',
+				entityId: effectiveTargetId,
+				userId: user.id
+			});
+		} catch (err) {
+			console.warn('[Update Remote] File folder sync warning:', err);
 		}
 
 		// Refresh caches

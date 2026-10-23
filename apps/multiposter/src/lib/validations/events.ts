@@ -60,6 +60,7 @@ export const eventBaseSchema = v.object({
 	heroImage: v.optional(v.string()),
 	participantsCount: v.optional(v.union([v.number(), v.string()])),
 	priceIds: v.optional(v.union([v.array(v.string()), v.string()])),
+	fileIds: v.optional(v.union([v.array(v.string()), v.string()])),
 });
 
 /**

@@ -56,5 +56,9 @@ export const ICONS = {
   receipt: {
     path: 'M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1zM8 7h8M8 11h8M8 15h5',
     strokeWidth: 2
+  } satisfies IconDef,
+  folder: {
+    path: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z',
+    strokeWidth: 2
   } satisfies IconDef
 } as const;

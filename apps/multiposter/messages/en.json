@@ -1079,6 +1079,9 @@
 	"sync_logic_and_both": "AND (Must match both)",
 	"sync_logic_or_either": "OR (Match either)",
 	"sync_logic_role_and_tag": "AND (Role AND Tag)",
-	"sync_logic_role_or_tag": "OR (Role OR Tag)"
+	"sync_logic_role_or_tag": "OR (Role OR Tag)",
+	"feature_files_title": "Files & Documents",
+	"feature_files_description": "Manage event and announcement files in Teams, SharePoint, and OneDrive.",
+	"feature_files_button": "Manage Files"
 }
 

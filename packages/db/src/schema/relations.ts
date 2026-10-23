@@ -16,6 +16,7 @@ import { price, priceItem, eventPrice } from "./prices";
 import { payrollRun, payrollProfile, payslip } from "./payroll";
 import { hmo } from "./hmos";
 import { gdprRequest } from "./gdpr";
+import { file, eventFile, announcementFile, entityFileFolder } from "./files";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -36,6 +37,7 @@ export const userRelations = relations(user, ({ many }) => ({
     consumables: many(consumable),
     recipes: many(recipe),
     prices: many(price),
+    files: many(file),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -112,6 +114,7 @@ export const eventRelations = relations(event, ({ many, one }) => ({
     locations: many(eventLocation),
     tags: many(eventTag),
     prices: many(eventPrice),
+    files: many(eventFile),
     series: one(recurringSeries, { fields: [event.seriesId], references: [recurringSeries.id] }),
     user: one(user, { fields: [event.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [event.campaignId], references: [campaign.id] }),
@@ -138,6 +141,7 @@ export const announcementRelations = relations(announcement, ({ many, one }) => 
     locations: many(announcementLocation),
     contacts: many(announcementContact),
     tags: many(announcementTag),
+    files: many(announcementFile),
     user: one(user, { fields: [announcement.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [announcement.campaignId], references: [campaign.id] }),
 }));
@@ -253,6 +257,7 @@ export const syncMappingRelations = relations(syncMapping, ({ one }) => ({
     tag: one(tag, { fields: [syncMapping.tagId], references: [tag.id] }),
     resource: one(resource, { fields: [syncMapping.resourceId], references: [resource.id] }),
     shiftPlan: one(shiftPlan, { fields: [syncMapping.shiftPlanId], references: [shiftPlan.id] }),
+    file: one(file, { fields: [syncMapping.fileId], references: [file.id] }),
 }));
 
 export const webhookSubscriptionRelations = relations(webhookSubscription, ({ one }) => ({
@@ -458,6 +463,28 @@ export const payslipRelations = relations(payslip, ({ one }) => ({
     payrollRun: one(payrollRun, { fields: [payslip.payrollRunId], references: [payrollRun.id] }),
     talent: one(talent, { fields: [payslip.talentId], references: [talent.id] }),
     contract: one(contract, { fields: [payslip.contractId], references: [contract.id] }),
+}));
+
+export const fileRelations = relations(file, ({ one, many }) => ({
+    user: one(user, { fields: [file.userId], references: [user.id] }),
+    syncConfig: one(syncConfig, { fields: [file.syncConfigId], references: [syncConfig.id] }),
+    events: many(eventFile),
+    announcements: many(announcementFile),
+    mappings: many(syncMapping),
+}));
+
+export const eventFileRelations = relations(eventFile, ({ one }) => ({
+    event: one(event, { fields: [eventFile.eventId], references: [event.id] }),
+    file: one(file, { fields: [eventFile.fileId], references: [file.id] }),
+}));
+
+export const announcementFileRelations = relations(announcementFile, ({ one }) => ({
+    announcement: one(announcement, { fields: [announcementFile.announcementId], references: [announcement.id] }),
+    file: one(file, { fields: [announcementFile.fileId], references: [file.id] }),
+}));
+
+export const entityFileFolderRelations = relations(entityFileFolder, ({ one }) => ({
+    syncConfig: one(syncConfig, { fields: [entityFileFolder.syncConfigId], references: [syncConfig.id] }),
 }));
 
 

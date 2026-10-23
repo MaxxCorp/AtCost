@@ -69,6 +69,7 @@
     } from "#lib/filters/index.js";
     import RichTextEditor from "#lib/components/cms/RichTextEditor.svelte";
     import ImageUploader from "#lib/components/cms/ImageUploader.svelte";
+    import EmbeddedFileManager from "#lib/components/files/EmbeddedFileManager.svelte";
     import RecurrenceDialog from "#lib/components/events/RecurrenceDialog.svelte";
     import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
     import EventRoleManagerModal from "#lib/components/events/EventRoleManagerModal.svelte";
@@ -94,6 +95,7 @@
         Calculator,
         Globe,
         X,
+        Folder,
     } from "@lucide/svelte";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -2162,6 +2164,30 @@
                 </div>
             </div>
         {/if}
+    </div>
+
+    <div class="pt-4 border-t border-gray-100">
+        <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
+            <Folder size={18} class="text-blue-600" />
+            {m.feature_files_title?.() || 'Files & Documents'} ({m.optional?.() || 'optional'})
+        </h3>
+        {#key initialData?.id || "new"}
+            <EmbeddedFileManager
+                type="event"
+                entityId={initialData?.id}
+                initialItems={initialData?.files || []}
+                onchange={(ids: string[]) => {
+                    rf.fields.fileIds.set(JSON.stringify(ids));
+                }}
+            />
+        {/key}
+        <input
+            {...rf.fields.fileIds.as(
+                "text",
+                JSON.stringify(initialData?.fileIds || []),
+            )}
+            class="hidden"
+        />
     </div>
 
     <SyncCheckboxBlock
