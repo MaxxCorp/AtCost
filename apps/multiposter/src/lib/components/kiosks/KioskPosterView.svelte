@@ -1491,6 +1491,7 @@
                         {@const cancelledCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'cancelled').length : 0}
                         {@const tentativeCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'tentative').length : 0}
                         {@const totalInstances = evt.seriesInstances ? evt.seriesInstances.length : (evt.seriesDates ? evt.seriesDates.length : 1)}
+                        {@const itemRecurrenceRule = isEvt ? ((Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null) : null}
 
                         <!-- Single Programme Entry (Avoid breaking inside columns - Highlight for Non-Repeating One-Offs) -->
                         <div class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60'}">
@@ -1635,10 +1636,10 @@
                                         {/if}
 
                                         <!-- Recurrence text for unrolled series -->
-                                        {#if !isCompressed && isEvt && (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
+                                        {#if !isCompressed && isEvt && itemRecurrenceRule}
                                             <span class="inline-flex items-center gap-1 text-slate-600 font-medium text-[9px]">
                                                 <RefreshCw class="w-2.5 h-2.5 text-slate-500" />
-                                                {formatRecurrenceText((item as any).recurrence, undefined, { omitLength: true })}
+                                                {formatRecurrenceText(itemRecurrenceRule, undefined, { omitLength: true })}
                                             </span>
                                         {/if}
                                     </div>

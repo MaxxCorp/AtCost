@@ -1193,6 +1193,7 @@
 
 {#snippet renderEventRow(event: EnrichedEvent)}
     {@const eventRooms = getEventRooms(event)}
+    {@const eventRecurrenceRule = (Array.isArray((event as any).recurrence) ? (event as any).recurrence[0] : typeof (event as any).recurrence === 'string' ? (event as any).recurrence : null) || (event as any).seriesMaster?.recurrence?.[0] || null}
     {@const displayPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
     {@const isSpecialNonSeries = isNonSeriesEvent(event)}
     {@const isCompressed = Boolean(event.isCompressedSeries && ((event.seriesInstances && event.seriesInstances.length >= 1) || (event.seriesDates && event.seriesDates.length >= 1)))}
@@ -1433,10 +1434,10 @@
                 {/if}
 
                 <!-- Recurrence text for unrolled series item -->
-                {#if !isCompressed && (event as any).recurrence && ((event as any).recurrence as string[]).length > 0}
+                {#if !isCompressed && eventRecurrenceRule}
                     <span class="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-medium">
                         <RefreshCw class="w-3 h-3 text-slate-500" />
-                        {formatRecurrenceText((event as any).recurrence, undefined, { omitLength: true })}
+                        {formatRecurrenceText(eventRecurrenceRule, undefined, { omitLength: true })}
                     </span>
                 {/if}
 

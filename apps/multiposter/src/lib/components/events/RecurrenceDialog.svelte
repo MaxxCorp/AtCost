@@ -4,7 +4,6 @@
     import { RRule, Frequency } from "#lib/utils/rrule-compat.js";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { RefreshCw } from "@lucide/svelte";
-    import { createEventDispatcher } from "svelte";
     import * as m from "#lib/paraglide/messages.js";
 
     let { 
@@ -28,7 +27,7 @@
     let byweekday = $state<number[]>([]); // Mon=0, Sun=6
     let monthlyType = $state("day"); // day, relative
     let bymonthday = $state(1);
-    let bysetpos = $state(1); // 1st, 2nd, 3rd, 4th, last (-1)
+    let bysetpos = $state<number[]>([1]); // 1st, 2nd, 3rd, 4th, last (-1)
     let relativeDay = $state(0); // 0=Mon, 6=Sun, 7=Day, 8=Weekday, 9=Weekend Day
     let yearlyType = $state("day"); // day, relative
     let bymonth = $state(1); // 1-12
@@ -119,10 +118,44 @@
                     yearlyType = "day";
                 }
 
-                if (rule.options.bysetpos) {
-                    bysetpos = Array.isArray(rule.options.bysetpos)
-                        ? rule.options.bysetpos[0]
-                        : rule.options.bysetpos;
+                if (
+                    rule.options.bysetpos &&
+                    (!Array.isArray(rule.options.bysetpos) || rule.options.bysetpos.length > 0)
+                ) {
+                    const rawPos = Array.isArray(rule.options.bysetpos)
+                        ? rule.options.bysetpos
+                        : [rule.options.bysetpos];
+                    bysetpos = rawPos.length > 0 ? rawPos : [1];
+                    monthlyType = "relative";
+                    yearlyType = "relative";
+                } else if (
+                    (freq === RRule.MONTHLY || freq === RRule.YEARLY) &&
+                    ((rule.options as any).bynweekday?.length > 0 ||
+                        (Array.isArray(rule.origOptions?.byweekday)
+                            ? rule.origOptions.byweekday.some(
+                                  (d: any) => d && typeof d === "object" && "n" in d && d.n
+                              )
+                            : (rule.origOptions?.byweekday as any)?.n))
+                ) {
+                    const bynweekday = (rule.options as any).bynweekday as
+                        | [number, number][]
+                        | undefined;
+                    if (bynweekday && bynweekday.length > 0) {
+                        bysetpos = bynweekday.map((entry) => entry[1]);
+                        relativeDay = bynweekday[0][0];
+                    } else {
+                        const origDays = Array.isArray(rule.origOptions?.byweekday)
+                            ? rule.origOptions.byweekday
+                            : [rule.origOptions?.byweekday];
+                        const extractedPos = origDays
+                            .map((d: any) => d?.n)
+                            .filter((n: any): n is number => typeof n === "number");
+                        bysetpos = extractedPos.length > 0 ? extractedPos : [1];
+                        const firstWeekday = (origDays[0] as any)?.weekday;
+                        if (typeof firstWeekday === "number") {
+                            relativeDay = firstWeekday;
+                        }
+                    }
                     monthlyType = "relative";
                     yearlyType = "relative";
                 }
@@ -162,7 +195,7 @@
             byweekday = [];
             monthlyType = "day";
             bymonthday = 1;
-            bysetpos = 1;
+            bysetpos = [1];
             relativeDay = 0;
             yearlyType = "day";
             bymonth = 1;
@@ -190,7 +223,8 @@
             if (monthlyType === "day") {
                 options.bymonthday = bymonthday;
             } else {
-                options.bysetpos = bysetpos;
+                const posValues = bysetpos.length > 0 ? bysetpos : [1];
+                options.bysetpos = posValues.length === 1 ? posValues[0] : posValues;
                 options.byweekday = getRRuleWeekdays(relativeDay);
             }
         }
@@ -200,7 +234,8 @@
             if (yearlyType === "day") {
                 options.bymonthday = bymonthday;
             } else {
-                options.bysetpos = bysetpos;
+                const posValues = bysetpos.length > 0 ? bysetpos : [1];
+                options.bysetpos = posValues.length === 1 ? posValues[0] : posValues;
                 options.byweekday = getRRuleWeekdays(relativeDay);
             }
         }
@@ -245,6 +280,19 @@
         }
     }
 
+    const posOrder = [1, 2, 3, 4, -1];
+    function toggleSetPos(pos: number) {
+        if (bysetpos.includes(pos)) {
+            if (bysetpos.length > 1) {
+                bysetpos = bysetpos.filter((p) => p !== pos);
+            }
+        } else {
+            bysetpos = [...bysetpos, pos].sort(
+                (a, b) => posOrder.indexOf(a) - posOrder.indexOf(b)
+            );
+        }
+    }
+
     let previewRule = $derived.by(() => {
         const options: any = { freq, interval };
         if (endType === "count") {
@@ -261,7 +309,8 @@
             if (monthlyType === "day") {
                 options.bymonthday = bymonthday;
             } else {
-                options.bysetpos = bysetpos;
+                const posValues = bysetpos.length > 0 ? bysetpos : [1];
+                options.bysetpos = posValues.length === 1 ? posValues[0] : posValues;
                 options.byweekday = getRRuleWeekdays(relativeDay);
             }
         }
@@ -271,7 +320,8 @@
             if (yearlyType === "day") {
                 options.bymonthday = bymonthday;
             } else {
-                options.bysetpos = bysetpos;
+                const posValues = bysetpos.length > 0 ? bysetpos : [1];
+                options.bysetpos = posValues.length === 1 ? posValues[0] : posValues;
                 options.byweekday = getRRuleWeekdays(relativeDay);
             }
         }
@@ -379,24 +429,29 @@
                             />
                             <span class="text-sm text-muted-foreground">{m.of_the_month()}</span>
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
                             <input type="radio" id="monthly-relative" value="relative" bind:group={monthlyType} class="h-4 w-4" />
                             <label for="monthly-relative" class="text-sm">{m.the_relative()}</label>
-                            <select 
-                                bind:value={bysetpos} 
-                                disabled={monthlyType !== 'relative'}
-                                class="h-8 rounded-md border text-sm px-1"
-                            >
-                                {#each positions as pos}
-                                    <option value={pos.value}>{pos.label}</option>
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each positions as pos (pos.value)}
+                                    <button
+                                        type="button"
+                                        class="h-8 px-2.5 text-xs rounded-md border transition-colors {monthlyType === 'relative' && bysetpos.includes(pos.value) ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted border-input'}"
+                                        onclick={() => {
+                                            monthlyType = "relative";
+                                            toggleSetPos(pos.value);
+                                        }}
+                                    >
+                                        {pos.label}
+                                    </button>
                                 {/each}
-                            </select>
+                            </div>
                             <select 
                                 bind:value={relativeDay} 
                                 disabled={monthlyType !== 'relative'}
                                 class="h-8 rounded-md border text-sm px-1"
                             >
-                                {#each relativeDays as day}
+                                {#each relativeDays as day (day.value)}
                                     <option value={day.value}>{day.label}</option>
                                 {/each}
                             </select>
@@ -411,7 +466,7 @@
                     <div class="col-span-1 sm:col-span-3 space-y-4">
                         <div class="flex items-center gap-3">
                             <select bind:value={bymonth} class="h-8 rounded-md border text-sm px-1 w-32">
-                                {#each months as month}
+                                {#each months as month (month.value)}
                                     <option value={month.value}>{month.label}</option>
                                 {/each}
                             </select>
@@ -427,24 +482,29 @@
                                 class="h-8 w-14 rounded-md border text-sm px-2" 
                             />
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
                             <input type="radio" id="yearly-relative" value="relative" bind:group={yearlyType} class="h-4 w-4" />
                             <label for="yearly-relative" class="text-sm">{m.the_relative()}</label>
-                            <select 
-                                bind:value={bysetpos} 
-                                disabled={yearlyType !== 'relative'}
-                                class="h-8 rounded-md border text-sm px-1"
-                            >
-                                {#each positions as pos}
-                                    <option value={pos.value}>{pos.label}</option>
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each positions as pos (pos.value)}
+                                    <button
+                                        type="button"
+                                        class="h-8 px-2.5 text-xs rounded-md border transition-colors {yearlyType === 'relative' && bysetpos.includes(pos.value) ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted border-input'}"
+                                        onclick={() => {
+                                            yearlyType = "relative";
+                                            toggleSetPos(pos.value);
+                                        }}
+                                    >
+                                        {pos.label}
+                                    </button>
                                 {/each}
-                            </select>
+                            </div>
                             <select 
                                 bind:value={relativeDay} 
                                 disabled={yearlyType !== 'relative'}
                                 class="h-8 rounded-md border text-sm px-1"
                             >
-                                {#each relativeDays as day}
+                                {#each relativeDays as day (day.value)}
                                     <option value={day.value}>{day.label}</option>
                                 {/each}
                             </select>
@@ -465,7 +525,6 @@
                                 type="radio"
                                 id="end-never"
                                 value="never"
-                                name="recurrence-end"
                                 bind:group={endType}
                                 class="h-4 w-4"
                             />
@@ -481,7 +540,6 @@
                                 type="radio"
                                 id="end-count"
                                 value="count"
-                                name="recurrence-end"
                                 bind:group={endType}
                                 class="h-4 w-4"
                             />
@@ -507,7 +565,6 @@
                                 type="radio"
                                 id="end-until"
                                 value="until"
-                                name="recurrence-end"
                                 bind:group={endType}
                                 class="h-4 w-4"
                             />

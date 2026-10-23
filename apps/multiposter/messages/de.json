@@ -731,6 +731,7 @@
 	"ms_tenant_resources": "Microsoft Tenant Ressourcen",
 	"loading_ms_resources": "Tenant Ressourcen werden geladen...",
 	"no_ms_resources_found": "Keine Tenant Ressourcen für diesen Typ gefunden",
+	"ms_new_room_propagation_hint": "Neu erstellte Raum-Postfächer in Microsoft 365 benötigen unter Umständen einige Stunden, bis sie im Places-Verzeichnis erscheinen. Sie können die E-Mail-Adresse des Raumes auch direkt in das Feld 'Kalender-ID' unten eingeben.",
 	"select_resource_type": "Ressourcentyp auswählen...",
 	"resource_synced_success": "Ressourcenreservierung erfolgreich synchronisiert.",
 	"resource_unlinked_sync_cleaned": "Ressource getrennt und externe Reservierung storniert.",

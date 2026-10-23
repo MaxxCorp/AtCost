@@ -731,6 +731,7 @@
 	"ms_tenant_resources": "Microsoft Tenant Resources",
 	"loading_ms_resources": "Loading tenant resources...",
 	"no_ms_resources_found": "No tenant resources found for this type",
+	"ms_new_room_propagation_hint": "Newly created room mailboxes in Microsoft 365 can take several hours to propagate to the Places directory. You can also directly type or paste the room email address into the Calendar ID field below.",
 	"select_resource_type": "Select Resource Type...",
 	"resource_synced_success": "Resource reservation synchronized successfully.",
 	"resource_unlinked_sync_cleaned": "Resource unlinked and external reservation cancelled.",

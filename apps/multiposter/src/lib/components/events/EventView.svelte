@@ -77,6 +77,7 @@
     const hasContact = $derived(!!event.resolvedContact);
     const hasDescription = $derived(!!(event.description && event.description.trim().length > 0));
     const displayTicketPrice = $derived(formatTicketPrice((event as any).ticketPrice, (event as any).ticketPriceUnknown));
+    const eventRecurrenceRule = $derived((Array.isArray(event.recurrence) ? event.recurrence[0] : (typeof event.recurrence === 'string' ? event.recurrence : null)) || (event as any).seriesMaster?.recurrence?.[0] || null);
     const hasSidebar = $derived(
         !!(event as any).qrCodeDataUrl ||
         !!event.qrCodePath ||
@@ -151,10 +152,10 @@
                 <Calendar class="w-4 h-4" />
                 <span>{displayDate}</span>
             </div>
-            {#if (event.recurrence && (Array.isArray(event.recurrence) ? event.recurrence.length > 0 : true)) || event.recurringEventId || event.seriesId}
+            {#if eventRecurrenceRule || event.recurringEventId || event.seriesId}
                 <div class="flex items-center gap-1.5 text-xs sm:text-sm text-blue-200 mt-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/20">
                     <RefreshCw class="w-3.5 h-3.5" />
-                    <span>{formatRecurrenceText(Array.isArray(event.recurrence) ? event.recurrence[0] : (typeof event.recurrence === 'string' ? event.recurrence : null))}</span>
+                    <span>{formatRecurrenceText(eventRecurrenceRule)}</span>
                 </div>
             {/if}
         </div>

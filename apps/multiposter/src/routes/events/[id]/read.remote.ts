@@ -436,6 +436,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			priceIds: (result.prices || []).map((p: any) => p.priceId),
 			iCalPath,
 			qrCodePath,
+			recurrence: result.recurrence ?? undefined,
+			recurringEventId: result.recurringEventId ?? undefined,
+			seriesId: result.seriesId ?? undefined,
 			seriesMaster: seriesMaster ?? undefined,
 			instances: instances.length > 0 ? instances : undefined,
 		} as any;

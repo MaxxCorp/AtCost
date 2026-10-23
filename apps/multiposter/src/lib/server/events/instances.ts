@@ -196,6 +196,10 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 			rruleStr = seriesMap.get(master.seriesId) || null;
 		}
 
+		if (rruleStr && (!master.recurrence || (Array.isArray(master.recurrence) && master.recurrence.length === 0))) {
+			master.recurrence = [rruleStr];
+		}
+
 		if (rruleStr && master.startDateTime) {
 			const exdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
 			const startDate = master.startDateTime instanceof Date ? master.startDateTime : new Date(master.startDateTime);

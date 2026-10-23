@@ -213,6 +213,7 @@
                     {#key currentPage}
                         {#each currentPageData.items as item, i}
                             {@const eventRooms = getEventRooms(item)}
+                            {@const itemRecurrenceRule = (Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null}
                             {@const displayPrice = formatTicketPrice((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
                             {@const isSpecialNonSeries = isNonSeriesEvent(item)}
                             {@const multiDay = isMultiDayEvent(item)}
@@ -278,10 +279,10 @@
                                                 <span>{displayPrice}</span>
                                             </div>
                                         {/if}
-                                        {#if (item as any).recurrence && ((item as any).recurrence as string[]).length > 0}
+                                        {#if itemRecurrenceRule}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-300 text-sm font-semibold">
                                                 <RefreshCw class="w-3.5 h-3.5" />
-                                                <span>{formatRecurrenceText((item as any).recurrence, undefined, { omitLength: true })}</span>
+                                                <span>{formatRecurrenceText(itemRecurrenceRule, undefined, { omitLength: true })}</span>
                                             </div>
                                         {/if}
                                         {#if (item as any).resolvedContact}

@@ -31,7 +31,7 @@
         type Location,
         type Contact,
     } from "@ac/validations";
-    import { User, MapPin } from "@lucide/svelte";
+    import { User, MapPin, RefreshCw } from "@lucide/svelte";
 
     import {
         addLocationAssociation,
@@ -93,45 +93,50 @@
 
     let prevFetchKey = $state<string>("");
 
+    async function loadMsResources(force = false) {
+        if (newProvider !== "microsoft-calendar") return;
+        const fetchKey = `${newProvider}:${resourceType}`;
+        if (!force && prevFetchKey === fetchKey) return;
+        prevFetchKey = fetchKey;
+        msResourcesState = { loading: true, data: [] };
+
+        try {
+            const res = await listMsTenantResources({ type: resourceType });
+            if (prevFetchKey !== fetchKey && !force) return;
+            msResourcesState = {
+                loading: false,
+                data: res?.data || [],
+                success: res?.success,
+                configured: res?.configured,
+                error: res?.error,
+                message: res?.message,
+            };
+
+            if (res?.success === false && res?.error) {
+                toast.error(res.error);
+            } else if (res?.configured === false && res?.message) {
+                toast.warning(res.message);
+            } else if (res?.success && (!res?.data || res.data.length === 0)) {
+                toast.info(m.no_ms_resources_found());
+            } else if (force) {
+                toast.success(m.ms_refresh_tenant ? m.ms_refresh_tenant() : "Refreshed from Microsoft 365");
+            }
+        } catch (err: any) {
+            if (prevFetchKey !== fetchKey && !force) return;
+            const errorMsg = err?.message || m.something_went_wrong();
+            msResourcesState = {
+                loading: false,
+                data: [],
+                success: false,
+                error: errorMsg,
+            };
+            toast.error(errorMsg);
+        }
+    }
+
     $effect(() => {
         if (newProvider === "microsoft-calendar") {
-            const fetchKey = `${newProvider}:${resourceType}`;
-            if (prevFetchKey !== fetchKey) {
-                prevFetchKey = fetchKey;
-                msResourcesState = { loading: true, data: [] };
-
-                listMsTenantResources({ type: resourceType })
-                    .then((res) => {
-                        if (prevFetchKey !== fetchKey) return;
-                        msResourcesState = {
-                            loading: false,
-                            data: res?.data || [],
-                            success: res?.success,
-                            configured: res?.configured,
-                            error: res?.error,
-                            message: res?.message,
-                        };
-
-                        if (res?.success === false && res?.error) {
-                            toast.error(res.error);
-                        } else if (res?.configured === false && res?.message) {
-                            toast.warning(res.message);
-                        } else if (res?.success && (!res?.data || res.data.length === 0)) {
-                            toast.info(m.no_ms_resources_found());
-                        }
-                    })
-                    .catch((err) => {
-                        if (prevFetchKey !== fetchKey) return;
-                        const errorMsg = err?.message || m.something_went_wrong();
-                        msResourcesState = {
-                            loading: false,
-                            data: [],
-                            success: false,
-                            error: errorMsg,
-                        };
-                        toast.error(errorMsg);
-                    });
-            }
+            void loadMsResources();
         } else {
             prevFetchKey = "";
         }
@@ -469,37 +474,72 @@
 
                 {#if newProvider === "microsoft-calendar"}
                     {#if msResourcesState.loading}
-                        <span class="text-xs text-gray-500 self-center">{m.loading_ms_resources()}</span>
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500 self-center">
+                            <RefreshCw class="h-3.5 w-3.5 animate-spin text-blue-600" />
+                            <span>{m.loading_ms_resources()}</span>
+                        </div>
                     {:else if msResourcesState.success === false}
-                        <div class="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-900 flex-1 flex items-center gap-1.5">
+                        <div class="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-900 flex-1 flex items-center justify-between gap-1.5">
                             <span>{msResourcesState.error || m.something_went_wrong()}</span>
+                            <button
+                                type="button"
+                                title={m.ms_refresh_tenant ? m.ms_refresh_tenant() : "Refresh from Microsoft 365"}
+                                onclick={() => void loadMsResources(true)}
+                                class="p-1 rounded hover:bg-red-100 text-red-700 shrink-0"
+                            >
+                                <RefreshCw class="h-3.5 w-3.5" />
+                            </button>
                         </div>
                     {:else if msResourcesState.configured === false}
                         <div class="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-900 flex-1 flex items-center gap-1.5">
                             <span>{msResourcesState.message}</span>
                         </div>
                     {:else if msResourcesState.data && msResourcesState.data.length > 0}
-                        <select
-                            class="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            onchange={(e) => {
-                                const val = (e.target as HTMLSelectElement).value;
-                                if (val) newCalendarId = val;
-                            }}
-                        >
-                            <option value="">-- {m.select_ms_tenant_resource()} --</option>
-                            {#each msResourcesState.data as tenantItem}
-                                <option value={tenantItem.emailAddress || tenantItem.id}>
-                                    {tenantItem.displayName} ({tenantItem.emailAddress || tenantItem.id})
-                                </option>
-                            {/each}
-                        </select>
+                        <div class="flex-1 flex items-center gap-1.5">
+                            <select
+                                class="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                onchange={(e) => {
+                                    const val = (e.target as HTMLSelectElement).value;
+                                    if (val) newCalendarId = val;
+                                }}
+                            >
+                                <option value="">-- {m.select_ms_tenant_resource()} --</option>
+                                {#each msResourcesState.data as tenantItem}
+                                    <option value={tenantItem.emailAddress || tenantItem.id}>
+                                        {tenantItem.displayName} ({tenantItem.emailAddress || tenantItem.id})
+                                    </option>
+                                {/each}
+                            </select>
+                            <button
+                                type="button"
+                                title={m.ms_refresh_tenant ? m.ms_refresh_tenant() : "Refresh from Microsoft 365"}
+                                onclick={() => void loadMsResources(true)}
+                                class="p-2 border border-gray-300 rounded-md bg-white hover:bg-gray-100 text-gray-600 shrink-0"
+                            >
+                                <RefreshCw class="h-4 w-4" />
+                            </button>
+                        </div>
                     {:else}
-                        <div class="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-900 flex-1 flex items-center gap-1.5">
+                        <div class="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-900 flex-1 flex items-center justify-between gap-1.5">
                             <span>{m.no_ms_resources_found()}</span>
+                            <button
+                                type="button"
+                                title={m.ms_refresh_tenant ? m.ms_refresh_tenant() : "Refresh from Microsoft 365"}
+                                onclick={() => void loadMsResources(true)}
+                                class="p-1 rounded hover:bg-amber-100 text-amber-800 shrink-0"
+                            >
+                                <RefreshCw class="h-3.5 w-3.5" />
+                            </button>
                         </div>
                     {/if}
                 {/if}
             </div>
+
+            {#if newProvider === "microsoft-calendar"}
+                <p class="text-xs text-gray-500 italic">
+                    {m.ms_new_room_propagation_hint ? m.ms_new_room_propagation_hint() : "Newly created room mailboxes in Microsoft 365 can take several hours to propagate to the Places directory. You can also directly type or paste the room email address into the Calendar ID field below."}
+                </p>
+            {/if}
 
             <div class="flex gap-2">
                 <input

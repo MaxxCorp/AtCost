@@ -253,6 +253,12 @@
                                     ? m.editing_series_title()
                                     : m.editing_instance_title()}
                             </h3>
+                            {#if recurrenceDescription}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white/80 dark:bg-gray-800/80 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60">
+                                    <RefreshCw size={12} class="shrink-0" />
+                                    <span>{recurrenceDescription}</span>
+                                </span>
+                            {/if}
                         </div>
 
                         <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 max-w-xl">

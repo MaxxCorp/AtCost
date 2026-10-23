@@ -179,6 +179,7 @@
             {@const event = eventQuery.current}
             {#key event.id}
                 {@const hasDescription = !!(event.description && event.description.trim().length > 0)}
+                {@const recurrenceRule = (Array.isArray(event.recurrence) ? event.recurrence[0] : typeof event.recurrence === "string" ? event.recurrence : null) || (event as any).seriesMaster?.recurrence?.[0] || null}
                 {@const eventInstances = event.instances || []}
                 {@const hasContact = !!event.resolvedContact}
                 {@const hasStaffNotes = !!(checkCanEdit(event) && event.internalNotes && event.internalNotes.trim().length > 0)}
@@ -452,7 +453,15 @@
                                                 </span>
                                             {/if}
 
-                                            {#if event.recurringEventId || (event.seriesId && !event.recurringEventId && event.recurrence && (event.recurrence as string[]).length > 0)}
+
+                                            {#if recurrenceRule}
+                                                <div class="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                                                    <RefreshCw size={14} class="text-blue-600 flex-shrink-0" />
+                                                    <span>{formatRecurrenceText(recurrenceRule)}</span>
+                                                </div>
+                                            {/if}
+
+                                            {#if isSeriesEvent(event)}
                                                 <div class="mt-2">
                                                     <SeriesModeSelector event={event} variant="inline" viewMode={true} />
                                                 </div>

@@ -26,6 +26,18 @@ describe("formatRecurrenceText", () => {
             const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO,TU,WE,TH,FR", "en");
             expect(text.toLowerCase()).toContain("weekday");
         });
+
+        it("should format multiple positions (every 1st and 2nd Friday of a month)", () => {
+            const textSetpos = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1,2;BYDAY=FR", "en");
+            expect(textSetpos.toLowerCase()).toContain("every month");
+            expect(textSetpos.toLowerCase()).toContain("1st and 2nd friday");
+
+            const textByday = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR", "en");
+            expect(textByday.toLowerCase()).toContain("every month");
+            expect(textByday.toLowerCase()).toContain("1st");
+            expect(textByday.toLowerCase()).toContain("2nd");
+            expect(textByday.toLowerCase()).toContain("friday");
+        });
     });
 
     describe("German locale", () => {
@@ -39,6 +51,18 @@ describe("formatRecurrenceText", () => {
             const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=2MO", "de");
             expect(text).toContain("jeden Monat");
             expect(text).toContain("2. Montag");
+        });
+
+        it("should format 1st and 2nd Friday of a month in German (jeden Monat am 1. und 2. Freitag)", () => {
+            const textSetpos = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1,2;BYDAY=FR", "de");
+            expect(textSetpos).toContain("jeden Monat");
+            expect(textSetpos).toContain("am 1. und 2. Freitag");
+
+            const textByday = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR", "de");
+            expect(textByday).toContain("jeden Monat");
+            expect(textByday).toContain("1.");
+            expect(textByday).toContain("2.");
+            expect(textByday).toContain("Freitag");
         });
 
         it("should format 2-month interval with relative weekday in German (alle 2 Monate am 2. Montag)", () => {

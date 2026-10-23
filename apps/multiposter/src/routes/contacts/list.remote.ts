@@ -15,7 +15,12 @@ export const listContacts = query(PaginationSchema, async (input: v.InferOutput<
     const version = await getNamespaceVersion(CACHE_NAMESPACES.CONTACTS);
     const key = cacheKeys.contactsList(version, hashParams(input));
 
-    return cached(key, 300, async () => {
-        return (await queryContacts(input)) as unknown as PaginatedResult<Contact>;
-    });
+    try {
+        return await cached(key, 300, async () => {
+            return (await queryContacts(input)) as unknown as PaginatedResult<Contact>;
+        });
+    } catch (err) {
+        console.error('[listContacts error]:', err);
+        throw err;
+    }
 });

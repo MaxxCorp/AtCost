@@ -49,6 +49,21 @@ describe('Recurrence Expansion', () => {
         expect(instances[2].date.toISOString()).toBe('2024-05-14T10:00:00.000Z');
     });
 
+    it('should expand multi-position monthly recurrence (every 1st and 2nd Friday of a month)', () => {
+        // Start is Friday 2024-03-01 (1st Friday of March 2024 - skipped as master)
+        // Next occurrences:
+        // - 2024-03-08 (2nd Friday of March)
+        // - 2024-04-05 (1st Friday of April)
+        // - 2024-04-12 (2nd Friday of April)
+        const rrule = 'FREQ=MONTHLY;BYDAY=FR;BYSETPOS=1,2;COUNT=4';
+        const instances = expandRecurrence(rrule, start, end, 50, false);
+
+        expect(instances).toHaveLength(3);
+        expect(instances[0].date.toISOString()).toBe('2024-03-08T10:00:00.000Z');
+        expect(instances[1].date.toISOString()).toBe('2024-04-05T10:00:00.000Z');
+        expect(instances[2].date.toISOString()).toBe('2024-04-12T10:00:00.000Z');
+    });
+
     it('should expand relative yearly recurrence (last Friday of August)', () => {
         const rrule = 'FREQ=YEARLY;BYDAY=FR;BYSETPOS=-1;BYMONTH=8;COUNT=2';
         const instances = expandRecurrence(rrule, start, end, 50, false);

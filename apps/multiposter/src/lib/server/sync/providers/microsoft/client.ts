@@ -594,10 +594,13 @@ export class MicrosoftGraphClient {
 		// 3. If a search term is specified, actively probe candidate mailbox
 		if (searchTerm) {
 			const candidateEmails: string[] = [];
+			const defaultDomain = this.config.mailboxEmail?.includes('@')
+				? this.config.mailboxEmail.split('@')[1]
+				: 'ballev.onmicrosoft.com';
 			if (searchTerm.includes('@')) {
 				candidateEmails.push(searchTerm);
 			} else if (searchTerm.length >= 3) {
-				candidateEmails.push(`${searchTerm}@ballev.onmicrosoft.com`);
+				candidateEmails.push(`${searchTerm}@${defaultDomain}`);
 			}
 
 			for (const candidate of candidateEmails) {
@@ -879,22 +882,37 @@ export class MicrosoftGraphClient {
 	// --- Room & Place Discovery ---
 
 	async listRooms(): Promise<MicrosoftRoom[]> {
-		const results: MicrosoftRoom[] = [];
+		const resultsMap = new Map<string, MicrosoftRoom>();
 		let lastError: any = null;
 
-		// 1. Try Graph Places API (standard in M365)
+		const addRoom = (r: MicrosoftRoom) => {
+			const key = (r.email || r.id).toLowerCase().trim();
+			if (key && !resultsMap.has(key)) {
+				resultsMap.set(key, r);
+			}
+		};
+
+		// 1. Try Graph Places API (standard in M365) with @odata.nextLink pagination
 		try {
-			const res = await this.makeRequest<any>('places/microsoft.graph.room', { method: 'GET' });
-			if (Array.isArray(res.value) && res.value.length > 0) {
-				return res.value.map((r: any) => ({
-					id: r.id || r.emailAddress,
-					name: r.displayName || r.nickname || r.emailAddress,
-					email: r.emailAddress || '',
-					capacity: r.capacity ?? undefined,
-					building: r.building ?? undefined,
-					floorNumber: r.floorNumber ?? undefined,
-					type: 'room'
-				}));
+			let nextUrl: string | null = 'places/microsoft.graph.room';
+			let pages = 0;
+			while (nextUrl && pages < 10) {
+				pages++;
+				const res: any = await this.makeRequest<any>(nextUrl, { method: 'GET' });
+				if (Array.isArray(res.value)) {
+					for (const r of res.value) {
+						addRoom({
+							id: r.id || r.emailAddress,
+							name: r.displayName || r.nickname || r.emailAddress,
+							email: r.emailAddress || '',
+							capacity: r.capacity ?? undefined,
+							building: r.building ?? undefined,
+							floorNumber: r.floorNumber ?? undefined,
+							type: 'room'
+						});
+					}
+				}
+				nextUrl = res['@odata.nextLink'] || null;
 			}
 		} catch (err) {
 			lastError = err;
@@ -904,21 +922,31 @@ export class MicrosoftGraphClient {
 			if (this.clientId && this.clientSecret) {
 				try {
 					const appToken = await this.acquireAppToken();
-					const appRes = await fetch('https://graph.microsoft.com/v1.0/places/microsoft.graph.room', {
-						headers: { Authorization: `Bearer ${appToken}` }
-					});
-					if (appRes.ok) {
-						const appData = await appRes.json();
-						if (Array.isArray(appData.value) && appData.value.length > 0) {
-							return appData.value.map((r: any) => ({
-								id: r.id || r.emailAddress,
-								name: r.displayName || r.nickname || r.emailAddress,
-								email: r.emailAddress || '',
-								capacity: r.capacity ?? undefined,
-								building: r.building ?? undefined,
-								floorNumber: r.floorNumber ?? undefined,
-								type: 'room'
-							}));
+					let nextAppUrl: string | null = 'https://graph.microsoft.com/v1.0/places/microsoft.graph.room';
+					let appPages = 0;
+					while (nextAppUrl && appPages < 10) {
+						appPages++;
+						const appRes: Response = await fetch(nextAppUrl, {
+							headers: { Authorization: `Bearer ${appToken}` }
+						});
+						if (appRes.ok) {
+							const appData: any = await appRes.json();
+							if (Array.isArray(appData.value)) {
+								for (const r of appData.value) {
+									addRoom({
+										id: r.id || r.emailAddress,
+										name: r.displayName || r.nickname || r.emailAddress,
+										email: r.emailAddress || '',
+										capacity: r.capacity ?? undefined,
+										building: r.building ?? undefined,
+										floorNumber: r.floorNumber ?? undefined,
+										type: 'room'
+									});
+								}
+							}
+							nextAppUrl = appData['@odata.nextLink'] || null;
+						} else {
+							break;
 						}
 					}
 				} catch (appErr: any) {
@@ -927,50 +955,55 @@ export class MicrosoftGraphClient {
 			}
 		}
 
-		// 2. Try findRooms (if user token or delegate context)
+		// 2. Supplement with findRooms (if user token or delegate context) to discover newly provisioned rooms
+		// before Microsoft Places indexing finishes propagating
 		if (this.resolvedAuthMode === 'user') {
 			try {
 				const res = await this.makeRequest<any>('me/findRooms', { method: 'GET' });
-				if (Array.isArray(res.value) && res.value.length > 0) {
-					return res.value.map((r: any) => ({
-						id: r.address || r.name,
-						name: r.name || r.address,
-						email: r.address || '',
-						type: 'room'
-					}));
-				}
-			} catch (err) {
-				lastError = err;
-			}
-		}
-
-		// 3. Fallback: Search user directory for Room Mailboxes
-		try {
-			const res = await this.makeRequest<any>(
-				"users?$filter=recipientTypeDetails eq 'RoomMailbox' or userType eq 'Member'&$top=100&$select=id,displayName,mail,userPrincipalName",
-				{ method: 'GET' }
-			);
-
-			if (Array.isArray(res.value)) {
-				for (const u of res.value) {
-					const email = u.mail || u.userPrincipalName;
-					if (email) {
-						results.push({
-							id: u.id || email,
-							name: u.displayName || email,
-							email,
+				if (Array.isArray(res.value)) {
+					for (const r of res.value) {
+						addRoom({
+							id: r.address || r.name,
+							name: r.name || r.address,
+							email: r.address || '',
 							type: 'room'
 						});
 					}
 				}
-			}
-		} catch (err) {
-			if (results.length === 0 && lastError) {
-				throw lastError;
+			} catch (err) {
+				if (resultsMap.size === 0) lastError = err;
 			}
 		}
 
-		return results;
+		// 3. Fallback: Search user directory for Room Mailboxes if none found yet
+		if (resultsMap.size === 0) {
+			try {
+				const res = await this.makeRequest<any>(
+					"users?$top=100&$select=id,displayName,mail,userPrincipalName,userType",
+					{ method: 'GET' }
+				);
+
+				if (Array.isArray(res.value)) {
+					for (const u of res.value) {
+						const email = u.mail || u.userPrincipalName;
+						if (email) {
+							addRoom({
+								id: u.id || email,
+								name: u.displayName || email,
+								email,
+								type: 'room'
+							});
+						}
+					}
+				}
+			} catch (err) {
+				if (resultsMap.size === 0 && lastError) {
+					throw lastError;
+				}
+			}
+		}
+
+		return Array.from(resultsMap.values());
 	}
 
 	// --- Room Availability & Booking ---

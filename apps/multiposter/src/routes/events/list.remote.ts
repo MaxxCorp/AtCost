@@ -599,6 +599,10 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 				if (!rruleStr || !master.startDateTime) continue;
 
+				if (!master.recurrence || (Array.isArray(master.recurrence) && master.recurrence.length === 0)) {
+					master.recurrence = [rruleStr];
+				}
+
 				const masterTime = new Date(master.startDateTime).getTime();
 				if (masterTime >= startD.getTime() && masterTime <= endD.getTime()) {
 					const key = `${master.id}_${masterTime}`;
@@ -638,6 +642,19 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 						} as any);
 						existingKeys.add(key);
 						if (seriesKey) existingKeys.add(seriesKey);
+					}
+				}
+			}
+
+			// Ensure materialized DB exception instances in rawResults also inherit their master's recurrence rule
+			for (const r of rawResults) {
+				if (!r.recurrence || (Array.isArray(r.recurrence) && r.recurrence.length === 0)) {
+					const m = (r.recurringEventId ? idToMasterMap.get(r.recurringEventId) : null)
+						|| (r.seriesId ? seriesToMasterMap.get(r.seriesId) : null);
+					if (m?.recurrence && Array.isArray(m.recurrence) && m.recurrence.length > 0) {
+						r.recurrence = m.recurrence;
+					} else if (r.seriesId && seriesIdToRruleMap.has(r.seriesId)) {
+						r.recurrence = [seriesIdToRruleMap.get(r.seriesId)!];
 					}
 				}
 			}

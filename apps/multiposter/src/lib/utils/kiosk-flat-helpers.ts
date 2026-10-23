@@ -307,6 +307,9 @@ export function compressSeriesEvents(
             } else if (typeof (g as any).recurrence === 'string' && (g as any).recurrence.length > 0) {
                 rruleStr = (g as any).recurrence;
                 break;
+            } else if ((g as any).seriesMaster?.recurrence?.[0]) {
+                rruleStr = (g as any).seriesMaster.recurrence[0];
+                break;
             }
         }
 
