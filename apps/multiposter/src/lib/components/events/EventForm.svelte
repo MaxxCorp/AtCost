@@ -136,6 +136,10 @@
     // svelte-ignore state_referenced_locally
     const rf = (remoteFunction as any).preflight(validationSchema);
     const type = "event";
+    const locationsQuery = listLocations();
+    const resourcesQuery = listResources();
+    const availableLocations = $derived(locationsQuery.current?.data ?? []);
+    const availableResources = $derived(resourcesQuery.current?.data ?? []);
 
     function getCollaboratorStyle(fieldName: string) {
         const peer = collab?.getFieldCollaborator(fieldName);
@@ -1283,11 +1287,15 @@
                     onSuccess,
                     onCancel,
                 }: any)}
-                    {#await Promise.all([listLocations(), listResources()])}
+                    {#if (locationsQuery.loading && !locationsQuery.current) || (resourcesQuery.loading && !resourcesQuery.current)}
                         <div class="p-4 flex justify-center">
                             <LoadingSection />
                         </div>
-                    {:then [locs, ress]}
+                    {:else if locationsQuery.error || resourcesQuery.error}
+                        <div class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center">
+                            {locationsQuery.error?.message || resourcesQuery.error?.message || m.something_went_wrong()}
+                        </div>
+                    {:else}
                         <div class="p-4">
                             <ResourceForm
                                 remoteFunction={rfForm}
@@ -1296,15 +1304,11 @@
                                 initialData={formData}
                                 {onSuccess}
                                 {onCancel}
-                                locations={locs.data}
-                                allResources={ress.data}
+                                locations={availableLocations}
+                                allResources={availableResources}
                             />
                         </div>
-                    {:catch error}
-                        <div class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center">
-                            {error.message || m.something_went_wrong()}
-                        </div>
-                    {/await}
+                    {/if}
                 {/snippet}
             </EntityManager>
         {/key}

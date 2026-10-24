@@ -69,18 +69,24 @@ export const updatePrice = form(updatePriceSchema, async (data) => {
     }
     try {
         await listPrices().refresh();
+        void listPrices({}).refresh();
+        void listPrices({ isTemplate: true, limit: 100 }).refresh();
         await readPrice(data.id).refresh();
     } catch (refreshErr) {
         console.warn('--- updatePrice refresh warning ---', refreshErr);
     }
 
+    const formattedResult = {
+        ...result,
+        createdAt: result.createdAt.toISOString(),
+        updatedAt: result.updatedAt.toISOString(),
+    };
+
     return {
         success: true,
-        data: {
-            ...result,
-            createdAt: result.createdAt.toISOString(),
-            updatedAt: result.updatedAt.toISOString(),
-        }
+        id: data.id,
+        price: formattedResult,
+        data: formattedResult
     };
 });
 
@@ -100,6 +106,7 @@ export const removePriceItem = command(removePriceItemSchema, async (data) => {
     }
     try {
         await listPrices().refresh();
+        void listPrices({}).refresh();
         await readPrice(data.priceId).refresh();
     } catch (refreshErr) {
         console.warn('--- removePriceItem refresh warning ---', refreshErr);
@@ -134,6 +141,7 @@ export const updatePriceItem = command(updatePriceItemSchema, async (data) => {
     }
     try {
         await listPrices().refresh();
+        void listPrices({}).refresh();
         await readPrice(data.priceId).refresh();
     } catch (refreshErr) {
         console.warn('--- updatePriceItem refresh warning ---', refreshErr);
@@ -141,4 +149,3 @@ export const updatePriceItem = command(updatePriceItemSchema, async (data) => {
 
     return { success: true };
 });
-

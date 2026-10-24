@@ -1,4 +1,4 @@
-import { command, query } from '$app/server';
+import { command, query, requested } from '$app/server';
 import {
     addLocationAssociation as attachLocation,
     removeLocationAssociation as detachLocation,
@@ -6,6 +6,8 @@ import {
 } from '@ac/db';
 import { locationAssociationSchema, getLocationAssociationsSchema } from '@ac/validations';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import { readEvent } from '../events/[id]/read.remote.js';
 
 export const addLocationAssociation = command(locationAssociationSchema, async (data) => {
     const user = getAuthenticatedUser();
@@ -13,6 +15,13 @@ export const addLocationAssociation = command(locationAssociationSchema, async (
 
     const { type, entityId, locationId } = data;
     await attachLocation({ type, entityId, locationId });
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+    }
+    try {
+        await requested(fetchEntityLocations, 20).refreshAll();
+    } catch { /* ignore */ }
     await fetchEntityLocations({ type, entityId }).refresh();
     return { success: true };
 });
@@ -23,6 +32,13 @@ export const removeLocationAssociation = command(locationAssociationSchema, asyn
 
     const { type, entityId, locationId } = data;
     await detachLocation({ type, entityId, locationId });
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+    }
+    try {
+        await requested(fetchEntityLocations, 20).refreshAll();
+    } catch { /* ignore */ }
     await fetchEntityLocations({ type, entityId }).refresh();
     return { success: true };
 });

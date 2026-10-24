@@ -1,6 +1,7 @@
 import { command, requested } from '$app/server';
 import { deleteLocations } from '@ac/db';
 import { listLocations } from '../list.remote';
+import { fetchEntityLocations } from '../associate.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { invalidateLocation, invalidateAllKioskViews } from '#lib/server/cache/index.js';
@@ -15,6 +16,7 @@ export const deleteLocation = command(v.array(v.string()), async (ids: string[])
 
     try {
         await requested(listLocations, 20).refreshAll();
+        await requested(fetchEntityLocations, 20).refreshAll();
     } catch { /* ignore */ }
     void listLocations().refresh();
     void listLocations({}).refresh();

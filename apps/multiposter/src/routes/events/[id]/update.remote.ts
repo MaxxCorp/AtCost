@@ -1,4 +1,4 @@
-import { form, getRequestEvent } from '$app/server';
+import { form, getRequestEvent, requested } from '$app/server';
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
 import { eq, and, or, ne, inArray, sql } from '@ac/db';
@@ -590,7 +590,10 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		if (data.id !== effectiveTargetId) {
 			await readEvent(data.id).refresh();
 		}
-		await listEvents().refresh();
+		try { await requested(readEvent, 20).refreshAll(); } catch { /* ignore */ }
+		try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+		void listEvents().refresh();
+		void listEvents({}).refresh();
 		console.log('--- updateEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {

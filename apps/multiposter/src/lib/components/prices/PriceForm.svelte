@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, untrack } from "svelte";
+    import { untrack } from "svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import * as m from "#lib/paraglide/messages.js";
     import { toast } from "svelte-sonner";
@@ -67,47 +67,25 @@
         message: () => m.please_fix_validation?.() || 'Please fix validation errors',
     });
 
+    const consumablesQuery = listConsumables({ limit: 200 });
+    const recipesQuery = listRecipes({ limit: 200 });
+    const templatesQuery = listPrices({ isTemplate: true, limit: 100 });
+
     let localConsumables = $state<Consumable[]>([]);
     let localRecipes = $state<Recipe[]>([]);
-    let fetchedConsumables = $state<Consumable[]>([]);
-    let fetchedRecipes = $state<Recipe[]>([]);
 
     const consumablesList = $derived([
         ...localConsumables,
-        ...(allConsumables.length > 0 ? allConsumables : fetchedConsumables),
+        ...(allConsumables.length > 0 ? allConsumables : (consumablesQuery.current?.data ?? [])),
     ]);
     const recipesList = $derived([
         ...localRecipes,
-        ...(allRecipes.length > 0 ? allRecipes : fetchedRecipes),
+        ...(allRecipes.length > 0 ? allRecipes : (recipesQuery.current?.data ?? [])),
     ]);
+    const templatesList = $derived(templatesQuery.current?.data ?? []);
 
     let showQuickCreateConsumable = $state(false);
     let showQuickCreateRecipe = $state(false);
-
-    onMount(async () => {
-        if (allConsumables.length === 0) {
-            try {
-                const res = await listConsumables({ limit: 200 });
-                if (res?.data) fetchedConsumables = res.data;
-            } catch (e) {
-                console.error('Failed to load consumables:', e);
-            }
-        }
-        if (allRecipes.length === 0) {
-            try {
-                const res = await listRecipes({ limit: 200 });
-                if (res?.data) fetchedRecipes = res.data;
-            } catch (e) {
-                console.error('Failed to load recipes:', e);
-            }
-        }
-        try {
-            const tplRes = await listPrices({ isTemplate: true, limit: 100 });
-            if (tplRes?.data) templatesList = tplRes.data;
-        } catch (e) {
-            console.error('Failed to load price templates:', e);
-        }
-    });
 
     let currentParticipants = $state(untrack(() => participantsCount > 0 ? participantsCount : 1));
 
@@ -123,8 +101,6 @@
         if (initialData?.isTemplate !== undefined) return Boolean(initialData.isTemplate);
         return onSuccess ? false : true;
     }));
-
-    let templatesList = $state<any[]>([]);
 
     interface FormPriceItem {
         id?: string;
@@ -289,8 +265,7 @@
         }
         showQuickCreateConsumable = false;
         try {
-            const refreshed = await listConsumables({ limit: 200 });
-            if (refreshed?.data) fetchedConsumables = refreshed.data;
+            await consumablesQuery.refresh();
         } catch {}
     }
 
@@ -298,12 +273,9 @@
         const item = res?.recipe || res?.data || (res?.id ? res : null);
         let fullRecipe = item;
         try {
-            const refreshed = await listRecipes({ limit: 200 });
-            if (refreshed?.data) {
-                fetchedRecipes = refreshed.data;
-                const found = refreshed.data.find(r => r.id === item?.id);
-                if (found) fullRecipe = found;
-            }
+            await recipesQuery.refresh();
+            const found = recipesQuery.current?.data?.find((r: any) => r.id === item?.id);
+            if (found) fullRecipe = found;
         } catch {}
 
         if (fullRecipe) {
@@ -480,6 +452,7 @@
     {...rf.enhance(async ({ submit }: any) => {
         try {
             const res = await submit();
+            const resultData = (rf as any).result ?? (typeof res === 'object' ? res : null);
             if (res === true || res?.success || (rf as any).result?.success) {
                 toast.success(
                     isUpdating
@@ -487,7 +460,7 @@
                         : (m.item_created?.({ item: m.price_list?.() || 'Price List' }) || 'Price list created successfully')
                 );
                 if (onSuccess) {
-                    onSuccess(res);
+                    onSuccess(resultData ?? res);
                 } else {
                     await refreshAll();
                     await goto(effectiveCancelHref);

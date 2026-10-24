@@ -1,6 +1,7 @@
 import { form, requested } from '$app/server';
 import { updateLocation as updateLocationRecord } from '@ac/db';
 import { listLocations } from '../list.remote';
+import { fetchEntityLocations } from '../associate.remote';
 import { readLocation } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateLocationSchema } from '@ac/validations';
@@ -18,11 +19,12 @@ export const updateLocation = form(updateLocationSchema, async (data) => {
 
         try {
             await requested(listLocations, 20).refreshAll();
+            await requested(fetchEntityLocations, 20).refreshAll();
         } catch { /* ignore */ }
         void listLocations().refresh();
         void listLocations({}).refresh();
 
-        return { success: true, location: updated };
+        return { success: true, location: updated, id: data.id };
     } catch (err: any) {
         return { success: false, error: { message: err.message || 'Update failed' } };
     }

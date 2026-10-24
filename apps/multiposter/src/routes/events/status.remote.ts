@@ -2,6 +2,7 @@ import { command, requested } from '$app/server';
 import { db, event } from '@ac/db';
 import { inArray, eq, and, or, sql } from '@ac/db';
 import { listEvents } from './list.remote';
+import { readEvent } from './[id]/read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { syncService } from '#lib/server/sync/service.js';
 import { publishEventChange } from '#lib/server/realtime.js';
@@ -149,10 +150,13 @@ export const updateEventsStatus = command(
 			console.warn('[updateEventsStatus] requested refresh warning:', e);
 		}
 		try {
-			await listEvents().refresh();
-		} catch (e) {
-			console.warn('[updateEventsStatus] listEvents refresh warning:', e);
+			await requested(readEvent, 20).refreshAll();
+		} catch { /* ignore */ }
+		for (const id of [...new Set([...affectedEventIds, ...ids])]) {
+			void readEvent(id).refresh();
 		}
+		void listEvents().refresh();
+		void listEvents({}).refresh();
 
 		return { success: true, count: affectedEventIds.length };
 	}

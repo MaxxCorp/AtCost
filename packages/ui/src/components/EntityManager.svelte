@@ -593,27 +593,19 @@
         if (!entityId || !type) {
             return localAssociatedItems;
         }
-        let list: T[] = [];
+        let list: T[] | null = null;
         if (associationsQuery && 'current' in associationsQuery) {
             if (associationsQuery.current !== undefined && associationsQuery.current !== null) {
                 list = normalize<T>(associationsQuery.current).data;
-            } else {
-                list = localAssociatedItems;
             }
         } else if (plainAssociationsData !== null && plainAssociationsData !== undefined) {
             list = normalize<T>(plainAssociationsData).data;
-        } else {
-            list = localAssociatedItems;
         }
 
-        if (localAssociatedItems.length > 0 && list.length > 0) {
-            const listIds = new Set(list.map((i: any) => i?.id).filter(Boolean));
-            const newLocalItems = localAssociatedItems.filter((i: any) => i?.id && !listIds.has(i.id));
-            if (newLocalItems.length > 0) {
-                return [...list, ...newLocalItems];
-            }
+        if (list !== null) {
+            return list;
         }
-        return list;
+        return localAssociatedItems;
     });
 
     const isAssociationsLoading = $derived.by(() => {
@@ -739,11 +731,11 @@
         }
     }
 
+    let prevEntityId = $state(entityId);
     $effect(() => {
-        if (initialItems) {
-            untrack(() => {
-                localAssociatedItems = initialItems;
-            });
+        if (entityId !== prevEntityId) {
+            prevEntityId = entityId;
+            localAssociatedItems = initialItems ?? [];
         }
     });
 
@@ -757,6 +749,66 @@
     let linkingItemId = $state<string | null>(null);
     let deletingItemId = $state<string | null>(null);
     let editingItem = $state<any | null>(null);
+
+    const editItemQuery = $derived(editingItem?.id && readItemRemote ? invokeRemote(readItemRemote, editingItem.id) : null);
+    let plainEditItemData = $state<any>(null);
+    let plainEditItemLoading = $state(false);
+    let plainEditItemError = $state<any>(null);
+
+    $effect(() => {
+        const q = editItemQuery;
+        if (!q) {
+            plainEditItemData = null;
+            plainEditItemLoading = false;
+            plainEditItemError = null;
+            return;
+        }
+        if ('current' in q) {
+            return;
+        }
+        if (typeof q.then === 'function') {
+            plainEditItemLoading = true;
+            plainEditItemError = null;
+            q.then((val: any) => {
+                if (editItemQuery === q) {
+                    plainEditItemData = val;
+                    plainEditItemLoading = false;
+                }
+            }).catch((err: any) => {
+                if (editItemQuery === q) {
+                    plainEditItemError = err;
+                    plainEditItemLoading = false;
+                }
+            });
+        } else {
+            plainEditItemData = q;
+            plainEditItemLoading = false;
+        }
+    });
+
+    const editItemData = $derived.by(() => {
+        if (!editItemQuery) return null;
+        if ('current' in editItemQuery) {
+            return editItemQuery.current ?? null;
+        }
+        return plainEditItemData;
+    });
+
+    const isEditItemLoading = $derived.by(() => {
+        if (!editItemQuery) return false;
+        if ('loading' in editItemQuery) {
+            return Boolean(editItemQuery.loading && editItemQuery.current === undefined);
+        }
+        return plainEditItemLoading;
+    });
+
+    const editItemError = $derived.by(() => {
+        if (!editItemQuery) return null;
+        if ('error' in editItemQuery) {
+            return editItemQuery.error;
+        }
+        return plainEditItemError;
+    });
 
     function isAssociated(item: T, list: T[]) {
         if (!item || !list || !Array.isArray(list)) return false;
@@ -907,13 +959,13 @@
             }
         }
 
-        let newItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
+        let newItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent || result?.price || result?.location;
         if (!newItem && result && typeof result === 'object' && 'id' in result) {
             newItem = result;
         }
 
         if (newId) {
-            if (readItemRemote) {
+            if (!newItem && readItemRemote) {
                 try {
                     const fullItem = await invokeRemote(readItemRemote, newId);
                     if (fullItem) {
@@ -957,12 +1009,12 @@
         editingItem = null;
         if (!targetId) return;
 
-        let updatedItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent;
+        let updatedItem = result?.data || result?.contact || result?.resource || result?.tag || result?.talent || result?.price || result?.location;
         if (!updatedItem && result && typeof result === 'object' && 'id' in result) {
             updatedItem = result;
         }
 
-        if (readItemRemote) {
+        if (!updatedItem && readItemRemote) {
             try {
                 const fullItem = await invokeRemote(readItemRemote, targetId);
                 if (fullItem) {
@@ -1502,36 +1554,34 @@
 
             <div style="overflow-y: auto; flex: 1; min-height: 0;">
                 <svelte:boundary>
-                    {#if editingItem && readItemRemote}
-                        {#key editingItem.id}
-                            {#await invokeRemote(readItemRemote, editingItem.id)}
-                                <div class="p-8 flex flex-col items-center justify-center gap-2">
-                                    <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                    <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
-                                </div>
-                            {:then fullItem}
-                                {@render renderForm({
-                                    remoteFunction: updateRemote,
-                                    schema: updateSchema,
-                                    initialData: fullItem,
-                                    isUpdating: true,
-                                    onSuccess: (result) => {
-                                        void handleInPlaceUpdateSuccess(
-                                            result,
-                                            currentAssociations,
-                                        );
-                                    },
-                                    onCancel: () => {
-                                        editingItem = null;
-                                    },
-                                    id: editingItem.id,
-                                })}
-                            {:catch error}
-                                <div class="p-8 text-center text-red-500 text-sm">
-                                    {error?.message || i18n.failedToLoadLabel}
-                                </div>
-                            {/await}
-                        {/key}
+                    {#if editingItem}
+                        {#if readItemRemote && isEditItemLoading && !editItemData}
+                            <div class="p-8 flex flex-col items-center justify-center gap-2">
+                                <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                            </div>
+                        {:else if readItemRemote && editItemError}
+                            <div class="p-8 text-center text-red-500 text-sm">
+                                {editItemError?.message || i18n.failedToLoadLabel}
+                            </div>
+                        {:else}
+                            {@render renderForm({
+                                remoteFunction: updateRemote,
+                                schema: updateSchema,
+                                initialData: (readItemRemote ? editItemData : editingItem) ?? editingItem,
+                                isUpdating: true,
+                                onSuccess: (result) => {
+                                    void handleInPlaceUpdateSuccess(
+                                        result,
+                                        currentAssociations,
+                                    );
+                                },
+                                onCancel: () => {
+                                    editingItem = null;
+                                },
+                                id: editingItem.id,
+                            })}
+                        {/if}
                     {:else if showQuickCreate}
                         {@render renderForm({
                             remoteFunction: createRemote,

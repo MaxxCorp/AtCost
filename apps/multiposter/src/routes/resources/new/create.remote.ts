@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { resource, resourceRelation, resourceLocation as resourceLocationTable } from '@ac/db';
 import { listResources } from '../list.remote';
@@ -104,11 +104,17 @@ export const createResource = form(createResourceSchema, async (data) => {
         }
 
         console.log('Refreshing queries...');
-        await listResources().refresh();
-        await listResourcesWithHierarchy().refresh();
+        try {
+            await requested(listResources, 20).refreshAll();
+            await requested(listResourcesWithHierarchy, 20).refreshAll();
+        } catch { /* ignore */ }
+        void listResources().refresh();
+        void listResources({}).refresh();
+        void listResourcesWithHierarchy().refresh();
+        void listResourcesWithHierarchy({}).refresh();
 
         console.log('--- createResource SUCCESS ---');
-        return { success: true, resource: newResource };
+        return { success: true, resource: newResource, id: newResource.id };
 
     } catch (err: any) {
         console.error('--- createResource ERROR ---');

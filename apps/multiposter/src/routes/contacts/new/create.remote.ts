@@ -1,4 +1,4 @@
-import { form, getRequestEvent } from '$app/server';
+import { form, getRequestEvent, requested } from '$app/server';
 import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress,
@@ -193,7 +193,9 @@ export const createContact = form(createContactSchema, async (input) => {
         } as Contact;
 
         await invalidateContact(contactId);
-        await listContacts().refresh();
+        try { await requested(listContacts, 20).refreshAll(); } catch { /* ignore */ }
+        void listContacts().refresh();
+        void listContacts({}).refresh();
         return { success: true, id: contactId, contact: transformed };
 
     } catch (err: any) {

@@ -167,11 +167,8 @@ export const deleteEvents = command(
 		} catch (e) {
 			console.warn('[deleteEvents] requested refresh warning:', e);
 		}
-		try {
-			await listEvents().refresh();
-		} catch (e) {
-			console.warn('[deleteEvents] listEvents refresh warning:', e);
-		}
+		void listEvents().refresh();
+		void listEvents({}).refresh();
 		return { success: true, deletedCount: eventIdsToDelete.length };
 	}
 );

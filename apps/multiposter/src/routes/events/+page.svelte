@@ -359,7 +359,7 @@
 				await deleteEvents({ ids: [event.id] });
 			}
 			toast.success(m.delete_successful());
-			await listEvents(filterState).refresh();
+			await eventsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
 		}
@@ -471,6 +471,8 @@
 	let selectedIds = $state<string[]>([]);
 	let isBulkUpdatingStatus = $state(false);
 
+	const migrationStatusQuery = checkSeriesMigrationStatus();
+	const migrationStatus = $derived(migrationStatusQuery.current);
 	const eventsQuery = $derived(listEvents(filterState));
 	const eventsRes = $derived(eventsQuery.current);
 	const rawEvents = $derived(eventsRes?.data ?? []);
@@ -577,48 +579,46 @@
 		</div>
 
 		<!-- Series Migration Banner -->
-		{#await checkSeriesMigrationStatus() then migStatus}
-			{#if migStatus?.hasLegacyData}
-				<div
-					class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl shadow-sm mb-6"
-				>
-					<div class="flex items-center gap-3">
-						<div class="p-2.5 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-xl shrink-0">
-							<RefreshCw size={20} />
-						</div>
-						<div>
-							<h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-								Upgrade Event Series Architecture
-							</h3>
-							<p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-								{migStatus.totalItems} legacy record(s) detected. Migrate to the high-performance calendar engine to eliminate redundant instances and optimize sync.
-							</p>
-						</div>
+		{#if migrationStatus?.hasLegacyData}
+			<div
+				class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl shadow-sm mb-6"
+			>
+				<div class="flex items-center gap-3">
+					<div class="p-2.5 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300 rounded-xl shrink-0">
+						<RefreshCw size={20} />
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						class="bg-white dark:bg-gray-800 shadow-sm gap-2 shrink-0 self-end sm:self-center font-medium"
-						onclick={() => (showMigrationDialog = true)}
-					>
-						<RefreshCw size={14} />
-						Migrate Series
-					</Button>
-
-					{#if showMigrationDialog}
-						<SeriesMigrationDialog
-							bind:open={showMigrationDialog}
-							statusData={migStatus}
-							oncomplete={() => {
-								checkSeriesMigrationStatus().refresh();
-								listEvents(filterState).refresh();
-							}}
-							onclose={() => (showMigrationDialog = false)}
-						/>
-					{/if}
+					<div>
+						<h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+							Upgrade Event Series Architecture
+						</h3>
+						<p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+							{migrationStatus.totalItems} legacy record(s) detected. Migrate to the high-performance calendar engine to eliminate redundant instances and optimize sync.
+						</p>
+					</div>
 				</div>
-			{/if}
-		{/await}
+				<Button
+					variant="outline"
+					size="sm"
+					class="bg-white dark:bg-gray-800 shadow-sm gap-2 shrink-0 self-end sm:self-center font-medium"
+					onclick={() => (showMigrationDialog = true)}
+				>
+					<RefreshCw size={14} />
+					Migrate Series
+				</Button>
+
+				{#if showMigrationDialog}
+					<SeriesMigrationDialog
+						bind:open={showMigrationDialog}
+						statusData={migrationStatus}
+						oncomplete={async () => {
+							await migrationStatusQuery.refresh();
+							await eventsQuery.refresh();
+						}}
+						onclose={() => (showMigrationDialog = false)}
+					/>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Action Bar -->
 		<div class="flex flex-col md:flex-row gap-3 mb-6">

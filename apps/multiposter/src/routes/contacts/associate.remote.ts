@@ -1,4 +1,4 @@
-import { command, query } from '$app/server';
+import { command, query, requested } from '$app/server';
 import { db } from '@ac/db';
 import { 
     userContact, locationContact, resourceContact, eventContact, announcementContact,
@@ -61,6 +61,11 @@ export const addAssociation = command(associationSchema, async (data) => {
         await syncService.syncContactAssociationsChange(user.id, entityId, contactId, 'link');
     }
 
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+    }
+    try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
 });
@@ -95,6 +100,11 @@ export const removeAssociation = command(associationSchema, async (data) => {
         await syncService.syncContactAssociationsChange(user.id, entityId, contactId, 'unlink');
     }
 
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+    }
+    try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
 });
@@ -127,6 +137,11 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
         await syncService.syncContactAssociationsChange(user.id, targetEntityId, contactId, 'status_update');
     }
 
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+    }
+    try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
 });

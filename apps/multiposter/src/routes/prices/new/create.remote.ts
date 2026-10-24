@@ -53,17 +53,23 @@ export const createPrice = form(createPriceSchema, async (data) => {
         }
         try {
             await listPrices().refresh();
+            void listPrices({}).refresh();
+            void listPrices({ isTemplate: true, limit: 100 }).refresh();
         } catch (refreshErr) {
             console.warn('--- createPrice refresh warning ---', refreshErr);
         }
 
+        const formattedResult = {
+            ...result,
+            createdAt: result.createdAt.toISOString(),
+            updatedAt: result.updatedAt.toISOString(),
+        };
+
         return {
             success: true,
-            data: {
-                ...result,
-                createdAt: result.createdAt.toISOString(),
-                updatedAt: result.updatedAt.toISOString(),
-            }
+            id: result.id,
+            price: formattedResult,
+            data: formattedResult
         };
     } catch (err: any) {
         console.error('--- createPrice ERROR ---', err);

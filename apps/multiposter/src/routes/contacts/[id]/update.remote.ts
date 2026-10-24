@@ -1,4 +1,4 @@
-import { form, getRequestEvent } from '$app/server';
+import { form, getRequestEvent, requested } from '$app/server';
 import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress,
@@ -9,6 +9,7 @@ import { updateContactSchema, type Contact } from '#lib/validations/contacts.js'
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { generateContactAssets } from '#lib/server/contacts.js';
 import { listContacts } from '../list.remote';
+import { fetchEntityContacts } from '../associate.remote';
 import { readContact } from './read.remote';
 import { invalidateContact } from '#lib/server/cache/index.js';
 
@@ -261,7 +262,12 @@ export const updateContact = form(updateContactSchema, async (input) => {
         console.log('--- updateContact SUCCESS ---');
         await invalidateContact(id);
         readContact(id).set(transformed);
-        await listContacts().refresh();
+        try {
+            await requested(listContacts, 20).refreshAll();
+            await requested(fetchEntityContacts, 20).refreshAll();
+        } catch { /* ignore */ }
+        void listContacts().refresh();
+        void listContacts({}).refresh();
         return { success: true, contact: transformed };
 
     } catch (err: any) {

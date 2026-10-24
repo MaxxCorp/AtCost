@@ -1,4 +1,4 @@
-import { command, query } from '$app/server';
+import { command, query, requested } from '$app/server';
 import { db } from '@ac/db';
 import { eventResource, resource, announcementResource, kioskResource, resourceLocation } from '@ac/db';
 import { eq } from '@ac/db';
@@ -6,6 +6,9 @@ import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js
 import { resourceAssociationSchema, getResourceAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import { readEvent } from '../events/[id]/read.remote.js';
+import { syncService } from '#lib/server/sync/service.js';
 
 const tableMap = {
     event: eventResource,
@@ -20,8 +23,6 @@ const fieldMap = {
     kiosk: 'kioskId',
     location: 'locationId'
 } as const;
-
-import { syncService } from '#lib/server/sync/service.js';
 
 export const addResourceAssociation = command(resourceAssociationSchema, async (data) => {
     const user = getAuthenticatedUser();
@@ -39,10 +40,17 @@ export const addResourceAssociation = command(resourceAssociationSchema, async (
         userId: user?.id
     });
     
-    if (type === 'event' && user?.id) {
-        await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'link');
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+        if (user?.id) {
+            await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'link');
+        }
     }
 
+    try {
+        await requested(fetchEntityResources, 20).refreshAll();
+    } catch { /* ignore */ }
     await fetchEntityResources({ type, entityId }).refresh();
     return { success: true };
 });
@@ -63,10 +71,17 @@ export const removeResourceAssociation = command(resourceAssociationSchema, asyn
         userId: user?.id
     });
     
-    if (type === 'event' && user?.id) {
-        await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'unlink');
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+        if (user?.id) {
+            await syncService.syncResourceAssociationsChange(user.id, entityId, resourceId, 'unlink');
+        }
     }
 
+    try {
+        await requested(fetchEntityResources, 20).refreshAll();
+    } catch { /* ignore */ }
     await fetchEntityResources({ type, entityId }).refresh();
     return { success: true };
 });
@@ -97,4 +112,3 @@ export const fetchEntityResources = query(getResourceAssociationsSchema, async (
         updatedAt: r.resource.updatedAt.toISOString(),
     }));
 });
-

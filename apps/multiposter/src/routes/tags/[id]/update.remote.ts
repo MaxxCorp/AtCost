@@ -3,6 +3,7 @@ import { db, tag, eq } from '@ac/db';
 import { ensureAccess, getAuthenticatedUser } from '#lib/server/authorization.js';
 import { updateTagSchema } from '@ac/validations';
 import { listTags } from '../list.remote.js';
+import { readTag } from './read.remote.js';
 
 export const updateTag = form(updateTagSchema, async (input) => {
     const user = getAuthenticatedUser();
@@ -19,10 +20,15 @@ export const updateTag = form(updateTagSchema, async (input) => {
         .where(eq(tag.id, input.id))
         .returning();
 
+    if (updatedTag) {
+        readTag(input.id).set(updatedTag);
+    }
+
     try {
         await requested(listTags, 20).refreshAll();
     } catch { /* ignore */ }
     void listTags().refresh();
+    void listTags({}).refresh();
     void listTags({ limit: 50 }).refresh();
 
     return { success: true, tag: updatedTag, ...updatedTag };

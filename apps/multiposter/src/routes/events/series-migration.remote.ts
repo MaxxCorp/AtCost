@@ -1,4 +1,4 @@
-import { query, command } from '$app/server';
+import { query, command, requested } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { db } from '@ac/db';
 import {
@@ -312,7 +312,12 @@ export const processSeriesMigrationBatch = command(
 				.where(eq(syncOperationTable.id, operationId));
 
 			await invalidateEvent();
-			await listEvents().refresh();
+			void checkSeriesMigrationStatus().refresh();
+			try {
+				await requested(listEvents, 20).refreshAll();
+			} catch { /* ignore */ }
+			void listEvents().refresh();
+			void listEvents({}).refresh();
 		} else {
 			await db
 				.update(syncOperationTable)

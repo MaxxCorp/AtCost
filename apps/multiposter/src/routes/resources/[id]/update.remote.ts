@@ -1,9 +1,10 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { resource, resourceRelation, resourceLocation as resourceLocationTable } from '@ac/db';
 import { eq, and } from '@ac/db';
 import { listResources } from '../list.remote';
 import { listResourcesWithHierarchy } from '../list-with-hierarchy.remote';
+import { fetchEntityResources } from '../associate.remote';
 import { readResource } from './read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { updateResourceSchema } from '#lib/validations/resources.js';
@@ -131,12 +132,19 @@ export const updateResource = form(updateResourceSchema, async (data) => {
         };
 
         readResource(data.id).set(updatedResource);
-        await listResources().refresh();
-        await listResourcesWithHierarchy().refresh();
+        try {
+            await requested(listResources, 20).refreshAll();
+            await requested(listResourcesWithHierarchy, 20).refreshAll();
+            await requested(fetchEntityResources, 20).refreshAll();
+        } catch { /* ignore */ }
+        void listResources().refresh();
+        void listResources({}).refresh();
+        void listResourcesWithHierarchy().refresh();
+        void listResourcesWithHierarchy({}).refresh();
         await syncService.syncResourceConfigChange(user.id, data.id);
 
         console.log('--- updateResource SUCCESS ---');
-        return { success: true, resource: updated };
+        return { success: true, resource: updatedResource, id: data.id };
 
     } catch (err: any) {
         console.error('--- updateResource ERROR ---');

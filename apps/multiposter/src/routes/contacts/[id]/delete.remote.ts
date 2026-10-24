@@ -1,10 +1,11 @@
 import * as v from 'valibot';
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db } from '@ac/db';
 import { contact } from '@ac/db';
 import { inArray, and, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { listContacts } from '../list.remote';
+import { fetchEntityContacts } from '../associate.remote';
 import { getStorageProvider } from '#lib/server/blob-storage/index.js';
 import { invalidateContact } from '#lib/server/cache/index.js';
 
@@ -37,7 +38,12 @@ export const deleteContact = command(deleteContactsSchema, async (ids) => {
     }
 
     await invalidateContact(deletedIds);
-    await listContacts().refresh();
+    try {
+        await requested(listContacts, 20).refreshAll();
+        await requested(fetchEntityContacts, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listContacts().refresh();
+    void listContacts({}).refresh();
     return { count: result.length, ids: deletedIds };
 });
 

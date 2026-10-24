@@ -1,4 +1,4 @@
-import { form, getRequestEvent } from '$app/server';
+import { form, getRequestEvent, requested } from '$app/server';
 import { error } from "@sveltejs/kit";
 import { db } from '@ac/db';
 import { event, eventResource, eventContact, eventContactRole, eventLocation, tag, eventTag, eventPrice, recurringSeries, campaign, syncConfig } from '@ac/db';
@@ -309,7 +309,9 @@ export const createEvent = form(createEventSchema, async (data) => {
 		}
 
 		await invalidateEvent([newEvent.id]);
-		await listEvents().refresh();
+		try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+		void listEvents().refresh();
+		void listEvents({}).refresh();
 		console.log('--- createEvent DONE ---');
 		return { success: true };
 	} catch (err: any) {

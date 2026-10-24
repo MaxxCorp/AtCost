@@ -1,9 +1,11 @@
-import { command, query } from '$app/server';
+import { command, query, requested } from '$app/server';
 import { db, eventPrice, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { priceAssociationSchema, getPriceAssociationsSchema } from '@ac/validations';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import { readEvent } from '../events/[id]/read.remote.js';
 
 const tableMap = {
     event: eventPrice,
@@ -31,6 +33,11 @@ export const addPriceAssociation = command(priceAssociationSchema, async (data) 
         userId: user?.id
     });
 
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+    }
+    try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
     await fetchEntityPrices({ type, entityId }).refresh();
     return { success: true };
 });
@@ -53,6 +60,11 @@ export const removePriceAssociation = command(priceAssociationSchema, async (dat
         userId: user?.id
     });
 
+    if (type === 'event') {
+        await invalidateEvent(entityId);
+        void readEvent(entityId).refresh();
+    }
+    try { await requested(fetchEntityPrices, 20).refreshAll(); } catch { /* ignore */ }
     await fetchEntityPrices({ type, entityId }).refresh();
     return { success: true };
 });
