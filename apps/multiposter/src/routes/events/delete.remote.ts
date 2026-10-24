@@ -60,7 +60,9 @@ export const deleteEvents = command(
 			}
 
 			if (realIds.length === 0) {
-				await listEvents().refresh();
+				try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+				void listEvents().refresh();
+				void listEvents({}).refresh();
 				return { success: true, deletedCount: virtualIds.length };
 			}
 		}

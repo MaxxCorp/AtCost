@@ -33,7 +33,7 @@
 	} from "@lucide/svelte";
 	import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
 	import { toast } from "svelte-sonner";
-	import { onMount, untrack } from "svelte";
+	import { onMount, untrack, tick } from "svelte";
 	import { SvelteDate } from "svelte/reactivity";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 	import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
@@ -43,7 +43,7 @@
 		getStatusBadgeClass,
 		getStatusDotClass,
 	} from "#lib/utils/format-event-status.js";
-	import { goto } from "$app/navigation";
+	import { goto, afterNavigate } from "$app/navigation";
 	import {
 		formatFriendlyEventTime,
 		getEventDurationDays,
@@ -289,6 +289,8 @@
 			console.error("Failed to load preferences", e);
 		} finally {
 			isInitialized = true;
+			await tick();
+			void eventsQuery.refresh();
 		}
 	});
 
@@ -400,6 +402,18 @@
 					: (b.startDateTime ? new Date(b.startDateTime).getTime() : 0);
 				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
 			});
+		} else if (sortField === "createdAt") {
+			grouped.sort((a: any, b: any) => {
+				const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+				const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+			});
+		} else {
+			grouped.sort((a: any, b: any) => {
+				const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+				const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+			});
 		}
 
 		return grouped;
@@ -474,6 +488,10 @@
 	const migrationStatusQuery = checkSeriesMigrationStatus();
 	const migrationStatus = $derived(migrationStatusQuery.current);
 	const eventsQuery = $derived(listEvents(filterState));
+
+	afterNavigate(() => {
+		void eventsQuery.refresh();
+	});
 	const eventsRes = $derived(eventsQuery.current);
 	const rawEvents = $derived(eventsRes?.data ?? []);
 	const displayedEvents = $derived(

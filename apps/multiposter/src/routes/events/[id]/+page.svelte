@@ -121,12 +121,12 @@
                                     <DropdownMenu.Content align="end">
                                         <DropdownMenu.Item
                                             onclick={async () => {
-                                                await handleDelete({
+                                                const ok = await handleDelete({
                                                     ids: [event.id],
                                                     deleteFn: async (ids) => await deleteEventAction({ ids }),
                                                 itemName: m.instance().toLowerCase(),
                                                 });
-                                                goto(getLastListUrl("events", "/events"));
+                                                if (ok) await goto(getLastListUrl("events", "/events"));
                                             }}
                                         >
                                             <Trash2 size={14} class="mr-2" />
@@ -140,7 +140,7 @@
                                                 try {
                                                     await deleteEventAction({ ids: [event.id], deleteSeries: true });
                                                     toast.success(m.series_deleted());
-                                                    goto(getLastListUrl("events", "/events"));
+                                                    await goto(getLastListUrl("events", "/events"));
                                             } catch (err: any) {
                                                 toast.error(
                                                     err.message ||
@@ -161,12 +161,12 @@
                                     variant="destructive"
                                     loading={deleteEventAction.pending}
                                     onclick={async () => {
-                                        await handleDelete({
+                                        const ok = await handleDelete({
                                             ids: [event.id],
                                             deleteFn: async (ids) => await deleteEventAction({ ids }),
                                         itemName: m.event_label(),
                                         });
-                                        goto(getLastListUrl("events", "/events"));
+                                        if (ok) await goto(getLastListUrl("events", "/events"));
                                     }}
                             >
                                 {m.delete()}

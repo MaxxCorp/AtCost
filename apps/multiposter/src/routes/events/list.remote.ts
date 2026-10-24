@@ -876,6 +876,25 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
 			return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
 		});
+	} else if (sortField === 'createdAt') {
+		data.sort((a: any, b: any) => {
+			const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+			const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+			return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+		});
+	} else if (sortField === 'updatedAt') {
+		data.sort((a: any, b: any) => {
+			const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+			const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+			return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+		});
+	} else {
+		const idIndexMap = new Map(ids.map((id, idx) => [id, idx]));
+		data.sort((a: any, b: any) => {
+			const idxA = idIndexMap.get(a.id) ?? idIndexMap.get(a.recurringEventId) ?? 9999;
+			const idxB = idIndexMap.get(b.id) ?? idIndexMap.get(b.recurringEventId) ?? 9999;
+			return idxA - idxB;
+		});
 	}
 
 	return { data, total: includeSeriesEntries ? data.length : total };

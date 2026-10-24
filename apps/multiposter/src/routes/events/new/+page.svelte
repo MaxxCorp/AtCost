@@ -31,15 +31,16 @@
         <form
         {...rf.preflight(createEventSchema).enhance(async ({ submit }: any) => {
                 try {
-                    const result: any = await submit();
-                    if (result?.error) {
+                    const res = await submit();
+                    const result: any = (rf as any).result || res;
+                    if (res === false || result?.error || result?.success === false) {
                         toast.error(
-                            result.error.message || m.something_went_wrong(),
+                            result?.error?.message || result?.error || m.something_went_wrong(),
                         );
                         return;
                     }
                     toast.success(m.successfully_saved());
-                    goto("/events");
+                    await goto("/events");
                 } catch (error: any) {
                     toast.error(error?.message || m.something_went_wrong());
                 }
