@@ -31,6 +31,7 @@
         Lock,
         Utensils,
         Receipt,
+        Printer,
     } from "@lucide/svelte";
     import Button from "#lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
@@ -44,8 +45,13 @@
 
     import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
-    import SeriesModeSelector from "#lib/components/events/SeriesModeSelector.svelte";
     import PriceListView from "#lib/components/prices/PriceListView.svelte";
+    import {
+        formatDateDay,
+        formatDateMonth,
+        formatDateWeekday,
+        formatFullDate,
+    } from "#lib/utils/kiosk-flat-helpers.js";
 
     const eventId = $derived(page.params.id || "");
     const eventQuery = $derived(readEvent(eventId));
@@ -194,10 +200,6 @@
                 })}
 
                 <Breadcrumb feature="events" current={event.summary} />
-
-                <div class="mt-4">
-                    <SeriesModeSelector event={event} variant="banner" viewMode={true} />
-                </div>
 
                 <div
                     class="bg-white shadow-xl rounded-2xl p-5 md:p-8 mt-4 border border-gray-100 space-y-6"
@@ -454,16 +456,49 @@
                                             {/if}
 
 
-                                            {#if recurrenceRule}
-                                                <div class="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
-                                                    <RefreshCw size={14} class="text-blue-600 flex-shrink-0" />
-                                                    <span>{formatRecurrenceText(recurrenceRule)}</span>
-                                                </div>
-                                            {/if}
+                                            {#if recurrenceRule || isSeriesEvent(event)}
+                                                <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-2.5">
+                                                    <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-900 bg-indigo-100/90 px-2.5 py-1 rounded-md border border-indigo-200/80">
+                                                        <RefreshCw size={13} class="text-indigo-600 flex-shrink-0" />
+                                                        <span>{recurrenceRule ? formatRecurrenceText(recurrenceRule) : m.series_badge()}</span>
+                                                    </div>
 
-                                            {#if isSeriesEvent(event)}
-                                                <div class="mt-2">
-                                                    <SeriesModeSelector event={event} variant="inline" viewMode={true} />
+                                                    {#if eventInstances.length > 0}
+                                                        <div class="space-y-1.5">
+                                                            <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                                                <Calendar size={12} class="text-indigo-500" />
+                                                                <span>{m.all_instances_count?.({ count: eventInstances.length }) ?? `${eventInstances.length} ${m.instances()}`}</span>
+                                                            </div>
+                                                            <div class="flex flex-wrap items-center gap-1.5 max-h-52 overflow-y-auto pr-1 py-0.5">
+                                                                {#each eventInstances as inst (inst.id || inst.startDateTime)}
+                                                                    {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && !!inst.startDateTime && !!event.startDateTime && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
+                                                                    <a
+                                                                        href={`/events/${inst.id}/view`}
+                                                                        title={`${formatFullDate(inst.startDateTime)}${inst.status === 'cancelled' ? ` – ${m.cancelled()}` : inst.status === 'tentative' ? ` – ${m.tentative()}` : ''}`}
+                                                                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold tracking-tight transition-all shadow-2xs {inst.status === 'cancelled'
+                                                                            ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                                                                            : inst.status === 'tentative'
+                                                                              ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                                                                              : isCurrent
+                                                                                ? 'bg-indigo-600 text-white ring-2 ring-indigo-600/30'
+                                                                                : 'bg-slate-800 text-white hover:bg-slate-700'}"
+                                                                    >
+                                                                        <span class="{inst.status === 'cancelled' ? 'line-through opacity-75' : isCurrent ? 'text-indigo-100 font-medium' : 'text-slate-300 font-medium'}">
+                                                                            {formatDateWeekday(inst.startDateTime)}
+                                                                        </span>
+                                                                        <span class="{inst.status === 'cancelled' ? 'line-through opacity-75' : ''}">
+                                                                            {formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}
+                                                                        </span>
+                                                                        {#if inst.status === 'cancelled'}
+                                                                            <span class="bg-red-600 text-white text-[9px] font-black px-1 py-0.2 rounded uppercase ml-0.5">{m.cancelled()}</span>
+                                                                        {:else if inst.status === 'tentative'}
+                                                                            <span class="bg-amber-500 text-white text-[9px] font-black px-1 py-0.2 rounded uppercase ml-0.5">{m.tentative()}</span>
+                                                                        {/if}
+                                                                    </a>
+                                                                {/each}
+                                                            </div>
+                                                        </div>
+                                                    {/if}
                                                 </div>
                                             {/if}
                                         </div>
@@ -704,29 +739,31 @@
                     <Dialog.Root bind:open={pricesDialogOpen}>
                         <Dialog.Content class="max-w-3xl max-h-[90vh] overflow-y-auto">
                             <Dialog.Header>
-                                <div class="flex items-center gap-2 text-violet-700">
-                                    <Receipt size={22} />
-                                    <Dialog.Title class="text-xl font-bold text-gray-900">
-                                        {m.prices?.() || 'Prices'}
-                                    </Dialog.Title>
-                                </div>
+                                <Dialog.Title class="text-xl font-bold text-gray-900">
+                                    {m.price_list()}
+                                </Dialog.Title>
                                 <Dialog.Description class="text-sm text-gray-500">
-                                    {event.summary} - {m.feature_prices_description?.() || 'Items and prices for this event.'}
+                                    {event.summary}
                                 </Dialog.Description>
                             </Dialog.Header>
 
                             <div class="py-2">
-                                <PriceListView
-                                    prices={event.prices}
-                                    participantsCount={event.participantsCount || 1}
-                                    canEdit={checkCanEdit(event)}
-                                    eventSummary={event.summary}
-                                />
+                                <PriceListView prices={event.prices} />
                             </div>
 
                             <Dialog.Footer class="print:hidden">
+                                {#if checkCanEdit(event)}
+                                    <Button
+                                        variant="outline"
+                                        href={`/events/${event.id}/price-menu`}
+                                        class="flex items-center gap-2"
+                                    >
+                                        <Printer size={16} />
+                                        {m.price_menu_open()}
+                                    </Button>
+                                {/if}
                                 <Button variant="outline" onclick={() => (pricesDialogOpen = false)}>
-                                    {m.close?.() || 'Close'}
+                                    {m.close()}
                                 </Button>
                             </Dialog.Footer>
                         </Dialog.Content>

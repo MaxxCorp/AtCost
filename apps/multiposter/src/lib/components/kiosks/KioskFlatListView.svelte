@@ -240,7 +240,7 @@
 
     let events = $derived.by(() => {
         if (!compressSeries) return rawEvents;
-        return compressSeriesEvents(rawEvents, smallestGrouping);
+        return compressSeriesEvents(rawEvents, smallestGrouping, { includeEnd: true });
     });
 
     interface EventGroupNode {
@@ -1437,7 +1437,7 @@
                 {#if !isCompressed && eventRecurrenceRule}
                     <span class="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-medium">
                         <RefreshCw class="w-3 h-3 text-slate-500" />
-                        {formatRecurrenceText(eventRecurrenceRule, undefined, { omitLength: true })}
+                        {formatRecurrenceText(eventRecurrenceRule, { includeEnd: true })}
                     </span>
                 {/if}
 

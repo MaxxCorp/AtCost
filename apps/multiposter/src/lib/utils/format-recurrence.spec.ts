@@ -5,34 +5,34 @@ import { setLocale } from "#lib/paraglide/runtime.js";
 describe("formatRecurrenceText", () => {
     describe("English locale", () => {
         it("should format non-consecutive weekly recurrence", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO", "en");
+            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO", { locale: "en", includeEnd: true });
             expect(text.toLowerCase()).toContain("every 2 weeks");
             expect(text.toLowerCase()).toContain("monday");
         });
 
         it("should format monthly relative weekday recurrence (e.g. 2nd Monday)", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=2MO", "en");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=2MO", { locale: "en", includeEnd: true });
             expect(text.toLowerCase()).toContain("every month");
             expect(text.toLowerCase()).toContain("2nd monday");
         });
 
         it("should format 2-month interval with relative weekday (e.g. every 2 months on 2nd Monday)", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=2MO", "en");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=2MO", { locale: "en", includeEnd: true });
             expect(text.toLowerCase()).toContain("every 2 months");
             expect(text.toLowerCase()).toContain("2nd monday");
         });
 
         it("should format positional weekday rule", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO,TU,WE,TH,FR", "en");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO,TU,WE,TH,FR", { locale: "en", includeEnd: true });
             expect(text.toLowerCase()).toContain("weekday");
         });
 
         it("should format multiple positions (every 1st and 2nd Friday of a month)", () => {
-            const textSetpos = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1,2;BYDAY=FR", "en");
+            const textSetpos = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1,2;BYDAY=FR", { locale: "en", includeEnd: true });
             expect(textSetpos.toLowerCase()).toContain("every month");
             expect(textSetpos.toLowerCase()).toContain("1st and 2nd friday");
 
-            const textByday = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR", "en");
+            const textByday = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR", { locale: "en", includeEnd: true });
             expect(textByday.toLowerCase()).toContain("every month");
             expect(textByday.toLowerCase()).toContain("1st");
             expect(textByday.toLowerCase()).toContain("2nd");
@@ -42,23 +42,23 @@ describe("formatRecurrenceText", () => {
 
     describe("German locale", () => {
         it("should format non-consecutive weekly recurrence in German", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO", "de");
+            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO", { locale: "de", includeEnd: true });
             expect(text).toContain("alle 2 Wochen");
             expect(text).toContain("Montag");
         });
 
         it("should format monthly relative weekday recurrence in German (jeden Monat am 2. Montag)", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=2MO", "de");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=2MO", { locale: "de", includeEnd: true });
             expect(text).toContain("jeden Monat");
             expect(text).toContain("2. Montag");
         });
 
         it("should format 1st and 2nd Friday of a month in German (jeden Monat am 1. und 2. Freitag)", () => {
-            const textSetpos = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1,2;BYDAY=FR", "de");
+            const textSetpos = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1,2;BYDAY=FR", { locale: "de", includeEnd: true });
             expect(textSetpos).toContain("jeden Monat");
             expect(textSetpos).toContain("am 1. und 2. Freitag");
 
-            const textByday = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR", "de");
+            const textByday = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR", { locale: "de", includeEnd: true });
             expect(textByday).toContain("jeden Monat");
             expect(textByday).toContain("1.");
             expect(textByday).toContain("2.");
@@ -66,30 +66,30 @@ describe("formatRecurrenceText", () => {
         });
 
         it("should format 2-month interval with relative weekday in German (alle 2 Monate am 2. Montag)", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=2MO", "de");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=2MO", { locale: "de", includeEnd: true });
             expect(text).toContain("alle 2 Monate");
             expect(text).toContain("2. Montag");
         });
 
         it("should format positional weekday rule in German (am 1. Wochentag)", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO,TU,WE,TH,FR", "de");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO,TU,WE,TH,FR", { locale: "de", includeEnd: true });
             expect(text).toContain("Wochentag");
         });
 
         it("should format positional weekend day rule in German (am 2. Wochenendtag)", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=2;BYDAY=SA,SU", "de");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=2;BYDAY=SA,SU", { locale: "de", includeEnd: true });
             expect(text).toContain("Wochenendtag");
         });
 
         it("should format last Sunday of the month in German (am letzten Sonntag)", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=-1;BYDAY=SU", "de");
+            const text = formatRecurrenceText("RRULE:FREQ=MONTHLY;BYSETPOS=-1;BYDAY=SU", { locale: "de", includeEnd: true });
             expect(text).toContain("letzten Sonntag");
         });
     });
 
-    describe("omitLength option", () => {
+    describe("without series end", () => {
         it("should omit until date in English", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;UNTIL=20261231T000000Z;BYDAY=MO", "en", { omitLength: true });
+            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;UNTIL=20261231T000000Z;BYDAY=MO", { locale: "en" });
             expect(text.toLowerCase()).toContain("every week");
             expect(text.toLowerCase()).toContain("monday");
             expect(text.toLowerCase()).not.toContain("until");
@@ -97,7 +97,7 @@ describe("formatRecurrenceText", () => {
         });
 
         it("should omit until date in German", () => {
-            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;UNTIL=20261231T000000Z;BYDAY=MO", "de", { omitLength: true });
+            const text = formatRecurrenceText("RRULE:FREQ=WEEKLY;UNTIL=20261231T000000Z;BYDAY=MO", { locale: "de" });
             expect(text).toContain("jede Woche");
             expect(text).toContain("Montag");
             expect(text).not.toContain("bis");
@@ -105,11 +105,32 @@ describe("formatRecurrenceText", () => {
         });
 
         it("should omit count in English and German", () => {
-            const textEn = formatRecurrenceText("RRULE:FREQ=WEEKLY;COUNT=10;BYDAY=TU", "en", { omitLength: true });
+            const textEn = formatRecurrenceText("RRULE:FREQ=WEEKLY;COUNT=10;BYDAY=TU", { locale: "en" });
             expect(textEn.toLowerCase()).not.toContain("10 times");
 
-            const textDe = formatRecurrenceText("RRULE:FREQ=WEEKLY;COUNT=10;BYDAY=TU", "de", { omitLength: true });
+            const textDe = formatRecurrenceText("RRULE:FREQ=WEEKLY;COUNT=10;BYDAY=TU", { locale: "de" });
             expect(textDe).not.toContain("10 mal");
+        });
+    });
+
+    describe("short form", () => {
+        it("abbreviates monthly ordinals with end date (de)", () => {
+            expect(formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR;UNTIL=20261231T000000Z", { locale: "de", short: true, includeEnd: true }))
+                .toBe("monatl. 1. & 2. Fr - 31.12.26");
+        });
+
+        it("omits end by default", () => {
+            expect(formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR;UNTIL=20261231T000000Z", { locale: "de", short: true }))
+                .toBe("monatl. 1. & 2. Fr");
+        });
+
+        it("strings changing days together with commas", () => {
+            expect(formatRecurrenceText("RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR", { locale: "de", short: true })).toBe("wöchentl. Mo, Mi, Fr");
+        });
+
+        it("long form uses numeric end date (de)", () => {
+            expect(formatRecurrenceText("RRULE:FREQ=MONTHLY;BYDAY=1FR,2FR;UNTIL=20261231T000000Z", { locale: "de", includeEnd: true }))
+                .toBe("jeden Monat am 1. und 2. Freitag bis 31.12.2026");
         });
     });
 });

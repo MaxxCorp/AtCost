@@ -18,9 +18,9 @@ function generateFallbackSummaries(
     targetDensity: 'compact' | 'standard' | 'detailed'
 ): Record<string, FlyerItemSummary> {
     const wordLimits = {
-        compact: 20,
-        standard: 40,
-        detailed: 90
+        compact: 30,
+        standard: 60,
+        detailed: 120
     };
     const maxWords = wordLimits[targetDensity] || 40;
 

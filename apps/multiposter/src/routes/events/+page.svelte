@@ -892,7 +892,7 @@
 											{event.isSeriesInstance
 												? m.part_of_series({ title: event.seriesMaster?.summary || event.summary || '' })
 												: (event.recurrence && event.recurrence.length > 0
-													? formatRecurrenceText(event.recurrence)
+													? formatRecurrenceText(event.recurrence, { includeEnd: true })
 													: m.series_mode_label())}
 										</span>
 									</div>

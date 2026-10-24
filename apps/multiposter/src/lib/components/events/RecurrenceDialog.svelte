@@ -333,7 +333,7 @@
         }
     });
 
-    let previewText = $derived(previewRule ? formatRecurrenceText(previewRule) : "");
+    let previewText = $derived(previewRule ? formatRecurrenceText(previewRule, { includeEnd: true }) : "");
 </script>
 
 <Dialog.Root bind:open>

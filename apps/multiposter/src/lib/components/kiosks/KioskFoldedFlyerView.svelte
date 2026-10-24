@@ -418,7 +418,7 @@
                 }
             }
 
-            const recText = formatRecurrenceText(rruleStr, undefined, { omitLength: true });
+            const recText = formatRecurrenceText(rruleStr, { short: true });
 
             if (dates.length >= 1) {
                 compressed.push({
@@ -1232,7 +1232,7 @@
                             {@const itemRecurrenceRule = (Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null}
                             <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
                                 <RefreshCw class="w-2.5 h-2.5 text-indigo-500" />
-                                <span>{item.recurrenceText || (itemRecurrenceRule ? formatRecurrenceText(itemRecurrenceRule, undefined, { omitLength: true }) : m.series_badge())}</span>
+                                <span>{item.recurrenceText || (itemRecurrenceRule ? formatRecurrenceText(itemRecurrenceRule, { short: true }) : m.series_badge())}</span>
                             </span>
                         {/if}
                         <!-- Price Badge -->

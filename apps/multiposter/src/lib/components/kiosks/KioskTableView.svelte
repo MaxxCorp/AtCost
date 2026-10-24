@@ -282,7 +282,7 @@
                                         {#if itemRecurrenceRule}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-300 text-sm font-semibold">
                                                 <RefreshCw class="w-3.5 h-3.5" />
-                                                <span>{formatRecurrenceText(itemRecurrenceRule, undefined, { omitLength: true })}</span>
+                                                <span>{formatRecurrenceText(itemRecurrenceRule, { short: true })}</span>
                                             </div>
                                         {/if}
                                         {#if (item as any).resolvedContact}

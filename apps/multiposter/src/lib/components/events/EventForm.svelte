@@ -92,6 +92,7 @@
         Utensils,
         Receipt,
         Calculator,
+        Printer,
         Globe,
         X,
     } from "@lucide/svelte";
@@ -378,7 +379,7 @@
 
     let recurrenceText = $derived(
         rf.fields.recurrence.value()
-            ? formatRecurrenceText(rf.fields.recurrence.value() as string)
+            ? formatRecurrenceText(rf.fields.recurrence.value() as string, { includeEnd: true })
             : m.recurrence(),
     );
 
@@ -2063,6 +2064,22 @@
                 deselectAllLabel={m.deselect_all?.() || 'Deselect All'}
             >
 
+
+                {#snippet toolbarActions()}
+                    {#if initialData?.id && currentPrices.length > 0}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            href={`/events/${initialData.id}/price-menu`}
+                            target="_blank"
+                            rel="noopener"
+                            class="h-9 rounded-xl px-3 text-violet-700 hover:bg-violet-50"
+                        >
+                            <Printer size={16} class="mr-1.5" />
+                            <span class="text-sm font-semibold">{m.price_menu_open()}</span>
+                        </Button>
+                    {/if}
+                {/snippet}
 
                 {#snippet renderItemLabel(item: any)}
                     <div class="flex items-center gap-2">

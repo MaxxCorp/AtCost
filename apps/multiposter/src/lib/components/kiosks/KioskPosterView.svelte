@@ -495,6 +495,9 @@
         }
     });
 
+    // In 1- and 2-column mode the QR code/hero floats top-right and content wraps around/beneath it
+    let wrapAroundQr = $derived(effectiveColumns <= 2);
+
     // Month & Date Range derivation for Programme Title
     let programmeMonthTitle = $derived.by<string>(() => {
         return formatPosterProgrammeHeadline(kiosk, displayItems, customProgrammeTitle);
@@ -736,6 +739,31 @@
         }
     </style>
 </svelte:head>
+
+{#snippet rightVisuals(item: PosterDisplayItem, evt: EnrichedEvent, isEvt: boolean)}
+    <!-- Hero Image -->
+    {#if visibleComponents.heroImage && (item as any).heroImage}
+        <div class="overflow-hidden rounded-md border border-slate-200 bg-slate-100 shrink-0">
+            <img
+                src={(item as any).heroImage}
+                alt={evt.summary || "Event"}
+                class="{density === 'compact' ? 'w-14 h-10' : 'w-20 h-14'} object-cover"
+                loading="lazy"
+            />
+        </div>
+    {/if}
+
+    <!-- Scannable Event QR Code -->
+    {#if visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath)}
+        <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0 shadow-2xs">
+            <img
+                src={evt.qrCodeDataUrl || evt.qrCodePath}
+                alt="QR"
+                class="{density === 'compact' ? 'w-16 h-16' : density === 'relaxed' ? 'w-22 h-22' : 'w-18 h-18'} object-contain"
+            />
+        </div>
+    {/if}
+{/snippet}
 
 {#snippet customSectionCard(sec: CustomSectionItem, slotContext: string)}
     {@const colorBorder = sec.accentColor === 'red' ? 'border-l-red-600' : sec.accentColor === 'gold' ? 'border-l-[#fbc707]' : sec.accentColor === 'emerald' ? 'border-l-emerald-600' : 'border-l-slate-400'}
@@ -1491,6 +1519,7 @@
                         {@const cancelledCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'cancelled').length : 0}
                         {@const tentativeCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'tentative').length : 0}
                         {@const totalInstances = evt.seriesInstances ? evt.seriesInstances.length : (evt.seriesDates ? evt.seriesDates.length : 1)}
+                        {@const hasRightVisuals = Boolean((visibleComponents.heroImage && (item as any).heroImage) || (visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath)))}
                         {@const itemRecurrenceRule = isEvt ? ((Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null) : null}
 
                         <!-- Single Programme Entry (Avoid breaking inside columns - Highlight for Non-Repeating One-Offs) -->
@@ -1530,16 +1559,32 @@
                                 {/if}
 
                                 <!-- Event Details -->
-                                <div class="flex-1 min-w-0">
-                                    <!-- Meta Badges & Time Row -->
-                                    <div class="flex items-center flex-wrap gap-1.5 text-slate-500 font-medium mb-0.5 text-[10px]">
-                                        <!-- Series Recurrence or Multi-day Badge -->
+                                <div class="flex-1 min-w-0 flow-root">
+                                    {#if wrapAroundQr && hasRightVisuals}
+                                        <!-- Floated visuals (top-aligned): content flows beside, then beneath once the space left of it is used up -->
+                                        <div class="float-right ml-2 mb-1 flex items-start gap-1.5">
+                                            {@render rightVisuals(item, evt, isEvt)}
+                                        </div>
+                                    {/if}
+
+                                    <!-- Title, recurrence and meta badges: one continuous wrapping line (line break only before series dates) -->
+                                    <div class="text-slate-500 font-medium mb-0.5 text-[10px] [&>*]:mr-1.5 [&>*]:mb-0.5 [&>*]:align-middle">
+                                        <h3 class="inline mr-1.5 font-bold text-slate-900 leading-snug tracking-tight {density === 'compact' ? 'text-xs' : density === 'relaxed' ? 'text-sm' : 'text-[13px]'} {evt.status === 'cancelled' ? 'line-through text-slate-400' : ''}">
+                                            {isEvt ? (item as Event).summary : (item as Announcement).title}
+                                        </h3>
                                         {#if isCompressed}
                                             <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-900 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
                                                 <RefreshCw class="w-2.5 h-2.5" />
                                                 {evt.recurrenceText || m.series_badge()}
                                             </span>
-                                        {:else if multiDay}
+                                        {:else if isEvt && itemRecurrenceRule}
+                                            <span class="inline-flex items-center gap-1 text-slate-600 font-medium text-[9px]">
+                                                <RefreshCw class="w-2.5 h-2.5 text-slate-500" />
+                                                {formatRecurrenceText(itemRecurrenceRule, { short: true })}
+                                            </span>
+                                        {/if}
+                                        <!-- Multi-day Badge -->
+                                        {#if multiDay && !isCompressed}
                                             <span class="inline-flex items-center gap-1 bg-indigo-100 text-indigo-900 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
                                                 <Calendar class="w-2.5 h-2.5" />
                                                 {m.multi_day_badge()}
@@ -1634,25 +1679,12 @@
                                                 </span>
                                             {/if}
                                         {/if}
-
-                                        <!-- Recurrence text for unrolled series -->
-                                        {#if !isCompressed && isEvt && itemRecurrenceRule}
-                                            <span class="inline-flex items-center gap-1 text-slate-600 font-medium text-[9px]">
-                                                <RefreshCw class="w-2.5 h-2.5 text-slate-500" />
-                                                {formatRecurrenceText(itemRecurrenceRule, undefined, { omitLength: true })}
-                                            </span>
-                                        {/if}
                                     </div>
-
-                                    <!-- Title -->
-                                    <h3 class="font-bold text-slate-900 leading-snug tracking-tight {density === 'compact' ? 'text-xs' : density === 'relaxed' ? 'text-sm' : 'text-[13px]'} {evt.status === 'cancelled' ? 'line-through text-slate-400' : ''}">
-                                        {isEvt ? (item as Event).summary : (item as Announcement).title}
-                                    </h3>
 
                                     <!-- Compressed Series Dates Pills with per-instance status -->
                                     {#if isCompressed && evt.seriesInstances && evt.seriesInstances.length >= 1}
-                                        <div class="mt-1 flex items-center gap-1 flex-wrap">
-                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                        <div class="mt-1 [&>*]:mr-1 [&>*]:mb-0.5 [&>*]:align-middle">
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider inline-flex items-center gap-1">
                                                 <Calendar class="w-2.5 h-2.5 text-indigo-500" />
                                                 <span>{m.all_instances_count?.({ count: evt.seriesInstances.length }) ?? `${evt.seriesInstances.length} Termine`}:</span>
                                             </span>
@@ -1684,8 +1716,8 @@
                                             {/each}
                                         </div>
                                     {:else if isCompressed && evt.seriesDates && evt.seriesDates.length >= 1}
-                                        <div class="mt-1 flex items-center gap-1 flex-wrap">
-                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                        <div class="mt-1 [&>*]:mr-1 [&>*]:mb-0.5 [&>*]:align-middle">
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider inline-flex items-center gap-1">
                                                 <Calendar class="w-2.5 h-2.5 text-indigo-500" />
                                                 <span>{m.all_instances_count?.({ count: evt.seriesDates.length }) ?? `${evt.seriesDates.length} Termine`}:</span>
                                             </span>
@@ -1707,7 +1739,7 @@
                                                     <Users class="w-2.5 h-2.5 text-slate-400" />
                                                     <span>{m.component_contacts()} ({allContacts.length})</span>
                                                 </div>
-                                                <div class="flex flex-wrap items-center gap-1">
+                                                <div class="[&>*]:mr-1 [&>*]:mb-0.5 [&>*]:align-middle">
                                                     {#each allContacts as c (c.id || c.name || getContactName(c))}
                                                         {@const cName = getContactName(c)}
                                                         {@const cRoles = getContactRoles(c)}
@@ -1751,7 +1783,7 @@
                                     {#if visibleComponents.descriptions && descriptionStyle !== "none"}
                                         {@const rawDesc = isEvt ? (item as Event).description : (item as Announcement).content}
                                         {#if rawDesc && rawDesc.trim()}
-                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {descriptionStyle === 'short' ? 'line-clamp-2' : ''} text-[10px]">
+                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
                                                 {@html rawDesc}
                                             </div>
                                         {/if}
@@ -1772,7 +1804,7 @@
 
                                     <!-- Tags -->
                                     {#if visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0}
-                                        <div class="mt-0.5 flex items-center gap-1 flex-wrap">
+                                        <div class="mt-0.5 [&>*]:mr-1 [&>*]:align-middle">
                                             {#each (item as any).tags as t}
                                                 <span class="text-[8.5px] px-1 py-0.2 bg-slate-100 text-slate-500 rounded border border-slate-200">
                                                     #{typeof t === 'string' ? t : t.name || t.tag?.name}
@@ -1783,30 +1815,9 @@
                                 </div>
 
                                 <!-- Right Side Visuals (Hero Image & QR Code) -->
-                                {#if (visibleComponents.heroImage && (item as any).heroImage) || (visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath))}
+                                {#if !wrapAroundQr && hasRightVisuals}
                                     <div class="shrink-0 flex items-center gap-1.5 self-start pt-1">
-                                        <!-- Hero Image -->
-                                        {#if visibleComponents.heroImage && (item as any).heroImage}
-                                            <div class="overflow-hidden rounded-md border border-slate-200 bg-slate-100 shrink-0">
-                                                <img
-                                                    src={(item as any).heroImage}
-                                                    alt={evt.summary || "Event"}
-                                                    class="{density === 'compact' ? 'w-14 h-10' : 'w-20 h-14'} object-cover"
-                                                    loading="lazy"
-                                                />
-                                            </div>
-                                        {/if}
-
-                                        <!-- Scannable Event QR Code -->
-                                        {#if visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath)}
-                                            <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0 shadow-2xs">
-                                                <img
-                                                    src={evt.qrCodeDataUrl || evt.qrCodePath}
-                                                    alt="QR"
-                                                    class="{density === 'compact' ? 'w-16 h-16' : density === 'relaxed' ? 'w-22 h-22' : 'w-18 h-18'} object-contain"
-                                                />
-                                            </div>
-                                        {/if}
+                                        {@render rightVisuals(item, evt, isEvt)}
                                     </div>
                                 {/if}
                             </div>

@@ -400,6 +400,29 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		};
 	}).filter(Boolean);
 
+	// Guests only get customer-facing price data (no purchase costs, markups or linked consumables/recipes)
+	const publicEventPrices = eventPrices.map((p: any) => ({
+		id: p.id,
+		name: p.name,
+		description: p.description,
+		isTemplate: p.isTemplate,
+		createdAt: p.createdAt,
+		updatedAt: p.updatedAt,
+		totalPricePerPortion: p.totalPricePerPortion,
+		items: (p.items || []).map((it: any) => ({
+			id: it.id,
+			priceId: it.priceId,
+			itemType: it.itemType,
+			name: it.name,
+			description: it.description,
+			portionAmount: it.portionAmount,
+			unit: it.unit,
+			unitPrice: it.unitPrice,
+			sortOrder: it.sortOrder,
+			tags: it.tags,
+		})),
+	}));
+
 	const iCalPath = result.id.includes('_inst_') ? `/api/events/${result.id}/event.ics` : (result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`);
 	const qrCodePath = result.id.includes('_inst_') ? `/api/events/${result.id}/qr.png` : (result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`);
 
@@ -432,7 +455,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			resolvedContact,
 			contactIds: [],
 			syncIds: [],
-			prices: eventPrices,
+			prices: publicEventPrices,
 			priceIds: (result.prices || []).map((p: any) => p.priceId),
 			iCalPath,
 			qrCodePath,

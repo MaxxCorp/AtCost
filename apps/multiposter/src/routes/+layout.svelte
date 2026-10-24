@@ -40,7 +40,9 @@
 		page.url.pathname.startsWith("/kiosks/") || kioskState.isKiosk,
 	);
 	let isKioskView = $derived(
-		page.url.pathname.includes("/view") || kioskState.isKiosk,
+		page.url.pathname.includes("/view") ||
+			page.url.pathname.endsWith("/price-menu") ||
+			kioskState.isKiosk,
 	);
 
 	import { getLastListUrl } from "@ac/ui";

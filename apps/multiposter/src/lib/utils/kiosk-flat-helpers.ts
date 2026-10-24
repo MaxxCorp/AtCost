@@ -1,5 +1,5 @@
 import { type Event, type Announcement } from "@ac/validations";
-import { formatRecurrenceText } from "./format-recurrence.js";
+import { formatRecurrenceText, type FormatRecurrenceOptions } from "./format-recurrence.js";
 import { isSeriesItem, getSeriesRootId } from "./event-series.js";
 import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from "./kiosk-dates.js";
 import * as m from "#lib/paraglide/messages.js";
@@ -226,7 +226,8 @@ export function formatFullDate(dateStr: string | null | undefined): string {
 
 export function compressSeriesEvents(
     eventList: EnrichedEvent[],
-    smallest: "day" | "week" | "month" | "none" = "none"
+    smallest: "day" | "week" | "month" | "none" = "none",
+    recurrenceOptions: FormatRecurrenceOptions = { short: true }
 ): EnrichedEvent[] {
     const seriesGroups = new Map<string, EnrichedEvent[]>();
     const nonSeriesEvents: EnrichedEvent[] = [];
@@ -313,7 +314,7 @@ export function compressSeriesEvents(
             }
         }
 
-        const recText = formatRecurrenceText(rruleStr, undefined, { omitLength: true });
+        const recText = formatRecurrenceText(rruleStr, recurrenceOptions);
 
         if (instances.length >= 1) {
             const allCancelled = instances.every(i => i.status === 'cancelled');
