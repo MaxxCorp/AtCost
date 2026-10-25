@@ -427,11 +427,17 @@
                         <option value="table">{m.table_view_list()}</option>
                         <option value="flat_list">{m.flat_list_print_export()}</option>
                         <option value="folded_flyer">{m.folded_flyer_print_template()}</option>
+                        <option value="folded_flyer_ci">{m.folded_flyer_ci_template()}</option>
                         <option value="poster">{m.poster_print_template()}</option>
+                        <option value="poster_ci">{m.poster_ci_template()}</option>
                     </select>
-                    {#if uiMode === "poster"}
+                    {#if uiMode === "poster" || uiMode === "poster_ci"}
                         <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                            {m.poster_print_template()} – Shows all events on one A4/A3 portrait page with location & sponsor logos and letterhead support.
+                            {uiMode === 'poster_ci' ? m.poster_ci_template() : m.poster_print_template()} – Shows all events on one A4/A3 portrait page with corporate identity triangles, location & sponsor logos, and flexible print options.
+                        </p>
+                    {:else if uiMode === "folded_flyer_ci"}
+                        <p class="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
+                            {m.folded_flyer_ci_template()} – Folded flyer with corporate identity triangles, line & background color presets, and cost-saving print options.
                         </p>
                     {/if}
                 </div>

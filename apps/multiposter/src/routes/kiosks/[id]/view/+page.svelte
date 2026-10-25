@@ -8,7 +8,9 @@
     import KioskTableView from "#lib/components/kiosks/KioskTableView.svelte";
     import KioskFlatListView from "#lib/components/kiosks/KioskFlatListView.svelte";
     import KioskFoldedFlyerView from "#lib/components/kiosks/KioskFoldedFlyerView.svelte";
+    import KioskFoldedFlyerCiView from "#lib/components/kiosks/KioskFoldedFlyerCiView.svelte";
     import KioskPosterView from "#lib/components/kiosks/KioskPosterView.svelte";
+    import KioskPosterViewCi from "#lib/components/kiosks/KioskPosterViewCi.svelte";
     import { type Event, type Announcement } from "@ac/validations";
 
     import { browser } from '$app/env';
@@ -43,7 +45,7 @@
     }
 
     function resetInactivity() {
-        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster' || kiosk?.uiMode === 'folded_flyer_ci' || kiosk?.uiMode === 'poster_ci') return;
         console.log("Resetting inactivity timer"); // debug
         showHeader();
         // Reset loop timer on interaction to prevent flipping while reading/swiping
@@ -53,7 +55,7 @@
     // --- Loop Logic ---
     function startLoop() {
         clearInterval(timer);
-        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster' || kiosk?.uiMode === 'folded_flyer_ci' || kiosk?.uiMode === 'poster_ci') return;
         timer = setInterval(
             () => {
                 nextSlide(true); // Auto-advance
@@ -377,10 +379,18 @@
     <div
         class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto"
     ><KioskFoldedFlyerView items={items} kiosk={kiosk} /></div>
+{:else if kiosk?.uiMode === "folded_flyer_ci"}
+    <div
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto"
+    ><KioskFoldedFlyerCiView items={items} kiosk={kiosk} /></div>
 {:else if kiosk?.uiMode === "poster"}
     <div
         class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible print:block print:w-auto print:h-auto print:m-0 print:p-0 overflow-y-auto"
     ><KioskPosterView items={items} kiosk={kiosk} /></div>
+{:else if kiosk?.uiMode === "poster_ci"}
+    <div
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible print:block print:w-auto print:h-auto print:m-0 print:p-0 overflow-y-auto"
+    ><KioskPosterViewCi items={items} kiosk={kiosk} /></div>
 {:else}
     <div
         class="fixed inset-0 bg-gray-900 overflow-hidden flex items-center justify-center"

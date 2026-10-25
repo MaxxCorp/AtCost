@@ -283,17 +283,17 @@
 											>
 												<Monitor class="w-5 h-5 text-gray-400" />
 												{kiosk.name}
-												{#if kiosk.uiMode === "folded_flyer"}
-													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:purple-300">
-														{m.folded_flyer_badge()}
+												{#if kiosk.uiMode === "folded_flyer" || kiosk.uiMode === "folded_flyer_ci"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+														{kiosk.uiMode === "folded_flyer_ci" ? "Flyer (CI)" : m.folded_flyer_badge()}
 													</span>
 												{:else if kiosk.uiMode === "flat_list"}
 													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
 														Flat List
 													</span>
-												{:else if kiosk.uiMode === "poster"}
+												{:else if kiosk.uiMode === "poster" || kiosk.uiMode === "poster_ci"}
 													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
-														{m.poster_badge()}
+														{kiosk.uiMode === "poster_ci" ? "Poster (CI)" : m.poster_badge()}
 													</span>
 												{/if}
 											</h3>
