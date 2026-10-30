@@ -6,9 +6,9 @@ import type {
 	SyncDirection
 } from '../types';
 import { getAuthenticatedUser } from '#lib/server/authorization.js';
-import { getEntityContacts } from '../../contacts';
+import { resolveEventContact } from '../../contact-resolution';
 import { db } from '@ac/db';
-import { user, eventResource } from '@ac/db';
+import { user } from '@ac/db';
 
 /**
  * Bewegungsatlas.Berlin sync provider implementation
@@ -265,52 +265,14 @@ export class BewegungsatlasBerlinProvider implements SyncProvider {
 			formData['event_location'] = event.location;
 		}
 
-		// Contact information - resolve from contacts
-		let targetContact = null;
-		const eventId = event.metadata?.eventId;
+		// Contact information - resolve public work contact info only
+		const resolvedContact = await resolveEventContact(event, { filterWorkOnly: true, publicOnly: true });
 
-		if (eventId) {
-			// 1. Check if event has a contact
-			const eventContacts = await getEntityContacts('event', eventId);
-			if (eventContacts.length > 0) {
-				targetContact = eventContacts[0];
-			}
-
-			// 2. Check if location has a contact
-			if (!targetContact) {
-				const resources = await db.query.eventResource.findMany({
-					where: (er, { eq }) => eq(er.eventId, eventId),
-					with: {
-						resource: {
-							with: {
-								location: true
-							}
-						}
-					}
-				});
-
-				for (const er of resources) {
-					const locationId = (er.resource as any)?.locationId;
-					if (locationId) {
-						const locationContacts = await getEntityContacts('location', locationId);
-						if (locationContacts.length > 0) {
-							targetContact = locationContacts[0];
-							break;
-						}
-					}
-				}
-			}
-		}
-
-		if (targetContact) {
-			const contactName = targetContact.displayName || `${targetContact.givenName || ''} ${targetContact.familyName || ''}`.trim();
-			const contactEmail = (targetContact as any).emails?.find((e: any) => e.primary)?.value || (targetContact as any).emails?.[0]?.value || '';
-			const contactPhone = (targetContact as any).phones?.find((p: any) => p.primary)?.value || (targetContact as any).phones?.[0]?.value || '';
-
-			formData['event_contact_name'] = contactName;
-			formData['event_contact_email'] = contactEmail;
-			if (contactPhone) {
-				formData['event_contact_phone'] = contactPhone;
+		if (resolvedContact) {
+			formData['event_contact_name'] = resolvedContact.name;
+			formData['event_contact_email'] = resolvedContact.email;
+			if (resolvedContact.phone) {
+				formData['event_contact_phone'] = resolvedContact.phone;
 			}
 		} else {
 			// Default to user info if no contact found

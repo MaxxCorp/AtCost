@@ -187,11 +187,12 @@
                 {@const hasDescription = !!(event.description && event.description.trim().length > 0)}
                 {@const recurrenceRule = (Array.isArray(event.recurrence) ? event.recurrence[0] : typeof event.recurrence === "string" ? event.recurrence : null) || (event as any).seriesMaster?.recurrence?.[0] || null}
                 {@const eventInstances = event.instances || []}
-                {@const hasContact = !!event.resolvedContact}
+                {@const hasContact = !!(event.resolvedContact && event.resolvedContact.isPublic !== false)}
                 {@const hasStaffNotes = !!(checkCanEdit(event) && event.internalNotes && event.internalNotes.trim().length > 0)}
                 {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
                 {@const otherContacts = ((event as any).contacts || []).filter((c: any) => {
                     const cObj = c.contact || c;
+                    if (!cObj || cObj.isPublic !== true || cObj.obfuscationStatus === 'obfuscated') return false;
                     const cId = cObj.id || c.id;
                     if (event.resolvedContact?.id && cId && cId === event.resolvedContact.id) return false;
                     const cName = (cObj.displayName || `${cObj.givenName || ''} ${cObj.familyName || ''}`.trim() || cObj.company || cObj.name || '').trim().toLowerCase();
@@ -505,8 +506,8 @@
                                     </li>
 
                                     <!-- Locations -->
-                                    {#if event.locations && event.locations.length > 0}
-                                        {#each event.locations as loc (loc.id || loc.name)}
+                                    {#if event.locations && event.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false).length > 0}
+                                        {#each event.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false) as loc (loc.id || loc.name)}
                                             <li
                                                 class="flex items-start gap-3 text-gray-700"
                                             >

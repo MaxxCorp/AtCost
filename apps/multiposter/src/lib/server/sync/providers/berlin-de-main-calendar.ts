@@ -222,8 +222,8 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 			formData[this.fieldMappings.eintrittspreis] = isFree ? 'Gratis' : priceValue;
 		}
 
-		// Contact info resolution using shared algorithm
-		const resolvedContact = await resolveEventContact(event);
+		// Contact info resolution using shared algorithm (public work contacts only)
+		const resolvedContact = await resolveEventContact(event, { filterWorkOnly: true, publicOnly: true });
 
 		if (resolvedContact) {
 			formData[this.fieldMappings.name] = resolvedContact.name;

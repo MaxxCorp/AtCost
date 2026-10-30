@@ -341,7 +341,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	 * @returns Venue ID
 	 */
 	private async ensureVenue(venue: NonNullable<ExternalEvent['venue']>, internalId?: string): Promise<number | undefined> {
-		if (!this.config) return undefined;
+		if (!this.config || !venue?.name || (venue as any).isPublic === false) return undefined;
 
 		try {
 			// Check in-memory cache first
@@ -432,7 +432,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	 * @returns Organizer ID
 	 */
 	private async ensureOrganizer(organizer: NonNullable<ExternalEvent['organizer']>, internalId?: string): Promise<number | undefined> {
-		if (!this.config) return undefined;
+		if (!this.config || !organizer?.name || (organizer as any).isPublic === false) return undefined;
 
 		try {
 			// Check in-memory cache first
@@ -518,8 +518,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	 * @param tag Tag data
 	 * @returns Tag ID
 	 */
-	private async ensureTag(tag: { id: string; name: string }): Promise<number | undefined> {
-		if (!this.config) return undefined;
+	private async ensureTag(tag: { id: string; name: string; visibility?: string }): Promise<number | undefined> {
+		if (!this.config || !tag?.name || (tag.visibility && tag.visibility !== 'external')) return undefined;
 
 		try {
 			// Check in-memory cache first

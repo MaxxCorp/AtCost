@@ -33,6 +33,13 @@ import {
 } from '@ac/db';
 import { getEntityContacts } from '../contacts';
 import { resolveEventContact, isEmployeeContact } from '../contact-resolution';
+import {
+	isPublicContact,
+	isPublicLocation,
+	isPublicTag,
+	extractPublicWorkContactInfo,
+	filterWorkEmails
+} from '../public-sanitization';
 import { eq, and, isNull, isNotNull, lt, gt, gte, lte, or, inArray, desc, sql } from '@ac/db';
 import {
 	getCampaignTargetIds,
@@ -424,7 +431,17 @@ export class SyncService {
 	 * For a series master event, expand its occurrences (master + virtual occurrences + materialized exceptions)
 	 * for providers that do not natively support recurrence rules (like WP The Events Calendar).
 	 */
-	public async getMasterOccurrenceIds(master: typeof eventTable.$inferSelect, options?: { windowPastDays?: number }): Promise<string[]> {
+	public async getMasterOccurrenceIds(
+		master: typeof eventTable.$inferSelect,
+		options?: { windowPastDays?: number; excludeNonPublic?: boolean; excludeTentative?: boolean }
+	): Promise<string[]> {
+		const excludeNonPublic = options?.excludeNonPublic ?? true;
+		const excludeTentative = options?.excludeTentative ?? false;
+		const isMasterEligible =
+			master.status !== 'cancelled' &&
+			(!excludeNonPublic || master.isPublic !== false) &&
+			(!excludeTentative || master.status !== 'tentative');
+
 		let rruleStr: string | null = null;
 		const rec = master.recurrence as unknown;
 		if (Array.isArray(rec) && rec[0] && typeof rec[0] === 'string') {
@@ -440,7 +457,7 @@ export class SyncService {
 		}
 
 		if (!rruleStr || !master.startDateTime) {
-			return [master.id];
+			return isMasterEligible ? [master.id] : [];
 		}
 
 		const exdates = Array.isArray(master.exdates) ? master.exdates as string[] : [];
@@ -450,7 +467,8 @@ export class SyncService {
 			.select({
 				id: eventTable.id,
 				originalStartTime: eventTable.originalStartTime,
-				status: eventTable.status
+				status: eventTable.status,
+				isPublic: eventTable.isPublic
 			})
 			.from(eventTable)
 			.where(eq(eventTable.recurringEventId, master.id));
@@ -471,7 +489,7 @@ export class SyncService {
 		const cutoff = windowPastDays > 0 ? new Date(Date.now() - windowPastDays * 24 * 60 * 60 * 1000) : null;
 
 		// Occurrence #0: Master event itself
-		if (master.status !== 'cancelled') {
+		if (isMasterEligible) {
 			if (!cutoff || !master.startDateTime || new Date(master.startDateTime) >= cutoff) {
 				occurrenceIds.push(master.id);
 			}
@@ -485,10 +503,14 @@ export class SyncService {
 			const instIso = inst.date.toISOString();
 			const ex = exceptionMap.get(instIso);
 			if (ex) {
-				if (ex.status !== 'cancelled') {
+				const isExEligible =
+					ex.status !== 'cancelled' &&
+					(!excludeNonPublic || ex.isPublic !== false) &&
+					(!excludeTentative || ex.status !== 'tentative');
+				if (isExEligible) {
 					occurrenceIds.push(ex.id);
 				}
-			} else {
+			} else if (isMasterEligible) {
 				occurrenceIds.push(`${master.id}_inst_${instIso}`);
 			}
 		}
@@ -749,7 +771,10 @@ export class SyncService {
 				const syncSeriesMode = config.settings?.syncSeriesMode || (excludeSeries ? 'exclude' : 'all');
 
 				if (provider.supportsNativeRecurrence !== true && this.isSeriesMaster(r.event)) {
-					const occIds = await this.getMasterOccurrenceIds(r.event);
+					const occIds = await this.getMasterOccurrenceIds(r.event, {
+						excludeNonPublic: config.settings?.excludeNonPublic !== false && config.settings?.excludeNonPublic !== 'false',
+						excludeTentative: config.settings?.excludeTentative !== false && config.settings?.excludeTentative !== 'false'
+					});
 					for (const occId of occIds) {
 						processedEventIds.add(occId);
 						const itemSyncState = getItemSyncState(eventCampaign?.content, occId, config.id);
@@ -1883,7 +1908,8 @@ export class SyncService {
 		let locationHeroImage: string | null | undefined = undefined;
 		const tags: Array<{ id: string; name: string }> = [];
 
-		const cachedAssoc = batchContext?.associations?.get(directEventId);
+		const assocCacheKey = `${config?.id || providerId}:${directEventId}`;
+		const cachedAssoc = batchContext?.associations?.get(assocCacheKey);
 		if (cachedAssoc) {
 			attendees = [...cachedAssoc.attendees];
 			venues = cachedAssoc.venues;
@@ -1900,12 +1926,23 @@ export class SyncService {
 				associatedContacts = await getEntityContacts(entityType, fallbackMasterId) || [];
 			}
 
+			const allowNonPublicContacts =
+				config?.settings?.includeNonPublicContacts === true ||
+				config?.settings?.includeNonPublicContacts === 'true';
+
 			// Filter and sync associated contacts based on configuration rules (roles, tags, employee-only)
 			for (const contact of associatedContacts) {
+				if ((contact as any)?.obfuscationStatus === 'obfuscated') continue;
 				if (this.shouldSyncContactForEvent(contact, config)) {
-					// Get primary email
-					const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
-						(contact as any).emails?.[0]?.value;
+					const rawEmails = ((contact as any).emails || []) as any[];
+					const workEmails = filterWorkEmails(rawEmails);
+					// Prefer work email; for non-employee public contacts when non-public contacts are disallowed, strictly require work email
+					const email = !allowNonPublicContacts && !isEmployeeContact(contact)
+						? (workEmails.find((e: any) => e.primary)?.value || workEmails[0]?.value)
+						: (workEmails.find((e: any) => e.primary)?.value ||
+							workEmails[0]?.value ||
+							rawEmails.find((e: any) => e.primary)?.value ||
+							rawEmails[0]?.value);
 
 					if (email) {
 						// Find the association to get participation status
@@ -2008,22 +2045,24 @@ export class SyncService {
 				}
 			}
 
-			// Resolve Venues (Locations)
+			// Resolve Venues (Locations) - only public locations may be synced externally
 			const locationTableToUse = isEvent ? eventLocationTable : announcementLocation;
 
 			const whereClause = isEvent
 				? eq(eventLocationTable.eventId, directEventId)
 				: eq(announcementLocation.announcementId, internal.id);
 
-			let locations = await db.select({ location: locationTable }).from(locationTableToUse as any).innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id)).where(whereClause as any);
+			let rawLocations = await db.select({ location: locationTable }).from(locationTableToUse as any).innerJoin(locationTable, eq((locationTableToUse as any).locationId, locationTable.id)).where(whereClause as any);
 
-			if (locations.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
-				locations = await db
+			if (rawLocations.length === 0 && isEvent && fallbackMasterId && fallbackMasterId !== directEventId) {
+				rawLocations = await db
 					.select({ location: locationTable })
 					.from(eventLocationTable as any)
 					.innerJoin(locationTable, eq(eventLocationTable.locationId, locationTable.id))
 					.where(eq(eventLocationTable.eventId, fallbackMasterId));
 			}
+
+			const locations = rawLocations.filter((l: any) => isPublicLocation(l));
 
 			if (locations.length > 0) {
 				venues = locations.map((l) => ({
@@ -2048,40 +2087,34 @@ export class SyncService {
 					zip: primary.zip ?? undefined,
 					province: primary.state ?? undefined,
 				};
-			} else if (internal.location) {
-				// Fallback to text location if no structured location is linked
+			} else if (rawLocations.length === 0 && internal.location) {
+				// Fallback to text location only if no structured locations were linked at all
 				venue = {
 					name: internal.location
 				};
 				venues = [venue];
 			}
 
-			// Resolve Organizer (Contact with "Employee" tag)
+			// Resolve Organizer: must be an Employee contact that is public (isPublic === true),
+			// allowed by config contact sync rules, and only work email / work phone are exposed.
 			for (const contact of associatedContacts) {
-				const contactTags = (contact as any).tags || [];
-				const isEmployee = contactTags.some((ct: any) => {
-					const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
-					return tagName === 'employee' || tagName === 'employees';
-				});
+				if (!isEmployeeContact(contact)) continue;
+				if (!isPublicContact(contact)) continue;
+				if (config && !this.shouldSyncContactForEvent(contact, config)) continue;
 
-				if (isEmployee) {
-					// Use the first employee found as organizer
+				const publicWorkInfo = extractPublicWorkContactInfo(contact);
+				if (publicWorkInfo) {
 					organizerId = contact.id;
-					const email = (contact as any).emails?.find((e: any) => e.primary)?.value ||
-						(contact as any).emails?.[0]?.value;
-					const phone = (contact as any).phones?.find((p: any) => p.primary)?.value ||
-						(contact as any).phones?.[0]?.value;
-
 					organizer = {
-						name: contact.displayName || `${contact.givenName || ''} ${contact.familyName || ''}`.trim(),
-						email,
-						phone
+						name: publicWorkInfo.name,
+						email: publicWorkInfo.email,
+						phone: publicWorkInfo.phone
 					};
 					break; // Only one organizer
 				}
 			}
 
-			// Resolve Tags
+			// Resolve Tags: strictly filter to external tags (visibility === 'external')
 			const tagTableToUse = isEvent ? eventTag : announcementTag;
 
 			const tagWhereClause = isEvent
@@ -2098,12 +2131,13 @@ export class SyncService {
 					.where(eq(eventTag.eventId, fallbackMasterId));
 			}
 
-			if (entityTags.length > 0) {
-				tags.push(...entityTags.map((t: { tag: { id: string; name: string } }) => ({ id: t.tag.id, name: t.tag.name })));
+			const publicEntityTags = entityTags.filter((t: any) => isPublicTag(t));
+			if (publicEntityTags.length > 0) {
+				tags.push(...publicEntityTags.map((t: { tag: { id: string; name: string } }) => ({ id: t.tag.id, name: t.tag.name })));
 			}
 
 			if (batchContext?.associations) {
-				batchContext.associations.set(directEventId, {
+				batchContext.associations.set(assocCacheKey, {
 					attendees,
 					venues,
 					venue,
@@ -2453,7 +2487,10 @@ export class SyncService {
 					if (entityType === 'event' && provider.supportsNativeRecurrence !== true) {
 						const evtRow = eventRowMap.get(itemId);
 						if (this.isSeriesMaster(evtRow)) {
-							const occIds = await this.getMasterOccurrenceIds(evtRow!);
+							const occIds = await this.getMasterOccurrenceIds(evtRow!, {
+								excludeNonPublic: config.settings?.excludeNonPublic !== false && config.settings?.excludeNonPublic !== 'false',
+								excludeTentative: config.settings?.excludeTentative !== false && config.settings?.excludeTentative !== 'false'
+							});
 							expandedItemIds.push(...occIds);
 
 							// Also unpublish any removed/stale occurrences from campaign
@@ -2727,6 +2764,12 @@ export class SyncService {
 
 		if (!itemRow) {
 			console.warn(`[SyncService] ${entityType} ${itemId} not found in database.`);
+			return;
+		}
+
+		const excludeNonPublic = config.settings?.excludeNonPublic !== false && config.settings?.excludeNonPublic !== 'false';
+		if (excludeNonPublic && itemRow.isPublic === false) {
+			console.warn(`[SyncService] Refusing to push non-public ${entityType} ${itemId} to ${config.providerType}`);
 			return;
 		}
 

@@ -3,15 +3,38 @@ import { db, tag, tagCategory, inArray, notInArray, isNull, sql, ilike, eq, and,
 import { tagPaginationSchema, parseFilterValue } from '@ac/validations';
 import type * as v from 'valibot';
 import { ensureDefaultCategoriesAndTags } from '#lib/server/tags/service.js';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 
 export const listTags = query(tagPaginationSchema, async (input: v.InferOutput<typeof tagPaginationSchema>) => {
-    await ensureDefaultCategoriesAndTags();
+    const user = getOptionalUser();
+    const isAuthorized = Boolean(
+        user && (
+            hasAccess(user, 'tags') ||
+            hasAccess(user, 'events') ||
+            hasAccess(user, 'announcements') ||
+            hasAccess(user, 'contacts') ||
+            hasAccess(user, 'locations') ||
+            hasAccess(user, 'resources') ||
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'recipes') ||
+            hasAccess(user, 'consumables')
+        )
+    );
+
+    if (isAuthorized) {
+        await ensureDefaultCategoriesAndTags();
+    }
 
     const { page = 1, limit = 50, search = '', sortField = 'name', sortOrder = 'asc', visibility, categoryId } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select({ id: tag.id }).from(tag).$dynamic();
     const conditions = [];
+
+    // Unauthenticated / unauthorized callers can ONLY see external tags
+    if (!isAuthorized) {
+        conditions.push(eq(tag.visibility, 'external'));
+    }
     
     if (search.trim()) {
         conditions.push(
@@ -22,7 +45,7 @@ export const listTags = query(tagPaginationSchema, async (input: v.InferOutput<t
         );
     }
 
-    if (visibility) {
+    if (visibility && isAuthorized) {
         const { include, exclude } = parseFilterValue(visibility);
         if (include.length > 0) {
             conditions.push(inArray(tag.visibility, include as any));
@@ -110,15 +133,29 @@ export const listTags = query(tagPaginationSchema, async (input: v.InferOutput<t
         where: inArray(tag.id, ids),
         orderBy: [orderExpression],
         with: {
-            user: true,
+            ...(isAuthorized ? { user: true } : {}),
             category: true,
         }
     });
 
-    const data = rawResults.map((row) => ({
-        ...row,
-        createdAt: row.createdAt.toISOString()
-    }));
+    const data = rawResults.map((row) => {
+        if (!isAuthorized) {
+            return {
+                id: row.id,
+                name: row.name,
+                visibility: 'external' as const,
+                color: row.color,
+                description: row.description,
+                categoryId: row.categoryId,
+                category: row.category,
+                createdAt: row.createdAt.toISOString()
+            };
+        }
+        return {
+            ...row,
+            createdAt: row.createdAt.toISOString()
+        };
+    });
 
-    return { data, total };
+    return { data: data as any, total };
 });

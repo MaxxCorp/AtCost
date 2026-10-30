@@ -1,16 +1,16 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, campaign, announcementLocation, announcementTag, tag, announcementResource, resource, locationContact } from '@ac/db';
-import { eq, desc, inArray, notInArray, and, or, not, ilike, sql, exists } from '@ac/db';
+import { announcement, announcementLocation, announcementTag, tag, announcementResource, resource, locationContact } from '@ac/db';
+import { eq, inArray, notInArray, and, or, not, ilike, sql, exists } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import type { Announcement as DbAnnouncement } from '@ac/db';
 import { announcementPaginationSchema as PaginationSchema, parseFilterValue, type Announcement, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
 import { resolveAnnouncementContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
+import { sanitizePublicAnnouncement } from '#lib/server/public-sanitization.js';
 
 /**
- * List all announcements for the authenticated user
+ * List all announcements
  */
 export const listAnnouncements = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<Announcement>> => {
     let hasAccess = false;
@@ -22,18 +22,19 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 		// unauthorized can only see public announcements
 	}
 
+    const isPublicView = !hasAccess || Boolean(input?.excludeNonPublic);
     const version = await getNamespaceVersion(CACHE_NAMESPACES.ANNOUNCEMENTS);
-    const key = cacheKeys.announcementsList(version, hashParams(input));
+    const key = cacheKeys.announcementsList(version, hashParams(input), isPublicView ? 'public' : 'auth');
 
     return cached(key, 300, async () => {
-    const { page = 1, limit = 50, search = '', locationId, tagId, sortField = 'updatedAt', sortOrder = 'desc', excludedAnnouncementIds, includedAnnouncementIds, excludedTags, includedTags } = input || {};
+    const { page = 1, limit = 50, search = '', locationId, tagId, sortField = 'updatedAt', sortOrder = 'desc', excludeNonPublic, excludedAnnouncementIds, includedAnnouncementIds, excludedTags, includedTags } = input || {};
     const offset = (page - 1) * limit;
 
     let baseQuery = db.select({ id: announcement.id }).from(announcement).$dynamic();
     
     const conditions: any[] = [];
     
-    if (!hasAccess) {
+    if (isPublicView) {
 		conditions.push(eq(announcement.isPublic, true));
 	}
 
@@ -104,6 +105,10 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     // Advanced Kiosk filters
     const conditionalFilters = [];
 
+    if (excludeNonPublic) {
+        conditionalFilters.push(eq(announcement.isPublic, true));
+    }
+
     if (excludedTags && excludedTags.length > 0) {
 		conditionalFilters.push(
 			sql`NOT EXISTS (
@@ -130,12 +135,12 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 
 	if (includedAnnouncementIds && includedAnnouncementIds.length > 0) {
 		const explicitInclusion = inArray(announcement.id, includedAnnouncementIds);
-		if (conditionalFilters.length > 0 || conditions.length > (hasAccess ? 0 : 1)) {
+		if (conditionalFilters.length > 0 || conditions.length > (isPublicView ? 1 : 0)) {
 			const standardFilters = and(...conditions, ...conditionalFilters);
 			conditions.length = 0;
 			conditions.push(or(standardFilters, explicitInclusion));
 			
-			if (!hasAccess) {
+			if (isPublicView) {
 				conditions.push(eq(announcement.isPublic, true));
 			}
 		} else {
@@ -207,11 +212,14 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 
     const neededLocationIds = new Set<string>();
     for (const a of rawResults) {
-        const hasEmployee = (a.contacts || []).some((ac: any) => isEmployeeContact(ac.contact || ac));
-        if (!hasEmployee) {
+        const hasEligibleEmployee = (a.contacts || []).some((ac: any) => {
+            const cObj = ac.contact || ac;
+            return cObj?.isPublic === true && isEmployeeContact(cObj);
+        });
+        if (!hasEligibleEmployee) {
             for (const l of a.locations || []) {
+                if (l.location && !l.location.isPublic) continue;
                 if (l.location?.id) neededLocationIds.add(l.location.id);
-                else if (l.locationId) neededLocationIds.add(l.locationId);
             }
         }
     }
@@ -241,7 +249,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
         }
     }
 
-    const data = rawResults.map((row) => {
+    let data = rawResults.map((row) => {
         const locations = (row.locations?.map((l: any) => l.location).filter(Boolean) || []).map((loc: any) => ({
             ...loc,
             locationContacts: locationContactsMap.get(loc.id) || []
@@ -251,7 +259,8 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
             ...row,
             locations
         }, {
-            filterWorkOnly: !hasAccess,
+            filterWorkOnly: true,
+            publicOnly: true,
             fallbackToLocation: true,
             fallbackToFirst: true
         });
@@ -260,7 +269,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
             ...row,
             createdAt: row.createdAt.toISOString(),
             updatedAt: row.updatedAt.toISOString(),
-            tags: (row.tags?.map((t: any) => t.tag) || []).filter((tagItem: any) => hasAccess || tagItem?.visibility === 'external'),
+            tags: (row.tags?.map((t: any) => t.tag) || []).filter((tagItem: any) => !isPublicView || tagItem?.visibility === 'external'),
             locations,
             locationIds: locations.map((l: any) => l.id),
             contactIds: row.contacts?.map((c: any) => c.contactId) || [],
@@ -268,7 +277,12 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
         };
     });
 
+    if (isPublicView) {
+        data = data
+            .map((item) => sanitizePublicAnnouncement(item))
+            .filter((item): item is NonNullable<typeof item> => item !== null);
+    }
+
     return { data: data as any, total };
     });
 });
-

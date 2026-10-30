@@ -7,6 +7,7 @@ export interface SeriesInstanceItem {
 	startDateTime: string | null;
 	endDateTime: string | null;
 	status?: string | null;
+	isPublic?: boolean;
 }
 
 export interface SeriesMasterSummary {
@@ -15,6 +16,7 @@ export interface SeriesMasterSummary {
 	startDateTime: string | null;
 	endDateTime: string | null;
 	recurrence?: string[] | null;
+	isPublic?: boolean;
 	instances?: SeriesInstanceItem[];
 }
 
@@ -27,6 +29,8 @@ function toIsoSafe(d: any): string | null {
 
 /**
  * Returns all instances (real DB exceptions + projected virtual occurrences) for a given master event.
+ * When `options.publicOnly` is true, non-public materialized exceptions (`isPublic !== true`) are excluded
+ * from the returned list while still blocking their time slots so virtual public occurrences are not synthesized over them.
  */
 export async function getSeriesInstances(
 	master: {
@@ -39,23 +43,31 @@ export async function getSeriesInstances(
 		startTimeZone?: string | null;
 		recurringEventId?: string | null;
 		seriesId?: string | null;
+		isPublic?: boolean | null;
 	},
-	maxProjected: number = 100
+	maxProjected: number = 100,
+	options: { publicOnly?: boolean } = {}
 ): Promise<SeriesInstanceItem[]> {
 	const masterId = master.id;
 	if (!masterId) return [];
+	if (options.publicOnly && master.isPublic === false) return [];
 
 	const fetchedInstances = await db.query.event.findMany({
 		where: eq(event.recurringEventId, masterId),
 		orderBy: [asc(event.startDateTime)],
 	});
 
-	const instances: SeriesInstanceItem[] = fetchedInstances.map((inst: any) => ({
+	const visibleDbInstances = options.publicOnly
+		? fetchedInstances.filter((inst: any) => inst.isPublic === true)
+		: fetchedInstances;
+
+	const instances: SeriesInstanceItem[] = visibleDbInstances.map((inst: any) => ({
 		id: inst.id,
 		summary: inst.summary,
 		startDateTime: toIsoSafe(inst.startDateTime),
 		endDateTime: toIsoSafe(inst.endDateTime),
 		status: inst.status,
+		isPublic: Boolean(inst.isPublic),
 	}));
 
 	const rec: any = master.recurrence;
@@ -86,8 +98,13 @@ export async function getSeriesInstances(
 			exdates
 		);
 
-		const existingTimes = new Set(instances.map((i) => (i.startDateTime ? new Date(i.startDateTime).getTime() : 0)));
+		// Register ALL DB exceptions (even non-public ones) in existingTimes so virtual public slots aren't synthesized over privatized exceptions
+		const existingTimes = new Set<number>();
 		for (const inst of fetchedInstances) {
+			if (inst.startDateTime) {
+				const instTime = new Date(inst.startDateTime).getTime();
+				if (!isNaN(instTime)) existingTimes.add(instTime);
+			}
 			if (inst.originalStartTime && typeof inst.originalStartTime === 'object' && 'dateTime' in (inst.originalStartTime as any)) {
 				const origTime = new Date((inst.originalStartTime as any).dateTime).getTime();
 				if (!isNaN(origTime)) {
@@ -105,6 +122,7 @@ export async function getSeriesInstances(
 					startDateTime: p.date.toISOString(),
 					endDateTime: p.end ? p.end.toISOString() : null,
 					status: 'published',
+					isPublic: master.isPublic !== false,
 				});
 				existingTimes.add(pTime);
 			}
@@ -121,11 +139,16 @@ export async function getSeriesInstances(
  * Executes a single DB query for all recurring masters in the list, then calculates
  * recurrence projections in-memory.
  */
-export async function populateSeriesInstances(events: any[], maxProjected: number = 100): Promise<void> {
+export async function populateSeriesInstances(
+	events: any[],
+	maxProjected: number = 100,
+	options: { publicOnly?: boolean } = {}
+): Promise<void> {
 	if (!events || events.length === 0) return;
 
 	// Find all master events that are recurring series
 	const seriesMasters = events.filter((e) => {
+		if (options.publicOnly && e.isPublic === false) return false;
 		const isMaster = !e.recurringEventId;
 		const rec: any = e.recurrence;
 		const hasRecurrence = Boolean(
@@ -178,12 +201,17 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 	// For each master event, build the instances list
 	for (const master of seriesMasters) {
 		const fetchedInstances = dbInstancesByMaster.get(master.id) || [];
-		const instances: SeriesInstanceItem[] = fetchedInstances.map((inst: any) => ({
+		const visibleDbInstances = options.publicOnly
+			? fetchedInstances.filter((inst: any) => inst.isPublic === true)
+			: fetchedInstances;
+
+		const instances: SeriesInstanceItem[] = visibleDbInstances.map((inst: any) => ({
 			id: inst.id,
 			summary: inst.summary,
 			startDateTime: toIsoSafe(inst.startDateTime),
 			endDateTime: toIsoSafe(inst.endDateTime),
 			status: inst.status,
+			isPublic: Boolean(inst.isPublic),
 		}));
 
 		const rec: any = master.recurrence;
@@ -217,8 +245,12 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 				exdates
 			);
 
-			const existingTimes = new Set(instances.map((i) => (i.startDateTime ? new Date(i.startDateTime).getTime() : 0)));
+			const existingTimes = new Set<number>();
 			for (const inst of fetchedInstances) {
+				if (inst.startDateTime) {
+					const instTime = new Date(inst.startDateTime).getTime();
+					if (!isNaN(instTime)) existingTimes.add(instTime);
+				}
 				if (inst.originalStartTime && typeof inst.originalStartTime === 'object' && 'dateTime' in (inst.originalStartTime as any)) {
 					const origTime = new Date((inst.originalStartTime as any).dateTime).getTime();
 					if (!isNaN(origTime)) {
@@ -236,6 +268,7 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 						startDateTime: p.date.toISOString(),
 						endDateTime: p.end ? p.end.toISOString() : null,
 						status: 'published',
+						isPublic: master.isPublic !== false,
 					});
 					existingTimes.add(pTime);
 				}
@@ -251,6 +284,7 @@ export async function populateSeriesInstances(events: any[], maxProjected: numbe
 			startDateTime: toIsoSafe(master.startDateTime),
 			endDateTime: toIsoSafe(master.endDateTime),
 			recurrence: master.recurrence,
+			isPublic: master.isPublic !== false,
 			instances,
 		};
 	}

@@ -1,12 +1,12 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, location, contact, contactEmail, contactPhone, contactTag, locationContact, campaign } from '@ac/db';
-import { eq, and, inArray } from '@ac/db';
-import { getOptionalUser, hasAccess, ensureAccess } from '#lib/server/authorization.js';
+import { announcement, locationContact, eq, inArray } from '@ac/db';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { type Announcement, getCampaignTargetIds } from '@ac/validations';
 import { resolveAnnouncementContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
 import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
+import { sanitizePublicAnnouncement } from '#lib/server/public-sanitization.js';
 
 /**
  * Query: Read an announcement by ID
@@ -26,7 +26,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
             if (cachedPayload.isPrivate) {
                 throw new Error('Unauthorized');
             }
-            return (cachedPayload.data as any) ?? null;
+            return cachedPayload.data ? (sanitizePublicAnnouncement(cachedPayload.data) as any) : null;
         }
     }
 
@@ -67,14 +67,17 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     }
 
     // 3. Resolve Primary Contact
-    const hasAnnouncementEmployee = (result.contacts || []).some((ac: any) => isEmployeeContact(ac.contact || ac));
+    const hasEligibleEmployee = (result.contacts || []).some((ac: any) => {
+        const cObj = ac.contact || ac;
+        return cObj?.isPublic === true && isEmployeeContact(cObj);
+    });
     const locationContactsMap = new Map<string, any[]>();
 
-    if (!hasAnnouncementEmployee) {
+    if (!hasEligibleEmployee) {
         const neededLocationIds = new Set<string>();
         for (const l of result.locations || []) {
+            if (l.location && !l.location.isPublic) continue;
             if (l.location?.id) neededLocationIds.add(l.location.id);
-            else if (l.locationId) neededLocationIds.add(l.locationId);
         }
 
         if (neededLocationIds.size > 0) {
@@ -107,29 +110,19 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         ...result,
         locations
     }, {
-		filterWorkOnly: !isAuthorized,
+		filterWorkOnly: true,
+		publicOnly: true,
 		fallbackToLocation: true,
 		fallbackToFirst: true
 	});
 
     // 4. Return Data
     if (!isAuthorized) {
-        const publicAnnouncement = {
-            id: result.id,
-            title: result.title,
-            content: result.content,
-            isPublic: result.isPublic,
-            createdAt: result.createdAt.toISOString(),
-            updatedAt: result.updatedAt.toISOString(),
-            tags: result.tags
-                .filter(t => t.tag?.visibility === 'external')
-                .map(t => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),
-            locations: result.locations.filter(l => l.location.isPublic).map(l => l.location),
-            resolvedContact,
-            contactIds: [],
-            locationIds: [],
-            syncIds: [],
-        } as any;
+        const publicAnnouncement = sanitizePublicAnnouncement({
+            ...result,
+            locations,
+            resolvedContact
+        });
 
         await setCache(cacheKeys.publicAnnouncement(announcementId), { isPrivate: false, data: publicAnnouncement }, 3600);
         return publicAnnouncement;

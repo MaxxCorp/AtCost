@@ -91,7 +91,7 @@ const handleRouteGuard: Handle = async ({ event, resolve }) => {
 };
 
 const handleE2EAuth: Handle = async ({ event, resolve }) => {
-	if (PLAYWRIGHT_TEST === 'true' && !event.locals.user) {
+	if (PLAYWRIGHT_TEST === 'true' && event.url.port === '4175' && !event.locals.user) {
 		const mockUserId = 'playwright-test-user';
 		
 		// Ensure user exists in the database using onConflictDoNothing to handle concurrent requests gracefully

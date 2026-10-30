@@ -14,11 +14,11 @@
                 {announcement.title}
             </h1>
             {#if announcement.tags && announcement.tags.length > 0}
-                {#each announcement.tags as tag}
+                {#each announcement.tags.filter((tag: any) => typeof tag === 'string' || (tag.tag ? tag.tag.visibility === 'external' : tag.visibility === 'external')) as tag}
                     <span
                         class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100"
                     >
-                        #{typeof tag === 'string' ? tag : tag.name}
+                        #{typeof tag === 'string' ? tag : (tag.tag?.name || tag.name)}
                     </span>
                 {/each}
             {/if}
@@ -35,7 +35,7 @@
         {@html announcement.content}
     </div>
 
-    {#if announcement.locations && announcement.locations.length > 0}
+    {#if announcement.locations && announcement.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false).length > 0}
         <div class="mt-8 pt-6 border-t">
             <h3
                 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4"
@@ -43,7 +43,7 @@
                 {m.locations()}
             </h3>
             <div class="space-y-4">
-                {#each announcement.locations as loc}
+                {#each announcement.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false) as loc}
                     <div class="flex items-start gap-3">
                         <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
                             <MapPin size={18} />

@@ -27,6 +27,7 @@ export type Announcement = Omit<DbAnnouncement, 'createdAt' | 'updatedAt'> & {
         name: string;
         email: string;
         phone: string;
+        isPublic?: boolean;
         qrCodeDataUrl?: string;
         qrCodePath?: string;
     } | null;
@@ -47,6 +48,7 @@ export const announcementPaginationSchema = v.optional(v.object({
 	tagId: FilterableIdSchema,
     sortField: v.optional(v.string()),
     sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
+    excludeNonPublic: v.optional(v.boolean()),
     excludedAnnouncementIds: v.optional(v.array(v.string())),
     includedAnnouncementIds: v.optional(v.array(v.string())),
     excludedTags: v.optional(v.array(v.string())),

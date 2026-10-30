@@ -1420,3 +1420,169 @@ describe('SyncService - Bulk Sync', () => {
 });
 
 
+
+describe('SyncService - Public Data Leak Prevention', () => {
+	let service: SyncService;
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(getEntityContacts).mockResolvedValue([]);
+		service = new SyncService();
+	});
+
+	it('should exclude non-public locations, internal tags, non-public organizers, and non-work contact details in mapInternalToExternal', async () => {
+		const internalEvent = {
+			id: 'evt-privacy-sync',
+			summary: 'Public Sync Event',
+			status: 'confirmed',
+			isPublic: true,
+			startDateTime: new Date('2026-09-01T10:00:00Z'),
+			endDateTime: new Date('2026-09-01T11:00:00Z')
+		};
+
+		// 1st contact: Non-public employee (should NOT become organizer)
+		// 2nd contact: Public employee with personal primary email/phone + work secondary email/phone (should become organizer with work info ONLY)
+		vi.mocked(getEntityContacts).mockResolvedValueOnce([
+			{
+				id: 'ctc-priv-emp',
+				isPublic: false,
+				displayName: 'Hidden Internal Employee',
+				emails: [{ value: 'hidden@company.com', type: 'work', primary: true }],
+				phones: [{ value: '+49-HIDDEN', type: 'work', primary: true }],
+				tags: [{ name: 'Employee' }]
+			},
+			{
+				id: 'ctc-pub-emp',
+				isPublic: true,
+				displayName: 'Public Organizer Employee',
+				emails: [
+					{ value: 'organizer.home@gmail.com', type: 'home', primary: true },
+					{ value: 'organizer@company.com', type: 'work', primary: false }
+				],
+				phones: [
+					{ value: '+49-170-PRIVATE', type: 'mobile', primary: true },
+					{ value: '+49-30-OFFICE', type: 'work', primary: false }
+				],
+				tags: [{ name: 'Employee' }]
+			}
+		]);
+
+		let joinCallCount = 0;
+		(db.select as any).mockImplementation(() => ({
+			from: vi.fn().mockReturnValue({
+				innerJoin: vi.fn().mockReturnValue({
+					where: vi.fn().mockImplementation(async () => {
+						joinCallCount++;
+						if (joinCallCount === 1) {
+							// 1. Linked resources for calendar room bookings
+							return [];
+						}
+						if (joinCallCount === 2) {
+							// 2. Locations query: 1 private location, 1 public location
+							return [
+								{
+									location: {
+										id: 'loc-private',
+										name: 'Secret Bunker',
+										isPublic: false,
+										city: 'Berlin'
+									}
+								},
+								{
+									location: {
+										id: 'loc-public',
+										name: 'Public Town Hall',
+										isPublic: true,
+										city: 'Berlin'
+									}
+								}
+							];
+						}
+						if (joinCallCount === 3) {
+							// 3. Tags query: 1 internal tag, 1 external tag
+							return [
+								{
+									tag: {
+										id: 'tag-internal',
+										name: 'InternalBudget',
+										visibility: 'internal'
+									}
+								},
+								{
+									tag: {
+										id: 'tag-external',
+										name: 'PublicCulture',
+										visibility: 'external'
+									}
+								}
+							];
+						}
+						return [];
+					})
+				}),
+				where: vi.fn().mockReturnValue({
+					limit: vi.fn().mockResolvedValue([{ participationStatus: 'accepted' }])
+				})
+			})
+		}));
+
+		// @ts-ignore - private method
+		const externalResult = await service.mapInternalToExternal(internalEvent, 'wp-the-events-calendar');
+
+		// Only the public location is mapped to venues/venue
+		expect(externalResult.venues).toHaveLength(1);
+		expect(externalResult.venue?.name).toBe('Public Town Hall');
+		expect(externalResult.location).toContain('Public Town Hall');
+		expect(externalResult.location).not.toContain('Secret Bunker');
+
+		// Only the external tag is mapped to tags
+		expect(externalResult.tags).toEqual([
+			{ id: 'tag-external', name: 'PublicCulture' }
+		]);
+
+		// Organizer must be the public employee and must only expose work email & work phone
+		expect(externalResult.organizer).toEqual({
+			name: 'Public Organizer Employee',
+			email: 'organizer@company.com',
+			phone: '+49-30-OFFICE'
+		});
+		expect(externalResult.metadata?.organizerId).toBe('ctc-pub-emp');
+	});
+
+	it('excludes non-public materialized exceptions from getMasterOccurrenceIds while still blocking their virtual slot', async () => {
+		const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+		start.setUTCHours(10, 0, 0, 0);
+		const day2 = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+		const end = new Date(start.getTime() + 3600000);
+
+		// Day 2 is a materialized exception that was marked non-public (isPublic: false)
+		(db.select as any).mockReturnValueOnce({
+			from: vi.fn().mockReturnValueOnce({
+				where: vi.fn().mockResolvedValueOnce([
+					{
+						id: 'exc-private-day2',
+						originalStartTime: { dateTime: day2.toISOString() },
+						status: 'confirmed',
+						isPublic: false
+					}
+				])
+			})
+		});
+
+		const masterEvent: any = {
+			id: 'master-uuid',
+			startDateTime: start,
+			endDateTime: end,
+			recurrence: ['RRULE:FREQ=DAILY;COUNT=3'],
+			status: 'confirmed',
+			isPublic: true
+		};
+
+		const occIds = await service.getMasterOccurrenceIds(masterEvent, { excludeNonPublic: true });
+		// 3 total days, day 2 is private exception -> only master (day 1) and virtual day 3 should be returned
+		expect(occIds).toHaveLength(2);
+		expect(occIds).toContain('master-uuid');
+		expect(occIds).not.toContain('exc-private-day2');
+		expect(occIds).not.toContain(`master-uuid_inst_${day2.toISOString()}`);
+	});
+});

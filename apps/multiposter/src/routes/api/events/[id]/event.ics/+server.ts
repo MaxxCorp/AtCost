@@ -3,11 +3,15 @@ import ICAL from 'ical.js';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { cached, cacheKeys } from '#lib/server/cache/index.js';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
+import { isPublicLocation, isPublicContact } from '#lib/server/public-sanitization.js';
 
 export const GET: RequestHandler = async ({ params }) => {
     const eventId = params.id;
+    const user = getOptionalUser();
+    const isAuthorized = Boolean(user && hasAccess(user, 'events'));
 
-    const cachedResult = await cached(cacheKeys.eventIcs(eventId), 3600, async () => {
+    const buildIcs = async (publicOnly: boolean) => {
         let data: any = null;
         const isVirtual = eventId.includes('_inst_');
 
@@ -76,86 +80,92 @@ export const GET: RequestHandler = async ({ params }) => {
             error(404, 'Event not found');
         }
 
-    const vcalendar = new ICAL.Component(['vcalendar', [], []]);
-    vcalendar.addPropertyWithValue('prodid', '-//MaxxCorp//ac-multiposter//EN');
-    vcalendar.addPropertyWithValue('version', '2.0');
-
-    const vevent = new ICAL.Component('vevent');
-    vevent.addPropertyWithValue('uid', data.iCalUID || eventId);
-    vevent.addPropertyWithValue('summary', data.summary);
-    if (data.description) vevent.addPropertyWithValue('description', data.description);
-    
-    const locationParts: string[] = [];
-    // data.location is removed
-    data.locations?.forEach((el: any) => {
-        const l = el.location;
-        if (l) {
-            let locStr = l.name;
-            if (l.roomId) locStr += ` (${l.roomId})`;
-            if (!locationParts.includes(locStr)) locationParts.push(locStr);
+        if (publicOnly && !data.isPublic) {
+            error(403, 'Forbidden');
         }
-    });
-    if (locationParts.length > 0) {
-        vevent.addPropertyWithValue('location', locationParts.join(', '));
-    }
 
-    data.contacts?.forEach((ec: any) => {
-        const c = ec.contact;
-        if (c) {
-            const name = c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim();
-            if (name) {
-                const attendee = vevent.addPropertyWithValue('attendee', 'MAILTO:no-reply@example.com');
-                attendee.setParameter('cn', name);
-                if (ec.participationStatus) {
-                    const statusMap: Record<string, string> = {
-                        'accepted': 'ACCEPTED',
-                        'declined': 'DECLINED',
-                        'tentative': 'TENTATIVE',
-                        'needsAction': 'NEEDS-ACTION'
-                    };
-                    attendee.setParameter('partstat', statusMap[ec.participationStatus] || 'NEEDS-ACTION');
+        const vcalendar = new ICAL.Component(['vcalendar', [], []]);
+        vcalendar.addPropertyWithValue('prodid', '-//MaxxCorp//ac-multiposter//EN');
+        vcalendar.addPropertyWithValue('version', '2.0');
+
+        const vevent = new ICAL.Component('vevent');
+        vevent.addPropertyWithValue('uid', data.iCalUID || eventId);
+        vevent.addPropertyWithValue('summary', data.summary);
+        if (data.description) vevent.addPropertyWithValue('description', data.description);
+        
+        const locationParts: string[] = [];
+        data.locations?.forEach((el: any) => {
+            const l = el.location;
+            if (l && (!publicOnly || isPublicLocation(l))) {
+                let locStr = l.name;
+                if (l.roomId) locStr += ` (${l.roomId})`;
+                if (!locationParts.includes(locStr)) locationParts.push(locStr);
+            }
+        });
+        if (locationParts.length > 0) {
+            vevent.addPropertyWithValue('location', locationParts.join(', '));
+        }
+
+        data.contacts?.forEach((ec: any) => {
+            const c = ec.contact;
+            if (c && (!publicOnly || isPublicContact(c))) {
+                const name = c.displayName || `${c.givenName || ''} ${c.familyName || ''}`.trim();
+                if (name) {
+                    const attendee = vevent.addPropertyWithValue('attendee', 'MAILTO:no-reply@example.com');
+                    attendee.setParameter('cn', name);
+                    if (ec.participationStatus) {
+                        const statusMap: Record<string, string> = {
+                            'accepted': 'ACCEPTED',
+                            'declined': 'DECLINED',
+                            'tentative': 'TENTATIVE',
+                            'needsAction': 'NEEDS-ACTION'
+                        };
+                        attendee.setParameter('partstat', statusMap[ec.participationStatus] || 'NEEDS-ACTION');
+                    }
+                }
+            }
+        });
+
+        if (data.startDateTime) vevent.addPropertyWithValue('dtstart', ICAL.Time.fromJSDate(data.startDateTime, true));
+        if (data.endDateTime) vevent.addPropertyWithValue('dtend', ICAL.Time.fromJSDate(data.endDateTime, true));
+        vevent.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(data.updatedAt, true));
+
+        if (data.recurrence && Array.isArray(data.recurrence) && data.recurrence[0]) {
+            try {
+                const cleanRule = data.recurrence[0].replace(/^RRULE:/i, '');
+                vevent.addPropertyWithValue('rrule', ICAL.Recur.fromString(cleanRule));
+            } catch (e) {
+                console.warn('Failed to parse RRULE for ICS:', e);
+            }
+        }
+
+        if (data.exdates && Array.isArray(data.exdates) && data.exdates.length > 0) {
+            for (const ex of data.exdates) {
+                const exD = new Date(ex);
+                if (!isNaN(exD.getTime())) {
+                    vevent.addPropertyWithValue('exdate', ICAL.Time.fromJSDate(exD, true));
                 }
             }
         }
-    });
 
-    if (data.startDateTime) vevent.addPropertyWithValue('dtstart', ICAL.Time.fromJSDate(data.startDateTime, true));
-    if (data.endDateTime) vevent.addPropertyWithValue('dtend', ICAL.Time.fromJSDate(data.endDateTime, true));
-    vevent.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(data.updatedAt, true));
+        vcalendar.addSubcomponent(vevent);
 
-    if (data.recurrence && Array.isArray(data.recurrence) && data.recurrence[0]) {
-        try {
-            const cleanRule = data.recurrence[0].replace(/^RRULE:/i, '');
-            vevent.addPropertyWithValue('rrule', ICAL.Recur.fromString(cleanRule));
-        } catch (e) {
-            console.warn('Failed to parse RRULE for ICS:', e);
-        }
-    }
-
-    if (data.exdates && Array.isArray(data.exdates) && data.exdates.length > 0) {
-        for (const ex of data.exdates) {
-            const exD = new Date(ex);
-            if (!isNaN(exD.getTime())) {
-                vevent.addPropertyWithValue('exdate', ICAL.Time.fromJSDate(exD, true));
-            }
-        }
-    }
-
-    vcalendar.addSubcomponent(vevent);
-
-    const icsContent = vcalendar.toString();
+        const icsContent = vcalendar.toString();
         return {
             summary: data.summary,
             icsContent
         };
-    });
+    };
 
-    return new Response(new Uint8Array(Buffer.from(cachedResult.icsContent)), {
+    const result = isAuthorized
+        ? await buildIcs(false)
+        : await cached(cacheKeys.eventIcs(eventId), 3600, () => buildIcs(true));
+
+    return new Response(new Uint8Array(Buffer.from(result.icsContent)), {
         headers: {
             'Content-Type': 'text/calendar',
-            'Content-Disposition': `attachment; filename="${cachedResult.summary.replace(/\s+/g, '_')}.ics"`,
-            'Cache-Control': 'public, max-age=60'
+            'Content-Disposition': `attachment; filename="${result.summary.replace(/\s+/g, '_')}.ics"`,
+            'Cache-Control': isAuthorized ? 'private, max-age=60' : 'public, max-age=60'
         }
     });
 };
-

@@ -18,22 +18,22 @@ export function hashParams(params: unknown): string {
  * Cache key generators
  */
 export const cacheKeys = {
-    kioskView: (kioskId: string, version: number) => `cache:kiosk:view:${kioskId}:v${version}`,
-    kioskDisplay: (kioskId: string) => `cache:kiosk:display:${kioskId}`,
-    publicEvent: (eventId: string) => `cache:event:public:${eventId}`,
-    eventsList: (access: string, version: number, hash: string) => `cache:event:list:${access}:v${version}:${hash}`,
-    eventQr: (eventId: string) => `cache:event:qr:${eventId}`,
-    eventIcs: (eventId: string) => `cache:event:ics:${eventId}`,
-    publicContact: (contactId: string) => `cache:contact:public:${contactId}`,
-    contactsList: (version: number, hash: string) => `cache:contact:list:v${version}:${hash}`,
-    contactQr: (contactId: string) => `cache:contact:qr:${contactId}`,
-    contactVcf: (contactId: string) => `cache:contact:vcf:public:${contactId}`,
-    publicAnnouncement: (announcementId: string) => `cache:announcement:public:${announcementId}`,
-    announcementsList: (version: number, hash: string) => `cache:announcement:list:v${version}:${hash}`,
-    location: (locationId: string) => `cache:location:${locationId}`,
-    locationsList: (version: number, hash: string) => `cache:location:list:v${version}:${hash}`,
+    kioskView: (kioskId: string, version: number) => `cache:v2:kiosk:view:${kioskId}:v${version}`,
+    kioskDisplay: (kioskId: string) => `cache:v2:kiosk:display:${kioskId}`,
+    publicEvent: (eventId: string) => `cache:v2:event:public:${eventId}`,
+    eventsList: (access: string, version: number, hash: string) => `cache:v2:event:list:${access}:v${version}:${hash}`,
+    eventQr: (eventId: string) => `cache:v2:event:qr:${eventId}`,
+    eventIcs: (eventId: string) => `cache:v2:event:ics:${eventId}`,
+    publicContact: (contactId: string) => `cache:v2:contact:public:${contactId}`,
+    contactsList: (version: number, hash: string) => `cache:v2:contact:list:v${version}:${hash}`,
+    contactQr: (contactId: string) => `cache:v2:contact:qr:${contactId}`,
+    contactVcf: (contactId: string) => `cache:v2:contact:vcf:public:${contactId}`,
+    publicAnnouncement: (announcementId: string) => `cache:v2:announcement:public:${announcementId}`,
+    announcementsList: (version: number, hash: string, access: string = 'public') => `cache:v2:announcement:list:${access}:v${version}:${hash}`,
+    location: (locationId: string) => `cache:v2:location:${locationId}`,
+    locationsList: (version: number, hash: string) => `cache:v2:location:list:v${version}:${hash}`,
     cmsContent: (pageSlug: string, slotName: string, language: string, branch: string, version: number) =>
-        `cache:cms:${pageSlug}:${slotName}:${language}:${branch}:v${version}`,
+        `cache:v2:cms:${pageSlug}:${slotName}:${language}:${branch}:v${version}`,
 };
 
 /**
@@ -77,6 +77,8 @@ export async function invalidateContact(contactIds: string | string[]): Promise<
     await Promise.all([
         delCache(keys),
         bumpNamespaceVersion(CACHE_NAMESPACES.CONTACTS),
+        bumpNamespaceVersion(CACHE_NAMESPACES.EVENTS),
+        bumpNamespaceVersion(CACHE_NAMESPACES.ANNOUNCEMENTS),
         bumpNamespaceVersion(CACHE_NAMESPACES.KIOSKS)
     ]);
 }
@@ -107,6 +109,8 @@ export async function invalidateLocation(locationIds?: string | string[]): Promi
     await Promise.all([
         delCache(keys),
         bumpNamespaceVersion(CACHE_NAMESPACES.LOCATIONS),
+        bumpNamespaceVersion(CACHE_NAMESPACES.EVENTS),
+        bumpNamespaceVersion(CACHE_NAMESPACES.ANNOUNCEMENTS),
         bumpNamespaceVersion(CACHE_NAMESPACES.KIOSKS),
     ]);
 }
@@ -138,4 +142,3 @@ export async function invalidateAllKioskViews(): Promise<void> {
 export async function invalidateCms(): Promise<void> {
     await bumpNamespaceVersion(CACHE_NAMESPACES.CMS);
 }
-

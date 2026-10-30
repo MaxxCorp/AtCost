@@ -277,4 +277,103 @@ describe('Contact Resolution Engine', () => {
 			expect(resolveAnnouncementContactSync(annDataFallback)?.name).toBe('Alice Visitor');
 		});
 	});
+
+	describe('Public Privacy Protections (publicOnly & filterWorkOnly)', () => {
+		const privateEmployee = {
+			id: 'c-priv-emp',
+			isPublic: false,
+			displayName: 'Private Employee',
+			emails: [{ type: 'work', value: 'priv.emp@org.com', primary: true }],
+			phones: [{ type: 'work', value: '+111', primary: true }],
+			tags: [{ name: 'Employee' }]
+		};
+
+		const publicEmployee = {
+			id: 'c-pub-emp',
+			isPublic: true,
+			displayName: 'Public Employee',
+			emails: [
+				{ type: 'home', value: 'pub.personal@gmail.com', primary: true },
+				{ type: 'work', value: 'pub.emp@org.com', primary: false }
+			],
+			phones: [
+				{ type: 'mobile', value: '+999-PRIVATE', primary: true },
+				{ type: 'work', value: '+222-WORK', primary: false }
+			],
+			tags: [{ name: 'Employee' }]
+		};
+
+		const obfuscatedPublicEmployee = {
+			id: 'c-obf-emp',
+			isPublic: true,
+			obfuscationStatus: 'obfuscated',
+			displayName: 'Obfuscated Employee',
+			emails: [{ type: 'work', value: 'obf@org.com', primary: true }],
+			tags: [{ name: 'Employee' }]
+		};
+
+		it('never resolves obfuscated contacts even in internal mode', () => {
+			const eventData = {
+				id: 'evt-obf',
+				contacts: [{ contact: obfuscatedPublicEmployee }]
+			};
+			expect(resolveEventContactSync(eventData)).toBeNull();
+		});
+
+		it('skips non-public contacts when publicOnly or filterWorkOnly is true', () => {
+			const eventWithPrivateOnly = {
+				id: 'evt-1',
+				contacts: [{ contact: privateEmployee }]
+			};
+
+			expect(resolveEventContactSync(eventWithPrivateOnly)).toBeNull();
+			expect(resolveEventContactSync(eventWithPrivateOnly, { publicOnly: true })).toBeNull();
+			expect(resolveEventContactSync(eventWithPrivateOnly, { filterWorkOnly: true })).toBeNull();
+
+			const eventWithBoth = {
+				id: 'evt-2',
+				contacts: [{ contact: privateEmployee }, { contact: publicEmployee }]
+			};
+
+			const resolved = resolveEventContactSync(eventWithBoth, { publicOnly: true, filterWorkOnly: true });
+			expect(resolved).toEqual({
+				id: 'c-pub-emp',
+				name: 'Public Employee',
+				email: 'pub.emp@org.com',
+				phone: '+222-WORK',
+				isPublic: true,
+				qrCodePath: '/api/contacts/c-pub-emp/qr.png',
+				qrCodeDataUrl: undefined
+			});
+		});
+
+		it('skips contacts from non-public locations when publicOnly or filterWorkOnly is true', () => {
+			const eventWithPrivateLocation = {
+				id: 'evt-loc-priv',
+				contacts: [],
+				locations: [
+					{
+						location: {
+							id: 'loc-priv',
+							isPublic: false,
+							locationContacts: [{ contact: publicEmployee }]
+						}
+					}
+				]
+			};
+
+			expect(resolveEventContactSync(eventWithPrivateLocation, { publicOnly: true })).toBeNull();
+			expect(resolveEventContactSync(eventWithPrivateLocation, { filterWorkOnly: true })).toBeNull();
+			expect(
+				resolveLocationContactSync(
+					{
+						id: 'loc-priv',
+						isPublic: false,
+						locationContacts: [{ contact: publicEmployee }]
+					},
+					{ publicOnly: true }
+				)
+			).toBeNull();
+		});
+	});
 });

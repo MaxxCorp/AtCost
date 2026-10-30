@@ -4,18 +4,14 @@ import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
+import { sanitizePublicContact } from '#lib/server/public-sanitization.js';
 
 /**
  * Query: Read a contact by ID
  * 
  * Access rules:
- * - If contact is public: anyone can view (but only work info, no relations)
+ * - If contact is public: anyone can view (but only work info, no relations, no internal notes, external tags only)
  * - If contact is private: only authenticated users with 'contacts' access can view
- * 
- * For public contacts accessed by unauthenticated/unauthorized users:
- * - Filter to only work emails, phones, addresses
- * - Remove relations
- * - Show public versions of QR code and vCard
  */
 export const readContact = query(v.string(), async (id: string): Promise<any> => {
     const user = getOptionalUser();
@@ -68,7 +64,7 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
     }
 
     // Check access based on public flag
-    if (!result.isPublic) {
+    if (!result.isPublic || result.obfuscationStatus === 'obfuscated') {
         if (!isAuthorized) {
             await setCache(cacheKeys.publicContact(id), { isPrivate: true }, 300);
         }
@@ -80,58 +76,23 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
         }
     }
 
-    // For public contacts viewed by unauthenticated/unauthorized users, filter data
-    if (result.isPublic && !isAuthorized) {
-        // Filter to only work type items
-        const workEmails = result.emails?.filter((e: any) => e.type?.toLowerCase() === 'work') || [];
-        const workPhones = result.phones?.filter((p: any) => p.type?.toLowerCase() === 'work') || [];
-        const workAddresses = result.addresses?.filter((a: any) => a.type?.toLowerCase() === 'work') || [];
-        // Use dynamic API paths
-        let publicQrCodePath = result.qrCodePath;
-        let publicVCardPath = result.vCardPath;
-
-        // Ensure paths point to the dynamic API
-        if (!publicQrCodePath || !publicQrCodePath.includes('/api/')) {
-            publicQrCodePath = `/api/contacts/${id}/qr.png`;
-        }
-        if (!publicVCardPath || !publicVCardPath.includes('/api/')) {
-            publicVCardPath = `/api/contacts/${id}/contact.vcf`;
-        }
-
-        // For public view, append public query param to vCard
-        if (publicVCardPath && !publicVCardPath.includes('public')) {
-            publicVCardPath += '?public';
-        }
-
-        const publicContact = {
-            id: result.id,
-            displayName: result.displayName,
-            givenName: result.givenName,
-            familyName: result.familyName,
-            middleName: result.middleName,
-            honorificPrefix: result.honorificPrefix,
-            honorificSuffix: result.honorificSuffix,
-            notes: result.notes,
-            isPublic: result.isPublic,
-            // Filtered data (work only)
-            emails: workEmails,
-            phones: workPhones,
-            addresses: workAddresses,
-            // No relations for public view
-            relations: [],
-            // Only external tags for public view
-            tags: result.tags
-                .filter((t: any) => t.tag?.visibility === 'external')
-                .map((t: any) => ({
-                    id: t.tag.id,
-                    name: t.tag.name,
-                    visibility: t.tag.visibility,
-                    color: t.tag.color
-                })),
-            // Public file versions
-            qrCodePath: publicQrCodePath,
-            vCardPath: publicVCardPath,
-        };
+    // For public contacts viewed by unauthenticated/unauthorized users, sanitize via centralized helper
+    if (!isAuthorized) {
+        const sanitized = sanitizePublicContact(result);
+        const publicContact = sanitized
+            ? {
+                  ...sanitized,
+                  tags: (sanitized.tags || []).map((t: any) => {
+                      const tagObj = t.tag || t;
+                      return {
+                          id: tagObj.id,
+                          name: tagObj.name,
+                          visibility: 'external',
+                          color: tagObj.color
+                      };
+                  })
+              }
+            : null;
 
         await setCache(cacheKeys.publicContact(id), { isPrivate: false, data: publicContact }, 3600);
         return publicContact;

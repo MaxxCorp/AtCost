@@ -1,12 +1,13 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, desc, asc, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
+import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult, type Event } from '@ac/validations';
+import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
 import { resolveEventContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 import { populateSeriesInstances } from '#lib/server/events/instances.js';
+import { sanitizePublicEvent } from '#lib/server/public-sanitization.js';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
 	let hasAccess = false;
@@ -18,8 +19,9 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		// unauthorized can only see public events
 	}
 
+	const isPublicView = !hasAccess || Boolean(input?.excludeNonPublic);
 	const version = await getNamespaceVersion(CACHE_NAMESPACES.EVENTS);
-	const key = cacheKeys.eventsList(hasAccess ? 'auth' : 'public', version, hashParams(input));
+	const key = cacheKeys.eventsList(isPublicView ? 'public' : 'auth', version, hashParams(input));
 
 	return cached(key, 300, async () => {
 	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, includeSeriesEntries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
@@ -31,8 +33,23 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		conditions.push(isNull(event.recurringEventId));
 	}
 
-	if (!hasAccess) {
-		conditions.push(eq(event.isPublic, true));
+	if (isPublicView) {
+		conditions.push(
+			eq(event.isPublic, true),
+			sql`NOT EXISTS (
+				SELECT 1 FROM ${event} master_evt
+				WHERE (
+					master_evt.id = ${event.recurringEventId}
+					OR (
+						${event.seriesId} IS NOT NULL
+						AND master_evt.series_id = ${event.seriesId}
+						AND master_evt.recurring_event_id IS NULL
+						AND master_evt.id != ${event.id}
+					)
+				)
+				AND master_evt.is_public = false
+			)`
+		);
 	}
 
 	// Search filter: Summary, Description, Location Names, Contact Names
@@ -41,16 +58,28 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		conditions.push(or(
 			ilike(event.summary, searchPattern),
 			ilike(event.description, searchPattern),
-			sql`EXISTS (
-				SELECT 1 FROM ${eventLocation} el
-				JOIN ${location} l ON el.location_id = l.id
-				WHERE el.event_id = ${event.id} AND l.name ILIKE ${searchPattern}
-			)`,
-			sql`EXISTS (
-				SELECT 1 FROM ${eventContact} ec
-				JOIN ${contact} c ON ec.contact_id = c.id
-				WHERE ec.event_id = ${event.id} AND (c.display_name ILIKE ${searchPattern} OR c.given_name ILIKE ${searchPattern} OR c.family_name ILIKE ${searchPattern})
-			)`
+			isPublicView
+				? sql`EXISTS (
+					SELECT 1 FROM ${eventLocation} el
+					JOIN ${location} l ON el.location_id = l.id
+					WHERE el.event_id = ${event.id} AND l.is_public = true AND l.name ILIKE ${searchPattern}
+				)`
+				: sql`EXISTS (
+					SELECT 1 FROM ${eventLocation} el
+					JOIN ${location} l ON el.location_id = l.id
+					WHERE el.event_id = ${event.id} AND l.name ILIKE ${searchPattern}
+				)`,
+			isPublicView
+				? sql`EXISTS (
+					SELECT 1 FROM ${eventContact} ec
+					JOIN ${contact} c ON ec.contact_id = c.id
+					WHERE ec.event_id = ${event.id} AND c.is_public = true AND (c.display_name ILIKE ${searchPattern} OR c.given_name ILIKE ${searchPattern} OR c.family_name ILIKE ${searchPattern})
+				)`
+				: sql`EXISTS (
+					SELECT 1 FROM ${eventContact} ec
+					JOIN ${contact} c ON ec.contact_id = c.id
+					WHERE ec.event_id = ${event.id} AND (c.display_name ILIKE ${searchPattern} OR c.given_name ILIKE ${searchPattern} OR c.family_name ILIKE ${searchPattern})
+				)`
 		));
 	}
 
@@ -211,6 +240,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					  .where(
 						  and(
 							  eq(instanceEvent.recurringEventId, event.id),
+							  isPublicView ? eq(instanceEvent.isPublic, true) : sql`true`,
 							  or(
 								  gte(instanceEvent.startDateTime, cutoff),
 								  gte(instanceEvent.endDateTime, cutoff)
@@ -240,7 +270,6 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 	
 	if (excludedTags && excludedTags.length > 0) {
-		// exclude events that have any of these tag names
 		conditionalFilters.push(
 			sql`NOT EXISTS (
 				SELECT 1 FROM ${eventTag} et
@@ -251,7 +280,6 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 	
 	if (includedTags && includedTags.length > 0) {
-		// include events that have these tag names
 		conditionalFilters.push(
 			sql`EXISTS (
 				SELECT 1 FROM ${eventTag} et
@@ -266,23 +294,20 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 
 	if (includedEventIds && includedEventIds.length > 0) {
-		// If explicit inclusion is present, it ORs with the conditions, but we still respect isPublic if unauth
 		const explicitInclusion = inArray(event.id, includedEventIds);
-		if (conditionalFilters.length > 0 || conditions.length > (hasAccess ? 1 : 2)) {
-			// Combine the standard filters, then OR with explicit inclusion
+		if (conditionalFilters.length > 0 || conditions.length > (isPublicView ? 3 : 1)) {
 			const standardFilters = and(...conditions, ...conditionalFilters);
-			// Overwrite conditions so we just apply this top level OR
 			conditions.length = 0;
 			conditions.push(or(standardFilters, explicitInclusion));
 			
 			// Re-apply access restriction if needed so included events must still be public
-			if (!hasAccess) {
+			if (isPublicView) {
 				conditions.push(eq(event.isPublic, true));
 			}
-			// And keep the recurringEventId restriction
-			conditions.push(isNull(event.recurringEventId));
+			if (!includeSeriesEntries) {
+				conditions.push(isNull(event.recurringEventId));
+			}
 		} else {
-			// Just normal pushing
 			conditions.push(explicitInclusion);
 		}
 	} else {
@@ -318,7 +343,14 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	// Fetch full data for the paginated IDs
 	const rawResults = await db.query.event.findMany({
-		where: includeSeriesEntries ? inArray(event.id, ids) : or(inArray(event.id, ids), inArray(event.recurringEventId, ids)),
+		where: includeSeriesEntries
+			? inArray(event.id, ids)
+			: or(
+				inArray(event.id, ids),
+				isPublicView
+					? and(inArray(event.recurringEventId, ids), eq(event.isPublic, true))
+					: inArray(event.recurringEventId, ids)
+			),
 		with: {
 			contacts: {
 				with: {
@@ -342,7 +374,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			},
 			resources: {
 				with: {
-					resource: true
+					resource: {
+						with: {
+							location: true
+						}
+					}
 				}
 			},
 			tags: {
@@ -373,7 +409,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				and(isNotNull(event.recurrence), sql`${event.recurrence} != '[]'::jsonb`)
 			),
 			lte(event.startDateTime, endD),
-			hasAccess ? sql`true` : eq(event.isPublic, true)
+			isPublicView ? eq(event.isPublic, true) : sql`true`
 		];
 
 		if (excludeTentative) masterConditions.push(ne(event.status, 'tentative'));
@@ -501,7 +537,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					}
 				},
 				locations: { with: { location: true } },
-				resources: { with: { resource: true } },
+				resources: { with: { resource: { with: { location: true } } } },
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
@@ -510,8 +546,6 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		});
 
 		if (masters.length > 0) {
-			const { expandRecurrence } = await import('#lib/server/events/recurrence.js');
-
 			const masterIds = masters.map(m => m.id);
 			const masterSeriesIds = masters.map(m => m.seriesId).filter((id): id is string => Boolean(id));
 
@@ -551,9 +585,9 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				}
 			}
 
-			// 2. Also register all existing DB instances (including cancelled/tentative/etc.)
+			// 2. Also register all existing DB instances (including cancelled/tentative/non-public)
 			// This guarantees recurrence expansion NEVER synthesizes a virtual instance for a slot
-			// that already exists in the database (e.g., cancelled instances).
+			// that already exists in the database (e.g., cancelled or privatized instances).
 			for (const dbInst of existingDbInstances) {
 				const m = (dbInst.recurringEventId ? idToMasterMap.get(dbInst.recurringEventId) : null)
 					|| (dbInst.seriesId ? seriesToMasterMap.get(dbInst.seriesId) : null);
@@ -664,14 +698,19 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	// Collect location IDs for events that might need location contact fallback
 	const neededLocationIds = new Set<string>();
 	for (const e of rawResults) {
-		const hasEmployee = (e.contacts || []).some((ec: any) => isEmployeeContact(ec.contact || ec));
-		if (!hasEmployee) {
+		const hasEligibleEmployee = (e.contacts || []).some((ec: any) => {
+			const cObj = ec.contact || ec;
+			return cObj?.isPublic === true && isEmployeeContact(cObj);
+		});
+		if (!hasEligibleEmployee) {
 			for (const l of e.locations || []) {
+				if (l.location && !l.location.isPublic) continue;
 				if (l.location?.id) neededLocationIds.add(l.location.id);
-				else if (l.locationId) neededLocationIds.add(l.locationId);
 			}
 			for (const r of e.resources || []) {
-				const locId = (r.resource as any)?.locationId;
+				const res = r.resource as any;
+				if (res?.location && !res.location.isPublic) continue;
+				const locId = res?.locationId;
 				if (locId) neededLocationIds.add(locId);
 			}
 		}
@@ -720,8 +759,8 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	if (excludeTentative) {
 		results = results.filter((e: any) => e.status !== 'tentative');
 	}
-	if (excludeNonPublic) {
-		results = results.filter((e: any) => e.isPublic);
+	if (isPublicView) {
+		results = results.filter((e: any) => e.isPublic === true);
 	}
 
 	if (locationId) {
@@ -730,11 +769,15 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			results = results.filter((e: any) => {
 				const eventLocIds = new Set<string>();
 				for (const l of (e.locations || [])) {
-					const id = l?.id || l?.locationId || l?.location?.id;
+					const loc = l?.location || l;
+					if (isPublicView && loc && !loc.isPublic) continue;
+					const id = l?.id || l?.locationId || loc?.id;
 					if (id) eventLocIds.add(id);
 				}
 				for (const r of (e.resources || [])) {
-					const id = r?.locationId || r?.resource?.locationId || r?.location?.id;
+					const res = r?.resource || r;
+					if (isPublicView && res?.location && !res.location.isPublic) continue;
+					const id = r?.locationId || res?.locationId || res?.location?.id;
 					if (id) eventLocIds.add(id);
 				}
 
@@ -768,9 +811,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			const isSelfFuture = (start ? start >= cutoff : false) || (end ? end >= cutoff : false);
 
 			if (!e.recurringEventId) {
-				// Master or single event
 				if (isSelfFuture || e.recurrence || e.seriesId) return true;
-				// If master's anchor date is past, check if it has any current/future instances
 				const instances = instancesByMaster.get(e.id) || [];
 				return instances.some((inst: any) => {
 					const iStart = inst.startDateTime ? new Date(inst.startDateTime) : null;
@@ -778,13 +819,12 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					return (iStart ? iStart >= cutoff : false) || (iEnd ? iEnd >= cutoff : false);
 				});
 			} else {
-				// Child instance event
 				return isSelfFuture;
 			}
 		});
 	}
 
-	const data = results.map((e: any) => {
+	let data = results.map((e: any) => {
 		const evtLocations = (e.locations?.map((l: any) => l.location).filter(Boolean) || []).map((loc: any) => ({
 			...loc,
 			locationContacts: locationContactsMap.get(loc.id) || []
@@ -805,6 +845,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				return {
 					...res,
 					location: {
+						...(res.location || {}),
 						id: res.locationId,
 						locationContacts: locationContactsMap.get(res.locationId) || []
 					}
@@ -837,7 +878,8 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			locations: evtLocations,
 			resources: resWithLocContacts
 		}, {
-			filterWorkOnly: !hasAccess,
+			filterWorkOnly: true,
+			publicOnly: true,
 			fallbackToLocation: true,
 			fallbackToFirst: true
 		});
@@ -859,16 +901,22 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			createdAt: e.createdAt ? (e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString()) : null,
 			updatedAt: e.updatedAt ? (e.updatedAt instanceof Date ? e.updatedAt.toISOString() : new Date(e.updatedAt).toISOString()) : null,
 			locations: evtLocations,
-			resources: evtResources,
+			resources: resWithLocContacts,
 			rooms,
 			locationIds: Array.from(allLocIds),
 			resourceIds: evtResources.map((r: any) => r.id),
-			tags: (e.tags?.map((t: any) => t.tag || t).filter(Boolean) || []).filter((tagItem: any) => hasAccess || tagItem?.visibility === 'external'),
+			tags: (e.tags?.map((t: any) => t.tag || t).filter(Boolean) || []).filter((tagItem: any) => !isPublicView || tagItem?.visibility === 'external'),
 			resolvedContact,
 		};
 	});
 
-	await populateSeriesInstances(data);
+	await populateSeriesInstances(data, 100, { publicOnly: isPublicView });
+
+	if (isPublicView) {
+		data = data
+			.map((item: any) => sanitizePublicEvent(item))
+			.filter((item: any): item is NonNullable<typeof item> => item !== null);
+	}
 
 	if (sortField === 'startDateTime' || includeSeriesEntries) {
 		data.sort((a: any, b: any) => {
@@ -900,4 +948,3 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	return { data, total: includeSeriesEntries ? data.length : total };
 	});
 });
-

@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { db } from '@ac/db';
-import { event, locationContact, recurringSeries, inArray, eq, asc, or, and, sql } from '@ac/db';
+import { event, locationContact, recurringSeries, inArray, eq, or, and, sql } from '@ac/db';
 import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
@@ -9,6 +9,7 @@ import { getEventRooms } from '#lib/utils/format-rooms.js';
 import { resolveEventContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
 import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
 import { getSeriesInstances } from '#lib/server/events/instances.js';
+import { sanitizePublicEvent, filterPublicTags } from '#lib/server/public-sanitization.js';
 
 /**
  * Query: Read an event by ID
@@ -31,7 +32,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				}
 				error(403, 'You do not have permission to view this event');
 			}
-			return (cachedPayload.data as any) ?? null;
+			return cachedPayload.data ? (sanitizePublicEvent(cachedPayload.data) as any) : null;
 		}
 	}
 
@@ -66,7 +67,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 						}
 					}
 				},
-				resources: { with: { resource: true } },
+				resources: { with: { resource: { with: { location: true } } } },
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
@@ -76,8 +77,16 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 							with: {
 								items: {
 									with: {
-										consumable: true,
-										recipe: true,
+										consumable: {
+											with: {
+												tags: { with: { tag: { with: { category: true } } } }
+											}
+										},
+										recipe: {
+											with: {
+												tags: { with: { tag: { with: { category: true } } } }
+											}
+										},
 									}
 								}
 							}
@@ -104,7 +113,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 							}
 						}
 					},
-					resources: { with: { resource: true } },
+					resources: { with: { resource: { with: { location: true } } } },
 					contactRoles: { with: { role: true } },
 					tags: { with: { tag: true } },
 					campaign: true,
@@ -114,8 +123,16 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 								with: {
 									items: {
 										with: {
-											consumable: true,
-											recipe: true,
+											consumable: {
+												with: {
+													tags: { with: { tag: { with: { category: true } } } }
+												}
+											},
+											recipe: {
+												with: {
+													tags: { with: { tag: { with: { category: true } } } }
+												}
+											},
 										}
 									}
 								}
@@ -176,7 +193,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 						}
 					}
 				},
-				resources: { with: { resource: true } },
+				resources: { with: { resource: { with: { location: true } } } },
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
@@ -245,17 +262,21 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		};
 	}).filter((c: any) => c && c.id);
 
-	const hasEventEmployee = allContacts.some((ec: any) => isEmployeeContact(ec));
+	const hasEligibleEventEmployee = allContacts.some(
+		(ec: any) => ec.isPublic === true && isEmployeeContact(ec)
+	);
 	const locationContactsMap = new Map<string, any[]>();
 
-	if (!hasEventEmployee) {
+	if (!hasEligibleEventEmployee) {
 		const neededLocationIds = new Set<string>();
 		for (const l of result.locations || []) {
+			if (l.location && !l.location.isPublic) continue;
 			if (l.location?.id) neededLocationIds.add(l.location.id);
-			else if (l.locationId) neededLocationIds.add(l.locationId);
 		}
 		for (const r of result.resources || []) {
-			const locId = (r.resource as any)?.locationId;
+			const res = r.resource as any;
+			if (res?.location && !res.location.isPublic) continue;
+			const locId = res?.locationId;
 			if (locId) neededLocationIds.add(locId);
 		}
 
@@ -290,6 +311,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			return {
 				...res,
 				location: {
+					...(res.location || {}),
 					id: res.locationId,
 					locationContacts: locationContactsMap.get(res.locationId) || []
 				}
@@ -304,7 +326,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		locations: evtLocations,
 		resources: evtResources
 	}, {
-		filterWorkOnly: !isAuthorized,
+		filterWorkOnly: true,
+		publicOnly: true,
 		fallbackToLocation: true,
 		fallbackToFirst: true
 	});
@@ -325,7 +348,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			masterRecord = result;
 		}
 
-		if (masterRecord) {
+		// Do not expose seriesMaster or sibling instances if the master is private and viewer is unauthorized
+		if (masterRecord && (isAuthorized || masterRecord.isPublic === true)) {
 			let masterRrule: string[] | null = masterRecord.recurrence
 				? (Array.isArray(masterRecord.recurrence) ? masterRecord.recurrence : [masterRecord.recurrence])
 				: null;
@@ -340,10 +364,14 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				}
 			}
 
-			instances = await getSeriesInstances({
-				...masterRecord,
-				recurrence: masterRrule,
-			});
+			instances = await getSeriesInstances(
+				{
+					...masterRecord,
+					recurrence: masterRrule,
+				},
+				100,
+				{ publicOnly: !isAuthorized }
+			);
 
 			seriesMaster = {
 				id: masterRecord.id,
@@ -351,6 +379,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				startDateTime: masterRecord.startDateTime ? (masterRecord.startDateTime instanceof Date ? masterRecord.startDateTime.toISOString() : new Date(masterRecord.startDateTime).toISOString()) : null,
 				endDateTime: masterRecord.endDateTime ? (masterRecord.endDateTime instanceof Date ? masterRecord.endDateTime.toISOString() : new Date(masterRecord.endDateTime).toISOString()) : null,
 				recurrence: masterRrule,
+				isPublic: Boolean(masterRecord.isPublic),
 				instances: instances.length > 0 ? instances : undefined,
 			};
 
@@ -359,9 +388,6 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			}
 		}
 	}
-
-	const publicLocations = result.locations.filter((l: any) => l.location.isPublic).map((l: any) => l.location);
-	const publicResources = result.resources.filter((r: any) => r.resource).map((r: any) => r.resource);
 
 	const toIsoSafe = (d: any) => {
 		if (!d) return null;
@@ -385,7 +411,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				: (it.consumable?.tags || []).map((t: any) => t.tag || t).filter(Boolean);
 			return {
 				...it,
-				tags: itemTags,
+				tags: isAuthorized ? itemTags : filterPublicTags(itemTags),
 				createdAt: it.createdAt ? toIsoSafe(it.createdAt) : undefined,
 				updatedAt: it.updatedAt ? toIsoSafe(it.updatedAt) : undefined,
 			};
@@ -400,71 +426,23 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		};
 	}).filter(Boolean);
 
-	// Guests only get customer-facing price data (no purchase costs, markups or linked consumables/recipes)
-	const publicEventPrices = eventPrices.map((p: any) => ({
-		id: p.id,
-		name: p.name,
-		description: p.description,
-		isTemplate: p.isTemplate,
-		createdAt: p.createdAt,
-		updatedAt: p.updatedAt,
-		totalPricePerPortion: p.totalPricePerPortion,
-		items: (p.items || []).map((it: any) => ({
-			id: it.id,
-			priceId: it.priceId,
-			itemType: it.itemType,
-			name: it.name,
-			description: it.description,
-			portionAmount: it.portionAmount,
-			unit: it.unit,
-			unitPrice: it.unitPrice,
-			sortOrder: it.sortOrder,
-			tags: it.tags,
-		})),
-	}));
-
 	const iCalPath = result.id.includes('_inst_') ? `/api/events/${result.id}/event.ics` : (result.iCalPath?.includes('/api/') ? result.iCalPath : `/api/events/${result.id}/event.ics`);
 	const qrCodePath = result.id.includes('_inst_') ? `/api/events/${result.id}/qr.png` : (result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/events/${result.id}/qr.png`);
 
 	// 4. Return Data
 	if (!isAuthorized) {
-		// Public safe object
-		const publicSafeEvent = {
-			id: result.id,
-			summary: result.summary,
-			description: result.description,
-			status: result.status,
-			startDateTime: toIsoSafe(result.startDateTime),
-			endDateTime: toIsoSafe(result.endDateTime),
-			isAllDay: result.isAllDay,
-			isPublic: result.isPublic,
-			heroImage: result.heroImage,
-			ticketPrice: result.ticketPrice,
-			ticketPriceUnknown: result.ticketPriceUnknown,
-			categoryBerlinDotDe: result.categoryBerlinDotDe,
-			createdAt: toIsoSafe(result.createdAt) ?? new Date().toISOString(),
-			updatedAt: toIsoSafe(result.updatedAt) ?? new Date().toISOString(),
-			locations: publicLocations,
-			resources: publicResources,
-			rooms: getEventRooms({ locations: publicLocations, resources: publicResources }),
-			locationIds: publicLocations.map((l: any) => l.id),
-			resourceIds: publicResources.map((r: any) => r.id),
-			tags: result.tags
-				.filter((t: any) => t.tag?.visibility === 'external')
-				.map((t: any) => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),
+		const publicSafeEvent = sanitizePublicEvent({
+			...result,
+			contacts: allContacts,
+			locations: evtLocations,
+			resources: evtResources,
+			prices: eventPrices,
 			resolvedContact,
-			contactIds: [],
-			syncIds: [],
-			prices: publicEventPrices,
-			priceIds: (result.prices || []).map((p: any) => p.priceId),
-			iCalPath,
-			qrCodePath,
-			recurrence: result.recurrence ?? undefined,
-			recurringEventId: result.recurringEventId ?? undefined,
-			seriesId: result.seriesId ?? undefined,
-			seriesMaster: seriesMaster ?? undefined,
+			seriesMaster,
 			instances: instances.length > 0 ? instances : undefined,
-		} as any;
+			iCalPath,
+			qrCodePath
+		});
 
 		await setCache(cacheKeys.publicEvent(eventId), { isPrivate: false, data: publicSafeEvent }, 3600);
 		return publicSafeEvent;

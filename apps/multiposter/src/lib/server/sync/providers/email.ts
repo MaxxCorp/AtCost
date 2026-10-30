@@ -359,6 +359,7 @@ export class EmailProvider implements SyncProvider {
 				});
 
 				for (const c of dbContacts) {
+					if ((c as any).obfuscationStatus === 'obfuscated') continue;
 					const primaryEmail =
 						c.emails?.find((e: any) => e.primary)?.value || c.emails?.[0]?.value;
 					const name =
@@ -396,6 +397,9 @@ export class EmailProvider implements SyncProvider {
 				try {
 					const eventContacts = await getEntityContacts(entityType, entityId);
 					for (const c of eventContacts) {
+						if ((c as any).obfuscationStatus === 'obfuscated' || (c as any).contact?.obfuscationStatus === 'obfuscated') {
+							continue;
+						}
 						const cid = c.id || c.contact?.id;
 						if (cid && excludedContactIds.includes(cid)) {
 							continue;
@@ -429,7 +433,7 @@ export class EmailProvider implements SyncProvider {
 		};
 
 		try {
-			const resolvedContact = await resolveEventContact(event);
+			const resolvedContact = await resolveEventContact(event, { filterWorkOnly: true, publicOnly: true });
 			if (resolvedContact) {
 				contactInfo = resolvedContact;
 			}

@@ -259,5 +259,44 @@ describe('WpTheEventsCalendarProvider', () => {
 			expect(formatted.cost).toBe('0');
 		});
 	});
+
+	describe('public privacy guards in ensureVenue, ensureOrganizer, and ensureTag', () => {
+		it('refuses to sync non-public venues (isPublic === false)', async () => {
+			const mockFetch = vi.fn();
+			global.fetch = mockFetch;
+
+			const venueId = await (provider as any).ensureVenue(
+				{ name: 'Private Venue', isPublic: false },
+				'loc-priv-1'
+			);
+			expect(venueId).toBeUndefined();
+			expect(mockFetch).not.toHaveBeenCalled();
+		});
+
+		it('refuses to sync non-public organizers (isPublic === false)', async () => {
+			const mockFetch = vi.fn();
+			global.fetch = mockFetch;
+
+			const organizerId = await (provider as any).ensureOrganizer(
+				{ name: 'Private Organizer', email: 'priv@org.com', isPublic: false },
+				'ctc-priv-1'
+			);
+			expect(organizerId).toBeUndefined();
+			expect(mockFetch).not.toHaveBeenCalled();
+		});
+
+		it('refuses to sync internal tags (visibility !== "external")', async () => {
+			const mockFetch = vi.fn();
+			global.fetch = mockFetch;
+
+			const tagId = await (provider as any).ensureTag({
+				id: 'tag-int-1',
+				name: 'InternalTag',
+				visibility: 'internal'
+			});
+			expect(tagId).toBeUndefined();
+			expect(mockFetch).not.toHaveBeenCalled();
+		});
+	});
 });
 
