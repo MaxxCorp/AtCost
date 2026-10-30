@@ -1,7 +1,7 @@
 import { command } from '$app/server';
 import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
-import { eq, and, inArray } from '@ac/db';
+import { eq, and, or, inArray, sql } from '@ac/db';
 import { listEvents } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
@@ -49,6 +49,25 @@ export const deleteEvents = command(
 							await db.update(event).set({ exdates: [...existingExdates, decodedIso] }).where(eq(event.id, masterId));
 						}
 						await invalidateEvent([masterId, vId]);
+					}
+
+					// Also check if an exception row existed in DB for this slot and clean it up
+					const [existingException] = await db
+						.select({ id: event.id })
+						.from(event)
+						.where(
+							and(
+								eq(event.recurringEventId, masterId),
+								or(
+									sql`${event.originalStartTime}->>'dateTime' = ${isoDate}`,
+									sql`${event.originalStartTime}->>'dateTime' = ${decodedIso}`
+								)
+							)
+						);
+					if (existingException) {
+						await syncService.deleteEventMappings(user.id, [existingException.id]).catch(console.error);
+						await db.delete(event).where(eq(event.id, existingException.id));
+						await invalidateEvent([existingException.id]);
 					}
 				}
 			}

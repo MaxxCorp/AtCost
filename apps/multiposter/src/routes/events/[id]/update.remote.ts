@@ -286,6 +286,48 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 						targetId = createdException.id;
 						isNewException = true;
+
+						// Migrate campaign sync entries from the virtual instance to the new exception
+						if (master.campaignId) {
+							const [camp] = await tx.select().from(campaign).where(eq(campaign.id, master.campaignId));
+							if (camp && (camp.content as any)?.version === 1) {
+								const content = camp.content as CampaignContent;
+								const candidateVids = [
+									data.id,
+									instIso ? `${instMasterId}_inst_${instIso}` : '',
+									instIso ? `${instMasterId}_inst_${decodeURIComponent(instIso)}` : '',
+									instIso ? `${instMasterId}_inst_${new Date(decodeURIComponent(instIso)).toISOString()}` : ''
+								].filter(Boolean);
+
+								let migrated = false;
+								if (!content.items) content.items = {};
+								if (!content.items[targetId]) {
+									content.items[targetId] = { entityType: 'event', syncs: {} };
+								}
+
+								for (const cVid of candidateVids) {
+									if (cVid && content.items[cVid]?.syncs) {
+										content.items[targetId].syncs = {
+											...content.items[cVid].syncs,
+											...content.items[targetId].syncs
+										};
+										if (content.externalIds) {
+											for (const [extId, mapping] of Object.entries(content.externalIds)) {
+												if (mapping.itemId === cVid) {
+													mapping.itemId = targetId;
+												}
+											}
+										}
+										delete content.items[cVid];
+										migrated = true;
+									}
+								}
+
+								if (migrated) {
+									await tx.update(campaign).set({ content, updatedAt: new Date() }).where(eq(campaign.id, camp.id));
+								}
+							}
+						}
 					}
 				}
 			} else if (!isVirtualInstance && oldEvent?.recurringEventId && data.seriesMode === 'series') {
@@ -577,7 +619,14 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		});
 
 		try {
-			await syncService.syncItems(user.id, [effectiveTargetId], 'event');
+			const syncTargets = [effectiveTargetId];
+			if (instMasterId && !syncTargets.includes(instMasterId)) {
+				syncTargets.push(instMasterId);
+			}
+			if (oldEvent?.recurringEventId && !syncTargets.includes(oldEvent.recurringEventId)) {
+				syncTargets.push(oldEvent.recurringEventId);
+			}
+			await syncService.syncItems(user.id, syncTargets, 'event');
 		} catch (err) {
 			console.error('[Update Remote] Sync error:', err);
 		}

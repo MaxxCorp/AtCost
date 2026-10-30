@@ -224,6 +224,40 @@ export class SyncService {
 	}
 
 	/**
+	 * For an event record that is a materialized recurrence exception, returns all candidate
+	 * virtual instance IDs (e.g. `${masterId}_inst_${iso}`) that may have been previously used
+	 * to track its sync state before materialization.
+	 */
+	public getVirtualCandidateKeys(itemRow: any): string[] {
+		if (!itemRow?.recurringEventId) return [];
+		const masterId = itemRow.recurringEventId;
+		const keys = new Set<string>();
+
+		if (itemRow.originalStartTime && typeof itemRow.originalStartTime === 'object' && 'dateTime' in itemRow.originalStartTime) {
+			const dt = String((itemRow.originalStartTime as any).dateTime || '').trim();
+			if (dt) {
+				keys.add(`${masterId}_inst_${dt}`);
+				try {
+					const iso = new Date(dt).toISOString();
+					keys.add(`${masterId}_inst_${iso}`);
+				} catch { /* ignore */ }
+				try {
+					keys.add(`${masterId}_inst_${encodeURIComponent(dt)}`);
+				} catch { /* ignore */ }
+			}
+		}
+
+		if (itemRow.startDateTime) {
+			try {
+				const startIso = new Date(itemRow.startDateTime).toISOString();
+				keys.add(`${masterId}_inst_${startIso}`);
+			} catch { /* ignore */ }
+		}
+
+		return Array.from(keys);
+	}
+
+	/**
 	 * Check if an event record represents a series master (has recurrence rule and is not an exception).
 	 */
 	public isSeriesMaster(event: any): boolean {
@@ -827,8 +861,15 @@ export class SyncService {
 					// Also check for previously synced occurrences in campaign content that are no longer active
 					if (eventCampaign?.content) {
 						const cItems = (eventCampaign.content as CampaignContent).items || {};
+						const masterExceptions = await db
+							.select({ id: eventTable.id })
+							.from(eventTable)
+							.where(eq(eventTable.recurringEventId, r.event.id));
+						const masterExceptionIds = new Set(masterExceptions.map((e) => e.id));
+
 						for (const k of Object.keys(cItems)) {
-							if ((k.startsWith(`${r.event.id}_inst_`) || k === r.event.id) && !occIds.includes(k)) {
+							const isMasterOccurrence = k.startsWith(`${r.event.id}_inst_`) || k === r.event.id || masterExceptionIds.has(k);
+							if (isMasterOccurrence && !occIds.includes(k)) {
 								const syncEntry = cItems[k]?.syncs?.[config.id];
 								if (syncEntry?.externalId) {
 									itemsToSync.push({
@@ -2497,8 +2538,15 @@ export class SyncService {
 							const camp = campaignRowMap.get(itemId);
 							if (camp?.content) {
 								const cItems = (camp.content as CampaignContent).items || {};
+								const masterExceptions = await db
+									.select({ id: eventTable.id })
+									.from(eventTable)
+									.where(eq(eventTable.recurringEventId, (evtRow!).id));
+								const masterExceptionIds = new Set(masterExceptions.map((e) => e.id));
+
 								for (const k of Object.keys(cItems)) {
-									if ((k.startsWith(`${(evtRow!).id}_inst_`) || k === (evtRow!).id) && !occIds.includes(k)) {
+									const isMasterOccurrence = k.startsWith(`${(evtRow!).id}_inst_`) || k === (evtRow!).id || masterExceptionIds.has(k);
+									if (isMasterOccurrence && !occIds.includes(k)) {
 										const syncEntry = cItems[k]?.syncs?.[config.id];
 										if (syncEntry?.externalId) {
 											expandedItemIds.push(k);
@@ -2693,8 +2741,10 @@ export class SyncService {
 						if (batchContext?.campaigns) {
 							batchContext.campaigns.set(masterId, master.campaign);
 						}
-						if (!isVirtual) {
-							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+						const targetUpdateId = !isVirtual ? itemId : (itemRow.id && !itemRow.id.includes('_inst_') ? itemRow.id : null);
+						if (targetUpdateId && !itemRow.campaignId) {
+							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, targetUpdateId));
+							itemRow.campaignId = master.campaign.id;
 						}
 					}
 				}
@@ -2732,7 +2782,19 @@ export class SyncService {
 			}
 		}
 
-		const hasCampaignSync = !!((campaign?.content as any)?.version === 1 && ((campaign!).content as CampaignContent).items?.[itemId]?.syncs?.[config.id]?.externalId);
+		let hasCampaignSync = !!((campaign?.content as any)?.version === 1 && ((campaign!).content as CampaignContent).items?.[itemId]?.syncs?.[config.id]?.externalId);
+		if (!hasCampaignSync && (campaign?.content as any)?.version === 1 && itemRow?.recurringEventId) {
+			const cContent = (campaign!).content as CampaignContent;
+			for (const vk of this.getVirtualCandidateKeys(itemRow)) {
+				if (cContent.items?.[vk]?.syncs?.[config.id]?.externalId) {
+					hasCampaignSync = true;
+					break;
+				}
+			}
+			if (!hasCampaignSync && itemRow.id !== itemId && cContent.items?.[itemRow.id]?.syncs?.[config.id]?.externalId) {
+				hasCampaignSync = true;
+			}
+		}
 		const needsSync = shouldBeSynced || !!mapping || hasCampaignSync;
 		if (!needsSync) {
 			console.log(`[SyncService] Item ${itemId} checkSync skipped: shouldBeSynced=${shouldBeSynced} (targets: [${syncIds.join(', ')}]), hasMapping=${!!mapping}, hasCampaignSync=${hasCampaignSync} for config ${config.id} (${config.providerType})`);
@@ -2835,8 +2897,21 @@ export class SyncService {
 			? campaignRow?.content as any
 			: createDefaultCampaignContent([config.id]);
 
-		const existingItemSync = campContent.items?.[itemId]?.syncs?.[config.id];
-		const existingExternalId = existingItemSync?.externalId || legacyMapping?.externalId;
+		let existingItemSync = campContent.items?.[itemId]?.syncs?.[config.id];
+		let existingExternalId = existingItemSync?.externalId || legacyMapping?.externalId;
+		let migratedFromVirtualKey: string | null = null;
+
+		if (!existingExternalId && campContent.items && itemRow?.recurringEventId) {
+			for (const vk of this.getVirtualCandidateKeys(itemRow)) {
+				const vSync = campContent.items[vk]?.syncs?.[config.id];
+				if (vSync?.externalId) {
+					existingExternalId = vSync.externalId;
+					existingItemSync = vSync;
+					migratedFromVirtualKey = vk;
+					break;
+				}
+			}
+		}
 
 		const externalItem = await this.mapInternalToExternal(itemRow, config.providerType, batchContext, config);
 
@@ -2880,6 +2955,38 @@ export class SyncService {
 			};
 			if (!campContent.externalIds) campContent.externalIds = {};
 			campContent.externalIds[finalExternalId] = { itemId, configId: config.id };
+
+			// Clean up virtual key if we migrated from it
+			if (migratedFromVirtualKey && campContent.items[migratedFromVirtualKey]) {
+				delete campContent.items[migratedFromVirtualKey].syncs[config.id];
+				if (Object.keys(campContent.items[migratedFromVirtualKey].syncs).length === 0) {
+					delete campContent.items[migratedFromVirtualKey];
+				}
+			}
+
+			// Clean up any stale duplicate virtual occurrences from this provider
+			if (itemRow?.recurringEventId) {
+				for (const vk of this.getVirtualCandidateKeys(itemRow)) {
+					if (vk !== itemId && campContent.items?.[vk]?.syncs?.[config.id]) {
+						const staleExternalId = campContent.items[vk].syncs[config.id].externalId;
+						if (staleExternalId && staleExternalId !== finalExternalId) {
+							console.log(`[SyncService] Cleaning up duplicate external event ${staleExternalId} from provider ${config.providerType}`);
+							try {
+								await provider.deleteEvent(staleExternalId);
+							} catch (delErr) {
+								console.warn(`[SyncService] Warning while deleting duplicate external event ${staleExternalId}:`, delErr);
+							}
+							if (campContent.externalIds?.[staleExternalId]) {
+								delete campContent.externalIds[staleExternalId];
+							}
+						}
+						delete campContent.items[vk].syncs[config.id];
+						if (Object.keys(campContent.items[vk].syncs).length === 0) {
+							delete campContent.items[vk];
+						}
+					}
+				}
+			}
 
 			if (campaignRow) {
 				await db.update(campaignTable).set({ content: campContent, updatedAt: new Date() }).where(eq(campaignTable.id, campaignRow.id));
@@ -3139,8 +3246,10 @@ export class SyncService {
 						if (batchContext?.campaigns) {
 							batchContext.campaigns.set(masterId, master.campaign);
 						}
-						if (!isVirtual) {
-							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, itemId));
+						const targetUpdateId = !isVirtual ? itemId : (itemRow.id && !itemRow.id.includes('_inst_') ? itemRow.id : null);
+						if (targetUpdateId && !itemRow.campaignId) {
+							await db.update(eventTable).set({ campaignId: master.campaign.id }).where(eq(eventTable.id, targetUpdateId));
+							itemRow.campaignId = master.campaign.id;
 						}
 					}
 				} else if (itemRow.seriesId) {
@@ -3182,8 +3291,28 @@ export class SyncService {
 			}
 
 			const campContent = (campaign?.content as any)?.version === 1 ? (campaign!).content as CampaignContent : null;
-			const existingItemSync = campContent?.items?.[itemId]?.syncs?.[config.id];
-			const existingExternalId = existingItemSync?.externalId || mapping?.externalId;
+			let existingItemSync = campContent?.items?.[itemId]?.syncs?.[config.id];
+			let existingExternalId = existingItemSync?.externalId || mapping?.externalId;
+			let matchedVirtualKey: string | null = null;
+
+			if (!existingExternalId && campContent?.items && itemRow?.recurringEventId) {
+				for (const vk of this.getVirtualCandidateKeys(itemRow)) {
+					const vSync = campContent.items[vk]?.syncs?.[config.id];
+					if (vSync?.externalId) {
+						existingExternalId = vSync.externalId;
+						existingItemSync = vSync;
+						matchedVirtualKey = vk;
+						break;
+					}
+				}
+			}
+			if (!existingExternalId && campContent?.items && isVirtual && itemRow && itemRow.id !== itemId) {
+				const exSync = campContent.items[itemRow.id]?.syncs?.[config.id];
+				if (exSync?.externalId) {
+					existingExternalId = exSync.externalId;
+					existingItemSync = exSync;
+				}
+			}
 
 			if (!shouldBeSynced && !existingExternalId) {
 				console.log(`[SyncService] Skipping ${entityType} ${itemId}: not selected or not eligible for synchronization config ${config.id}`);
@@ -3199,8 +3328,29 @@ export class SyncService {
 					if (mapping) {
 						await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
 					}
-					if (campContent && campContent.items?.[itemId]?.syncs?.[config.id]) {
-						delete campContent.items[itemId].syncs[config.id];
+					if (campContent) {
+						if (campContent.items?.[itemId]?.syncs?.[config.id]) {
+							delete campContent.items[itemId].syncs[config.id];
+							if (Object.keys(campContent.items[itemId].syncs).length === 0) {
+								delete campContent.items[itemId];
+							}
+						}
+						if (matchedVirtualKey && campContent.items?.[matchedVirtualKey]?.syncs?.[config.id]) {
+							delete campContent.items[matchedVirtualKey].syncs[config.id];
+							if (Object.keys(campContent.items[matchedVirtualKey].syncs).length === 0) {
+								delete campContent.items[matchedVirtualKey];
+							}
+						}
+						if (itemRow?.recurringEventId) {
+							for (const vk of this.getVirtualCandidateKeys(itemRow)) {
+								if (campContent.items?.[vk]?.syncs?.[config.id]) {
+									delete campContent.items[vk].syncs[config.id];
+									if (Object.keys(campContent.items[vk].syncs).length === 0) {
+										delete campContent.items[vk];
+									}
+								}
+							}
+						}
 						if (campContent.externalIds?.[existingExternalId]) {
 							delete campContent.externalIds[existingExternalId];
 						}
@@ -3267,8 +3417,14 @@ export class SyncService {
 			const configMap = new Map(configs.map((c) => [c.id, this.rowToConfig(c)]));
 			const deletedExternalKeys = new Set<string>();
 
-			// 1. Find campaigns containing these events or their virtual instances
-			const idList = sql.join(eventIds.map((id) => sql`${id}`), sql`, `);
+			// 1. Find campaigns containing these events or their virtual instances or child exceptions
+			const childExceptions = await db
+				.select({ id: eventTable.id })
+				.from(eventTable)
+				.where(inArray(eventTable.recurringEventId, eventIds));
+			const allTargetIds = new Set([...eventIds, ...childExceptions.map((c) => c.id)]);
+
+			const idList = sql.join(Array.from(allTargetIds).map((id) => sql`${id}`), sql`, `);
 
 			const campaignsToUpdate = await db.select().from(campaignTable).where(or(
 				sql`EXISTS (
@@ -3286,7 +3442,7 @@ export class SyncService {
 				const content = camp.content as CampaignContent;
 				if (!content || content.version !== 1 || !content.items) continue;
 
-				const keysToDelete = Object.keys(content.items).filter((k) => eventIds.includes(k) || eventIds.includes(k.split('_inst_')[0]));
+				const keysToDelete = Object.keys(content.items).filter((k) => allTargetIds.has(k) || allTargetIds.has(k.split('_inst_')[0]));
 
 				for (const itemKey of keysToDelete) {
 					const item = content.items[itemKey];

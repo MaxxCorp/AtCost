@@ -1,5 +1,5 @@
 import { command, requested } from '$app/server';
-import { db, event } from '@ac/db';
+import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventPrice, campaign } from '@ac/db';
 import { inArray, eq, and, or, sql } from '@ac/db';
 import { listEvents } from './list.remote';
 import { readEvent } from './[id]/read.remote';
@@ -8,6 +8,7 @@ import { syncService } from '#lib/server/sync/service.js';
 import { publishEventChange } from '#lib/server/realtime.js';
 import { invalidateEvent } from '#lib/server/cache/index.js';
 import { updateEventsStatusSchema } from '#lib/validations/events.js';
+import type { CampaignContent } from '@ac/validations';
 
 export const updateEventsStatus = command(
 	updateEventsStatusSchema,
@@ -73,12 +74,14 @@ export const updateEventsStatus = command(
 								summary: master.summary,
 								description: master.description,
 								internalNotes: master.internalNotes,
+								heroImage: master.heroImage,
 								startDateTime: targetStart,
 								startTimeZone: master.startTimeZone,
 								endDateTime: targetEnd,
 								endTimeZone: master.endTimeZone,
 								isAllDay: master.isAllDay,
 								status,
+								campaignId: master.campaignId,
 								recurringEventId: master.id,
 								originalStartTime: { dateTime: decodedIso },
 								isException: true,
@@ -89,6 +92,64 @@ export const updateEventsStatus = command(
 							})
 							.returning();
 						affectedEventIds.push(newException.id);
+
+						// Copy associations from master
+						const masterLocs = await db.select().from(eventLocation).where(eq(eventLocation.eventId, masterId));
+						if (masterLocs.length > 0) {
+							await db.insert(eventLocation).values(masterLocs.map((l) => ({ eventId: newException.id, locationId: l.locationId })));
+						}
+						const masterRess = await db.select().from(eventResource).where(eq(eventResource.eventId, masterId));
+						if (masterRess.length > 0) {
+							await db.insert(eventResource).values(masterRess.map((r) => ({ eventId: newException.id, resourceId: r.resourceId })));
+						}
+						const masterCtcs = await db.select().from(eventContact).where(eq(eventContact.eventId, masterId));
+						if (masterCtcs.length > 0) {
+							await db.insert(eventContact).values(masterCtcs.map((c) => ({ eventId: newException.id, contactId: c.contactId, participationStatus: c.participationStatus })));
+						}
+						const masterRoles = await db.select().from(eventContactRole).where(eq(eventContactRole.eventId, masterId));
+						if (masterRoles.length > 0) {
+							await db.insert(eventContactRole).values(masterRoles.map((r) => ({ eventId: newException.id, contactId: r.contactId, roleId: r.roleId })));
+						}
+						const masterTags = await db.select().from(eventTag).where(eq(eventTag.eventId, masterId));
+						if (masterTags.length > 0) {
+							await db.insert(eventTag).values(masterTags.map((t) => ({ eventId: newException.id, tagId: t.tagId })));
+						}
+						const masterPrices = await db.select().from(eventPrice).where(eq(eventPrice.eventId, masterId));
+						if (masterPrices.length > 0) {
+							await db.insert(eventPrice).values(masterPrices.map((m) => ({ eventId: newException.id, priceId: m.priceId })));
+						}
+
+						// Migrate campaign sync state if master has campaign
+						if (master.campaignId) {
+							const [camp] = await db.select().from(campaign).where(eq(campaign.id, master.campaignId));
+							if (camp && (camp.content as any)?.version === 1) {
+								const cContent = camp.content as CampaignContent;
+								const candidateVids = [vId, `${masterId}_inst_${decodedIso}`, `${masterId}_inst_${new Date(decodedIso).toISOString()}`];
+								let foundVid: string | null = null;
+								for (const cVid of candidateVids) {
+									if (cContent.items?.[cVid]?.syncs) {
+										foundVid = cVid;
+										break;
+									}
+								}
+								if (foundVid && cContent.items?.[foundVid]) {
+									if (!cContent.items) cContent.items = {};
+									cContent.items[newException.id] = {
+										entityType: 'event',
+										syncs: { ...cContent.items[foundVid].syncs }
+									};
+									if (cContent.externalIds) {
+										for (const [extId, mapping] of Object.entries(cContent.externalIds)) {
+											if (mapping.itemId === foundVid) {
+												mapping.itemId = newException.id;
+											}
+										}
+									}
+									delete cContent.items[foundVid];
+									await db.update(campaign).set({ content: cContent, updatedAt: new Date() }).where(eq(campaign.id, camp.id));
+								}
+							}
+						}
 					}
 				}
 			}
@@ -140,8 +201,9 @@ export const updateEventsStatus = command(
 			await publishEventChange('update', affectedEventIds).catch(console.error);
 		}
 
-		for (const mId of affectedMasterIds) {
-			await syncService.syncItems(user.id, [mId], 'event').catch(console.error);
+		const syncTargets = [...new Set([...affectedEventIds, ...affectedMasterIds])];
+		for (const targetId of syncTargets) {
+			await syncService.syncItems(user.id, [targetId], 'event').catch(console.error);
 		}
 
 		try {

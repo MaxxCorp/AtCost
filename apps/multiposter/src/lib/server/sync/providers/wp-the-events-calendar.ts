@@ -37,9 +37,14 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	private venueCache = new Map<string, number>();
 	private organizerCache = new Map<string, number>();
 	private tagCache = new Map<string, number>();
+	private imageCache = new Map<string, { id: number; url: string; isNew?: boolean }>();
 
 	async initialize(config: SyncConfig): Promise<void> {
 		this.config = config;
+		this.venueCache.clear();
+		this.organizerCache.clear();
+		this.tagCache.clear();
+		this.imageCache.clear();
 
 		// Get WordPress credentials from environment variables
 		this.baseUrl = WP_EVENTS_CALENDAR_BASE_URL || '';
@@ -153,13 +158,14 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			}
 
 			// Ensure image
-			let mediaData: { id: number; url: string } | undefined;
+			let mediaData: { id: number; url: string; isNew?: boolean } | undefined;
 			if (event.image) {
 				console.log(`[WP-Sync] Ensuring image: ${event.image.url}`);
 				mediaData = await this.ensureImage(event.image);
 				if (mediaData) {
 					console.log(`[WP-Sync] Image ensured with ID: ${mediaData.id}`);
-					wpEventData.image = mediaData.url; // Use URL as requested
+					// Pass WordPress attachment ID to TEC to link existing media without sideloading duplicates
+					wpEventData.image = mediaData.id;
 				} else {
 					console.warn(`[WP-Sync] Failed to ensure image`);
 				}
@@ -185,9 +191,9 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			const createdEvent = await response.json();
 
-			// Post-link media if we have it
-			if (mediaData && createdEvent.id) {
-				console.log(`[WP-Sync] Linking media ${mediaData.id} to event ${createdEvent.id}`);
+			// Post-link media only if it was newly uploaded to avoid re-parenting across series instances
+			if (mediaData?.isNew && createdEvent.id) {
+				console.log(`[WP-Sync] Linking newly uploaded media ${mediaData.id} to event ${createdEvent.id}`);
 				await fetch(this.getApiUrl(`/wp/v2/media/${mediaData.id}`), {
 					method: 'POST',
 					headers: {
@@ -195,7 +201,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify({ post: createdEvent.id }),
-				});
+				}).catch(err => console.warn(`[WP-Sync] Failed to post-link media ${mediaData?.id}:`, err));
 			}
 
 			return {
@@ -254,11 +260,12 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			}
 
 			// Ensure image
-			let mediaData: { id: number; url: string } | undefined;
+			let mediaData: { id: number; url: string; isNew?: boolean } | undefined;
 			if (event.image) {
 				mediaData = await this.ensureImage(event.image);
 				if (mediaData) {
-					wpEventData.image = mediaData.url;
+					// Pass WordPress attachment ID to TEC to link existing media without sideloading duplicates
+					wpEventData.image = mediaData.id;
 				}
 			}
 
@@ -280,9 +287,9 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			const updatedEvent = await response.json();
 
-			// Post-link media if we have it
-			if (mediaData) {
-				console.log(`[WP-Sync] Linking media ${mediaData.id} to event ${externalId}`);
+			// Post-link media only if it was newly uploaded to avoid re-parenting across series instances
+			if (mediaData?.isNew) {
+				console.log(`[WP-Sync] Linking newly uploaded media ${mediaData.id} to event ${externalId}`);
 				await fetch(this.getApiUrl(`/wp/v2/media/${mediaData.id}`), {
 					method: 'POST',
 					headers: {
@@ -290,7 +297,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 						'Content-Type': 'application/json',
 					},
 					body: JSON.stringify({ post: externalId }),
-				});
+				}).catch(err => console.warn(`[WP-Sync] Failed to post-link media ${mediaData?.id}:`, err));
 			}
 
 			return {
@@ -586,8 +593,15 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	 * @param image Image data
 	 * @returns Media ID and URL
 	 */
-	private async ensureImage(image: { url: string; title?: string }): Promise<{ id: number; url: string } | undefined> {
+	private async ensureImage(image: { url: string; title?: string }): Promise<{ id: number; url: string; isNew?: boolean } | undefined> {
 		try {
+			// In-memory cache check by URL (instant deduplication across instances of the same series during sync)
+			if (this.imageCache.has(image.url)) {
+				const cached = this.imageCache.get(image.url)!;
+				console.log(`[WP-Sync] Image URL in-memory match found! Reusing media ID: ${cached.id}`);
+				return { id: cached.id, url: cached.url, isNew: false };
+			}
+
 			console.log(`[WP-Sync] ensureImage check for: ${image.url}`);
 
 			// 1. Download the image first so we can hash it for deduplication
@@ -600,18 +614,34 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			// 2. Hash the image buffer
 			const hash = crypto.createHash('sha256').update(buffer).digest('hex').substring(0, 16);
 
-			const filename = image.url.split('/').pop() || 'image.jpg';
-			const safeFilename = filename.toLowerCase().replace(/[^a-z0-9.]/g, '-').replace(/-+/g, '-');
+			// In-memory cache check by hash (same image buffer under a different URL)
+			if (this.imageCache.has(hash)) {
+				const cached = this.imageCache.get(hash)!;
+				console.log(`[WP-Sync] Image hash in-memory match found! Reusing media ID: ${cached.id}`);
+				const result = { id: cached.id, url: cached.url, isNew: false };
+				this.imageCache.set(image.url, result);
+				return result;
+			}
+
+			// Clean query parameters and fragments from URL
+			const cleanUrl = image.url.split('?')[0].split('#')[0];
+			const rawFilename = decodeURIComponent(cleanUrl.split('/').pop() || 'image.jpg');
+
+			// Extract clean extension and base name
+			const lastDotIndex = rawFilename.lastIndexOf('.');
+			const ext = (lastDotIndex !== -1 ? rawFilename.substring(lastDotIndex + 1).toLowerCase() : 'jpg').replace(/[^a-z0-9]/g, '') || 'jpg';
+			const baseName = lastDotIndex !== -1 ? rawFilename.substring(0, lastDotIndex) : rawFilename;
+			const safeBaseName = baseName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'image';
 
 			// Create a precise slug based on the hash to guarantee finding it later
-			const nameWithoutExt = safeFilename.split('.')[0];
-			const uniqueSlug = `${hash}-${nameWithoutExt}`.substring(0, 100); // WP slugs have length limits
-			const uploadFilename = `${hash}-${safeFilename}`;
+			const uniqueSlug = `${hash}-${safeBaseName}`.substring(0, 90);
+			const uploadFilename = `${uniqueSlug}.${ext}`;
 
-			// 3. Search WordPress by this exact hash-slug
+			// 3. Search WordPress by this exact hash-slug first
 			const slugParams = new URLSearchParams();
 			slugParams.set('slug', uniqueSlug);
 			slugParams.set('media_type', 'image');
+			slugParams.set('status', 'inherit,publish,any');
 
 			const searchUrl = this.getApiUrl('/wp/v2/media', slugParams);
 			const searchResponse = await fetch(searchUrl, {
@@ -623,28 +653,69 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 
 			if (searchResponse.ok) {
 				const media = await searchResponse.json();
-				// Reuse if found
-				if (media.length > 0) {
-					console.log(`[WP-Sync] Image hash match found! Reusing media ID: ${media[0].id}`);
-					return { id: media[0].id, url: media[0].source_url };
+				if (Array.isArray(media) && media.length > 0) {
+					console.log(`[WP-Sync] Image slug match found! Reusing media ID: ${media[0].id}`);
+					const result = { id: media[0].id, url: media[0].source_url };
+					this.imageCache.set(image.url, result);
+					this.imageCache.set(hash, result);
+					return result;
+				}
+			}
+
+			// Fallback search: search by the 16-character sha256 hash in case WP appended a suffix or slug differed
+			const fallbackParams = new URLSearchParams();
+			fallbackParams.set('search', hash);
+			fallbackParams.set('media_type', 'image');
+			fallbackParams.set('status', 'inherit,publish,any');
+
+			const fallbackUrl = this.getApiUrl('/wp/v2/media', fallbackParams);
+			const fallbackResponse = await fetch(fallbackUrl, {
+				method: 'GET',
+				headers: {
+					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
+				},
+			});
+
+			if (fallbackResponse.ok) {
+				const media = await fallbackResponse.json();
+				if (Array.isArray(media) && media.length > 0) {
+					const matched = media.find((m: any) =>
+						(m.slug && m.slug.includes(hash)) ||
+						(m.source_url && m.source_url.includes(hash)) ||
+						(m.title?.rendered && m.title.rendered.includes(hash))
+					);
+					if (matched) {
+						console.log(`[WP-Sync] Image hash fallback search match found! Reusing media ID: ${matched.id}`);
+						const result = { id: matched.id, url: matched.source_url };
+						this.imageCache.set(image.url, result);
+						this.imageCache.set(hash, result);
+						return result;
+					}
 				}
 			}
 
 			// 4. Upload if not found
 			console.log(`[WP-Sync] Image hash not found, uploading as: ${uploadFilename}`);
-			const uploadResponse = await fetch(this.getApiUrl('/wp/v2/media'), {
+			const uploadParams = new URLSearchParams();
+			uploadParams.set('slug', uniqueSlug);
+			uploadParams.set('title', uniqueSlug);
+
+			const uploadResponse = await fetch(this.getApiUrl('/wp/v2/media', uploadParams), {
 				method: 'POST',
 				headers: {
 					'Authorization': `Basic ${Buffer.from(`${this.username}:${this.applicationPassword}`).toString('base64')}`,
 					'Content-Disposition': `attachment; filename="${uploadFilename}"`,
-					'Content-Type': imageResponse.headers.get('content-type') || 'image/jpeg',
+					'Content-Type': imageResponse.headers.get('content-type') || `image/${ext === 'png' ? 'png' : ext === 'webp' ? 'webp' : ext === 'gif' ? 'gif' : 'jpeg'}`,
 				},
 				body: buffer,
 			});
 
 			if (uploadResponse.ok) {
 				const uploadedMedia = await uploadResponse.json();
-				return { id: uploadedMedia.id, url: uploadedMedia.source_url };
+				const result = { id: uploadedMedia.id, url: uploadedMedia.source_url, isNew: true };
+				this.imageCache.set(image.url, result);
+				this.imageCache.set(hash, result);
+				return result;
 			} else {
 				const errorText = await uploadResponse.text();
 				console.error(`[WP-Sync] Failed to upload image to WordPress: ${uploadResponse.status} ${uploadResponse.statusText}`);

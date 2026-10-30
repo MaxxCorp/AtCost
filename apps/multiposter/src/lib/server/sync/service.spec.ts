@@ -64,6 +64,11 @@ vi.mock('../contacts', () => ({
 	getEntityContacts: vi.fn().mockResolvedValue([])
 }));
 
+// Mock cache invalidation to prevent real Redis client activation
+vi.mock('#lib/server/cache/index.js', () => ({
+	invalidateEvent: vi.fn().mockResolvedValue(undefined)
+}));
+
 describe('SyncService - processExternalEvent deduplication', () => {
 	let service: SyncService;
 	const mockConfig = { id: 'config-1', userId: 'user-1', providerId: 'provider-1' } as any;
@@ -928,6 +933,13 @@ describe('SyncService - Bulk Sync', () => {
 				from: vi.fn().mockResolvedValueOnce([mockConfigRow])
 			});
 
+			// 1.5. Fetch child exceptions
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([])
+				})
+			});
+
 			// 2. Fetch campaigns containing event-master-1 or virtual instances
 			(db.select as any).mockReturnValueOnce({
 				from: vi.fn().mockReturnValueOnce({
@@ -1584,5 +1596,277 @@ describe('SyncService - Public Data Leak Prevention', () => {
 		expect(occIds).toContain('master-uuid');
 		expect(occIds).not.toContain('exc-private-day2');
 		expect(occIds).not.toContain(`master-uuid_inst_${day2.toISOString()}`);
+	});
+
+	describe('SyncService - Recurring Series Instance Sync & Deduplication', () => {
+		let service: SyncService;
+		const configId = 'cfg-wp-1';
+		const mockConfig: any = {
+			id: configId,
+			userId: 'user-1',
+			providerType: 'wp-the-events-calendar',
+			direction: 'push',
+			enabled: true,
+			settings: {}
+		};
+
+		beforeEach(() => {
+			service = new SyncService();
+			vi.clearAllMocks();
+		});
+
+		it('should migrate sync state from virtual instance to exception on executeSyncItem without creating duplicate', async () => {
+			const start = new Date('2026-10-15T10:00:00.000Z');
+			const end = new Date('2026-10-15T11:00:00.000Z');
+			const virtualKey = `master-1_inst_${start.toISOString()}`;
+
+			const mockProviderInstance: any = {
+				supportedEntityTypes: ['event'],
+				supportsNativeRecurrence: false,
+				pushEvent: vi.fn().mockResolvedValue({ externalId: 'wp-new-duplicate', etag: 'etag-new' }),
+				updateEvent: vi.fn().mockResolvedValue({ etag: 'etag-updated' }),
+				deleteEvent: vi.fn().mockResolvedValue(undefined)
+			};
+
+			const mockCampaign: any = {
+				id: 'camp-1',
+				userId: 'user-1',
+				content: {
+					version: 1,
+					targets: { [configId]: { enabled: true } },
+					items: {
+						[virtualKey]: {
+							entityType: 'event',
+							syncs: {
+								[configId]: { status: 'synced', externalId: 'wp-100', lastSyncedAt: new Date().toISOString() }
+							}
+						}
+					},
+					externalIds: {
+						'wp-100': { itemId: virtualKey, configId }
+					}
+				}
+			};
+
+			const exceptionRecord: any = {
+				id: 'exc-uuid-1',
+				summary: 'Instance with note',
+				startDateTime: start,
+				endDateTime: end,
+				recurringEventId: 'master-1',
+				originalStartTime: { dateTime: start.toISOString() },
+				isException: true,
+				status: 'confirmed',
+				isPublic: true,
+				campaignId: 'camp-1',
+				userId: 'user-1'
+			};
+
+			// Mock db queries
+			(db.select as any).mockReturnValue({
+				from: vi.fn().mockReturnValue({
+					innerJoin: vi.fn().mockReturnValue({
+						where: vi.fn().mockResolvedValue([])
+					}),
+					leftJoin: vi.fn().mockReturnValue({
+						where: vi.fn().mockResolvedValue([])
+					}),
+					where: vi.fn().mockResolvedValue([exceptionRecord])
+				})
+			});
+
+			const mockUpdateSet = vi.fn().mockReturnValue({
+				where: vi.fn().mockResolvedValue([])
+			});
+			(db.update as any).mockReturnValue({
+				set: mockUpdateSet
+			});
+
+			const batchContext: any = {
+				eventRecords: new Map([['exc-uuid-1', exceptionRecord]]),
+				campaigns: new Map([['camp-1', mockCampaign]])
+			};
+
+			await service.executeSyncItem(mockConfig, mockProviderInstance, 'exc-uuid-1', 'event', batchContext);
+
+			// Must update existing event wp-100 instead of pushing a duplicate
+			expect(mockProviderInstance.updateEvent).toHaveBeenCalledWith('wp-100', expect.any(Object));
+			expect(mockProviderInstance.pushEvent).not.toHaveBeenCalled();
+
+			// Campaign content should now track exc-uuid-1 and virtualKey should be deleted
+			const updatedContent = mockCampaign.content;
+			expect(updatedContent.items['exc-uuid-1']).toBeDefined();
+			expect(updatedContent.items['exc-uuid-1'].syncs[configId].externalId).toBe('wp-100');
+			expect(updatedContent.items[virtualKey]).toBeUndefined();
+			expect(updatedContent.externalIds['wp-100'].itemId).toBe('exc-uuid-1');
+		});
+
+		it('should unpublish/delete from provider when an exception is cancelled even if previously synced under virtual key', async () => {
+			const start = new Date('2026-10-15T10:00:00.000Z');
+			const end = new Date('2026-10-15T11:00:00.000Z');
+			const virtualKey = `master-1_inst_${start.toISOString()}`;
+
+			const mockProviderInstance: any = {
+				supportedEntityTypes: ['event'],
+				supportsNativeRecurrence: false,
+				updateEvent: vi.fn().mockResolvedValue({ etag: 'etag-1' }),
+				deleteEvent: vi.fn().mockResolvedValue(undefined)
+			};
+
+			const mockCampaign: any = {
+				id: 'camp-1',
+				userId: 'user-1',
+				content: {
+					version: 1,
+					targets: { [configId]: { enabled: true } },
+					items: {
+						[virtualKey]: {
+							entityType: 'event',
+							syncs: {
+								[configId]: { status: 'synced', externalId: 'wp-100', lastSyncedAt: new Date().toISOString() }
+							}
+						}
+					},
+					externalIds: {
+						'wp-100': { itemId: virtualKey, configId }
+					}
+				}
+			};
+
+			const cancelledException: any = {
+				id: 'exc-uuid-1',
+				summary: 'Cancelled Instance',
+				startDateTime: start,
+				endDateTime: end,
+				recurringEventId: 'master-1',
+				originalStartTime: { dateTime: start.toISOString() },
+				isException: true,
+				status: 'cancelled',
+				isPublic: true,
+				campaignId: 'camp-1',
+				userId: 'user-1'
+			};
+
+			(db.select as any).mockImplementation(() => ({
+				from: vi.fn().mockImplementation(() => ({
+					where: vi.fn().mockImplementation(() => Promise.resolve([cancelledException]))
+				}))
+			}));
+
+			const mockUpdateSet = vi.fn().mockReturnValue({
+				where: vi.fn().mockResolvedValue([])
+			});
+			(db.update as any).mockReturnValue({
+				set: mockUpdateSet
+			});
+
+			const batchContext: any = {
+				eventRecords: new Map([['exc-uuid-1', cancelledException]]),
+				campaigns: new Map([['camp-1', mockCampaign]])
+			};
+
+			await (service as any).syncSingleItem(mockConfig, mockProviderInstance, 'exc-uuid-1', 'event', batchContext);
+
+			// Should have deleted wp-100 from WordPress!
+			expect(mockProviderInstance.deleteEvent).toHaveBeenCalledWith('wp-100');
+
+			// Campaign content should be cleaned up
+			const updatedContent = mockCampaign.content;
+			expect(updatedContent.items[virtualKey]).toBeUndefined();
+			expect(updatedContent.items['exc-uuid-1']?.syncs?.[configId]).toBeUndefined();
+			expect(updatedContent.externalIds['wp-100']).toBeUndefined();
+		});
+
+		it('should clean up stale duplicate virtual occurrences from provider when exception sync runs', async () => {
+			const start = new Date('2026-10-15T10:00:00.000Z');
+			const end = new Date('2026-10-15T11:00:00.000Z');
+			const virtualKey = `master-1_inst_${start.toISOString()}`;
+
+			const mockProviderInstance: any = {
+				supportedEntityTypes: ['event'],
+				supportsNativeRecurrence: false,
+				updateEvent: vi.fn().mockResolvedValue({ etag: 'etag-updated' }),
+				deleteEvent: vi.fn().mockResolvedValue(undefined)
+			};
+
+			// Simulate stale state where both virtual key AND exception already had external IDs (duplicate on WP)
+			const mockCampaign: any = {
+				id: 'camp-1',
+				userId: 'user-1',
+				content: {
+					version: 1,
+					targets: { [configId]: { enabled: true } },
+					items: {
+						'exc-uuid-1': {
+							entityType: 'event',
+							syncs: {
+								[configId]: { status: 'synced', externalId: 'wp-101', lastSyncedAt: new Date().toISOString() }
+							}
+						},
+						[virtualKey]: {
+							entityType: 'event',
+							syncs: {
+								[configId]: { status: 'synced', externalId: 'wp-100', lastSyncedAt: new Date().toISOString() }
+							}
+						}
+					},
+					externalIds: {
+						'wp-100': { itemId: virtualKey, configId },
+						'wp-101': { itemId: 'exc-uuid-1', configId }
+					}
+				}
+			};
+
+			const exceptionRecord: any = {
+				id: 'exc-uuid-1',
+				summary: 'Active Exception',
+				startDateTime: start,
+				endDateTime: end,
+				recurringEventId: 'master-1',
+				originalStartTime: { dateTime: start.toISOString() },
+				isException: true,
+				status: 'confirmed',
+				isPublic: true,
+				campaignId: 'camp-1',
+				userId: 'user-1'
+			};
+
+			(db.select as any).mockReturnValue({
+				from: vi.fn().mockReturnValue({
+					innerJoin: vi.fn().mockReturnValue({
+						where: vi.fn().mockResolvedValue([])
+					}),
+					leftJoin: vi.fn().mockReturnValue({
+						where: vi.fn().mockResolvedValue([])
+					}),
+					where: vi.fn().mockResolvedValue([exceptionRecord])
+				})
+			});
+
+			const mockUpdateSet = vi.fn().mockReturnValue({
+				where: vi.fn().mockResolvedValue([])
+			});
+			(db.update as any).mockReturnValue({
+				set: mockUpdateSet
+			});
+
+			const batchContext: any = {
+				eventRecords: new Map([['exc-uuid-1', exceptionRecord]]),
+				campaigns: new Map([['camp-1', mockCampaign]])
+			};
+
+			await service.executeSyncItem(mockConfig, mockProviderInstance, 'exc-uuid-1', 'event', batchContext);
+
+			// Active item wp-101 should be updated
+			expect(mockProviderInstance.updateEvent).toHaveBeenCalledWith('wp-101', expect.any(Object));
+
+			// Duplicate wp-100 should be deleted from provider!
+			expect(mockProviderInstance.deleteEvent).toHaveBeenCalledWith('wp-100');
+
+			// Campaign content should have virtualKey removed
+			expect(mockCampaign.content.items[virtualKey]).toBeUndefined();
+			expect(mockCampaign.content.externalIds['wp-100']).toBeUndefined();
+			expect(mockCampaign.content.items['exc-uuid-1'].syncs[configId].externalId).toBe('wp-101');
+		});
 	});
 });
