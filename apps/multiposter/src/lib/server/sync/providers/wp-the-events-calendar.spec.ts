@@ -215,10 +215,10 @@ describe('WpTheEventsCalendarProvider', () => {
 				ticketPrice: '0',
 				metadata: { ticketPriceUnknown: true }
 			});
-			expect(formatted.cost).toBe('Preis bitte erfragen');
+			expect(formatted.cost).toBe('');
 		});
 
-		it('maps ticketPrice to "Preis bitte erfragen" when ticketPrice is explicitly "Unbekannt" or "Bitte erfragen"', () => {
+		it('maps ticketPrice to "" when ticketPrice is explicitly "Unbekannt" or "Bitte erfragen"', () => {
 			const format = (provider as any).mapEventToWpFormat.bind(provider);
 
 			const withUnbekannt = format({
@@ -227,7 +227,7 @@ describe('WpTheEventsCalendarProvider', () => {
 				summary: 'Unbekannt Price',
 				ticketPrice: 'Unbekannt'
 			});
-			expect(withUnbekannt.cost).toBe('Preis bitte erfragen');
+			expect(withUnbekannt.cost).toBe('');
 
 			const withBitteErfragen = format({
 				externalId: '',
@@ -235,7 +235,7 @@ describe('WpTheEventsCalendarProvider', () => {
 				summary: 'Bitte erfragen Price',
 				ticketPrice: 'Bitte erfragen'
 			});
-			expect(withBitteErfragen.cost).toBe('Preis bitte erfragen');
+			expect(withBitteErfragen.cost).toBe('');
 
 			const withPreisBitteErfragen = format({
 				externalId: '',
@@ -243,7 +243,7 @@ describe('WpTheEventsCalendarProvider', () => {
 				summary: 'Preis bitte erfragen Price',
 				ticketPrice: 'Preis bitte erfragen'
 			});
-			expect(withPreisBitteErfragen.cost).toBe('Preis bitte erfragen');
+			expect(withPreisBitteErfragen.cost).toBe('');
 		});
 
 		it('maps genuine free admission ("0") to "0" when ticketPriceUnknown is false', () => {

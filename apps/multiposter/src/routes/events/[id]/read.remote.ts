@@ -6,7 +6,7 @@ import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { type Event, getCampaignTargetIds } from '@ac/validations';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
-import { resolveEventContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
 import { getSeriesInstances } from '#lib/server/events/instances.js';
 import { sanitizePublicEvent, filterPublicTags } from '#lib/server/public-sanitization.js';
@@ -262,12 +262,11 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		};
 	}).filter((c: any) => c && c.id);
 
-	const hasEligibleEventEmployee = allContacts.some(
-		(ec: any) => ec.isPublic === true && isEmployeeContact(ec)
-	);
+	const sortedContacts = sortContactsByPriority(allContacts);
+
 	const locationContactsMap = new Map<string, any[]>();
 
-	if (!hasEligibleEventEmployee) {
+	if (allContacts.length === 0) {
 		const neededLocationIds = new Set<string>();
 		for (const l of result.locations || []) {
 			if (l.location && !l.location.isPublic) continue;
@@ -322,7 +321,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 
 	const resolvedContact = resolveEventContactSync({
 		...result,
-		contacts: allContacts,
+		contacts: sortedContacts,
 		locations: evtLocations,
 		resources: evtResources
 	}, {
@@ -433,7 +432,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	if (!isAuthorized) {
 		const publicSafeEvent = sanitizePublicEvent({
 			...result,
-			contacts: allContacts,
+			contacts: sortedContacts,
 			locations: evtLocations,
 			resources: evtResources,
 			prices: eventPrices,
@@ -462,7 +461,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		endDateTime: toIsoSafe(result.endDateTime),
 		locations: allLocations,
 		resources: allResources,
-		contacts: allContacts,
+		contacts: sortedContacts,
 		prices: eventPrices,
 		priceIds: (result.prices || []).map((p: any) => p.priceId),
 		rooms: getEventRooms({ locations: allLocations, resources: allResources }),

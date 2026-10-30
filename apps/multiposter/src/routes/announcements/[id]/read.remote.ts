@@ -4,7 +4,7 @@ import { announcement, locationContact, eq, inArray } from '@ac/db';
 import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { type Announcement, getCampaignTargetIds } from '@ac/validations';
-import { resolveAnnouncementContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { resolveAnnouncementContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
 import { sanitizePublicAnnouncement } from '#lib/server/public-sanitization.js';
 
@@ -35,6 +35,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 		where: eq(announcement.id, announcementId),
 		with: {
 			locations: { with: { location: true } },
+			contactRoles: { with: { role: true } },
 			contacts: {
 				with: {
 					contact: {
@@ -67,13 +68,28 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     }
 
     // 3. Resolve Primary Contact
-    const hasEligibleEmployee = (result.contacts || []).some((ac: any) => {
-        const cObj = ac.contact || ac;
-        return cObj?.isPublic === true && isEmployeeContact(cObj);
-    });
+    const contactRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
+    for (const cr of (result.contactRoles || [])) {
+        const list = contactRolesMap.get(cr.contactId) || [];
+        if (cr.role) {
+            list.push({ id: cr.role.id, name: cr.role.name, color: cr.role.color });
+        }
+        contactRolesMap.set(cr.contactId, list);
+    }
+
+    const allContacts = (result.contacts || []).map((c: any) => {
+        const contactObj = c.contact || c;
+        return {
+            ...contactObj,
+            roles: contactRolesMap.get(contactObj.id) || [],
+        };
+    }).filter((c: any) => c && c.id);
+
+    const sortedContacts = sortContactsByPriority(allContacts);
+
     const locationContactsMap = new Map<string, any[]>();
 
-    if (!hasEligibleEmployee) {
+    if (allContacts.length === 0) {
         const neededLocationIds = new Set<string>();
         for (const l of result.locations || []) {
             if (l.location && !l.location.isPublic) continue;
@@ -108,6 +124,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 
 	const resolvedContact = resolveAnnouncementContactSync({
         ...result,
+        contacts: sortedContacts,
         locations
     }, {
 		filterWorkOnly: true,
@@ -120,6 +137,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     if (!isAuthorized) {
         const publicAnnouncement = sanitizePublicAnnouncement({
             ...result,
+            contacts: sortedContacts,
             locations,
             resolvedContact
         });
@@ -130,6 +148,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
 
     return {
         ...result,
+        contacts: sortedContacts,
         createdAt: result.createdAt.toISOString(),
         updatedAt: result.updatedAt.toISOString(),
         tags: result.tags.map(t => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),

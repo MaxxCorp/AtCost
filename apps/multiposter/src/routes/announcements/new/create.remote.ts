@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign, syncConfig } from '@ac/db';
+import { announcement, announcementTag, announcementContact, announcementContactRole, tag, announcementLocation, campaign, syncConfig } from '@ac/db';
 import { createAnnouncementSchema } from '#lib/validations/announcements.js';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { publishAnnouncementChange } from '#lib/server/realtime.js';
@@ -130,6 +130,26 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
                         contactId: contactId
                     }))
                 );
+            }
+
+            // Insert Contact Roles
+            if (input.contactRolesJson) {
+                try {
+                    const rolesMap: Record<string, string[]> = JSON.parse(input.contactRolesJson);
+                    const roleEntries: { announcementId: string; contactId: string; roleId: string }[] = [];
+                    for (const [cId, roleIds] of Object.entries(rolesMap)) {
+                        if (Array.isArray(roleIds)) {
+                            for (const rId of roleIds) {
+                                roleEntries.push({ announcementId, contactId: cId, roleId: rId });
+                            }
+                        }
+                    }
+                    if (roleEntries.length > 0) {
+                        await tx.insert(announcementContactRole).values(roleEntries);
+                    }
+                } catch (err) {
+                    console.error('Failed to parse or insert announcement contact roles:', err);
+                }
             }
 
             // Insert Locations

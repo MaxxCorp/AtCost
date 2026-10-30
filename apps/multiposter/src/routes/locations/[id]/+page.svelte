@@ -16,8 +16,11 @@
     import { updateContact } from "../../contacts/[id]/update.remote";
     import { readContact } from "../../contacts/[id]/read.remote";
     import { createContactSchema, updateContactSchema, updateLocationSchema } from "@ac/validations";
+    import EventContactRoleSelector from "#lib/components/events/EventContactRoleSelector.svelte";
+    import EventRoleManagerModal from "#lib/components/events/EventRoleManagerModal.svelte";
 
     const locationId = $derived(page.params.id || "");
+    let isRoleManagerOpen = $state(false);
 </script>
 
 {#snippet contactLabel(item: any)}
@@ -115,7 +118,20 @@
                 selectAllLabel={m.select_all()}
                 deselectAllLabel={m.deselect_all()}
                 confirmUnlinkLabel={m.confirm_unlink_label({ item: m.contact() })}
-            />
+            >
+                {#snippet rolesSnippet(contact: any)}
+                    <EventContactRoleSelector
+                        {contact}
+                        entityType="location"
+                        entityId={location.id}
+                        onopenManager={() => (isRoleManagerOpen = true)}
+                    />
+                {/snippet}
+            </EntityManager>
         </div>
     {/snippet}
 </LocationDetailView>
+
+<EventRoleManagerModal
+    bind:open={isRoleManagerOpen}
+/>

@@ -1,8 +1,9 @@
-import { pgTable, text, timestamp, boolean, uuid, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, primaryKey, index } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { contact, tag } from "./contacts";
 import { location } from "./resources";
 import { campaign } from "./campaigns";
+import { eventRole } from "./events";
 
 // --- ANNOUNCEMENT TABLES ---
 
@@ -24,6 +25,15 @@ export const announcementContact = pgTable("announcement_contact", {
     contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.announcementId, table.contactId] })]);
 
+export const announcementContactRole = pgTable("announcement_contact_role", {
+    announcementId: uuid("announcement_id").notNull().references(() => announcement.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id").notNull().references(() => eventRole.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.announcementId, table.contactId, table.roleId] }),
+    index("announcement_contact_role_idx").on(table.announcementId, table.contactId),
+]);
+
 export const announcementTag = pgTable("announcement_tag", {
     announcementId: uuid("announcement_id").notNull().references(() => announcement.id, { onDelete: "cascade" }),
     tagId: uuid("tag_id").notNull().references(() => tag.id, { onDelete: "cascade" }),
@@ -43,3 +53,5 @@ export const announcementResource = pgTable("announcement_resource", {
 
 export type Announcement = typeof announcement.$inferSelect;
 export type NewAnnouncement = typeof announcement.$inferInsert;
+export type AnnouncementContactRole = typeof announcementContactRole.$inferSelect;
+export type NewAnnouncementContactRole = typeof announcementContactRole.$inferInsert;

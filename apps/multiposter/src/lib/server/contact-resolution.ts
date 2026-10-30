@@ -62,20 +62,74 @@ export function isLocationEligibleForResolution(
 }
 
 /**
- * Checks whether a contact has a "Main Contact" role.
+ * Priority Tier 1: Role "Contact" or "Kontakt" (or "Main Contact" / "Hauptkontakt").
  */
-export function isMainContact(contactOrAssociation: any): boolean {
+export function isContactRole(contactOrAssociation: any): boolean {
 	if (!contactOrAssociation) return false;
 	const c = contactOrAssociation.contact || contactOrAssociation;
-	const roles = contactOrAssociation.roles || c.roles || contactOrAssociation.eventRoles || c.eventRoles || [];
-	return roles.some((r: any) => {
-		const name = (typeof r === 'string' ? r : r.name || r.role?.name || '').trim().toLowerCase();
-		return name === 'main contact' || name === 'maincontact' || name === 'main_contact';
+	const rawRoles = contactOrAssociation.roles || c.roles || contactOrAssociation.eventRoles || c.eventRoles || [];
+	const roleNames = rawRoles.map((r: any) => typeof r === 'string' ? r : r.name || r.role?.name || '').filter(Boolean);
+	if (c.role) roleNames.push(c.role);
+
+	return roleNames.some((r: string) => {
+		const name = r.trim().toLowerCase();
+		return (
+			name === 'contact' ||
+			name === 'kontakt' ||
+			name === 'main contact' ||
+			name === 'maincontact' ||
+			name === 'main_contact' ||
+			name === 'hauptkontakt'
+		);
 	});
 }
 
 /**
- * Checks whether a contact or contact association has an "Employee" tag.
+ * Checks whether a contact has a "Main Contact" role (alias for Tier 1).
+ */
+export function isMainContact(contactOrAssociation: any): boolean {
+	return isContactRole(contactOrAssociation);
+}
+
+/**
+ * Priority Tier 2: Role "Verantwortlich" or "Responsible".
+ */
+export function isResponsibleRole(contactOrAssociation: any): boolean {
+	if (!contactOrAssociation) return false;
+	const c = contactOrAssociation.contact || contactOrAssociation;
+	const rawRoles = contactOrAssociation.roles || c.roles || contactOrAssociation.eventRoles || c.eventRoles || [];
+	const roleNames = rawRoles.map((r: any) => typeof r === 'string' ? r : r.name || r.role?.name || '').filter(Boolean);
+	if (c.role) roleNames.push(c.role);
+
+	return roleNames.some((r: string) => {
+		const name = r.trim().toLowerCase();
+		return (
+			name === 'verantwortlich' ||
+			name === 'verantwortlicher' ||
+			name === 'verantwortliche' ||
+			name === 'responsible'
+		);
+	});
+}
+
+/**
+ * Priority Tier 3: Role "Moderator".
+ */
+export function isModeratorRole(contactOrAssociation: any): boolean {
+	if (!contactOrAssociation) return false;
+	const c = contactOrAssociation.contact || contactOrAssociation;
+	const rawRoles = contactOrAssociation.roles || c.roles || contactOrAssociation.eventRoles || c.eventRoles || [];
+	const roleNames = rawRoles.map((r: any) => typeof r === 'string' ? r : r.name || r.role?.name || '').filter(Boolean);
+	if (c.role) roleNames.push(c.role);
+
+	return roleNames.some((r: string) => {
+		const name = r.trim().toLowerCase();
+		return name === 'moderator' || name === 'moderation';
+	});
+}
+
+/**
+ * Priority Tier 4: Tag "Employee" or "Mitarbeiter".
  */
 export function isEmployeeContact(contactOrAssociation: any): boolean {
 	if (!contactOrAssociation) return false;
@@ -84,7 +138,52 @@ export function isEmployeeContact(contactOrAssociation: any): boolean {
 
 	return tags.some((t: any) => {
 		const tagName = (t?.name || t?.tag?.name || (typeof t === 'string' ? t : '')).trim().toLowerCase();
-		return tagName === 'employee' || tagName === 'employees' || tagName === 'mitarbeiter' || tagName === 'staff';
+		return (
+			tagName === 'employee' ||
+			tagName === 'employees' ||
+			tagName === 'mitarbeiter' ||
+			tagName === 'mitarbeitende' ||
+			tagName === 'staff'
+		);
+	});
+}
+
+/**
+ * Returns the numerical priority rank (1 to 5) for a contact or contact association:
+ * 1: Role "Contact" or "Kontakt"
+ * 2: Role "Verantwortlich" or "Responsible"
+ * 3: Role "Moderator"
+ * 4: Tag "Employee" or "Mitarbeiter"
+ * 5: Other contacts
+ */
+export function getContactPriorityRank(contactOrAssociation: any): number {
+	if (isContactRole(contactOrAssociation)) return 1;
+	if (isResponsibleRole(contactOrAssociation)) return 2;
+	if (isModeratorRole(contactOrAssociation)) return 3;
+	if (isEmployeeContact(contactOrAssociation)) return 4;
+	return 5;
+}
+
+/**
+ * Sorts contacts or contact associations by the defined preference hierarchy:
+ * 1. Contact / Kontakt
+ * 2. Verantwortlich / Responsible
+ * 3. Moderator
+ * 4. Employee / Mitarbeiter
+ * 5. Other contacts (alphabetical by name)
+ */
+export function sortContactsByPriority<T = any>(contacts: T[]): T[] {
+	if (!Array.isArray(contacts)) return [];
+	return [...contacts].sort((a: any, b: any) => {
+		const rankA = getContactPriorityRank(a);
+		const rankB = getContactPriorityRank(b);
+		if (rankA !== rankB) return rankA - rankB;
+
+		const cA = a?.contact || a || {};
+		const cB = b?.contact || b || {};
+		const nameA = (cA.displayName || `${cA.givenName || ''} ${cA.familyName || ''}`.trim() || cA.company || cA.name || '').toLowerCase();
+		const nameB = (cB.displayName || `${cB.givenName || ''} ${cB.familyName || ''}`.trim() || cB.company || cB.name || '').toLowerCase();
+		return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
 	});
 }
 
@@ -142,9 +241,12 @@ export function extractContactDetails(
 }
 
 /**
- * Resolves contact from a list of contacts:
- * 1. First eligible contact tagged with "Employee"
- * 2. Fallback to first eligible contact in list (if fallbackToFirst !== false)
+ * Resolves contact from a list of contacts according to priority hierarchy:
+ * 1. Role "Contact" or "Kontakt"
+ * 2. Role "Verantwortlich" or "Responsible"
+ * 3. Role "Moderator"
+ * 4. Tag "Employee" or "Mitarbeiter"
+ * 5. Fallback to first eligible contact (if fallbackToFirst !== false)
  */
 export function resolveContactFromList(
 	contacts: any[] | undefined | null,
@@ -155,22 +257,21 @@ export function resolveContactFromList(
 	const eligibleContacts = contacts.filter((c: any) => isContactEligibleForResolution(c, options));
 	if (eligibleContacts.length === 0) return null;
 
-	const employee = eligibleContacts.find((c: any) => isEmployeeContact(c));
-	if (employee) {
-		return extractContactDetails(employee, options);
-	}
+	const sorted = sortContactsByPriority(eligibleContacts);
 
 	if (options.fallbackToFirst !== false) {
-		return extractContactDetails(eligibleContacts[0], options);
+		return extractContactDetails(sorted[0], options);
+	}
+
+	if (getContactPriorityRank(sorted[0]) <= 4) {
+		return extractContactDetails(sorted[0], options);
 	}
 
 	return null;
 }
 
 /**
- * Resolves a Location's contact:
- * 1. First eligible location contact tagged with "Employee"
- * 2. Fallback to first eligible location contact (if fallbackToFirst !== false)
+ * Resolves a Location's contact using the standard priority hierarchy on its associated contacts.
  */
 export function resolveLocationContactSync(
 	locationData: any,
@@ -220,10 +321,14 @@ export async function resolveLocationContact(
 
 /**
  * Synchronous Event Contact Resolution when relations are already loaded in memory:
- * 0. Eligible event contact assigned the role "Main Contact"
- * 1. Eligible event contact tagged as "Employee"
- * 2. Eligible location contact tagged as "Employee" (from eligible direct event locations or resource locations)
- * 3. Fallback: First eligible event contact, or First eligible location contact
+ * 1. Evaluates event's own contacts in priority order:
+ *    - Role "Contact" or "Kontakt"
+ *    - Role "Verantwortlich" or "Responsible"
+ *    - Role "Moderator"
+ *    - Tag "Employee" or "Mitarbeiter"
+ *    - Fallback: first eligible event contact
+ * 2. If event has NO eligible contacts, and fallbackToLocation is enabled:
+ *    - Fallback: checks contacts from associated event locations/resource locations.
  */
 export function resolveEventContactSync(
 	eventData: any,
@@ -237,7 +342,7 @@ export function resolveEventContactSync(
 		filterWorkOnly = false,
 		publicOnly = false
 	} = options;
-	const eligibilityOpts = { filterWorkOnly, publicOnly };
+	const eligibilityOpts = { filterWorkOnly, publicOnly, fallbackToFirst };
 
 	const eventContacts = (eventData.contacts || [])
 		.map((ec: any) => {
@@ -249,19 +354,12 @@ export function resolveEventContactSync(
 		})
 		.filter((c: any) => isContactEligibleForResolution(c, eligibilityOpts));
 
-	// Priority 0: Event contact assigned the role "Main Contact"
-	const eventMainContact = eventContacts.find((c: any) => isMainContact(c));
-	if (eventMainContact) {
-		return extractContactDetails(eventMainContact, eligibilityOpts);
+	// If event has eligible contacts, resolve strictly from event contacts (resolution ends here)
+	if (eventContacts.length > 0) {
+		return resolveContactFromList(eventContacts, eligibilityOpts);
 	}
 
-	// Priority 1: Event contact tagged as "Employee"
-	const eventEmployee = eventContacts.find((c: any) => isEmployeeContact(c));
-	if (eventEmployee) {
-		return extractContactDetails(eventEmployee, eligibilityOpts);
-	}
-
-	// Priority 2: Location contact tagged as "Employee"
+	// Only if event has no eligible contacts and fallbackToLocation is requested:
 	if (fallbackToLocation) {
 		const locationList: any[] = [];
 		if (Array.isArray(eventData.locations)) {
@@ -285,29 +383,11 @@ export function resolveEventContactSync(
 			const locContacts = (loc.locationContacts || loc.contacts || []).filter((c: any) =>
 				isContactEligibleForResolution(c, eligibilityOpts)
 			);
-			const locEmployee = locContacts.find((c: any) => isEmployeeContact(c));
-			if (locEmployee) {
-				return extractContactDetails(locEmployee, eligibilityOpts);
+			if (locContacts.length > 0) {
+				const resolved = resolveContactFromList(locContacts, eligibilityOpts);
+				if (resolved) return resolved;
 			}
 		}
-
-		// Priority 3: Fallbacks when no Employee tag was found anywhere
-		if (fallbackToFirst) {
-			if (eventContacts.length > 0) {
-				return extractContactDetails(eventContacts[0], eligibilityOpts);
-			}
-
-			for (const loc of locationList) {
-				const locContacts = (loc.locationContacts || loc.contacts || []).filter((c: any) =>
-					isContactEligibleForResolution(c, eligibilityOpts)
-				);
-				if (locContacts.length > 0) {
-					return extractContactDetails(locContacts[0], eligibilityOpts);
-				}
-			}
-		}
-	} else if (fallbackToFirst && eventContacts.length > 0) {
-		return extractContactDetails(eventContacts[0], eligibilityOpts);
 	}
 
 	return null;
@@ -336,7 +416,7 @@ export async function resolveEventContact(
 		filterWorkOnly = false,
 		publicOnly = false
 	} = options;
-	const eligibilityOpts = { filterWorkOnly, publicOnly };
+	const eligibilityOpts = { filterWorkOnly, publicOnly, fallbackToFirst };
 
 	// 1. Check event contacts
 	const rawEventContacts = await getEntityContacts('event', eventId, true);
@@ -344,16 +424,11 @@ export async function resolveEventContact(
 		isContactEligibleForResolution(c, eligibilityOpts)
 	);
 
-	const eventMainContact = eventContacts.find((c: any) => isMainContact(c));
-	if (eventMainContact) {
-		return extractContactDetails(eventMainContact, eligibilityOpts);
-	}
-	const eventEmployee = eventContacts.find((c: any) => isEmployeeContact(c));
-	if (eventEmployee) {
-		return extractContactDetails(eventEmployee, eligibilityOpts);
+	if (eventContacts.length > 0) {
+		return resolveContactFromList(eventContacts, eligibilityOpts);
 	}
 
-	// 2. Check location contacts if needed
+	// 2. Check location contacts only if fallbackToLocation is enabled and event has no contacts
 	if (fallbackToLocation) {
 		const locationIds = new Set<string>();
 
@@ -391,42 +466,23 @@ export async function resolveEventContact(
 			}
 		}
 
-		const allLocationContacts: any[] = [];
 		for (const locId of locationIds) {
 			const rawLocContacts = await getEntityContacts('location', locId, true);
 			const locContacts = rawLocContacts.filter((c: any) =>
 				isContactEligibleForResolution(c, eligibilityOpts)
 			);
-			const locEmployee = locContacts.find((c: any) => isEmployeeContact(c));
-			if (locEmployee) {
-				return extractContactDetails(locEmployee, eligibilityOpts);
-			}
 			if (locContacts.length > 0) {
-				allLocationContacts.push(...locContacts);
+				const resolved = resolveContactFromList(locContacts, eligibilityOpts);
+				if (resolved) return resolved;
 			}
 		}
-
-		// Priority 3: Fallbacks
-		if (fallbackToFirst) {
-			if (eventContacts.length > 0) {
-				return extractContactDetails(eventContacts[0], eligibilityOpts);
-			}
-			if (allLocationContacts.length > 0) {
-				return extractContactDetails(allLocationContacts[0], eligibilityOpts);
-			}
-		}
-	} else if (fallbackToFirst && eventContacts.length > 0) {
-		return extractContactDetails(eventContacts[0], eligibilityOpts);
 	}
 
 	return null;
 }
 
 /**
- * Resolves an Announcement's contact:
- * 1. Eligible announcement contact tagged as "Employee"
- * 2. Eligible location contact tagged as "Employee"
- * 3. Fallback: First eligible announcement contact, or First eligible location contact
+ * Resolves an Announcement's contact using the standard priority hierarchy.
  */
 export function resolveAnnouncementContactSync(
 	announcementData: any,
@@ -440,15 +496,20 @@ export function resolveAnnouncementContactSync(
 		filterWorkOnly = false,
 		publicOnly = false
 	} = options;
-	const eligibilityOpts = { filterWorkOnly, publicOnly };
+	const eligibilityOpts = { filterWorkOnly, publicOnly, fallbackToFirst };
 
 	const contacts = (announcementData.contacts || [])
-		.map((ac: any) => ac.contact || ac)
+		.map((ac: any) => {
+			const c = ac.contact || ac;
+			return {
+				...c,
+				roles: ac.roles || c.roles || []
+			};
+		})
 		.filter((c: any) => isContactEligibleForResolution(c, eligibilityOpts));
 
-	const employee = contacts.find((c: any) => isEmployeeContact(c));
-	if (employee) {
-		return extractContactDetails(employee, eligibilityOpts);
+	if (contacts.length > 0) {
+		return resolveContactFromList(contacts, eligibilityOpts);
 	}
 
 	if (fallbackToLocation && Array.isArray(announcementData.locations)) {
@@ -460,27 +521,11 @@ export function resolveAnnouncementContactSync(
 			const locContacts = (loc?.locationContacts || loc?.contacts || []).filter((c: any) =>
 				isContactEligibleForResolution(c, eligibilityOpts)
 			);
-			const locEmployee = locContacts.find((c: any) => isEmployeeContact(c));
-			if (locEmployee) {
-				return extractContactDetails(locEmployee, eligibilityOpts);
+			if (locContacts.length > 0) {
+				const resolved = resolveContactFromList(locContacts, eligibilityOpts);
+				if (resolved) return resolved;
 			}
 		}
-
-		if (fallbackToFirst) {
-			if (contacts.length > 0) {
-				return extractContactDetails(contacts[0], eligibilityOpts);
-			}
-			for (const loc of eligibleLocations) {
-				const locContacts = (loc?.locationContacts || loc?.contacts || []).filter((c: any) =>
-					isContactEligibleForResolution(c, eligibilityOpts)
-				);
-				if (locContacts.length > 0) {
-					return extractContactDetails(locContacts[0], eligibilityOpts);
-				}
-			}
-		}
-	} else if (fallbackToFirst && contacts.length > 0) {
-		return extractContactDetails(contacts[0], eligibilityOpts);
 	}
 
 	return null;

@@ -1,6 +1,6 @@
 import { form } from '$app/server';
 import { db } from '@ac/db';
-import { announcement, announcementTag, announcementContact, tag, announcementLocation, campaign } from '@ac/db';
+import { announcement, announcementTag, announcementContact, announcementContactRole, tag, announcementLocation, campaign } from '@ac/db';
 import { updateAnnouncementSchema } from '#lib/validations/announcements.js';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { publishAnnouncementChange } from '#lib/server/realtime.js';
@@ -150,6 +150,29 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
                             contactId: contactId
                         }))
                     );
+                }
+            }
+
+            // Update Contact Roles if provided
+            if (input.contactRolesJson !== undefined) {
+                await tx.delete(announcementContactRole).where(eq(announcementContactRole.announcementId, announcementId));
+                if (input.contactRolesJson) {
+                    try {
+                        const rolesMap: Record<string, string[]> = JSON.parse(input.contactRolesJson);
+                        const roleEntries: { announcementId: string; contactId: string; roleId: string }[] = [];
+                        for (const [cId, roleIds] of Object.entries(rolesMap)) {
+                            if (Array.isArray(roleIds)) {
+                                for (const rId of roleIds) {
+                                    roleEntries.push({ announcementId, contactId: cId, roleId: rId });
+                                }
+                            }
+                        }
+                        if (roleEntries.length > 0) {
+                            await tx.insert(announcementContactRole).values(roleEntries);
+                        }
+                    } catch (err) {
+                        console.error('Failed to parse or update announcement contact roles:', err);
+                    }
                 }
             }
 

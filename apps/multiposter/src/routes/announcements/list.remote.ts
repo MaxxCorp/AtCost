@@ -5,7 +5,7 @@ import { eq, inArray, notInArray, and, or, not, ilike, sql, exists } from '@ac/d
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { announcementPaginationSchema as PaginationSchema, parseFilterValue, type Announcement, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
-import { resolveAnnouncementContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { resolveAnnouncementContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 import { sanitizePublicAnnouncement } from '#lib/server/public-sanitization.js';
 
@@ -192,6 +192,11 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
                     location: true
                 }
             },
+            contactRoles: {
+                with: {
+                    role: true
+                }
+            },
             contacts: {
                 with: {
                     contact: {
@@ -212,11 +217,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 
     const neededLocationIds = new Set<string>();
     for (const a of rawResults) {
-        const hasEligibleEmployee = (a.contacts || []).some((ac: any) => {
-            const cObj = ac.contact || ac;
-            return cObj?.isPublic === true && isEmployeeContact(cObj);
-        });
-        if (!hasEligibleEmployee) {
+        if (!a.contacts || a.contacts.length === 0) {
             for (const l of a.locations || []) {
                 if (l.location && !l.location.isPublic) continue;
                 if (l.location?.id) neededLocationIds.add(l.location.id);
@@ -255,8 +256,28 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
             locationContacts: locationContactsMap.get(loc.id) || []
         }));
 
+        const contactRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
+        for (const cr of ((row as any).contactRoles || [])) {
+            const list = contactRolesMap.get(cr.contactId) || [];
+            if (cr.role) {
+                list.push({ id: cr.role.id, name: cr.role.name, color: cr.role.color });
+            }
+            contactRolesMap.set(cr.contactId, list);
+        }
+
+        const contactsWithRoles = (row.contacts || []).map((c: any) => {
+            const cObj = c.contact || c;
+            return {
+                ...cObj,
+                roles: contactRolesMap.get(cObj.id) || [],
+            };
+        });
+
+        const sortedContacts = sortContactsByPriority(contactsWithRoles);
+
         const resolvedContact = resolveAnnouncementContactSync({
             ...row,
+            contacts: sortedContacts,
             locations
         }, {
             filterWorkOnly: true,
@@ -267,6 +288,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 
         return {
             ...row,
+            contacts: sortedContacts,
             createdAt: row.createdAt.toISOString(),
             updatedAt: row.updatedAt.toISOString(),
             tags: (row.tags?.map((t: any) => t.tag) || []).filter((tagItem: any) => !isPublicView || tagItem?.visibility === 'external'),

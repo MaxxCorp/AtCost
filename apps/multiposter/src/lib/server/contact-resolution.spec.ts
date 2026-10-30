@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
 	isEmployeeContact,
+	isContactRole,
+	isResponsibleRole,
+	isModeratorRole,
+	getContactPriorityRank,
+	sortContactsByPriority,
 	extractContactDetails,
 	resolveContactFromList,
 	resolveLocationContactSync,
@@ -59,6 +64,66 @@ describe('Contact Resolution Engine', () => {
 		],
 		tags: []
 	};
+
+	describe('Role and Tag Priority Hierarchy', () => {
+		const contactRoleEng = { displayName: 'John Contact', roles: [{ name: 'Contact' }] };
+		const contactRoleDe = { displayName: 'Hans Kontakt', roles: [{ name: 'Kontakt' }] };
+		const responsibleRoleEng = { displayName: 'Jane Responsible', roles: [{ name: 'Responsible' }] };
+		const responsibleRoleDe = { displayName: 'Greta Verantwortlich', roles: [{ name: 'Verantwortlich' }] };
+		const moderatorRole = { displayName: 'Max Moderator', roles: [{ name: 'Moderator' }] };
+		const employeeTagged = { displayName: 'Eva Employee', tags: [{ name: 'Employee' }] };
+		const regularContact = { displayName: 'Otto Other' };
+
+		it('should detect Contact / Kontakt roles (Tier 1)', () => {
+			expect(isContactRole(contactRoleEng)).toBe(true);
+			expect(isContactRole(contactRoleDe)).toBe(true);
+			expect(isContactRole({ roles: ['Main Contact'] })).toBe(true);
+			expect(isContactRole({ roles: ['Hauptkontakt'] })).toBe(true);
+			expect(isContactRole(responsibleRoleEng)).toBe(false);
+		});
+
+		it('should detect Responsible / Verantwortlich roles (Tier 2)', () => {
+			expect(isResponsibleRole(responsibleRoleEng)).toBe(true);
+			expect(isResponsibleRole(responsibleRoleDe)).toBe(true);
+			expect(isResponsibleRole(contactRoleEng)).toBe(false);
+		});
+
+		it('should detect Moderator role (Tier 3)', () => {
+			expect(isModeratorRole(moderatorRole)).toBe(true);
+			expect(isModeratorRole(contactRoleEng)).toBe(false);
+		});
+
+		it('should calculate priority ranks 1 to 5', () => {
+			expect(getContactPriorityRank(contactRoleEng)).toBe(1);
+			expect(getContactPriorityRank(contactRoleDe)).toBe(1);
+			expect(getContactPriorityRank(responsibleRoleEng)).toBe(2);
+			expect(getContactPriorityRank(responsibleRoleDe)).toBe(2);
+			expect(getContactPriorityRank(moderatorRole)).toBe(3);
+			expect(getContactPriorityRank(employeeTagged)).toBe(4);
+			expect(getContactPriorityRank(regularContact)).toBe(5);
+		});
+
+		it('should sort contacts by priority (Tier 1 -> Tier 2 -> Tier 3 -> Tier 4 -> Tier 5)', () => {
+			const unsorted = [
+				regularContact,
+				employeeTagged,
+				moderatorRole,
+				responsibleRoleEng,
+				contactRoleDe,
+				contactRoleEng
+			];
+
+			const sorted = sortContactsByPriority(unsorted);
+			expect(sorted.map(c => c.displayName)).toEqual([
+				'Hans Kontakt',      // Tier 1 (H before J)
+				'John Contact',      // Tier 1
+				'Jane Responsible',  // Tier 2
+				'Max Moderator',     // Tier 3
+				'Eva Employee',      // Tier 4
+				'Otto Other'         // Tier 5
+			]);
+		});
+	});
 
 	describe('isEmployeeContact', () => {
 		it('should detect Employee tag with direct name', () => {
@@ -164,11 +229,48 @@ describe('Contact Resolution Engine', () => {
 			expect(result?.id).toBe('c2');
 		});
 
-		it('Priority 2: Should fall back to Location Employee contact when event has no Employee-tagged contacts', () => {
+		it('Priority 1 (Event Role Tier 1): Should pick Contact/Kontakt role over Responsible, Moderator, and Employee', () => {
 			const eventData = {
 				id: 'evt1',
 				contacts: [
-					{ contact: nonEmployeeContact } // Non-employee
+					{ contact: employeeContact }, // Tier 4
+					{
+						contact: {
+							id: 'c-mod',
+							displayName: 'Molly Mod',
+							emails: [{ type: 'work', value: 'mod@org.com', primary: true }]
+						},
+						roles: [{ name: 'Moderator' }] // Tier 3
+					},
+					{
+						contact: {
+							id: 'c-resp',
+							displayName: 'Ron Resp',
+							emails: [{ type: 'work', value: 'resp@org.com', primary: true }]
+						},
+						roles: [{ name: 'Responsible' }] // Tier 2
+					},
+					{
+						contact: {
+							id: 'c-main',
+							displayName: 'Connie Contact',
+							emails: [{ type: 'work', value: 'connie@org.com', primary: true }]
+						},
+						roles: [{ name: 'Kontakt' }] // Tier 1
+					}
+				]
+			};
+
+			const result = resolveEventContactSync(eventData);
+			expect(result?.name).toBe('Connie Contact');
+			expect(result?.id).toBe('c-main');
+		});
+
+		it('Priority: Does NOT fall back to Location contact when event has associated contacts', () => {
+			const eventData = {
+				id: 'evt1',
+				contacts: [
+					{ contact: nonEmployeeContact } // Non-employee event contact
 				],
 				locations: [
 					{
@@ -176,7 +278,30 @@ describe('Contact Resolution Engine', () => {
 							id: 'loc1',
 							locationContacts: [
 								{ contact: locationGeneralContact },
-								{ contact: locationEmployeeContact } // Employee
+								{ contact: locationEmployeeContact } // Location employee
+							]
+						}
+					}
+				]
+			};
+
+			// Resolution ends at event contacts; does not query or fall back to location contacts
+			const result = resolveEventContactSync(eventData);
+			expect(result?.name).toBe('Alice Visitor');
+			expect(result?.id).toBe('c1');
+		});
+
+		it('Priority (fallback): Falls back to Location Employee contact when event has NO contacts', () => {
+			const eventData = {
+				id: 'evt1',
+				contacts: [],
+				locations: [
+					{
+						location: {
+							id: 'loc1',
+							locationContacts: [
+								{ contact: locationGeneralContact },
+								{ contact: locationEmployeeContact } // Location employee
 							]
 						}
 					}
@@ -189,7 +314,7 @@ describe('Contact Resolution Engine', () => {
 			expect(result?.id).toBe('c3');
 		});
 
-		it('Priority 2 (from resource location): Should check resource locations for Employee contact', () => {
+		it('Priority (from resource location): Should check resource locations when event has NO contacts', () => {
 			const eventData = {
 				id: 'evt1',
 				contacts: [],
@@ -257,24 +382,24 @@ describe('Contact Resolution Engine', () => {
 	});
 
 	describe('resolveAnnouncementContactSync', () => {
-		it('should resolve announcement employee first, then location employee, then fallback', () => {
+		it('should resolve announcement contact without falling back to location when contacts exist', () => {
 			const annDataWithEmployee = {
 				contacts: [{ contact: employeeContact }],
 				locations: [{ location: { locationContacts: [{ contact: locationEmployeeContact }] } }]
 			};
 			expect(resolveAnnouncementContactSync(annDataWithEmployee)?.name).toBe('Bob Staff');
 
-			const annDataWithLocEmployee = {
+			const annDataWithOwnContact = {
 				contacts: [{ contact: nonEmployeeContact }],
 				locations: [{ location: { locationContacts: [{ contact: locationEmployeeContact }] } }]
 			};
-			expect(resolveAnnouncementContactSync(annDataWithLocEmployee)?.name).toBe('Charlie Caretaker');
+			expect(resolveAnnouncementContactSync(annDataWithOwnContact)?.name).toBe('Alice Visitor');
 
-			const annDataFallback = {
-				contacts: [{ contact: nonEmployeeContact }],
-				locations: [{ location: { locationContacts: [{ contact: locationGeneralContact }] } }]
+			const annDataEmptyContacts = {
+				contacts: [],
+				locations: [{ location: { locationContacts: [{ contact: locationEmployeeContact }] } }]
 			};
-			expect(resolveAnnouncementContactSync(annDataFallback)?.name).toBe('Alice Visitor');
+			expect(resolveAnnouncementContactSync(annDataEmptyContacts)?.name).toBe('Charlie Caretaker');
 		});
 	});
 

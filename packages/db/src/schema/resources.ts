@@ -1,6 +1,8 @@
-import { pgTable, text, timestamp, boolean, uuid, integer, doublePrecision, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, integer, doublePrecision, jsonb, primaryKey, index } from "drizzle-orm/pg-core";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { contact } from "./contacts";
+import { eventRole } from "./events";
 
 // --- GRANULAR OPENING HOURS TYPES ---
 
@@ -82,9 +84,6 @@ export const resource = pgTable("resource", {
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
 
-import { primaryKey } from "drizzle-orm/pg-core";
-import type { AnyPgColumn } from "drizzle-orm/pg-core";
-
 export const resourceContact = pgTable("resource_contact", {
     resourceId: uuid("resource_id").notNull().references(() => resource.id, { onDelete: "cascade" }),
     contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
@@ -94,6 +93,15 @@ export const locationContact = pgTable("location_contact", {
     locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
     contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
 }, (table) => [primaryKey({ columns: [table.locationId, table.contactId] })]);
+
+export const locationContactRole = pgTable("location_contact_role", {
+    locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id").notNull().references(() => eventRole.id, { onDelete: "cascade" }),
+}, (table) => [
+    primaryKey({ columns: [table.locationId, table.contactId, table.roleId] }),
+    index("location_contact_role_idx").on(table.locationId, table.contactId),
+]);
 
 export const resourceLocation = pgTable("resource_location", {
     resourceId: uuid("resource_id").notNull().references(() => resource.id, { onDelete: "cascade" }),
@@ -110,3 +118,5 @@ export type Location = typeof location.$inferSelect;
 export type NewLocation = typeof location.$inferInsert;
 export type Resource = typeof resource.$inferSelect;
 export type NewResource = typeof resource.$inferInsert;
+export type LocationContactRole = typeof locationContactRole.$inferSelect;
+export type NewLocationContactRole = typeof locationContactRole.$inferInsert;

@@ -6,6 +6,7 @@ import { getRequestEvent } from '$app/server';
 import QRCode from 'qrcode';
 import ICAL from 'ical.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
+import { sortContactsByPriority } from './contact-resolution.js';
 
 
 /**
@@ -220,7 +221,7 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: false });
     }
 
-    const eventRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
+    const entityRolesMap = new Map<string, { id: string; name: string; color: string }[]>();
     if (type === 'event') {
         const rolesData = await db.query.eventContactRole.findMany({
             where: (t: any, { eq }: any) => eq(t.eventId, targetEntityId),
@@ -229,11 +230,39 @@ export async function getEntityContacts(type: string, entityId: string, includeS
             }
         });
         for (const r of rolesData) {
-            const list = eventRolesMap.get(r.contactId) || [];
+            const list = entityRolesMap.get(r.contactId) || [];
             if (r.role) {
                 list.push({ id: r.role.id, name: r.role.name, color: r.role.color });
             }
-            eventRolesMap.set(r.contactId, list);
+            entityRolesMap.set(r.contactId, list);
+        }
+    } else if (type === 'announcement') {
+        const rolesData = await db.query.announcementContactRole.findMany({
+            where: (t: any, { eq }: any) => eq(t.announcementId, targetEntityId),
+            with: {
+                role: true
+            }
+        });
+        for (const r of rolesData) {
+            const list = entityRolesMap.get(r.contactId) || [];
+            if (r.role) {
+                list.push({ id: r.role.id, name: r.role.name, color: r.role.color });
+            }
+            entityRolesMap.set(r.contactId, list);
+        }
+    } else if (type === 'location') {
+        const rolesData = await db.query.locationContactRole.findMany({
+            where: (t: any, { eq }: any) => eq(t.locationId, targetEntityId),
+            with: {
+                role: true
+            }
+        });
+        for (const r of rolesData) {
+            const list = entityRolesMap.get(r.contactId) || [];
+            if (r.role) {
+                list.push({ id: r.role.id, name: r.role.name, color: r.role.color });
+            }
+            entityRolesMap.set(r.contactId, list);
         }
     }
 
@@ -246,9 +275,9 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         const c = a.contact;
         if (!c) return null;
         
-        const roles = eventRolesMap.get(c.id) || [];
+        const roles = entityRolesMap.get(c.id) || [];
 
-        // Add participation status and roles for events if present
+        // Add participation status and roles if present
         const result = {
             ...c,
             roles,
@@ -279,9 +308,5 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         return result;
     }).filter(Boolean);
 
-    return contacts.sort((a: any, b: any) => {
-        const nameA = (a.displayName || `${a.givenName || ''} ${a.familyName || ''}`.trim() || a.company || '').toLowerCase();
-        const nameB = (b.displayName || `${b.givenName || ''} ${b.familyName || ''}`.trim() || b.company || '').toLowerCase();
-        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
-    });
+    return sortContactsByPriority(contacts);
 }

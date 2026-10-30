@@ -1,10 +1,10 @@
 import { relations } from "drizzle-orm";
 import { user, session, account, verification } from "./auth";
 import { contact, contactEmail, contactPhone, contactAddress, contactRelation, tag, tagCategory, contactTag, userContact } from "./contacts";
-import { location, resource, resourceContact, locationContact, resourceLocation, resourceRelation } from "./resources";
+import { location, resource, resourceContact, locationContact, locationContactRole, resourceLocation, resourceRelation } from "./resources";
 import { event, recurringSeries, eventContact, eventLocation, eventResource, eventTag, eventRole, eventContactRole } from "./events";
 import { talent, talentTag, talentTimelineEntry, shiftPlan, shiftSchedulingGroup, timesheetEntry, timesheetAuditTrail, timeOffRequest, timeOffBalance, userTalent, shiftPlanTemplate, shiftPlanTemplateTalent, task } from "./talents";
-import { announcement, announcementContact, announcementTag, announcementLocation } from "./announcements";
+import { announcement, announcementContact, announcementContactRole, announcementTag, announcementLocation } from "./announcements";
 import { campaign, emailCampaign, emailEvent } from "./campaigns";
 import { kiosk, kioskLocation } from "./kiosks";
 import { syncConfig, syncOperation, syncMapping, webhookSubscription } from "./sync";
@@ -56,6 +56,8 @@ export const contactRelations = relations(contact, ({ many, one }) => ({
     resourceAssociations: many(resourceContact),
     events: many(eventContact),
     eventRoles: many(eventContactRole),
+    locationRoles: many(locationContactRole),
+    announcementRoles: many(announcementContactRole),
     announcements: many(announcementContact),
     relations: many(contactRelation, { relationName: 'fromRelations' }),
     relatedTo: many(contactRelation, { relationName: 'toRelations' }),
@@ -121,6 +123,8 @@ export const eventRelations = relations(event, ({ many, one }) => ({
 
 export const eventRoleRelations = relations(eventRole, ({ many }) => ({
     contactRoles: many(eventContactRole),
+    locationContactRoles: many(locationContactRole),
+    announcementContactRoles: many(announcementContactRole),
 }));
 
 export const eventContactRoleRelations = relations(eventContactRole, ({ one }) => ({
@@ -137,6 +141,7 @@ export const recurringSeriesRelations = relations(recurringSeries, ({ one, many 
 export const announcementRelations = relations(announcement, ({ many, one }) => ({
     locations: many(announcementLocation),
     contacts: many(announcementContact),
+    contactRoles: many(announcementContactRole),
     tags: many(announcementTag),
     user: one(user, { fields: [announcement.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [announcement.campaignId], references: [campaign.id] }),
@@ -149,6 +154,7 @@ export const locationRelations = relations(location, ({ many, one }) => ({
     kioskLocations: many(kioskLocation),
     resourceLocations: many(resourceLocation),
     locationContacts: many(locationContact),
+    contactRoles: many(locationContactRole),
     user: one(user, { fields: [location.userId], references: [user.id] }),
 }));
 
@@ -461,3 +467,15 @@ export const payslipRelations = relations(payslip, ({ one }) => ({
 }));
 
 
+
+export const announcementContactRoleRelations = relations(announcementContactRole, ({ one }) => ({
+    announcement: one(announcement, { fields: [announcementContactRole.announcementId], references: [announcement.id] }),
+    contact: one(contact, { fields: [announcementContactRole.contactId], references: [contact.id] }),
+    role: one(eventRole, { fields: [announcementContactRole.roleId], references: [eventRole.id] }),
+}));
+
+export const locationContactRoleRelations = relations(locationContactRole, ({ one }) => ({
+    location: one(location, { fields: [locationContactRole.locationId], references: [location.id] }),
+    contact: one(contact, { fields: [locationContactRole.contactId], references: [contact.id] }),
+    role: one(eventRole, { fields: [locationContactRole.roleId], references: [eventRole.id] }),
+}));

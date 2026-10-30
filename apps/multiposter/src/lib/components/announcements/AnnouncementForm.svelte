@@ -61,6 +61,8 @@
     import { MapPin, User } from "@lucide/svelte";
 
     import RichTextEditor from "#lib/components/cms/RichTextEditor.svelte";
+    import EventContactRoleSelector from "#lib/components/events/EventContactRoleSelector.svelte";
+    import EventRoleManagerModal from "#lib/components/events/EventRoleManagerModal.svelte";
     import { FieldCollaboratorBadge, type CollaborationRoom } from "#lib/client/collaboration/index.js";
 
     let {
@@ -111,6 +113,20 @@
     );
     // svelte-ignore state_referenced_locally
     let selectedContactIds = $state<string[]>(untrack(() => initialData?.contactIds || []));
+
+    let isRoleManagerOpen = $state(false);
+    // svelte-ignore state_referenced_locally
+    let contactRolesState = $state<Record<string, string[]>>((() => {
+        const map: Record<string, string[]> = {};
+        if (initialData?.contacts) {
+            for (const c of initialData.contacts as any[]) {
+                if (c.id && Array.isArray(c.roles)) {
+                    map[c.id] = c.roles.map((r: any) => r.id || r);
+                }
+            }
+        }
+        return map;
+    })());
     // svelte-ignore state_referenced_locally
     let isPublic = $state(untrack(() => initialData?.isPublic ?? false));
     // svelte-ignore state_referenced_locally
@@ -203,6 +219,13 @@
             {...rf.fields.contactIds.as(
                 "text",
                 JSON.stringify(selectedContactIds),
+            )}
+            class="hidden"
+        />
+        <input
+            {...rf.fields.contactRolesJson.as(
+                "text",
+                JSON.stringify(contactRolesState),
             )}
             class="hidden"
         />
@@ -515,7 +538,17 @@
                     {type}
                     entityId={initialData?.id}
                     filters={getContactFilterGroups(m)}
-                    onchange={(ids: string[]) => (selectedContactIds = ids)}
+                    onchange={(ids: string[]) => {
+                        selectedContactIds = ids;
+                        const newRolesState: Record<string, string[]> = {};
+                        for (const id of ids) {
+                            if (contactRolesState[id]) {
+                                newRolesState[id] = contactRolesState[id];
+                            }
+                        }
+                        contactRolesState = newRolesState;
+                        rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
+                    }}
                     listItemsRemote={listContacts as any}
                     fetchAssociationsRemote={fetchEntityContacts as any}
                     addAssociationRemote={async (p: any) =>
@@ -560,6 +593,20 @@
                         item: m.contact(),
                     })}
                 >
+                    {#snippet rolesSnippet(contact: any)}
+                        <EventContactRoleSelector
+                            {contact}
+                            entityType="announcement"
+                            entityId={initialData?.id}
+                            selectedRoleIds={contactRolesState[contact.id] ?? []}
+                            onchange={(newRoleIds: string[]) => {
+                                contactRolesState[contact.id] = newRoleIds;
+                                rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
+                            }}
+                            onopenManager={() => (isRoleManagerOpen = true)}
+                        />
+                    {/snippet}
+
                     {#snippet renderItemLabel(contact: any)}
                         {contact.displayName ||
                             `${contact.givenName || ""} ${contact.familyName || ""}`.trim() ||
@@ -611,5 +658,8 @@
                 {m.cancel()}
             </Button>
         </div>
+        <EventRoleManagerModal
+            bind:open={isRoleManagerOpen}
+        />
     </form>
 </div>

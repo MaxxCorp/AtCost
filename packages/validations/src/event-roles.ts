@@ -41,7 +41,9 @@ export const updateEventRoleSchema = v.object({
 });
 
 export const updateContactRolesSchema = v.object({
-    eventId: v.string(),
+    eventId: v.optional(v.string()),
+    entityId: v.optional(v.string()),
+    type: v.optional(v.union([v.literal('event'), v.literal('location'), v.literal('announcement'), v.literal('resource')]), 'event'),
     contactId: v.pipe(v.string(), v.uuid()),
     roleIds: v.array(v.pipe(v.string(), v.uuid())),
 });

@@ -4,7 +4,7 @@ import { db, event, recurringSeries, eventContact, eventLocation, eventResource,
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
-import { resolveEventContactSync, isEmployeeContact } from '#lib/server/contact-resolution.js';
+import { resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 import { populateSeriesInstances } from '#lib/server/events/instances.js';
 import { sanitizePublicEvent } from '#lib/server/public-sanitization.js';
@@ -698,11 +698,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	// Collect location IDs for events that might need location contact fallback
 	const neededLocationIds = new Set<string>();
 	for (const e of rawResults) {
-		const hasEligibleEmployee = (e.contacts || []).some((ec: any) => {
-			const cObj = ec.contact || ec;
-			return cObj?.isPublic === true && isEmployeeContact(cObj);
-		});
-		if (!hasEligibleEmployee) {
+		if (!e.contacts || e.contacts.length === 0) {
 			for (const l of e.locations || []) {
 				if (l.location && !l.location.isPublic) continue;
 				if (l.location?.id) neededLocationIds.add(l.location.id);
@@ -872,9 +868,11 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			};
 		});
 
+		const sortedContacts = sortContactsByPriority(eventContactsWithRoles);
+
 		const resolvedContact = resolveEventContactSync({
 			...e,
-			contacts: eventContactsWithRoles,
+			contacts: sortedContacts,
 			locations: evtLocations,
 			resources: resWithLocContacts
 		}, {
@@ -892,7 +890,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 		return {
 			...e,
-			contacts: eventContactsWithRoles,
+			contacts: sortedContacts,
 			isSeries,
 			qrCodePath: e.id.includes('_inst_') ? `/api/events/${e.id}/qr.png` : (e.qrCodePath?.includes('/api/') ? e.qrCodePath : `/api/events/${e.id}/qr.png`),
 			iCalPath: e.id.includes('_inst_') ? `/api/events/${e.id}/event.ics` : (e.iCalPath?.includes('/api/') ? e.iCalPath : `/api/events/${e.id}/event.ics`),

@@ -970,6 +970,8 @@
 	"roles_description": "Define and manage contact roles for events",
 	"confirm_delete_role": "Are you sure you want to delete this role?",
 	"main_contact": "Main Contact",
+	"role_responsible": "Responsible",
+	"role_moderator": "Moderator",
 	"project_manager": "Project Manager",
 	"participant": "Participant",
 	"role_created": "Role created successfully",

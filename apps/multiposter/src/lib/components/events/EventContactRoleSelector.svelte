@@ -10,6 +10,8 @@
     interface Props {
         contact: any;
         eventId?: string;
+        entityId?: string;
+        entityType?: 'event' | 'location' | 'announcement' | 'resource';
         selectedRoleIds?: string[];
         onchange?: (roleIds: string[], roles: EventRole[]) => void;
         onopenManager?: () => void;
@@ -18,6 +20,8 @@
     let {
         contact,
         eventId,
+        entityId,
+        entityType = "event",
         selectedRoleIds = $bindable(),
         onchange,
         onopenManager
@@ -69,11 +73,15 @@
         const newRoles = allRoles.filter((r) => newIds.includes(r.id));
         onchange?.(newIds, newRoles);
 
-        if (eventId && contact?.id) {
+        const targetEntityId = entityId || eventId;
+        const targetEntityType = entityType || "event";
+
+        if (targetEntityId && contact?.id) {
             isUpdating = true;
             try {
                 await updateContactRoles({
-                    eventId,
+                    entityId: targetEntityId,
+                    type: targetEntityType,
                     contactId: contact.id,
                     roleIds: newIds
                 });
@@ -88,9 +96,29 @@
     function getRoleLabel(roleName?: string | null) {
         if (!roleName) return "";
         const key = roleName.trim().toLowerCase();
-        if (key === "main contact" || key === "maincontact") return m.main_contact?.() ?? roleName;
-        if (key === "project manager" || key === "projectmanager") return m.project_manager?.() ?? roleName;
-        if (key === "participant") return m.participant?.() ?? roleName;
+        if (key === "main contact" || key === "maincontact" || key === "hauptkontakt") {
+            return m.main_contact?.() ?? roleName;
+        }
+        if (key === "contact" || key === "kontakt") {
+            return m.contact?.() ?? roleName;
+        }
+        if (
+            key === "responsible" ||
+            key === "verantwortlich" ||
+            key === "verantwortlicher" ||
+            key === "verantwortliche"
+        ) {
+            return m.role_responsible?.() ?? roleName;
+        }
+        if (key === "moderator" || key === "moderation") {
+            return m.role_moderator?.() ?? roleName;
+        }
+        if (key === "project manager" || key === "projectmanager") {
+            return m.project_manager?.() ?? roleName;
+        }
+        if (key === "participant") {
+            return m.participant?.() ?? roleName;
+        }
         return roleName;
     }
 
