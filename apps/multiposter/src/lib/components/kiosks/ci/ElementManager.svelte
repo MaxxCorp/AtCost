@@ -24,11 +24,13 @@
         elementSettings = $bindable(),
         previewGreyscaleOnScreen = $bindable(false),
         isFlyer = false,
+        showCi = true,
         onSettingsChange
     }: {
         elementSettings: KioskElementSettings;
         previewGreyscaleOnScreen?: boolean;
         isFlyer?: boolean;
+        showCi?: boolean;
         onSettingsChange?: () => void;
     } = $props();
 
@@ -75,20 +77,22 @@
                 <span>🟢 Alles Farbe & Normal</span>
             </button>
 
-            <button
-                type="button"
-                onclick={() => triggerQuickPreset('letterhead_ci', 'Vordruck-Briefpapier')}
-                class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-purple-500 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5"
-            >
-                <span>📄 Vordruck-Briefpapier (CI Raum frei)</span>
-            </button>
+            {#if showCi}
+                <button
+                    type="button"
+                    onclick={() => triggerQuickPreset('letterhead_ci', 'Vordruck-Briefpapier')}
+                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-purple-500 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5"
+                >
+                    <span>📄 Vordruck-Briefpapier (CI Raum frei)</span>
+                </button>
+            {/if}
 
             <button
                 type="button"
-                onclick={() => triggerQuickPreset('greyscale_content', 'Spartoner (CI farbig)')}
+                onclick={() => triggerQuickPreset('greyscale_content', showCi ? 'Spartoner (CI farbig)' : 'Spartoner (Inhalt S/W)')}
                 class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-blue-500 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5"
             >
-                <span>💧 Spartoner (Inhalt S/W, CI Farbe)</span>
+                <span>💧 Spartoner ({showCi ? 'Inhalt S/W, CI Farbe' : 'Inhalt S/W'})</span>
             </button>
 
             <button
@@ -99,41 +103,45 @@
                 <span>⚫ Alles Schwarz/Weiß</span>
             </button>
 
-            <button
-                type="button"
-                onclick={() => triggerQuickPreset('ci_only', 'Nur CI drucken')}
-                class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-amber-500 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5"
-            >
-                <span>🎨 Nur CI drucken (Shells erstellen)</span>
-            </button>
+            {#if showCi}
+                <button
+                    type="button"
+                    onclick={() => triggerQuickPreset('ci_only', 'Nur CI drucken')}
+                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-amber-500 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5"
+                >
+                    <span>🎨 Nur CI drucken (Shells erstellen)</span>
+                </button>
+            {/if}
         </div>
     </div>
 
     <!-- Section 1: Corporate Identity & Branding -->
-    <div class="space-y-3">
-        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            <Palette class="w-3.5 h-3.5 text-red-600" />
-            <span>Corporate Identity & Branding</span>
-        </h4>
+    {#if showCi}
+        <div class="space-y-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Palette class="w-3.5 h-3.5 text-red-600" />
+                <span>Corporate Identity & Branding</span>
+            </h4>
 
-        <div class="space-y-2">
-            <!-- CI Top Triangle -->
-            <ElementSettingsRow
-                title="CI Kopfbereich (Oberes Dreieck)"
-                description="Standort-Logo & BALL e.V. Logo im geometrischen Vektor-Dreieck"
-                icon={Palette}
-                bind:config={elementSettings.ciTop}
-            />
+            <div class="space-y-2">
+                <!-- CI Top Triangle -->
+                <ElementSettingsRow
+                    title="CI Kopfbereich (Oberes Dreieck)"
+                    description="Standort-Logo & BALL e.V. Logo im geometrischen Vektor-Dreieck"
+                    icon={Palette}
+                    bind:config={elementSettings.ciTop}
+                />
 
-            <!-- CI Bottom Triangle -->
-            <ElementSettingsRow
-                title="CI Fußbereich (Unteres Dreieck)"
-                description="Inklusions-Hinweis, Sponsoren-Logos & Standort-Adressblock"
-                icon={Building2}
-                bind:config={elementSettings.ciBottom}
-            />
+                <!-- CI Bottom Triangle -->
+                <ElementSettingsRow
+                    title="CI Fußbereich (Unteres Dreieck)"
+                    description="Inklusions-Hinweis, Sponsoren-Logos & Standort-Adressblock"
+                    icon={Building2}
+                    bind:config={elementSettings.ciBottom}
+                />
+            </div>
         </div>
-    </div>
+    {/if}
 
     <!-- Section 2: Programme Content & Structure -->
     <div class="space-y-3">

@@ -70,6 +70,41 @@ export function getElementPrintClasses(
     return classes.join(' ');
 }
 
+export interface CardPrintConfig {
+    printBehavior?: 'print' | 'reserve_space' | 'omit';
+    printColor?: 'color' | 'greyscale';
+}
+
+export function getCardPrintClasses(
+    cardConfig?: CardPrintConfig,
+    elementConfig?: ElementPrintConfig,
+    previewGreyscaleOnScreen = false
+): string {
+    if (elementConfig && elementConfig.enabled === false) return 'hidden print:hidden';
+
+    const behavior = cardConfig?.printBehavior ?? elementConfig?.printBehavior ?? 'print';
+    const color = cardConfig?.printColor ?? elementConfig?.printColor ?? 'color';
+
+    const classes: string[] = [];
+
+    // Print behavior:
+    if (behavior === 'reserve_space') {
+        classes.push('print:invisible opacity-75 border-dashed border-amber-400');
+    } else if (behavior === 'omit') {
+        classes.push('print:hidden opacity-40 border-dashed border-red-400');
+    }
+
+    // Print color:
+    if (color === 'greyscale') {
+        classes.push('print:grayscale');
+        if (previewGreyscaleOnScreen) {
+            classes.push('grayscale');
+        }
+    }
+
+    return classes.join(' ');
+}
+
 export function applyQuickPrintPreset(
     settings: KioskElementSettings,
     presetKey: 'all_color' | 'letterhead_ci' | 'greyscale_content' | 'all_greyscale' | 'ci_only'

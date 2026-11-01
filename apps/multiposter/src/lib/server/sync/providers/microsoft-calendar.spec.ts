@@ -165,6 +165,61 @@ describe('MicrosoftCalendarProvider', () => {
 			expect(mapped.attendees[0].emailAddress.address).toBe('john@example.com');
 			expect(mapped.locations).toBeUndefined();
 		});
+
+		it('should exclude human attendees while keeping room resource bookings when includeContacts is false', () => {
+			(provider as any).config = {
+				id: 'test-config',
+				providerType: 'microsoft-calendar',
+				settings: {
+					includeContacts: false,
+					syncParticipants: true,
+					includeRoomBookings: true
+				}
+			};
+
+			const event: ExternalEvent = {
+				externalId: 'ext-7',
+				providerId: 'microsoft-calendar',
+				summary: 'Overview Event Without Personal Invites',
+				attendees: [
+					{ email: 'buergerhaus@example.com', displayName: 'Bürgerhaus', type: 'required' },
+					{ email: 'room-a@example.com', displayName: 'Saal 1', type: 'resource' }
+				]
+			};
+
+			const mapped = (provider as any).mapToMicrosoftEvent(event);
+
+			expect(mapped.attendees).toHaveLength(1);
+			expect(mapped.attendees[0].emailAddress.address).toBe('room-a@example.com');
+			expect(mapped.attendees[0].type).toBe('resource');
+			expect(mapped.locations).toHaveLength(1);
+		});
+
+		it('should set attendees to empty array on update when all attendees are filtered out or removed', () => {
+			(provider as any).config = {
+				id: 'test-config',
+				providerType: 'microsoft-calendar',
+				settings: {
+					includeContacts: false,
+					includeRoomBookings: true
+				}
+			};
+
+			const event: ExternalEvent = {
+				externalId: 'ext-8',
+				providerId: 'microsoft-calendar',
+				summary: 'Updated Event Clearing Attendees',
+				attendees: [
+					{ email: 'staff@example.com', displayName: 'Staff Member', type: 'required' }
+				]
+			};
+
+			const mappedCreate = (provider as any).mapToMicrosoftEvent(event);
+			expect(mappedCreate.attendees).toBeUndefined();
+
+			const mappedUpdate = (provider as any).mapToMicrosoftEvent(event, { isUpdate: true });
+			expect(mappedUpdate.attendees).toEqual([]);
+		});
 	});
 
 	describe('updateEvent', () => {
@@ -657,6 +712,59 @@ describe('MicrosoftCalendarProvider', () => {
 		it('should return false from validateConnection when validateCalendarAccess fails', async () => {
 			vi.spyOn(provider, 'validateCalendarAccess').mockRejectedValueOnce(new Error('Calendar not found'));
 			expect(await provider.validateConnection()).toBe(false);
+		});
+
+		it('should update organization calendarPermissions from freeBusyRead to read when calendarVisibility is read', async () => {
+			(provider as any).config = {
+				...mockConfig,
+				settings: {
+					authMode: 'app',
+					mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com',
+					calendarVisibility: 'read'
+				}
+			};
+			(provider as any).client.config = {
+				authMode: 'app',
+				mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com'
+			};
+			(provider as any).client.resolvedAuthMode = 'app';
+			(provider as any).calendarId = 'primary';
+
+			const makeRequestMock = vi
+				.fn()
+				.mockResolvedValueOnce({ id: 'primary-cal' })
+				.mockResolvedValueOnce({
+					value: [
+						{
+							id: 'RGVmYXVsdA==',
+							isRemovable: false,
+							isInsideOrganization: true,
+							role: 'freeBusyRead',
+							allowedRoles: ['none', 'freeBusyRead', 'limitedRead', 'read', 'write'],
+							emailAddress: { name: 'My Organization' }
+						}
+					]
+				})
+				.mockResolvedValueOnce({ id: 'RGVmYXVsdA==', role: 'read' });
+
+			(provider as any).makeRequest = makeRequestMock;
+
+			await provider.validateCalendarAccess();
+
+			expect(makeRequestMock).toHaveBeenCalledTimes(3);
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				2,
+				'https://graph.microsoft.com/v1.0/users/veranstaltung.bhs%40ballev.onmicrosoft.com/calendar/calendarPermissions',
+				{ method: 'GET' }
+			);
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				3,
+				'https://graph.microsoft.com/v1.0/users/veranstaltung.bhs%40ballev.onmicrosoft.com/calendar/calendarPermissions/RGVmYXVsdA%3D%3D',
+				{
+					method: 'PATCH',
+					body: JSON.stringify({ role: 'read' })
+				}
+			);
 		});
 	});
 

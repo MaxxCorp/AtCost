@@ -36,6 +36,13 @@ export const synchronizationBaseSchema = v.object({
         includeRoomBookings: v.optional(v.union([v.boolean(), v.string()])),
         includeContacts: v.optional(v.union([v.boolean(), v.string()])),
         autoBookOnCalendar: v.optional(v.union([v.boolean(), v.string()])),
+        calendarVisibility: v.optional(v.union([
+            v.literal('unchanged'),
+            v.literal('freeBusyRead'),
+            v.literal('limitedRead'),
+            v.literal('read'),
+            v.string()
+        ])),
         syncTag: v.optional(v.string()),
 
         // Event Selection & Filtering Settings
@@ -80,6 +87,7 @@ export const synchronizationBaseSchema = v.object({
         participantTagFilterMode: v.optional(v.union([v.literal('all'), v.literal('include'), v.literal('exclude'), v.string()])),
         includedContactTags: v.optional(v.union([v.array(v.string()), v.string()])),
         excludedContactTags: v.optional(v.union([v.array(v.string()), v.string()])),
+        excludedContactIds: v.optional(v.union([v.array(v.string()), v.string()])),
         participantScopeLogic: v.optional(v.union([v.literal('AND'), v.literal('OR'), v.string()])),
         participantFilterLogic: v.optional(v.union([v.literal('AND'), v.literal('OR'), v.string()])),
     })),
@@ -117,6 +125,23 @@ export function normalizeSyncSettings(settings: Record<string, any>): Record<str
 
     if (settings.includeRoomBookings === undefined && settings.autoBookOnCalendar !== undefined) {
         settings.includeRoomBookings = settings.autoBookOnCalendar;
+    }
+
+    // Reconcile duplicate contact/participant master toggles so disabling either disables both
+    if (settings.includeContacts === false || settings.syncParticipants === false) {
+        if (settings.includeContacts !== undefined) settings.includeContacts = false;
+        if (settings.syncParticipants !== undefined) settings.syncParticipants = false;
+    } else if (settings.includeContacts === true && settings.syncParticipants === undefined) {
+        settings.syncParticipants = true;
+    }
+
+    if (settings.calendarVisibility !== undefined) {
+        const cv = String(settings.calendarVisibility).trim();
+        if (cv === 'read' || cv === 'limitedRead' || cv === 'freeBusyRead' || cv === 'unchanged') {
+            settings.calendarVisibility = cv;
+        } else {
+            delete settings.calendarVisibility;
+        }
     }
 
     // Default contact privacy scope: internal staff only, public off by default, non-public off by default
@@ -159,7 +184,8 @@ export function normalizeSyncSettings(settings: Record<string, any>): Record<str
         'includedContactRoles',
         'excludedContactRoles',
         'includedContactTags',
-        'excludedContactTags'
+        'excludedContactTags',
+        'excludedContactIds'
     ];
     for (const af of arrayFields) {
         if (typeof settings[af] === 'string') {

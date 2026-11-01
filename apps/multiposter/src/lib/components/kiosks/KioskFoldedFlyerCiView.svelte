@@ -31,11 +31,14 @@
     import CiTopTriangle from "./ci/CiTopTriangle.svelte";
     import CiBottomTriangle from "./ci/CiBottomTriangle.svelte";
     import CiSettingsModal from "./ci/CiSettingsModal.svelte";
+    import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
     import {
         DEFAULT_PRESETS,
         DEFAULT_PRINT_OPTIONS,
         DEFAULT_ELEMENT_SETTINGS,
         getElementPrintClasses,
+        getCardPrintClasses,
+        type CardPrintConfig,
         type CiPreset,
         type CiPrintOptions,
         type CiSponsorItem,
@@ -120,6 +123,20 @@
     let printOptions = $state<CiPrintOptions>({ ...DEFAULT_PRINT_OPTIONS });
     let elementSettings = $state<KioskElementSettings>({ ...DEFAULT_ELEMENT_SETTINGS });
     let isCiSettingsOpen = $state<boolean>(false);
+    let itemPercentages = $state<Record<string, number>>({});
+    let selectedCardId = $state<string | null>(null);
+    let cardSettings = $state<Record<string, CardPrintConfig>>({});
+    let selectedItem = $derived.by(() => {
+        if (!selectedCardId) return null;
+        const it = items.find(i => i.id === selectedCardId);
+        if (!it) return null;
+        const isEvt = "startDateTime" in it;
+        return {
+            id: it.id,
+            title: isEvt ? (it as Event).summary : (it as Announcement).title,
+            description: isEvt ? (it as Event).description : (it as Announcement).content
+        };
+    });
 
     const storageKeyCi = $derived(`kiosk_flyer_ci_settings_${kiosk?.id || 'default'}`);
 
@@ -146,7 +163,9 @@
                 ciPreset,
                 customPresets,
                 printOptions,
-                elementSettings
+                elementSettings,
+                itemPercentages,
+                cardSettings
             };
             localStorage.setItem(storageKeyCi, JSON.stringify(prefs));
         } catch (e) {
@@ -155,7 +174,7 @@
     }
 
     $effect(() => {
-        const _ = [ciPreset, customPresets, printOptions, elementSettings];
+        const _ = [ciPreset, customPresets, printOptions, elementSettings, itemPercentages, cardSettings];
         saveCiPrefs();
     });
 
@@ -260,6 +279,8 @@
                 if (Array.isArray(parsed.customPresets)) customPresets = parsed.customPresets;
                 if (parsed.printOptions) printOptions = { ...printOptions, ...parsed.printOptions };
                 if (parsed.elementSettings) elementSettings = { ...DEFAULT_ELEMENT_SETTINGS, ...parsed.elementSettings };
+                if (parsed.itemPercentages) itemPercentages = parsed.itemPercentages;
+                if (parsed.cardSettings && typeof parsed.cardSettings === 'object') cardSettings = parsed.cardSettings;
             }
         } catch (e) {
             console.error("Failed to load cached flyer summaries or CI settings", e);
@@ -396,10 +417,13 @@
     }
 
     function getItemSummary(item: Event | Announcement): string {
+        const raw = "startDateTime" in item ? (item as Event).description : (item as Announcement).content;
+        if (itemPercentages[item.id] === 100) {
+            return raw ? raw.trim() : "";
+        }
         if (aiSummaries[item.id]?.summary) {
             return aiSummaries[item.id].summary;
         }
-        const raw = "startDateTime" in item ? (item as Event).description : (item as Announcement).content;
         return raw ? raw.trim() : "";
     }
 
@@ -1275,6 +1299,49 @@
         onSavePreset={handleSaveCustomPreset}
         onDeletePreset={handleDeleteCustomPreset}
     />
+
+    {#if selectedItem}
+        <CardLayoutActionBar
+            {selectedItem}
+            kioskId={kiosk?.id || 'default'}
+            currentPercentage={itemPercentages[selectedItem.id]}
+            currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
+            currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
+            onPercentageChange={(percentage, text) => {
+                if (!selectedItem) return;
+                itemPercentages[selectedItem.id] = percentage;
+                aiSummaries = {
+                    ...aiSummaries,
+                    [selectedItem.id]: {
+                        id: selectedItem.id,
+                        title: selectedItem.title,
+                        summary: text
+                    }
+                };
+                saveSummariesToCache(aiSummaries);
+                saveCiPrefs();
+            }}
+            onBehaviorChange={(behavior) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    printBehavior: behavior
+                };
+                saveCiPrefs();
+            }}
+            onColorChange={(color) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    printColor: color
+                };
+                saveCiPrefs();
+            }}
+            onClose={() => {
+                selectedCardId = null;
+            }}
+        />
+    {/if}
 </div>
 
 <!-- SNIPPET: ITEM CARD ON PANELS -->
@@ -1283,6 +1350,7 @@
     {@const isSpecialNonSeries = isNonSeriesEvent(item)}
     {@const title = getItemTitle(item)}
     {@const summary = getItemSummary(item)}
+    {@const rawDesc = isEvent ? (item as Event).description : (item as Announcement).content}
     {@const highlight = getItemHighlight(item)}
     {@const rooms = isEvent ? getEventRooms(item as Event) : []}
 
@@ -1295,9 +1363,12 @@
         : null}
 
     <article
-        class="event-item-card p-2 rounded-lg transition-all space-y-1 print:break-inside-avoid {getElementPrintClasses(elementSettings.events, printOptions.previewGreyscaleOnScreen)} {isSpecialNonSeries
+        class="event-item-card p-2 rounded-lg transition-colors cursor-pointer space-y-1 print:break-inside-avoid {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries
             ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30'
-            : 'border border-slate-200/90 bg-white hover:border-slate-300'}"
+            : 'border border-slate-200/90 bg-white hover:border-slate-300')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, printOptions.previewGreyscaleOnScreen)}"
+        onclick={() => { selectedCardId = selectedCardId === item.id ? null : item.id; }}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedCardId = selectedCardId === item.id ? null : item.id; } }}
+        tabindex="0"
     >
         <!-- Date Badge & Meta Row -->
         {#if isEvent && item.isCompressedSeries && item.seriesDates && item.seriesDates.length >= 1}
@@ -1425,14 +1496,14 @@
                 </h4>
 
                 <!-- Summary (Editable inline) -->
-                {#if showDescriptions && summary}
+                {#if showDescriptions && (rawDesc || summary)}
                     <div
-                        class="rich-description text-[10px] text-slate-600 leading-snug {density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10'} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
+                        class="rich-description text-[10px] text-slate-600 leading-snug {itemPercentages[item.id] === undefined ? (density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10') : ''} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
                         contenteditable="true"
                         onblur={(e) => handleInlineEdit(item.id, title, summary, e)}
                         title={m.edit_summary_tooltip()}
                     >
-                        {@html summary}
+                        {@html (itemPercentages[item.id] === 100 ? (rawDesc || '') : summary)}
                     </div>
                 {/if}
 

@@ -72,6 +72,14 @@ export interface MicrosoftContactFolderSummary {
 	parentFolderId?: string;
 }
 
+export type MicrosoftCalendarVisibilityRole = 'freeBusyRead' | 'limitedRead' | 'read';
+
+export interface MicrosoftOrganizationPermissionInfo {
+	id: string;
+	role: string;
+	allowedRoles?: string[];
+}
+
 // In-memory token cache for App-Only tokens per tenant+client
 const appTokenCache = new Map<string, { token: string; expiresAt: number }>();
 
@@ -397,6 +405,71 @@ export class MicrosoftGraphClient {
 
 	// --- Diagnostics and Target Validation ---
 
+	async getOrganizationCalendarPermission(
+		mailboxEmail?: string,
+		calendarId?: string
+	): Promise<MicrosoftOrganizationPermissionInfo | null> {
+		const calBaseUrl = this.getCalendarBaseUrl(mailboxEmail, calendarId);
+		const res = await this.makeRequest<any>(`${calBaseUrl}/calendarPermissions`, { method: 'GET' });
+		const perms: any[] = Array.isArray(res?.value) ? res.value : [];
+
+		const orgPerm = perms.find(
+			(p) =>
+				p &&
+				(p.id === 'RGVmYXVsdA==' ||
+					(p.isInsideOrganization === true && p.isRemovable === false) ||
+					p.emailAddress?.name === 'My Organization')
+		);
+
+		if (!orgPerm?.id) return null;
+
+		return {
+			id: orgPerm.id,
+			role: orgPerm.role,
+			allowedRoles: Array.isArray(orgPerm.allowedRoles) ? orgPerm.allowedRoles : undefined
+		};
+	}
+
+	async ensureOrganizationCalendarPermission(
+		desiredRole: MicrosoftCalendarVisibilityRole,
+		mailboxEmail?: string,
+		calendarId?: string
+	): Promise<{ updated: boolean; role: string } | null> {
+		try {
+			await this.resolveAuthentication();
+			const calBaseUrl = this.getCalendarBaseUrl(mailboxEmail, calendarId);
+			const orgPerm = await this.getOrganizationCalendarPermission(mailboxEmail, calendarId);
+			if (!orgPerm) return null;
+
+			if (orgPerm.role === desiredRole) {
+				return { updated: false, role: orgPerm.role };
+			}
+
+			if (orgPerm.allowedRoles && !orgPerm.allowedRoles.includes(desiredRole)) {
+				console.warn(
+					`[MicrosoftGraphClient] Desired calendar permission role "${desiredRole}" is not in allowedRoles (${orgPerm.allowedRoles.join(', ')}).`
+				);
+				return { updated: false, role: orgPerm.role };
+			}
+
+			await this.makeRequest<any>(
+				`${calBaseUrl}/calendarPermissions/${encodeURIComponent(orgPerm.id)}`,
+				{
+					method: 'PATCH',
+					body: JSON.stringify({ role: desiredRole })
+				}
+			);
+
+			return { updated: true, role: desiredRole };
+		} catch (err: any) {
+			console.warn(
+				`[MicrosoftGraphClient] Failed to update organization calendar permission to "${desiredRole}":`,
+				err?.message || err
+			);
+			return null;
+		}
+	}
+
 	async testCalendarTarget(mailboxEmail?: string, calendarId?: string): Promise<MicrosoftTargetTestResult> {
 		try {
 			await this.resolveAuthentication();
@@ -404,6 +477,14 @@ export class MicrosoftGraphClient {
 			const targetUrl = this.getCalendarBaseUrl(mbEmail, calendarId);
 
 			const calData = await this.makeRequest<any>(targetUrl, { method: 'GET' });
+
+			let organizationPermissionRole: string | undefined;
+			try {
+				const orgPerm = await this.getOrganizationCalendarPermission(mbEmail, calendarId);
+				organizationPermissionRole = orgPerm?.role;
+			} catch {
+				// Optional diagnostic info; ignore if delegated permissions cannot read calendarPermissions
+			}
 
 			return {
 				success: true,
@@ -416,7 +497,8 @@ export class MicrosoftGraphClient {
 					calendarId: calData.id,
 					name: calData.name,
 					canEdit: calData.canEdit ?? true,
-					owner: calData.owner
+					owner: calData.owner,
+					...(organizationPermissionRole ? { organizationPermissionRole } : {})
 				}
 			};
 		} catch (err: any) {

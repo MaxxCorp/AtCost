@@ -3727,10 +3727,27 @@ export function shouldSyncContactForEvent(contact: any, config?: SyncConfig): bo
 
 	const settings = (config.settings || {}) as Record<string, any>;
 
-	// 1. Master toggle: syncParticipants / includeEventContacts / includeContacts
-	const syncParticipants = settings.syncParticipants ?? settings.includeEventContacts ?? settings.includeContacts;
-	if (syncParticipants === false) {
+	// 1. Master toggle: if any participant/contact sync toggle is explicitly disabled, block all contacts
+	if (
+		settings.syncParticipants === false ||
+		settings.syncParticipants === 'false' ||
+		settings.includeContacts === false ||
+		settings.includeContacts === 'false' ||
+		settings.includeEventContacts === false ||
+		settings.includeEventContacts === 'false'
+	) {
 		return false;
+	}
+
+	const contactId = String(contact?.contact?.id || contact?.id || '').trim();
+	if (contactId) {
+		const excludedIds = [
+			...normalizeSyncFilterList(settings.excludedContactIds),
+			...normalizeSyncFilterList(settings.excludedRecipientContactIds)
+		];
+		if (excludedIds.includes(contactId)) {
+			return false;
+		}
 	}
 
 	// 2. Data privacy / Employee, Public, and Non-Public Scope check
@@ -3777,9 +3794,9 @@ export function shouldSyncContactForEvent(contact: any, config?: SyncConfig): bo
 	let roleFilterActive = false;
 	let roleMatches = true;
 
-	if (roleFilterMode === 'include' && includedRoles.length > 0) {
+	if (roleFilterMode === 'include') {
 		roleFilterActive = true;
-		roleMatches = includedRoles.some(
+		roleMatches = includedRoles.length > 0 && includedRoles.some(
 			(role) => contactRoleIds.has(role.toLowerCase()) || contactRoleNames.has(role.toLowerCase().trim())
 		);
 	} else if (roleFilterMode === 'exclude' && excludedRoles.length > 0) {
@@ -3801,9 +3818,9 @@ export function shouldSyncContactForEvent(contact: any, config?: SyncConfig): bo
 	let tagFilterActive = false;
 	let tagMatches = true;
 
-	if (tagFilterMode === 'include' && includedTags.length > 0) {
+	if (tagFilterMode === 'include') {
 		tagFilterActive = true;
-		tagMatches = includedTags.some(
+		tagMatches = includedTags.length > 0 && includedTags.some(
 			(tag) => contactTagIds.has(tag.toLowerCase()) || contactTagNames.has(tag.toLowerCase().trim())
 		);
 	} else if (tagFilterMode === 'exclude' && excludedTags.length > 0) {

@@ -2,7 +2,8 @@ import { command } from '$app/server';
 import { GEMINI_API_KEY } from '$app/env/private';
 import { GoogleGenAI, Type } from '@google/genai';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { summarizeFlyerSchema, type SummarizeFlyerResult, type FlyerItemSummary } from '#lib/validations/flyer.js';
+import { summarizeFlyerSchema, summarizeItemLengthSchema, type SummarizeFlyerResult, type SummarizeItemLengthResult, type FlyerItemSummary } from '#lib/validations/flyer.js';
+import { calculatePlainCutoff, stripHtmlAndFormatting } from '#lib/utils/text-cutoff.js';
 
 function stripFormatting(text?: string | null): string {
     if (!text) return '';
@@ -198,3 +199,100 @@ ${JSON.stringify(items.map((i) => ({
         };
     }
 });
+
+export const summarizeItemLength = command(summarizeItemLengthSchema, async (data): Promise<SummarizeItemLengthResult> => {
+    try {
+        const user = getAuthenticatedUser();
+        ensureAccess(user, 'kiosks');
+    } catch {
+        // Allow public/view access for kiosk if unauthenticated
+    }
+
+    const { itemId, title, description, targetPercentage } = data;
+    if (!description || !description.trim()) {
+        return { success: true, summary: '' };
+    }
+
+    const cleanDesc = stripHtmlAndFormatting(description);
+    if (!cleanDesc) {
+        return { success: true, summary: '' };
+    }
+
+    if (targetPercentage >= 100) {
+        return { success: true, summary: cleanDesc };
+    }
+
+    const totalWords = cleanDesc.split(/\s+/).filter(Boolean).length;
+    const targetWords = Math.max(4, Math.round((totalWords * targetPercentage) / 100));
+
+    if (!GEMINI_API_KEY) {
+        const fallbackText = calculatePlainCutoff(cleanDesc, targetPercentage);
+        return {
+            success: true,
+            fallback: true,
+            summary: fallbackText
+        };
+    }
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+        const prompt = `You are an expert editorial designer and copywriter for physical brochures, calendars, and posters.
+Condense the following event description down to approximately ${targetPercentage}% of its original length (target: about ${targetWords} words).
+
+Rules:
+1. Actively rewrite the description into coherent, complete, elegant sentences that retain the core meaning, main activity, and atmosphere of the event within the target length.
+2. DO NOT just truncate or cut off the text with an ellipsis (...). Provide a complete summary.
+3. Maintain the original language of the event (e.g. German if in German, English if in English).
+4. Ensure dates, times, and facts remain accurate.
+
+Event Title: ${title}
+Event Description:
+${cleanDesc}`;
+
+        const candidateModels = ['gemini-3.5-flash', 'gemini-3.6-flash'];
+        let summaryText: string | undefined;
+
+        for (const modelName of candidateModels) {
+            try {
+                const response = await ai.models.generateContent({
+                    model: modelName,
+                    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                    config: {
+                        responseMimeType: 'text/plain'
+                    }
+                });
+                const txt = response.text?.trim();
+                if (txt) {
+                    summaryText = txt;
+                    break;
+                }
+            } catch (modelErr: any) {
+                console.warn(`[AI Summarize Length] Model ${modelName} failed:`, modelErr?.message || modelErr);
+            }
+        }
+
+        if (summaryText) {
+            return {
+                success: true,
+                fallback: false,
+                summary: summaryText
+            };
+        }
+
+        const fallbackText = calculatePlainCutoff(cleanDesc, targetPercentage);
+        return {
+            success: true,
+            fallback: true,
+            summary: fallbackText
+        };
+    } catch (err: any) {
+        console.error('Error during AI length summarization, using rule-based fallback:', err);
+        const fallbackText = calculatePlainCutoff(cleanDesc, targetPercentage);
+        return {
+            success: true,
+            fallback: true,
+            summary: fallbackText
+        };
+    }
+});
+

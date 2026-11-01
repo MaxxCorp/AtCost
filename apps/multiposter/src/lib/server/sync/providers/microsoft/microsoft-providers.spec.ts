@@ -182,6 +182,44 @@ describe('Microsoft Sync Suite', () => {
 			expect(folders.length).toBe(2);
 			expect(folders.some((f) => f.displayName === 'Artists & Performers')).toBe(true);
 		});
+
+		it('should update organization calendar permission when current role is freeBusyRead', async () => {
+			(client as any).config = {
+				authMode: 'app',
+				mailboxEmail: 'veranstaltung.bhs@ballev.onmicrosoft.com',
+				calendarId: 'primary'
+			};
+			(client as any).resolvedAuthMode = 'app';
+			(client as any).accessToken = 'mock-token';
+			vi.spyOn(client as any, 'resolveAuthentication').mockResolvedValue(undefined);
+
+			const makeRequestMock = vi
+				.spyOn(client, 'makeRequest')
+				.mockResolvedValueOnce({
+					value: [
+						{
+							id: 'RGVmYXVsdA==',
+							isRemovable: false,
+							isInsideOrganization: true,
+							role: 'freeBusyRead',
+							allowedRoles: ['none', 'freeBusyRead', 'limitedRead', 'read', 'write'],
+							emailAddress: { name: 'My Organization' }
+						}
+					]
+				})
+				.mockResolvedValueOnce({ id: 'RGVmYXVsdA==', role: 'read' });
+
+			const res = await client.ensureOrganizationCalendarPermission('read');
+			expect(res).toEqual({ updated: true, role: 'read' });
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				2,
+				'https://graph.microsoft.com/v1.0/users/veranstaltung.bhs%40ballev.onmicrosoft.com/calendar/calendarPermissions/RGVmYXVsdA%3D%3D',
+				{
+					method: 'PATCH',
+					body: JSON.stringify({ role: 'read' })
+				}
+			);
+		});
 	});
 
 	describe('MicrosoftContactsProvider', () => {

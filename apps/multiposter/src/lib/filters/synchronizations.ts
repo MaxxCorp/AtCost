@@ -55,12 +55,28 @@ function normalizeArray(val: any): string[] {
 export function matchesContactParticipantRules(contactOrAssoc: any, settings: Record<string, any>): boolean {
     if (!contactOrAssoc) return false;
 
-    const syncParticipants = settings.syncParticipants ?? settings.includeEventContacts ?? settings.includeContacts;
-    if (syncParticipants === false || syncParticipants === 'false') {
+    if (
+        settings.syncParticipants === false ||
+        settings.syncParticipants === 'false' ||
+        settings.includeContacts === false ||
+        settings.includeContacts === 'false' ||
+        settings.includeEventContacts === false ||
+        settings.includeEventContacts === 'false'
+    ) {
         return false;
     }
 
     const c = contactOrAssoc.contact || contactOrAssoc;
+    const contactId = String(c?.id || contactOrAssoc?.id || '').trim();
+    if (contactId) {
+        const excludedIds = [
+            ...normalizeArray(settings.excludedContactIds),
+            ...normalizeArray(settings.excludedRecipientContactIds)
+        ];
+        if (excludedIds.includes(contactId)) {
+            return false;
+        }
+    }
     const isEmployee = isEmployeeContact(contactOrAssoc);
     const isPublic = c.isPublic === true || contactOrAssoc.isPublic === true;
 
@@ -92,9 +108,9 @@ export function matchesContactParticipantRules(contactOrAssoc: any, settings: Re
     let roleFilterActive = false;
     let roleMatches = true;
 
-    if (roleFilterMode === 'include' && includedRoles.length > 0) {
+    if (roleFilterMode === 'include') {
         roleFilterActive = true;
-        roleMatches = includedRoles.some(r => roleIds.has(r.toLowerCase()) || roleNames.has(r.toLowerCase().trim()));
+        roleMatches = includedRoles.length > 0 && includedRoles.some(r => roleIds.has(r.toLowerCase()) || roleNames.has(r.toLowerCase().trim()));
     } else if (roleFilterMode === 'exclude' && excludedRoles.length > 0) {
         roleFilterActive = true;
         roleMatches = !excludedRoles.some(r => roleIds.has(r.toLowerCase()) || roleNames.has(r.toLowerCase().trim()));
@@ -112,9 +128,9 @@ export function matchesContactParticipantRules(contactOrAssoc: any, settings: Re
     let tagFilterActive = false;
     let tagMatches = true;
 
-    if (tagFilterMode === 'include' && includedTags.length > 0) {
+    if (tagFilterMode === 'include') {
         tagFilterActive = true;
-        tagMatches = includedTags.some(t => tagIds.has(t.toLowerCase()) || tagNames.has(t.toLowerCase().trim()));
+        tagMatches = includedTags.length > 0 && includedTags.some(t => tagIds.has(t.toLowerCase()) || tagNames.has(t.toLowerCase().trim()));
     } else if (tagFilterMode === 'exclude' && excludedTags.length > 0) {
         tagFilterActive = true;
         tagMatches = !excludedTags.some(t => tagIds.has(t.toLowerCase()) || tagNames.has(t.toLowerCase().trim()));
@@ -205,6 +221,11 @@ export function matchesEventSelectionRules(event: any, settings: Record<string, 
     const eventLocIds: string[] = [];
     if (event.locationId) eventLocIds.push(event.locationId);
     if (event.venueId) eventLocIds.push(event.venueId);
+    if (Array.isArray(event.locationIds)) {
+        for (const id of event.locationIds) {
+            if (id) eventLocIds.push(id);
+        }
+    }
     if (Array.isArray(event.locations)) {
         for (const l of event.locations) {
             if (l?.id) eventLocIds.push(l.id);

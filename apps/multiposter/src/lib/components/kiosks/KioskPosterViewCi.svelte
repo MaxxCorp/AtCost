@@ -43,7 +43,8 @@
     import CiTopTriangle from "./ci/CiTopTriangle.svelte";
     import CiBottomTriangle from "./ci/CiBottomTriangle.svelte";
     import CiSettingsModal from "./ci/CiSettingsModal.svelte";
-    import { DEFAULT_PRESETS, DEFAULT_PRINT_OPTIONS, DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, type CiPreset, type CiPrintOptions, type CiSponsorItem, type KioskElementSettings } from "./ci/types.js";
+    import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
+    import { DEFAULT_PRESETS, DEFAULT_PRINT_OPTIONS, DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, type CiPreset, type CiPrintOptions, type CiSponsorItem, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
@@ -256,6 +257,21 @@
     // --- State: Series Mode & Content Selection ---
     let compressSeries = $state<boolean>(true);
     let descriptionStyle = $state<"short" | "full" | "none">("short");
+    let itemDescriptions = $state<Record<string, string>>({});
+    let itemPercentages = $state<Record<string, number>>({});
+    let selectedCardId = $state<string | null>(null);
+    let cardSettings = $state<Record<string, CardPrintConfig>>({});
+    let selectedItem = $derived.by(() => {
+        if (!selectedCardId) return null;
+        const it = displayItems.find(i => i.id === selectedCardId);
+        if (!it) return null;
+        const isEvt = "startDateTime" in it;
+        return {
+            id: it.id,
+            title: isEvt ? (it as Event).summary : (it as Announcement).title,
+            description: isEvt ? (it as Event).description : (it as Announcement).content
+        };
+    });
     let showTimes = $state<boolean>(true);
     let showLocationQr = $state<boolean>(true);
     let customProgrammeTitle = $state<string>("");
@@ -374,6 +390,9 @@
                 if (prefs.printOptions) printOptions = { ...printOptions, ...prefs.printOptions };
                 if (prefs.elementSettings) elementSettings = { ...DEFAULT_ELEMENT_SETTINGS, ...prefs.elementSettings };
                 if (prefs.descriptionStyle !== undefined) descriptionStyle = prefs.descriptionStyle;
+                if (prefs.itemDescriptions) itemDescriptions = prefs.itemDescriptions;
+                if (prefs.itemPercentages) itemPercentages = prefs.itemPercentages;
+                if (prefs.cardSettings && typeof prefs.cardSettings === 'object') cardSettings = prefs.cardSettings;
                 if (prefs.showTimes !== undefined) showTimes = prefs.showTimes;
                 if (prefs.showLocationQr !== undefined) showLocationQr = prefs.showLocationQr;
                 if (prefs.compressSeries !== undefined) compressSeries = prefs.compressSeries;
@@ -420,6 +439,9 @@
                 printOptions,
                 elementSettings,
                 descriptionStyle,
+                itemDescriptions,
+                itemPercentages,
+                cardSettings,
                 showTimes,
                 showLocationQr,
                 compressSeries,
@@ -441,7 +463,7 @@
             paperSize, columns, density, showLocationLogo, locationLogoPosition,
             customLocationLogoUrl, locationLogoSizeMode, locationLogoHeight, locationLogoMaxWidth,
             locationLogoOffsetY, showSponsors, sponsorSectionTitle,
-            sponsorPosition, sponsors, ciPreset, customPresets, printOptions, elementSettings, descriptionStyle, showTimes,
+            sponsorPosition, sponsors, ciPreset, customPresets, printOptions, elementSettings, descriptionStyle, itemDescriptions, itemPercentages, cardSettings, showTimes,
             showLocationQr, compressSeries, customProgrammeTitle, customProgrammeSubtitle,
             activeLocationId, visibleComponents.contacts, visibleComponents.participants,
             visibleComponents.publicStatus, visibleComponents.descriptions, visibleComponents.qrCodes,
@@ -1489,7 +1511,10 @@
                         {@const itemRecurrenceRule = isEvt ? ((Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null) : null}
 
                         <!-- Single Programme Entry (Avoid breaking inside columns - Highlight for Non-Repeating One-Offs) -->
-                        <div class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs {getElementPrintClasses(elementSettings.events, printOptions.previewGreyscaleOnScreen)} {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60'}">
+                        <div
+                            class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs cursor-pointer {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, printOptions.previewGreyscaleOnScreen)} {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'}"
+                            onclick={() => { selectedCardId = selectedCardId === item.id ? null : item.id; }}
+                        >
                             <div class="flex items-start gap-3">
                                 <!-- Date Badge Block -->
                                 {#if isCompressed}
@@ -1749,8 +1774,8 @@
                                     {#if visibleComponents.descriptions && descriptionStyle !== "none"}
                                         {@const rawDesc = isEvt ? (item as Event).description : (item as Announcement).content}
                                         {#if rawDesc && rawDesc.trim()}
-                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
-                                                {@html rawDesc}
+                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {itemPercentages[item.id] === undefined && descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
+                                                {@html (itemPercentages[item.id] === 100 ? rawDesc : (itemDescriptions[item.id] ?? rawDesc))}
                                             </div>
                                         {/if}
                                     {/if}
@@ -1879,6 +1904,41 @@
     onSavePreset={handleSaveCustomPreset}
     onDeletePreset={handleDeleteCustomPreset}
 />
+
+{#if selectedItem}
+    <CardLayoutActionBar
+        {selectedItem}
+        kioskId={kiosk?.id || 'default'}
+        currentPercentage={itemPercentages[selectedItem.id]}
+        currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
+        currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
+        onPercentageChange={(percentage, text) => {
+            if (!selectedItem) return;
+            itemPercentages[selectedItem.id] = percentage;
+            itemDescriptions[selectedItem.id] = text;
+            savePrefs();
+        }}
+        onBehaviorChange={(behavior) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                printBehavior: behavior
+            };
+            savePrefs();
+        }}
+        onColorChange={(color) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                printColor: color
+            };
+            savePrefs();
+        }}
+        onClose={() => {
+            selectedCardId = null;
+        }}
+    />
+{/if}
 
 <!-- Settings & Logos Modal Drawer -->
 {#if isSettingsOpen}

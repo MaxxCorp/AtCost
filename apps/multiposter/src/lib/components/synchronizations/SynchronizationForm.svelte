@@ -305,12 +305,30 @@
 			return val === undefined ? true : (val === true || val === "true" || val === 1);
 		})
 	);
-	let msIncludeContacts = $state<boolean>(
+	const initialParticipantToggle = untrack(() => {
+		const incContacts = initialData?.settings?.includeContacts;
+		const syncParts = initialData?.settings?.syncParticipants;
+		const incEvtContacts = initialData?.settings?.includeEventContacts;
+		if (incContacts === false || incContacts === "false" || incContacts === 0) return false;
+		if (syncParts === false || syncParts === "false" || syncParts === 0) return false;
+		if (incEvtContacts === false || incEvtContacts === "false" || incEvtContacts === 0) return false;
+		const firstDefined = syncParts ?? incContacts ?? incEvtContacts;
+		return firstDefined === undefined ? true : (firstDefined === true || firstDefined === "true" || firstDefined === 1);
+	});
+	let msIncludeContacts = $state<boolean>(initialParticipantToggle);
+	let msCalendarVisibility = $state<"unchanged" | "freeBusyRead" | "limitedRead" | "read">(
 		untrack(() => {
-			const val = initialData?.settings?.includeContacts;
-			return val === undefined ? true : (val === true || val === "true" || val === 1);
+			const val = initialData?.settings?.calendarVisibility;
+			if (val === "read" || val === "limitedRead" || val === "freeBusyRead" || val === "unchanged") {
+				return val;
+			}
+			const calId = initialData?.settings?.calendarId;
+			const isEmail = typeof calId === "string" && calId.includes("@");
+			const mbType = initialData?.settings?.mailboxType || (initialData?.settings?.mailboxEmail || isEmail ? "shared" : "user");
+			return mbType === "shared" || mbType === "room" || mbType === "group" ? "read" : "unchanged";
 		})
 	);
+	let msCalendarVisibilityTouched = $state<boolean>(untrack(() => Boolean(initialData?.settings?.calendarVisibility)));
 
 	let msMailboxSearch = $state("");
 	let debouncedSearch = $state("");
@@ -438,12 +456,7 @@
 	);
 
 	// Participant & Contact Sync Settings
-	let syncParticipants = $state<boolean>(
-		untrack(() => {
-			const val = initialData?.settings?.syncParticipants ?? initialData?.settings?.includeEventContacts;
-			return val === undefined ? true : (val === true || val === "true" || val === 1);
-		})
-	);
+	let syncParticipants = $state<boolean>(initialParticipantToggle);
 	let includePublicContacts = $state<boolean>(
 		untrack(() => {
 			const val = initialData?.settings?.includePublicContacts;
@@ -542,20 +555,19 @@
 			: "Exclude (None excluded)";
 	});
 
-	const participantStats = $derived.by(() => {
-		if (!syncParticipants || !events || events.length === 0) {
-			return { totalMatching: 0, eventsCount: events?.length ?? 0 };
-		}
+	const previewDerivedContacts = $derived.by<DerivedRecipientContact[]>(() => {
+		if (!syncParticipants || !events || events.length === 0) return [];
 		try {
-			const derived = getDerivedEventContacts(events, currentSyncSettings);
-			return {
-				totalMatching: derived.length,
-				eventsCount: events.length
-			};
+			return getDerivedEventContacts(events, currentSyncSettings);
 		} catch {
-			return { totalMatching: 0, eventsCount: events.length };
+			return [];
 		}
 	});
+
+	const participantStats = $derived.by(() => ({
+		totalMatching: previewDerivedContacts.length,
+		eventsCount: events?.length ?? 0
+	}));
 	let participantRoleFilterMode = $state<"all" | "include" | "exclude">(
 		untrack(() => {
 			const mode = initialData?.settings?.participantRoleFilterMode;
@@ -890,7 +902,9 @@
 
 		// Participant filters
 		syncParticipants,
+		includeContacts: selectedProvider === "microsoft-calendar" ? msIncludeContacts : undefined,
 		includeEventContacts: syncParticipants,
+		excludedRecipientContactIds,
 		includeEmployeeContacts,
 		includePublicContacts,
 		includeNonPublicContacts,
@@ -1159,7 +1173,12 @@
 								type="radio"
 								value="user"
 								checked={msMailboxType === "user"}
-								onchange={() => (msMailboxType = "user")}
+								onchange={() => {
+									msMailboxType = "user";
+									if (!msCalendarVisibilityTouched) {
+										msCalendarVisibility = "unchanged";
+									}
+								}}
 								class="mt-1 text-blue-600 focus:ring-blue-500"
 							/>
 							<div>
@@ -1179,7 +1198,12 @@
 								type="radio"
 								value="shared"
 								checked={msMailboxType === "shared"}
-								onchange={() => (msMailboxType = "shared")}
+								onchange={() => {
+									msMailboxType = "shared";
+									if (!msCalendarVisibilityTouched) {
+										msCalendarVisibility = "read";
+									}
+								}}
 								class="mt-1 text-blue-600 focus:ring-blue-500"
 							/>
 							<div>
@@ -1585,7 +1609,10 @@
 							<input
 								type="checkbox"
 								checked={msIncludeContacts}
-								onchange={(e) => (msIncludeContacts = e.currentTarget.checked)}
+								onchange={(e) => {
+									msIncludeContacts = e.currentTarget.checked;
+									syncParticipants = e.currentTarget.checked;
+								}}
 								class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
 							/>
 							<div>
@@ -1595,8 +1622,44 @@
 								<span class="text-xs text-gray-500 block">
 									{m.ms_include_contacts_hint ? m.ms_include_contacts_hint() : "Include linked contacts as meeting attendees on the calendar event."}
 								</span>
+								{#if msIncludeContacts}
+									<span class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1.5 block">
+										{m.ms_shared_contacts_invite_hint ? m.ms_shared_contacts_invite_hint() : "Note: Exchange Online sends meeting invitations to matched attendees' personal calendars. Configure which contacts are invited below under 'Event Participants & Attendee Sync Rules'."}
+									</span>
+								{/if}
 							</div>
 						</label>
+
+						<div class="pt-2 border-t border-blue-100">
+							<label for="msCalendarVisibility" class="block text-sm font-medium text-gray-700 mb-1">
+								{m.ms_calendar_visibility ? m.ms_calendar_visibility() : "Organization Calendar Visibility"}
+							</label>
+							<select
+								id="msCalendarVisibility"
+								value={msCalendarVisibility}
+								onchange={(e) => {
+									msCalendarVisibility = e.currentTarget.value as "unchanged" | "freeBusyRead" | "limitedRead" | "read";
+									msCalendarVisibilityTouched = true;
+								}}
+								class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							>
+								<option value="read">
+									{m.ms_calendar_visibility_read ? m.ms_calendar_visibility_read() : "Show Full Details (Title, Time, Location & Description)"}
+								</option>
+								<option value="limitedRead">
+									{m.ms_calendar_visibility_limited ? m.ms_calendar_visibility_limited() : "Show Title, Time & Location Only"}
+								</option>
+								<option value="freeBusyRead">
+									{m.ms_calendar_visibility_freebusy ? m.ms_calendar_visibility_freebusy() : "Show Free/Busy Only ('Busy')"}
+								</option>
+								<option value="unchanged">
+									{m.ms_calendar_visibility_unchanged ? m.ms_calendar_visibility_unchanged() : "Do Not Modify Calendar Permissions"}
+								</option>
+							</select>
+							<p class="text-xs text-gray-500 mt-1">
+								{m.ms_calendar_visibility_hint ? m.ms_calendar_visibility_hint() : "Controls whether colleagues in Outlook see event titles and details or only 'Busy' (Free/Busy)."}
+							</p>
+						</div>
 					</div>
 				{/if}
 
@@ -1819,6 +1882,9 @@
 									{#if msTestingState.result.details.calendarName}
 										<div>Calendar: {msTestingState.result.details.calendarName}</div>
 									{/if}
+									{#if msTestingState.result.details.organizationPermissionRole}
+										<div>Organization Visibility: {msTestingState.result.details.organizationPermissionRole}</div>
+									{/if}
 									{#if msTestingState.result.details.roomsCount !== undefined}
 										<div>Rooms discovered in tenant: {msTestingState.result.details.roomsCount}</div>
 									{/if}
@@ -1863,6 +1929,9 @@
 					{/if}
 					{#if fields?.settings?.includeContacts}
 						<input {...fields.settings.includeContacts.as("hidden", msIncludeContacts ? "true" : "false")} />
+					{/if}
+					{#if fields?.settings?.calendarVisibility && msCalendarVisibility}
+						<input {...fields.settings.calendarVisibility.as("hidden", msCalendarVisibility)} />
 					{/if}
 				{/if}
 			</div>
@@ -2738,6 +2807,9 @@
 					checked={syncParticipants}
 					onchange={(e) => {
 						syncParticipants = e.currentTarget.checked;
+						if (selectedProvider === "microsoft-calendar") {
+							msIncludeContacts = e.currentTarget.checked;
+						}
 					}}
 					class="mt-1 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
 				/>
@@ -3316,6 +3388,51 @@
 						Inclusive union: Contacts will be synchronized if they match the <strong>Base Audience</strong> scope <em>OR</em> the <strong>Role filter</strong> <em>OR</em> the <strong>Tag filter</strong>.
 					{/if}
 				</p>
+
+				{#if participantScopeLogic === 'OR' && (participantRoleFilterMode !== 'all' || participantTagFilterMode !== 'all')}
+					<div class="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+						<div class="flex items-start gap-2">
+							<AlertCircle class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+							<span>
+								{m.sync_scope_or_warning ? m.sync_scope_or_warning() : "Caution with OR: All contacts in the Base Audience (e.g. all Staff) will be synced even if they do NOT match the selected Role or Tag filter. Use AND to require both."}
+							</span>
+						</div>
+						<button
+							type="button"
+							onclick={() => { participantScopeLogic = 'AND'; }}
+							class="shrink-0 px-2.5 py-1 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
+						>
+							{m.sync_logic_and_both()}
+						</button>
+					</div>
+				{/if}
+
+				{#if previewDerivedContacts.length > 0}
+					<div class="pt-2 border-t border-indigo-100/80 space-y-1.5">
+						<div class="text-[11px] font-semibold text-indigo-900">
+							Matching Contacts Preview ({previewDerivedContacts.length}):
+						</div>
+						<div class="flex flex-wrap gap-1.5">
+							{#each previewDerivedContacts.slice(0, 12) as c (c.id)}
+								{@const primaryEmail = c.emails?.find((e) => e.primary)?.value || c.emails?.[0]?.value}
+								<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] bg-white border border-gray-200 text-gray-800 shadow-2xs">
+									<span class="font-semibold">{c.displayName}</span>
+									{#if primaryEmail}
+										<span class="text-gray-500 font-mono text-[10px]">({primaryEmail})</span>
+									{/if}
+									<span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 font-medium">
+										{c.eventCount}x
+									</span>
+								</span>
+							{/each}
+							{#if previewDerivedContacts.length > 12}
+								<span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] bg-gray-100 text-gray-600 font-medium">
+									+{previewDerivedContacts.length - 12} more
+								</span>
+							{/if}
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 

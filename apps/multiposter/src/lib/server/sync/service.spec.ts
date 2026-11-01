@@ -1428,6 +1428,63 @@ describe('SyncService - Bulk Sync', () => {
 
 			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(true);
 		});
+
+		it('should block all contacts when includeContacts is false even if syncParticipants is true', () => {
+			const config = {
+				id: 'cfg-ms-contradictory',
+				providerType: 'microsoft-calendar',
+				settings: {
+					includeContacts: false,
+					syncParticipants: true
+				}
+			} as any;
+
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(speakerContact, config)).toBe(false);
+		});
+
+		it('should block contacts listed in excludedContactIds or excludedRecipientContactIds', () => {
+			const config = {
+				...baseConfig,
+				settings: {
+					includeEmployeeContacts: true,
+					excludedContactIds: [employeeContact.id]
+				}
+			};
+
+			expect(service.shouldSyncContactForEvent(employeeContact, config)).toBe(false);
+		});
+
+		it('should block employee contacts without the required role when participantScopeLogic is AND', () => {
+			const locationStaffContact = {
+				id: 'contact-bhs',
+				displayName: 'Bürgerhaus Südspitze',
+				isPublic: true,
+				tags: [{ name: 'Employee' }],
+				roles: [{ id: 'role-kontakt', name: 'Kontakt' }]
+			};
+			const responsibleStaffContact = {
+				id: 'contact-anders',
+				displayName: 'Peter Anders',
+				isPublic: false,
+				tags: [{ name: 'Employee' }],
+				roles: [{ id: 'role-verantwortlich', name: 'Verantwortlich' }]
+			};
+			const config = {
+				...baseConfig,
+				settings: {
+					includeEmployeeContacts: true,
+					includePublicContacts: false,
+					includeNonPublicContacts: false,
+					participantRoleFilterMode: 'include',
+					includedContactRoles: ['role-verantwortlich'],
+					participantScopeLogic: 'AND'
+				}
+			};
+
+			expect(service.shouldSyncContactForEvent(locationStaffContact, config)).toBe(false);
+			expect(service.shouldSyncContactForEvent(responsibleStaffContact, config)).toBe(true);
+		});
 	});
 });
 

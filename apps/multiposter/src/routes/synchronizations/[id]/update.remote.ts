@@ -4,6 +4,7 @@ import { db } from '@ac/db';
 import { syncConfig } from '@ac/db';
 import { eq, and } from '@ac/db';
 import { updateSynchronizationSchema, normalizeSyncSettings } from '#lib/validations/synchronizations.js';
+import { MicrosoftGraphClient } from '#lib/server/sync/providers/microsoft/index.js';
 import { list as listSynchronizations } from '../list.remote';
 import { readSynchronization as read } from './read.remote';
 
@@ -61,6 +62,36 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 
 		if (!updated) {
 			throw new Error('Update failed');
+		}
+
+		if (
+			updated.providerType === 'microsoft-calendar' &&
+			(newSettings?.calendarVisibility === 'read' ||
+				newSettings?.calendarVisibility === 'limitedRead' ||
+				newSettings?.calendarVisibility === 'freeBusyRead')
+		) {
+			try {
+				const msClient = new MicrosoftGraphClient();
+				await msClient.initialize({
+					id: updated.id,
+					userId: updated.userId,
+					providerId: updated.providerId ?? 'microsoft',
+					providerType: updated.providerType as any,
+					direction: updated.direction as any,
+					enabled: updated.enabled,
+					credentials: updated.credentials as any,
+					settings: updated.settings as any,
+					createdAt: updated.createdAt,
+					updatedAt: updated.updatedAt
+				});
+				await msClient.ensureOrganizationCalendarPermission(
+					newSettings.calendarVisibility,
+					newSettings.mailboxEmail,
+					newSettings.calendarId
+				);
+			} catch (permErr) {
+				console.warn('[UpdateSync] Could not apply Microsoft calendar organization visibility:', permErr);
+			}
 		}
 
 		read(id).set(updated);

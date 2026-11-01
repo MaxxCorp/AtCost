@@ -67,6 +67,9 @@
         formatFullDate,
         formatPosterProgrammeHeadline
     } from "#lib/utils/kiosk-flat-helpers.js";
+    import PrintSettingsModal from "./PrintSettingsModal.svelte";
+    import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
+    import { DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
 
     interface LocationContact {
         name: string;
@@ -306,6 +309,24 @@
 
     // Settings Modal
     let isSettingsOpen = $state<boolean>(false);
+    let isPrintSettingsOpen = $state<boolean>(false);
+    let previewGreyscaleOnScreen = $state<boolean>(false);
+    let elementSettings = $state<KioskElementSettings>({ ...DEFAULT_ELEMENT_SETTINGS });
+    let itemDescriptions = $state<Record<string, string>>({});
+    let itemPercentages = $state<Record<string, number>>({});
+    let selectedCardId = $state<string | null>(null);
+    let cardSettings = $state<Record<string, CardPrintConfig>>({});
+    let selectedItem = $derived.by(() => {
+        if (!selectedCardId) return null;
+        const it = displayItems.find(i => i.id === selectedCardId);
+        if (!it) return null;
+        const isEvt = "startDateTime" in it;
+        return {
+            id: it.id,
+            title: isEvt ? (it as Event).summary : (it as Announcement).title,
+            description: isEvt ? (it as Event).description : (it as Announcement).content
+        };
+    });
 
     // Measurement & Overflow warning
     let posterContentElement = $state<HTMLElement | null>(null);
@@ -354,6 +375,11 @@
                         ...prefs.visibleComponents
                     };
                 }
+                if (prefs.elementSettings) elementSettings = { ...DEFAULT_ELEMENT_SETTINGS, ...prefs.elementSettings };
+                if (prefs.previewGreyscaleOnScreen !== undefined) previewGreyscaleOnScreen = prefs.previewGreyscaleOnScreen;
+                if (prefs.itemDescriptions) itemDescriptions = prefs.itemDescriptions;
+                if (prefs.itemPercentages) itemPercentages = prefs.itemPercentages;
+                if (prefs.cardSettings && typeof prefs.cardSettings === 'object') cardSettings = prefs.cardSettings;
                 if (Array.isArray(prefs.customSections)) {
                     customSections = prefs.customSections;
                 }
@@ -393,7 +419,12 @@
                 customProgrammeSubtitle,
                 activeLocationId,
                 visibleComponents,
-                customSections
+                customSections,
+                elementSettings,
+                previewGreyscaleOnScreen,
+                itemDescriptions,
+                itemPercentages,
+                cardSettings
             };
             localStorage.setItem(storageKey, JSON.stringify(prefs));
         } catch (e) {
@@ -414,7 +445,12 @@
             visibleComponents.publicStatus, visibleComponents.descriptions, visibleComponents.qrCodes,
             visibleComponents.ticketPrice, visibleComponents.rooms, visibleComponents.tags,
             visibleComponents.internalNotes, visibleComponents.heroImage, visibleComponents.openingHours,
-            customSections
+            customSections,
+            elementSettings,
+            previewGreyscaleOnScreen,
+            itemDescriptions,
+            itemPercentages,
+            cardSettings
         ];
         savePrefs();
     });
@@ -742,8 +778,8 @@
 
 {#snippet rightVisuals(item: PosterDisplayItem, evt: EnrichedEvent, isEvt: boolean)}
     <!-- Hero Image -->
-    {#if visibleComponents.heroImage && (item as any).heroImage}
-        <div class="overflow-hidden rounded-md border border-slate-200 bg-slate-100 shrink-0">
+    {#if visibleComponents.heroImage && (item as any).heroImage && elementSettings.heroImages.enabled}
+        <div class="overflow-hidden rounded-md border border-slate-200 bg-slate-100 shrink-0 {getElementPrintClasses(elementSettings.heroImages, previewGreyscaleOnScreen)}">
             <img
                 src={(item as any).heroImage}
                 alt={evt.summary || "Event"}
@@ -754,8 +790,8 @@
     {/if}
 
     <!-- Scannable Event QR Code -->
-    {#if visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath)}
-        <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0 shadow-2xs">
+    {#if visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath) && elementSettings.qrCodes.enabled}
+        <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0 shadow-2xs {getElementPrintClasses(elementSettings.qrCodes, previewGreyscaleOnScreen)}">
             <img
                 src={evt.qrCodeDataUrl || evt.qrCodePath}
                 alt="QR"
@@ -768,7 +804,7 @@
 {#snippet customSectionCard(sec: CustomSectionItem, slotContext: string)}
     {@const colorBorder = sec.accentColor === 'red' ? 'border-l-red-600' : sec.accentColor === 'gold' ? 'border-l-[#fbc707]' : sec.accentColor === 'emerald' ? 'border-l-emerald-600' : 'border-l-slate-400'}
     {@const colorBg = sec.accentColor === 'red' ? 'bg-red-50/25' : sec.accentColor === 'gold' ? 'bg-amber-50/25' : sec.accentColor === 'emerald' ? 'bg-emerald-50/25' : 'bg-slate-50/80'}
-    <div class="custom-section-item p-2.5 rounded-r-md border border-slate-200/60 border-l-[3.5px] {colorBorder} {colorBg} break-inside-avoid {slotContext === 'banner' ? 'mb-2' : 'mb-3.5'}">
+    <div class="custom-section-item p-2.5 rounded-r-md border border-slate-200/60 border-l-[3.5px] {colorBorder} {colorBg} break-inside-avoid {slotContext === 'banner' ? 'mb-2' : 'mb-3.5'} {getElementPrintClasses(elementSettings.customSections, previewGreyscaleOnScreen)}">
         <div class="flex items-start gap-3">
             {#if sec.imageUrl}
                 <img src={sec.imageUrl} alt={sec.title} class="max-h-16 max-w-[120px] object-contain rounded shrink-0 bg-white p-1 border border-slate-200" />
@@ -1283,6 +1319,17 @@
                 </button>
             </div>
 
+            <!-- Open Print Settings Modal -->
+            <button
+                type="button"
+                onclick={() => (isPrintSettingsOpen = true)}
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-medium rounded-md border border-purple-300 dark:border-purple-700 transition"
+                title="Druck-Optionen (Farbe, Raum reservieren, Ausblenden) für Elemente anpassen"
+            >
+                <Printer class="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span class="hidden lg:inline">Druck-Optionen</span>
+            </button>
+
             <!-- Open Settings Modal -->
             <button
                 type="button"
@@ -1333,7 +1380,7 @@
                 {/if}
 
                 <!-- Poster Editorial Header -->
-                <header class="poster-header px-8 pt-5 pb-1 flex flex-col gap-2">
+                <header class="poster-header px-8 pt-5 pb-1 flex flex-col gap-2 {getElementPrintClasses(elementSettings.header, previewGreyscaleOnScreen)}">
                     <!-- Top Row: Location Branding / Venue Info & Right Logo / Sponsors -->
                     <div class="flex items-start justify-between gap-6">
                         <!-- Left: Location Info Block -->
@@ -1523,7 +1570,10 @@
                         {@const itemRecurrenceRule = isEvt ? ((Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null) : null}
 
                         <!-- Single Programme Entry (Avoid breaking inside columns - Highlight for Non-Repeating One-Offs) -->
-                        <div class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'} {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60'}">
+                        <div
+                            class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs cursor-pointer {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, previewGreyscaleOnScreen)} {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'}"
+                            onclick={() => { selectedCardId = selectedCardId === item.id ? null : item.id; }}
+                        >
                             <div class="flex items-start gap-3">
                                 <!-- Date Badge Block -->
                                 {#if isCompressed}
@@ -1783,8 +1833,8 @@
                                     {#if visibleComponents.descriptions && descriptionStyle !== "none"}
                                         {@const rawDesc = isEvt ? (item as Event).description : (item as Announcement).content}
                                         {#if rawDesc && rawDesc.trim()}
-                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
-                                                {@html rawDesc}
+                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {itemPercentages[item.id] === undefined && descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
+                                                {@html (itemPercentages[item.id] === 100 ? rawDesc : (itemDescriptions[item.id] ?? rawDesc))}
                                             </div>
                                         {/if}
                                     {/if}
@@ -1843,7 +1893,7 @@
             {/if}
 
             <!-- Bottom Section: Footer & Sponsors Bar -->
-            <footer class="poster-footer px-8 py-3.5 border-t border-slate-200 shrink-0 bg-slate-50/50 print:bg-transparent">
+            <footer class="poster-footer px-8 py-3.5 border-t border-slate-200 shrink-0 bg-slate-50/50 print:bg-transparent {getElementPrintClasses(elementSettings.locationDetails, previewGreyscaleOnScreen)}">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <!-- Location Contact Details -->
                     <div class="text-[10px] text-slate-600 flex items-center flex-wrap gap-x-4 gap-y-1">
@@ -1865,8 +1915,8 @@
                     </div>
 
                     <!-- Bottom Sponsor Logos (If enabled and position is footer) -->
-                    {#if showSponsors && sponsorPosition === "footer" && sponsors.length > 0}
-                        <div class="flex items-center gap-3">
+                    {#if showSponsors && sponsorPosition === "footer" && sponsors.length > 0 && elementSettings.sponsors.enabled}
+                        <div class="flex items-center gap-3 {getElementPrintClasses(elementSettings.sponsors, previewGreyscaleOnScreen)}">
                             <span class="text-[9px] uppercase tracking-wider font-semibold text-slate-400">
                                 {sponsorSectionTitle}:
                             </span>
@@ -1916,6 +1966,26 @@
 
             <!-- Modal Body (Scrollable) -->
             <div class="p-6 overflow-y-auto space-y-6 flex-1 text-sm text-slate-700 dark:text-slate-300">
+                <!-- Quick Link: Print and Greyscale Settings -->
+                <div class="p-3 bg-purple-50 dark:bg-purple-950/40 rounded-lg border border-purple-200 dark:border-purple-800 flex items-center justify-between">
+                    <div>
+                        <h4 class="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                            <Printer class="w-3.5 h-3.5 text-purple-600" />
+                            <span>Druck-Optionen & Elemente</span>
+                        </h4>
+                        <p class="text-[11px] text-purple-700 dark:text-purple-300">
+                            Farbe, Spartoner, Raum reservieren oder Bereiche ausblenden
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onclick={() => { isSettingsOpen = false; isPrintSettingsOpen = true; }}
+                        class="px-2.5 py-1 text-xs font-semibold rounded bg-purple-600 hover:bg-purple-700 text-white transition"
+                    >
+                        Öffnen
+                    </button>
+                </div>
+
                 <!-- 1. Location Logo Configuration -->
                 <section class="space-y-3">
                     <div class="flex items-center justify-between">
@@ -2591,6 +2661,49 @@
             </div>
         </div>
     </div>
+{/if}
+
+<PrintSettingsModal
+    bind:open={isPrintSettingsOpen}
+    bind:elementSettings
+    bind:previewGreyscaleOnScreen
+    isFlyer={false}
+    onSettingsChange={savePrefs}
+/>
+
+{#if selectedItem}
+    <CardLayoutActionBar
+        {selectedItem}
+        kioskId={kiosk?.id || 'default'}
+        currentPercentage={itemPercentages[selectedItem.id]}
+        currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
+        currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
+        onPercentageChange={(percentage, text) => {
+            if (!selectedItem) return;
+            itemPercentages[selectedItem.id] = percentage;
+            itemDescriptions[selectedItem.id] = text;
+            savePrefs();
+        }}
+        onBehaviorChange={(behavior) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                printBehavior: behavior
+            };
+            savePrefs();
+        }}
+        onColorChange={(color) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                printColor: color
+            };
+            savePrefs();
+        }}
+        onClose={() => {
+            selectedCardId = null;
+        }}
+    />
 {/if}
 
 <style>

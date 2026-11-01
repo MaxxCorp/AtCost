@@ -28,6 +28,9 @@
     } from "@lucide/svelte";
     import { summarizeFlyerItems } from "../../../routes/kiosks/[id]/view/summarize.remote";
     import type { FlyerItemSummary, FlyerDensity } from "#lib/validations/flyer.js";
+    import PrintSettingsModal from "./PrintSettingsModal.svelte";
+    import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
+    import { DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
     import { resolve } from '$app/paths';
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice } from "#lib/utils/format-ticket-price.js";
@@ -98,6 +101,23 @@
     let density = $state<FlyerDensity>("standard");
     let zoomLevel = $state<number>(0.85); // Preview zoom scale
     let isSummarizing = $state(false);
+    let isPrintSettingsOpen = $state<boolean>(false);
+    let previewGreyscaleOnScreen = $state<boolean>(false);
+    let elementSettings = $state<KioskElementSettings>({ ...DEFAULT_ELEMENT_SETTINGS });
+    let itemPercentages = $state<Record<string, number>>({});
+    let selectedCardId = $state<string | null>(null);
+    let cardSettings = $state<Record<string, CardPrintConfig>>({});
+    let selectedItem = $derived.by(() => {
+        if (!selectedCardId) return null;
+        const it = items.find(i => i.id === selectedCardId);
+        if (!it) return null;
+        const isEvt = "startDateTime" in it;
+        return {
+            id: it.id,
+            title: isEvt ? (it as Event).summary : (it as Announcement).title,
+            description: isEvt ? (it as Event).description : (it as Announcement).content
+        };
+    });
 
     // Summaries map: item.id -> FlyerItemSummary
     let aiSummaries = $state<Record<string, FlyerItemSummary>>({});
@@ -183,8 +203,57 @@
         return isAnnouncement && flyerLocations.length <= 1;
     }
 
-    // Load cached summaries from localStorage on mount
+    const storageKeyFlyer = $derived(`kiosk_flyer_settings_${kiosk?.id || 'default'}`);
+
+    function saveFlyerPrefs() {
+        if (!browser || !kiosk.id) return;
+        try {
+            const prefs = {
+                elementSettings,
+                previewGreyscaleOnScreen,
+                itemPercentages,
+                cardSettings,
+                density,
+                showFoldGuides,
+                showQrCodes,
+                showEventQrCodes,
+                showDescriptions,
+                showFooters,
+                compressSeries
+            };
+            localStorage.setItem(storageKeyFlyer, JSON.stringify(prefs));
+        } catch (e) {
+            console.error("Failed to save flyer settings", e);
+        }
+    }
+
+    $effect(() => {
+        const _ = [elementSettings, previewGreyscaleOnScreen, itemPercentages, cardSettings, density, showFoldGuides, showQrCodes, showEventQrCodes, showDescriptions, showFooters, compressSeries];
+        saveFlyerPrefs();
+    });
+
+    // Load cached summaries and settings from localStorage on mount
     onMount(() => {
+        if (!browser || !kiosk.id) return;
+        try {
+            const savedPrefs = localStorage.getItem(storageKeyFlyer);
+            if (savedPrefs) {
+                const parsed = JSON.parse(savedPrefs);
+                if (parsed.elementSettings) elementSettings = { ...DEFAULT_ELEMENT_SETTINGS, ...parsed.elementSettings };
+                if (parsed.previewGreyscaleOnScreen !== undefined) previewGreyscaleOnScreen = parsed.previewGreyscaleOnScreen;
+                if (parsed.itemPercentages) itemPercentages = parsed.itemPercentages;
+                if (parsed.cardSettings && typeof parsed.cardSettings === 'object') cardSettings = parsed.cardSettings;
+                if (parsed.density) density = parsed.density;
+                if (parsed.showFoldGuides !== undefined) showFoldGuides = parsed.showFoldGuides;
+                if (parsed.showQrCodes !== undefined) showQrCodes = parsed.showQrCodes;
+                if (parsed.showEventQrCodes !== undefined) showEventQrCodes = parsed.showEventQrCodes;
+                if (parsed.showDescriptions !== undefined) showDescriptions = parsed.showDescriptions;
+                if (parsed.showFooters !== undefined) showFooters = parsed.showFooters;
+                if (parsed.compressSeries !== undefined) compressSeries = parsed.compressSeries;
+            }
+        } catch (e) {
+            console.error("Failed to load flyer settings", e);
+        }
         if (!browser || !kiosk.id) return;
         try {
             const cached = localStorage.getItem(`flyer_ai_summaries_${kiosk.id}`);
@@ -326,10 +395,13 @@
     }
 
     function getItemSummary(item: Event | Announcement): string {
+        const raw = "startDateTime" in item ? (item as Event).description : (item as Announcement).content;
+        if (itemPercentages[item.id] === 100) {
+            return raw ? raw.trim() : "";
+        }
         if (aiSummaries[item.id]?.summary) {
             return aiSummaries[item.id].summary;
         }
-        const raw = "startDateTime" in item ? (item as Event).description : (item as Announcement).content;
         return raw ? raw.trim() : "";
     }
 
@@ -666,6 +738,17 @@
                         <span>{m.show_footers()}</span>
                     </label>
 
+                    <!-- Print & Layout Settings Button -->
+                    <button
+                        type="button"
+                        onclick={() => (isPrintSettingsOpen = true)}
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 shadow-2xs"
+                        title="Druck-Optionen (Farbe, Spartoner, Raum freihalten, Ausblenden) anpassen"
+                    >
+                        <Printer class="w-3.5 h-3.5 text-purple-600" />
+                        <span>Druck-Optionen</span>
+                    </button>
+
                     <!-- Preview Zoom controls -->
                     <div class="hidden md:flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                         <button
@@ -731,11 +814,11 @@
                         style="--zoom: {zoomLevel}; transform-origin: top center;"
                     >
                         <!-- Fold marks / guides on screen and print if enabled -->
-                        {#if showFoldGuides}
-                            <div class="fold-line fold-line-1">
+                        {#if showFoldGuides && elementSettings.foldGuides.enabled}
+                            <div class="fold-line fold-line-1 {getElementPrintClasses(elementSettings.foldGuides, previewGreyscaleOnScreen)}">
                                 <span class="fold-indicator">{m.fold_here()}</span>
                             </div>
-                            <div class="fold-line fold-line-2">
+                            <div class="fold-line fold-line-2 {getElementPrintClasses(elementSettings.foldGuides, previewGreyscaleOnScreen)}">
                                 <span class="fold-indicator">{m.fold_here()}</span>
                             </div>
                         {/if}
@@ -862,8 +945,8 @@
                             <!-- PANEL 1: FRONT COVER (Right on Outside Sheet) - STANDORT & KONTAKT -->
                             <section class="panel panel-front relative bg-slate-900 text-white overflow-hidden flex flex-col justify-between">
                                 <!-- Location Hero Image or Artwork Header -->
-                                {#if loc.heroImage}
-                                    <div class="hero-image-container relative h-36 w-full shrink-0 overflow-hidden">
+                                {#if loc.heroImage && elementSettings.heroImages.enabled}
+                                    <div class="hero-image-container relative h-36 w-full shrink-0 overflow-hidden {getElementPrintClasses(elementSettings.heroImages, previewGreyscaleOnScreen)}">
                                         <img
                                             src={loc.heroImage}
                                             alt={loc.name}
@@ -886,24 +969,26 @@
                                 <!-- Front Cover Body: Location Name, Address, Room & Contact -->
                                 <div class="p-3 flex-1 flex flex-col justify-between relative z-10 space-y-2 overflow-hidden">
                                     <div class="space-y-2 overflow-hidden">
-                                        <!-- Date Range Badge -->
-                                        <div class="inline-flex items-center gap-1.5 bg-blue-500/20 border border-blue-400/40 text-blue-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">
-                                            <Calendar class="w-3 h-3" />
-                                            <span>{getDateRangeTitle()}</span>
+                                        <div class="space-y-1.5 {getElementPrintClasses(elementSettings.header, previewGreyscaleOnScreen)}">
+                                            <!-- Date Range Badge -->
+                                            <div class="inline-flex items-center gap-1.5 bg-blue-500/20 border border-blue-400/40 text-blue-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                                                <Calendar class="w-3 h-3" />
+                                                <span>{getDateRangeTitle()}</span>
+                                            </div>
+
+                                            <!-- Location Name (Headline) -->
+                                            <h2 class="text-base font-black tracking-tight text-white leading-tight">
+                                                {loc.name}
+                                            </h2>
+
+                                            <!-- Subtitle -->
+                                            <p class="text-[10.5px] text-slate-300 font-medium leading-tight">
+                                                {kiosk.name || m.program_and_schedule()}
+                                            </p>
                                         </div>
 
-                                        <!-- Location Name (Headline) -->
-                                        <h2 class="text-base font-black tracking-tight text-white leading-tight">
-                                            {loc.name}
-                                        </h2>
-
-                                        <!-- Subtitle -->
-                                        <p class="text-[10.5px] text-slate-300 font-medium leading-tight">
-                                            {kiosk.name || m.program_and_schedule()}
-                                        </p>
-
                                         <!-- Address & Venue Info -->
-                                        <div class="space-y-1 text-[10.5px] text-slate-300 bg-slate-800/80 p-2 rounded-lg border border-slate-700/60">
+                                        <div class="space-y-1 text-[10.5px] text-slate-300 bg-slate-800/80 p-2 rounded-lg border border-slate-700/60 {getElementPrintClasses(elementSettings.locationDetails, previewGreyscaleOnScreen)}">
                                             {#if loc.street || loc.houseNumber}
                                                 <div class="flex items-start gap-1.5">
                                                     <MapPin class="w-3 h-3 text-blue-400 shrink-0 mt-0.5" />
@@ -920,8 +1005,8 @@
                                                     {m.room_label({ room: loc.roomId })}
                                                 </div>
                                             {/if}
-                                            {#if loc.openingHours}
-                                                <div class="flex items-start gap-1.5 pt-1 border-t border-slate-700/60">
+                                            {#if loc.openingHours && elementSettings.openingHours.enabled}
+                                                <div class="flex items-start gap-1.5 pt-1 border-t border-slate-700/60 {getElementPrintClasses(elementSettings.openingHours, previewGreyscaleOnScreen)}">
                                                     <Clock class="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
                                                     <div class="text-[10px] text-slate-300">
                                                         <span class="font-bold text-white block text-[9.5px] uppercase">{m.opening_hours?.() ?? "Öffnungszeiten"}:</span>
@@ -989,8 +1074,8 @@
                                         </div>
 
                                         <!-- Online Calendar / Kiosk QR code -->
-                                        {#if showQrCodes}
-                                            <div class="bg-white p-1 rounded-md shrink-0 shadow-xs">
+                                        {#if showQrCodes && elementSettings.qrCodes.enabled}
+                                            <div class="bg-white p-1 rounded-md shrink-0 shadow-xs {getElementPrintClasses(elementSettings.qrCodes, previewGreyscaleOnScreen)}">
                                                 {#if loc.contact?.qrCodeDataUrl}
                                                     <img src={loc.contact.qrCodeDataUrl} alt="Calendar QR" class="w-10 h-10 object-contain image-pixelated" />
                                                 {:else if (locItems[0] as any)?.qrCodeDataUrl}
@@ -1016,11 +1101,11 @@
                         style="--zoom: {zoomLevel}; transform-origin: top center;"
                     >
                         <!-- Fold marks / guides on screen and print if enabled -->
-                        {#if showFoldGuides}
-                            <div class="fold-line fold-line-1">
+                        {#if showFoldGuides && elementSettings.foldGuides.enabled}
+                            <div class="fold-line fold-line-1 {getElementPrintClasses(elementSettings.foldGuides, previewGreyscaleOnScreen)}">
                                 <span class="fold-indicator">{m.fold_here()}</span>
                             </div>
-                            <div class="fold-line fold-line-2">
+                            <div class="fold-line fold-line-2 {getElementPrintClasses(elementSettings.foldGuides, previewGreyscaleOnScreen)}">
                                 <span class="fold-indicator">{m.fold_here()}</span>
                             </div>
                         {/if}
@@ -1131,6 +1216,56 @@
                 </div>
             </div>
         {/each}
+        <PrintSettingsModal
+            bind:open={isPrintSettingsOpen}
+            bind:elementSettings
+            bind:previewGreyscaleOnScreen
+            isFlyer={true}
+            onSettingsChange={saveFlyerPrefs}
+        />
+
+        {#if selectedItem}
+            <CardLayoutActionBar
+                {selectedItem}
+                kioskId={kiosk?.id || 'default'}
+                currentPercentage={itemPercentages[selectedItem.id]}
+                currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
+                currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
+                onPercentageChange={(percentage, text) => {
+                    if (!selectedItem) return;
+                    itemPercentages[selectedItem.id] = percentage;
+                    aiSummaries = {
+                        ...aiSummaries,
+                        [selectedItem.id]: {
+                            id: selectedItem.id,
+                            title: selectedItem.title,
+                            summary: text
+                        }
+                    };
+                    saveSummariesToCache(aiSummaries);
+                    saveFlyerPrefs();
+                }}
+                onBehaviorChange={(behavior) => {
+                    if (!selectedItem) return;
+                    cardSettings[selectedItem.id] = {
+                        ...cardSettings[selectedItem.id],
+                        printBehavior: behavior
+                    };
+                    saveFlyerPrefs();
+                }}
+                onColorChange={(color) => {
+                    if (!selectedItem) return;
+                    cardSettings[selectedItem.id] = {
+                        ...cardSettings[selectedItem.id],
+                        printColor: color
+                    };
+                    saveFlyerPrefs();
+                }}
+                onClose={() => {
+                    selectedCardId = null;
+                }}
+            />
+        {/if}
     </main>
 </div>
 
@@ -1140,6 +1275,7 @@
     {@const isSpecialNonSeries = isNonSeriesEvent(item)}
     {@const title = getItemTitle(item)}
     {@const summary = getItemSummary(item)}
+    {@const rawDesc = isEvent ? (item as Event).description : (item as Announcement).content}
     {@const highlight = getItemHighlight(item)}
     {@const rooms = isEvent ? getEventRooms(item as Event) : []}
 
@@ -1152,9 +1288,12 @@
         : null}
 
     <article
-        class="event-item-card p-2 rounded-lg transition-all space-y-1 print:break-inside-avoid {isSpecialNonSeries
+        class="event-item-card p-2 rounded-lg transition-colors cursor-pointer space-y-1 print:break-inside-avoid {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries
             ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30'
-            : 'border border-slate-200/90 bg-white hover:border-slate-300'}"
+            : 'border border-slate-200/90 bg-white hover:border-slate-300')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, previewGreyscaleOnScreen)}"
+        onclick={() => { selectedCardId = selectedCardId === item.id ? null : item.id; }}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedCardId = selectedCardId === item.id ? null : item.id; } }}
+        tabindex="0"
     >
         <!-- Date Badge & Meta Row -->
         {#if isEvent && item.isCompressedSeries && item.seriesDates && item.seriesDates.length >= 1}
@@ -1282,14 +1421,14 @@
                 </h4>
 
                 <!-- Summary (Editable inline) -->
-                {#if showDescriptions && summary}
+                {#if showDescriptions && (rawDesc || summary)}
                     <div
-                        class="rich-description text-[10px] text-slate-600 leading-snug {density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10'} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
+                        class="rich-description text-[10px] text-slate-600 leading-snug {itemPercentages[item.id] === undefined ? (density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10') : ''} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
                         contenteditable="true"
                         onblur={(e) => handleInlineEdit(item.id, title, summary, e)}
                         title={m.edit_summary_tooltip()}
                     >
-                        {@html summary}
+                        {@html (itemPercentages[item.id] === 100 ? (rawDesc || '') : summary)}
                     </div>
                 {/if}
 
@@ -1305,8 +1444,8 @@
                 {/if}
             </div>
 
-            {#if showEventQrCodes && eventQr}
-                <div class="shrink-0 flex flex-col items-center pt-0.5">
+            {#if showEventQrCodes && eventQr && elementSettings.qrCodes.enabled}
+                <div class="shrink-0 flex flex-col items-center pt-0.5 {getElementPrintClasses(elementSettings.qrCodes, previewGreyscaleOnScreen)}">
                     <div class="p-0.5 bg-white border border-slate-200/90 rounded shadow-2xs">
                         <img
                             src={eventQr}

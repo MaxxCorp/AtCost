@@ -5,6 +5,7 @@ import { db } from '@ac/db';
 import { syncConfig, account } from '@ac/db'; // Updated syncConfig import path
 import { eq, and } from '@ac/db';
 import { syncService } from '#lib/server/sync/service.js';
+import { MicrosoftGraphClient } from '#lib/server/sync/providers/microsoft/index.js';
 import { createSynchronizationSchema, normalizeSyncSettings } from '#lib/validations/synchronizations.js';
 import { list as listSynchronizations } from '../list.remote'; // New import
 
@@ -29,34 +30,39 @@ export const create = form(createSynchronizationSchema, async (input) => {
 		const oauthProviderId = providerIdMap[input.providerType];
 		let credentials: any = null;
 
+		const settings = typeof input.settings === 'string' ? JSON.parse(input.settings) : (input.settings || {});
+		normalizeSyncSettings(settings);
+
+		const isMicrosoftAppOnly =
+			input.providerType === 'microsoft-calendar' &&
+			(settings?.authMode === 'app' || (settings?.authMode !== 'user' && settings?.mailboxType === 'shared' && settings?.mailboxEmail));
+
 		if (oauthProviderId) {
-			// OAuth-based provider - verify account exists
+			// OAuth-based provider - verify account exists (optional if Microsoft app-only mode is used)
 			const [userAccount] = await db
 				.select()
 				.from(account)
 				.where(and(eq(account.userId, user.id), eq(account.providerId, oauthProviderId)))
 				.limit(1);
 
-			if (!userAccount) {
+			if (!userAccount && !isMicrosoftAppOnly) {
 				throw new Error(
 					`No ${oauthProviderId} account connected. Please connect your account in settings first.`
 				);
 			}
 
-			credentials = {
-				accessToken: userAccount.accessToken,
-				refreshToken: userAccount.refreshToken,
-				expiresAt: userAccount.accessTokenExpiresAt?.getTime()
-			};
+			if (userAccount) {
+				credentials = {
+					accessToken: userAccount.accessToken,
+					refreshToken: userAccount.refreshToken,
+					expiresAt: userAccount.accessTokenExpiresAt?.getTime()
+				};
+			}
 		} else if (input.credentials) {
 			// Direct credentials (username/password)
 			credentials = typeof input.credentials === 'string' ? JSON.parse(input.credentials) : input.credentials;
 			console.log('Using direct credentials from input');
 		}
-
-		// Create sync config
-		const settings = typeof input.settings === 'string' ? JSON.parse(input.settings) : (input.settings || {});
-		normalizeSyncSettings(settings);
 
 		const insertData: any = {
 			userId: user.id,
@@ -83,6 +89,36 @@ export const create = form(createSynchronizationSchema, async (input) => {
 		}
 
 		const newConfigId = config.id;
+
+		if (
+			input.providerType === 'microsoft-calendar' &&
+			(settings?.calendarVisibility === 'read' ||
+				settings?.calendarVisibility === 'limitedRead' ||
+				settings?.calendarVisibility === 'freeBusyRead')
+		) {
+			try {
+				const msClient = new MicrosoftGraphClient();
+				await msClient.initialize({
+					id: config.id,
+					userId: config.userId,
+					providerId: config.providerId ?? 'microsoft',
+					providerType: config.providerType as any,
+					direction: config.direction as any,
+					enabled: config.enabled,
+					credentials: config.credentials as any,
+					settings: config.settings as any,
+					createdAt: config.createdAt,
+					updatedAt: config.updatedAt
+				});
+				await msClient.ensureOrganizationCalendarPermission(
+					settings.calendarVisibility,
+					settings.mailboxEmail,
+					settings.calendarId
+				);
+			} catch (permErr) {
+				console.warn('[CreateSync] Could not apply Microsoft calendar organization visibility:', permErr);
+			}
+		}
 
 		// Setup webhook for push notifications if direction is pull or bidirectional
 		if (input.direction === 'pull' || input.direction === 'bidirectional') {

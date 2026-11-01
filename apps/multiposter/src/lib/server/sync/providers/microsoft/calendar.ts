@@ -81,6 +81,52 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			console.error(`[MicrosoftCalendarProvider] Specified ${target} is not available:`, error);
 			throw new Error(`Microsoft Calendar sync failed: Specified ${target} is not available or accessible (${error.message || error}).`);
 		}
+
+		const calendarVisibility = this.config?.settings?.calendarVisibility;
+		if (
+			calendarVisibility === 'read' ||
+			calendarVisibility === 'limitedRead' ||
+			calendarVisibility === 'freeBusyRead'
+		) {
+			await this.ensureCalendarVisibility(calendarVisibility);
+		}
+	}
+
+	/**
+	 * Ensures the organization-wide default calendar permission ("My Organization" / Default)
+	 * matches the configured visibility role (e.g. 'read' so event titles & details show instead of 'Gebucht').
+	 */
+	async ensureCalendarVisibility(
+		desiredRole: 'freeBusyRead' | 'limitedRead' | 'read'
+	): Promise<void> {
+		try {
+			const baseUrl = this.getBaseUrl();
+			const res = await this.makeRequest<any>(`${baseUrl}/calendarPermissions`, { method: 'GET' });
+			const perms: any[] = Array.isArray(res?.value) ? res.value : [];
+			const orgPerm = perms.find(
+				(p) =>
+					p &&
+					(p.id === 'RGVmYXVsdA==' ||
+						(p.isInsideOrganization === true && p.isRemovable === false) ||
+						p.emailAddress?.name === 'My Organization')
+			);
+			if (!orgPerm?.id || orgPerm.role === desiredRole) return;
+			if (Array.isArray(orgPerm.allowedRoles) && !orgPerm.allowedRoles.includes(desiredRole)) {
+				return;
+			}
+			await this.makeRequest(
+				`${baseUrl}/calendarPermissions/${encodeURIComponent(orgPerm.id)}`,
+				{
+					method: 'PATCH',
+					body: JSON.stringify({ role: desiredRole })
+				}
+			);
+		} catch (err: any) {
+			console.warn(
+				`[MicrosoftCalendarProvider] Could not update organization calendar visibility to "${desiredRole}":`,
+				err?.message || err
+			);
+		}
 	}
 
 	async validateConnection(): Promise<boolean> {
@@ -180,7 +226,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			}
 		}
 
-		const msEvent = this.mapToMicrosoftEvent(event);
+		const msEvent = this.mapToMicrosoftEvent(event, { isUpdate: true });
 		const url = `${this.getBaseUrl()}/events/${encodeURIComponent(externalId)}`;
 		const response = await this.makeRequest<any>(url, {
 			method: 'PATCH',
@@ -358,7 +404,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 		};
 	}
 
-	private mapToMicrosoftEvent(event: ExternalEvent): any {
+	private mapToMicrosoftEvent(event: ExternalEvent, options?: { isUpdate?: boolean }): any {
 		let showAs = 'busy';
 		if (event.status === 'tentative') {
 			showAs = 'tentative';
@@ -396,38 +442,51 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			timeZone: endTimeZone
 		};
 
-		// Map attendees (including resource attendees)
-		if (event.attendees && event.attendees.length > 0) {
-			const includeRoomBookings = this.config?.settings?.includeRoomBookings !== false && (this.config?.settings?.autoBookOnCalendar !== false);
-			const eligibleAttendees = includeRoomBookings
-				? event.attendees
-				: event.attendees.filter((a) => a.type !== 'resource');
+		// Map attendees (respecting both contact sync and room booking toggles)
+		const includeRoomBookings =
+			this.config?.settings?.includeRoomBookings !== false &&
+			this.config?.settings?.autoBookOnCalendar !== false;
+		const includeContacts =
+			this.config?.settings?.includeContacts !== false &&
+			this.config?.settings?.syncParticipants !== false &&
+			this.config?.settings?.includeEventContacts !== false;
 
-			if (eligibleAttendees.length > 0) {
-				msEvent.attendees = eligibleAttendees.map((a) => ({
-					emailAddress: { address: a.email, name: a.displayName },
-					type: a.type || 'required'
+		const rawAttendees = event.attendees || [];
+		const eligibleAttendees = rawAttendees.filter((a) => {
+			if (a.type === 'resource') return includeRoomBookings;
+			return includeContacts;
+		});
+
+		if (eligibleAttendees.length > 0) {
+			msEvent.attendees = eligibleAttendees.map((a) => ({
+				emailAddress: { address: a.email, name: a.displayName },
+				type: a.type || 'required'
+			}));
+		} else if (options?.isUpdate) {
+			msEvent.attendees = [];
+		}
+
+		if (includeRoomBookings && rawAttendees.length > 0) {
+			// Map conference room locations for Exchange room booking
+			const roomAttendees = rawAttendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
+			if (roomAttendees.length > 0) {
+				msEvent.locations = roomAttendees.map((r) => ({
+					displayName: r.displayName || r.email,
+					locationEmailAddress: r.email,
+					locationType: 'conferenceRoom'
 				}));
-			}
-
-			if (includeRoomBookings) {
-				// Map conference room locations for Exchange room booking
-				const roomAttendees = event.attendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
-				if (roomAttendees.length > 0) {
-					msEvent.locations = roomAttendees.map((r) => ({
-						displayName: r.displayName || r.email,
-						locationEmailAddress: r.email,
+				if (!msEvent.location && roomAttendees.length === 1) {
+					msEvent.location = {
+						displayName: roomAttendees[0].displayName || roomAttendees[0].email,
+						locationEmailAddress: roomAttendees[0].email,
 						locationType: 'conferenceRoom'
-					}));
-					if (!msEvent.location && roomAttendees.length === 1) {
-						msEvent.location = {
-							displayName: roomAttendees[0].displayName || roomAttendees[0].email,
-							locationEmailAddress: roomAttendees[0].email,
-							locationType: 'conferenceRoom'
-						};
-					}
+					};
 				}
+			} else if (options?.isUpdate && !event.location) {
+				msEvent.locations = [];
 			}
+		} else if (options?.isUpdate && !event.location) {
+			msEvent.locations = [];
 		}
 
 		if (event.recurrence && event.recurrence.length > 0) {

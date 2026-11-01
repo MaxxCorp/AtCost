@@ -36,3 +36,20 @@ export interface SummarizeFlyerResult {
     fallback?: boolean;
     summaries?: Record<string, FlyerItemSummary>;
 }
+
+export const summarizeItemLengthSchema = v.object({
+    kioskId: v.string(),
+    itemId: v.string(),
+    title: v.string(),
+    description: v.string(),
+    targetPercentage: v.number()
+});
+export type SummarizeItemLengthInput = v.InferOutput<typeof summarizeItemLengthSchema>;
+
+export interface SummarizeItemLengthResult {
+    success: boolean;
+    error?: string;
+    fallback?: boolean;
+    summary?: string;
+}
+
