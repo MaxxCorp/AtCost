@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { Sparkles, LoaderCircle, Sliders, X, Eye, SquareDashed, EyeOff, Palette, Contrast } from "@lucide/svelte";
+    import { Sparkles, LoaderCircle, Sliders, X, Eye, SquareDashed, EyeOff, Palette, Contrast, Calendar, CalendarOff } from "@lucide/svelte";
     import { summarizeItemLength } from "../../../routes/kiosks/[id]/view/summarize.remote";
     import { calculatePlainCutoff } from "#lib/utils/text-cutoff.js";
 
@@ -10,14 +10,17 @@
             id: string;
             title: string;
             description?: string | null;
+            hasSeriesDates?: boolean;
         };
         kioskId?: string;
         currentPercentage?: number;
         currentBehavior?: 'print' | 'reserve_space' | 'omit';
         currentColor?: 'color' | 'greyscale';
+        hideSeriesDates?: boolean;
         onPercentageChange: (percentage: number, summarizedText: string) => void;
         onBehaviorChange: (behavior: 'print' | 'reserve_space' | 'omit') => void;
         onColorChange: (color: 'color' | 'greyscale') => void;
+        onToggleSeriesDates?: (hide: boolean) => void;
         onClose: () => void;
     }
 
@@ -27,9 +30,11 @@
         currentPercentage = $bindable(),
         currentBehavior = "print",
         currentColor = "color",
+        hideSeriesDates = false,
         onPercentageChange,
         onBehaviorChange,
         onColorChange,
+        onToggleSeriesDates,
         onClose
     }: Props = $props();
 
@@ -168,6 +173,32 @@
             </div>
         {:else}
             <span class="text-slate-400 italic text-[11px] shrink-0">Keine Beschreibung</span>
+        {/if}
+
+        <!-- Series Dates Visibility (only for series with instances/dates) -->
+        {#if selectedItem.hasSeriesDates}
+            <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+
+            <div class="flex items-center gap-1 shrink-0 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                <button
+                    type="button"
+                    onclick={() => onToggleSeriesDates?.(false)}
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer {!hideSeriesDates ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+                    title="Alle Termine der Serie auf der Karte anzeigen"
+                >
+                    <Calendar class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Termine</span>
+                </button>
+                <button
+                    type="button"
+                    onclick={() => onToggleSeriesDates?.(true)}
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer {hideSeriesDates ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+                    title="Serientermine ausblenden, um Platz auf der Karte zu sparen"
+                >
+                    <CalendarOff class="w-3.5 h-3.5 text-slate-500" />
+                    <span>Ohne</span>
+                </button>
+            </div>
         {/if}
 
         <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 shrink-0"></div>

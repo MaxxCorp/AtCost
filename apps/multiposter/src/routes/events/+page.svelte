@@ -910,7 +910,7 @@
 											{event.isSeriesInstance
 												? m.part_of_series({ title: event.seriesMaster?.summary || event.summary || '' })
 												: (event.recurrence && event.recurrence.length > 0
-													? formatRecurrenceText(event.recurrence, { includeEnd: true })
+													? formatRecurrenceText(event.recurrence, { includeEnd: true, dtstart: event.startDateTime })
 													: m.series_mode_label())}
 										</span>
 									</div>

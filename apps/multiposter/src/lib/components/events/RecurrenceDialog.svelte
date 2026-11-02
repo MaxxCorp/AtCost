@@ -9,12 +9,31 @@
     let { 
         open = $bindable(false), 
         value = $bindable<string | null>(null),
+        startDate = null,
         onchange
     }: {
         open?: boolean;
         value?: string | null;
+        startDate?: string | Date | null;
         onchange?: (value: string | null) => void;
     } = $props();
+
+    function getRRuleWeekdayFromDate(dInput: string | Date | null | undefined): number | null {
+        if (!dInput) return null;
+        let d: Date;
+        if (typeof dInput === "string") {
+            const dateMatch = dInput.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (dateMatch) {
+                d = new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3])));
+                return (d.getUTCDay() + 6) % 7;
+            }
+            d = new Date(dInput);
+        } else {
+            d = dInput;
+        }
+        if (isNaN(d.getTime())) return null;
+        return (d.getDay() + 6) % 7;
+    }
 
     // Internal state
     let freq = $state(RRule.WEEKLY);
@@ -107,7 +126,8 @@
                         typeof d === "number" ? d : d.weekday
                     );
                 } else {
-                    byweekday = [];
+                    const defaultWd = freq === RRule.WEEKLY ? getRRuleWeekdayFromDate(startDate) : null;
+                    byweekday = defaultWd !== null ? [defaultWd] : [];
                 }
 
                 if (rule.options.bymonthday) {
@@ -192,11 +212,12 @@
             endType = "never";
             count = 10;
             untilDate = "";
-            byweekday = [];
+            const defaultWd = getRRuleWeekdayFromDate(startDate);
+            byweekday = defaultWd !== null ? [defaultWd] : [];
             monthlyType = "day";
             bymonthday = 1;
             bysetpos = [1];
-            relativeDay = 0;
+            relativeDay = defaultWd !== null ? defaultWd : 0;
             yearlyType = "day";
             bymonth = 1;
         }
@@ -215,8 +236,16 @@
         }
 
         // Apply advanced fields
-        if (freq === RRule.WEEKLY && byweekday.length > 0) {
-            options.byweekday = byweekday;
+        if (freq === RRule.WEEKLY) {
+            const effectiveWeekdays = byweekday.length > 0 
+                ? byweekday 
+                : (() => {
+                    const def = getRRuleWeekdayFromDate(startDate);
+                    return def !== null ? [def] : [];
+                })();
+            if (effectiveWeekdays.length > 0) {
+                options.byweekday = effectiveWeekdays;
+            }
         }
 
         if (freq === RRule.MONTHLY) {
@@ -301,8 +330,16 @@
             options.until = new Date(untilDate);
         }
 
-        if (freq === RRule.WEEKLY && byweekday.length > 0) {
-            options.byweekday = byweekday;
+        if (freq === RRule.WEEKLY) {
+            const effectiveWeekdays = byweekday.length > 0 
+                ? byweekday 
+                : (() => {
+                    const def = getRRuleWeekdayFromDate(startDate);
+                    return def !== null ? [def] : [];
+                })();
+            if (effectiveWeekdays.length > 0) {
+                options.byweekday = effectiveWeekdays;
+            }
         }
 
         if (freq === RRule.MONTHLY) {
@@ -333,7 +370,7 @@
         }
     });
 
-    let previewText = $derived(previewRule ? formatRecurrenceText(previewRule, { includeEnd: true }) : "");
+    let previewText = $derived(previewRule ? formatRecurrenceText(previewRule, { includeEnd: true, dtstart: startDate }) : "");
 </script>
 
 <Dialog.Root bind:open>
@@ -361,6 +398,12 @@
                     <select
                         id="freq"
                         bind:value={freq}
+                        onchange={() => {
+                            if (freq === RRule.WEEKLY && byweekday.length === 0) {
+                                const def = getRRuleWeekdayFromDate(startDate);
+                                if (def !== null) byweekday = [def];
+                            }
+                        }}
                         class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                         {#each frequencies as f}

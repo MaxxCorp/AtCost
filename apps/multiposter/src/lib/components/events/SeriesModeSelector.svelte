@@ -47,7 +47,7 @@
         null
     );
     const recurrenceDescription = $derived(
-        recurrenceRule ? formatRecurrenceText(recurrenceRule, { includeEnd: true }) : ""
+        recurrenceRule ? formatRecurrenceText(recurrenceRule, { includeEnd: true, dtstart: event?.startDateTime }) : ""
     );
 
     function formatDate(dateStr: string | null | undefined) {

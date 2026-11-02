@@ -134,7 +134,8 @@
         return {
             id: it.id,
             title: isEvt ? (it as Event).summary : (it as Announcement).title,
-            description: isEvt ? (it as Event).description : (it as Announcement).content
+            description: isEvt ? (it as Event).description : (it as Announcement).content,
+            hasSeriesDates: Boolean((it as any).isCompressedSeries && (it as any).seriesDates && (it as any).seriesDates.length >= 1)
         };
     });
 
@@ -512,7 +513,7 @@
                 }
             }
 
-            const recText = formatRecurrenceText(rruleStr, { short: true });
+            const recText = formatRecurrenceText(rruleStr, { short: true, dtstart: first.startDateTime });
 
             if (dates.length >= 1) {
                 compressed.push({
@@ -1307,6 +1308,7 @@
             currentPercentage={itemPercentages[selectedItem.id]}
             currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
             currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
+            hideSeriesDates={Boolean(cardSettings[selectedItem.id]?.hideSeriesDates)}
             onPercentageChange={(percentage, text) => {
                 if (!selectedItem) return;
                 itemPercentages[selectedItem.id] = percentage;
@@ -1334,6 +1336,14 @@
                 cardSettings[selectedItem.id] = {
                     ...cardSettings[selectedItem.id],
                     printColor: color
+                };
+                saveCiPrefs();
+            }}
+            onToggleSeriesDates={(hide) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    hideSeriesDates: hide
                 };
                 saveCiPrefs();
             }}
@@ -1404,13 +1414,15 @@
                 </div>
 
                 <!-- Multiple dates list -->
-                <div class="flex items-center gap-1 flex-wrap pt-0.5">
-                    {#each item.seriesDates as dateStr}
-                        <span class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8.5px] font-bold tracking-tight">
-                            {formatDay(dateStr)} {formatMonth(dateStr)}
-                        </span>
-                    {/each}
-                </div>
+                {#if !cardSettings[item.id]?.hideSeriesDates}
+                    <div class="flex items-center gap-1 flex-wrap pt-0.5">
+                        {#each item.seriesDates as dateStr}
+                            <span class="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[8.5px] font-bold tracking-tight">
+                                {formatDay(dateStr)} {formatMonth(dateStr)}
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
             </div>
         {:else}
             <!-- Standard single item row -->
@@ -1446,7 +1458,7 @@
                             {@const itemRecurrenceRule = (Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null}
                             <span class="text-[8.5px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1 py-0.2 rounded inline-flex items-center gap-0.5">
                                 <RefreshCw class="w-2.5 h-2.5 text-indigo-500" />
-                                <span>{item.recurrenceText || (itemRecurrenceRule ? formatRecurrenceText(itemRecurrenceRule, { short: true }) : m.series_badge())}</span>
+                                <span>{item.recurrenceText || (itemRecurrenceRule ? formatRecurrenceText(itemRecurrenceRule, { short: true, dtstart: (item as Event).startDateTime }) : m.series_badge())}</span>
                             </span>
                         {/if}
                         <!-- Price Badge -->

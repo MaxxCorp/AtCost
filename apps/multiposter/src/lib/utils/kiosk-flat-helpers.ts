@@ -314,7 +314,10 @@ export function compressSeriesEvents(
             }
         }
 
-        const recText = formatRecurrenceText(rruleStr, recurrenceOptions);
+        const recText = formatRecurrenceText(rruleStr, {
+            ...recurrenceOptions,
+            dtstart: first.startDateTime
+        });
 
         if (instances.length >= 1) {
             const allCancelled = instances.every(i => i.status === 'cancelled');

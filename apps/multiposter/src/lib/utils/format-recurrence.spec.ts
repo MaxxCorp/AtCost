@@ -133,4 +133,49 @@ describe("formatRecurrenceText", () => {
                 .toBe("jeden Monat am 1. und 2. Freitag bis 31.12.2026");
         });
     });
+
+    describe("weekly recurrence without explicit BYDAY (RFC 5545 inference from dtstart)", () => {
+        const ruleWithoutByday = "RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231T000000Z";
+        // 2026-10-07 is a Wednesday
+        const wednesdayStart = "2026-10-07T07:00:00.000Z";
+        // 2026-10-05 is a Monday
+        const mondayStart = "2026-10-05T05:00:00.000Z";
+
+        it("infers Wednesday for short German format", () => {
+            expect(formatRecurrenceText(ruleWithoutByday, { locale: "de", short: true, dtstart: wednesdayStart }))
+                .toBe("wöchentl. Mi");
+        });
+
+        it("infers Monday for short German format", () => {
+            expect(formatRecurrenceText(ruleWithoutByday, { locale: "de", short: true, dtstart: mondayStart }))
+                .toBe("wöchentl. Mo");
+        });
+
+        it("infers Wednesday for long German format", () => {
+            expect(formatRecurrenceText(ruleWithoutByday, { locale: "de", dtstart: wednesdayStart }))
+                .toBe("jede Woche am Mittwoch");
+        });
+
+        it("infers Wednesday for short English format", () => {
+            expect(formatRecurrenceText(ruleWithoutByday, { locale: "en", short: true, dtstart: wednesdayStart }))
+                .toBe("wkly Wed");
+        });
+
+        it("infers Wednesday for long English format", () => {
+            expect(formatRecurrenceText(ruleWithoutByday, { locale: "en", dtstart: wednesdayStart }))
+                .toBe("every week on Wednesday");
+        });
+
+        it("infers weekday from embedded DTSTART string", () => {
+            const ruleWithDtstart = "DTSTART:20261007T070000Z\nRRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231T000000Z";
+            expect(formatRecurrenceText(ruleWithDtstart, { locale: "de", short: true }))
+                .toBe("wöchentl. Mi");
+        });
+
+        it("preserves explicit BYDAY even if dtstart is provided", () => {
+            const ruleWithByday = "RRULE:FREQ=WEEKLY;INTERVAL=1;UNTIL=20261231T000000Z;BYDAY=MO";
+            expect(formatRecurrenceText(ruleWithByday, { locale: "de", short: true, dtstart: wednesdayStart }))
+                .toBe("wöchentl. Mo");
+        });
+    });
 });

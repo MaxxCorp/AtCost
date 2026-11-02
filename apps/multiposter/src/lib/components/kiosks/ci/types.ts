@@ -73,6 +73,7 @@ export function getElementPrintClasses(
 export interface CardPrintConfig {
     printBehavior?: 'print' | 'reserve_space' | 'omit';
     printColor?: 'color' | 'greyscale';
+    hideSeriesDates?: boolean;
 }
 
 export function getCardPrintClasses(

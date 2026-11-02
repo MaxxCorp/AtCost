@@ -461,7 +461,7 @@
                                                 <div class="mt-3 pt-3 border-t border-gray-200/70 space-y-2.5">
                                                     <div class="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-900 bg-indigo-100/90 px-2.5 py-1 rounded-md border border-indigo-200/80">
                                                         <RefreshCw size={13} class="text-indigo-600 flex-shrink-0" />
-                                                        <span>{recurrenceRule ? formatRecurrenceText(recurrenceRule) : m.series_badge()}</span>
+                                                        <span>{recurrenceRule ? formatRecurrenceText(recurrenceRule, { dtstart: event.startDateTime }) : m.series_badge()}</span>
                                                     </div>
 
                                                     {#if eventInstances.length > 0}

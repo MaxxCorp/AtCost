@@ -383,7 +383,10 @@
 
     let recurrenceText = $derived(
         rf.fields.recurrence.value()
-            ? formatRecurrenceText(rf.fields.recurrence.value() as string, { includeEnd: true })
+            ? formatRecurrenceText(rf.fields.recurrence.value() as string, {
+                    includeEnd: true,
+                    dtstart: rf.fields.startDate.value() || startParsed.date || localNow.date
+              })
             : m.recurrence(),
     );
 
@@ -1042,6 +1045,7 @@
     <RecurrenceDialog
         bind:open={showRecurrenceDialog}
         value={rf.fields.recurrence.value() ?? initialData?.recurrence?.[0] ?? ""}
+        startDate={rf.fields.startDate.value() || currentStartDateVal}
         onchange={(val: string | null) => rf.fields.recurrence.set(val ?? "")}
     />
     {#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}

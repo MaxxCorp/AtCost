@@ -321,10 +321,13 @@
         const it = displayItems.find(i => i.id === selectedCardId);
         if (!it) return null;
         const isEvt = "startDateTime" in it;
+        const evt = it as EnrichedEvent;
+        const isCompressed = Boolean(isEvt && evt.isCompressedSeries && ((evt.seriesInstances && evt.seriesInstances.length >= 1) || (evt.seriesDates && evt.seriesDates.length >= 1)));
         return {
             id: it.id,
             title: isEvt ? (it as Event).summary : (it as Announcement).title,
-            description: isEvt ? (it as Event).description : (it as Announcement).content
+            description: isEvt ? (it as Event).description : (it as Announcement).content,
+            hasSeriesDates: isCompressed
         };
     });
 
@@ -1630,7 +1633,7 @@
                                         {:else if isEvt && itemRecurrenceRule}
                                             <span class="inline-flex items-center gap-1 text-slate-600 font-medium text-[9px]">
                                                 <RefreshCw class="w-2.5 h-2.5 text-slate-500" />
-                                                {formatRecurrenceText(itemRecurrenceRule, { short: true })}
+                                                {formatRecurrenceText(itemRecurrenceRule, { short: true, dtstart: (item as Event).startDateTime })}
                                             </span>
                                         {/if}
                                         <!-- Multi-day Badge -->
@@ -1732,52 +1735,54 @@
                                     </div>
 
                                     <!-- Compressed Series Dates Pills with per-instance status -->
-                                    {#if isCompressed && evt.seriesInstances && evt.seriesInstances.length >= 1}
-                                        <div class="mt-1 [&>*]:mr-1 [&>*]:mb-0.5 [&>*]:align-middle">
-                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider inline-flex items-center gap-1">
-                                                <Calendar class="w-2.5 h-2.5 text-indigo-500" />
-                                                <span>{m.all_instances_count?.({ count: evt.seriesInstances.length }) ?? `${evt.seriesInstances.length} Termine`}:</span>
-                                            </span>
-                                            {#each evt.seriesInstances as inst (inst.id || inst.startDateTime)}
-                                                {#if inst.status === 'cancelled'}
-                                                    <span
-                                                        class="inline-flex items-center gap-0.5 bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight"
-                                                        title="{formatFullDate(inst.startDateTime)} – {m.cancelled()}"
-                                                    >
-                                                        <span class="line-through opacity-75">{formatDateWeekday(inst.startDateTime)}</span>
-                                                        <span class="line-through opacity-75">{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
-                                                        <span class="bg-red-600 text-white text-[7.5px] font-black px-0.5 rounded uppercase ml-0.5">{m.cancelled()}</span>
-                                                    </span>
-                                                {:else if inst.status === 'tentative'}
-                                                    <span
-                                                        class="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight"
-                                                        title="{formatFullDate(inst.startDateTime)} – {m.tentative()}"
-                                                    >
-                                                        <span class="text-amber-700 font-medium">{formatDateWeekday(inst.startDateTime)}</span>
-                                                        <span>{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
-                                                        <span class="bg-amber-500 text-white text-[7.5px] font-black px-0.5 rounded uppercase ml-0.5">{m.tentative()}</span>
-                                                    </span>
-                                                {:else}
-                                                    <span class="inline-flex items-center gap-0.5 bg-slate-900 text-white px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
-                                                        <span class="text-slate-300 font-medium">{formatDateWeekday(inst.startDateTime)}</span>
-                                                        <span>{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
-                                                    </span>
-                                                {/if}
-                                            {/each}
-                                        </div>
-                                    {:else if isCompressed && evt.seriesDates && evt.seriesDates.length >= 1}
-                                        <div class="mt-1 [&>*]:mr-1 [&>*]:mb-0.5 [&>*]:align-middle">
-                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider inline-flex items-center gap-1">
-                                                <Calendar class="w-2.5 h-2.5 text-indigo-500" />
-                                                <span>{m.all_instances_count?.({ count: evt.seriesDates.length }) ?? `${evt.seriesDates.length} Termine`}:</span>
-                                            </span>
-                                            {#each evt.seriesDates as sDate}
-                                                <span class="inline-flex items-center gap-0.5 bg-slate-900 text-white px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
-                                                    <span class="text-slate-300 font-medium">{formatDateWeekday(sDate)}</span>
-                                                    <span>{formatDateDay(sDate)} {formatDateMonth(sDate)}</span>
+                                    {#if isCompressed && !cardSettings[item.id]?.hideSeriesDates}
+                                        {#if evt.seriesInstances && evt.seriesInstances.length >= 1}
+                                            <div class="mt-1 [&>*]:mr-1 [&>*]:mb-0.5 [&>*]:align-middle">
+                                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider inline-flex items-center gap-1">
+                                                    <Calendar class="w-2.5 h-2.5 text-indigo-500" />
+                                                    <span>{m.all_instances_count?.({ count: evt.seriesInstances.length }) ?? `${evt.seriesInstances.length} Termine`}:</span>
                                                 </span>
-                                            {/each}
-                                        </div>
+                                                {#each evt.seriesInstances as inst (inst.id || inst.startDateTime)}
+                                                    {#if inst.status === 'cancelled'}
+                                                        <span
+                                                            class="inline-flex items-center gap-0.5 bg-red-100 text-red-700 border border-red-300 px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight"
+                                                            title="{formatFullDate(inst.startDateTime)} – {m.cancelled()}"
+                                                        >
+                                                            <span class="line-through opacity-75">{formatDateWeekday(inst.startDateTime)}</span>
+                                                            <span class="line-through opacity-75">{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
+                                                            <span class="bg-red-600 text-white text-[7.5px] font-black px-0.5 rounded uppercase ml-0.5">{m.cancelled()}</span>
+                                                        </span>
+                                                    {:else if inst.status === 'tentative'}
+                                                        <span
+                                                            class="inline-flex items-center gap-0.5 bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight"
+                                                            title="{formatFullDate(inst.startDateTime)} – {m.tentative()}"
+                                                        >
+                                                            <span class="text-amber-700 font-medium">{formatDateWeekday(inst.startDateTime)}</span>
+                                                            <span>{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
+                                                            <span class="bg-amber-500 text-white text-[7.5px] font-black px-0.5 rounded uppercase ml-0.5">{m.tentative()}</span>
+                                                        </span>
+                                                    {:else}
+                                                        <span class="inline-flex items-center gap-0.5 bg-slate-900 text-white px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
+                                                            <span class="text-slate-300 font-medium">{formatDateWeekday(inst.startDateTime)}</span>
+                                                            <span>{formatDateDay(inst.startDateTime)} {formatDateMonth(inst.startDateTime)}</span>
+                                                        </span>
+                                                    {/if}
+                                                {/each}
+                                            </div>
+                                        {:else if evt.seriesDates && evt.seriesDates.length >= 1}
+                                            <div class="mt-1 [&>*]:mr-1 [&>*]:mb-0.5 [&>*]:align-middle">
+                                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider inline-flex items-center gap-1">
+                                                    <Calendar class="w-2.5 h-2.5 text-indigo-500" />
+                                                    <span>{m.all_instances_count?.({ count: evt.seriesDates.length }) ?? `${evt.seriesDates.length} Termine`}:</span>
+                                                </span>
+                                                {#each evt.seriesDates as sDate}
+                                                    <span class="inline-flex items-center gap-0.5 bg-slate-900 text-white px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
+                                                        <span class="text-slate-300 font-medium">{formatDateWeekday(sDate)}</span>
+                                                        <span>{formatDateDay(sDate)} {formatDateMonth(sDate)}</span>
+                                                    </span>
+                                                {/each}
+                                            </div>
+                                        {/if}
                                     {/if}
 
                                     <!-- Associated Contacts List (if enabled in visibleComponents) -->
@@ -2678,6 +2683,7 @@
         currentPercentage={itemPercentages[selectedItem.id]}
         currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
         currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
+        hideSeriesDates={Boolean(cardSettings[selectedItem.id]?.hideSeriesDates)}
         onPercentageChange={(percentage, text) => {
             if (!selectedItem) return;
             itemPercentages[selectedItem.id] = percentage;
@@ -2697,6 +2703,14 @@
             cardSettings[selectedItem.id] = {
                 ...cardSettings[selectedItem.id],
                 printColor: color
+            };
+            savePrefs();
+        }}
+        onToggleSeriesDates={(hide) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                hideSeriesDates: hide
             };
             savePrefs();
         }}

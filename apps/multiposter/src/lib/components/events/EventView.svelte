@@ -155,7 +155,7 @@
             {#if eventRecurrenceRule || event.recurringEventId || event.seriesId}
                 <div class="flex items-center gap-1.5 text-xs sm:text-sm text-blue-200 mt-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/20">
                     <RefreshCw class="w-3.5 h-3.5" />
-                    <span>{formatRecurrenceText(eventRecurrenceRule)}</span>
+                    <span>{formatRecurrenceText(eventRecurrenceRule, { dtstart: event.startDateTime })}</span>
                 </div>
             {/if}
         </div>

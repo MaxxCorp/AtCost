@@ -19,6 +19,32 @@ export interface FormatRecurrenceOptions {
     includeEnd?: boolean;
     /** Override the active locale. */
     locale?: string;
+    /** Reference start date to infer recurrence weekday for weekly rules without BYDAY (RFC 5545). */
+    dtstart?: Date | string | null;
+}
+
+/**
+ * Returns the two-letter RRule weekday code ('MO', 'TU', ...) for a given Date or ISO date string.
+ */
+export function getWeekdayCodeFromDate(dInput: Date | string | null | undefined): string | null {
+    if (!dInput) return null;
+    let d: Date;
+    if (typeof dInput === 'string') {
+        const dateMatch = dInput.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (dateMatch) {
+            d = new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3])));
+            const rruleIdx = (d.getUTCDay() + 6) % 7;
+            const DAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+            return DAY_CODES[rruleIdx] ?? null;
+        }
+        d = new Date(dInput);
+    } else {
+        d = dInput;
+    }
+    if (isNaN(d.getTime())) return null;
+    const rruleIdx = (d.getDay() + 6) % 7;
+    const DAY_CODES = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    return DAY_CODES[rruleIdx] ?? null;
 }
 
 function formatOrdinalEn(pos: number): string {
@@ -170,8 +196,26 @@ export function formatRecurrenceText(
     if (!cleanRule) return m.recurrence();
 
     try {
+        let dtstartVal = options.dtstart;
+        if (!dtstartVal) {
+            const dtstartMatch = cleanRule.match(/DTSTART(?:;[^:]*)?:(\d{4})(\d{2})(\d{2})/i);
+            if (dtstartMatch) {
+                dtstartVal = new Date(Date.UTC(Number(dtstartMatch[1]), Number(dtstartMatch[2]) - 1, Number(dtstartMatch[3])));
+            }
+        }
+
+        cleanRule = cleanRule.replace(/DTSTART[^\n\r]*[\r\n]+/i, '').trim();
+
         if (!cleanRule.startsWith('RRULE:')) {
             cleanRule = 'RRULE:' + cleanRule;
+        }
+
+        // Weekly recurrence without BYDAY defaults to the DTSTART weekday per RFC 5545
+        if (!/BYDAY=/i.test(cleanRule) && /FREQ=WEEKLY/i.test(cleanRule) && dtstartVal) {
+            const dayCode = getWeekdayCodeFromDate(dtstartVal);
+            if (dayCode) {
+                cleanRule += `;BYDAY=${dayCode}`;
+            }
         }
 
         const currentLocale = localeOverride || getLocale();
