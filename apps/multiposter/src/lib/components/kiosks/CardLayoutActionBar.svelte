@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onDestroy } from "svelte";
     import { fly } from "svelte/transition";
-    import { Sparkles, LoaderCircle, Sliders, X, Eye, SquareDashed, EyeOff, Palette, Contrast, Calendar, CalendarOff } from "@lucide/svelte";
+    import { Sparkles, LoaderCircle, Sliders, X, Eye, SquareDashed, EyeOff, Palette, Contrast, Calendar, CalendarOff, Clock } from "@lucide/svelte";
     import { summarizeItemLength } from "../../../routes/kiosks/[id]/view/summarize.remote";
     import { calculatePlainCutoff } from "#lib/utils/text-cutoff.js";
 
@@ -11,16 +11,19 @@
             title: string;
             description?: string | null;
             hasSeriesDates?: boolean;
+            hasEndTime?: boolean;
         };
         kioskId?: string;
         currentPercentage?: number;
         currentBehavior?: 'print' | 'reserve_space' | 'omit';
         currentColor?: 'color' | 'greyscale';
         hideSeriesDates?: boolean;
+        hideEndTime?: boolean;
         onPercentageChange: (percentage: number, summarizedText: string) => void;
         onBehaviorChange: (behavior: 'print' | 'reserve_space' | 'omit') => void;
         onColorChange: (color: 'color' | 'greyscale') => void;
         onToggleSeriesDates?: (hide: boolean) => void;
+        onToggleEndTime?: (hide: boolean) => void;
         onClose: () => void;
     }
 
@@ -31,10 +34,12 @@
         currentBehavior = "print",
         currentColor = "color",
         hideSeriesDates = false,
+        hideEndTime = false,
         onPercentageChange,
         onBehaviorChange,
         onColorChange,
         onToggleSeriesDates,
+        onToggleEndTime,
         onClose
     }: Props = $props();
 
@@ -196,6 +201,32 @@
                     title="Serientermine ausblenden, um Platz auf der Karte zu sparen"
                 >
                     <CalendarOff class="w-3.5 h-3.5 text-slate-500" />
+                    <span>Ohne</span>
+                </button>
+            </div>
+        {/if}
+
+        <!-- End Time Visibility (only for items with end time) -->
+        {#if selectedItem.hasEndTime}
+            <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+
+            <div class="flex items-center gap-1 shrink-0 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                <button
+                    type="button"
+                    onclick={() => onToggleEndTime?.(false)}
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer {!hideEndTime ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+                    title="Endzeit auf der Karte anzeigen (z. B. 14:00 – 16:00)"
+                >
+                    <Clock class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Endzeit</span>
+                </button>
+                <button
+                    type="button"
+                    onclick={() => onToggleEndTime?.(true)}
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer {hideEndTime ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+                    title="Endzeit ausblenden, nur Beginn anzeigen (z. B. 14:00)"
+                >
+                    <Clock class="w-3.5 h-3.5 text-slate-400" />
                     <span>Ohne</span>
                 </button>
             </div>

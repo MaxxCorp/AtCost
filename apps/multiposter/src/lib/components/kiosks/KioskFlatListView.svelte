@@ -107,18 +107,8 @@
     });
 
     // Visible components selection
-    let visibleComponents = $state({
-        contacts: false,      // All associated contacts with roles & details
-        participants: false,  // Number of participants & occupancy
-        publicStatus: false,  // Public or internal badge
-        descriptions: true,   // Event descriptions
-        qrCodes: true,        // QR codes
-        ticketPrice: true,    // Ticket prices & free badges
-        rooms: true,          // Rooms & facilities
-        tags: true,           // Tags
-        internalNotes: false, // Staff internal notes
-        heroImage: false,     // Hero image
-        openingHours: true,   // Location opening hours
+    let visibleComponents = $state<VisibleComponentsState>({
+        ...defaultVisibleComponents
     });
 
     const storageKey = $derived(`kiosk_flat_list_prefs_${kiosk?.id || 'default'}`);
@@ -191,24 +181,13 @@
             internalNotes: true,
             heroImage: true,
             openingHours: true,
+            endTimes: true,
         };
         savePrefs();
     }
 
     function resetComponentsToDefault() {
-        visibleComponents = {
-            contacts: false,
-            participants: false,
-            publicStatus: false,
-            descriptions: true,
-            qrCodes: true,
-            ticketPrice: true,
-            rooms: true,
-            tags: true,
-            internalNotes: false,
-            heroImage: false,
-            openingHours: true,
-        };
+        visibleComponents = { ...defaultVisibleComponents };
         savePrefs();
     }
 
@@ -830,6 +809,26 @@
                                         {/if}
                                     </div>
                                 </button>
+
+                                <!-- End Times -->
+                                <button
+                                    type="button"
+                                    onclick={() => toggleComponent('endTimes')}
+                                    class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.endTimes ? 'bg-slate-100 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                                >
+                                    <div class="flex items-center gap-2.5">
+                                        <Clock class="w-4 h-4 text-slate-500 shrink-0" />
+                                        <div>
+                                            <div class="font-semibold text-xs leading-tight">{m.component_end_times?.() ?? "Endzeiten"}</div>
+                                            <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_end_times_desc?.() ?? "Endzeiten bei Terminen anzeigen"}</div>
+                                        </div>
+                                    </div>
+                                    <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.endTimes ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                        {#if visibleComponents.endTimes}
+                                            <Check class="w-3 h-3 stroke-[3]" />
+                                        {/if}
+                                    </div>
+                                </button>
                             </div>
                         </div>
                     {/if}
@@ -1248,7 +1247,7 @@
                 {#if isCompressed}
                     <div class="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-100">
                         <Clock class="w-3 h-3 text-slate-400" />
-                        <span>{formatTimeRange(event.startDateTime, event.endDateTime, event.isAllDay)}</span>
+                        <span>{formatTimeRange(event.startDateTime, event.endDateTime, event.isAllDay, visibleComponents.endTimes)}</span>
                     </div>
                 {:else if multiDay}
                     {#if event.isAllDay}
@@ -1260,7 +1259,7 @@
                             <Clock class="w-3 h-3 text-slate-400" />
                             <span>{formatTime(event.startDateTime)}</span>
                         </div>
-                        {#if event.endDateTime}
+                        {#if visibleComponents.endTimes && event.endDateTime}
                             <div class="text-slate-500 pl-4 text-[11px]">
                                 – {dateParts.endWeekday} {formatTime(event.endDateTime)}
                             </div>
@@ -1276,7 +1275,7 @@
                             <Clock class="w-3 h-3 text-slate-400" />
                             <span>{formatTime(event.startDateTime)}</span>
                         </div>
-                        {#if event.endDateTime}
+                        {#if visibleComponents.endTimes && event.endDateTime}
                             <div class="text-slate-500 pl-4 text-[11px]">
                                 – {formatTime(event.endDateTime)}
                             </div>

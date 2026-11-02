@@ -268,11 +268,13 @@
         const isEvt = "startDateTime" in it;
         const evt = it as EnrichedEvent;
         const isCompressed = Boolean(isEvt && evt.isCompressedSeries && ((evt.seriesInstances && evt.seriesInstances.length >= 1) || (evt.seriesDates && evt.seriesDates.length >= 1)));
+        const hasEndTime = Boolean(isEvt && (it as Event).endDateTime && !(it as Event).isAllDay);
         return {
             id: it.id,
             title: isEvt ? (it as Event).summary : (it as Announcement).title,
             description: isEvt ? (it as Event).description : (it as Announcement).content,
-            hasSeriesDates: isCompressed
+            hasSeriesDates: isCompressed,
+            hasEndTime
         };
     });
     let showTimes = $state<boolean>(true);
@@ -346,6 +348,7 @@
             internalNotes: true,
             heroImage: true,
             openingHours: true,
+            endTimes: true,
         };
         savePrefs();
     }
@@ -472,6 +475,7 @@
             visibleComponents.publicStatus, visibleComponents.descriptions, visibleComponents.qrCodes,
             visibleComponents.ticketPrice, visibleComponents.rooms, visibleComponents.tags,
             visibleComponents.internalNotes, visibleComponents.heroImage, visibleComponents.openingHours,
+            visibleComponents.endTimes,
             customSections
         ];
         savePrefs();
@@ -1275,6 +1279,26 @@
                                     {/if}
                                 </div>
                             </button>
+
+                            <!-- End Times -->
+                            <button
+                                type="button"
+                                onclick={() => toggleComponent('endTimes')}
+                                class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors {visibleComponents.endTimes ? 'bg-slate-100 dark:bg-slate-700/70 text-slate-900 dark:text-slate-100' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'}"
+                            >
+                                <div class="flex items-center gap-2.5">
+                                    <Clock class="w-4 h-4 text-slate-500 shrink-0" />
+                                    <div>
+                                        <div class="font-semibold text-xs leading-tight">{m.component_end_times?.() ?? "Endzeiten"}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{m.component_end_times_desc?.() ?? "Endzeiten bei Terminen anzeigen"}</div>
+                                    </div>
+                                </div>
+                                <div class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ml-2 {visibleComponents.endTimes ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'}">
+                                    {#if visibleComponents.endTimes}
+                                        <Check class="w-3 h-3 stroke-[3]" />
+                                    {/if}
+                                </div>
+                            </button>
                         </div>
                     </div>
                 {/if}
@@ -1625,9 +1649,10 @@
 
                                         <!-- Time Range -->
                                         {#if showTimes && isEvt}
+                                            {@const showEnd = cardSettings[item.id]?.hideEndTime !== undefined ? !cardSettings[item.id]!.hideEndTime : visibleComponents.endTimes}
                                             <span class="inline-flex items-center gap-1 font-bold {isSpecialNonSeries ? 'text-amber-900' : 'text-slate-800'}">
                                                 <Clock class="w-3 h-3 {isSpecialNonSeries ? 'text-amber-600' : 'text-slate-500'} shrink-0" />
-                                                {formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}
+                                                {formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay, showEnd)}
                                             </span>
                                         {/if}
 
@@ -1918,6 +1943,7 @@
         currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
         currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
         hideSeriesDates={Boolean(cardSettings[selectedItem.id]?.hideSeriesDates)}
+        hideEndTime={cardSettings[selectedItem.id]?.hideEndTime ?? !visibleComponents.endTimes}
         onPercentageChange={(percentage, text) => {
             if (!selectedItem) return;
             itemPercentages[selectedItem.id] = percentage;
@@ -1945,6 +1971,14 @@
             cardSettings[selectedItem.id] = {
                 ...cardSettings[selectedItem.id],
                 hideSeriesDates: hide
+            };
+            savePrefs();
+        }}
+        onToggleEndTime={(hide) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                hideEndTime: hide
             };
             savePrefs();
         }}
@@ -2413,6 +2447,10 @@
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" bind:checked={showTimes} class="rounded text-emerald-600" />
                             <span>Uhrzeiten anzeigen</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" bind:checked={visibleComponents.endTimes} class="rounded text-emerald-600" />
+                            <span>Endzeiten anzeigen</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" bind:checked={visibleComponents.rooms} class="rounded text-emerald-600" />

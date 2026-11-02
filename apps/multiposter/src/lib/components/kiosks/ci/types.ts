@@ -74,6 +74,7 @@ export interface CardPrintConfig {
     printBehavior?: 'print' | 'reserve_space' | 'omit';
     printColor?: 'color' | 'greyscale';
     hideSeriesDates?: boolean;
+    hideEndTime?: boolean;
 }
 
 export function getCardPrintClasses(

@@ -37,6 +37,7 @@ export interface VisibleComponentsState {
     internalNotes: boolean; // Staff internal notes
     heroImage: boolean;     // Hero image
     openingHours: boolean;  // Location opening hours & accessibility notes
+    endTimes?: boolean;     // Event end times
 }
 
 export const defaultVisibleComponents: VisibleComponentsState = {
@@ -51,6 +52,7 @@ export const defaultVisibleComponents: VisibleComponentsState = {
     internalNotes: false,
     heroImage: false,
     openingHours: true,
+    endTimes: true,
 };
 
 // --- Contact resolution helpers ---
@@ -196,14 +198,14 @@ export function formatTime(dateStr: string | null | undefined): string {
     return isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-export function formatTimeRange(startStr?: string | null, endStr?: string | null, isAllDay = false): string {
+export function formatTimeRange(startStr?: string | null, endStr?: string | null, isAllDay = false, showEndTime = true): string {
     if (isAllDay) return m.all_day_label?.() || "All Day";
     if (!startStr) return "";
     const start = new Date(startStr);
     if (isNaN(start.getTime())) return "";
     const startFormatted = start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
-    if (!endStr) return startFormatted;
+    if (!endStr || !showEndTime) return startFormatted;
     const end = new Date(endStr);
     if (isNaN(end.getTime())) return startFormatted;
     const endFormatted = end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });

@@ -97,6 +97,7 @@
     let showEventQrCodes = $state<boolean>(untrack(() => (kiosk as any)?.showEventQrCodes ?? false));
     let showDescriptions = $state(true);
     let showFooters = $state(false);
+    let showEndTimes = $state(true);
     let compressSeries = $state(true);
     let density = $state<FlyerDensity>("standard");
     let zoomLevel = $state<number>(0.85); // Preview zoom scale
@@ -112,11 +113,13 @@
         const it = items.find(i => i.id === selectedCardId);
         if (!it) return null;
         const isEvt = "startDateTime" in it;
+        const hasEndTime = Boolean(isEvt && (it as Event).endDateTime && !(it as Event).isAllDay);
         return {
             id: it.id,
             title: isEvt ? (it as Event).summary : (it as Announcement).title,
             description: isEvt ? (it as Event).description : (it as Announcement).content,
-            hasSeriesDates: Boolean((it as any).isCompressedSeries && (it as any).seriesDates && (it as any).seriesDates.length >= 1)
+            hasSeriesDates: Boolean((it as any).isCompressedSeries && (it as any).seriesDates && (it as any).seriesDates.length >= 1),
+            hasEndTime
         };
     });
 
@@ -220,6 +223,7 @@
                 showEventQrCodes,
                 showDescriptions,
                 showFooters,
+                showEndTimes,
                 compressSeries
             };
             localStorage.setItem(storageKeyFlyer, JSON.stringify(prefs));
@@ -229,7 +233,7 @@
     }
 
     $effect(() => {
-        const _ = [elementSettings, previewGreyscaleOnScreen, itemPercentages, cardSettings, density, showFoldGuides, showQrCodes, showEventQrCodes, showDescriptions, showFooters, compressSeries];
+        const _ = [elementSettings, previewGreyscaleOnScreen, itemPercentages, cardSettings, density, showFoldGuides, showQrCodes, showEventQrCodes, showDescriptions, showFooters, showEndTimes, compressSeries];
         saveFlyerPrefs();
     });
 
@@ -250,6 +254,7 @@
                 if (parsed.showEventQrCodes !== undefined) showEventQrCodes = parsed.showEventQrCodes;
                 if (parsed.showDescriptions !== undefined) showDescriptions = parsed.showDescriptions;
                 if (parsed.showFooters !== undefined) showFooters = parsed.showFooters;
+                if (parsed.showEndTimes !== undefined) showEndTimes = parsed.showEndTimes;
                 if (parsed.compressSeries !== undefined) compressSeries = parsed.compressSeries;
             }
         } catch (e) {
@@ -359,14 +364,14 @@
         return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { weekday: "short" });
     }
 
-    function formatTimeRange(startStr?: string | null, endStr?: string | null, isAllDay = false) {
+    function formatTimeRange(startStr?: string | null, endStr?: string | null, isAllDay = false, showEndTime = true) {
         if (isAllDay) return m.all_day_label();
         if (!startStr) return "";
         const start = new Date(startStr);
         if (isNaN(start.getTime())) return "";
         const startFormatted = start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
-        if (!endStr) return startFormatted;
+        if (!endStr || !showEndTime) return startFormatted;
         const end = new Date(endStr);
         if (isNaN(end.getTime())) return startFormatted;
         const endFormatted = end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -732,6 +737,12 @@
                         <input type="checkbox" bind:checked={compressSeries} class="rounded text-blue-600 w-3.5 h-3.5" />
                         <RefreshCw class="w-3.5 h-3.5 text-slate-500" />
                         <span>{m.compress_series()}</span>
+                    </label>
+
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-100 dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 font-medium" title={m.component_end_times_desc?.() || "Endzeiten bei Terminen anzeigen"}>
+                        <input type="checkbox" bind:checked={showEndTimes} class="rounded text-blue-600 w-3.5 h-3.5" />
+                        <Clock class="w-3.5 h-3.5 text-slate-500" />
+                        <span>{m.component_end_times?.() || "Endzeiten"}</span>
                     </label>
 
                     <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-100 dark:bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 font-medium">
@@ -1233,6 +1244,7 @@
                 currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
                 currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
                 hideSeriesDates={Boolean(cardSettings[selectedItem.id]?.hideSeriesDates)}
+                hideEndTime={cardSettings[selectedItem.id]?.hideEndTime ?? !showEndTimes}
                 onPercentageChange={(percentage, text) => {
                     if (!selectedItem) return;
                     itemPercentages[selectedItem.id] = percentage;
@@ -1268,6 +1280,14 @@
                     cardSettings[selectedItem.id] = {
                         ...cardSettings[selectedItem.id],
                         hideSeriesDates: hide
+                    };
+                    saveFlyerPrefs();
+                }}
+                onToggleEndTime={(hide) => {
+                    if (!selectedItem) return;
+                    cardSettings[selectedItem.id] = {
+                        ...cardSettings[selectedItem.id],
+                        hideEndTime: hide
                     };
                     saveFlyerPrefs();
                 }}
@@ -1319,7 +1339,7 @@
                         <!-- Shared Time -->
                         <div class="text-[9.5px] text-slate-600 font-medium flex items-center gap-0.5">
                             <Clock class="w-2.5 h-2.5 text-slate-400" />
-                            <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
+                            <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay, cardSettings[item.id]?.hideEndTime !== undefined ? !cardSettings[item.id]!.hideEndTime : showEndTimes)}</span>
                         </div>
                         <!-- Price Badge -->
                         {#if displayPrice}
@@ -1376,7 +1396,7 @@
                         <!-- Time -->
                         <div class="text-[9.5px] text-slate-600 font-medium flex items-center gap-0.5">
                             <Clock class="w-2.5 h-2.5 text-slate-400" />
-                            <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay)}</span>
+                            <span>{formatTimeRange((item as Event).startDateTime, (item as Event).endDateTime, (item as Event).isAllDay, cardSettings[item.id]?.hideEndTime !== undefined ? !cardSettings[item.id]!.hideEndTime : showEndTimes)}</span>
                         </div>
                         <!-- Series entry badge -->
                         {#if isSeries}

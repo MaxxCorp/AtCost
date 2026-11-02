@@ -992,6 +992,8 @@
 	"component_hero_image_desc": "Haupt-Titelbild und Grafiken der Veranstaltung anzeigen",
 	"component_opening_hours": "Öffnungszeiten",
 	"component_opening_hours_desc": "Öffnungszeiten und Barrierefreiheit des Standorts anzeigen",
+	"component_end_times": "Endzeiten",
+	"component_end_times_desc": "Endzeiten bei Veranstaltungen und Serien anzeigen",
 	"opening_hours": "Öffnungszeiten",
 	"custom_sections": "Abschnitte & Zusatzbereiche",
 	"custom_sections_desc": "Benutzerdefinierte Hinweisfelder, Infoblöcke und Banner im Template platzieren",

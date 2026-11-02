@@ -992,6 +992,8 @@
 	"component_hero_image_desc": "Display event artwork and hero images",
 	"component_opening_hours": "Opening Hours",
 	"component_opening_hours_desc": "Display location opening hours and accessibility notes",
+	"component_end_times": "End times",
+	"component_end_times_desc": "Display end times for events and series",
 	"opening_hours": "Opening Hours",
 	"custom_sections": "Sections & Custom Content",
 	"custom_sections_desc": "Place custom notices, info blocks and banners in the template",
