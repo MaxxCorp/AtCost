@@ -829,8 +829,8 @@ describe('SyncService - Bulk Sync', () => {
 
 			const masterEvent: any = {
 				id: 'master-uuid',
-				startDateTime: new Date('2026-10-18T10:00:00.000Z'),
-				endDateTime: new Date('2026-10-18T11:00:00.000Z'),
+				startDateTime: new Date(Math.floor((Date.now() + 86400000) / 1000) * 1000),
+				endDateTime: new Date(Math.floor((Date.now() + 90000000) / 1000) * 1000),
 				recurrence: ['RRULE:FREQ=DAILY;COUNT=3'],
 				status: 'confirmed'
 			};
@@ -1924,6 +1924,54 @@ describe('SyncService - Public Data Leak Prevention', () => {
 			expect(mockCampaign.content.items[virtualKey]).toBeUndefined();
 			expect(mockCampaign.content.externalIds['wp-100']).toBeUndefined();
 			expect(mockCampaign.content.items['exc-uuid-1'].syncs[configId].externalId).toBe('wp-101');
+		});
+
+
+		it('coordinates room booking with prepMinutes and teardownMinutes padding', async () => {
+			const service = new SyncService();
+			const mockProviderInstance = {
+				bookRoom: vi.fn().mockResolvedValue({ success: true, bookingId: 'book-123' })
+			};
+			vi.spyOn(service as any, 'getProviderInstance').mockResolvedValue(mockProviderInstance);
+
+			const mockResConfig = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerType: 'microsoft-resources',
+				enabled: true,
+				settings: {}
+			};
+
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([mockResConfig])
+				})
+			});
+
+			const itemRow = {
+				id: 'event-padded-1',
+				summary: 'Workshop',
+				startDateTime: new Date('2026-11-10T14:00:00.000Z'),
+				endDateTime: new Date('2026-11-10T16:00:00.000Z'),
+				prepMinutes: 30,
+				teardownMinutes: 15,
+				startTimeZone: 'UTC',
+				endTimeZone: 'UTC'
+			};
+
+			const resourceAttendees = [
+				{ resourceId: 'res-room-1', email: 'room1@example.com', displayName: 'Meeting Room 1' }
+			];
+
+			await (service as any).coordinateResourceBooking(itemRow, resourceAttendees, { id: 'cfg-cal-1' });
+
+			expect(mockProviderInstance.bookRoom).toHaveBeenCalledWith(expect.objectContaining({
+				eventId: 'event-padded-1',
+				resourceId: 'res-room-1',
+				roomEmail: 'room1@example.com',
+				start: new Date('2026-11-10T13:30:00.000Z'),
+				end: new Date('2026-11-10T16:15:00.000Z')
+			}));
 		});
 	});
 });

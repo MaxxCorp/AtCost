@@ -119,6 +119,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		}
 
 		updateData.isAllDay = data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on';
+		if (data.prepMinutes !== undefined) updateData.prepMinutes = Math.max(0, Number(data.prepMinutes) || 0);
+		if (data.teardownMinutes !== undefined) updateData.teardownMinutes = Math.max(0, Number(data.teardownMinutes) || 0);
 
 		if (data.recurrence !== undefined) {
 			updateData.recurrence = data.recurrence ? (Array.isArray(data.recurrence) ? data.recurrence : [data.recurrence]) : null;
@@ -245,6 +247,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								guestsCanModify: updateData.guestsCanModify,
 								guestsCanSeeOtherGuests: updateData.guestsCanSeeOtherGuests,
 								participantsCount: data.participantsCount,
+								prepMinutes: data.prepMinutes,
+								teardownMinutes: data.teardownMinutes,
 								reminders
 							},
 							targetStart,

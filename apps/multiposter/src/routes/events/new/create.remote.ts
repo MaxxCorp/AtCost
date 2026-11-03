@@ -167,6 +167,8 @@ export const createEvent = form(createEventSchema, async (data) => {
 		// Insert Master Event
 		console.log('Inserting event into DB...');
 		const participantsCount = data.participantsCount !== undefined ? Number(data.participantsCount) || 0 : 0;
+		const prepMinutes = data.prepMinutes !== undefined ? Math.max(0, Number(data.prepMinutes) || 0) : 0;
+		const teardownMinutes = data.teardownMinutes !== undefined ? Math.max(0, Number(data.teardownMinutes) || 0) : 0;
 		const [newEvent] = await db.insert(event).values({
 			id: eventId,
 			userId: user.id,
@@ -178,6 +180,8 @@ export const createEvent = form(createEventSchema, async (data) => {
 			ticketPriceUnknown: data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on',
 			ticketPrice: (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on') ? "0" : (data.ticketPrice || null),
 			isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
+			prepMinutes,
+			teardownMinutes,
 			status: data.status || 'confirmed',
 			startDateTime: start,
 			startTimeZone: data.startTimeZone || null,

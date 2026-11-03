@@ -10,6 +10,9 @@ const checkAvailabilitySchema = v.object({
     eventId: v.optional(v.string()),
     resourceIds: v.optional(v.array(v.string())),
     contactIds: v.optional(v.array(v.string())),
+    prepMinutes: v.optional(v.union([v.number(), v.string()])),
+    teardownMinutes: v.optional(v.union([v.number(), v.string()])),
+
 });
 
 export const checkEventAvailability = query(checkAvailabilitySchema, async (input) => {
@@ -87,7 +90,9 @@ export const checkEventAvailability = query(checkAvailabilitySchema, async (inpu
             currentEventId: input.eventId,
             resources: targetResources,
             contacts: targetContacts,
-            userId: user?.id
+            userId: user?.id,
+            prepMinutes: input.prepMinutes !== undefined ? Math.max(0, Number(input.prepMinutes) || 0) : 0,
+            teardownMinutes: input.teardownMinutes !== undefined ? Math.max(0, Number(input.teardownMinutes) || 0) : 0
         });
 
         return result;

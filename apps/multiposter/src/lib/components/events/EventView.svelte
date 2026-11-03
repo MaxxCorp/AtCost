@@ -20,7 +20,9 @@
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
-    import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from "#lib/utils/format-event-date.js";
+    import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from '#lib/utils/format-event-date.js';
+    import { page } from '$app/state';
+    const isLoggedIn = $derived(Boolean(page.data?.user));
 
     let { event }: { event: Event } = $props();
 
@@ -156,8 +158,21 @@
                 <div class="flex items-center gap-1.5 text-xs sm:text-sm text-blue-200 mt-1 bg-white/10 px-2.5 py-1 rounded-full border border-white/20">
                     <RefreshCw class="w-3.5 h-3.5" />
                     <span>{formatRecurrenceText(eventRecurrenceRule, { dtstart: event.startDateTime })}</span>
-                </div>
-            {/if}
+                </div>{/if}
+{#if isLoggedIn && ((event.prepMinutes && event.prepMinutes > 0) || (event.teardownMinutes && event.teardownMinutes > 0))}
+    <div class="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-amber-200">
+        {#if event.prepMinutes && event.prepMinutes > 0}
+            <span class="bg-white/10 px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs font-semibold">
+                {m.prep_padding()}: -{event.prepMinutes}m
+            </span>
+        {/if}
+        {#if event.teardownMinutes && event.teardownMinutes > 0}
+            <span class="bg-white/10 px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs font-semibold">
+                {m.teardown_padding()}: +{event.teardownMinutes}m
+            </span>
+        {/if}
+    </div>
+{/if}
         </div>
     </div>
 

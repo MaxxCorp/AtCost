@@ -338,5 +338,42 @@ describe('AvailabilityService', () => {
         expect(roomRes).toBeDefined();
         expect(roomRes?.available).toBe(true);
     });
+    it('should expand room check window by prepMinutes and teardownMinutes', async () => {
+        const mockProvider = {
+            name: 'microsoft',
+            checkSchedule: vi.fn().mockResolvedValue(new Map())
+        };
+        (service as any).providers = [mockProvider];
+
+        const mockWhere = vi.fn().mockResolvedValue([]);
+        const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
+        const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
+        (db.select as any).mockReturnValue({ from: mockFrom });
+
+        await service.checkAvailability({
+            startDateTime: new Date('2026-09-08T10:00:00Z'),
+            endDateTime: new Date('2026-09-08T12:00:00Z'),
+            prepMinutes: 30,
+            teardownMinutes: 45,
+            resources: [{ id: 'room-1', allocationCalendars: [{ email: 'room1@example.com' }] }],
+            contacts: [{ id: 'contact-1', email: 'user@example.com' }]
+        });
+
+        // Room resource must be checked with padded window: 09:30 to 12:45
+        expect(mockProvider.checkSchedule).toHaveBeenCalledWith(
+            ['room1@example.com'],
+            new Date('2026-09-08T09:30:00.000Z'),
+            new Date('2026-09-08T12:45:00.000Z'),
+            undefined
+        );
+
+        // Contact must be checked with unpadded window: 10:00 to 12:00
+        expect(mockProvider.checkSchedule).toHaveBeenCalledWith(
+            ['user@example.com'],
+            new Date('2026-09-08T10:00:00.000Z'),
+            new Date('2026-09-08T12:00:00.000Z'),
+            undefined
+        );
+    });
 });
 

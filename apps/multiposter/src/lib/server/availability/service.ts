@@ -1,5 +1,6 @@
 import {
     db,
+    sql,
     event,
     eventResource,
     eventContact,
@@ -233,12 +234,19 @@ export class AvailabilityService {
         resources: Array<{ id: string; allocationCalendars?: any }>;
         contacts: Array<{ id: string; email?: string }>;
         userId?: string;
+        prepMinutes?: number;
+        teardownMinutes?: number;
     }): Promise<{
         resourceAvailability: Record<string, AvailabilityResult>;
         contactAvailability: Record<string, AvailabilityResult>;
     }> {
         const resourceAvailability: Record<string, AvailabilityResult> = {};
         const contactAvailability: Record<string, AvailabilityResult> = {};
+
+        const prepMs = (params.prepMinutes || 0) * 60000;
+        const teardownMs = (params.teardownMinutes || 0) * 60000;
+        const targetResourceStart = new Date(params.startDateTime.getTime() - prepMs);
+        const targetResourceEnd = new Date(params.endDateTime.getTime() + teardownMs);
 
         const isVirtual = Boolean(params.currentEventId && params.currentEventId.includes('_inst_'));
         const currentMasterId = isVirtual ? (params.currentEventId!).split('_inst_')[0] : null;
@@ -395,7 +403,11 @@ export class AvailabilityService {
                 .select({
                     resourceId: eventResource.resourceId,
                     eventId: event.id,
-                    eventTitle: event.summary
+                    eventTitle: event.summary,
+                    startDateTime: event.startDateTime,
+                    endDateTime: event.endDateTime,
+                    prepMinutes: event.prepMinutes,
+                    teardownMinutes: event.teardownMinutes,
                 })
                 .from(eventResource)
                 .innerJoin(event, eq(eventResource.eventId, event.id))
@@ -403,8 +415,8 @@ export class AvailabilityService {
                     inArray(eventResource.resourceId, resourceIds),
                     ne(event.status, 'cancelled'),
                     dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
-                    lt(event.startDateTime, params.endDateTime),
-                    gt(event.endDateTime, params.startDateTime)
+                    sql`(${event.startDateTime} - (${event.prepMinutes} * interval '1 minute') < ${targetResourceEnd})`,
+                    sql`(${event.endDateTime} + (${event.teardownMinutes} * interval '1 minute') > ${targetResourceStart})`
                 ));
 
             for (const c of resourceCollisions) {
@@ -426,6 +438,8 @@ export class AvailabilityService {
                         eventTitle: event.summary,
                         startDateTime: event.startDateTime,
                         endDateTime: event.endDateTime,
+                        prepMinutes: event.prepMinutes,
+                        teardownMinutes: event.teardownMinutes,
                         recurrence: event.recurrence,
                         seriesId: event.seriesId,
                         exdates: event.exdates,
@@ -461,13 +475,15 @@ export class AvailabilityService {
                         const durationMs = r.endDateTime
                             ? new Date(r.endDateTime).getTime() - new Date(r.startDateTime).getTime()
                             : 0;
-                        const rangeSearchStart = new Date(params.startDateTime.getTime() - durationMs);
+                        const occPrepMs = (r.prepMinutes || 0) * 60000;
+                        const occTeardownMs = (r.teardownMinutes || 0) * 60000;
+                        const rangeSearchStart = new Date(targetResourceStart.getTime() - durationMs - occTeardownMs);
                         const occurrences = expandRecurrenceRange(
                             rrule,
                             new Date(r.startDateTime),
                             r.endDateTime ? new Date(r.endDateTime) : null,
                             rangeSearchStart,
-                            params.endDateTime,
+                            targetResourceEnd,
                             r.startTimeZone,
                             exdates
                         );
@@ -479,9 +495,9 @@ export class AvailabilityService {
                                 const targetTime = new Date(currentInstIso).getTime();
                                 if (Math.abs(occTime - targetTime) < 60000) return false;
                             }
-                            const occStart = (occ.date || (occ as any).start).getTime();
-                            const occEnd = occ.end ? occ.end.getTime() : occStart + durationMs;
-                            return occStart < params.endDateTime.getTime() && occEnd > params.startDateTime.getTime();
+                            const occStart = (occ.date || (occ as any).start).getTime() - occPrepMs;
+                            const occEnd = (occ.end ? occ.end.getTime() : (occ.date || (occ as any).start).getTime() + durationMs) + occTeardownMs;
+                            return occStart < targetResourceEnd.getTime() && occEnd > targetResourceStart.getTime();
                         });
 
                         if (conflictingOccurrences.length > 0) {
@@ -606,7 +622,8 @@ export class AvailabilityService {
         }
 
         // Collect external calendar emails for remaining resources & contacts
-        const emailsToCheck: string[] = [];
+        const resourceEmailsToCheck: string[] = [];
+        const contactEmailsToCheck: string[] = [];
         const emailToTarget: Map<string, { type: 'resource' | 'contact'; id: string }> = new Map();
 
         for (const res of params.resources) {
@@ -623,7 +640,7 @@ export class AvailabilityService {
                 const email = cal.calendarId || cal.email;
                 if (email && typeof email === 'string' && email.includes('@')) {
                     const lower = email.toLowerCase();
-                    emailsToCheck.push(lower);
+                    resourceEmailsToCheck.push(lower);
                     emailToTarget.set(lower, { type: 'resource', id: res.id });
                 }
             }
@@ -633,21 +650,38 @@ export class AvailabilityService {
             if (contactAvailability[c.id] && !contactAvailability[c.id].available) continue;
             if (c.email && typeof c.email === 'string' && c.email.includes('@')) {
                 const lower = c.email.toLowerCase();
-                emailsToCheck.push(lower);
+                contactEmailsToCheck.push(lower);
                 emailToTarget.set(lower, { type: 'contact', id: c.id });
             }
         }
 
         // 3. Query External Providers
-        if (emailsToCheck.length > 0) {
+        if (resourceEmailsToCheck.length > 0 || contactEmailsToCheck.length > 0) {
             for (const provider of this.providers) {
                 try {
-                    const scheduleResults = await provider.checkSchedule(
-                        emailsToCheck,
-                        params.startDateTime,
-                        params.endDateTime,
-                        params.userId
-                    );
+                    const scheduleResults = new Map<string, AvailabilityResult>();
+                    if (resourceEmailsToCheck.length > 0) {
+                        const resSchedules = await provider.checkSchedule(
+                            resourceEmailsToCheck,
+                            targetResourceStart,
+                            targetResourceEnd,
+                            params.userId
+                        );
+                        for (const [email, r] of resSchedules) {
+                            scheduleResults.set(email, r);
+                        }
+                    }
+                    if (contactEmailsToCheck.length > 0) {
+                        const contactSchedules = await provider.checkSchedule(
+                            contactEmailsToCheck,
+                            params.startDateTime,
+                            params.endDateTime,
+                            params.userId
+                        );
+                        for (const [email, r] of contactSchedules) {
+                            scheduleResults.set(email, r);
+                        }
+                    }
 
                     for (const [email, res] of scheduleResults) {
                         const target = emailToTarget.get(email);

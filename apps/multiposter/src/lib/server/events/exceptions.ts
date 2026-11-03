@@ -14,6 +14,8 @@ export interface VirtualInstanceDiffInput {
 		guestsCanModify?: boolean | null;
 		guestsCanSeeOtherGuests?: boolean | null;
 		participantsCount?: number | null;
+		prepMinutes?: number | null;
+		teardownMinutes?: number | null;
 		startDateTime?: Date | string | null;
 		endDateTime?: Date | string | null;
 		reminders?: any;
@@ -33,6 +35,8 @@ export interface VirtualInstanceDiffInput {
 		guestsCanModify?: boolean | string | null;
 		guestsCanSeeOtherGuests?: boolean | string | null;
 		participantsCount?: number | string | null;
+		prepMinutes?: number | string | null;
+		teardownMinutes?: number | string | null;
 		reminders?: any;
 	};
 	targetStart: Date;
@@ -90,6 +94,8 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	if (submitted.ticketPrice !== undefined && strNorm(submitted.ticketPrice) !== strNorm(master.ticketPrice)) return true;
 	if (submitted.ticketPriceUnknown !== undefined && Boolean(submitted.ticketPriceUnknown) !== Boolean(master.ticketPriceUnknown)) return true;
 	if (submitted.participantsCount !== undefined && Number(submitted.participantsCount || 0) !== Number(master.participantsCount || 0)) return true;
+	if (submitted.prepMinutes !== undefined && Number(submitted.prepMinutes || 0) !== Number(master.prepMinutes || 0)) return true;
+	if (submitted.teardownMinutes !== undefined && Number(submitted.teardownMinutes || 0) !== Number(master.teardownMinutes || 0)) return true;
 
 	// Booleans
 	if (submitted.isAllDay !== undefined && Boolean(submitted.isAllDay) !== Boolean(master.isAllDay)) return true;

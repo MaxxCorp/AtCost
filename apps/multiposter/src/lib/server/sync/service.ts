@@ -3053,6 +3053,11 @@ export class SyncService {
 					for (const room of resourceAttendees) {
 						if (!room.resourceId) continue;
 
+						const prepMs = (itemRow.prepMinutes || 0) * 60000;
+						const teardownMs = (itemRow.teardownMinutes || 0) * 60000;
+						const effectiveStart = itemRow.startDateTime ? new Date(itemRow.startDateTime.getTime() - prepMs) : itemRow.startDateTime;
+						const effectiveEnd = itemRow.endDateTime ? new Date(itemRow.endDateTime.getTime() + teardownMs) : itemRow.endDateTime;
+
 						const bookingResult = await provider.bookRoom({
 							eventId: itemRow.id,
 							resourceId: room.resourceId,
@@ -3060,8 +3065,8 @@ export class SyncService {
 							roomName: room.displayName || room.email,
 							summary: itemRow.summary || itemRow.title || 'Event',
 							description: itemRow.description,
-							start: itemRow.startDateTime,
-							end: itemRow.endDateTime,
+							start: effectiveStart,
+							end: effectiveEnd,
 							startTimeZone: itemRow.startTimeZone || 'UTC',
 							endTimeZone: itemRow.endTimeZone || 'UTC'
 						});

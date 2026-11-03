@@ -864,7 +864,24 @@
 									</span>
 								{/if}
 							</div>
-							{#if event.locations && event.locations.length > 0}
+
+							{#if (displayDateEvent.prepMinutes && displayDateEvent.prepMinutes > 0) || (displayDateEvent.teardownMinutes && displayDateEvent.teardownMinutes > 0)}
+	<div class="flex flex-wrap items-center gap-1.5 mt-1.5 text-xs text-amber-800 dark:text-amber-300">
+		{#if displayDateEvent.prepMinutes && displayDateEvent.prepMinutes > 0}
+			<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900/40 text-[11px] font-medium">
+						<span class="text-amber-600 dark:text-amber-400 font-semibold">{m.prep_padding()}:</span>
+				<span>-{displayDateEvent.prepMinutes}m</span>
+			</span>
+		{/if}
+		{#if displayDateEvent.teardownMinutes && displayDateEvent.teardownMinutes > 0}
+			<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-900/40 text-[11px] font-medium">
+						<span class="text-amber-600 dark:text-amber-400 font-semibold">{m.teardown_padding()}:</span>
+				<span>+{displayDateEvent.teardownMinutes}m</span>
+			</span>
+		{/if}
+	</div>
+{/if}
+								{#if event.locations && event.locations.length > 0}
 								<div
 									class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2"
 								>

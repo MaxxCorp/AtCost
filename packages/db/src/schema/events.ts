@@ -30,6 +30,8 @@ export const event = pgTable("event", {
     endDateTime: timestamp("end_date_time").notNull(),
     endTimeZone: text("end_time_zone").notNull(),
     isAllDay: boolean("is_all_day").default(false).notNull(),
+    prepMinutes: integer("prep_minutes").default(0).notNull(),
+    teardownMinutes: integer("teardown_minutes").default(0).notNull(),
     status: text("status").default("tentative").notNull(),
     recurrence: jsonb("recurrence").$type<string[]>(),
     exdates: jsonb("exdates").$type<string[]>().default([]).notNull(),

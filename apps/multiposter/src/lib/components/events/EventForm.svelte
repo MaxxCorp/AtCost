@@ -315,6 +315,70 @@
         rf.fields.endDate.set(currentStartDate);
     }
 
+    // svelte-ignore state_referenced_locally
+    let showPrepTime = $state(
+        Boolean(initialData?.prepMinutes && initialData.prepMinutes > 0)
+    );
+
+    // svelte-ignore state_referenced_locally
+    let showTeardownTime = $state(
+        Boolean(initialData?.teardownMinutes && initialData.teardownMinutes > 0)
+    );
+
+    function enablePrepTime() {
+        showPrepTime = true;
+        if (!rf.fields.prepMinutes.value()) {
+            rf.fields.prepMinutes.set(15);
+        }
+    }
+
+    function disablePrepTime() {
+        showPrepTime = false;
+        rf.fields.prepMinutes.set(0);
+    }
+
+    function enableTeardownTime() {
+        showTeardownTime = true;
+        if (!rf.fields.teardownMinutes.value()) {
+            rf.fields.teardownMinutes.set(15);
+        }
+    }
+
+    function disableTeardownTime() {
+        showTeardownTime = false;
+        rf.fields.teardownMinutes.set(0);
+    }
+
+    const effectivePrepStartTimeText = $derived.by(() => {
+        if (!showPrepTime) return null;
+        const prep = Number(rf.fields.prepMinutes?.value?.()) || 0;
+        if (!prep || prep <= 0) return null;
+        if (isAllDay) return null;
+        const sTime = currentStartTimeVal;
+        if (!sTime) return null;
+        const [h, min] = sTime.split(':').map(Number);
+        if (isNaN(h) || isNaN(min)) return null;
+        const totalMinutes = h * 60 + min - prep;
+        const effH = Math.floor(((totalMinutes % 1440) + 1440) % 1440 / 60);
+        const effMin = ((totalMinutes % 60) + 60) % 60;
+        return `${String(effH).padStart(2, '0')}:${String(effMin).padStart(2, '0')} Uhr (${m.prep_padding()})`;
+    });
+
+    const effectiveTeardownEndTimeText = $derived.by(() => {
+        if (!showTeardownTime) return null;
+        const teardown = Number(rf.fields.teardownMinutes?.value?.()) || 0;
+        if (!teardown || teardown <= 0) return null;
+        if (isAllDay) return null;
+        const eTime = currentEndTimeVal;
+        if (!eTime) return null;
+        const [h, min] = eTime.split(':').map(Number);
+        if (isNaN(h) || isNaN(min)) return null;
+        const totalMinutes = h * 60 + min + teardown;
+        const effH = Math.floor(((totalMinutes % 1440) + 1440) % 1440 / 60);
+        const effMin = ((totalMinutes % 60) + 60) % 60;
+        return `${String(effH).padStart(2, '0')}:${String(effMin).padStart(2, '0')} Uhr (${m.teardown_padding()})`;
+    });
+
     function handleStartTimeZoneChange(e: globalThis.Event) {
         const val = (e.target as HTMLInputElement).value;
         if (!showEndTimeZone && (!initialData?.endTimeZone || initialData.endTimeZone === initialData.startTimeZone)) {
@@ -466,11 +530,15 @@
         const startIso = activeStartIso;
         const endIso = activeEndIso;
         if (!startIso || !endIso) return;
+        const prep = showPrepTime ? (Number(rf.fields.prepMinutes?.value?.()) || 0) : 0;
+        const teardown = showTeardownTime ? (Number(rf.fields.teardownMinutes?.value?.()) || 0) : 0;
         availabilityLoading = true;
         checkEventAvailability({
             startDateTime: startIso,
             endDateTime: endIso,
-            eventId: initialData?.id
+            eventId: initialData?.id,
+            prepMinutes: prep,
+            teardownMinutes: teardown,
         }).then((res) => {
             if (res) {
                 resourceAvailability = res.resourceAvailability || {};
@@ -486,7 +554,9 @@
     $effect(() => {
         const startIso = activeStartIso;
         const endIso = activeEndIso;
-        const queryKey = `${startIso}_${endIso}_${initialData?.id || 'new'}`;
+        const prep = showPrepTime ? (Number(rf.fields.prepMinutes?.value?.()) || 0) : 0;
+        const teardown = showTeardownTime ? (Number(rf.fields.teardownMinutes?.value?.()) || 0) : 0;
+        const queryKey = `${startIso}_${endIso}_${initialData?.id || 'new'}_p${prep}_t${teardown}`;
 
         if (!startIso || !endIso || queryKey === lastQueryKey) return;
         lastQueryKey = queryKey;
@@ -798,229 +868,358 @@
                     <span>{m.add_end_date()}</span>
                 </button>
             {/if}
+
+            {#if !showPrepTime}
+                <button
+                    type="button"
+                    class="text-xs text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1 hover:underline"
+                    onclick={enablePrepTime}
+                >
+                    <Plus size={14} />
+                    <span>{m.add_prep_time()}</span>
+                </button>
+            {/if}
+
+            {#if !showTeardownTime}
+                <button
+                    type="button"
+                    class="text-xs text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1 hover:underline"
+                    onclick={enableTeardownTime}
+                >
+                    <Plus size={14} />
+                    <span>{m.add_teardown_time()}</span>
+                </button>
+            {/if}
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <!-- Start Block -->
-            <div class="space-y-4">
-                <div>
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-6">
+            <!-- Start Date -->
+            <div class={isAllDay && !showEndDate ? "sm:col-span-12" : "sm:col-span-6"}>
+                <div class="flex items-center justify-between mb-1">
+                    <label
+                        for="startDate"
+                        class="block text-sm font-medium text-gray-700"
+                    >
+                        {m.start_date()}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <div class="flex items-center gap-1.5">
+                        <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startDate')} />
+                        {#if isAllDay}
+                            <button
+                                type="button"
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone || (rf.fields.startTimeZone.value() && rf.fields.startTimeZone.value() !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
+                                title="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
+                                onclick={() => (showStartTimeZone = !showStartTimeZone)}
+                                aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
+                            >
+                                <Globe size={16} />
+                            </button>
+                        {/if}
+                    </div>
+                </div>
+                <input
+                    {...rf.fields.startDate.as(
+                        "date",
+                        startParsed.date || localNow.date,
+                    )}
+                    required
+                    onfocus={() => collab?.setFocus('startDate')}
+                    onblur={() => collab?.setFocus(null)}
+                    oninput={(e) => updateEndDateTime(e, true)}
+                    style={getCollaboratorStyle('startDate')}
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                />
+            </div>
+
+            {#if !isAllDay}
+                <!-- Start Time -->
+                <div class={showEndDate ? "sm:col-span-6" : "sm:col-span-3"}>
                     <div class="flex items-center justify-between mb-1">
                         <label
-                            for="startDate"
+                            for="startTime"
                             class="block text-sm font-medium text-gray-700"
                         >
-                            {m.start_date()}
+                            {m.start_time()}
                             <span class="text-red-500">*</span>
                         </label>
                         <div class="flex items-center gap-1.5">
-                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startDate')} />
-                            {#if isAllDay}
-                                <button
-                                    type="button"
-                                    class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone || (rf.fields.startTimeZone.value() && rf.fields.startTimeZone.value() !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
-                                    title="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
-                                    onclick={() => (showStartTimeZone = !showStartTimeZone)}
-                                    aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
-                                >
-                                    <Globe size={16} />
-                                </button>
-                            {/if}
-                        </div>
-                    </div>
-                    <input
-                        {...rf.fields.startDate.as(
-                            "date",
-                            startParsed.date || localNow.date,
-                        )}
-                        required
-                        onfocus={() => collab?.setFocus('startDate')}
-                        onblur={() => collab?.setFocus(null)}
-                        oninput={(e) => updateEndDateTime(e, true)}
-                        style={getCollaboratorStyle('startDate')}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    />
-                </div>
-
-                {#if !isAllDay}
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <label
-                                for="startTime"
-                                class="block text-sm font-medium text-gray-700"
-                            >
-                                {m.start_time()}
-                                <span class="text-red-500">*</span>
-                            </label>
-                            <div class="flex items-center gap-1.5">
-                                <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startTime')} />
-                                <button
-                                    type="button"
-                                    class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone || (rf.fields.startTimeZone.value() && rf.fields.startTimeZone.value() !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
-                                    title="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
-                                    onclick={() => (showStartTimeZone = !showStartTimeZone)}
-                                    aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
-                                >
-                                    <Globe size={16} />
-                                </button>
-                            </div>
-                        </div>
-                        <input
-                            {...rf.fields.startTime.as(
-                                "time",
-                                startParsed.time || localNow.time,
-                            )}
-                            required
-                            onfocus={() => collab?.setFocus('startTime')}
-                            onblur={() => collab?.setFocus(null)}
-                            oninput={(e) => updateEndDateTime(e, false)}
-                            style={getCollaboratorStyle('startTime')}
-                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                        />
-                    </div>
-                {/if}
-
-                <div class={showStartTimeZone ? "" : "hidden"}>
-                    <div class="flex items-center justify-between mb-1">
-                        <label
-                            for="startTimeZone"
-                            class="block text-sm font-medium text-gray-700"
-                        >
-                            {m.timezone()}
-                        </label>
-                        <button
-                            type="button"
-                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded"
-                            title={m.close?.() ?? "Close"}
-                            onclick={() => (showStartTimeZone = false)}
-                        >
-                            <X size={13} />
-                        </button>
-                    </div>
-                    <input
-                        {...rf.fields.startTimeZone.as(
-                            "text",
-                            initialData?.startTimeZone || browserTimezone,
-                        )}
-                        list="timezones"
-                        placeholder={browserTimezone}
-                        oninput={handleStartTimeZoneChange}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    />
-                </div>
-            </div>
-
-            <!-- End Block -->
-            <div class="space-y-4">
-                <div class={showEndDate ? "" : "hidden"}>
-                    <div class="flex items-center justify-between mb-1">
-                        <label
-                            for="endDate"
-                            class="block text-sm font-medium text-gray-700"
-                        >
-                            {m.end_date()}
-                            <span class="text-red-500">*</span>
-                        </label>
-                        <div class="flex items-center gap-2">
-                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endDate')} />
-                            {#if isAllDay}
-                                <button
-                                    type="button"
-                                    class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone || (rf.fields.endTimeZone.value() && rf.fields.endTimeZone.value() !== (rf.fields.startTimeZone.value() || browserTimezone)) ? 'text-blue-600 bg-blue-50' : ''}"
-                                    title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
-                                    onclick={() => (showEndTimeZone = !showEndTimeZone)}
-                                    aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
-                                >
-                                    <Globe size={16} />
-                                </button>
-                            {/if}
+                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startTime')} />
                             <button
                                 type="button"
-                                class="text-xs text-gray-500 hover:text-red-600 inline-flex items-center gap-1 transition-colors"
-                                onclick={disableEndDate}
-                                title={m.same_day()}
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone || (rf.fields.startTimeZone.value() && rf.fields.startTimeZone.value() !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
+                                title="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
+                                onclick={() => (showStartTimeZone = !showStartTimeZone)}
+                                aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
                             >
-                                <X size={13} />
-                                <span>{m.same_day()}</span>
+                                <Globe size={16} />
                             </button>
                         </div>
                     </div>
                     <input
-                        {...rf.fields.endDate.as("date", initialEnd.date)}
-                        placeholder={rf.fields.startDate.value()}
-                        required={showEndDate}
-                        onfocus={() => collab?.setFocus('endDate')}
+                        {...rf.fields.startTime.as(
+                            "time",
+                            startParsed.time || localNow.time,
+                        )}
+                        required
+                        onfocus={() => collab?.setFocus('startTime')}
                         onblur={() => collab?.setFocus(null)}
-                        style={getCollaboratorStyle('endDate')}
+                        oninput={(e) => updateEndDateTime(e, false)}
+                        style={getCollaboratorStyle('startTime')}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     />
                 </div>
+            {/if}
 
-                {#if !isAllDay}
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <label
-                                for="endTime"
-                                class="block text-sm font-medium text-gray-700"
+            <!-- End Date -->
+            <div class={showEndDate ? "sm:col-span-6" : "hidden"}>
+                <div class="flex items-center justify-between mb-1">
+                    <label
+                        for="endDate"
+                        class="block text-sm font-medium text-gray-700"
+                    >
+                        {m.end_date()}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endDate')} />
+                        {#if isAllDay}
+                            <button
+                                type="button"
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone || (rf.fields.endTimeZone.value() && rf.fields.endTimeZone.value() !== (rf.fields.startTimeZone.value() || browserTimezone)) ? 'text-blue-600 bg-blue-50' : ''}"
+                                title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
+                                onclick={() => (showEndTimeZone = !showEndTimeZone)}
+                                aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
                             >
-                                {m.end_time()}
-                                <span class="text-red-500">*</span>
+                                <Globe size={16} />
+                            </button>
+                        {/if}
+                        <button
+                            type="button"
+                            class="text-xs text-gray-500 hover:text-red-600 inline-flex items-center gap-1 transition-colors"
+                            onclick={disableEndDate}
+                            title={m.same_day()}
+                        >
+                            <X size={13} />
+                            <span>{m.same_day()}</span>
+                        </button>
+                    </div>
+                </div>
+                <input
+                    {...rf.fields.endDate.as("date", initialEnd.date)}
+                    placeholder={rf.fields.startDate.value()}
+                    required={showEndDate}
+                    onfocus={() => collab?.setFocus('endDate')}
+                    onblur={() => collab?.setFocus(null)}
+                    style={getCollaboratorStyle('endDate')}
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                />
+            </div>
+
+            {#if !isAllDay}
+                <!-- End Time -->
+                <div class={showEndDate ? "sm:col-span-6" : "sm:col-span-3"}>
+                    <div class="flex items-center justify-between mb-1">
+                        <label
+                            for="endTime"
+                            class="block text-sm font-medium text-gray-700"
+                        >
+                            {m.end_time()}
+                            <span class="text-red-500">*</span>
+                        </label>
+                        <div class="flex items-center gap-1.5">
+                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endTime')} />
+                            <button
+                                type="button"
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone || (rf.fields.endTimeZone.value() && rf.fields.endTimeZone.value() !== (rf.fields.startTimeZone.value() || browserTimezone)) ? 'text-blue-600 bg-blue-50' : ''}"
+                                title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
+                                onclick={() => (showEndTimeZone = !showEndTimeZone)}
+                                aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
+                            >
+                                <Globe size={16} />
+                            </button>
+                        </div>
+                    </div>
+                    <input
+                        {...rf.fields.endTime.as("time", initialEnd.time)}
+                        placeholder={getDefaultEndTime(rf)}
+                        required
+                        onfocus={() => collab?.setFocus('endTime')}
+                        onblur={() => collab?.setFocus(null)}
+                        style={getCollaboratorStyle('endTime')}
+                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                    />
+                </div>
+            {/if}
+        </div>
+
+        <!-- Timezones (hidden by default unless globe clicked) -->
+        <div class={(showStartTimeZone || showEndTimeZone) ? "grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" : "hidden"}>
+            <div class={showStartTimeZone ? "" : "hidden"}>
+                <div class="flex items-center justify-between mb-1">
+                    <label
+                        for="startTimeZone"
+                        class="block text-sm font-medium text-gray-700"
+                    >
+                        {m.timezone()}
+                    </label>
+                    <button
+                        type="button"
+                        class="text-gray-400 hover:text-gray-600 p-0.5 rounded"
+                        title={m.close?.() ?? "Close"}
+                        onclick={() => (showStartTimeZone = false)}
+                    >
+                        <X size={13} />
+                    </button>
+                </div>
+                <input
+                    {...rf.fields.startTimeZone.as(
+                        "text",
+                        initialData?.startTimeZone || browserTimezone,
+                    )}
+                    list="timezones"
+                    placeholder={browserTimezone}
+                    oninput={handleStartTimeZoneChange}
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                />
+            </div>
+
+            <div class="{showEndTimeZone ? '' : 'hidden'} {showEndTimeZone && !showStartTimeZone ? 'sm:col-start-2' : ''}">
+                <div class="flex items-center justify-between mb-1">
+                    <label
+                        for="endTimeZone"
+                        class="block text-sm font-medium text-gray-700"
+                    >
+                        {m.end_time()} {m.timezone()}
+                    </label>
+                    <button
+                        type="button"
+                        class="text-gray-400 hover:text-gray-600 p-0.5 rounded"
+                        title={m.close?.() ?? "Close"}
+                        onclick={() => (showEndTimeZone = false)}
+                    >
+                        <X size={13} />
+                    </button>
+                </div>
+                <input
+                    {...rf.fields.endTimeZone.as(
+                        "text",
+                        initialData?.endTimeZone ||
+                            initialData?.startTimeZone ||
+                            browserTimezone,
+                    )}
+                    list="timezones"
+                    placeholder={rf.fields.startTimeZone.value()}
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
+                />
+            </div>
+        </div>
+
+        <!-- Prep and Teardown Times (Aufbau- und Abbauzeit) -->
+        {#if showPrepTime || showTeardownTime}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                {#if showPrepTime}
+                    <div class="p-3 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg border border-amber-200/80 dark:border-amber-900/40 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label for="prepMinutes" class="block text-xs font-semibold text-amber-900 dark:text-amber-200">
+                                {m.prep_time()} ({m.prep_padding()})
                             </label>
-                            <div class="flex items-center gap-1.5">
-                                <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endTime')} />
-                                <button
-                                    type="button"
-                                    class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone || (rf.fields.endTimeZone.value() && rf.fields.endTimeZone.value() !== (rf.fields.startTimeZone.value() || browserTimezone)) ? 'text-blue-600 bg-blue-50' : ''}"
-                                    title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
-                                    onclick={() => (showEndTimeZone = !showEndTimeZone)}
-                                    aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
-                                >
-                                    <Globe size={16} />
-                                </button>
+                            <button
+                                type="button"
+                                class="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 transition-colors"
+                                onclick={disablePrepTime}
+                                title={m.close?.() ?? "Close"}
+                            >
+                                <X size={13} />
+                                <span>{m.close?.() ?? "Close"}</span>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input
+                                {...rf.fields.prepMinutes.as("number", initialData?.prepMinutes ?? 0)}
+                                id="prepMinutes"
+                                type="number"
+                                min="0"
+                                step="5"
+                                placeholder="0"
+                                class="w-24 px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border rounded-md border-amber-300 dark:border-amber-700 focus:ring-2 focus:ring-amber-500"
+                            />
+                            <span class="text-xs text-gray-500 font-medium">Min.</span>
+                            <div class="flex items-center gap-1 ml-auto">
+                                {#each [15, 30, 60] as min}
+                                    <button
+                                        type="button"
+                                        class="text-[11px] px-2 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-gray-700 dark:text-gray-300 transition-colors font-medium"
+                                        onclick={() => rf.fields.prepMinutes.set(min)}
+                                    >
+                                        +{min}m
+                                    </button>
+                                {/each}
                             </div>
                         </div>
-                        <input
-                            {...rf.fields.endTime.as("time", initialEnd.time)}
-                            placeholder={getDefaultEndTime(rf)}
-                            required
-                            onfocus={() => collab?.setFocus('endTime')}
-                            onblur={() => collab?.setFocus(null)}
-                            style={getCollaboratorStyle('endTime')}
-                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                        />
+                        {#if effectivePrepStartTimeText}
+                            <p class="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                                {m.room_booking_window()}: {effectivePrepStartTimeText}
+                            </p>
+                        {/if}
                     </div>
                 {/if}
 
-                <div class={showEndTimeZone ? "" : "hidden"}>
-                    <div class="flex items-center justify-between mb-1">
-                        <label
-                            for="endTimeZone"
-                            class="block text-sm font-medium text-gray-700"
-                        >
-                            {m.end_time()} {m.timezone()}
-                        </label>
-                        <button
-                            type="button"
-                            class="text-gray-400 hover:text-gray-600 p-0.5 rounded"
-                            title={m.close?.() ?? "Close"}
-                            onclick={() => (showEndTimeZone = false)}
-                        >
-                            <X size={13} />
-                        </button>
+                {#if showTeardownTime}
+                    <div class="p-3 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg border border-amber-200/80 dark:border-amber-900/40 space-y-2 {!showPrepTime ? 'sm:col-start-2' : ''}">
+                        <div class="flex items-center justify-between">
+                            <label for="teardownMinutes" class="block text-xs font-semibold text-amber-900 dark:text-amber-200">
+                                {m.teardown_time()} ({m.teardown_padding()})
+                            </label>
+                            <button
+                                type="button"
+                                class="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 transition-colors"
+                                onclick={disableTeardownTime}
+                                title={m.close?.() ?? "Close"}
+                            >
+                                <X size={13} />
+                                <span>{m.close?.() ?? "Close"}</span>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input
+                                {...rf.fields.teardownMinutes.as("number", initialData?.teardownMinutes ?? 0)}
+                                id="teardownMinutes"
+                                type="number"
+                                min="0"
+                                step="5"
+                                placeholder="0"
+                                class="w-24 px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border rounded-md border-amber-300 dark:border-amber-700 focus:ring-2 focus:ring-amber-500"
+                            />
+                            <span class="text-xs text-gray-500 font-medium">Min.</span>
+                            <div class="flex items-center gap-1 ml-auto">
+                                {#each [15, 30, 60] as min}
+                                    <button
+                                        type="button"
+                                        class="text-[11px] px-2 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-gray-700 dark:text-gray-300 transition-colors font-medium"
+                                        onclick={() => rf.fields.teardownMinutes.set(min)}
+                                    >
+                                        +{min}m
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
+                        {#if effectiveTeardownEndTimeText}
+                            <p class="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                                {m.room_booking_window()}: {effectiveTeardownEndTimeText}
+                            </p>
+                        {/if}
                     </div>
-                    <input
-                        {...rf.fields.endTimeZone.as(
-                            "text",
-                            initialData?.endTimeZone ||
-                                initialData?.startTimeZone ||
-                                browserTimezone,
-                        )}
-                        list="timezones"
-                        placeholder={rf.fields.startTimeZone.value()}
-                        class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
-                    />
-                </div>
+                {/if}
             </div>
-        </div>
+        {/if}
+
+        {#if !showPrepTime}
+            <input type="hidden" name="prepMinutes" value="0" />
+        {/if}
+        {#if !showTeardownTime}
+            <input type="hidden" name="teardownMinutes" value="0" />
+        {/if}
 
         <!-- Recurrence Button -->
         <div class="pt-4 border-t flex flex-wrap items-center justify-between gap-4">

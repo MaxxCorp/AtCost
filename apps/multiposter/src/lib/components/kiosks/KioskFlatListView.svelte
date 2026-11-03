@@ -32,7 +32,9 @@
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isSeriesItem, isNonSeriesEvent, getSeriesRootId } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
-    import * as m from "#lib/paraglide/messages.js";
+    import * as m from '#lib/paraglide/messages.js';
+    import { page } from '$app/state';
+    const isLoggedIn = $derived(Boolean(page.data?.user));
     import { resolve } from '$app/paths';
     import {
         type SeriesInstanceInfo,
@@ -1282,6 +1284,17 @@
                         {/if}
                     {/if}
                 {/if}
+
+                {#if isLoggedIn && ((event.prepMinutes && event.prepMinutes > 0) || (event.teardownMinutes && event.teardownMinutes > 0))}
+    <div class="mt-1 flex flex-col gap-0.5 text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+        {#if event.prepMinutes && event.prepMinutes > 0}
+            <span>{m.prep_padding()}: -{event.prepMinutes}m</span>
+        {/if}
+        {#if event.teardownMinutes && event.teardownMinutes > 0}
+            <span>{m.teardown_padding()}: +{event.teardownMinutes}m</span>
+        {/if}
+    </div>
+{/if}
             </div>
         </div>
 

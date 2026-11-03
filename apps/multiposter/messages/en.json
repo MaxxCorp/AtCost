@@ -1178,5 +1178,16 @@
 	"ci_print_options": "Print & Layout Options",
 	"ci_hide_qr_print": "Omit QR codes from print",
 	"ci_hide_images_print": "Omit images from print",
-	"ci_grayscale_images_print": "Print images in greyscale"
+	"ci_grayscale_images_print": "Print images in greyscale",
+	"add_prep_time": "Add prep time",
+	"add_teardown_time": "Add teardown time",
+	"prep_time": "Preparation",
+	"teardown_time": "Teardown",
+	"prep_minutes": "Prep time (minutes)",
+	"teardown_minutes": "Teardown time (minutes)",
+	"room_booking_window": "Room reservation",
+	"prep_padding": "Prep",
+	"teardown_padding": "Teardown",
+	"prep_badge": "Prep: {minutes} min.",
+	"teardown_badge": "Teardown: {minutes} min."
 }
