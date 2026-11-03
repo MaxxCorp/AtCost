@@ -33,7 +33,8 @@
     import { DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
     import { resolve } from '$app/paths';
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
-    import { formatTicketPrice } from "#lib/utils/format-ticket-price.js";
+    import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isSeriesItem, isNonSeriesEvent, getSeriesRootId } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
@@ -1314,7 +1315,7 @@
         : null}
 
     {@const displayPrice = isEvent
-        ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown)
+        ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown, { currency: (item as any).currency || 'EUR' })
         : null}
 
     <article
@@ -1344,7 +1345,11 @@
                         <!-- Price Badge -->
                         {#if displayPrice}
                             <span class="text-[8.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
-                                <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                {#if isEventFree((item as Event).ticketPrice, (item as Event).ticketPriceUnknown)}
+                                    <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                {:else}
+                                    <CurrencyIcon currency={(item as any).currency || 'EUR'} class="w-2.5 h-2.5 text-emerald-600" />
+                                {/if}
                                 <span>{displayPrice}</span>
                             </span>
                         {/if}
@@ -1409,7 +1414,11 @@
                         <!-- Price Badge -->
                         {#if displayPrice}
                             <span class="text-[8.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 shrink-0">
-                                <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                {#if isEventFree((item as Event).ticketPrice, (item as Event).ticketPriceUnknown)}
+                                    <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                {:else}
+                                    <CurrencyIcon currency={(item as any).currency || 'EUR'} class="w-2.5 h-2.5 text-emerald-600" />
+                                {/if}
                                 <span>{displayPrice}</span>
                             </span>
                         {/if}

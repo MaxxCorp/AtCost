@@ -30,6 +30,7 @@
         Check,
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
+    import { formatCurrency, getCurrencySymbol } from "@ac/validations";
 
     let searchQuery = $state("");
     let templateFilter = $state<string>("all");
@@ -260,7 +261,7 @@
                                             {:else}
                                                 <Package size={11} class="text-amber-600" />
                                             {/if}
-                                            {mi.name} (€{mi.unitPrice})
+                                            {mi.name} ({getCurrencySymbol(mi.currency || item.currency)}{mi.unitPrice})
                                         </span>
                                     {/each}
                                     {#if (item.items || []).length > 5}
@@ -278,7 +279,7 @@
                                     Price / Person
                                 </span>
                                 <span class="text-xl font-extrabold text-violet-900">
-                                    €{(item.totalPricePerPortion ?? 0).toFixed(2)}
+                                    {formatCurrency(item.totalPricePerPortion ?? 0, item.currency || 'EUR')}
                                 </span>
                             </div>
 

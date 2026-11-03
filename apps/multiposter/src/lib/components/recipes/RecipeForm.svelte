@@ -5,7 +5,9 @@
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
     import { goto, refreshAll } from "$app/navigation";
-    import { Euro, ChefHat, Plus, Trash2, Scale, Tag as TagIcon, Package } from "@lucide/svelte";
+    import { ChefHat, Plus, Trash2, Scale, Tag as TagIcon, Package } from "@lucide/svelte";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
+    import { formatCurrency, getCurrencySymbol } from "@ac/validations";
     import type { Consumable } from "@ac/validations";
     import { TagManager, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
@@ -176,6 +178,14 @@
         };
     });
 
+    const recipeCurrency = $derived.by(() => {
+        for (const ing of ingredients) {
+            const c = getConsumable(ing.consumableId);
+            if (c?.currency) return c.currency;
+        }
+        return 'EUR';
+    });
+
     const ingredientsJson = $derived(JSON.stringify(ingredients.map(i => ({
         consumableId: i.consumableId,
         amount: Number(i.amount) || 1,
@@ -344,7 +354,7 @@
                             {@const rawCost = c.amount > 0 ? (c.purchasePrice / c.amount) : Number(c.purchasePrice || 0)}
                             {@const unitCost = rawCost > 0 && rawCost < 0.01 ? rawCost.toFixed(4) : rawCost.toFixed(2)}
                             <option value={c.id}>
-                                {c.name} — €{unitCost} / {c.unit || 'unit'} (Pkg: €{Number(c.purchasePrice).toFixed(2)} / {c.amount} {c.unit || ''})
+                                {c.name} — {formatCurrency(Number(unitCost), c.currency)} / {c.unit || 'unit'} (Pkg: {formatCurrency(Number(c.purchasePrice), c.currency)} / {c.amount} {c.unit || ''})
                             </option>
                         {/each}
                     </select>
@@ -397,7 +407,7 @@
                                     >
                                         {#each consumablesList as item (item.id)}
                                             <option value={item.id}>
-                                                {item.name} (€{item.purchasePrice}/{item.amount} {item.unit})
+                                                {item.name} ({formatCurrency(item.purchasePrice, item.currency)}/{item.amount} {item.unit})
                                             </option>
                                         {/each}
                                     </select>
@@ -417,7 +427,7 @@
                                     </span>
                                 </td>
                                 <td class="py-2 px-3 text-right font-medium text-gray-900">
-                                    €{calc?.lineCost.toFixed(2) ?? '0.00'}
+                                    {formatCurrency(calc?.lineCost ?? 0, c?.currency || recipeCurrency)}
                                 </td>
                                 <td class="py-2 px-2 text-right">
                                     <button
@@ -439,7 +449,7 @@
                 <div class="flex items-center gap-6">
                     <div>
                         <span class="text-xs text-gray-500 uppercase font-semibold">Total Batch Cost</span>
-                        <p class="text-lg font-bold text-gray-900">€{ingredientCalculations.totalBatchCost.toFixed(2)}</p>
+                        <p class="text-lg font-bold text-gray-900">{formatCurrency(ingredientCalculations.totalBatchCost, recipeCurrency)}</p>
                     </div>
                     <div class="border-l border-emerald-200 pl-6">
                         <span class="text-xs text-gray-500 uppercase font-semibold">Portions</span>
@@ -448,10 +458,10 @@
                 </div>
                 <div class="text-right">
                     <span class="text-xs text-emerald-700 uppercase font-bold flex items-center justify-end gap-1">
-                        <Euro size={14} /> {m.cost_per_portion?.() || 'Cost per Portion'}
+                        <CurrencyIcon currency={recipeCurrency} size={14} /> {m.cost_per_portion?.() || 'Cost per Portion'}
                     </span>
                     <p class="text-2xl font-extrabold text-emerald-900">
-                        €{ingredientCalculations.costPerPortion.toFixed(2)}
+                        {formatCurrency(ingredientCalculations.costPerPortion, recipeCurrency)}
                     </p>
                 </div>
             </div>

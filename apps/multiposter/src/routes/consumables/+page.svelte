@@ -28,6 +28,7 @@
         Check,
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
+    import { formatCurrency, getCurrencySymbol } from "@ac/validations";
 
     let searchQuery = $state("");
     let sortField = $state<"name" | "purchasePrice" | "amount" | "storageLocation" | "expirationDate" | "createdAt" | "updatedAt">("name");
@@ -261,12 +262,12 @@
                                             </td>
 
                                             <td class="py-3 px-4 text-gray-700">
-                                                <span class="font-medium text-gray-900">€{item.purchasePrice.toFixed(2)}</span>
+                                                <span class="font-medium text-gray-900">{formatCurrency(item.purchasePrice, item.currency || 'EUR')}</span>
                                                 <span class="text-xs text-gray-400"> / {item.amount} {item.unit}</span>
                                             </td>
                                             <td class="py-3 px-4">
                                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                                    €{cpu > 0 && cpu < 0.01 ? cpu.toFixed(4) : cpu.toFixed(2)} / {item.unit}
+                                                    {getCurrencySymbol(item.currency || 'EUR')}{cpu > 0 && cpu < 0.01 ? cpu.toFixed(4) : cpu.toFixed(2)} / {item.unit}
                                                 </span>
                                             </td>
                                             <td class="py-3 px-4 text-gray-600">

@@ -8,6 +8,7 @@ export interface VirtualInstanceDiffInput {
 		heroImage?: string | null;
 		ticketPrice?: string | null;
 		ticketPriceUnknown?: boolean | null;
+		currency?: string | null;
 		isAllDay?: boolean | null;
 		isPublic?: boolean | null;
 		guestsCanInviteOthers?: boolean | null;
@@ -29,6 +30,7 @@ export interface VirtualInstanceDiffInput {
 		heroImage?: string | null;
 		ticketPrice?: string | null;
 		ticketPriceUnknown?: boolean | string | null;
+		currency?: string | null;
 		isAllDay?: boolean | string | null;
 		isPublic?: boolean | string | null;
 		guestsCanInviteOthers?: boolean | string | null;
@@ -93,6 +95,7 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	// Pricing & participants
 	if (submitted.ticketPrice !== undefined && strNorm(submitted.ticketPrice) !== strNorm(master.ticketPrice)) return true;
 	if (submitted.ticketPriceUnknown !== undefined && Boolean(submitted.ticketPriceUnknown) !== Boolean(master.ticketPriceUnknown)) return true;
+	if (submitted.currency !== undefined && strNorm(submitted.currency || 'EUR') !== strNorm(master.currency || 'EUR')) return true;
 	if (submitted.participantsCount !== undefined && Number(submitted.participantsCount || 0) !== Number(master.participantsCount || 0)) return true;
 	if (submitted.prepMinutes !== undefined && Number(submitted.prepMinutes || 0) !== Number(master.prepMinutes || 0)) return true;
 	if (submitted.teardownMinutes !== undefined && Number(submitted.teardownMinutes || 0) !== Number(master.teardownMinutes || 0)) return true;

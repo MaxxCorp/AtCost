@@ -45,6 +45,7 @@ export const event = pgTable("event", {
     campaignId: uuid("campaign_id").references(() => campaign.id, { onDelete: "set null" }),
     ticketPrice: text("ticket_price"),
     ticketPriceUnknown: boolean("ticket_price_unknown").default(false).notNull(),
+    currency: text("currency").default("EUR"),
     categoryBerlinDotDe: text("category_berlin_de"),
     qrCodePath: text("qrcode_path"),
     iCalPath: text("ical_path"),

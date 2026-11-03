@@ -1,5 +1,6 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"currency": "Currency",
 	"hello_world": "Hello, {name} from en!",
 	"multiposter": "Multiposter",
 	"ac_multiposter": "AC Multiposter",

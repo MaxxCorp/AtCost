@@ -27,6 +27,7 @@
         Check,
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
+    import { formatCurrency } from "@ac/validations";
 
     let searchQuery = $state("");
     let sortField = $state<"name" | "portions" | "createdAt" | "updatedAt">("name");
@@ -233,7 +234,7 @@
                                         {m.cost_per_portion?.() || 'Cost / Portion'}
                                     </span>
                                     <span class="text-xl font-extrabold text-emerald-700">
-                                        €{(item.costPerPortion ?? 0).toFixed(2)}
+                                        {formatCurrency(item.costPerPortion ?? 0, item.consumables?.[0]?.consumable?.currency || 'EUR')}
                                     </span>
                                 </div>
 

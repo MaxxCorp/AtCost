@@ -9,6 +9,7 @@ export const price = pgTable("price", {
     name: text("name").notNull(),
     description: text("description"),
     isTemplate: boolean("is_template").default(true).notNull(), // provides templates similar to kiosk templates
+    currency: text("currency").default("EUR"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

@@ -12,7 +12,6 @@
         Package,
         Plus,
         Trash2,
-        Euro,
         Users,
         Layers,
         Calculator,
@@ -27,7 +26,8 @@
     import { listPrices } from "../../../routes/prices/list.remote";
     import { createConsumable } from "../../../routes/consumables/new/create.remote";
     import { createRecipe } from "../../../routes/recipes/new/create.remote";
-    import { createConsumableSchema, createRecipeSchema } from "@ac/validations";
+    import { createConsumableSchema, createRecipeSchema, SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from "@ac/validations";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import type { Consumable, Recipe, PriceItem } from "@ac/validations";
     import { getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
@@ -102,6 +102,8 @@
         return onSuccess ? false : true;
     }));
 
+    let currency = $state(untrack(() => initialData?.currency || 'EUR'));
+
     interface FormPriceItem {
         id?: string;
         itemType: 'consumable' | 'recipe';
@@ -116,6 +118,7 @@
         factor: number;
         unitPrice: number;
         sortOrder: number;
+        currency?: string;
     }
 
     let defaultFactor = $state(2.0);
@@ -155,6 +158,7 @@
                 factor,
                 unitPrice,
                 sortOrder: it.sortOrder !== undefined ? it.sortOrder : index,
+                currency: it.currency || it.consumable?.currency || initialData?.currency || 'EUR',
             };
         });
     }));
@@ -194,6 +198,7 @@
                 factor: itemFactor,
                 unitPrice: finalUnitPrice,
                 sortOrder: items.length,
+                currency: (c as any).currency || currency,
             }
         ];
         selectedConsumableId = '';
@@ -227,6 +232,7 @@
                 factor: itemFactor,
                 unitPrice: finalUnitPrice,
                 sortOrder: items.length,
+                currency: (r as any).currency || currency,
             }
         ];
         selectedRecipeId = '';
@@ -259,6 +265,7 @@
                     factor: itemFactor,
                     unitPrice: finalUnitPrice,
                     sortOrder: items.length,
+                    currency: item.currency || currency,
                 }
             ];
             toast.success(`Created and added ${item.name}`);
@@ -299,6 +306,7 @@
                     factor: itemFactor,
                     unitPrice: finalUnitPrice,
                     sortOrder: items.length,
+                    currency: fullRecipe.currency || currency,
                 }
             ];
             toast.success(`Created and added ${fullRecipe.name}`);
@@ -339,6 +347,7 @@
                 factor,
                 unitPrice,
                 sortOrder: idx,
+        currency: it.currency || currency,
             };
         });
         toast.success(`Loaded items from template: ${tpl.name}`);
@@ -445,6 +454,7 @@
         factor: Number(it.factor) || 2,
         unitPrice: Number(it.unitPrice) || 0,
         sortOrder: idx,
+        currency: it.currency || currency,
     }))));
 </script>
 
@@ -496,7 +506,7 @@
 
     <!-- Basic Information -->
     <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div class="sm:col-span-2">
                 <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">
                     {m.name?.() || 'Price List Name'} <span class="text-red-500">*</span>
@@ -508,6 +518,26 @@
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.name.issues() as issue (issue.message)}
+                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                {/each}
+            </div>
+
+            <div>
+                <label for="currency" class="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                    <CurrencyIcon {currency} size={15} class="text-violet-600" />
+                    {m.currency?.() || 'Currency'}
+                </label>
+                <select
+                    id="currency"
+                    {...rf.fields.currency.as('text', initialData?.currency || 'EUR')}
+                    onchange={(e: any) => currency = e.target.value}
+                    class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                >
+                    {#each SUPPORTED_CURRENCIES as c (c.code)}
+                        <option value={c.code}>{c.label}</option>
+                    {/each}
+                </select>
+                {#each rf.fields.currency.issues() as issue (issue.message)}
                     <p class="text-xs text-red-500 mt-1">{issue.message}</p>
                 {/each}
             </div>
@@ -665,7 +695,7 @@
                         {#each consumablesList as c (c.id)}
                             {@const displayUnit = c.amount > 1 && c.unit && c.unit !== 'piece' ? `${c.amount} ${c.unit}` : (c.unit || 'unit')}
                             <option value={c.id}>
-                                {c.name} — €{Number(c.purchasePrice || 0).toFixed(2)} / {displayUnit}
+                                {c.name} — {formatCurrency(Number(c.purchasePrice || 0), c.currency || currency)} / {displayUnit}
                             </option>
                         {/each}
                     </select>
@@ -699,7 +729,7 @@
                         <option value="">{m.select_recipe?.() || 'Select a prepared recipe...'}</option>
                         {#each recipesList as r (r.id)}
                             <option value={r.id}>
-                                {r.name} — €{(r.costPerPortion ?? 0).toFixed(2)} / portion ({r.portions} {r.portions === 1 ? 'portion' : 'portions'})
+                                {r.name} — {formatCurrency(r.costPerPortion ?? 0, currency)} / portion ({r.portions} {r.portions === 1 ? 'portion' : 'portions'})
                             </option>
                         {/each}
                     </select>
@@ -792,7 +822,7 @@
                                 <!-- Base Cost (Purchase Cost) -->
                                 <td class="align-top py-2.5 px-2.5">
                                     <div class="relative">
-                                        <span class="absolute left-2.5 top-2 text-gray-400 text-xs">€</span>
+                                        <span class="absolute left-2.5 top-2 text-gray-400 text-xs">{getCurrencySymbol(item.currency || currency)}</span>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -836,7 +866,7 @@
                                 <!-- Selling Price (Bidirectional with factor) -->
                                 <td class="align-top py-2.5 px-2.5">
                                     <div class="relative">
-                                        <span class="absolute left-2.5 top-2 text-gray-400 text-xs">€</span>
+                                        <span class="absolute left-2.5 top-2 text-gray-400 text-xs">{getCurrencySymbol(item.currency || currency)}</span>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -847,7 +877,7 @@
                                         />
                                     </div>
                                     <span class="text-[10px] font-semibold text-emerald-600 block mt-1 leading-tight">
-                                        +€{lineMargin.toFixed(2)} ({marginPct.toFixed(0)}%)
+                                        +{getCurrencySymbol(item.currency || currency)}{lineMargin.toFixed(2)} ({marginPct.toFixed(0)}%)
                                     </span>
                                 </td>
 
@@ -868,10 +898,10 @@
                                 <!-- Total for Participants -->
                                 <td class="align-top py-2.5 px-3 text-right">
                                     <span class="text-sm font-black text-gray-900 block pt-1">
-                                        €{calc?.totalPrice.toFixed(2) ?? '0.00'}
+                                        {formatCurrency(calc?.totalPrice ?? 0, item.currency || currency)}
                                     </span>
                                     <span class="text-[10px] text-gray-500 font-normal block leading-tight mt-0.5">
-                                        Cost: €{calc?.totalCost.toFixed(2)} • Profit: <span class="text-emerald-600 font-semibold">+€{calc?.grossProfit.toFixed(2)}</span>
+                                        Cost: {formatCurrency(calc?.totalCost ?? 0, item.currency || currency)} • Profit: <span class="text-emerald-600 font-semibold">+{formatCurrency(calc?.grossProfit ?? 0, item.currency || currency)}</span>
                                     </span>
                                 </td>
 
@@ -909,10 +939,10 @@
                             {m.base_cost?.() || 'Total Base Cost'}
                         </span>
                         <p class="text-xl font-bold text-slate-200 mt-0.5">
-                            €{calculations.totalCost.toFixed(2)}
+                            {formatCurrency(calculations.totalCost, currency)}
                         </p>
                         <span class="text-[10px] text-slate-400 block">
-                            €{calculations.perPersonCost.toFixed(2)} / {m.portion?.() || 'person'}
+                            {formatCurrency(calculations.perPersonCost, currency)} / {m.portion?.() || 'person'}
                         </span>
                     </div>
 
@@ -922,7 +952,7 @@
                             {m.gross_profit?.() || 'Gross Profit'}
                         </span>
                         <p class="text-xl font-bold text-emerald-300 mt-0.5">
-                            +€{calculations.grossProfit.toFixed(2)}
+                            +{formatCurrency(calculations.grossProfit, currency)}
                         </p>
                         <span class="text-[10px] text-emerald-400/80 font-medium block">
                             {calculations.marginPercent.toFixed(1)}% {m.margin?.() || 'margin'}
@@ -936,10 +966,10 @@
                         {m.selling_price?.() || 'Grand Total Selling Price'}
                     </span>
                     <p class="text-3xl font-black text-white mt-1">
-                        €{calculations.grandTotal.toFixed(2)}
+                        {formatCurrency(calculations.grandTotal, currency)}
                     </p>
                     <span class="text-xs text-indigo-300/80 block mt-0.5">
-                        €{calculations.perPersonSales.toFixed(2)} / {m.portion?.() || 'person'}
+                        {formatCurrency(calculations.perPersonSales, currency)} / {m.portion?.() || 'person'}
                     </span>
                 </div>
             </div>

@@ -33,6 +33,7 @@ export const createConsumable = form(createConsumableSchema, async (data) => {
             purchasePrice,
             unit: data.unit || 'piece',
             amount,
+            currency: data.currency || 'EUR',
             storageLocation: data.storageLocation || null,
             expirationDate,
         }).returning();

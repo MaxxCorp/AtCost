@@ -1,7 +1,8 @@
 <script lang="ts">
     import * as m from "#lib/paraglide/messages.js";
     import {
-        formatEuro,
+        formatCurrency,
+        getItemCurrency,
         formatPortion,
         getItemPrice,
         groupItemsBySection,
@@ -62,7 +63,7 @@
                                         {/if}
                                     </div>
                                     <span class="shrink-0 font-mono text-sm font-bold text-gray-900">
-                                        {formatEuro(getItemPrice(item))}
+                                        {formatCurrency(getItemPrice(item), getItemCurrency(item, list))}
                                     </span>
                                 </li>
                             {/each}

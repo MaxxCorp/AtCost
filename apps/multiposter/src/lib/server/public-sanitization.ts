@@ -284,6 +284,7 @@ export function sanitizePublicPrice(priceOrAssoc: any): any | null {
 			portionAmount: it.portionAmount,
 			unit: it.unit ?? null,
 			unitPrice: it.unitPrice,
+			currency: it.currency ?? p.currency ?? 'EUR',
 			sortOrder: it.sortOrder,
 			tags: filterPublicTags(rawTags)
 		};
@@ -494,6 +495,7 @@ export function sanitizePublicEvent(event: any): any | null {
 		heroImage: event.heroImage ?? null,
 		ticketPrice: event.ticketPrice ?? null,
 		ticketPriceUnknown: Boolean(event.ticketPriceUnknown),
+		currency: event.currency ?? 'EUR',
 		categoryBerlinDotDe: event.categoryBerlinDotDe ?? null,
 		createdAt: toIsoSafe(event.createdAt) ?? new Date().toISOString(),
 		updatedAt: toIsoSafe(event.updatedAt) ?? new Date().toISOString(),

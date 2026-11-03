@@ -890,6 +890,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 		return {
 			...e,
+			currency: e.currency || 'EUR',
 			contacts: sortedContacts,
 			isSeries,
 			qrCodePath: e.id.includes('_inst_') ? `/api/events/${e.id}/qr.png` : (e.qrCodePath?.includes('/api/') ? e.qrCodePath : `/api/events/${e.id}/qr.png`),

@@ -4,7 +4,8 @@
     import {
         PRICE_MENU_PAPER,
         PRICE_MENU_TEXT_SCALE,
-        formatEuro,
+        formatCurrency,
+        getItemCurrency,
         formatPortion,
         getItemPrice,
         groupItemsBySection,
@@ -160,7 +161,7 @@
                                             <span class="portion">{portion}</span>
                                         {/if}
                                         <span class="leader"></span>
-                                        <span class="price">{formatEuro(getItemPrice(item))}</span>
+                                        <span class="price">{formatCurrency(getItemPrice(item), getItemCurrency(item, list))}</span>
                                         {#if settings.showSaleTallies}
                                             <span class="tally"></span>
                                         {/if}

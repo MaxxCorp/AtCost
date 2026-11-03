@@ -67,6 +67,9 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		if (data.ticketPrice !== undefined) {
 			updateData.ticketPrice = updateData.ticketPriceUnknown ? "0" : data.ticketPrice;
 		}
+		if (data.currency !== undefined) {
+			updateData.currency = data.currency || 'EUR';
+		}
 
 		if (data.startDate !== undefined) {
 			const startTimeZone = data.startTimeZone || 'UTC';
@@ -241,6 +244,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								heroImage: data.heroImage,
 								ticketPrice: updateData.ticketPrice,
 								ticketPriceUnknown: updateData.ticketPriceUnknown,
+								currency: updateData.currency ?? data.currency,
 								isAllDay: updateData.isAllDay,
 								isPublic: updateData.isPublic,
 								guestsCanInviteOthers: updateData.guestsCanInviteOthers,

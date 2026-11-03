@@ -64,6 +64,7 @@ export const listConsumables = query(PaginationSchema, async (input: v.InferOutp
         const costPerUnit = r.amount > 0 ? r.purchasePrice / r.amount : r.purchasePrice;
         return {
             ...r,
+            currency: r.currency || 'EUR',
             expirationDate: r.expirationDate ? r.expirationDate.toISOString() : null,
             createdAt: r.createdAt.toISOString(),
             updatedAt: r.updatedAt.toISOString(),

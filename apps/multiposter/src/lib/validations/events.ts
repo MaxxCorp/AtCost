@@ -54,6 +54,7 @@ export const eventBaseSchema = v.object({
 	categoryBerlinDotDe: v.optional(v.string()),
 	ticketPrice: v.pipe(v.string(), v.minLength(1, m.ticket_price_required?.() ?? 'Ticket price is required')),
 	ticketPriceUnknown: v.optional(v.union([v.boolean(), v.string()])),
+	currency: v.optional(v.string(), 'EUR'),
 	tags: v.optional(v.string()),
 	syncIds: v.optional(v.union([v.array(v.string()), v.string()])),
 	status: v.optional(v.string()),

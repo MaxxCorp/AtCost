@@ -11,6 +11,7 @@ export type PriceItem = Omit<DbPriceItem, 'createdAt' | 'updatedAt'> & {
     consumable?: Consumable | null;
     recipe?: Recipe | null;
     tags?: Tag[];
+    currency?: string | null;
 };
 
 export type PriceListItem = PriceItem;
@@ -71,6 +72,7 @@ export const priceItemInputSchema = v.object({
         v.union([v.number(), v.string()]),
         v.transform((val) => typeof val === 'number' ? val : parseFloat(String(val)) || 0)
     ),
+    currency: v.optional(v.nullable(v.string()), 'EUR'),
     sortOrder: v.optional(v.pipe(
         v.union([v.number(), v.string()]),
         v.transform((val) => typeof val === 'number' ? val : parseInt(String(val), 10) || 0)
@@ -80,6 +82,7 @@ export const priceItemInputSchema = v.object({
 export const priceListItemInputSchema = priceItemInputSchema;
 
 export const createPriceSchema = v.object({
+    currency: v.optional(v.string(), 'EUR'),
     name: v.pipe(v.string(), v.minLength(1, 'Price list name is required')),
     description: v.optional(v.string()),
     isTemplate: v.optional(v.union([
@@ -92,6 +95,7 @@ export const createPriceSchema = v.object({
 export const createPriceListSchema = createPriceSchema;
 
 export const updatePriceSchema = v.object({
+    currency: v.optional(v.string(), 'EUR'),
     id: v.pipe(v.string(), v.minLength(1)),
     name: v.pipe(v.string(), v.minLength(1, 'Price list name is required')),
     description: v.optional(v.string()),

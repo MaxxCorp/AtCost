@@ -37,6 +37,7 @@ export const updateConsumable = form(updateConsumableSchema, async (data) => {
                 purchasePrice,
                 unit: data.unit || 'piece',
                 amount,
+                currency: data.currency || 'EUR',
                 storageLocation: data.storageLocation || null,
                 expirationDate,
             })

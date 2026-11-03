@@ -71,6 +71,15 @@ describe("formatTicketPrice", () => {
             expect(formatTicketPrice("Spende", false)).toBe("Spende");
             expect(formatTicketPrice("ab 5 €", false)).toBe("ab 5 €");
         });
+
+        it("formats bare numeric prices with appropriate currency symbol", () => {
+            expect(formatTicketPrice("15", false)).toBe("15 €");
+            expect(formatTicketPrice("15.50", false)).toBe("15.50 €");
+            expect(formatTicketPrice("15", false, { currency: "USD" })).toBe("$15");
+            expect(formatTicketPrice("15", false, { currency: "GBP" })).toBe("£15");
+            expect(formatTicketPrice("15", false, { currency: "CHF" })).toBe("15 CHF");
+            expect(formatTicketPrice("ab 10", false, { currency: "EUR" })).toBe("ab 10 €");
+        });
     });
 });
 

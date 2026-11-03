@@ -14,7 +14,7 @@
     import { readConsumable } from "../../../routes/consumables/[id]/read.remote";
     import { updateRecipe } from "../../../routes/recipes/[id]/update.remote";
     import { readRecipe } from "../../../routes/recipes/[id]/read.remote";
-    import { updateConsumableSchema, updateRecipeSchema } from "@ac/validations";
+    import { updateConsumableSchema, updateRecipeSchema, formatCurrency, getCurrencySymbol } from "@ac/validations";
     import ConsumableForm from "#lib/components/consumables/ConsumableForm.svelte";
     import RecipeForm from "#lib/components/recipes/RecipeForm.svelte";
 
@@ -29,6 +29,8 @@
         onItemUpdated?: (priceListId: string, updatedItem: any) => void;
         onItemRemoved?: (priceListId: string, itemId: string) => void;
     } = $props();
+
+    const listCurrency = $derived(priceList?.currency || 'EUR');
 
     interface SectionGroup {
         id: string;
@@ -277,11 +279,11 @@
                             </div>
                             <div class="flex items-center gap-2 text-right">
                                 <span class="text-xs font-mono font-semibold text-gray-700">
-                                    €{section.subtotal.toFixed(2)} / {m.portion?.() || "portion"}
+                                    {formatCurrency(section.subtotal, listCurrency)} / {m.portion?.() || "portion"}
                                 </span>
                                 {#if participantsCount > 1}
                                     <span class="text-[11px] font-mono text-emerald-700 font-medium">
-                                        • €{(section.subtotal * participantsCount).toFixed(2)} ({participantsCount}p)
+                                        • {formatCurrency(section.subtotal * participantsCount, listCurrency)} ({participantsCount}p)
                                     </span>
                                 {/if}
                             </div>
@@ -350,13 +352,13 @@
                                                 {m.portion_size?.() || "Portion"}: {portion} {item.unit || ""}
                                             </span>
                                             {#if costPrice > 0}
-                                                <span>• Cost: €{costPrice.toFixed(2)}</span>
+                                                <span>• Cost: {formatCurrency(costPrice, item.currency || listCurrency)}</span>
                                                 {#if item.factor}
                                                     <span>• {Number(item.factor).toFixed(1)}×</span>
                                                 {/if}
                                                 {#if lineProfitPerPortion > 0}
                                                     <span class="text-emerald-700 font-semibold">
-                                                        • Margin: +€{lineProfitPerPortion.toFixed(2)}
+                                                        • Margin: +{formatCurrency(lineProfitPerPortion, item.currency || listCurrency)}
                                                     </span>
                                                 {/if}
                                             {/if}
@@ -370,14 +372,14 @@
                                 >
                                     <div class="text-left sm:text-right">
                                         <div class="font-mono font-bold text-xs sm:text-sm text-gray-900">
-                                            €{lineTotalPerPortion.toFixed(2)}
+                                            {formatCurrency(lineTotalPerPortion, item.currency || listCurrency)}
                                             <span class="text-[10px] text-gray-400 font-normal">
                                                 / {m.portion?.() || "portion"}
                                             </span>
                                         </div>
                                         {#if participantsCount > 1}
                                             <div class="font-mono text-xs font-semibold text-emerald-700">
-                                                €{(lineTotalPerPortion * participantsCount).toFixed(2)}
+                                                {formatCurrency(lineTotalPerPortion * participantsCount, item.currency || listCurrency)}
                                                 <span class="text-[10px] text-emerald-600 font-normal">
                                                     ({participantsCount}p)
                                                 </span>

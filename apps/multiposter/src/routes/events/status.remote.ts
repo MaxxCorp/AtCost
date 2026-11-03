@@ -88,6 +88,7 @@ export const updateEventsStatus = command(
 								isPublic: master.isPublic,
 								ticketPrice: master.ticketPrice,
 								ticketPriceUnknown: master.ticketPriceUnknown,
+								currency: master.currency ?? 'EUR',
 								categoryBerlinDotDe: master.categoryBerlinDotDe,
 							})
 							.returning();

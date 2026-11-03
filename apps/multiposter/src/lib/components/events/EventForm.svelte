@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
-    import { type Event, type Tag, createTagSchema, updateTagSchema } from "@ac/validations";
+    import { type Event, type Tag, createTagSchema, updateTagSchema, SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from "@ac/validations";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
 
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
@@ -491,6 +492,8 @@
                rf.fields.ticketPriceUnknown.value() === "on")
             : (initialData?.id ? !!initialData.ticketPriceUnknown : true),
     );
+
+    let eventCurrency = $derived((rf.fields.currency?.value?.() as string) || initialData?.currency || "EUR");
 
     let resourceAvailability = $state<Record<string, { available: boolean; reason?: string; eventId?: string; eventTitle?: string }>>({});
     let contactAvailability = $state<Record<string, { available: boolean; reason?: string; eventId?: string; eventTitle?: string }>>({});
@@ -1552,22 +1555,37 @@
             >
                 {m.ticket_price()} <span class="text-red-500">*</span>
             </label>
-            <div class="flex items-center gap-4 min-h-[42px]">
+            <div class="flex items-center gap-3 min-h-[42px]">
                 {#if !isTicketPriceUnknown}
-                    <input
-                        {...rf.fields.ticketPrice.as(
-                            "text",
-                            initialData?.ticketPrice?.toString() ?? "",
-                        )}
-                        class="flex-1 w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
-                            ? 'border-red-500'
-                            : 'border-gray-300'}"
-                        placeholder="e.g. 15.50"
-                        onblur={() => rf.validate()}
-                    />
+                    <div class="relative flex-1 flex items-center">
+                        <div class="absolute left-3 pointer-events-none flex items-center text-gray-500">
+                            <CurrencyIcon currency={eventCurrency} size={16} />
+                        </div>
+                        <input
+                            {...rf.fields.ticketPrice.as(
+                                "text",
+                                initialData?.ticketPrice?.toString() ?? "",
+                            )}
+                            class="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
+                                ? 'border-red-500'
+                                : 'border-gray-300'}"
+                            placeholder="e.g. 15.50"
+                            onblur={() => rf.validate()}
+                        />
+                    </div>
                 {:else}
                     <input {...rf.fields.ticketPrice.as("hidden", "0")} />
                 {/if}
+                <div class="w-28 shrink-0">
+                    <select
+                        {...rf.fields.currency.as("text", initialData?.currency || "EUR")}
+                        class="w-full px-2 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 text-sm font-mono"
+                    >
+                        {#each SUPPORTED_CURRENCIES as c}
+                            <option value={c.code}>{c.symbol} {c.code}</option>
+                        {/each}
+                    </select>
+                </div>
                 <div class="flex items-center gap-2 whitespace-nowrap">
                     <input
                         {...rf.fields.ticketPriceUnknown.as("checkbox", initialData?.id ? !!initialData.ticketPriceUnknown : true)}
@@ -2311,7 +2329,7 @@
 
                 {#snippet renderItemDetail(item: any)}
                     <div class="flex items-center gap-1.5 text-xs text-gray-600 font-mono">
-                        <span>€{(Number(item.totalPricePerPortion) || 0).toFixed(2)} / {m.portion?.() || 'portion'}</span>
+                        <span>{formatCurrency(Number(item.totalPricePerPortion) || 0, item.currency || eventCurrency)} / {m.portion?.() || 'portion'}</span>
                     </div>
                 {/snippet}
 
@@ -2319,7 +2337,7 @@
                     <div class="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs font-medium shrink-0">
                         <Calculator size={13} class="text-emerald-600" />
                         <span>
-                            €{((Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1)).toFixed(2)}
+                            {formatCurrency((Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1), item.currency || eventCurrency)}
                             <span class="text-emerald-600 text-[11px] font-normal">({totalParticipants} {m.participants?.() || 'participants'})</span>
                         </span>
                     </div>
@@ -2370,18 +2388,18 @@
             {@const cateringProfit = cateringTotal - cateringCost}
             <div class="mt-3 p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div class="flex items-center gap-2">
-                    <Receipt size={18} class="text-emerald-600" />
+                    <CurrencyIcon currency={eventCurrency} size={18} class="text-emerald-600" />
                     <span class="font-semibold text-gray-800">{m.catering_calculation?.() || 'Total Price Calculation'}:</span>
                     <span class="text-xs text-gray-600">({currentPrices.length} {currentPrices.length === 1 ? (m.price_list?.() || 'price list') : (m.prices?.() || 'prices')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
                 </div>
                 <div class="flex items-center gap-3 text-right">
                     {#if cateringCost > 0}
                         <div class="text-xs text-gray-600">
-                            Cost: <span class="font-mono text-gray-800">€{cateringCost.toFixed(2)}</span> • Profit: <span class="font-mono font-semibold text-emerald-700">+€{cateringProfit.toFixed(2)}</span>
+                            Cost: <span class="font-mono text-gray-800">{formatCurrency(cateringCost, eventCurrency)}</span> • Profit: <span class="font-mono font-semibold text-emerald-700">+{formatCurrency(cateringProfit, eventCurrency)}</span>
                         </div>
                     {/if}
                     <div class="font-bold text-base text-emerald-900 font-mono">
-                        €{cateringTotal.toFixed(2)}
+                        {formatCurrency(cateringTotal, eventCurrency)}
                     </div>
                 </div>
             </div>

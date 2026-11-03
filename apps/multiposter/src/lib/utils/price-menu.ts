@@ -1,4 +1,5 @@
 import { getLocale } from "#lib/paraglide/runtime.js";
+import { normalizeCurrency, getCurrencySymbol } from "@ac/validations";
 
 /**
  * Shared helpers for customer-facing price lists (event view dialog and the printable price menu).
@@ -12,6 +13,7 @@ export interface PriceMenuItem {
     portionAmount?: number | null;
     unit?: string | null;
     unitPrice?: number | null;
+    currency?: string | null;
     sortOrder?: number | null;
     tags?: any[];
 }
@@ -20,6 +22,7 @@ export interface PriceMenuList {
     id?: string;
     name: string;
     description?: string | null;
+    currency?: string | null;
     items?: PriceMenuItem[];
 }
 
@@ -114,8 +117,21 @@ export function getItemPrice(item: PriceMenuItem): number {
     return Math.round(price * 100) / 100;
 }
 
+export function formatCurrency(value: number, currency: string = "EUR"): string {
+    const code = normalizeCurrency(currency);
+    try {
+        return new Intl.NumberFormat(getLocale(), { style: "currency", currency: code }).format(value);
+    } catch {
+        return `${getCurrencySymbol(code)} ${value.toFixed(2)}`;
+    }
+}
+
+export function getItemCurrency(item: PriceMenuItem, list?: PriceMenuList): string {
+    return normalizeCurrency(item.currency || list?.currency);
+}
+
 export function formatEuro(value: number): string {
-    return new Intl.NumberFormat(getLocale(), { style: "currency", currency: "EUR" }).format(value);
+    return formatCurrency(value, "EUR");
 }
 
 /** Portion label such as "0,5 l"; `null` for plain pieces that need no explanation. */

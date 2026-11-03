@@ -12,13 +12,13 @@
         QrCode,
         Accessibility,
         Tag,
-        Euro,
         RefreshCw,
         Info,
         Ticket,
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from '#lib/utils/format-event-date.js';
     import { page } from '$app/state';
@@ -78,7 +78,7 @@
 
     const hasContact = $derived(!!event.resolvedContact);
     const hasDescription = $derived(!!(event.description && event.description.trim().length > 0));
-    const displayTicketPrice = $derived(formatTicketPrice((event as any).ticketPrice, (event as any).ticketPriceUnknown));
+    const displayTicketPrice = $derived(formatTicketPrice((event as any).ticketPrice, (event as any).ticketPriceUnknown, { currency: (event as any).currency || 'EUR' }));
     const eventRecurrenceRule = $derived((Array.isArray(event.recurrence) ? event.recurrence[0] : (typeof event.recurrence === 'string' ? event.recurrence : null)) || (event as any).seriesMaster?.recurrence?.[0] || null);
     const hasSidebar = $derived(
         !!(event as any).qrCodeDataUrl ||
@@ -358,7 +358,7 @@
                         <div class="space-y-2.5 text-xs">
                             {#if displayTicketPrice}
                                 <div class="flex items-center gap-2 text-indigo-800">
-                                    <Euro class="w-4 h-4 opacity-75" />
+                                    <CurrencyIcon currency={(event as any).currency || 'EUR'} class="w-4 h-4 opacity-75" />
                                     <span class="font-semibold">{displayTicketPrice}</span>
                                 </div>
                             {/if}

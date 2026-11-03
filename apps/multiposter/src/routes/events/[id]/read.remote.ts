@@ -417,6 +417,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		});
 		return {
 			...p,
+			currency: p.currency || 'EUR',
 			createdAt: toIsoSafe(p.createdAt),
 			updatedAt: toIsoSafe(p.updatedAt),
 			items,
@@ -453,6 +454,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	// Full object
 	return {
 		...result,
+		currency: result.currency || 'EUR',
 		iCalPath,
 		qrCodePath,
 		createdAt: toIsoSafe(result.createdAt) ?? new Date().toISOString(),

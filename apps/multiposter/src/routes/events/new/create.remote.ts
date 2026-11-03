@@ -179,6 +179,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 			categoryBerlinDotDe: data.categoryBerlinDotDe || null,
 			ticketPriceUnknown: data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on',
 			ticketPrice: (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on') ? "0" : (data.ticketPrice || null),
+			currency: data.currency || 'EUR',
 			isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
 			prepMinutes,
 			teardownMinutes,

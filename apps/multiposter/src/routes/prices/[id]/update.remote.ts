@@ -21,6 +21,7 @@ export const updatePrice = form(updatePriceSchema, async (data) => {
                 name: data.name,
                 description: data.description || null,
                 isTemplate: data.isTemplate !== undefined ? Boolean(data.isTemplate) : true,
+                currency: data.currency || 'EUR',
             })
             .where(eq(price.id, data.id))
             .returning();

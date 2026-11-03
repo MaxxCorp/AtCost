@@ -111,6 +111,7 @@ export const listPrices = query(PaginationSchema, async (input: v.InferOutput<ty
             name: p.name,
             description: p.description,
             isTemplate: p.isTemplate,
+            currency: p.currency || 'EUR',
             createdAt: p.createdAt.toISOString(),
             updatedAt: p.updatedAt.toISOString(),
             items,

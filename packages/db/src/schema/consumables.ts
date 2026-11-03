@@ -7,6 +7,7 @@ export const consumable = pgTable("consumable", {
     name: text("name").notNull(),
     description: text("description"),
     purchasePrice: doublePrecision("purchase_price").default(0).notNull(),
+    currency: text("currency").default("EUR"),
     unit: text("unit").default("piece").notNull(), // e.g. "kg", "g", "l", "ml", "piece", "can", "bottle", "pack"
     amount: doublePrecision("amount").default(1).notNull(), // package size / quantity corresponding to purchasePrice
     storageLocation: text("storage_location"),

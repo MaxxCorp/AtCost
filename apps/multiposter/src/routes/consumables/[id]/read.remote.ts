@@ -29,6 +29,7 @@ export const readConsumable = query(v.string(), async (id: string): Promise<Cons
 
     return {
         ...row,
+        currency: row.currency || 'EUR',
         expirationDate: row.expirationDate ? row.expirationDate.toISOString() : null,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),

@@ -42,6 +42,7 @@
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isSeriesItem, isNonSeriesEvent, getSeriesRootId } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
@@ -1514,7 +1515,7 @@
                         {@const dateParts = isEvt ? getEventDateParts(item as Event) : null}
                         {@const dateStr = isEvt ? (item as Event).startDateTime : (item as Announcement).createdAt}
                         {@const rooms = isEvt ? getEventRooms(item as Event) : []}
-                        {@const priceStr = isEvt ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown) : ""}
+                        {@const priceStr = isEvt ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown, { currency: (item as any).currency || 'EUR' }) : ""}
                         {@const isFree = isEvt ? isEventFree((item as Event).ticketPrice, (item as Event).ticketPriceUnknown) : false}
                         {@const cancelledCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'cancelled').length : 0}
                         {@const tentativeCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'tentative').length : 0}
@@ -1654,7 +1655,7 @@
                                                 </span>
                                             {:else if priceStr}
                                                 <span class="inline-flex items-center gap-0.5 font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
-                                                    <Ticket class="w-2.5 h-2.5" />
+                                                    <CurrencyIcon currency={(item as any).currency || 'EUR'} class="w-2.5 h-2.5" />
                                                     {priceStr}
                                                 </span>
                                             {/if}

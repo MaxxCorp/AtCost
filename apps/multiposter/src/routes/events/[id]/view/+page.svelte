@@ -15,7 +15,7 @@
         Users,
         Tag as TagIcon,
         Ticket,
-        Euro,
+
         Info,
         Download,
         Pencil,
@@ -36,6 +36,7 @@
     import Button from "#lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import {
         formatEventStatus,
@@ -189,7 +190,7 @@
                 {@const eventInstances = event.instances || []}
                 {@const hasContact = !!(event.resolvedContact && event.resolvedContact.isPublic !== false)}
                 {@const hasStaffNotes = !!(checkCanEdit(event) && event.internalNotes && event.internalNotes.trim().length > 0)}
-                {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown)}
+                {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown, { currency: event.currency || 'EUR' })}
                 {@const otherContacts = ((event as any).contacts || []).filter((c: any) => {
                     const cObj = c.contact || c;
                     if (!cObj || cObj.isPublic !== true || cObj.obfuscationStatus === 'obfuscated') return false;
@@ -575,7 +576,8 @@
                                         <li
                                             class="flex items-center gap-3 text-gray-700"
                                         >
-                                            <Euro
+                                            <CurrencyIcon
+                                                currency={event.currency || 'EUR'}
                                                 size={18}
                                                 class="text-green-600 flex-shrink-0"
                                             />
@@ -632,7 +634,7 @@
                                     class="flex items-center gap-2 text-violet-700 border-violet-200 hover:bg-violet-50"
                                     onclick={() => (pricesDialogOpen = true)}
                                 >
-                                    <Receipt size={16} class="text-violet-600" />
+                                    <CurrencyIcon currency={event.prices?.[0]?.currency || event.currency || 'EUR'} size={16} class="text-violet-600" />
                                     {m.prices?.() || 'Prices'}
                                 </Button>
                             {/if}

@@ -5,7 +5,9 @@
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
     import { goto, refreshAll } from "$app/navigation";
-    import { Euro, Calendar, MapPin, Package, Scale, Tag as TagIcon } from "@lucide/svelte";
+    import { Calendar, MapPin, Package, Scale, Tag as TagIcon } from "@lucide/svelte";
+    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
+    import { SUPPORTED_CURRENCIES, getCurrencySymbol } from "@ac/validations";
     import { TagManager, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
@@ -46,12 +48,12 @@
     const tagCategoriesQuery = $derived(listTagCategoriesRemote({ limit: 100 }));
     const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
 
-
     const feedback = useFormValidationFeedback(() => rf, {
         message: () => m.please_fix_validation?.() || 'Please fix validation errors',
     });
 
     let purchasePrice = $state(untrack(() => initialData?.purchasePrice ?? 0));
+    let currency = $state(untrack(() => initialData?.currency || 'EUR'));
     let amount = $state(untrack(() => initialData?.amount ?? 1));
     let unit = $state(untrack(() => initialData?.unit ?? 'piece'));
 
@@ -118,7 +120,6 @@
         class="hidden"
     />
 
-
     <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-xs space-y-4">
         <div>
             <label for="name" class="block text-sm font-semibold text-gray-700 mb-1">
@@ -148,11 +149,11 @@
             ></textarea>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
                 <label for="purchasePrice" class="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                    <Euro size={15} class="text-emerald-600" />
-                    {m.purchase_price?.() || 'Purchase Price'} (€) <span class="text-red-500">*</span>
+                    <CurrencyIcon {currency} size={15} class="text-emerald-600" />
+                    {m.purchase_price?.() || 'Purchase Price'} ({getCurrencySymbol(currency)}) <span class="text-red-500">*</span>
                 </label>
                 <input
                     id="purchasePrice"
@@ -164,6 +165,26 @@
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.purchasePrice.issues() as issue (issue.message)}
+                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                {/each}
+            </div>
+
+            <div>
+                <label for="currency" class="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                    <CurrencyIcon {currency} size={15} class="text-emerald-600" />
+                    {m.currency?.() || 'Currency'}
+                </label>
+                <select
+                    id="currency"
+                    {...rf.fields.currency.as('text', initialData?.currency || 'EUR')}
+                    onchange={(e: any) => currency = e.target.value}
+                    class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                >
+                    {#each SUPPORTED_CURRENCIES as c (c.code)}
+                        <option value={c.code}>{c.label}</option>
+                    {/each}
+                </select>
+                {#each rf.fields.currency.issues() as issue (issue.message)}
                     <p class="text-xs text-red-500 mt-1">{issue.message}</p>
                 {/each}
             </div>
@@ -208,11 +229,11 @@
         <!-- Calculated cost preview card -->
         <div class="p-3 bg-emerald-50/60 rounded-lg border border-emerald-100 flex items-center justify-between text-sm">
             <span class="text-emerald-800 font-medium flex items-center gap-1.5">
-                <Euro size={16} class="text-emerald-600" />
+                <CurrencyIcon {currency} size={16} class="text-emerald-600" />
                 {m.cost_per_unit?.() || 'Cost per Unit'}:
             </span>
             <span class="text-base font-bold text-emerald-900">
-                €{calculatedCostPerUnit > 0 && calculatedCostPerUnit < 0.01 ? calculatedCostPerUnit.toFixed(4) : calculatedCostPerUnit.toFixed(2)} / {unit || 'unit'}
+                {getCurrencySymbol(currency)}{calculatedCostPerUnit > 0 && calculatedCostPerUnit < 0.01 ? calculatedCostPerUnit.toFixed(4) : calculatedCostPerUnit.toFixed(2)} / {unit || 'unit'}
             </span>
         </div>
 
@@ -282,7 +303,6 @@
     </div>
 
     <div class="flex items-center justify-end gap-3 pt-2">
-
         {#if onCancel}
             <Button variant="outline" onclick={onCancel}>
                 {m.cancel?.() || 'Cancel'}

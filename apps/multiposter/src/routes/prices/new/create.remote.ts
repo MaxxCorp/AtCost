@@ -15,6 +15,7 @@ export const createPrice = form(createPriceSchema, async (data) => {
                 name: data.name,
                 description: data.description || null,
                 isTemplate: data.isTemplate !== undefined ? Boolean(data.isTemplate) : true,
+                currency: data.currency || 'EUR',
             }).returning();
 
             let items: any[] = [];
