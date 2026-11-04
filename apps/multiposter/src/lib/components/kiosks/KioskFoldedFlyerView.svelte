@@ -1318,7 +1318,8 @@
         ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown, { currency: (item as any).currency || 'EUR' })
         : null}
 
-    <article
+    <div
+        role="button"
         class="event-item-card p-2 rounded-lg transition-colors cursor-pointer space-y-1 print:break-inside-avoid {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries
             ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30'
             : 'border border-slate-200/90 bg-white hover:border-slate-300')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, previewGreyscaleOnScreen)}"
@@ -1489,7 +1490,7 @@
                 </div>
             {/if}
         </div>
-    </article>
+    </div>
 {/snippet}
 
 <style>

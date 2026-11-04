@@ -141,10 +141,10 @@
             </span>
         </div>
 
-        <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 shrink-0"></div>
-
-        <!-- Description Length Slider (if description exists) -->
+        <!-- Description Length Slider (only if description exists) -->
         {#if rawDesc}
+            <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+
             <div class="flex items-center gap-2 shrink-0">
                 <div class="flex items-center gap-1 shrink-0 min-w-[50px]">
                     {#if isLoading}
@@ -176,8 +176,6 @@
                     100%
                 </button>
             </div>
-        {:else}
-            <span class="text-slate-400 italic text-[11px] shrink-0">Keine Beschreibung</span>
         {/if}
 
         <!-- Series Dates Visibility (only for series with instances/dates) -->

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { CiPreset, PrintMode, CiSponsorItem } from "./types.js";
+    import { getCardPrintClasses, type CiPreset, type PrintMode, type CiSponsorItem, type CardPrintConfig, type KioskElementSettings } from "./types.js";
 
     let {
         preset,
@@ -15,7 +15,12 @@
         partnerLogoUrl = "",
         heightMm: explicitHeightMm,
         variant = "auto",
-        class: extraClass = ""
+        class: extraClass = "",
+        selectedCardId = null,
+        cardSettings = {},
+        elementSettings,
+        previewGreyscaleOnScreen = false,
+        onSelect
     }: {
         preset: CiPreset;
         printMode?: PrintMode;
@@ -31,6 +36,11 @@
         heightMm?: number;
         variant?: "auto" | "flyer" | "poster";
         class?: string;
+        selectedCardId?: string | null;
+        cardSettings?: Record<string, CardPrintConfig>;
+        elementSettings?: KioskElementSettings;
+        previewGreyscaleOnScreen?: boolean;
+        onSelect?: (id: string) => void;
     } = $props();
 
     let effectiveInclusivity = $derived(
@@ -142,11 +152,20 @@
             >
                 {#each centerSponsors as sponsor (sponsor.id)}
                     {#if sponsor.logoUrl}
-                        <img
-                            src={sponsor.logoUrl}
-                            alt={sponsor.name}
-                            class="{isPoster ? 'h-[10mm] max-h-[38px] max-w-[85px]' : 'h-[6.5mm] max-h-[25px] max-w-[55px]'} w-auto object-contain {sponsor.grayscaleInPrint ? 'print:grayscale' : ''} {sponsor.hideInPrint ? 'print:hidden' : ''}"
-                        />
+                        <div
+                            role="button"
+                            tabindex="0"
+                            onclick={(e) => { e.stopPropagation(); onSelect?.(sponsor.id); }}
+                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelect?.(sponsor.id); } }}
+                            class="cursor-pointer rounded-xs p-0.5 transition-all outline-hidden shrink-0 {selectedCardId === sponsor.id ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings?.[sponsor.id], elementSettings?.sponsors, previewGreyscaleOnScreen)}"
+                            title="{sponsor.name || 'Sponsor'} (Klicken für Druck- & Farbeinstellungen)"
+                        >
+                            <img
+                                src={sponsor.logoUrl}
+                                alt={sponsor.name}
+                                class="{isPoster ? 'h-[10mm] max-h-[38px] max-w-[85px]' : 'h-[6.5mm] max-h-[25px] max-w-[55px]'} w-auto object-contain"
+                            />
+                        </div>
                     {/if}
                 {/each}
             </div>
@@ -160,19 +179,37 @@
             {#if partnerLogoUrl || aboveAddressSponsors.length > 0}
                 <div class="flex items-center justify-end gap-1.5 pb-0.5">
                     {#if partnerLogoUrl}
-                        <img
-                            src={partnerLogoUrl}
-                            alt="Partner Logo"
-                            class="{isPoster ? 'h-[9mm] max-h-[34px] max-w-[90px]' : 'h-[6mm] max-h-[22px] max-w-[65px]'} w-auto object-contain object-right"
-                        />
+                        <div
+                            role="button"
+                            tabindex="0"
+                            onclick={(e) => { e.stopPropagation(); onSelect?.('partner_logo'); }}
+                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelect?.('partner_logo'); } }}
+                            class="cursor-pointer rounded-xs p-0.5 transition-all outline-hidden shrink-0 {selectedCardId === 'partner_logo' ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings?.['partner_logo'], elementSettings?.sponsors, previewGreyscaleOnScreen)}"
+                            title="Partnerlogo (Klicken für Druck- & Farbeinstellungen)"
+                        >
+                            <img
+                                src={partnerLogoUrl}
+                                alt="Partner Logo"
+                                class="{isPoster ? 'h-[9mm] max-h-[34px] max-w-[90px]' : 'h-[6mm] max-h-[22px] max-w-[65px]'} w-auto object-contain object-right"
+                            />
+                        </div>
                     {/if}
                     {#each aboveAddressSponsors as s (s.id)}
                         {#if s.logoUrl}
-                            <img
-                                src={s.logoUrl}
-                                alt={s.name}
-                                class="{isPoster ? 'h-[9mm] max-h-[34px] max-w-[85px]' : 'h-[6mm] max-h-[22px] max-w-[60px]'} w-auto object-contain object-right {s.grayscaleInPrint ? 'print:grayscale' : ''} {s.hideInPrint ? 'print:hidden' : ''}"
-                            />
+                            <div
+                                role="button"
+                                tabindex="0"
+                                onclick={(e) => { e.stopPropagation(); onSelect?.(s.id); }}
+                                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelect?.(s.id); } }}
+                                class="cursor-pointer rounded-xs p-0.5 transition-all outline-hidden shrink-0 {selectedCardId === s.id ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings?.[s.id], elementSettings?.sponsors, previewGreyscaleOnScreen)}"
+                                title="{s.name || 'Sponsor'} (Klicken für Druck- & Farbeinstellungen)"
+                            >
+                                <img
+                                    src={s.logoUrl}
+                                    alt={s.name}
+                                    class="{isPoster ? 'h-[9mm] max-h-[34px] max-w-[85px]' : 'h-[6mm] max-h-[22px] max-w-[60px]'} w-auto object-contain object-right"
+                                />
+                            </div>
                         {/if}
                     {/each}
                 </div>

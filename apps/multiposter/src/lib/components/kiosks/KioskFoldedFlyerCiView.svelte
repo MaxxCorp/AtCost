@@ -1042,7 +1042,7 @@
 
                                 <!-- Front Cover Body: Location Name, Address, Room, Opening Hours, Contact & Calendar QR -->
                                 <div
-                                    class="ci-content-body p-3 flex-1 flex flex-col justify-between relative z-10 space-y-2 overflow-hidden {printOptions.previewGreyscaleOnScreen ? 'grayscale' : ''} {printOptions.printMode === 'ci_only' ? 'print:invisible' : ''} {printOptions.printMode === 'greyscale_content' ? 'print:grayscale' : ''}"
+                                    class="ci-content-body p-3 flex-1 flex flex-col justify-between relative z-10 space-y-2 overflow-hidden {printOptions.previewGreyscaleOnScreen ? 'card-greyscale' : ''} {printOptions.printMode === 'ci_only' ? 'print:invisible' : ''} {printOptions.printMode === 'greyscale_content' ? 'print:card-greyscale' : ''}"
                                 >
                                     <div class="space-y-2 overflow-hidden">
                                         <div class="space-y-1.5 {getElementPrintClasses(elementSettings.header, printOptions.previewGreyscaleOnScreen)}">
@@ -1407,7 +1407,8 @@
         ? formatTicketPrice((item as Event).ticketPrice, (item as Event).ticketPriceUnknown, { currency: (item as any).currency || 'EUR' })
         : null}
 
-    <article
+    <div
+        role="button"
         class="event-item-card p-2 rounded-lg transition-colors cursor-pointer space-y-1 print:break-inside-avoid {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries
             ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30'
             : 'border border-slate-200/90 bg-white hover:border-slate-300')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, printOptions.previewGreyscaleOnScreen)}"
@@ -1578,7 +1579,7 @@
                 </div>
             {/if}
         </div>
-    </article>
+    </div>
 {/snippet}
 
 <style>
@@ -1802,9 +1803,19 @@
         :global(.print\:hidden) {
             display: none !important;
         }
-        :global(.print\:grayscale) {
+        :global(.print\:card-greyscale) img,
+        :global(.card-greyscale) img,
+        :global(img.print\:card-greyscale),
+        :global(img.card-greyscale) {
             filter: grayscale(100%) !important;
             -webkit-filter: grayscale(100%) !important;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            image-rendering: -webkit-optimize-contrast;
+        }
+        :global(.print\:card-greyscale) {
+            filter: none !important;
+            -webkit-filter: none !important;
         }
 
         .print-omit-ci .ci-area,
@@ -1824,8 +1835,8 @@
         .print-greyscale-content .panel-flap,
         .print-greyscale-content .panel-back,
         .print-greyscale-content .ci-content-body {
-            filter: grayscale(100%) !important;
-            -webkit-filter: grayscale(100%) !important;
+            filter: none !important;
+            -webkit-filter: none !important;
         }
 
         .print-hide-fold-guides .fold-line {

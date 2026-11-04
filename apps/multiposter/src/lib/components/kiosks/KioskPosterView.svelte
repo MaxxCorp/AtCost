@@ -320,6 +320,41 @@
     let cardSettings = $state<Record<string, CardPrintConfig>>({});
     let selectedItem = $derived.by(() => {
         if (!selectedCardId) return null;
+
+        if (selectedCardId === 'location_logo') {
+            return {
+                id: 'location_logo',
+                title: `${currentLocation?.name || 'Standort'} Logo`,
+                description: undefined
+            };
+        }
+
+        if (selectedCardId === 'partner_logo') {
+            return {
+                id: 'partner_logo',
+                title: 'Partnerlogo',
+                description: undefined
+            };
+        }
+
+        const sp = sponsors.find(s => s.id === selectedCardId);
+        if (sp) {
+            return {
+                id: sp.id,
+                title: sp.name ? `${sp.name} (Logo)` : 'Sponsor / Partner Logo',
+                description: undefined
+            };
+        }
+
+        const sec = customSections.find(s => s.id === selectedCardId);
+        if (sec) {
+            return {
+                id: sec.id,
+                title: sec.title || 'Abschnitt',
+                description: sec.content
+            };
+        }
+
         const it = displayItems.find(i => i.id === selectedCardId);
         if (!it) return null;
         const isEvt = "startDateTime" in it;
@@ -812,7 +847,13 @@
 {#snippet customSectionCard(sec: CustomSectionItem, slotContext: string)}
     {@const colorBorder = sec.accentColor === 'red' ? 'border-l-red-600' : sec.accentColor === 'gold' ? 'border-l-[#fbc707]' : sec.accentColor === 'emerald' ? 'border-l-emerald-600' : 'border-l-slate-400'}
     {@const colorBg = sec.accentColor === 'red' ? 'bg-red-50/25' : sec.accentColor === 'gold' ? 'bg-amber-50/25' : sec.accentColor === 'emerald' ? 'bg-emerald-50/25' : 'bg-slate-50/80'}
-    <div class="custom-section-item p-2.5 rounded-r-md border border-slate-200/60 border-l-[3.5px] {colorBorder} {colorBg} break-inside-avoid {slotContext === 'banner' ? 'mb-2' : 'mb-3.5'} {getElementPrintClasses(elementSettings.customSections, previewGreyscaleOnScreen)}">
+    <div
+        role="button"
+        tabindex="0"
+        onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === sec.id ? null : sec.id; }}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === sec.id ? null : sec.id; } }}
+        class="custom-section-item p-2.5 rounded-r-md border border-slate-200/60 border-l-[3.5px] {colorBorder} {colorBg} break-inside-avoid {slotContext === 'banner' ? 'mb-2' : 'mb-3.5'} cursor-pointer transition-all outline-hidden {selectedCardId === sec.id ? 'ring-2 ring-amber-400 bg-amber-100/70 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings[sec.id], elementSettings.customSections, previewGreyscaleOnScreen)}"
+    >
         <div class="flex items-start gap-3">
             {#if sec.imageUrl}
                 <img src={sec.imageUrl} alt={sec.title} class="max-h-16 max-w-[120px] object-contain rounded shrink-0 bg-white p-1 border border-slate-200" />
@@ -825,7 +866,7 @@
                 {/if}
                 {#if sec.content}
                     <div class="text-[11px] text-slate-700 leading-relaxed whitespace-pre-line rich-description">
-                        {@html sec.content}
+                        {@html itemDescriptions[sec.id] || sec.content}
                     </div>
                 {/if}
             </div>
@@ -1419,8 +1460,13 @@
                             <div class="flex items-start gap-4">
                                 {#if showLocationLogo && locationLogoPosition === "left" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
                                     <div
-                                        class="location-logo-wrap shrink-0"
+                                        role="button"
+                                        tabindex="0"
+                                        onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === 'location_logo' ? null : 'location_logo'; }}
+                                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === 'location_logo' ? null : 'location_logo'; } }}
+                                        class="location-logo-wrap shrink-0 cursor-pointer rounded-xs p-0.5 transition-all outline-hidden {selectedCardId === 'location_logo' ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings['location_logo'], elementSettings.header, previewGreyscaleOnScreen)}"
                                         style="transform: translateY({locationLogoOffsetY}px);"
+                                        title="Standortlogo (Klicken für Druck- & Farbeinstellungen)"
                                     >
                                         <img
                                             src={effectiveLocationLogo}
@@ -1508,8 +1554,13 @@
                         <div class="flex flex-col items-end gap-2.5 shrink-0 self-start">
                             {#if showLocationLogo && locationLogoPosition === "right" && effectiveLocationLogo && (!isLetterheadMode || letterheadShowLogo)}
                                 <div
-                                    class="location-logo-wrap shrink-0 text-right flex items-start justify-end"
+                                    role="button"
+                                    tabindex="0"
+                                    onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === 'location_logo' ? null : 'location_logo'; }}
+                                    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === 'location_logo' ? null : 'location_logo'; } }}
+                                    class="location-logo-wrap shrink-0 text-right flex items-start justify-end cursor-pointer rounded-xs p-0.5 transition-all outline-hidden {selectedCardId === 'location_logo' ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings['location_logo'], elementSettings.header, previewGreyscaleOnScreen)}"
                                     style="transform: translateY({locationLogoOffsetY}px);"
+                                    title="Standortlogo (Klicken für Druck- & Farbeinstellungen)"
                                 >
                                     <img
                                         src={effectiveLocationLogo}
@@ -1527,13 +1578,22 @@
                                     </span>
                                     <div class="flex items-center gap-3 flex-wrap justify-end">
                                         {#each sponsors as s (s.id)}
-                                            {#if s.logoUrl}
-                                                <img src={s.logoUrl} alt={s.name} class="h-8 max-w-[90px] object-contain" />
-                                            {:else}
-                                                <span class="text-[10px] font-bold text-slate-700 px-1.5 py-0.5 border border-slate-300 rounded">
-                                                    {s.name}
-                                                </span>
-                                            {/if}
+                                            <div
+                                                role="button"
+                                                tabindex="0"
+                                                onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === s.id ? null : s.id; }}
+                                                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === s.id ? null : s.id; } }}
+                                                class="cursor-pointer rounded-xs p-0.5 transition-all outline-hidden shrink-0 {selectedCardId === s.id ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings[s.id], elementSettings.sponsors, previewGreyscaleOnScreen)}"
+                                                title="{s.name || 'Sponsor / Partner'} (Klicken für Druck- & Farbeinstellungen)"
+                                            >
+                                                {#if s.logoUrl}
+                                                    <img src={s.logoUrl} alt={s.name} class="h-8 max-w-[90px] object-contain" />
+                                                {:else}
+                                                    <span class="text-[10px] font-bold text-slate-700 px-1.5 py-0.5 border border-slate-300 rounded">
+                                                        {s.name}
+                                                    </span>
+                                                {/if}
+                                            </div>
                                         {/each}
                                     </div>
                                 </div>
@@ -1599,8 +1659,11 @@
 
                         <!-- Single Programme Entry (Avoid breaking inside columns - Highlight for Non-Repeating One-Offs) -->
                         <div
+                            role="button"
+                            tabindex="0"
                             class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs cursor-pointer {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, previewGreyscaleOnScreen)} {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'}"
-                            onclick={() => { selectedCardId = selectedCardId === item.id ? null : item.id; }}
+                            onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === item.id ? null : item.id; }}
+                            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === item.id ? null : item.id; } }}
                         >
                             <div class="flex items-start gap-3">
                                 <!-- Date Badge Block -->
@@ -1953,13 +2016,22 @@
                             </span>
                             <div class="flex items-center gap-3 flex-wrap">
                                 {#each sponsors as s (s.id)}
-                                    {#if s.logoUrl}
-                                        <img src={s.logoUrl} alt={s.name} class="h-6 max-w-[85px] object-contain filter grayscale hover:grayscale-0 transition" />
-                                    {:else}
-                                        <span class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs">
-                                            {s.name}
-                                        </span>
-                                    {/if}
+                                    <div
+                                        role="button"
+                                        tabindex="0"
+                                        onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === s.id ? null : s.id; }}
+                                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === s.id ? null : s.id; } }}
+                                        class="cursor-pointer rounded-xs p-0.5 transition-all outline-hidden shrink-0 {selectedCardId === s.id ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings[s.id], elementSettings.sponsors, previewGreyscaleOnScreen)}"
+                                        title="{s.name || 'Sponsor / Partner'} (Klicken für Druck- & Farbeinstellungen)"
+                                    >
+                                        {#if s.logoUrl}
+                                            <img src={s.logoUrl} alt={s.name} class="h-6 max-w-[85px] object-contain transition" />
+                                        {:else}
+                                            <span class="text-[9px] font-bold text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs">
+                                                {s.name}
+                                            </span>
+                                        {/if}
+                                    </div>
                                 {/each}
                             </div>
                         </div>
@@ -2707,12 +2779,17 @@
 />
 
 {#if selectedItem}
+    {@const isLocationLogo = selectedItem.id === 'location_logo'}
+    {@const isSponsorOrPartner = selectedItem.id === 'partner_logo' || sponsors.some(s => s.id === selectedItem?.id)}
+    {@const isCustomSection = customSections.some(s => s.id === selectedItem?.id)}
+    {@const fallbackBehavior = isLocationLogo ? elementSettings.header.printBehavior : isSponsorOrPartner ? elementSettings.sponsors.printBehavior : isCustomSection ? elementSettings.customSections.printBehavior : elementSettings.events.printBehavior}
+    {@const fallbackColor = isLocationLogo ? elementSettings.header.printColor : isSponsorOrPartner ? elementSettings.sponsors.printColor : isCustomSection ? elementSettings.customSections.printColor : elementSettings.events.printColor}
     <CardLayoutActionBar
         {selectedItem}
         kioskId={kiosk?.id || 'default'}
         currentPercentage={itemPercentages[selectedItem.id]}
-        currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
-        currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
+        currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? fallbackBehavior}
+        currentColor={cardSettings[selectedItem.id]?.printColor ?? fallbackColor}
         hideSeriesDates={Boolean(cardSettings[selectedItem.id]?.hideSeriesDates)}
         hideEndTime={cardSettings[selectedItem.id]?.hideEndTime ?? !visibleComponents.endTimes}
         onPercentageChange={(percentage, text) => {

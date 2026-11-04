@@ -194,4 +194,181 @@
 
 .item-highlight-target {
   animation: itemHighlightPulse 2s ease-out forwards;
-}
+}
+
+
+/* =========================================================================
+   Crisp Greyscale System (Zero Low-DPI Rasterization Degradation)
+   Replaces destructive container-level `filter: grayscale()` with native
+   high-contrast monochrome vector colors for text, icons, badges, and borders.
+   ========================================================================= */
+
+.card-greyscale,
+.print\:card-greyscale {
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+.card-greyscale.poster-event-item,
+.print\:card-greyscale.poster-event-item,
+.poster-event-item.card-greyscale,
+.poster-event-item.print\:card-greyscale {
+  border-left-color: #64748b !important;
+  border-top-color: #e2e8f0 !important;
+  border-bottom-color: #e2e8f0 !important;
+  border-right-color: #e2e8f0 !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.card-greyscale.custom-section-item,
+.print\:card-greyscale.custom-section-item,
+.custom-section-item.card-greyscale,
+.custom-section-item.print\:card-greyscale {
+  border-left-color: #64748b !important;
+  background-color: #f8fafc !important;
+}
+
+.card-greyscale .poster-date-pill,
+.print\:card-greyscale .poster-date-pill {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+.card-greyscale .poster-date-pill span,
+.print\:card-greyscale .poster-date-pill span {
+  color: #cbd5e1 !important;
+}
+.card-greyscale .poster-date-pill span.font-black,
+.print\:card-greyscale .poster-date-pill span.font-black {
+  color: #ffffff !important;
+}
+.card-greyscale .poster-date-pill svg,
+.print\:card-greyscale .poster-date-pill svg {
+  color: #cbd5e1 !important;
+}
+
+.card-greyscale h1,
+.card-greyscale h2,
+.card-greyscale h3,
+.card-greyscale h4,
+.print\:card-greyscale h1,
+.print\:card-greyscale h2,
+.print\:card-greyscale h3,
+.print\:card-greyscale h4 {
+  color: #0f172a !important;
+}
+
+.card-greyscale [class*="bg-indigo-"],
+.print\:card-greyscale [class*="bg-indigo-"],
+.card-greyscale [class*="bg-amber-"],
+.print\:card-greyscale [class*="bg-amber-"],
+.card-greyscale [class*="bg-emerald-"],
+.print\:card-greyscale [class*="bg-emerald-"],
+.card-greyscale [class*="bg-blue-"],
+.print\:card-greyscale [class*="bg-blue-"] {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.card-greyscale [class*="bg-red-600"],
+.print\:card-greyscale [class*="bg-red-600"] {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+}
+.card-greyscale [class*="bg-amber-500"],
+.print\:card-greyscale [class*="bg-amber-500"] {
+  background-color: #475569 !important;
+  color: #ffffff !important;
+}
+
+.card-greyscale [class*="text-amber-"],
+.print\:card-greyscale [class*="text-amber-"],
+.card-greyscale [class*="text-indigo-"],
+.print\:card-greyscale [class*="text-indigo-"],
+.card-greyscale [class*="text-emerald-"],
+.print\:card-greyscale [class*="text-emerald-"],
+.card-greyscale [class*="text-red-"],
+.print\:card-greyscale [class*="text-red-"],
+.card-greyscale [class*="text-blue-"],
+.print\:card-greyscale [class*="text-blue-"] {
+  color: #334155 !important;
+}
+
+.card-greyscale svg:not(.ci-svg),
+.print\:card-greyscale svg:not(.ci-svg) {
+  color: #64748b !important;
+}
+
+.card-greyscale .rich-description,
+.print\:card-greyscale .rich-description {
+  color: #334155 !important;
+}
+.card-greyscale .rich-description a,
+.print\:card-greyscale .rich-description a {
+  color: #0f172a !important;
+}
+
+/* Image-only hardware accelerated crisp grayscale filter */
+.card-greyscale img,
+.print\:card-greyscale img,
+img.card-greyscale,
+img.print\:card-greyscale {
+  filter: grayscale(100%) !important;
+  -webkit-filter: grayscale(100%) !important;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+@media print {
+  .print\:card-greyscale {
+    filter: none !important;
+    -webkit-filter: none !important;
+  }
+  .print\:card-greyscale.poster-event-item,
+  .poster-event-item.print\:card-greyscale {
+    border-left-color: #64748b !important;
+    background-color: #f8fafc !important;
+  }
+  .print\:card-greyscale .poster-date-pill {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+  }
+  .print\:card-greyscale .poster-date-pill span {
+    color: #cbd5e1 !important;
+  }
+  .print\:card-greyscale .poster-date-pill span.font-black {
+    color: #ffffff !important;
+  }
+  .print\:card-greyscale .poster-date-pill svg {
+    color: #cbd5e1 !important;
+  }
+  .print\:card-greyscale h3 {
+    color: #0f172a !important;
+  }
+  .print\:card-greyscale [class*="bg-indigo-"],
+  .print\:card-greyscale [class*="bg-amber-"],
+  .print\:card-greyscale [class*="bg-emerald-"] {
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
+  }
+  .print\:card-greyscale [class*="text-amber-"],
+  .print\:card-greyscale [class*="text-indigo-"],
+  .print\:card-greyscale [class*="text-emerald-"] {
+    color: #334155 !important;
+  }
+  .print\:card-greyscale svg:not(.ci-svg) {
+    color: #64748b !important;
+  }
+  .print\:card-greyscale img,
+  img.print\:card-greyscale {
+    filter: grayscale(100%) !important;
+    -webkit-filter: grayscale(100%) !important;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    image-rendering: -webkit-optimize-contrast;
+  }
+}

@@ -59,11 +59,11 @@ export function getElementPrintClasses(
         classes.push('print:hidden');
     }
 
-    // Print color:
+    // Print color (use crisp vector card-greyscale styling rather than destructive container rasterization):
     if (config.printColor === 'greyscale') {
-        classes.push('print:grayscale');
+        classes.push('print:card-greyscale');
         if (previewGreyscaleOnScreen) {
-            classes.push('grayscale');
+            classes.push('card-greyscale');
         }
     }
 
@@ -97,11 +97,14 @@ export function getCardPrintClasses(
     }
 
     // Print color:
+    // If the card is individually set to greyscale, display it in greyscale immediately on screen.
+    // If global preset is greyscale and previewGreyscaleOnScreen is true, also display on screen.
+    const isGreyscaleActive = cardConfig?.printColor === 'greyscale' || (color === 'greyscale' && previewGreyscaleOnScreen);
+    if (isGreyscaleActive) {
+        classes.push('card-greyscale');
+    }
     if (color === 'greyscale') {
-        classes.push('print:grayscale');
-        if (previewGreyscaleOnScreen) {
-            classes.push('grayscale');
-        }
+        classes.push('print:card-greyscale');
     }
 
     return classes.join(' ');

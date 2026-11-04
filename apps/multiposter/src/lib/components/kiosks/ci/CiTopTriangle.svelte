@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { CiPreset, PrintMode } from "./types.js";
+    import { getCardPrintClasses, type CiPreset, type PrintMode, type CardPrintConfig, type KioskElementSettings } from "./types.js";
 
     let {
         preset,
@@ -10,7 +10,12 @@
         showLocationTitle = false,
         heightMm: explicitHeightMm,
         variant = "auto",
-        class: extraClass = ""
+        class: extraClass = "",
+        selectedCardId = null,
+        cardSettings = {},
+        elementSettings,
+        previewGreyscaleOnScreen = false,
+        onSelect
     }: {
         preset: CiPreset;
         printMode?: PrintMode;
@@ -21,6 +26,11 @@
         heightMm?: number;
         variant?: "auto" | "flyer" | "poster";
         class?: string;
+        selectedCardId?: string | null;
+        cardSettings?: Record<string, CardPrintConfig>;
+        elementSettings?: KioskElementSettings;
+        previewGreyscaleOnScreen?: boolean;
+        onSelect?: (id: string) => void;
     } = $props();
 
     let effectiveLocationLogo = $derived(customLocationLogo || preset.locationLogoUrl || "/logos/location-suedspitze.jpg");
@@ -90,11 +100,20 @@
                 style="max-width: {isPoster ? '42%' : '44%'}; max-height: 94%;"
             >
                 {#if effectiveLocationLogo}
-                    <img
-                        src={effectiveLocationLogo}
-                        alt={locationName}
-                        class="{isA3 ? 'h-[30mm] max-h-[115px] max-w-[240px]' : isPoster ? 'h-[25mm] max-h-[96px] max-w-[200px]' : 'h-[17mm] max-h-[66px] max-w-[140px]'} w-auto object-contain object-left-top"
-                    />
+                    <div
+                        role="button"
+                        tabindex="0"
+                        onclick={(e) => { e.stopPropagation(); onSelect?.('location_logo'); }}
+                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelect?.('location_logo'); } }}
+                        class="transition-all rounded-sm p-0.5 outline-hidden {onSelect ? 'cursor-pointer hover:ring-1 hover:ring-amber-300/70' : ''} {selectedCardId === 'location_logo' ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : ''} {getCardPrintClasses(cardSettings?.['location_logo'], elementSettings?.header, previewGreyscaleOnScreen)}"
+                        title="Standortlogo (Klicken für Druck- & Farbeinstellungen)"
+                    >
+                        <img
+                            src={effectiveLocationLogo}
+                            alt={locationName}
+                            class="{isA3 ? 'h-[30mm] max-h-[115px] max-w-[240px]' : isPoster ? 'h-[25mm] max-h-[96px] max-w-[200px]' : 'h-[17mm] max-h-[66px] max-w-[140px]'} w-auto object-contain object-left-top"
+                        />
+                    </div>
                 {/if}
                 {#if (showLocationTitle || !effectiveLocationLogo) && locationName}
                     <span
@@ -113,11 +132,20 @@
                 class="absolute {isPoster ? 'left-[38%] sm:left-[40%]' : 'left-[45%] sm:left-[46%]'} top-[3%] flex items-start justify-start"
                 style="max-width: {isPoster ? '25%' : '22%'};"
             >
-                <img
-                    src={effectiveOrgLogo}
-                    alt="Organisation Logo"
-                    class="{isA3 ? 'h-[20mm] max-h-[78px] max-w-[150px]' : isPoster ? 'h-[17mm] max-h-[66px] max-w-[130px]' : 'h-[11mm] max-h-[44px] max-w-[85px]'} w-auto object-contain object-left-top"
-                />
+                <div
+                    role="button"
+                    tabindex="0"
+                    onclick={(e) => { e.stopPropagation(); onSelect?.('org_logo'); }}
+                    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelect?.('org_logo'); } }}
+                    class="transition-all rounded-sm p-0.5 outline-hidden {onSelect ? 'cursor-pointer hover:ring-1 hover:ring-amber-300/70' : ''} {selectedCardId === 'org_logo' ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : ''} {getCardPrintClasses(cardSettings?.['org_logo'], elementSettings?.header, previewGreyscaleOnScreen)}"
+                    title="Organisationslogo (Klicken für Druck- & Farbeinstellungen)"
+                >
+                    <img
+                        src={effectiveOrgLogo}
+                        alt="Organisation Logo"
+                        class="{isA3 ? 'h-[20mm] max-h-[78px] max-w-[150px]' : isPoster ? 'h-[17mm] max-h-[66px] max-w-[130px]' : 'h-[11mm] max-h-[44px] max-w-[85px]'} w-auto object-contain object-left-top"
+                    />
+                </div>
             </div>
         {/if}
 
