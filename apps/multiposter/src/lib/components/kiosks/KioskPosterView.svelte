@@ -819,7 +819,7 @@
     </style>
 </svelte:head>
 
-{#snippet rightVisuals(item: PosterDisplayItem, evt: EnrichedEvent, isEvt: boolean)}
+{#snippet rightVisuals(item: PosterDisplayItem, evt: EnrichedEvent, _isEvt?: boolean)}
     <!-- Hero Image -->
     {#if visibleComponents.heroImage && (item as any).heroImage && elementSettings.heroImages.enabled}
         <div class="overflow-hidden rounded-md border border-slate-200 bg-slate-100 shrink-0 {getElementPrintClasses(elementSettings.heroImages, previewGreyscaleOnScreen)}">
@@ -828,17 +828,6 @@
                 alt={evt.summary || "Event"}
                 class="{density === 'compact' ? 'w-14 h-10' : 'w-20 h-14'} object-cover"
                 loading="lazy"
-            />
-        </div>
-    {/if}
-
-    <!-- Scannable Event QR Code -->
-    {#if visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath) && elementSettings.qrCodes.enabled}
-        <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0 shadow-2xs {getElementPrintClasses(elementSettings.qrCodes, previewGreyscaleOnScreen)}">
-            <img
-                src={evt.qrCodeDataUrl || evt.qrCodePath}
-                alt="QR"
-                class="{density === 'compact' ? 'w-16 h-16' : density === 'relaxed' ? 'w-22 h-22' : 'w-18 h-18'} object-contain"
             />
         </div>
     {/if}
@@ -1654,7 +1643,8 @@
                         {@const cancelledCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'cancelled').length : 0}
                         {@const tentativeCount = evt.seriesInstances ? evt.seriesInstances.filter(i => i.status === 'tentative').length : 0}
                         {@const totalInstances = evt.seriesInstances ? evt.seriesInstances.length : (evt.seriesDates ? evt.seriesDates.length : 1)}
-                        {@const hasRightVisuals = Boolean((visibleComponents.heroImage && (item as any).heroImage) || (visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath)))}
+                        {@const showEventQr = Boolean(visibleComponents.qrCodes && isEvt && (evt.qrCodeDataUrl || evt.qrCodePath) && elementSettings.qrCodes.enabled)}
+                        {@const hasRightVisuals = Boolean(visibleComponents.heroImage && (item as any).heroImage && elementSettings.heroImages.enabled)}
                         {@const itemRecurrenceRule = isEvt ? ((Array.isArray((item as any).recurrence) ? (item as any).recurrence[0] : typeof (item as any).recurrence === 'string' ? (item as any).recurrence : null) || (item as any).seriesMaster?.recurrence?.[0] || null) : null}
 
                         <!-- Single Programme Entry (Avoid breaking inside columns - Highlight for Non-Repeating One-Offs) -->
@@ -1666,8 +1656,16 @@
                             onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === item.id ? null : item.id; } }}
                         >
                             <div class="flex items-start gap-3">
-                                <!-- Date Badge Block -->
-                                {#if isCompressed}
+                                <!-- Left Visual: QR Code or Date Badge Block fallback -->
+                                {#if showEventQr}
+                                    <div class="flex flex-col items-center justify-center p-1 bg-white border border-slate-200 rounded shrink-0 shadow-2xs {getElementPrintClasses(elementSettings.qrCodes, previewGreyscaleOnScreen)}">
+                                        <img
+                                            src={evt.qrCodeDataUrl || evt.qrCodePath}
+                                            alt="QR"
+                                            class="{density === 'compact' ? 'w-12 h-12' : density === 'relaxed' ? 'w-[66px] h-[66px]' : 'w-[54px] h-[54px]'} object-contain"
+                                        />
+                                    </div>
+                                {:else if isCompressed}
                                     <div class="poster-date-pill shrink-0 flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded bg-slate-900 text-white font-mono text-center">
                                         <RefreshCw class="w-3.5 h-3.5 text-amber-400 mb-0.5" />
                                         <span class="text-sm font-black leading-tight text-amber-400">{totalInstances}×</span>
@@ -1766,6 +1764,21 @@
                                                 <span class="inline-flex items-center gap-0.5 bg-slate-100 text-slate-700 border border-slate-300 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
                                                     <Lock class="w-2.5 h-2.5 text-slate-500" />
                                                     <span>{m.private_label()}</span>
+                                                </span>
+                                            {/if}
+                                        {/if}
+
+                                        <!-- Inline Date Pill for single events when QR code replaces left date block -->
+                                        {#if showEventQr && !isCompressed && isEvt}
+                                            {#if multiDay && dateParts}
+                                                <span class="inline-flex items-center gap-1 bg-slate-900 text-white px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
+                                                    <span class="text-amber-300 font-extrabold uppercase">{dateParts.startMonth}{dateParts.startMonth !== dateParts.endMonth ? `/${dateParts.endMonth}` : ''}</span>
+                                                    <span>{dateParts.startDay}–{dateParts.endDay}</span>
+                                                </span>
+                                            {:else}
+                                                <span class="inline-flex items-center gap-0.5 {isSpecialNonSeries ? 'bg-amber-950 text-white ring-1 ring-amber-500/50' : 'bg-slate-900 text-white'} px-1.5 py-0.2 rounded text-[8.5px] font-bold tracking-tight">
+                                                    <span class="{isSpecialNonSeries ? 'text-amber-400' : 'text-slate-300'} font-medium">{formatDateWeekday(dateStr)}</span>
+                                                    <span>{formatDateDay(dateStr)} {formatDateMonth(dateStr)}</span>
                                                 </span>
                                             {/if}
                                         {/if}
