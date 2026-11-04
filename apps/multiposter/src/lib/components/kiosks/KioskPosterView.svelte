@@ -42,7 +42,7 @@
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
-    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
+
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isSeriesItem, isNonSeriesEvent, getSeriesRootId } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
@@ -1727,13 +1727,13 @@
                                         <!-- Ticket Price or Free Badge -->
                                         {#if visibleComponents.ticketPrice}
                                             {#if isFree}
-                                                <span class="inline-flex items-center gap-0.5 font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-1.5 py-0.2 rounded text-[9px]">
-                                                    <Ticket class="w-2.5 h-2.5 text-emerald-600" />
+                                                <span class="inline-flex items-center font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-1.5 py-0.2 rounded text-[9px]">
+
                                                     {m.ticket_price_free?.() || 'Kostenlos'}
                                                 </span>
                                             {:else if priceStr}
-                                                <span class="inline-flex items-center gap-0.5 font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
-                                                    <CurrencyIcon currency={(item as any).currency || 'EUR'} class="w-2.5 h-2.5" />
+                                                <span class="inline-flex items-center font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
+
                                                     {priceStr}
                                                 </span>
                                             {/if}

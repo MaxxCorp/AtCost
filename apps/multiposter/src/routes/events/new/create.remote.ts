@@ -169,6 +169,9 @@ export const createEvent = form(createEventSchema, async (data) => {
 		const participantsCount = data.participantsCount !== undefined ? Number(data.participantsCount) || 0 : 0;
 		const prepMinutes = data.prepMinutes !== undefined ? Math.max(0, Number(data.prepMinutes) || 0) : 0;
 		const teardownMinutes = data.teardownMinutes !== undefined ? Math.max(0, Number(data.teardownMinutes) || 0) : 0;
+		const isUnknownPrice = data.ticketPriceUnknown !== undefined
+			? (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on')
+			: true;
 		const [newEvent] = await db.insert(event).values({
 			id: eventId,
 			userId: user.id,
@@ -177,8 +180,8 @@ export const createEvent = form(createEventSchema, async (data) => {
 			description: data.description || null,
 			internalNotes: data.internalNotes || null,
 			categoryBerlinDotDe: data.categoryBerlinDotDe || null,
-			ticketPriceUnknown: data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on',
-			ticketPrice: (data.ticketPriceUnknown === 'true' || data.ticketPriceUnknown === true || data.ticketPriceUnknown === 'on') ? "0" : (data.ticketPrice || null),
+			ticketPriceUnknown: isUnknownPrice,
+			ticketPrice: isUnknownPrice ? "0" : (data.ticketPrice || null),
 			currency: data.currency || 'EUR',
 			isAllDay: data.isAllDay === 'true' || data.isAllDay === true || data.isAllDay === 'on',
 			prepMinutes,

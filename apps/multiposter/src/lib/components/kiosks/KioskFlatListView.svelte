@@ -29,7 +29,7 @@
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
-    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
+
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isSeriesItem, isNonSeriesEvent, getSeriesRootId } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
@@ -1421,7 +1421,7 @@
                 <!-- Ticket Price (if enabled in visibleComponents) -->
                 {#if visibleComponents.ticketPrice && displayPrice && !isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                     <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400 print:text-black">
-                        <CurrencyIcon currency={(event as any).currency || 'EUR'} class="w-3.5 h-3.5 text-emerald-600 print:text-black" />
+                        <Ticket class="w-3.5 h-3.5 text-emerald-600 print:text-black" />
                         {displayPrice}
                     </span>
                 {/if}

@@ -6,7 +6,7 @@
     import { RefreshCw, Ticket, Calendar, User } from "@lucide/svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
-    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
+
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isNonSeriesEvent } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
@@ -276,7 +276,7 @@
                                         {/if}
                                         {#if displayPrice && !isEventFree((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
                                             <div class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400 text-sm font-semibold">
-                                                <CurrencyIcon currency={(item as any).currency || 'EUR'} class="w-3.5 h-3.5 text-emerald-400" />
+                                                <Ticket class="w-3.5 h-3.5 text-emerald-400" />
                                                 <span>{displayPrice}</span>
                                             </div>
                                         {/if}

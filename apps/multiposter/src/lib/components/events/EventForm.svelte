@@ -2,7 +2,7 @@
 	import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
     import { type Event, type Tag, createTagSchema, updateTagSchema, SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from "@ac/validations";
-    import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
+
 
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
@@ -486,7 +486,7 @@
     import { checkEventAvailability } from "../../../routes/events/availability/check.remote";
 
     let isTicketPriceUnknown = $derived(
-        rf.fields.ticketPriceUnknown.value() !== undefined
+        rf.fields.ticketPriceUnknown.dirty()
             ? (rf.fields.ticketPriceUnknown.value() === true ||
                rf.fields.ticketPriceUnknown.value() === "true" ||
                rf.fields.ticketPriceUnknown.value() === "on")
@@ -1558,34 +1558,32 @@
             <div class="flex items-center gap-3 min-h-[42px]">
                 {#if !isTicketPriceUnknown}
                     <div class="relative flex-1 flex items-center">
-                        <div class="absolute left-3 pointer-events-none flex items-center text-gray-500">
-                            <CurrencyIcon currency={eventCurrency} size={16} />
-                        </div>
                         <input
                             {...rf.fields.ticketPrice.as(
                                 "text",
                                 initialData?.ticketPrice?.toString() ?? "",
                             )}
-                            class="w-full pl-9 pr-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
+                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
                                 ? 'border-red-500'
                                 : 'border-gray-300'}"
                             placeholder="e.g. 15.50"
                             onblur={() => rf.validate()}
                         />
                     </div>
+                    <div class="w-28 shrink-0">
+                        <select
+                            {...rf.fields.currency.as("text", initialData?.currency || "EUR")}
+                            class="w-full px-2 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 text-sm font-mono"
+                        >
+                            {#each SUPPORTED_CURRENCIES as c}
+                                <option value={c.code}>{c.symbol} {c.code}</option>
+                            {/each}
+                        </select>
+                    </div>
                 {:else}
                     <input {...rf.fields.ticketPrice.as("hidden", "0")} />
+                    <input {...rf.fields.currency.as("hidden", initialData?.currency || "EUR")} />
                 {/if}
-                <div class="w-28 shrink-0">
-                    <select
-                        {...rf.fields.currency.as("text", initialData?.currency || "EUR")}
-                        class="w-full px-2 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 text-sm font-mono"
-                    >
-                        {#each SUPPORTED_CURRENCIES as c}
-                            <option value={c.code}>{c.symbol} {c.code}</option>
-                        {/each}
-                    </select>
-                </div>
                 <div class="flex items-center gap-2 whitespace-nowrap">
                     <input
                         {...rf.fields.ticketPriceUnknown.as("checkbox", initialData?.id ? !!initialData.ticketPriceUnknown : true)}
@@ -2388,7 +2386,7 @@
             {@const cateringProfit = cateringTotal - cateringCost}
             <div class="mt-3 p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div class="flex items-center gap-2">
-                    <CurrencyIcon currency={eventCurrency} size={18} class="text-emerald-600" />
+                    <Receipt size={18} class="text-emerald-600" />
                     <span class="font-semibold text-gray-800">{m.catering_calculation?.() || 'Total Price Calculation'}:</span>
                     <span class="text-xs text-gray-600">({currentPrices.length} {currentPrices.length === 1 ? (m.price_list?.() || 'price list') : (m.prices?.() || 'prices')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
                 </div>
