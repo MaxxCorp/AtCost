@@ -34,6 +34,18 @@ function getDb() {
         
         const client = postgres(connectionString, { prepare: false });
         _db = drizzle(client, { schema });
+
+        // Drizzle-ORM overrides postgres.js serializers for date/time types with a no-op: (val) => val.
+        // When raw Date objects are passed into custom sql`...` expressions without column mapping,
+        // postgres.js extended query protocol attempts to write the raw Date to the network buffer via Buffer.byteLength,
+        // causing TypeError [ERR_INVALID_ARG_TYPE]: Received an instance of Date.
+        // Safely converting Date instances to ISO strings prevents this.
+        for (const type of [1184, 1082, 1083, 1114, 1182, 1185, 1115, 1231]) {
+            client.options.serializers[type] = (val: unknown) =>
+                (val instanceof Date || Object.prototype.toString.call(val) === '[object Date]')
+                    ? (val as Date).toISOString()
+                    : val;
+        }
     }
     return _db;
 }

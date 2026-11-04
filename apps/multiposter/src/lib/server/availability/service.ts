@@ -415,8 +415,8 @@ export class AvailabilityService {
                     inArray(eventResource.resourceId, resourceIds),
                     ne(event.status, 'cancelled'),
                     dbCurrentEventId ? ne(event.id, dbCurrentEventId) : undefined,
-                    sql`(${event.startDateTime} - (${event.prepMinutes} * interval '1 minute') < ${targetResourceEnd})`,
-                    sql`(${event.endDateTime} + (${event.teardownMinutes} * interval '1 minute') > ${targetResourceStart})`
+                    sql`(${event.startDateTime} - (${event.prepMinutes} * interval '1 minute') < ${targetResourceEnd.toISOString()})`,
+                    sql`(${event.endDateTime} + (${event.teardownMinutes} * interval '1 minute') > ${targetResourceStart.toISOString()})`
                 ));
 
             for (const c of resourceCollisions) {
