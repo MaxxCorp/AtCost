@@ -13,12 +13,14 @@ trigger: always_on
   - **NEVER use handwritten `name="..."` attributes inside forms**:
     - Raw HTML `name` attributes on ANY `<input>`, `<select>`, `<textarea>`, radio button, checkbox, or button inside a `<form {...remoteForm}>` are strictly PROHIBITED.
     - SvelteKit Remote Functions inspects every entry in the submitted `FormData` and expects the key to end with `/${form_id}` produced exclusively by `form.fields.fieldName.as(...)`.
-    - Any handwritten `name` attribute triggers the runtime error `https://svelte.dev/e/kit/form_field_unbound` (`Form contained a field that wasn't created with form.fields.as(...): %name%`) causing an HTTP 500 failure!
+    - Any handwritten `name` attribute triggers the runtime error `https://svelte.dev/e/kit/form_field_unbound` (`Form contained a field that wasn't created with form.fields.as(...): %name%`) causing an HTTP 500 failure or crashing immediately on blur validation!
+    - **Conditional / Fallback Inputs**: When an input or section is collapsed, toggled off, or hidden (e.g., `{#if !showCustomTime}`), NEVER write `<input type="hidden" name="customTime" value="0" />`. ALWAYS use `<input {...rf.fields.customTime.as("hidden", 0)} />`.
     - **UI-only inputs (radios, toggles, filter/search bars)**: Omit the `name` attribute entirely. Control them declaratively with Svelte reactivity (`checked={state === value}`, `onchange={() => (state = value)}`, `bind:value`). Pass values to the server using official field bindings (e.g., `<input {...fields.fieldName.as("hidden", state)} />` or `{...fields.fieldName.as("radio", value)}`).
     - **Embedded components & dialogs**: Never nest `<form>` tags. Ensure subcomponents, search filters, and modals embedded inside a form do not introduce named controls, or portal them outside the form DOM (e.g., using `Dialog.Portal`).
   - DO NOT manually create HTML `<input type="hidden">` tags without `fields.fieldName.as("hidden", ...)`.
   - DO wrap hidden fields that have a chance to empty in {#if ...} blocks to prevent the svelte static analyzer to throw an error
   - DO NOT use proxy helper functions (like a custom `getField` utility) to work around `fields` typings. Fix the underlying typing issues.
+  - **Safe `rf.validate()` Invocation**: `rf.validate()` is an async method that converts the current DOM `FormData` and validates all fields against the preflight schema. In event handlers (`onblur`, `onchange`, `oninput`), ALWAYS handle the Promise safely: `void rf.validate().catch(() => {})`. If an unbound field exists anywhere in the form DOM, `rf.validate()` will reject immediately when any field triggers validation on blur.
 - **Enhance & Preflight Pattern**: Always use `{...remoteForm.preflight(schema).enhance(async ({ submit }) => { ... })}` to bind forms and enable client-side validation.
   - **Client-Side Validation**: Reuse the remote validation schemas for `preflight()`. This prevents network requests when the form is locally invalid.
   - **Per-Field Feedback**: ALWAYS display field-specific validation errors using `{#each rf.fields.fieldName.issues() as issue}<p>{issue.message}</p>{/each}`.

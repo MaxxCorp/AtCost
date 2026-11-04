@@ -54,7 +54,7 @@
                 {...rf.fields.name.as("text")}
                 class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.name.issues?.() ?? []).length > 0 ? 'border-red-500' : 'border-gray-300'}"
                 placeholder={m.enter_framework_name()}
-                onblur={() => rf.validate()}
+                onblur={() => { void rf.validate().catch(() => {}); }}
                 value={initialData?.name ?? ""}
             />
             {#each rf.fields.name.issues?.() ?? [] as issue}

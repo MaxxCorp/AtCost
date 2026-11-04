@@ -200,7 +200,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_location_name()}
-            onblur={() => rf.validate()}
+            onblur={() => { void rf.validate().catch(() => {}); }}
         />
         {#each rf.fields.name.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
@@ -215,8 +215,8 @@
             class="mt-2 w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {(rf.fields.type.issues() ?? []).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            onchange={() => rf.validate()}
-            onblur={() => rf.validate()}
+            onchange={() => { void rf.validate().catch(() => {}); }}
+            onblur={() => { void rf.validate().catch(() => {}); }}
         >
             <option value="room">{m.room()}</option>
             <option value="equipment">{m.equipment()}</option>
@@ -234,7 +234,7 @@
                 ? 'border-red-500'
                 : 'border-gray-300'}"
             placeholder={m.enter_inventory_number()}
-            onblur={() => rf.validate()}
+            onblur={() => { void rf.validate().catch(() => {}); }}
         />
         {#each rf.fields.inventoryNumber.issues() ?? [] as issue}
             <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>

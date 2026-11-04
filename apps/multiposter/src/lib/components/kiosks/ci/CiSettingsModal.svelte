@@ -292,7 +292,6 @@
                                 <label class="flex items-center gap-2 p-3 rounded-lg border cursor-pointer {preset.bgStyle === 'solid' ? 'border-red-500 bg-red-50/40 dark:bg-red-950/20' : 'border-slate-200 dark:border-slate-700'}">
                                     <input
                                         type="radio"
-                                        name="bgStyle"
                                         value="solid"
                                         checked={preset.bgStyle === "solid"}
                                         onchange={() => (preset.bgStyle = "solid")}
@@ -304,7 +303,6 @@
                                 <label class="flex items-center gap-2 p-3 rounded-lg border cursor-pointer {preset.bgStyle === 'brick' ? 'border-red-500 bg-red-50/40 dark:bg-red-950/20' : 'border-slate-200 dark:border-slate-700'}">
                                     <input
                                         type="radio"
-                                        name="bgStyle"
                                         value="brick"
                                         checked={preset.bgStyle === "brick"}
                                         onchange={() => (preset.bgStyle = "brick")}

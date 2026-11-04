@@ -817,7 +817,7 @@
             onfocus={() => collab?.setFocus('summary')}
             onblur={() => {
                 collab?.setFocus(null);
-                rf.validate();
+                void rf.validate().catch(() => {});
             }}
         />
         {#each rf.fields.summary.issues() ?? [] as issue}
@@ -1218,10 +1218,10 @@
         {/if}
 
         {#if !showPrepTime}
-            <input type="hidden" name="prepMinutes" value="0" />
+            <input {...rf.fields.prepMinutes.as("hidden", 0)} />
         {/if}
         {#if !showTeardownTime}
-            <input type="hidden" name="teardownMinutes" value="0" />
+            <input {...rf.fields.teardownMinutes.as("hidden", 0)} />
         {/if}
 
         <!-- Recurrence Button -->
@@ -1567,7 +1567,7 @@
                                 ? 'border-red-500'
                                 : 'border-gray-300'}"
                             placeholder="e.g. 15.50"
-                            onblur={() => rf.validate()}
+                            onblur={() => { void rf.validate().catch(() => {}); }}
                         />
                     </div>
                     <div class="w-28 shrink-0">

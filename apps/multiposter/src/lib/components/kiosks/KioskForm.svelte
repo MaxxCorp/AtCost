@@ -124,7 +124,7 @@
         } else {
             rangeMode = "next_week";
         }
-        rf.validate();
+        validateForm();
     }
 
     function applyNextMonth() {
@@ -138,7 +138,7 @@
         } else {
             rangeMode = "next_month";
         }
-        rf.validate();
+        validateForm();
     }
 
     function applyThisWeek() {
@@ -152,7 +152,7 @@
         } else {
             rangeMode = "this_week";
         }
-        rf.validate();
+        validateForm();
     }
 
     function applyThisMonth() {
@@ -166,7 +166,7 @@
         } else {
             rangeMode = "this_month";
         }
-        rf.validate();
+        validateForm();
     }
 
     function applyDaysOffset(days: number) {
@@ -184,7 +184,11 @@
             lookAheadDays = days;
             lookPastDays = 0;
         }
-        rf.validate();
+        validateForm();
+    }
+
+    function validateForm() {
+        void rf.validate().catch(() => {});
     }
 </script>
 
@@ -228,7 +232,7 @@
                 {...rf.fields.name.as("text", initialData?.name ?? "")}
                 placeholder={m.kiosk_name_placeholder()}
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                onblur={() => rf.validate()}
+                onblur={validateForm}
             />
             {#each rf.fields.name.issues() ?? [] as issue (issue.message)}
                 <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
@@ -245,7 +249,7 @@
                 {...rf.fields.description.as("text", initialData?.description ?? "")}
                 rows="3"
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                onblur={() => rf.validate()}
+                onblur={validateForm}
             ></textarea>
         </div>
 
@@ -420,7 +424,7 @@
                     <select
                         {...rf.fields.uiMode.as("select", uiMode)}
                         bind:value={uiMode}
-                        onchange={() => rf.validate()}
+                        onchange={validateForm}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
                         <option value="carousel">{m.carousel_full_screen()}</option>
@@ -451,7 +455,7 @@
                     <select
                         {...rf.fields.rangeMode.as("select", rangeMode)}
                         bind:value={rangeMode}
-                        onchange={() => rf.validate()}
+                        onchange={validateForm}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border bg-white"
                     >
                         <optgroup label={m.rolling_calendar()}>
@@ -482,7 +486,7 @@
                     min="3"
                     required
                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                    onblur={() => rf.validate()}
+                    onblur={validateForm}
                 />
                 <p class="text-xs text-gray-500">{m.time_per_slide()}</p>
                 {#each rf.fields.loopDuration.issues() ?? [] as issue (issue.message)}
@@ -595,9 +599,9 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         oninput={(e) => {
                             lookAheadDays = Number(e.currentTarget.value);
-                            rf.validate();
+                            validateForm();
                         }}
-                        onblur={() => rf.validate()}
+                        onblur={validateForm}
                     />
 
                     {#each rf.fields.lookAheadDays.issues() ?? [] as issue (issue.message)}
@@ -619,9 +623,9 @@
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         oninput={(e) => {
                             lookPastDays = Number(e.currentTarget.value);
-                            rf.validate();
+                            validateForm();
                         }}
-                        onblur={() => rf.validate()}
+                        onblur={validateForm}
                     />
 
                     {#each rf.fields.lookPastDays.issues() ?? [] as issue (issue.message)}
@@ -689,7 +693,7 @@
                                 const val = startDate ? new Date(startDate) : new Date();
                                 val.setHours(0, 0, 0, 0);
                                 startDate = formatForInput(val);
-                                rf.validate();
+                                validateForm();
                             }}
                         >
                             {m.reset_start_time()}
@@ -701,7 +705,7 @@
                                 const val = endDate ? new Date(endDate) : new Date();
                                 val.setHours(23, 59, 0, 0);
                                 endDate = formatForInput(val);
-                                rf.validate();
+                                validateForm();
                             }}
                         >
                             {m.reset_end_time()}
@@ -722,7 +726,7 @@
                         max="2099-12-31T23:59"
                         oninput={(e) => {
                             startDate = e.currentTarget.value;
-                            rf.validate();
+                            validateForm();
                         }}
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
@@ -745,7 +749,7 @@
                         max="2099-12-31T23:59"
                         oninput={(e) => {
                             endDate = e.currentTarget.value;
-                            rf.validate();
+                            validateForm();
                         }}
                         required
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"

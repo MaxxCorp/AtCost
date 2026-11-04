@@ -2368,7 +2368,7 @@
 					checked={direction === dir.value}
 					onchange={() => {
 						direction = dir.value;
-						remoteFunction.validate();
+						void remoteFunction.validate().catch(() => {});
 					}}
 					disabled={(selectedProvider === "berlin-de-main-calendar" ||
 						selectedProvider === "berlin-de-mh-calendar" ||

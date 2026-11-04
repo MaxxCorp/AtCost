@@ -120,7 +120,7 @@
                         ? 'border-red-500'
                         : 'border-gray-300'}"
                     placeholder={m.enter_campaign_name()}
-                    onblur={() => rf.validate()}
+                    onblur={() => { void rf.validate().catch(() => {}); }}
                 />
                 {#each rf.fields.name.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">
@@ -140,7 +140,7 @@
                         ? 'border-red-500'
                         : 'border-gray-300'}"
                     placeholder={"{}"}
-                    onblur={() => rf.validate()}
+                    onblur={() => { void rf.validate().catch(() => {}); }}
                 ></textarea>
                 {#each rf.fields.content.issues() ?? [] as issue}
                     <p class="mt-1 text-sm text-red-600">

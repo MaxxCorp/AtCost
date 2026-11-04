@@ -22,6 +22,12 @@ Analyzes Svelte code and returns suggestions to fix issues. Pass the component c
 - Svelte 4 legacy syntax (`on:click`, `export let`, `<slot>`).
 - Missing keys in `{#each}` blocks.
 
+## Form & Remote Function Requirements
+When reviewing or modifying forms:
+1. **Never use raw `name="..."` attributes on inputs**: Inside `<form {...remoteForm}>`, ALL form controls must use `{...rf.fields.fieldName.as('type', value)}`. Never write `<input name="...">` or `<input type="hidden" name="..." value="...">`.
+2. **Conditional / Fallback Inputs**: When conditionally hiding inputs or fallback values (e.g. `{#if !showSection}`), ALWAYS use `{...rf.fields.fieldName.as('hidden', fallbackValue)}`.
+3. **Guard `rf.validate()` in Event Listeners**: `rf.validate()` is async and validates the whole DOM form via `FormData`. Always guard calls: `void rf.validate().catch(() => {})`.
+
 ## Workflow
 When invoked to work on a Svelte file:
 1. **Gather Context**: Call `list-sections` then `get-documentation` to fetch relevant Svelte/SvelteKit docs.
