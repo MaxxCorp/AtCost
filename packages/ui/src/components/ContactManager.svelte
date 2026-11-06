@@ -53,7 +53,7 @@
         renderForm?: Snippet<[any]>;
         rolesSnippet?: Snippet<[T]>;
         participationSnippet?: Snippet<[T]>;
-        toolbarActions?: Snippet;
+        toolbarActions?: Snippet<[{ items: any[]; count: number }]> | Snippet;
 
         // Search & Sort
         searchPredicate?: (item: T, query: string) => boolean;
@@ -260,9 +260,9 @@
         {/if}
     {/snippet}
 
-    {#snippet toolbarActions()}
+    {#snippet toolbarActions(params?: any)}
         {#if toolbarActions}
-            {@render toolbarActions()}
+            {@render toolbarActions(params)}
         {/if}
     {/snippet}
 

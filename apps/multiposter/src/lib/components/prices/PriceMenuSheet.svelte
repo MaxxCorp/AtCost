@@ -139,13 +139,6 @@
                     {/if}
                 {/if}
 
-                {#if settings.showSaleTallies}
-                    <div class="col-head" aria-hidden="true">
-                        <span class="col-head-price">{m.price_menu_price_header()}</span>
-                        <span class="col-head-tally">{m.price_menu_tally_header()}</span>
-                    </div>
-                {/if}
-
                 {#each sections as section (section.id)}
                     <div class="section">
                         {#if section.name}
@@ -162,12 +155,12 @@
                                         {/if}
                                         <span class="leader"></span>
                                         <span class="price">{formatCurrency(getItemPrice(item), getItemCurrency(item, list))}</span>
-                                        {#if settings.showSaleTallies}
-                                            <span class="tally"></span>
-                                        {/if}
                                     </div>
                                     {#if settings.showItemDescriptions && item.description}
                                         <p class="desc">{item.description}</p>
+                                    {/if}
+                                    {#if settings.showSaleTallies}
+                                        <div class="tally" aria-hidden="true"></div>
                                     {/if}
                                 </li>
                             {/each}
@@ -355,37 +348,13 @@
     }
 
     .tally {
-        align-self: center;
-        flex: none;
         box-sizing: border-box;
-        width: 26mm;
-        height: 1.9em;
-        margin-left: 2mm;
+        width: 100%;
+        height: 2.2em;
+        margin-top: 0.3em;
         border: 0.3mm solid #9ca3af;
-        border-radius: 1mm;
-    }
-
-    .col-head {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.5em;
-        margin-bottom: 0.15em;
-        font-size: 0.7em;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: #9ca3af;
-    }
-
-    .col-head-price {
-        min-width: 6.4em;
-        text-align: right;
-    }
-
-    .col-head-tally {
-        width: 26mm;
-        margin-left: 2mm;
-        text-align: center;
+        border-radius: 1.5mm;
+        background: #fff;
     }
 
     .note {

@@ -100,7 +100,7 @@
         renderSubItems?: Snippet<[T]>;
         participationSnippet?: Snippet<[T]>;
         rolesSnippet?: Snippet<[T]>;
-        toolbarActions?: Snippet;
+        toolbarActions?: Snippet<[{ items: T[]; count: number }]> | Snippet;
 
         // Initial state
         initialItems?: T[];
@@ -739,6 +739,21 @@
         }
     });
 
+    let prevAssociationsKey = $state<string | null>(null);
+    $effect(() => {
+        const items = currentAssociations;
+        if (onchange && items) {
+            const ids = items.map((i) => i.id!).filter(Boolean);
+            const key = ids.join(',');
+            if (prevAssociationsKey !== null && prevAssociationsKey !== key) {
+                prevAssociationsKey = key;
+                onchange(ids, items);
+            } else if (prevAssociationsKey === null) {
+                prevAssociationsKey = key;
+            }
+        }
+    });
+
     function toggleSelector() {
         showSelector = !showSelector;
         if (!showSelector) {
@@ -1059,7 +1074,7 @@
 
         <div class="flex flex-wrap items-center gap-1.5 {isStandalone ? 'md:ml-auto' : ''} shrink-0 w-full md:w-auto">
             {#if toolbarActions}
-                {@render toolbarActions()}
+                {@render toolbarActions({ items: currentAssociations, count: currentAssociations.length })}
             {/if}
 
             {#if isStandalone && (allFilterGroups.length > 0 || (booleanFilters && booleanFilters.length > 0) || (radioGroups && radioGroups.length > 0))}

@@ -722,6 +722,11 @@
     let totalParticipants = $derived(baseline + currentContactIds.length);
     // svelte-ignore state_referenced_locally
     let currentPrices = $state<any[]>(initialData?.prices || []);
+    $effect(() => {
+        if (initialData?.prices !== undefined) {
+            currentPrices = initialData.prices;
+        }
+    });
 
     function updateBaseline(delta: number) {
         baseline = Math.max(0, baseline + delta);
@@ -2288,8 +2293,9 @@
             >
 
 
-                {#snippet toolbarActions()}
-                    {#if initialData?.id && currentPrices.length > 0}
+                {#snippet toolbarActions(manager?: { items: any[]; count: number })}
+                    {@const count = manager ? manager.count : currentPrices.length}
+                    {#if initialData?.id && count > 0}
                         <Button
                             variant="ghost"
                             size="sm"
