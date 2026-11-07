@@ -30,6 +30,7 @@ import {
     computeContactBlindIndexes,
     recordPersonnelMutation,
     encryptPersonnelPayload,
+    decryptContactRecord,
     type CustomOnboardingFieldDef,
     type InterviewCompetencyDef,
 } from "@ac/db";
@@ -637,6 +638,9 @@ export async function readInvitationByTokenService(token: string) {
                 payrollProfile: true,
             },
         });
+        if (talentRecord?.contact) {
+            talentRecord.contact = await decryptContactRecord(talentRecord.contact);
+        }
     }
 
     return {
@@ -659,7 +663,11 @@ export async function readInvitationByTokenService(token: string) {
                   contact: {
                       givenName: talentRecord.contact?.givenName || inv.givenName || "",
                       familyName: talentRecord.contact?.familyName || inv.familyName || "",
-                      birthday: talentRecord.contact?.birthday?.toISOString().slice(0, 10) || "",
+                      birthday: talentRecord.contact?.birthday instanceof Date
+                          ? talentRecord.contact.birthday.toISOString().slice(0, 10)
+                          : (typeof (talentRecord.contact?.birthday as unknown) === "string"
+                              ? ((talentRecord.contact?.birthday as unknown) as string).slice(0, 10)
+                              : ""),
                       gender: talentRecord.contact?.gender || "",
                       email: talentRecord.contact?.emails?.[0]?.value || inv.email,
                       phone: talentRecord.contact?.phones?.[0]?.value || "",

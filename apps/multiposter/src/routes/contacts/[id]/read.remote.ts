@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db } from '@ac/db';
+import { db, decryptContactRecord } from '@ac/db';
 import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
@@ -63,8 +63,10 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
         return null;
     }
 
+    const decrypted = await decryptContactRecord(result);
+
     // Check access based on public flag
-    if (!result.isPublic || result.obfuscationStatus === 'obfuscated') {
+    if (!decrypted.isPublic || decrypted.obfuscationStatus === 'obfuscated') {
         if (!isAuthorized) {
             await setCache(cacheKeys.publicContact(id), { isPrivate: true }, 300);
         }
@@ -78,7 +80,7 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
 
     // For public contacts viewed by unauthenticated/unauthorized users, sanitize via centralized helper
     if (!isAuthorized) {
-        const sanitized = sanitizePublicContact(result);
+        const sanitized = sanitizePublicContact(decrypted);
         const publicContact = sanitized
             ? {
                   ...sanitized,
@@ -99,10 +101,10 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
     }
 
     return {
-        ...result,
-        vCardPath: result.vCardPath?.includes('/api/') ? result.vCardPath : `/api/contacts/${id}/contact.vcf`,
-        qrCodePath: result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/contacts/${id}/qr.png`,
-        tags: result.tags.map((t: any) => ({
+        ...decrypted,
+        vCardPath: decrypted.vCardPath?.includes('/api/') ? decrypted.vCardPath : `/api/contacts/${id}/contact.vcf`,
+        qrCodePath: decrypted.qrCodePath?.includes('/api/') ? decrypted.qrCodePath : `/api/contacts/${id}/qr.png`,
+        tags: decrypted.tags.map((t: any) => ({
             id: t.tag.id,
             name: t.tag.name
         }))

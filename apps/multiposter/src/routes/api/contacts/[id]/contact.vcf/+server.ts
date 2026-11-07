@@ -1,4 +1,4 @@
-import { db } from '@ac/db';
+import { db, decryptContactRecord } from '@ac/db';
 import ICAL from 'ical.js';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
     const enforcePublic = !isAuthorized || isPublicRequested;
 
     const generateVCard = async (publicOnly: boolean) => {
-        const data = await db.query.contact.findFirst({
+        const rawData = await db.query.contact.findFirst({
             where: (table, { eq }) => eq(table.id, contactId),
             with: {
                 emails: true,
@@ -24,9 +24,11 @@ export const GET: RequestHandler = async ({ params, url }) => {
             }
         });
 
-        if (!data) {
+        if (!rawData) {
             error(404, 'Contact not found');
         }
+
+        const data = await decryptContactRecord(rawData);
 
         if ((!data.isPublic || data.obfuscationStatus === 'obfuscated') && !isAuthorized) {
             error(403, 'Forbidden');
