@@ -19,7 +19,13 @@ export const talentTimelineEntrySchema = v.object({
 
 export const createTalentSchema = v.object({
     contactId: v.pipe(v.string(), v.minLength(1, "Contact is required")),
-    status: v.optional(v.picklist(["active", "inactive", "applicant"]), "applicant"),
+    status: v.optional(v.picklist(["active", "inactive", "applicant", "rejected"]), "applicant"),
+    pipelineStage: v.optional(
+        v.picklist(["applied", "screening", "interview", "evaluation", "offered", "onboarding", "hired", "rejected"]),
+        "applied",
+    ),
+    jobPostingId: v.optional(v.string()),
+    department: v.optional(v.string()),
     jobTitle: v.optional(v.string()),
     salaryExpectation: v.optional(v.string()),
     availabilityDate: v.optional(v.string()), // Expect ISO string from form
@@ -27,6 +33,7 @@ export const createTalentSchema = v.object({
     resumeUrl: v.optional(v.string()),
     source: v.optional(v.string()),
     internalNotes: v.optional(v.string()),
+    syncIdsJson: v.optional(v.string()),
 });
 
 export const updateTalentSchema = v.intersect([
@@ -38,7 +45,22 @@ export const unifiedTalentSchema = v.object({
     talent: v.object({
         id: v.optional(v.string()),
         contactId: v.optional(v.string()),
-        status: v.optional(v.picklist(["active", "inactive", "applicant"]), "applicant"),
+        status: v.optional(v.picklist(["active", "inactive", "applicant", "rejected"]), "applicant"),
+        pipelineStage: v.optional(
+            v.picklist([
+                "applied",
+                "screening",
+                "interview",
+                "evaluation",
+                "offered",
+                "onboarding",
+                "hired",
+                "rejected",
+            ]),
+            "applied",
+        ),
+        jobPostingId: v.optional(v.string()),
+        department: v.optional(v.string()),
         jobTitle: v.optional(v.string()),
         salaryExpectation: v.optional(v.string()),
         availabilityDate: v.optional(v.string()),
@@ -77,6 +99,7 @@ export const unifiedTalentSchema = v.object({
     tagsJson: v.optional(v.string()),
     addressesJson: v.optional(v.string()),
     locationIdsJson: v.optional(v.string()),
+    syncIdsJson: v.optional(v.string()),
     linkedUserId: v.optional(v.string()),
 });
 

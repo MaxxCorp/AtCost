@@ -125,6 +125,7 @@
         noItemsFoundLabel?: string;
         searchPlaceholder?: string;
         linkItemLabel?: string;
+        changeItemLabel?: string;
         quickCreateLabel?: string;
         showQuickCreateButton?: boolean;
         closeSearchLabel?: string;
@@ -186,6 +187,7 @@
         noItemsFoundLabel = `No ${title.toLowerCase()} found.`,
         searchPlaceholder = `Search ${title.toLowerCase()}...`,
         linkItemLabel = `Link ${title}`,
+        changeItemLabel = undefined,
         quickCreateLabel = "Quick Create",
         showQuickCreateButton = true,
         closeSearchLabel = "Close Search",
@@ -215,6 +217,9 @@
         },
         get linkItemLabel() {
             return m?.link_item_label?.({ item: title.toLowerCase() }) ?? `Link ${title}`;
+        },
+        get changeItemLabel() {
+            return changeItemLabel ?? m?.change_item_label?.({ item: title.toLowerCase() }) ?? `Change ${title}`;
         },
         get quickCreateLabel() {
             return m?.quick_create?.() ?? "Quick Create";
@@ -1103,7 +1108,7 @@
                     <div class="flex items-center justify-center p-1">
                         <Loader2 class="h-4 w-4 animate-spin text-blue-500" />
                     </div>
-                {:else if !singleSelect || currentAssociations.length === 0}
+                {:else}
                     <Button
                         type="button"
                         variant="ghost"
@@ -1121,7 +1126,7 @@
                         {:else}
                             <Link size={16} class="mr-1.5" />
                             <span class="text-sm font-semibold"
-                                >{i18n.linkItemLabel}</span
+                                >{singleSelect && currentAssociations.length > 0 ? i18n.changeItemLabel : i18n.linkItemLabel}</span
                             >
                         {/if}
                     </Button>

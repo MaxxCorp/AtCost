@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, boolean, uuid, index, primaryKey, jsonb } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import type { EncryptedEnvelopePayload } from "./recruitment";
 
 // --- CONTACT TABLES ---
 
@@ -22,6 +23,8 @@ export const contact = pgTable("contact", {
     vCardPath: text("vcard_path"),
     qrCodePath: text("qrcode_path"),
     fingerprints: jsonb("fingerprints").$type<Record<string, string>>().default({}).notNull(),
+    encryptedEnvelope: jsonb("encrypted_envelope").$type<EncryptedEnvelopePayload>(),
+    encryptionStatus: text("encryption_status", { enum: ["plaintext", "migrated", "shredded"] }).default("plaintext").notNull(),
     obfuscationStatus: text("obfuscation_status", { enum: ["pending", "obfuscated"] }),
     obfuscationRequestedAt: timestamp("obfuscation_requested_at"),
     obfuscatedAt: timestamp("obfuscated_at"),
@@ -30,6 +33,7 @@ export const contact = pgTable("contact", {
 }, (table) => [
     index("contact_user_id_idx").on(table.userId),
     index("contact_obfuscation_status_idx").on(table.obfuscationStatus),
+    index("contact_encryption_status_idx").on(table.encryptionStatus),
 ]);
 
 export const contactEmail = pgTable("contact_email", {

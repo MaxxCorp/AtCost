@@ -1,5 +1,5 @@
 import { query, form, requested } from '$app/server';
-import { db, payrollProfile, eq, and, hmo } from '@ac/db';
+import { db, payrollProfile, talent, eq, and, hmo, recordPersonnelMutation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { payrollProfileSchema } from '@ac/validations';
 import { upsertPayrollProfile } from '#lib/server/payroll/service.js';
@@ -182,7 +182,32 @@ export const saveTalentPayrollProfile = form(payrollProfileSchema, async (input)
         }
     }
 
+    const existingProfile = await db.query.payrollProfile.findFirst({
+        where: eq(payrollProfile.talentId, data.talentId),
+    });
+    const talentRecord = await db.query.talent.findFirst({
+        where: eq(talent.id, data.talentId),
+    });
+
     const saved = await upsertPayrollProfile(data);
+
+    await recordPersonnelMutation({
+        talentId: data.talentId,
+        contactId: talentRecord?.contactId ?? null,
+        entityType: 'payroll_profile',
+        entityId: saved.id,
+        operation: existingProfile ? 'update' : 'create',
+        channel: 'internal_ui',
+        actor: {
+            userId: user.id,
+            name: user.name || user.email,
+            email: user.email,
+            role: (user as any).role || 'admin',
+        },
+        beforeState: existingProfile ? { ...(existingProfile as unknown as Record<string, unknown>) } : null,
+        afterState: { ...(saved as unknown as Record<string, unknown>) },
+        changeSummary: `Statutory German payroll profile (ELStAM / SV / HMO / IBAN) updated by ${user.name || user.email}`,
+    });
 
     try {
         await requested(readTalentPayrollProfile, 20).refreshAll();

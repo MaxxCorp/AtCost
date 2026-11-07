@@ -16,6 +16,17 @@ import { price, priceItem, eventPrice, eventSale } from "./prices";
 import { payrollRun, payrollProfile, payslip } from "./payroll";
 import { hmo } from "./hmos";
 import { gdprRequest } from "./gdpr";
+import {
+    jobPosting,
+    jobPostingLocation,
+    jobPostingContact,
+    jobPostingTag,
+    applicantInvitation,
+    interviewEvaluation,
+    onboardingSubmission,
+    personnelLedgerBlock,
+    personnelDataVersion,
+} from "./recruitment";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -189,6 +200,12 @@ export const talentRelations = relations(talent, ({ one, many }) => ({
     contracts: many(contract),
     payrollProfile: one(payrollProfile, { fields: [talent.id], references: [payrollProfile.talentId] }),
     payslips: many(payslip),
+    jobPosting: one(jobPosting, { fields: [talent.jobPostingId], references: [jobPosting.id] }),
+    interviewEvaluations: many(interviewEvaluation),
+    onboardingSubmissions: many(onboardingSubmission),
+    invitations: many(applicantInvitation),
+    ledgerBlocks: many(personnelLedgerBlock),
+    dataVersions: many(personnelDataVersion),
 }));
 
 export const talentTagRelations = relations(talentTag, ({ one }) => ({
@@ -486,3 +503,58 @@ export const locationContactRoleRelations = relations(locationContactRole, ({ on
     contact: one(contact, { fields: [locationContactRole.contactId], references: [contact.id] }),
     role: one(eventRole, { fields: [locationContactRole.roleId], references: [eventRole.id] }),
 }));
+
+export const jobPostingRelations = relations(jobPosting, ({ one, many }) => ({
+    hiringManager: one(talent, { fields: [jobPosting.hiringManagerTalentId], references: [talent.id] }),
+    hrResponsible: one(user, { fields: [jobPosting.hrResponsibleUserId], references: [user.id] }),
+    locations: many(jobPostingLocation),
+    contacts: many(jobPostingContact),
+    tags: many(jobPostingTag),
+    applicants: many(talent),
+    invitations: many(applicantInvitation),
+    interviews: many(interviewEvaluation),
+    onboardingSubmissions: many(onboardingSubmission),
+}));
+
+export const jobPostingLocationRelations = relations(jobPostingLocation, ({ one }) => ({
+    jobPosting: one(jobPosting, { fields: [jobPostingLocation.jobPostingId], references: [jobPosting.id] }),
+    location: one(location, { fields: [jobPostingLocation.locationId], references: [location.id] }),
+}));
+
+export const jobPostingContactRelations = relations(jobPostingContact, ({ one }) => ({
+    jobPosting: one(jobPosting, { fields: [jobPostingContact.jobPostingId], references: [jobPosting.id] }),
+    contact: one(contact, { fields: [jobPostingContact.contactId], references: [contact.id] }),
+}));
+
+export const jobPostingTagRelations = relations(jobPostingTag, ({ one }) => ({
+    jobPosting: one(jobPosting, { fields: [jobPostingTag.jobPostingId], references: [jobPosting.id] }),
+    tag: one(tag, { fields: [jobPostingTag.tagId], references: [tag.id] }),
+}));
+
+export const applicantInvitationRelations = relations(applicantInvitation, ({ one }) => ({
+    jobPosting: one(jobPosting, { fields: [applicantInvitation.jobPostingId], references: [jobPosting.id] }),
+    talent: one(talent, { fields: [applicantInvitation.talentId], references: [talent.id] }),
+}));
+
+export const interviewEvaluationRelations = relations(interviewEvaluation, ({ one }) => ({
+    talent: one(talent, { fields: [interviewEvaluation.talentId], references: [talent.id] }),
+    jobPosting: one(jobPosting, { fields: [interviewEvaluation.jobPostingId], references: [jobPosting.id] }),
+}));
+
+export const onboardingSubmissionRelations = relations(onboardingSubmission, ({ one }) => ({
+    talent: one(talent, { fields: [onboardingSubmission.talentId], references: [talent.id] }),
+    jobPosting: one(jobPosting, { fields: [onboardingSubmission.jobPostingId], references: [jobPosting.id] }),
+    invitation: one(applicantInvitation, { fields: [onboardingSubmission.invitationId], references: [applicantInvitation.id] }),
+}));
+
+export const personnelLedgerBlockRelations = relations(personnelLedgerBlock, ({ one }) => ({
+    talent: one(talent, { fields: [personnelLedgerBlock.talentId], references: [talent.id] }),
+    contact: one(contact, { fields: [personnelLedgerBlock.contactId], references: [contact.id] }),
+}));
+
+export const personnelDataVersionRelations = relations(personnelDataVersion, ({ one }) => ({
+    talent: one(talent, { fields: [personnelDataVersion.talentId], references: [talent.id] }),
+    contact: one(contact, { fields: [personnelDataVersion.contactId], references: [contact.id] }),
+    ledgerBlock: one(personnelLedgerBlock, { fields: [personnelDataVersion.ledgerBlockId], references: [personnelLedgerBlock.id] }),
+}));
+

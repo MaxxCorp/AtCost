@@ -157,6 +157,21 @@ export const contactPaginationSchema = v.optional(v.object({
     sortOrder: v.optional(v.union([v.literal('asc'), v.literal('desc')])),
 }), {});
 
+export const processContactEncryptionBatchSchema = v.object({
+    operationId: v.string(),
+    batchSize: v.optional(v.number(), 25),
+});
+
+export type ProcessContactEncryptionBatchInput = v.InferOutput<typeof processContactEncryptionBatchSchema>;
+
+export interface ContactEncryptionStatus {
+    totalContacts: number;
+    unencryptedCount: number;
+    migratedCount: number;
+    hasUnencryptedData: boolean;
+}
+
+
 
 
 

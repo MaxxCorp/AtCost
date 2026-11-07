@@ -1,5 +1,6 @@
-import { db, timesheetEntry, timesheetAuditTrail, shiftPlan, talent, userTalent, userContact, task, getSuperior, eq, and, isNull, desc } from "@ac/db";
+import { db, timesheetEntry, timesheetAuditTrail, shiftPlan, talent, userTalent, userContact, contact, contactEmail, task, getSuperior, eq, and, isNull, desc, sql } from "@ac/db";
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from "#lib/server/authorization.js";
+import { dev } from '$app/env';
 
 export interface ClockInData {
     talentId: string;
@@ -124,7 +125,7 @@ export async function approveEntry(entryId: string, managerId: string, comment?:
             .set({ status: "completed" })
             .where(and(
                 eq(task.type as any, "timesheet_approval"),
-                eq(task.data as any, { timesheetEntryId: entryId } as any)
+                sql`${task.data}->>'timesheetEntryId' = ${entryId}`
             ));
 
         return updatedEntry;
@@ -162,7 +163,7 @@ export async function rejectEntry(entryId: string, managerId: string, comment?: 
             .set({ status: "completed" })
             .where(and(
                 eq(task.type as any, "timesheet_approval"),
-                eq(task.data as any, { timesheetEntryId: entryId } as any)
+                sql`${task.data}->>'timesheetEntryId' = ${entryId}`
             ));
 
         // Create a correction task for the talent
@@ -224,11 +225,37 @@ export async function getMyTalentIdCore() {
 
         // Step 2: Get contact ID for user as fallback
         const uc = await db.select().from(userContact).where(eq(userContact.userId as any, authUser.id)).limit(1);
-        if (!uc[0]) return null;
+        if (uc[0]) {
+            const t = await db.select({ id: talent.id }).from(talent).where(eq(talent.contactId as any, uc[0].contactId)).limit(1);
+            if (t[0]) return t[0].id;
+        }
 
-        // Step 3: Get talent for that contact
-        const t = await db.select({ id: talent.id }).from(talent).where(eq(talent.contactId as any, uc[0].contactId)).limit(1);
-        return t[0]?.id || null;
+        // Step 2.5: Direct association via contact.userId ownership
+        const directContactLink = await db.select({ talentId: talent.id })
+            .from(talent)
+            .innerJoin(contact, eq(contact.id, talent.contactId))
+            .where(eq(contact.userId, authUser.id))
+            .limit(1);
+        if (directContactLink[0]) return directContactLink[0].talentId;
+
+        // Step 3: Fallback association via email match
+        if (authUser.email) {
+            const emailMatch = await db.select({ talentId: talent.id })
+                .from(talent)
+                .innerJoin(contact, eq(talent.contactId, contact.id))
+                .innerJoin(contactEmail, eq(contact.id, contactEmail.contactId))
+                .where(eq(sql`LOWER(${contactEmail.value})`, authUser.email.toLowerCase()))
+                .limit(1);
+            if (emailMatch[0]) return emailMatch[0].talentId;
+        }
+
+        // Step 4: Dev fallback for mock-user / dev testing
+        if (dev) {
+            const firstTalent = await db.select({ id: talent.id }).from(talent).limit(1);
+            if (firstTalent[0]) return firstTalent[0].id;
+        }
+
+        return null;
     } catch (e: any) {
         console.error('getMyTalentIdCore failed:', e);
         return null;
@@ -299,7 +326,7 @@ async function ensureApprovalTask(tx: any, entryId: string, talentId: string) {
         where: and(
             eq(task.type, "timesheet_approval"),
             eq(task.status, "pending"),
-            eq(task.data, { timesheetEntryId: entryId } as any)
+            sql`${task.data}->>'timesheetEntryId' = ${entryId}`
         ) as any
     });
 

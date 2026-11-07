@@ -32,10 +32,35 @@
     import { updateTalentTagsAction } from './tags.remote.js';
 
     import { contractSchema, updateContractSchema } from "@ac/validations/contracts";
+    import { PIPELINE_STAGES, type PipelineStage } from "@ac/validations";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
     import PayrollProfileForm from "#lib/components/payroll/PayrollProfileForm.svelte";
+    import CustodyLedgerPanel from "#lib/components/talent/CustodyLedgerPanel.svelte";
+    import InterviewScorecardPanel from "#lib/components/recruitment/InterviewScorecardPanel.svelte";
+    import OnboardingPayrollForm from "#lib/components/recruitment/OnboardingPayrollForm.svelte";
+    import { transitionPipelineStage } from "../../recruitment/recruitment.remote";
+    import { toast } from "svelte-sonner";
     import { getContractFilterGroups } from "#lib/filters/index.js";
+
+    let activeViewTab = $state<"all" | "profile" | "interviews" | "onboarding" | "custody">("all");
+    let isTransitioningStage = $state(false);
+
+    async function handleQuickStageChange(nextStage: PipelineStage) {
+        isTransitioningStage = true;
+        try {
+            await transitionPipelineStage({
+                talentId: talentIdParam,
+                pipelineStage: nextStage,
+            });
+            toast.success(`Pipeline-Phase auf "${nextStage}" aktualisiert.`);
+            await talentQuery.refresh();
+        } catch (err: any) {
+            toast.error(err?.message || "Fehler beim Phasenwechsel.");
+        } finally {
+            isTransitioningStage = false;
+        }
+    }
 
     const talentIdParam = $derived(page.params.id as string);
     const talentQuery = $derived(readTalent(talentIdParam));
@@ -58,13 +83,8 @@
         }
     });
 
-    let employees = $state<any[]>([]);
-
-    $effect(() => {
-        listEmployees().then(res => {
-            employees = Array.isArray(res) ? res : [];
-        });
-    });
+    const employeesQuery = listEmployees();
+    const employees = $derived(Array.isArray(employeesQuery.current) ? employeesQuery.current : []);
 
     const listTalentContracts = (params: any) => listContracts({ ...params, talentId: talentIdParam });
 
@@ -92,10 +112,43 @@
                             Back to Talents
                         </a>
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                                Edit Talent Profile
-                            </h1>
+                            <div>
+                                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+                                    {talent.contact?.displayName || "Edit Talent Profile"}
+                                </h1>
+                                <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 font-bold text-indigo-800 border border-indigo-200">
+                                        Version v{talent.currentVersion || 1}
+                                    </span>
+                                    {#if talent.averageRating}
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 font-bold text-amber-900 border border-amber-200">
+                                            ★ {Number(talent.averageRating).toFixed(2)} / 5.00
+                                        </span>
+                                    {/if}
+                                    {#if talent.latestLedgerBlockHash}
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-emerald-800 border border-emerald-200" title={talent.latestLedgerBlockHash}>
+                                            <ShieldCheck size={12} /> Block {talent.latestLedgerBlockHash.slice(0, 12)}…
+                                        </span>
+                                    {/if}
+                                </div>
+                            </div>
                             <div class="flex flex-wrap items-center gap-2">
+                                <select
+                                    value={talent.pipelineStage || "applied"}
+                                    disabled={isTransitioningStage}
+                                    aria-label="Pipeline Stage"
+                                    onchange={(e) => handleQuickStageChange(e.currentTarget.value as PipelineStage)}
+                                    class="rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-xs font-bold text-indigo-950"
+                                >
+                                    {#each PIPELINE_STAGES as st (st.id)}
+                                        <option value={st.id}>Phase: {st.labelDe}</option>
+                                    {/each}
+                                </select>
+                                <a href="/recruitment" class="w-full sm:w-auto">
+                                    <Button variant="outline" size="sm" class="w-full sm:w-auto">
+                                        Pipeline-Board
+                                    </Button>
+                                </a>
                                 <a href="/talents/{talentIdParam}/view" class="w-full sm:w-auto">
                                     <Button variant="outline" size="sm" class="w-full sm:w-auto">
                                         <ExternalLink size={16} class="mr-2" />
@@ -104,9 +157,49 @@
                                 </a>
                             </div>
                         </div>
+
+                        <!-- Co-Existing View Switcher Tabs -->
+                        <div class="mt-5 flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+                            <button
+                                type="button"
+                                onclick={() => (activeViewTab = "all")}
+                                class="rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors {activeViewTab === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                            >
+                                Alle Bereiche (Gesamtansicht)
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => (activeViewTab = "profile")}
+                                class="rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors {activeViewTab === 'profile' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                            >
+                                1. Profil, Verträge & Timeline
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => (activeViewTab = "interviews")}
+                                class="rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors {activeViewTab === 'interviews' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                            >
+                                2. Strukturierte Interviews & Bewertungen
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => (activeViewTab = "onboarding")}
+                                class="rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors {activeViewTab === 'onboarding' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                            >
+                                3. Anpassbares Onboarding & Lohn-Intake
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => (activeViewTab = "custody")}
+                                class="rounded-xl px-3.5 py-1.5 text-xs font-bold transition-colors {activeViewTab === 'custody' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                            >
+                                4. PKI & Blockchain Chain-of-Custody
+                            </button>
+                        </div>
                     </div>
 
                     <div class="space-y-8">
+                        {#if activeViewTab === "all" || activeViewTab === "profile"}
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
                             <TalentForm
                                 initialData={talent}
@@ -418,6 +511,40 @@
                                 }}
                             />
                         </div>
+                        {/if}
+
+                        {#if activeViewTab === "all" || activeViewTab === "interviews"}
+                            <div class="pt-8 border-t border-gray-100">
+                                <InterviewScorecardPanel
+                                    talentId={talentIdParam}
+                                    jobPostingId={talent.jobPostingId}
+                                    onSubmitted={() => {
+                                        void talentQuery.refresh();
+                                    }}
+                                />
+                            </div>
+                        {/if}
+
+                        {#if activeViewTab === "all" || activeViewTab === "onboarding"}
+                            <div class="pt-8 border-t border-gray-100">
+                                <OnboardingPayrollForm
+                                    talentId={talentIdParam}
+                                    jobPostingId={talent.jobPostingId || ""}
+                                    initialData={talent}
+                                    mode="internal"
+                                    onSuccess={() => {
+                                        void talentQuery.refresh();
+                                        void effectiveContractQuery.refresh();
+                                    }}
+                                />
+                            </div>
+                        {/if}
+
+                        {#if activeViewTab === "all" || activeViewTab === "custody"}
+                            <div class="pt-8 border-t border-gray-100">
+                                <CustodyLedgerPanel talentId={talentIdParam} />
+                            </div>
+                        {/if}
                     </div>
                 {:else}
                     <div

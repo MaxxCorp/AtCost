@@ -31,7 +31,10 @@
         createLocationSchema,
         updateLocationSchema,
         createTalentSchema,
+        PIPELINE_STAGES,
     } from "@ac/validations";
+    import { listJobPostings } from "../../../routes/recruitment/recruitment.remote";
+    import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import {
         Button,
         AsyncButton,
@@ -106,7 +109,10 @@
     let relations = $state<any[]>(getInitial("contact.relations", []));
     // svelte-ignore state_referenced_locally
     let tagsInput = $state(
-        (getInitial("contact.tags", []) as string[]).join(", "),
+        (getInitial("contact.tags", []) as any[])
+            .map((t: any) => (typeof t === "string" ? t : (t?.tag?.name || t?.name)))
+            .filter(Boolean)
+            .join(", "),
     );
     // svelte-ignore state_referenced_locally
     let locationIds = $state<string[]>(
@@ -149,6 +155,9 @@
     let talentData = $state({
         id: talentId || d(initialData?.id, undefined),
         status: d(initialData?.status, "applicant"),
+        pipelineStage: d(initialData?.pipelineStage, "applied"),
+        jobPostingId: d(initialData?.jobPostingId, ""),
+        department: d(initialData?.department || initialData?.contact?.department, ""),
         jobTitle: d(initialData?.jobTitle, ""),
         salaryExpectation: d(initialData?.salaryExpectation, ""),
         availabilityDate: d(
@@ -162,6 +171,9 @@
         source: d(initialData?.source, ""),
         internalNotes: d(initialData?.internalNotes, ""),
     });
+
+    const jobPostingsQuery = listJobPostings({});
+    const jobPostings = $derived(jobPostingsQuery.current?.data ?? []);
 
     // Track selected contact for EntityManager list
     // svelte-ignore state_referenced_locally
@@ -219,7 +231,8 @@
                 : [];
 
         tagsInput = (c.tags || [])
-            .map((t: any) => (typeof t === "string" ? t : t.name))
+            .map((t: any) => (typeof t === "string" ? t : (t?.tag?.name || t?.name)))
+            .filter(Boolean)
             .join(", ");
 
         locationIds = (c.locationAssociations || []).map(
@@ -369,6 +382,14 @@
             )}
         />
     {/if}
+    {#if rf?.fields?.talent?.contactId && contactData.id}
+        <input
+            {...rf.fields.talent.contactId.as(
+                "hidden",
+                contactData.id,
+            )}
+        />
+    {/if}
 
     <!-- Talent Details -->
         <div class="space-y-6">
@@ -486,6 +507,64 @@
                                 placeholder="Status..."
                                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
+                        {/if}
+                    </div>
+
+                    <div>
+                        <label
+                            for="pipelineStage"
+                            class="block text-sm font-medium text-gray-700"
+                            >Pipeline-Phase (Hiring Stage)</label
+                        >
+                        {#if rf?.fields?.talent?.pipelineStage}
+                            <select
+                                id="pipelineStage"
+                                {...rf.fields.talent.pipelineStage.as("select")}
+                                bind:value={talentData.pipelineStage}
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500"
+                            >
+                                {#each PIPELINE_STAGES as st (st.id)}
+                                    <option value={st.id}>{st.labelDe} ({st.labelEn})</option>
+                                {/each}
+                            </select>
+                        {/if}
+                    </div>
+
+                    <div>
+                        <label
+                            for="department"
+                            class="block text-sm font-medium text-gray-700"
+                            >Fachbereich / Abteilung</label
+                        >
+                        {#if rf?.fields?.talent?.department}
+                            <input
+                                id="department"
+                                {...rf.fields.talent.department.as("text")}
+                                bind:value={talentData.department}
+                                placeholder="z.B. Soziale Arbeit & Beratung"
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        {/if}
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label
+                            for="jobPostingId"
+                            class="block text-sm font-medium text-gray-700"
+                            >Verknüpfte Stellenausschreibung (Job Role)</label
+                        >
+                        {#if rf?.fields?.talent?.jobPostingId}
+                            <select
+                                id="jobPostingId"
+                                {...rf.fields.talent.jobPostingId.as("select")}
+                                bind:value={talentData.jobPostingId}
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500"
+                            >
+                                <option value="">— Keine Stellenausschreibung verknüpft —</option>
+                                {#each jobPostings as jp (jp.id)}
+                                    <option value={jp.id}>{jp.title} ({jp.department})</option>
+                                {/each}
+                            </select>
                         {/if}
                     </div>
                 </div>
@@ -759,6 +838,15 @@
                         {/snippet}
                     </EntityManager>
                 </div>
+
+                {#if rf?.fields?.talent?.syncIds}
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <SyncCheckboxBlock
+                            syncFieldConfig={rf.fields.talent.syncIds}
+                            initialSelectedIds={initialData?.syncIds || []}
+                        />
+                    </div>
+                {/if}
             </div>
         </div>
     </div>

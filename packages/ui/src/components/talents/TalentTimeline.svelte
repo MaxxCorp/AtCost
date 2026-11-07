@@ -46,9 +46,11 @@
     let isOpen = $state(false);
     let showAll = $state(false);
 
-    const sortedEntries = $derived([...entries].sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    ));
+    const sortedEntries = $derived([...entries].sort((a, b) => {
+        const timeB = new Date(b.timestamp || b.date || b.data?.date || 0).getTime();
+        const timeA = new Date(a.timestamp || a.date || a.data?.date || 0).getTime();
+        return timeB - timeA;
+    }));
 
     const displayedEntries = $derived(showAll ? sortedEntries : sortedEntries.slice(0, 3));
     const hasMore = $derived(sortedEntries.length > 3);
@@ -66,6 +68,17 @@
         Evaluation: "bg-purple-100 text-purple-700 border-purple-200",
         Termination: "bg-red-100 text-red-700 border-red-200"
     };
+
+    function safeFormatDate(val: any, pattern = "PPP"): string {
+        if (!val) return "";
+        try {
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return "";
+            return format(d, pattern);
+        } catch {
+            return "";
+        }
+    }
 
 </script>
 
@@ -86,6 +99,7 @@
         <div class="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
             {#each displayedEntries as entry (entry.id)}
                 {@const Icon = typeIcons[entry.type]}
+                {@const rawDate = entry.data?.date || entry.date || entry.timestamp}
                 <div class="relative">
                     <div class="absolute -left-[31px] top-1 p-1 bg-white border-2 border-white rounded-full">
                         <div class="p-1.5 rounded-full {typeColors[entry.type]} shadow-sm">
@@ -98,7 +112,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-bold uppercase tracking-wider">{entry.type}</span>
                                 <span class="text-xs text-gray-400">•</span>
-                                <span class="text-xs text-gray-500">{format(new Date(entry.data.date), "PPP")}</span>
+                                <span class="text-xs text-gray-500">{safeFormatDate(rawDate)}</span>
                             </div>
                             <div class="flex items-center gap-1.5 text-xs text-gray-400">
                                 <User size={12} />
@@ -111,14 +125,14 @@
                                 <p class="text-sm text-gray-600">{entry.description}</p>
                             {/if}
                             
-                            {#if entry.data.comment}
+                            {#if entry.data?.comment}
                                 <div class="bg-gray-50 rounded-lg p-3 flex gap-3">
                                     <MessageSquare size={16} class="text-gray-400 shrink-0 mt-0.5" />
                                     <p class="text-sm text-gray-700 italic">"{entry.data.comment}"</p>
                                 </div>
                             {/if}
 
-                            {#if entry.data.nextStep}
+                            {#if entry.data?.nextStep}
                                 <div class="mt-4 pt-3 border-t border-gray-100">
                                     <div class="flex items-center gap-2 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-tight">
                                         <Calendar size={12} />
@@ -127,7 +141,7 @@
                                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
                                         <div>
                                             <p class="text-sm font-medium text-indigo-900">{entry.data.nextStep.name}</p>
-                                            <p class="text-xs text-indigo-700">{format(new Date(entry.data.nextStep.date), "PPP")}</p>
+                                            <p class="text-xs text-indigo-700">{safeFormatDate(entry.data.nextStep.date)}</p>
                                         </div>
                                         <div class="flex items-center gap-1.5 text-xs text-indigo-600 bg-white px-2 py-1 rounded border border-indigo-100">
                                             <User size={12} />

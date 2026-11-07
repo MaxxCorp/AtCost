@@ -1,5 +1,6 @@
 import { query, form, command } from '$app/server';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql } from '@ac/db';
+import { dev } from '$app/env';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, computeContactBlindIndexes, recordPersonnelMutation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '#lib/server/authorization.js';
 import {
     talentTimelineEntrySchema,
@@ -9,6 +10,7 @@ import {
 } from '@ac/validations';
 import * as v from 'valibot';
 import { readTalent as readTalentService, type TalentProfile } from '#lib/server/talents/service.js';
+import { syncTalentTargets } from '#lib/server/sync/talent-sync.js';
 import { listTalents } from './list.remote';
 import { readTalent } from './[id]/read.remote';
 import { invalidateTalent } from '#lib/server/cache/index.js';
@@ -67,18 +69,31 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
     const authUser = getAuthenticatedUser();
     ensureAccess(authUser, 'talents');
 
-    const { talent: talentData, contact: contactData, emailsJson, phonesJson, relationsJson, tagsJson, addressesJson, locationIdsJson, linkedUserId } = data;
+    const { talent: talentData, contact: contactData, emailsJson, phonesJson, relationsJson, tagsJson, addressesJson, locationIdsJson, syncIdsJson, linkedUserId } = data;
     const emails = emailsJson ? JSON.parse(emailsJson) : [];
     const phones = phonesJson ? JSON.parse(phonesJson) : [];
     const relations = relationsJson ? JSON.parse(relationsJson) : [];
     const tags = tagsJson ? JSON.parse(tagsJson) : [];
     const addresses = addressesJson ? JSON.parse(addressesJson) : [];
     const locationIds = locationIdsJson ? JSON.parse(locationIdsJson) : [];
+    const syncIds: string[] = syncIdsJson ? JSON.parse(syncIdsJson) : [];
 
     try {
+        const beforeSnapshot = talentData.id ? await readTalentService(talentData.id) : null;
+        const blindIndexes = computeContactBlindIndexes({
+            email: emails[0]?.value,
+            phone: phones[0]?.value,
+            birthday: contactData.birthday,
+            familyName: contactData.familyName,
+            givenName: contactData.givenName,
+            zip: addresses[0]?.zip,
+            city: addresses[0]?.city,
+            street: addresses[0]?.street,
+        });
+
         const result = await db.transaction(async (tx) => {
             // 1. Upsert Contact
-            let contactId = contactData.id;
+            let contactId = contactData.id || talentData.contactId;
             const contactValues = {
                 userId: authUser.id,
                 displayName: contactData.displayName,
@@ -86,8 +101,9 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
                 familyName: contactData.familyName,
                 birthday: contactData.birthday ? new Date(contactData.birthday) : null,
                 role: contactData.role,
-                department: contactData.department,
+                department: contactData.department || talentData.department,
                 notes: contactData.notes,
+                fingerprints: blindIndexes,
                 updatedAt: new Date(),
             };
 
@@ -147,6 +163,9 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             const talentValues = {
                 contactId,
                 status: talentData.status,
+                pipelineStage: talentData.pipelineStage || (talentData.status === 'active' ? 'hired' : talentData.status === 'rejected' ? 'rejected' : 'applied'),
+                jobPostingId: talentData.jobPostingId || null,
+                department: talentData.department || contactData.department || null,
                 jobTitle: talentData.jobTitle,
                 salaryExpectation: talentData.salaryExpectation,
                 availabilityDate: talentData.availabilityDate ? new Date(talentData.availabilityDate) : null,
@@ -154,6 +173,9 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
                 resumeUrl: talentData.resumeUrl,
                 source: talentData.source,
                 internalNotes: talentData.internalNotes,
+                syncIds,
+                lastModifiedByUserId: authUser.id,
+                lastModifiedChannel: 'internal_ui',
                 updatedAt: new Date(),
             };
 
@@ -189,8 +211,71 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             return { talentId, contactId };
         });
 
-        // Refresh the detail view and list to ensure client-side data is in sync
+        // Sync per-talent synchronization targets & record PKI-encrypted custody version block
         if (result.talentId) {
+            try {
+                await syncTalentTargets(authUser.id, result.talentId, syncIds);
+                await recordPersonnelMutation({
+                    talentId: result.talentId,
+                    contactId: result.contactId,
+                    entityType: 'talent',
+                    entityId: result.talentId,
+                    operation: talentData.id ? 'update' : 'create',
+                    channel: 'internal_ui',
+                    actor: {
+                        userId: authUser.id,
+                        name: (authUser as any).name || authUser.email,
+                        email: authUser.email,
+                        role: Array.isArray((authUser as any).roles) ? (authUser as any).roles[0] : 'admin',
+                    },
+                    beforeState: beforeSnapshot
+                        ? {
+                              status: beforeSnapshot.status,
+                              pipelineStage: beforeSnapshot.pipelineStage,
+                              jobTitle: beforeSnapshot.jobTitle,
+                              department: beforeSnapshot.department,
+                              salaryExpectation: beforeSnapshot.salaryExpectation,
+                              onboardingStatus: beforeSnapshot.onboardingStatus,
+                              internalNotes: beforeSnapshot.internalNotes,
+                              contact: {
+                                  displayName: beforeSnapshot.contact?.displayName,
+                                  givenName: beforeSnapshot.contact?.givenName,
+                                  familyName: beforeSnapshot.contact?.familyName,
+                                  role: beforeSnapshot.contact?.role,
+                                  department: beforeSnapshot.contact?.department,
+                                  notes: beforeSnapshot.contact?.notes,
+                              },
+                          }
+                        : null,
+                    afterState: {
+                        talent: {
+                            id: result.talentId,
+                            status: talentData.status,
+                            pipelineStage: talentData.pipelineStage || 'applied',
+                            jobTitle: talentData.jobTitle,
+                            department: talentData.department || contactData.department,
+                            salaryExpectation: talentData.salaryExpectation,
+                            onboardingStatus: talentData.onboardingStatus,
+                            internalNotes: talentData.internalNotes,
+                        },
+                        contact: {
+                            id: result.contactId,
+                            displayName: contactData.displayName,
+                            givenName: contactData.givenName,
+                            familyName: contactData.familyName,
+                            role: contactData.role,
+                            department: contactData.department || talentData.department,
+                            notes: contactData.notes,
+                            emails,
+                            phones,
+                            addresses,
+                        },
+                        syncIds,
+                    },
+                });
+            } catch (custodyErr) {
+                console.warn('[upsertTalent] Custody recording warning:', custodyErr);
+            }
             await invalidateTalent(result.talentId);
             void readTalent(result.talentId).refresh();
         } else {
@@ -273,6 +358,19 @@ export const getMyTalentProfile = query(v.undefined_(), async (): Promise<Talent
             }
         } catch (e) {
             console.error('[getMyTalentProfile] Error in Step 3 (email):', e);
+        }
+    }
+
+    // Step 4: Dev fallback for mock-user / dev testing
+    if (dev) {
+        try {
+            const firstTalent = await db.select({ id: talent.id }).from(talent).limit(1);
+            if (firstTalent[0]) {
+                const profile = await readTalentService(firstTalent[0].id);
+                if (profile) return profile;
+            }
+        } catch (e) {
+            console.error('[getMyTalentProfile] Error in Step 4 (dev fallback):', e);
         }
     }
 

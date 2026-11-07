@@ -803,10 +803,11 @@
 
         <!-- General Notes -->
         <div class="pt-2 border-t border-slate-200 dark:border-slate-700/80">
-            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            <label for="oh-notes" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Zusatzhinweise (z. B. Telefonische Erreichbarkeit, Barrierefreier Zugang)
             </label>
             <input
+                id="oh-notes"
                 type="text"
                 bind:value={ohState.notes}
                 placeholder="z. B. Telefonische Erreichbarkeit • Barrierefreier Zugang"

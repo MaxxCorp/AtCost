@@ -40,8 +40,19 @@
         recordActiveItem,
         activeItemAnchor,
         type FilterGroup,
-        type FilterStateMap
+        type FilterStateMap,
+        ContactEncryptionBanner,
+        ContactEncryptionMigrationDialog,
     } from "@ac/ui";
+    import {
+        checkContactEncryptionStatus,
+        startContactEncryptionMigration,
+        processContactEncryptionBatch,
+    } from "../contacts/encryption-migration.remote";
+
+    let showEncryptionMigrationDialog = $state(false);
+    const encryptionStatusQuery = checkContactEncryptionStatus();
+    const encryptionStatus = $derived(encryptionStatusQuery.current);
     import { getTalentFilterGroups } from "#lib/filters/index.js";
     
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
@@ -118,11 +129,42 @@
                 {m.talents_subtitle ? m.talents_subtitle() : "Strategic recruitment pipeline and professional network"}
             </p>
         </div>
-        <Button href="/talents/new" class="w-full md:w-auto shadow-sm">
-            <UserPlusIcon class="w-4 h-4 mr-2" />
-            {m.create_talent ? m.create_talent() : "Create Talent"}
-        </Button>
+        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <Button href="/recruitment" variant="outline" class="border-violet-200 bg-violet-50 text-violet-900 hover:bg-violet-100">
+                Pipeline & Stellenausschreibungen
+            </Button>
+            <Button href="/careers" variant="outline" class="border-teal-200 bg-teal-50 text-teal-900 hover:bg-teal-100">
+                Öffentliches Karriereportal
+            </Button>
+            <Button href="/contacts/obfuscations" variant="outline">
+                DSGVO Crypto-Shredding
+            </Button>
+            <Button href="/talents/new" class="shadow-sm">
+                <UserPlusIcon class="w-4 h-4 mr-2" />
+                {m.create_talent ? m.create_talent() : "Create Talent"}
+            </Button>
+        </div>
     </div>
+
+    <!-- Contact Encryption Migration Banner & Dialog -->
+    <ContactEncryptionBanner
+        status={encryptionStatus}
+        onopen={() => (showEncryptionMigrationDialog = true)}
+    />
+
+    {#if showEncryptionMigrationDialog && encryptionStatus}
+        <ContactEncryptionMigrationDialog
+            bind:open={showEncryptionMigrationDialog}
+            statusData={encryptionStatus}
+            startMigrationRemote={startContactEncryptionMigration}
+            processBatchRemote={processContactEncryptionBatch}
+            oncomplete={async () => {
+                await encryptionStatusQuery.refresh();
+                await talentsQuery.refresh();
+            }}
+            onclose={() => (showEncryptionMigrationDialog = false)}
+        />
+    {/if}
 
     <!-- Action Bar -->
     <div class="flex flex-col md:flex-row gap-3 mb-6">
@@ -223,6 +265,22 @@
                                             <Archive size={10} /> {m.status_inactive ? m.status_inactive() : "Inactive"}
                                         </span>
                                     {/if}
+
+                                    {#if (talent as any).pipelineStage}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-50 text-violet-800 text-[10px] font-bold uppercase tracking-wider border border-violet-200">
+                                            Stage: {(talent as any).pipelineStage}
+                                        </span>
+                                    {/if}
+
+                                    {#if (talent as any).averageRating}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 text-[10px] font-bold border border-amber-200">
+                                            ★ {Number((talent as any).averageRating).toFixed(1)}
+                                        </span>
+                                    {/if}
+
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono font-bold">
+                                        v{(talent as any).currentVersion || 1}
+                                    </span>
                                 </div>
                                 
                                 <p class="text-sm font-bold text-indigo-600 italic mb-1">{talent.jobTitle || "Professional Talent"}</p>

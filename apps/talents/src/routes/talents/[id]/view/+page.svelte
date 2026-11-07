@@ -19,6 +19,8 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
     const id = $derived(page.params.id as string);
+    const talentQuery = $derived(readTalent(id));
+    const talent = $derived(talentQuery.current);
 
     $effect(() => {
         if (id) {
@@ -27,14 +29,12 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
     });
 
     $effect(() => {
-        readTalent(id).then((t) => {
-            if (t?.contact) {
-                breadcrumbState.set({
-                    feature: "talents",
-                    current: `View: ${t.contact.displayName}`,
-                });
-            }
-        }).catch(() => {});
+        if (talent?.contact) {
+            breadcrumbState.set({
+                feature: "talents",
+                current: `View: ${talent.contact.displayName}`,
+            });
+        }
     });
 </script>
 
@@ -54,13 +54,12 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
     </div>
 
     <svelte:boundary>
-        {#if $effect.pending()}
+        {#if $effect.pending() || (talentQuery.loading && !talent)}
             <LoadingSection message="Loading talent details..." />
-        {/if}
-        <div class={[$effect.pending() && "opacity-50 pointer-events-none"]}>
-            {#await readTalent(id) then talent}
-                {#if talent && talent.contact}
-                    {@const contact = talent.contact as any}
+        {:else if talentQuery.error}
+            <ErrorSection headline="Error loading talent" message={talentQuery.error.message} />
+        {:else if talent && talent.contact}
+            {@const contact = talent.contact as any}
                     <div
                         class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
                     >
@@ -397,8 +396,6 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
                         >
                     </div>
                 {/if}
-            {/await}
-        </div>
         {#snippet failed(error: unknown)}
             <ErrorSection headline="Error" message={error instanceof Error ? error.message : "An error occurred"} />
         {/snippet}

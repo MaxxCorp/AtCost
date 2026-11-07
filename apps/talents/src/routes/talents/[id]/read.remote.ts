@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, talent, eq } from '@ac/db';
+import { db, talent, eq, decryptContactRecord } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { cached, cacheKeys } from '#lib/server/cache/index.js';
@@ -35,6 +35,12 @@ export const readTalent = query(v.string(), async (id: string) => {
             }
         });
 
-        return result || null;
+        if (!result) return null;
+
+        const decryptedContact = result.contact ? await decryptContactRecord(result.contact) : null;
+        return {
+            ...result,
+            contact: decryptedContact
+        };
     });
 });

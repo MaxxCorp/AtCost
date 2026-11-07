@@ -94,6 +94,36 @@ export const FEATURES: readonly FeatureMeta[] = [
         category: 'management'
     },
     {
+        key: 'recruitment',
+        title: 'Recruitment & Onboarding',
+        description: 'Job roles, hiring pipeline, structured interviews, customizable onboarding, and blockchain custody.',
+        href: '/recruitment',
+        buttonText: 'Open Pipeline',
+        claim: 'recruitment',
+        icon: 'briefcase',
+        gradientFrom: 'from-violet-50',
+        gradientTo: 'to-indigo-50',
+        borderClass: 'border-violet-100',
+        buttonClass: 'bg-violet-600 hover:bg-violet-700',
+        order: 9.5,
+        category: 'management'
+    },
+    {
+        key: 'careers',
+        title: 'Public Careers Portal',
+        description: 'Accessible, multilingual job board grouped by department with embeddable subview.',
+        href: '/careers',
+        buttonText: 'View Careers Site',
+        claim: 'careers',
+        icon: 'users',
+        gradientFrom: 'from-teal-50',
+        gradientTo: 'to-emerald-50',
+        borderClass: 'border-teal-100',
+        buttonClass: 'bg-teal-600 hover:bg-teal-700',
+        order: 4.5,
+        category: 'self-service'
+    },
+    {
         key: 'talents',
         title: 'Talents',
         description: 'Manage talent records, history timeline, and contact information.',

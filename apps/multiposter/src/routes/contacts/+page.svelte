@@ -44,8 +44,19 @@
 		initPageFromUrl,
 		syncPageToUrl,
 		recordActiveItem,
-		activeItemAnchor
+		activeItemAnchor,
+		ContactEncryptionBanner,
+		ContactEncryptionMigrationDialog,
 	} from "@ac/ui";
+	import {
+		checkContactEncryptionStatus,
+		startContactEncryptionMigration,
+		processContactEncryptionBatch,
+	} from "./encryption-migration.remote";
+
+	let showEncryptionMigrationDialog = $state(false);
+	const encryptionStatusQuery = checkContactEncryptionStatus();
+	const encryptionStatus = $derived(encryptionStatusQuery.current);
 
 	let sortField = $state<"updatedAt" | "createdAt" | "displayName">("updatedAt");
 	let sortOrder = $state<"asc" | "desc">("desc");
@@ -152,6 +163,26 @@
 				</Button>
 			</div>
 		</div>
+
+		<!-- Contact Encryption Migration Banner & Dialog -->
+		<ContactEncryptionBanner
+			status={encryptionStatus}
+			onopen={() => (showEncryptionMigrationDialog = true)}
+		/>
+
+		{#if showEncryptionMigrationDialog && encryptionStatus}
+			<ContactEncryptionMigrationDialog
+				bind:open={showEncryptionMigrationDialog}
+				statusData={encryptionStatus}
+				startMigrationRemote={startContactEncryptionMigration}
+				processBatchRemote={processContactEncryptionBatch}
+				oncomplete={async () => {
+					await encryptionStatusQuery.refresh();
+					await contactsQuery.refresh();
+				}}
+				onclose={() => (showEncryptionMigrationDialog = false)}
+			/>
+		{/if}
 
 		<!-- Action Bar -->
 		<div class="flex flex-col md:flex-row gap-3 mb-6">

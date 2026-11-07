@@ -62,6 +62,7 @@
 
         showQuickCreateButton?: boolean;
         linkItemLabel?: string;
+        changeItemLabel?: string;
         associatedItemLabel?: string;
         searchPlaceholder?: string;
         noItemsLabel?: string;
@@ -122,6 +123,7 @@
         sortOrder = "asc",
         showQuickCreateButton = true,
         linkItemLabel = undefined,
+        changeItemLabel = undefined,
         associatedItemLabel = undefined,
         searchPlaceholder = undefined,
         noItemsLabel = undefined,
@@ -191,6 +193,7 @@
     {sortOrder}
     {showQuickCreateButton}
     linkItemLabel={linkItemLabel ?? (m?.link_item_label ? m.link_item_label({ item: resolvedTitle }) : undefined)}
+    changeItemLabel={changeItemLabel ?? (m?.change_item_label ? m.change_item_label({ item: resolvedTitle }) : (m?.change_contact ? m.change_contact() : undefined))}
     associatedItemLabel={associatedItemLabel ?? (m?.associated_item_label ? m.associated_item_label({ item: resolvedTitle }) : undefined)}
     searchPlaceholder={searchPlaceholder ?? (m?.search_placeholder ? m.search_placeholder({ item: resolvedTitle }) : (m?.search_contacts_placeholder ? m.search_contacts_placeholder() : undefined))}
     noItemsLabel={noItemsLabel ?? (m?.no_items_associated_label ? m.no_items_associated_label({ item: resolvedTitle }) : (m?.no_contact_selected ? m.no_contact_selected() : undefined))}

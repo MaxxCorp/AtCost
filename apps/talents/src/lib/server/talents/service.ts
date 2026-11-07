@@ -1,10 +1,13 @@
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, and, sql } from '@ac/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, and, sql, decryptContactRecord } from '@ac/db';
 // Unifying Drizzle operators via @ac/db
 
 export interface TalentProfile {
     id: string;
     contactId: string;
     status: string;
+    pipelineStage?: string;
+    jobPostingId?: string | null;
+    department?: string | null;
     jobTitle: string | null;
     salaryExpectation: string | null;
     availabilityDate: string | null;
@@ -12,6 +15,13 @@ export interface TalentProfile {
     resumeUrl: string | null;
     source: string | null;
     internalNotes: string | null;
+    averageRating?: number | null;
+    syncIds?: string[];
+    currentVersion?: number;
+    latestLedgerBlockHash?: string | null;
+    customFieldValues?: Record<string, unknown>;
+    lastModifiedByUserId?: string | null;
+    lastModifiedChannel?: string | null;
     createdAt: string;
     updatedAt: string;
     linkedUser: { id: string; name: string; email: string } | null;
@@ -46,37 +56,41 @@ export async function readTalent(id: string): Promise<TalentProfile | null> {
 
     try {
 
+    const contactData = result.contact ? await decryptContactRecord(result.contact) : null;
+
     // Resolve linked user
     let linkedUser: { id: string; name: string; email: string } | null = null;
     
     // Check userContact (implicit)
-    const uc = await db.select({ userId: userContact.userId })
-        .from(userContact)
-        .where(eq(userContact.contactId, result.contact.id))
-        .limit(1);
-    
-    let userId = uc[0]?.userId;
-    
-    // Check userTalent (explicit) if no contact link found
-    if (!userId) {
-        const ut = await db.select({ userId: userTalent.userId })
-            .from(userTalent)
-            .where(eq(userTalent.talentId, result.id))
+    if (result.contact) {
+        const uc = await db.select({ userId: userContact.userId })
+            .from(userContact)
+            .where(eq(userContact.contactId, result.contact.id))
             .limit(1);
-        userId = ut[0]?.userId;
-    }
+        
+        let userId = uc[0]?.userId;
+        
+        // Check userTalent (explicit) if no contact link found
+        if (!userId) {
+            const ut = await db.select({ userId: userTalent.userId })
+                .from(userTalent)
+                .where(eq(userTalent.talentId, result.id))
+                .limit(1);
+            userId = ut[0]?.userId;
+        }
 
-    if (userId) {
-        const [u] = await db.select({ id: user.id, name: user.name, email: user.email })
-            .from(user)
-            .where(eq(user.id, userId))
-            .limit(1);
-        if (u) linkedUser = u;
+        if (userId) {
+            const [u] = await db.select({ id: user.id, name: user.name, email: user.email })
+                .from(user)
+                .where(eq(user.id, userId))
+                .limit(1);
+            if (u) linkedUser = u;
+        }
     }
 
     // NEW: Step 3: Global email fallback if no link found yet
-    if (!linkedUser) {
-        const emails = result.contact.emails.map(e => e.value.toLowerCase());
+    if (!linkedUser && contactData) {
+        const emails = (contactData.emails || []).map((e: any) => e.value.toLowerCase());
         if (emails.length > 0) {
             const [u] = await db.select({ id: user.id, name: user.name, email: user.email })
                 .from(user)
@@ -90,34 +104,44 @@ export async function readTalent(id: string): Promise<TalentProfile | null> {
         id: result.id,
         contactId: result.contactId,
         status: result.status,
+        pipelineStage: result.pipelineStage ?? 'applied',
+        jobPostingId: result.jobPostingId ?? null,
+        department: result.department ?? contactData?.department ?? null,
         jobTitle: result.jobTitle,
         salaryExpectation: result.salaryExpectation,
-        availabilityDate: result.availabilityDate?.toISOString() ?? null,
+        availabilityDate: result.availabilityDate instanceof Date ? result.availabilityDate.toISOString() : (result.availabilityDate ?? null),
         onboardingStatus: result.onboardingStatus,
         resumeUrl: result.resumeUrl,
         source: result.source,
         internalNotes: result.internalNotes,
+        averageRating: result.averageRating ?? null,
+        syncIds: result.syncIds ?? [],
+        currentVersion: result.currentVersion ?? 1,
+        latestLedgerBlockHash: result.latestLedgerBlockHash ?? null,
+        customFieldValues: result.customFieldValues ?? {},
+        lastModifiedByUserId: result.lastModifiedByUserId ?? null,
+        lastModifiedChannel: result.lastModifiedChannel ?? 'internal_ui',
         createdAt: result.createdAt?.toISOString?.() ?? (result.createdAt instanceof Date ? result.createdAt.toISOString() : result.createdAt),
         updatedAt: result.updatedAt?.toISOString?.() ?? (result.updatedAt instanceof Date ? result.updatedAt.toISOString() : result.updatedAt),
         linkedUser,
-        contact: {
-            id: result.contact.id,
-            displayName: result.contact.displayName,
-            givenName: result.contact.givenName,
-            familyName: result.contact.familyName,
-            company: result.contact.company,
-            role: result.contact.role,
-            department: result.contact.department,
-            birthday: result.contact.birthday?.toISOString() ?? null,
-            notes: result.contact.notes,
-            isPublic: result.contact.isPublic,
-            createdAt: result.contact.createdAt?.toISOString?.() ?? (result.contact.createdAt instanceof Date ? result.contact.createdAt.toISOString() : result.contact.createdAt),
-            updatedAt: result.contact.updatedAt?.toISOString?.() ?? (result.contact.updatedAt instanceof Date ? result.contact.updatedAt.toISOString() : result.contact.updatedAt),
-            emails: result.contact.emails || [],
-            phones: result.contact.phones || [],
-            addresses: result.contact.addresses || [],
-            locationAssociations: result.contact.locationAssociations || [],
-            relations: (result.contact.relations || []).map((r: any) => ({
+        contact: contactData ? {
+            id: contactData.id,
+            displayName: contactData.displayName,
+            givenName: contactData.givenName,
+            familyName: contactData.familyName,
+            company: contactData.company,
+            role: contactData.role,
+            department: contactData.department,
+            birthday: contactData.birthday instanceof Date ? contactData.birthday.toISOString() : (contactData.birthday ?? null),
+            notes: contactData.notes,
+            isPublic: contactData.isPublic,
+            createdAt: contactData.createdAt?.toISOString?.() ?? (contactData.createdAt instanceof Date ? contactData.createdAt.toISOString() : String(contactData.createdAt)),
+            updatedAt: contactData.updatedAt?.toISOString?.() ?? (contactData.updatedAt instanceof Date ? contactData.updatedAt.toISOString() : String(contactData.updatedAt)),
+            emails: contactData.emails || [],
+            phones: contactData.phones || [],
+            addresses: contactData.addresses || [],
+            locationAssociations: contactData.locationAssociations || [],
+            relations: (contactData.relations || []).map((r: any) => ({
                 id: r.id,
                 targetContactId: r.targetContactId,
                 relationType: r.relationType,
@@ -128,11 +152,11 @@ export async function readTalent(id: string): Promise<TalentProfile | null> {
                     familyName: r.targetContact.familyName,
                 } : null,
             })),
-            tags: (result.contact.tags || []).map((ct: any) => ({
+            tags: (contactData.tags || []).map((ct: any) => ({
                 id: ct.tag?.id,
                 name: ct.tag?.name
             })).filter((t: any) => t.name)
-        },
+        } : null,
         timelineEntries: (result.timelineEntries || []).map((te: any) => ({
             id: te.id,
             type: te.type,

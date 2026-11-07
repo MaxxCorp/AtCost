@@ -23,7 +23,12 @@
 	});
 
 	let isAuthPage = $derived(
-		page.url.pathname === "/login" || page.url.pathname === "/signup" || page.url.pathname.startsWith("/gdpr-self-service"),
+		page.url.pathname === "/login" ||
+			page.url.pathname === "/signup" ||
+			page.url.pathname.startsWith("/gdpr-self-service") ||
+			page.url.pathname.startsWith("/careers/embed") ||
+			page.url.pathname.startsWith("/apply/") ||
+			page.url.pathname.startsWith("/onboarding/"),
 	);
 
 	import { getLastListUrl } from "@ac/ui";
@@ -69,7 +74,7 @@
 									>
 								</Breadcrumb.Item>
 
-								{#each breadcrumbSegments as segment, i}
+								{#each breadcrumbSegments as segment, i (i)}
 									<Breadcrumb.Separator />
 									<Breadcrumb.Item>
 										{#if segment.href && (i < breadcrumbSegments.length - 1 || breadcrumbState.current)}

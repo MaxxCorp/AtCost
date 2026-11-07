@@ -20,7 +20,7 @@ export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ su
     try {
         const result = await db.transaction(async (tx) => {
             // 1. Upsert Contact
-            let contactId = contactData.id;
+            let contactId = contactData.id || talentData.contactId;
             const contactValues = {
                 userId: authUser.id,
                 displayName: contactData.displayName,

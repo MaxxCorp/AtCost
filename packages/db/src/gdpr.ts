@@ -6,9 +6,11 @@ import {
     contactAddress,
     gdprRequest,
     task,
+    talent,
 } from './schema/index.js';
 import { eq, and, or, sql, inArray, desc, isNull } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
+import { computeContactBlindIndexes, cryptoShredSubjectKeys, recordPersonnelMutation } from './crypto-ledger.js';
 
 export interface IdentifyAttributesInput {
     email?: string;
@@ -83,42 +85,81 @@ export async function identifyAndMarkContactForObfuscation(
         };
     }
 
-    // Load candidates matching any of the top discriminators (email, phone, birthday, or familyName)
+    const blindIndexes = computeContactBlindIndexes({
+        email: normEmail,
+        phone: normPhone,
+        birthday: normBirthday,
+        familyName: normFamilyName,
+        givenName: normGivenName,
+        zip: normZip,
+        city: normCity,
+        street: normStreet,
+    });
+
+    // Load candidates matching any of the top discriminators (email, phone, birthday, or familyName) or their HMAC blind indexes
     const baseConditions: any[] = [];
     if (normEmail) {
         baseConditions.push(
-            sql`EXISTS (SELECT 1 FROM ${contactEmail} WHERE ${contactEmail.contactId} = ${contact.id} AND lower(${contactEmail.value}) = ${normEmail})`
+            or(
+                sql`EXISTS (SELECT 1 FROM ${contactEmail} WHERE ${contactEmail.contactId} = ${contact.id} AND lower(${contactEmail.value}) = ${normEmail})`,
+                sql`${contact.fingerprints}->>'email' = ${blindIndexes.email}`
+            )
         );
     }
     if (normPhone) {
         baseConditions.push(
-            sql`EXISTS (SELECT 1 FROM ${contactPhone} WHERE ${contactPhone.contactId} = ${contact.id} AND regexp_replace(lower(${contactPhone.value}), '[\\s\\-\\(\\)\\.]', '', 'g') = ${normPhone})`
+            or(
+                sql`EXISTS (SELECT 1 FROM ${contactPhone} WHERE ${contactPhone.contactId} = ${contact.id} AND regexp_replace(lower(${contactPhone.value}), '[\\s\\-\\(\\)\\.]', '', 'g') = ${normPhone})`,
+                sql`${contact.fingerprints}->>'phone' = ${blindIndexes.phone}`
+            )
         );
     }
     if (normBirthday) {
         baseConditions.push(
-            sql`to_char(${contact.birthday}, 'YYYY-MM-DD') = ${normBirthday}`
+            or(
+                sql`to_char(${contact.birthday}, 'YYYY-MM-DD') = ${normBirthday}`,
+                sql`${contact.fingerprints}->>'birthday' = ${blindIndexes.birthday}`
+            )
         );
     }
     if (normFamilyName) {
-        baseConditions.push(sql`lower(${contact.familyName}) = ${normFamilyName}`);
+        baseConditions.push(
+            or(
+                sql`lower(${contact.familyName}) = ${normFamilyName}`,
+                sql`${contact.fingerprints}->>'familyName' = ${blindIndexes.familyName}`
+            )
+        );
     }
     if (normGivenName) {
-        baseConditions.push(sql`lower(${contact.givenName}) = ${normGivenName}`);
+        baseConditions.push(
+            or(
+                sql`lower(${contact.givenName}) = ${normGivenName}`,
+                sql`${contact.fingerprints}->>'givenName' = ${blindIndexes.givenName}`
+            )
+        );
     }
     if (normZip) {
         baseConditions.push(
-            sql`EXISTS (SELECT 1 FROM ${contactAddress} WHERE ${contactAddress.contactId} = ${contact.id} AND lower(${contactAddress.zip}) = ${normZip})`
+            or(
+                sql`EXISTS (SELECT 1 FROM ${contactAddress} WHERE ${contactAddress.contactId} = ${contact.id} AND lower(${contactAddress.zip}) = ${normZip})`,
+                sql`${contact.fingerprints}->>'zip' = ${blindIndexes.zip}`
+            )
         );
     }
     if (normCity) {
         baseConditions.push(
-            sql`EXISTS (SELECT 1 FROM ${contactAddress} WHERE ${contactAddress.contactId} = ${contact.id} AND lower(${contactAddress.city}) = ${normCity})`
+            or(
+                sql`EXISTS (SELECT 1 FROM ${contactAddress} WHERE ${contactAddress.contactId} = ${contact.id} AND lower(${contactAddress.city}) = ${normCity})`,
+                sql`${contact.fingerprints}->>'city' = ${blindIndexes.city}`
+            )
         );
     }
     if (normStreet) {
         baseConditions.push(
-            sql`EXISTS (SELECT 1 FROM ${contactAddress} WHERE ${contactAddress.contactId} = ${contact.id} AND lower(${contactAddress.street}) LIKE ${'%' + normStreet + '%'})`
+            or(
+                sql`EXISTS (SELECT 1 FROM ${contactAddress} WHERE ${contactAddress.contactId} = ${contact.id} AND lower(${contactAddress.street}) LIKE ${'%' + normStreet + '%'})`,
+                sql`${contact.fingerprints}->>'street' = ${blindIndexes.street}`
+            )
         );
     }
 
@@ -355,6 +396,43 @@ export async function obfuscateContact(
         console.warn('[GDPR Service] Notice: Could not auto-complete task:', taskErr);
     }
 
+    // 7. Obfuscate linked talent records & execute PKI Crypto-Shredding of historical DEKs
+    try {
+        const linkedTalents = await db.select().from(talent).where(eq(talent.contactId, contactId));
+        for (const t of linkedTalents) {
+            await db
+                .update(talent)
+                .set({
+                    status: 'inactive',
+                    pipelineStage: 'rejected',
+                    internalNotes: '[OBFUSCATED & CRYPTO-SHREDDED PER GDPR ART. 17]',
+                    resumeUrl: null,
+                    encryptedEnvelope: null,
+                    customFieldValues: {},
+                    updatedAt: now,
+                })
+                .where(eq(talent.id, t.id));
+
+            await cryptoShredSubjectKeys({
+                contactId,
+                talentId: t.id,
+                adminUserId,
+                reason: notes || 'GDPR Art. 17 Obfuscation & Crypto-Shredding',
+            });
+        }
+        if (linkedTalents.length === 0) {
+            await cryptoShredSubjectKeys({
+                contactId,
+                adminUserId,
+                reason: notes || 'GDPR Art. 17 Obfuscation & Crypto-Shredding',
+            });
+        }
+        // Clear blind indexes on contact
+        await db.update(contact).set({ fingerprints: {} }).where(eq(contact.id, contactId));
+    } catch (shredErr) {
+        console.warn('[GDPR Service] Notice during crypto-shredding:', shredErr);
+    }
+
     return { success: true, contactId };
 }
 
@@ -425,18 +503,18 @@ export async function listGdprRequests(options?: ListGdprRequestsOptions) {
         createdAt: r.createdAt.toISOString(),
         contact: r.contact
             ? {
-                  id: r.contact.id,
-                  displayName: r.contact.displayName || '',
-                  givenName: r.contact.givenName || '',
-                  familyName: r.contact.familyName || '',
-                  obfuscationStatus: r.contact.obfuscationStatus,
-                  obfuscatedAt: r.contact.obfuscatedAt?.toISOString() || null,
-                  emails: (r.contact.emails || []).map((e) => e.value),
-                  phones: (r.contact.phones || []).map((p) => p.value),
-                  addresses: (r.contact.addresses || []).map(
-                      (a) => `${a.street || ''} ${a.houseNumber || ''}, ${a.zip || ''} ${a.city || ''}`.trim()
-                  ),
-              }
+                id: r.contact.id,
+                displayName: r.contact.displayName || '',
+                givenName: r.contact.givenName || '',
+                familyName: r.contact.familyName || '',
+                obfuscationStatus: r.contact.obfuscationStatus,
+                obfuscatedAt: r.contact.obfuscatedAt?.toISOString() || null,
+                emails: (r.contact.emails || []).map((e) => e.value),
+                phones: (r.contact.phones || []).map((p) => p.value),
+                addresses: (r.contact.addresses || []).map(
+                    (a) => `${a.street || ''} ${a.houseNumber || ''}, ${a.zip || ''} ${a.city || ''}`.trim()
+                ),
+            }
             : null,
     }));
 

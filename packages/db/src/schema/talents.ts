@@ -8,7 +8,14 @@ import { location } from "./resources";
 export const talent = pgTable("talent", {
     id: uuid("id").primaryKey().defaultRandom(),
     contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
-    status: text("status", { enum: ["active", "inactive", "applicant"] }).default("applicant").notNull(),
+    status: text("status", { enum: ["active", "inactive", "applicant", "rejected"] }).default("applicant").notNull(),
+    pipelineStage: text("pipeline_stage", {
+        enum: ["applied", "screening", "interview", "evaluation", "offered", "onboarding", "hired", "rejected"],
+    })
+        .default("applied")
+        .notNull(),
+    jobPostingId: uuid("job_posting_id"),
+    department: text("department"),
     jobTitle: text("job_title"),
     salaryExpectation: text("salary_expectation"),
     availabilityDate: timestamp("availability_date"),
@@ -16,6 +23,14 @@ export const talent = pgTable("talent", {
     resumeUrl: text("resume_url"),
     source: text("source"),
     internalNotes: text("internal_notes"),
+    averageRating: doublePrecision("average_rating"),
+    syncIds: jsonb("sync_ids").$type<string[]>().default([]),
+    currentVersion: integer("current_version").default(1).notNull(),
+    latestLedgerBlockHash: text("latest_ledger_block_hash"),
+    encryptedEnvelope: jsonb("encrypted_envelope"),
+    customFieldValues: jsonb("custom_field_values").$type<Record<string, unknown>>().default({}),
+    lastModifiedByUserId: text("last_modified_by_user_id"),
+    lastModifiedChannel: text("last_modified_channel").default("internal_ui"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
 });

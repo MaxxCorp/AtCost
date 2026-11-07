@@ -36,6 +36,8 @@ export { default as LocationCreateView } from './components/locations/LocationCr
 export { default as LocationDetailView } from './components/locations/LocationDetailView.svelte';
 export { default as TagForm } from './components/forms/TagForm.svelte';
 export { default as TagCategoryForm } from './components/forms/TagCategoryForm.svelte';
+export { default as ContactEncryptionMigrationDialog } from './components/contacts/ContactEncryptionMigrationDialog.svelte';
+export { default as ContactEncryptionBanner } from './components/contacts/ContactEncryptionBanner.svelte';
 export { default as GdprSelfServiceForm } from './components/gdpr/GdprSelfServiceForm.svelte';
 export { default as GdprAdminList } from './components/gdpr/GdprAdminList.svelte';
 export { IsMobile } from "./hooks/is-mobile.svelte.ts";

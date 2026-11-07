@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { decryptContactRecord } from './contact-encryption.js';
 import {
     contact,
     contactEmail,
@@ -199,8 +200,9 @@ export async function listContacts(input?: ContactListInput) {
 
     const rawMap = new Map(rawResults.map((r) => [r.id, r]));
     const sortedResults = ids.map((id) => rawMap.get(id)!).filter(Boolean);
+    const decryptedResults = await Promise.all(sortedResults.map((r) => decryptContactRecord(r)));
 
-    const data = sortedResults.map((row) => ({
+    const data = decryptedResults.map((row) => ({
         ...row,
         displayName: row.displayName || '',
         givenName: row.givenName ?? undefined,
@@ -208,7 +210,7 @@ export async function listContacts(input?: ContactListInput) {
         middleName: row.middleName ?? undefined,
         honorificPrefix: row.honorificPrefix ?? undefined,
         honorificSuffix: row.honorificSuffix ?? undefined,
-        birthday: row.birthday?.toISOString() ?? undefined,
+        birthday: row.birthday instanceof Date ? row.birthday.toISOString() : (typeof row.birthday === 'string' ? row.birthday : undefined),
         gender: row.gender ?? undefined,
         company: row.company ?? undefined,
         department: row.department ?? undefined,
@@ -216,8 +218,8 @@ export async function listContacts(input?: ContactListInput) {
         vCardPath: row.vCardPath?.includes('/api/') ? row.vCardPath : `/api/contacts/${row.id}/contact.vcf`,
         qrCodePath: row.qrCodePath?.includes('/api/') ? row.qrCodePath : `/api/contacts/${row.id}/qr.png`,
         notes: row.notes ?? undefined,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
+        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt),
         emails: (row.emails || []).map((e: any) => ({
             id: e.id,
             value: e.value,
@@ -284,25 +286,26 @@ export async function getContactById(id: string) {
     });
 
     if (!result) return null;
+    const decrypted = await decryptContactRecord(result);
 
     return {
-        ...result,
-        displayName: result.displayName || '',
-        givenName: result.givenName ?? undefined,
-        familyName: result.familyName ?? undefined,
-        middleName: result.middleName ?? undefined,
-        honorificPrefix: result.honorificPrefix ?? undefined,
-        honorificSuffix: result.honorificSuffix ?? undefined,
-        birthday: result.birthday?.toISOString() ?? undefined,
-        gender: result.gender ?? undefined,
-        company: result.company ?? undefined,
-        department: result.department ?? undefined,
-        role: result.role ?? undefined,
-        vCardPath: result.vCardPath?.includes('/api/') ? result.vCardPath : `/api/contacts/${result.id}/contact.vcf`,
-        qrCodePath: result.qrCodePath?.includes('/api/') ? result.qrCodePath : `/api/contacts/${result.id}/qr.png`,
-        notes: result.notes ?? undefined,
-        createdAt: result.createdAt.toISOString(),
-        updatedAt: result.updatedAt.toISOString(),
+        ...decrypted,
+        displayName: decrypted.displayName || '',
+        givenName: decrypted.givenName ?? undefined,
+        familyName: decrypted.familyName ?? undefined,
+        middleName: decrypted.middleName ?? undefined,
+        honorificPrefix: decrypted.honorificPrefix ?? undefined,
+        honorificSuffix: decrypted.honorificSuffix ?? undefined,
+        birthday: decrypted.birthday instanceof Date ? decrypted.birthday.toISOString() : (decrypted.birthday ?? undefined),
+        gender: decrypted.gender ?? undefined,
+        company: decrypted.company ?? undefined,
+        department: decrypted.department ?? undefined,
+        role: decrypted.role ?? undefined,
+        vCardPath: decrypted.vCardPath?.includes('/api/') ? decrypted.vCardPath : `/api/contacts/${decrypted.id}/contact.vcf`,
+        qrCodePath: decrypted.qrCodePath?.includes('/api/') ? decrypted.qrCodePath : `/api/contacts/${decrypted.id}/qr.png`,
+        notes: decrypted.notes ?? undefined,
+        createdAt: decrypted.createdAt instanceof Date ? decrypted.createdAt.toISOString() : String(decrypted.createdAt),
+        updatedAt: decrypted.updatedAt instanceof Date ? decrypted.updatedAt.toISOString() : String(decrypted.updatedAt),
         emails: (result.emails || []).map((e: any) => ({
             id: e.id,
             value: e.value,

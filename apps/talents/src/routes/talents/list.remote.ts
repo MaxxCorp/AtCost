@@ -1,5 +1,5 @@
 import { query } from '$app/server';
-import { db, talent, contact, eq, desc, inArray, notInArray, not, ilike, or, and, sql, exists, talentTimelineEntry, userContact, user } from '@ac/db';
+import { db, talent, contact, eq, desc, inArray, notInArray, not, ilike, or, and, sql, exists, talentTimelineEntry, userContact, user, decryptContactRecord } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { talentPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
@@ -139,25 +139,36 @@ export const listTalents = query(PaginationSchema, async (input): Promise<Pagina
         if (u) userByContactId.set(ul.contactId, u);
     }
 
-    const data = untransformedResults.filter(t => t.contact != null).map(t => ({
+    const decryptedResults = await Promise.all(
+        untransformedResults.map(async (t) => {
+            if (!t.contact) return t;
+            const decryptedContact = await decryptContactRecord(t.contact);
+            return {
+                ...t,
+                contact: decryptedContact
+            };
+        })
+    );
+
+    const data = decryptedResults.filter(t => t.contact != null).map(t => ({
         id: t.id,
         contactId: t.contactId,
         status: t.status,
         jobTitle: t.jobTitle,
         salaryExpectation: t.salaryExpectation,
-        availabilityDate: t.availabilityDate?.toISOString() ?? null,
+        availabilityDate: t.availabilityDate instanceof Date ? t.availabilityDate.toISOString() : (t.availabilityDate ?? null),
         onboardingStatus: t.onboardingStatus,
         resumeUrl: t.resumeUrl,
         source: t.source,
         internalNotes: t.internalNotes,
-        createdAt: t.createdAt?.toISOString?.() ?? t.createdAt,
-        updatedAt: t.updatedAt?.toISOString?.() ?? t.updatedAt,
+        createdAt: t.createdAt?.toISOString?.() ?? (t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt),
+        updatedAt: t.updatedAt?.toISOString?.() ?? (t.updatedAt instanceof Date ? t.updatedAt.toISOString() : t.updatedAt),
         linkedUser: userByContactId.get(t.contact.id) ?? null,
         contact: {
             ...t.contact,
-            birthday: t.contact.birthday?.toISOString() ?? null,
-            createdAt: t.contact.createdAt?.toISOString() ?? t.contact.createdAt,
-            updatedAt: t.contact.updatedAt?.toISOString() ?? t.contact.updatedAt,
+            birthday: t.contact.birthday instanceof Date ? t.contact.birthday.toISOString() : (t.contact.birthday ?? null),
+            createdAt: t.contact.createdAt instanceof Date ? t.contact.createdAt.toISOString() : (t.contact.createdAt ? String(t.contact.createdAt) : ''),
+            updatedAt: t.contact.updatedAt instanceof Date ? t.contact.updatedAt.toISOString() : (t.contact.updatedAt ? String(t.contact.updatedAt) : ''),
             tags: (t.contact.tags || []).map((ct: any) => ({
                 id: ct.tag?.id,
                 name: ct.tag?.name
