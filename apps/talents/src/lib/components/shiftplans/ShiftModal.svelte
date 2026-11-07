@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { ShiftDetail, ShiftActivity, SchedulingGroupDetail } from "@ac/validations";
     import { createShift, updateShift, deleteShift } from "../../../routes/shiftplans/shifts.remote";
+    import SchedulingGroupModal from "./SchedulingGroupModal.svelte";
     import { SCHEDULE_ENTITY_THEMES } from "@ac/validations";
     import { Button, AsyncButton } from "@ac/ui";
     import { 
@@ -86,6 +87,13 @@
     let activities = $state<ShiftActivity[]>(Array.isArray(shift?.activities) ? [...shift.activities] : []);
     let isSaving = $state(false);
     let isDeleting = $state(false);
+    let showGroupModal = $state(false);
+    // svelte-ignore state_referenced_locally
+    let localGroups = $state<SchedulingGroupDetail[]>([...schedulingGroups]);
+
+    $effect(() => {
+        localGroups = [...schedulingGroups];
+    });
 
     const themeColors: { id: string; label: string; class: string }[] = [
         { id: "blue", label: "Blue", class: "bg-blue-500" },
@@ -252,17 +260,27 @@
                     </div>
 
                     <div>
-                        <label for="group-select" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                            <Tag size={13} class="text-purple-500" />
-                            Scheduling Group
-                        </label>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label for="group-select" class="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <Tag size={13} class="text-purple-500" />
+                                Scheduling Group
+                            </label>
+                            <button
+                                type="button"
+                                onclick={() => showGroupModal = true}
+                                class="text-[11px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 cursor-pointer hover:underline"
+                            >
+                                <Plus size={11} />
+                                New Group
+                            </button>
+                        </div>
                         <select
                             id="group-select"
                             bind:value={schedulingGroupId}
                             class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all outline-none"
                         >
                             <option value={null}>General / No Group</option>
-                            {#each schedulingGroups as g (g.id)}
+                            {#each localGroups as g (g.id)}
                                 <option value={g.id}>{g.name}</option>
                             {/each}
                         </select>
@@ -514,4 +532,18 @@
             </div>
         </div>
     </div>
+{/if}
+
+{#if showGroupModal}
+    <SchedulingGroupModal
+        bind:isOpen={showGroupModal}
+        {locations}
+        onclose={() => showGroupModal = false}
+        onSuccess={(newGroup) => {
+            if (newGroup && newGroup.id) {
+                localGroups = [...localGroups, newGroup];
+                schedulingGroupId = newGroup.id;
+            }
+        }}
+    />
 {/if}

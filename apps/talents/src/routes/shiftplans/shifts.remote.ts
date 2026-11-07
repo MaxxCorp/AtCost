@@ -1,5 +1,5 @@
 import { query, command, requested } from '$app/server';
-import { db, shiftPlan, shiftSchedulingGroup, talent, contact, location, eq, and, gte, lte, asc, desc } from '@ac/db';
+import { db, shiftPlan, shiftSchedulingGroup, talent, contact, location, eq, and, or, isNull, isNotNull, count, sql, gte, lte, asc, desc } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import {
@@ -12,6 +12,7 @@ import {
     createSchedulingGroupSchema,
     updateSchedulingGroupSchema,
     deleteSchedulingGroupSchema,
+    reorderSchedulingGroupsSchema,
     type ShiftDetail,
     type SchedulingGroupDetail
 } from '@ac/validations';
@@ -245,32 +246,63 @@ export const listSchedulingGroups = query(v.optional(v.object({ locationId: v.op
 
     const conditions: any[] = [];
     if (input?.locationId) {
-        conditions.push(eq(shiftSchedulingGroup.locationId, input.locationId));
+        conditions.push(or(eq(shiftSchedulingGroup.locationId, input.locationId), isNull(shiftSchedulingGroup.locationId)));
     }
 
-    let q = db.select().from(shiftSchedulingGroup);
+    // Subquery to count scheduled shifts per group
+    const shiftCountSubquery = db
+        .select({
+            groupId: shiftPlan.schedulingGroupId,
+            count: count().as('shift_count'),
+        })
+        .from(shiftPlan)
+        .where(isNotNull(shiftPlan.schedulingGroupId))
+        .groupBy(shiftPlan.schedulingGroupId)
+        .as('sc');
+
+    let q = db
+        .select({
+            id: shiftSchedulingGroup.id,
+            name: shiftSchedulingGroup.name,
+            code: shiftSchedulingGroup.code,
+            color: shiftSchedulingGroup.color,
+            locationId: shiftSchedulingGroup.locationId,
+            locationName: location.name,
+            order: shiftSchedulingGroup.order,
+            shiftCount: sql<number>`coalesce(${shiftCountSubquery.count}, 0)`.mapWith(Number),
+        })
+        .from(shiftSchedulingGroup)
+        .leftJoin(location, eq(shiftSchedulingGroup.locationId, location.id))
+        .leftJoin(shiftCountSubquery, eq(shiftSchedulingGroup.id, shiftCountSubquery.groupId));
+
     if (conditions.length > 0) {
         q = q.where(and(...conditions)) as any;
     }
 
     const groups = await q.orderBy(asc(shiftSchedulingGroup.order), asc(shiftSchedulingGroup.name));
 
-    if (groups.length === 0) {
-        const defaults = [
-            { name: "Front of House / Service", code: "FOH", color: "purple", order: 1 },
-            { name: "Kitchen / Production", code: "KIT", color: "darkBlue", order: 2 },
-            { name: "Logistics & Facilities", code: "LOG", color: "green", order: 3 },
-            { name: "Management / Supervisors", code: "MGT", color: "blue", order: 4 },
-        ];
-        const inserted = await db.insert(shiftSchedulingGroup).values(defaults).returning();
-        return inserted.map(g => ({
-            id: g.id,
-            name: g.name,
-            code: g.code,
-            color: g.color,
-            locationId: g.locationId,
-            order: g.order
-        }));
+    // Only seed defaults if the entire table is empty globally AND no location filter was passed
+    if (groups.length === 0 && !input?.locationId) {
+        const [totalCount] = await db.select({ count: count() }).from(shiftSchedulingGroup);
+        if (Number(totalCount?.count || 0) === 0) {
+            const defaults = [
+                { name: "Front of House / Service", code: "FOH", color: "purple", order: 1 },
+                { name: "Kitchen / Production", code: "KIT", color: "darkBlue", order: 2 },
+                { name: "Logistics & Facilities", code: "LOG", color: "green", order: 3 },
+                { name: "Management / Supervisors", code: "MGT", color: "blue", order: 4 },
+            ];
+            const inserted = await db.insert(shiftSchedulingGroup).values(defaults).returning();
+            return inserted.map(g => ({
+                id: g.id,
+                name: g.name,
+                code: g.code,
+                color: g.color,
+                locationId: g.locationId,
+                locationName: null,
+                order: g.order,
+                shiftCount: 0,
+            }));
+        }
     }
 
     return groups.map((g) => ({
@@ -279,7 +311,9 @@ export const listSchedulingGroups = query(v.optional(v.object({ locationId: v.op
         code: g.code,
         color: g.color,
         locationId: g.locationId,
+        locationName: g.locationName ?? null,
         order: g.order,
+        shiftCount: Number(g.shiftCount || 0),
     }));
 });
 
@@ -287,11 +321,20 @@ export const createSchedulingGroup = command(createSchedulingGroupSchema, async 
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
 
+    let order = data.order;
+    if (order === undefined || order === null) {
+        const [maxRow] = await db
+            .select({ maxOrder: sql<number>`coalesce(max(${shiftSchedulingGroup.order}), 0)`.mapWith(Number) })
+            .from(shiftSchedulingGroup);
+        order = (Number(maxRow?.maxOrder) || 0) + 1;
+    }
+
     const [inserted] = await db.insert(shiftSchedulingGroup).values({
         name: data.name,
         code: data.code || null,
         color: data.color || 'purple',
         locationId: data.locationId || null,
+        order,
     }).returning();
 
     try {
@@ -307,12 +350,18 @@ export const updateSchedulingGroup = command(updateSchedulingGroupSchema, async 
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
 
-    const [updated] = await db.update(shiftSchedulingGroup).set({
+    const updateValues: Record<string, any> = {
         name: data.name,
         code: data.code || null,
         color: data.color || 'purple',
         locationId: data.locationId || null,
-    }).where(eq(shiftSchedulingGroup.id, data.id)).returning();
+    };
+
+    if (data.order !== undefined && data.order !== null) {
+        updateValues.order = data.order;
+    }
+
+    const [updated] = await db.update(shiftSchedulingGroup).set(updateValues).where(eq(shiftSchedulingGroup.id, data.id)).returning();
 
     try {
         await requested(listSchedulingGroups, 20).refreshAll();
@@ -331,6 +380,9 @@ export const deleteSchedulingGroup = command(deleteSchedulingGroupSchema, async 
     const user = getAuthenticatedUser();
     ensureAccess(user, 'shiftplans');
 
+    // Unassign shifts from this group first to ensure clean state
+    await db.update(shiftPlan).set({ schedulingGroupId: null }).where(eq(shiftPlan.schedulingGroupId, data.id));
+
     await db.delete(shiftSchedulingGroup).where(eq(shiftSchedulingGroup.id, data.id));
 
     try {
@@ -342,6 +394,26 @@ export const deleteSchedulingGroup = command(deleteSchedulingGroupSchema, async 
     try {
         await requested(listShifts, 20).refreshAll();
     } catch { /* ignore */ }
+
+    return { success: true };
+});
+
+export const reorderSchedulingGroups = command(reorderSchedulingGroupsSchema, async (data) => {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'shiftplans');
+
+    for (const item of data.groups) {
+        await db
+            .update(shiftSchedulingGroup)
+            .set({ order: item.order })
+            .where(eq(shiftSchedulingGroup.id, item.id));
+    }
+
+    try {
+        await requested(listSchedulingGroups, 20).refreshAll();
+    } catch { /* ignore */ }
+    void listSchedulingGroups().refresh();
+    void listSchedulingGroups({}).refresh();
 
     return { success: true };
 });

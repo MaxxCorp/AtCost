@@ -3,6 +3,7 @@
     import { listShiftplans } from "./list.remote";
     import { deleteShiftplans } from "./[id]/delete.remote";
     import ShiftScheduleMatrix from "#lib/components/shiftplans/ShiftScheduleMatrix.svelte";
+    import SchedulingGroupsManager from "#lib/components/shiftplans/SchedulingGroupsManager.svelte";
     import { SvelteSet } from "svelte/reactivity";
     import { goto } from "$app/navigation";
     import { page as pageState } from "$app/state";
@@ -37,6 +38,7 @@
         Layers,
         CalendarDays,
         Check,
+        Tag,
     } from "@lucide/svelte";
     import { toast } from "svelte-sonner";
 
@@ -44,7 +46,10 @@
 
     type Shiftplan = Awaited<ReturnType<typeof listShiftplans>>["data"][number];
 
-    let activeTab = $state<"schedule" | "templates">("schedule");
+    let activeTab = $state<"schedule" | "groups" | "templates">("schedule");
+
+    const locationsQuery = listLocations({});
+    const locations = $derived(locationsQuery.current?.data ?? []);
 
     // Templates view state
     let sortField = $state<"updatedAt" | "createdAt" | "name">("updatedAt");
@@ -123,7 +128,7 @@
                 </p>
             </div>
 
-            <!-- Tab Switcher & New Template Action -->
+            <!-- Tab Switcher & Action -->
             <div class="flex items-center gap-3 w-full md:w-auto">
                 <div class="bg-gray-100 p-1 rounded-2xl flex items-center shadow-2xs">
                     <button
@@ -138,6 +143,19 @@
                     >
                         <CalendarDays size={15} />
                         <span>Weekly Schedule</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick={() => activeTab = "groups"}
+                        class={[
+                            "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer",
+                            activeTab === "groups"
+                                ? "bg-white text-purple-700 shadow-xs"
+                                : "text-gray-600 hover:text-gray-900"
+                        ]}
+                    >
+                        <Tag size={15} />
+                        <span>{m.scheduling_groups ? m.scheduling_groups() : "Scheduling Groups"}</span>
                     </button>
                     <button
                         type="button"
@@ -168,7 +186,12 @@
             <ShiftScheduleMatrix />
         {/if}
 
-        <!-- TAB 2: Templates & Presets List -->
+        <!-- TAB 2: Scheduling Groups Management -->
+        {#if activeTab === "groups"}
+            <SchedulingGroupsManager {locations} />
+        {/if}
+
+        <!-- TAB 3: Templates & Presets List -->
         {#if activeTab === "templates"}
             <div class="bg-white rounded-3xl p-6 shadow-xs border border-gray-100 space-y-6">
                 <div class="flex items-center justify-between">

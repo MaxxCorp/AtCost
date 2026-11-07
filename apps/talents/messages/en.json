@@ -349,5 +349,10 @@
 	"superseded_by": "Superseded by",
 	"contracts_order": "Contract Hierarchy & Supersedence",
 	"order_rank": "Rank #{rank}",
-	"contract_description": "Configure collective agreement, amendment agreement, or salary settlement."
+	"contract_description": "Configure collective agreement, amendment agreement, or salary settlement.",
+	"scheduling_groups": "Scheduling Groups",
+	"scheduling_groups_desc": "Organize team members and shift rosters into functional groups.",
+	"new_scheduling_group": "New Scheduling Group",
+	"edit_scheduling_group": "Edit Scheduling Group",
+	"delete_scheduling_group": "Delete Scheduling Group"
 }

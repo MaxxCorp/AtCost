@@ -10,7 +10,7 @@
         group?: SchedulingGroupDetail | null;
         locations?: Array<{ id: string; name: string }>;
         onclose: () => void;
-        onSuccess: () => void;
+        onSuccess: (savedGroup?: any) => void;
     }
 
     let {
@@ -31,6 +31,8 @@
     let color = $state(group?.color ?? "purple");
     // svelte-ignore state_referenced_locally
     let locationId = $state<string | null>(group?.locationId ?? null);
+    // svelte-ignore state_referenced_locally
+    let order = $state<number>(group?.order ?? 0);
 
     let isSaving = $state(false);
     let isDeleting = $state(false);
@@ -63,24 +65,26 @@
         isSaving = true;
         try {
             if (isEditing && group) {
-                await updateSchedulingGroup({
+                const updated = await updateSchedulingGroup({
                     id: group.id,
                     name: trimmedName,
                     code: code.trim() ? code.trim().toUpperCase() : null,
                     color,
                     locationId: locationId || null,
+                    order,
                 });
                 toast.success(`Scheduling group "${trimmedName}" updated`);
+                onSuccess(updated);
             } else {
-                await createSchedulingGroup({
+                const created = await createSchedulingGroup({
                     name: trimmedName,
                     code: code.trim() ? code.trim().toUpperCase() : null,
                     color,
                     locationId: locationId || null,
                 });
                 toast.success(`Scheduling group "${trimmedName}" created`);
+                onSuccess(created);
             }
-            onSuccess();
             onclose();
         } catch (error: any) {
             toast.error(error?.message || "Failed to save scheduling group");
@@ -107,7 +111,7 @@
 </script>
 
 {#if isOpen}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+    <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
         <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <!-- Modal Header -->
             <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-purple-50/70 to-indigo-50/70">
@@ -219,7 +223,12 @@
                         <div class="flex items-start gap-2 text-red-800 text-xs font-medium">
                             <AlertTriangle size={16} class="text-red-500 shrink-0 mt-0.5" />
                             <span>
-                                Are you sure you want to delete <strong>{group?.name}</strong>? Existing shifts in this group will not be deleted, but will become unassigned from this group.
+                                Are you sure you want to delete <strong>{group?.name}</strong>?
+                                {#if (group?.shiftCount ?? 0) > 0}
+                                    <strong class="block mt-1 text-red-700">{group?.shiftCount} scheduled shifts will become unassigned from this group.</strong>
+                                {:else}
+                                    Existing shifts in this group will not be deleted, but will become unassigned.
+                                {/if}
                             </span>
                         </div>
                         <div class="flex items-center justify-end gap-2">

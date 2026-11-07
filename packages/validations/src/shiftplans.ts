@@ -104,6 +104,7 @@ export const createSchedulingGroupSchema = v.object({
     code: v.optional(v.nullable(v.string())),
     color: v.optional(v.string(), "purple"),
     locationId: v.optional(v.nullable(v.string())),
+    order: v.optional(v.number()),
 });
 
 export type CreateSchedulingGroupInput = v.InferOutput<typeof createSchedulingGroupSchema>;
@@ -114,6 +115,7 @@ export const updateSchedulingGroupSchema = v.object({
     code: v.optional(v.nullable(v.string())),
     color: v.optional(v.string(), "purple"),
     locationId: v.optional(v.nullable(v.string())),
+    order: v.optional(v.number()),
 });
 
 export type UpdateSchedulingGroupInput = v.InferOutput<typeof updateSchedulingGroupSchema>;
@@ -121,6 +123,19 @@ export type UpdateSchedulingGroupInput = v.InferOutput<typeof updateSchedulingGr
 export const deleteSchedulingGroupSchema = v.object({
     id: v.pipe(v.string(), v.uuid("Invalid group ID")),
 });
+
+export type DeleteSchedulingGroupInput = v.InferOutput<typeof deleteSchedulingGroupSchema>;
+
+export const reorderSchedulingGroupsSchema = v.object({
+    groups: v.array(
+        v.object({
+            id: v.pipe(v.string(), v.uuid("Invalid group ID")),
+            order: v.number(),
+        })
+    ),
+});
+
+export type ReorderSchedulingGroupsInput = v.InferOutput<typeof reorderSchedulingGroupsSchema>;
 
 export interface ShiftDetail {
     id: string;
@@ -151,7 +166,9 @@ export interface SchedulingGroupDetail {
     code: string | null;
     color: string;
     locationId: string | null;
+    locationName?: string | null;
     order: number;
+    shiftCount?: number;
 }
 
 // --- REUSABLE TEMPLATES / PRESETS (Backward Compatibility) ---

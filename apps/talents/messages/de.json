@@ -349,5 +349,10 @@
 	"superseded_by": "Wird überstimmt von",
 	"contracts_order": "Vertragshierarchie & Rangfolge",
 	"order_rank": "Rang #{rank}",
-	"contract_description": "Vertrag, Änderungstarifvertrag oder Tarifeinigung konfigurieren."
+	"contract_description": "Vertrag, Änderungstarifvertrag oder Tarifeinigung konfigurieren.",
+	"scheduling_groups": "Planungsgruppen",
+	"scheduling_groups_desc": "Organisieren Sie Teammitglieder und Schichtpläne in funktionale Gruppen.",
+	"new_scheduling_group": "Neue Planungsgruppe",
+	"edit_scheduling_group": "Planungsgruppe bearbeiten",
+	"delete_scheduling_group": "Planungsgruppe löschen"
 }

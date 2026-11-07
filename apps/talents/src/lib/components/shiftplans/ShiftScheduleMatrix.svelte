@@ -111,7 +111,10 @@
     const shiftsQuery = $derived(listShifts(shiftsFilter));
     const shifts = $derived(shiftsQuery.current ?? []);
 
-    const groupsQuery = listSchedulingGroups();
+    const groupsFilter = $derived({
+        locationId: selectedLocationId || undefined,
+    });
+    const groupsQuery = $derived(listSchedulingGroups(groupsFilter));
     const schedulingGroups = $derived(groupsQuery.current ?? []);
 
     const talentsQuery = listTalents({});
