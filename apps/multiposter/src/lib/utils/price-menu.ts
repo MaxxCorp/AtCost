@@ -66,6 +66,7 @@ export interface PriceMenuSettings {
     footerNote: string;
     showSaleTallies: boolean;
     showStatistics: boolean;
+    showEventQr: boolean;
 }
 
 export const PRICE_MENU_ACCENTS = ["#1f2937", "#047857", "#b45309", "#4338ca", "#be123c"] as const;
@@ -108,6 +109,7 @@ export function defaultPriceMenuSettings(vatNote: string): PriceMenuSettings {
         footerNote: "",
         showSaleTallies: false,
         showStatistics: false,
+        showEventQr: true,
     };
 }
 

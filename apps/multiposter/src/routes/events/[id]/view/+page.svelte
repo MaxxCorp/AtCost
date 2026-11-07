@@ -47,6 +47,7 @@
     import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import PriceListView from "#lib/components/prices/PriceListView.svelte";
+    import EventSalesWorkflowSection from "#lib/components/events/EventSalesWorkflowSection.svelte";
     import {
         formatDateDay,
         formatDateMonth,
@@ -605,6 +606,15 @@
                     </div>
 
                     <!-- Actions Toolbar (Unified, No Duplication) -->
+                    {#if checkCanEdit(event) && event.prices && event.prices.length > 0}
+                        <EventSalesWorkflowSection
+                            eventId={event.id}
+                            eventSummary={event.summary}
+                            participantsCount={(event as any).participants?.length || 1}
+                            eventCurrency={event.currency || "EUR"}
+                            hasPrices={true}
+                        />
+                    {/if}
                     <div class="flex flex-wrap items-center justify-between gap-3 pt-5 md:pt-6 border-t border-gray-100 mt-6">
                         <div class="flex flex-wrap items-center gap-3">
                             {#if event.iCalPath}

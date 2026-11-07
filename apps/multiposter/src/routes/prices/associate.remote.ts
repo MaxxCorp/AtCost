@@ -118,9 +118,11 @@ export const fetchEntityPrices = query(getPriceAssociationsSchema, async (data) 
         if (!p) return null;
 
         let totalPricePerPortion = 0;
+        let totalCostPerPortion = 0;
         const items = (p.items || []).map((it: any) => {
             const linePricePerPortion = (it.unitPrice || 0) * (it.portionAmount || 1);
             totalPricePerPortion += linePricePerPortion;
+            totalCostPerPortion += (it.costPrice || 0) * (it.portionAmount || 1);
 
             const itemTags = it.itemType === 'recipe'
                 ? (it.recipe?.tags || []).map((t: any) => t.tag || t).filter(Boolean)
@@ -167,6 +169,8 @@ export const fetchEntityPrices = query(getPriceAssociationsSchema, async (data) 
             updatedAt: p.updatedAt.toISOString(),
             items,
             totalPricePerPortion: Math.round(totalPricePerPortion * 100) / 100,
+            totalCostPerPortion: Math.round(totalCostPerPortion * 100) / 100,
+            currency: p.currency || 'EUR',
         };
     }).filter(Boolean);
 });

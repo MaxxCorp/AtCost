@@ -84,7 +84,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 										},
 										recipe: {
 											with: {
-												tags: { with: { tag: { with: { category: true } } } }
+												tags: { with: { tag: { with: { category: true } } } },
+												consumables: { with: { consumable: true } }
 											}
 										},
 									}
@@ -130,7 +131,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 											},
 											recipe: {
 												with: {
-													tags: { with: { tag: { with: { category: true } } } }
+													tags: { with: { tag: { with: { category: true } } } },
+													consumables: { with: { consumable: true } }
 												}
 											},
 										}
@@ -210,7 +212,8 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 										},
 										recipe: {
 											with: {
-												tags: { with: { tag: { with: { category: true } } } }
+												tags: { with: { tag: { with: { category: true } } } },
+												consumables: { with: { consumable: true } }
 											}
 										},
 									}

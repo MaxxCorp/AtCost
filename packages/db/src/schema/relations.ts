@@ -12,7 +12,7 @@ import { cmsPage, cmsBlock, cmsSlot, cmsContentVersion, cmsMedia } from "./cms";
 import { contract, contractFramework, contractFrameworkContract } from "./contracts";
 import { consumable, consumableTag } from "./consumables";
 import { recipe, recipeConsumable, recipeTag } from "./recipes";
-import { price, priceItem, eventPrice } from "./prices";
+import { price, priceItem, eventPrice, eventSale } from "./prices";
 import { payrollRun, payrollProfile, payslip } from "./payroll";
 import { hmo } from "./hmos";
 import { gdprRequest } from "./gdpr";
@@ -114,6 +114,7 @@ export const eventRelations = relations(event, ({ many, one }) => ({
     locations: many(eventLocation),
     tags: many(eventTag),
     prices: many(eventPrice),
+    sales: many(eventSale),
     series: one(recurringSeries, { fields: [event.seriesId], references: [recurringSeries.id] }),
     user: one(user, { fields: [event.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [event.campaignId], references: [campaign.id] }),
@@ -443,6 +444,12 @@ export const priceItemRelations = relations(priceItem, ({ one }) => ({
 export const eventPriceRelations = relations(eventPrice, ({ one }) => ({
     event: one(event, { fields: [eventPrice.eventId], references: [event.id] }),
     price: one(price, { fields: [eventPrice.priceId], references: [price.id] }),
+}));
+
+export const eventSaleRelations = relations(eventSale, ({ one }) => ({
+    event: one(event, { fields: [eventSale.eventId], references: [event.id] }),
+    price: one(price, { fields: [eventSale.priceId], references: [price.id] }),
+    priceItem: one(priceItem, { fields: [eventSale.priceItemId], references: [priceItem.id] }),
 }));
 
 export const payrollRunRelations = relations(payrollRun, ({ many }) => ({

@@ -6,6 +6,7 @@
 
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
+    import EventSalesWorkflowSection from "#lib/components/events/EventSalesWorkflowSection.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
     import { EntityManager, TagManager, ContactManager, LocationForm, translateIssue, matchContactSearch, useFormValidationFeedback } from "@ac/ui";
@@ -2408,6 +2409,14 @@
                 </div>
             </div>
         {/if}
+
+        <EventSalesWorkflowSection
+            eventId={initialData?.id}
+            eventSummary={initialData?.summary || ""}
+            participantsCount={totalParticipants}
+            {eventCurrency}
+            hasPrices={currentPrices.length > 0}
+        />
     </div>
 
     <SyncCheckboxBlock

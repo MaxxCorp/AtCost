@@ -198,7 +198,7 @@
                     id="amount"
                     type="number"
                     step="any"
-                    min="0.0001"
+                    min="0"
                     {...rf.fields.amount.as('number', initialData?.amount ?? 1)}
                     oninput={(e: any) => amount = parseFloat(e.target.value) || 1}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"

@@ -22,6 +22,7 @@
     }
 
     interface MenuEvent {
+        id?: string;
         summary: string;
         description?: string | null;
         startDateTime?: string | null;
@@ -110,21 +111,29 @@
     {/if}
 
     <header class="head">
-        <h1>{headline}</h1>
-        {#if settings.subtitle.trim()}
-            <p class="subtitle">{settings.subtitle}</p>
-        {/if}
+        <div class="head-content">
+            <h1>{headline}</h1>
+            {#if settings.subtitle.trim()}
+                <p class="subtitle">{settings.subtitle}</p>
+            {/if}
 
-        {#if settings.showEventIntro}
-            {#if settings.showDateTime && whenText}
-                <p class="intro-line intro-when">{whenText}</p>
+            {#if settings.showEventIntro}
+                {#if settings.showDateTime && whenText}
+                    <p class="intro-line intro-when">{whenText}</p>
+                {/if}
+                {#if settings.showLocation && locationText}
+                    <p class="intro-line">{locationText}</p>
+                {/if}
+                {#if settings.showDescription && event.description}
+                    <div class="intro-desc">{@html event.description}</div>
+                {/if}
             {/if}
-            {#if settings.showLocation && locationText}
-                <p class="intro-line">{locationText}</p>
-            {/if}
-            {#if settings.showDescription && event.description}
-                <div class="intro-desc">{@html event.description}</div>
-            {/if}
+        </div>
+        {#if (settings.showEventQr ?? true) && event.id}
+            <div class="head-qr">
+                <img src="/api/events/{event.id}/qr.png" alt="Event QR" />
+                <span class="qr-id">ID: {event.id.slice(0, 8)}</span>
+            </div>
         {/if}
     </header>
 
@@ -225,9 +234,44 @@
     }
 
     .head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 6mm;
         margin-bottom: 1.1em;
         padding-bottom: 0.7em;
         border-bottom: 0.7mm solid var(--accent);
+    }
+
+    .head-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .head-qr {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex-shrink: 0;
+        padding: 1.5mm;
+        border: 0.3mm solid #d1d5db;
+        border-radius: 1.5mm;
+        background: #fff;
+    }
+
+    .head-qr img {
+        width: 20mm;
+        height: 20mm;
+        display: block;
+    }
+
+    .qr-id {
+        margin-top: 0.8mm;
+        font-family: monospace;
+        font-size: 6.5pt;
+        font-weight: 700;
+        color: #4b5563;
+        letter-spacing: 0.03em;
     }
 
     h1 {

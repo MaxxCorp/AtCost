@@ -267,6 +267,13 @@
       "when": 1793746432141,
       "tag": "0037_complex_iron_lad",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794006571681,
+      "tag": "0038_calm_squadron_supreme",
+      "breakpoints": true
     }
   ]
 }
