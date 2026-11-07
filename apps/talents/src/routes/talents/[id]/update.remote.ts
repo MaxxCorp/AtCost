@@ -1,5 +1,5 @@
 import { form } from '$app/server';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql } from '@ac/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, encryptSingleContact } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { unifiedTalentSchema } from '@ac/validations';
 import { readTalent } from './read.remote';
@@ -119,6 +119,27 @@ export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ su
 
             return { talentId, contactId };
         });
+
+        // Re-encrypt contact envelope if contact is migrated
+        if (result.contactId) {
+            try {
+                const [existing] = await db
+                    .select({ encryptionStatus: contact.encryptionStatus })
+                    .from(contact)
+                    .where(eq(contact.id, result.contactId))
+                    .limit(1);
+                if (existing?.encryptionStatus === 'migrated') {
+                    await encryptSingleContact(result.contactId, {
+                        userId: authUser.id,
+                        name: (authUser as any).name || authUser.email,
+                        email: authUser.email,
+                        role: 'user',
+                    });
+                }
+            } catch (encErr) {
+                console.warn('[updateTalent] Envelope re-encryption notice:', encErr);
+            }
+        }
 
         // Refresh the detail view and list to ensure client-side data is in sync
         if (result.talentId) {

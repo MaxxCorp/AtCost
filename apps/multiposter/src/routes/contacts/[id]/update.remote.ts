@@ -2,7 +2,7 @@ import { form, getRequestEvent, requested } from '$app/server';
 import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress,
-    contactRelation, tag, contactTag, locationContact
+    contactRelation, tag, contactTag, locationContact, encryptSingleContact
 } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
 import { updateContactSchema, type Contact } from '#lib/validations/contacts.js';
@@ -206,6 +206,25 @@ export const updateContact = form(updateContactSchema, async (input) => {
                 }
             }
         });
+
+        // If contact is encrypted at rest, update its encrypted envelope and custody ledger
+        try {
+            const [existingRecord] = await db
+                .select({ encryptionStatus: contact.encryptionStatus })
+                .from(contact)
+                .where(eq(contact.id, id))
+                .limit(1);
+            if (existingRecord?.encryptionStatus === 'migrated') {
+                await encryptSingleContact(id, {
+                    userId: user.id,
+                    name: (user as any).name || user.email,
+                    email: user.email,
+                    role: 'user',
+                });
+            }
+        } catch (encErr) {
+            console.warn('[updateContact] Envelope re-encryption notice:', encErr);
+        }
 
         // Re-generate assets
         let origin: string | undefined;

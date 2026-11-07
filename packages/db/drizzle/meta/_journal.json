@@ -274,6 +274,13 @@
       "when": 1794006571681,
       "tag": "0038_calm_squadron_supreme",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794078284429,
+      "tag": "0039_condemned_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

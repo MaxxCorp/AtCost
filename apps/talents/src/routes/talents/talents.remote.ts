@@ -1,6 +1,6 @@
 import { query, form, command } from '$app/server';
 import { dev } from '$app/env';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, computeContactBlindIndexes, recordPersonnelMutation } from '@ac/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, computeContactBlindIndexes, recordPersonnelMutation, encryptSingleContact } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '#lib/server/authorization.js';
 import {
     talentTimelineEntrySchema,
@@ -276,6 +276,28 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             } catch (custodyErr) {
                 console.warn('[upsertTalent] Custody recording warning:', custodyErr);
             }
+
+            // Re-encrypt contact envelope if contact is migrated
+            if (result.contactId) {
+                try {
+                    const [existing] = await db
+                        .select({ encryptionStatus: contact.encryptionStatus })
+                        .from(contact)
+                        .where(eq(contact.id, result.contactId))
+                        .limit(1);
+                    if (existing?.encryptionStatus === 'migrated') {
+                        await encryptSingleContact(result.contactId, {
+                            userId: authUser.id,
+                            name: (authUser as any).name || authUser.email,
+                            email: authUser.email,
+                            role: Array.isArray((authUser as any).roles) ? (authUser as any).roles[0] : 'admin',
+                        });
+                    }
+                } catch (encErr) {
+                    console.warn('[upsertTalent] Envelope re-encryption notice:', encErr);
+                }
+            }
+
             await invalidateTalent(result.talentId);
             void readTalent(result.talentId).refresh();
         } else {
