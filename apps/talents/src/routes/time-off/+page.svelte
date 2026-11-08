@@ -2,6 +2,9 @@
     import * as m from "#lib/paraglide/messages.js";
     import { listTimeOffRequests, requestTimeOff, deleteTimeOffRequests } from "./time-off.remote";
     import { listTalents } from "../talents/list.remote";
+    import { getMyTalentProfile } from "../talents/talents.remote";
+    import AbsenceApprovalModal from "#lib/components/time-off/AbsenceApprovalModal.svelte";
+    import TalentAbsenceContext from "#lib/components/time-off/TalentAbsenceContext.svelte";
     import { goto } from "$app/navigation";
     import { page as pageState } from "$app/state";
     import {
@@ -19,7 +22,25 @@
         useFormValidationFeedback,
     } from "@ac/ui";
     import * as Dialog from "@ac/ui/components/dialog";
-    import { Plane, Calendar, Clock, CheckCircle2, XCircle, Timer, Trash2, Plus, Search, ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, HelpCircle, Check } from "@lucide/svelte";
+    import {
+        Plane,
+        Calendar,
+        Clock,
+        CheckCircle2,
+        XCircle,
+        Timer,
+        Trash2,
+        Plus,
+        Search,
+        ArrowLeft,
+        ArrowRight,
+        ChevronsLeft,
+        ChevronsRight,
+        HelpCircle,
+        Check,
+        ShieldCheck,
+        Info,
+    } from "@lucide/svelte";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { timeOffRequestSchema } from "@ac/validations";
     import { authClient } from "#lib/auth.js";
@@ -41,6 +62,28 @@
     });
 
     type TimeOffRequest = Awaited<ReturnType<typeof listTimeOffRequests>>["data"][number];
+
+    const myProfileQuery = $derived(getMyTalentProfile());
+    const myProfile = $derived(myProfileQuery.current);
+
+    let formTalentId = $state("");
+    let formStartDate = $state("");
+    let formEndDate = $state("");
+    let formType = $state("vacation");
+
+    $effect(() => {
+        if (!formTalentId && (myProfile?.id || userId)) {
+            formTalentId = myProfile?.id ?? userId ?? "";
+        }
+    });
+
+    let showReviewModal = $state(false);
+    let selectedReviewRequest = $state<TimeOffRequest | null>(null);
+
+    function openReview(req: TimeOffRequest) {
+        selectedReviewRequest = req;
+        showReviewModal = true;
+    }
 
     const statusMap: Record<string, { label: string, color: string, icon: any }> = {
         pending: { label: "Pending", color: "text-amber-600 bg-amber-50 border-amber-100", icon: Timer },
@@ -126,7 +169,6 @@
     async function cancelRequest(req: TimeOffRequest) {
         toast.info("Cancel request not implemented natively yet");
     }
-
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -231,6 +273,12 @@
                                                 <h3 class="text-lg font-black text-gray-900 capitalize flex items-center gap-2">
                                                     {req.type}
                                                 </h3>
+
+                                                {#if req.talentName}
+                                                    <span class="text-sm font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+                                                        {req.talentName}
+                                                    </span>
+                                                {/if}
                                                 
                                                 <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border {status.color}">
                                                     <StatusIcon size={12} strokeWidth={3} />
@@ -259,13 +307,32 @@
                                         </div>
                                     </div>
 
-                                    <div class="shrink-0 flex sm:flex-col gap-2 w-full sm:w-auto mt-4 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all transform translate-x-0 sm:translate-x-2 sm:group-hover:translate-x-0">
+                                    <div class="shrink-0 flex flex-wrap sm:flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                                        {#if req.status === 'pending'}
+                                            <Button
+                                                class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs gap-1.5"
+                                                onclick={() => openReview(req)}
+                                            >
+                                                <ShieldCheck size={14} />
+                                                {(m as any).review_and_approve?.() ?? "Review & Approve"}
+                                            </Button>
+                                        {:else}
+                                            <Button
+                                                variant="outline"
+                                                class="text-xs rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50 gap-1.5"
+                                                onclick={() => openReview(req)}
+                                            >
+                                                <Info size={14} />
+                                                {(m as any).view_absence_details?.() ?? "View Details & Context"}
+                                            </Button>
+                                        {/if}
+
                                         <Button
                                             variant="ghost"
-                                            class="flex-1 sm:flex-none justify-start px-4 h-10 hover:bg-amber-50 hover:text-amber-600 rounded-xl"
+                                            class="text-xs text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl px-3 h-8 gap-1.5"
                                             onclick={() => cancelRequest(req)}
                                         >
-                                            <Trash2 size={16} class="mr-2" />
+                                            <Trash2 size={14} />
                                             {m.cancel_request ? m.cancel_request() : "Cancel"}
                                         </Button>
                                     </div>
@@ -374,7 +441,7 @@
 </div>
 
 <Dialog.Root bind:open={showQuickCreate}>
-    <Dialog.Content class="sm:max-w-[600px]">
+    <Dialog.Content class="sm:max-w-4xl max-h-[92vh] overflow-y-auto">
         <Dialog.Header>
             <Dialog.Title>{m.new_leave_request ? m.new_leave_request() : "New Leave Request"}</Dialog.Title>
         </Dialog.Header>
@@ -385,13 +452,17 @@
                 if (res) {
                     toast.success(m.request_submitted ? m.request_submitted() : "Request submitted");
                     showQuickCreate = false;
-                    listTimeOffRequests(filterState).refresh();
+                    formStartDate = "";
+                    formEndDate = "";
+                    formType = "vacation";
+                    formTalentId = myProfile?.id ?? userId ?? "";
+                    void timeOffQuery.refresh();
                 }
             })}
             class="space-y-4 pt-4"
         >
-            {#if userId}
-                <input {...timeOffForm.fields.talentId.as("hidden", userId)} />
+            {#if formTalentId || myProfile?.id || userId}
+                <input {...timeOffForm.fields.talentId.as("hidden", formTalentId || myProfile?.id || userId || "")} />
             {/if}
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -400,6 +471,8 @@
                     <select 
                         id="type"
                         {...timeOffForm.fields.type.as("select", "vacation")}
+                        value={formType}
+                        onchange={(e) => (formType = (e.currentTarget as HTMLSelectElement).value)}
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                     >
                         <option value="vacation">{m.leave_vacation()}</option>
@@ -415,6 +488,8 @@
                     <input 
                         id="startDate"
                         {...timeOffForm.fields.startDate.as("date")}
+                        value={formStartDate}
+                        oninput={(e) => (formStartDate = (e.currentTarget as HTMLInputElement).value)}
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all" 
                     />
                 </div>
@@ -423,6 +498,8 @@
                     <input 
                         id="endDate"
                         {...timeOffForm.fields.endDate.as("date")}
+                        value={formEndDate}
+                        oninput={(e) => (formEndDate = (e.currentTarget as HTMLInputElement).value)}
                         class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all" 
                     />
                 </div>
@@ -439,11 +516,31 @@
                 ></textarea>
             </div>
 
+            {#if formTalentId || myProfile?.id || userId}
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                        Situational Awareness & Live Balance Impact
+                    </h4>
+                    <TalentAbsenceContext
+                        talentId={formTalentId || myProfile?.id || userId || ""}
+                        selectedStartDate={formStartDate}
+                        selectedEndDate={formEndDate}
+                        selectedType={formType}
+                        compact={true}
+                    />
+                </div>
+            {/if}
+
             <Dialog.Footer class="pt-4">
                 <Button 
                     type="button" 
                     variant="outline" 
-                    onclick={() => (showQuickCreate = false)}
+                    onclick={() => {
+                        showQuickCreate = false;
+                        formStartDate = "";
+                        formEndDate = "";
+                        formType = "vacation";
+                    }}
                 >
                     {m.cancel ? m.cancel() : "Cancel"}
                 </Button>
@@ -458,3 +555,10 @@
         </form>
     </Dialog.Content>
 </Dialog.Root>
+
+<AbsenceApprovalModal
+    bind:open={showReviewModal}
+    request={selectedReviewRequest}
+    onClose={() => { showReviewModal = false; selectedReviewRequest = null; }}
+    onSuccess={() => { void timeOffQuery.refresh(); }}
+/>
