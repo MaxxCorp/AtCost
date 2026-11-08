@@ -227,11 +227,11 @@
                             <Umbrella class="w-4 h-4" />
                         </div>
                         <h4 class="font-bold text-gray-900 dark:text-white {compact ? 'text-sm' : 'text-base'}">
-                            Year {balances.year} Leave Balance
+                            {m.year_leave_balance({ year: balances.year })}
                         </h4>
                     </div>
                     <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                        {balances.remainingDays} days available
+                        {m.days_available({ count: balances.remainingDays })}
                     </span>
                 </div>
 
@@ -262,41 +262,41 @@
                     </div>
 
                     <div class="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 px-0.5">
-                        <span>{usedDays + pendingDays} deducted</span>
-                        <span>{balances.totalDays} days total entitlement</span>
+                        <span>{m.days_deducted({ count: usedDays + pendingDays })}</span>
+                        <span>{m.days_total_entitlement({ count: balances.totalDays })}</span>
                     </div>
                 </div>
 
                 <!-- Balance Breakdown Cards Grid -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     <div class="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-center">
-                        <div class="text-xs text-gray-500 dark:text-gray-400 font-medium">Total Allotment</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 font-medium">{m.total_allowance()}</div>
                         <div class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
-                            {balances.totalDays} <span class="text-xs font-normal text-gray-500">days</span>
+                            {balances.totalDays} <span class="text-xs font-normal text-gray-500">{m.days()}</span>
                         </div>
                     </div>
                     <div class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/40 text-center">
                         <div class="text-xs text-rose-700 dark:text-rose-400 font-medium flex items-center justify-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-rose-500"></span> Used
+                            <span class="w-2 h-2 rounded-full bg-rose-500"></span> {m.used()}
                         </div>
                         <div class="text-lg font-bold text-rose-800 dark:text-rose-200 mt-0.5">
-                            {balances.usedDays} <span class="text-xs font-normal text-rose-600 dark:text-rose-400">days</span>
+                            {balances.usedDays} <span class="text-xs font-normal text-rose-600 dark:text-rose-400">{m.days()}</span>
                         </div>
                     </div>
                     <div class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 text-center">
                         <div class="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center justify-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-amber-400"></span> Pending
+                            <span class="w-2 h-2 rounded-full bg-amber-400"></span> {m.pending()}
                         </div>
                         <div class="text-lg font-bold text-amber-800 dark:text-amber-200 mt-0.5">
-                            {balances.pendingDays} <span class="text-xs font-normal text-amber-600 dark:text-amber-400">days</span>
+                            {balances.pendingDays} <span class="text-xs font-normal text-amber-600 dark:text-amber-400">{m.days()}</span>
                         </div>
                     </div>
                     <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-center">
                         <div class="text-xs text-emerald-700 dark:text-emerald-400 font-medium flex items-center justify-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Remaining
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> {m.remaining_allowance()}
                         </div>
                         <div class="text-lg font-bold text-emerald-800 dark:text-emerald-200 mt-0.5">
-                            {balances.remainingDays} <span class="text-xs font-normal text-emerald-600 dark:text-emerald-400">days</span>
+                            {balances.remainingDays} <span class="text-xs font-normal text-emerald-600 dark:text-emerald-400">{m.days()}</span>
                         </div>
                     </div>
                 </div>
@@ -305,7 +305,7 @@
                 {#if awareness.allotmentSources && awareness.allotmentSources.length > 0}
                     <div class="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
                         <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            Allotment Sources & Entitlements
+                            {m.allotment_sources_and_entitlements()}
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                             {#each awareness.allotmentSources as src (src.source)}
@@ -321,11 +321,11 @@
                                             </span>
                                             {#if src.days !== null}
                                                 <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100/80 text-amber-800 dark:bg-amber-950 dark:text-amber-300 shrink-0">
-                                                    {src.days} days
+                                                    {src.days} {m.days()}
                                                 </span>
                                             {:else}
                                                 <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100/80 text-blue-800 dark:bg-blue-950 dark:text-blue-300 shrink-0">
-                                                    Eligible
+                                                    {m.eligible()}
                                                 </span>
                                             {/if}
                                         </div>
@@ -351,7 +351,7 @@
                         </div>
                         <div>
                             <h4 class="font-bold text-gray-900 dark:text-white {compact ? 'text-sm' : 'text-base'}">
-                                Request Working Day Impact
+                                {m.request_working_day_impact()}
                             </h4>
                             {#if selectedStartDate && selectedEndDate}
                                 <span class="text-xs text-gray-500 dark:text-gray-400">
@@ -362,38 +362,38 @@
                     </div>
                     
                     <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 text-white font-bold text-sm shadow-sm self-start sm:self-auto">
-                        <span>{impact.workingDays} working {impact.workingDays === 1 ? 'day' : 'days'}</span>
+                        <span>{m.working_days_count({ count: impact.workingDays, unit: impact.workingDays === 1 ? 'Tag' : 'Tage' })}</span>
                     </div>
                 </div>
 
                 <!-- Span Metrics Breakdown -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                     <div class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-100 dark:border-gray-700">
-                        <div class="text-gray-500 dark:text-gray-400">Calendar Span</div>
-                        <div class="font-bold text-sm text-gray-900 dark:text-white mt-0.5">{impact.calendarDays} days</div>
+                        <div class="text-gray-500 dark:text-gray-400">{m.calendar_span()}</div>
+                        <div class="font-bold text-sm text-gray-900 dark:text-white mt-0.5">{impact.calendarDays} {m.days()}</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-100 dark:border-gray-700">
-                        <div class="text-gray-500 dark:text-gray-400">Weekend Days</div>
-                        <div class="font-bold text-sm text-gray-900 dark:text-white mt-0.5">{impact.weekendDays} days</div>
+                        <div class="text-gray-500 dark:text-gray-400">{m.weekend_days()}</div>
+                        <div class="font-bold text-sm text-gray-900 dark:text-white mt-0.5">{impact.weekendDays} {m.days()}</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-100 dark:border-gray-700">
-                        <div class="text-gray-500 dark:text-gray-400">Public Holidays</div>
-                        <div class="font-bold text-sm text-amber-600 dark:text-amber-400 mt-0.5">{impact.holidayDays} days</div>
+                        <div class="text-gray-500 dark:text-gray-400">{m.holiday_days()}</div>
+                        <div class="font-bold text-sm text-amber-600 dark:text-amber-400 mt-0.5">{impact.holidayDays} {m.days()}</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-amber-100 dark:border-gray-700">
-                        <div class="text-gray-500 dark:text-gray-400">Eve Days Off</div>
-                        <div class="font-bold text-sm text-gray-900 dark:text-white mt-0.5">{impact.eveDays} days</div>
+                        <div class="text-gray-500 dark:text-gray-400">{m.eve_days()}</div>
+                        <div class="font-bold text-sm text-gray-900 dark:text-white mt-0.5">{impact.eveDays} {m.days()}</div>
                     </div>
                 </div>
 
                 <!-- Projected Balance Shift -->
                 {#if balances}
                     <div class="p-3 rounded-xl bg-white dark:bg-gray-800/80 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between text-xs sm:text-sm">
-                        <span class="font-medium text-gray-600 dark:text-gray-300">Projected Remaining Balance:</span>
+                        <span class="font-medium text-gray-600 dark:text-gray-300">{m.remaining_balance_after()}:</span>
                         <div class="flex items-center gap-2">
-                            <span class="line-through text-gray-400">{balances.remainingDays} days</span>
+                            <span class="line-through text-gray-400">{balances.remainingDays} {m.days()}</span>
                             <span class="font-bold text-base {impact.projectedRemainingDays <= 2 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}">
-                                → {impact.projectedRemainingDays} days
+                                → {impact.projectedRemainingDays} {m.days()}
                             </span>
                         </div>
                     </div>
@@ -404,7 +404,7 @@
                     <div class="space-y-1.5 pt-1">
                         <div class="text-xs font-semibold text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
                             <Calendar class="w-3.5 h-3.5 text-amber-500" />
-                            <span>Public Holidays during requested period:</span>
+                            <span>{m.public_holidays_during_period()}</span>
                         </div>
                         <div class="space-y-1">
                             {#each impact.holidays as h (h.date + h.name)}
@@ -445,7 +445,7 @@
                 >
                     <div class="flex items-center gap-2">
                         <Calendar class="w-4 h-4 text-amber-500" />
-                        <span>Statutory Public Holidays ({balances?.year ?? new Date().getFullYear()})</span>
+                        <span>{m.statutory_public_holidays({ year: String(balances?.year ?? new Date().getFullYear()) })}</span>
                         <span class="px-2 py-0.5 rounded-full text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                             {awareness.publicHolidays.length}
                         </span>
@@ -491,14 +491,14 @@
                         onclick={() => (activeTab = 'planned')}
                         class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab === 'planned' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-xs' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'}"
                     >
-                        Planned Absences ({awareness.plannedAbsences?.length ?? 0})
+                        {m.planned_absences_tab({ count: awareness.plannedAbsences?.length ?? 0 })}
                     </button>
                     <button
                         type="button"
                         onclick={() => (activeTab = 'previous')}
                         class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all {activeTab === 'previous' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-xs' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'}"
                     >
-                        Previous Absences ({awareness.previousAbsences?.length ?? 0})
+                        {m.previous_absences_tab({ count: awareness.previousAbsences?.length ?? 0 })}
                     </button>
                 </div>
             </div>
@@ -509,7 +509,7 @@
                 {#if planned.length === 0}
                     <div class="py-8 text-center text-gray-400 dark:text-gray-500">
                         <Calendar class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                        <p class="text-xs font-medium">No planned absences scheduled.</p>
+                        <p class="text-xs font-medium">{m.no_planned_absences_desc()}</p>
                     </div>
                 {:else}
                     <div class="space-y-2">
@@ -543,7 +543,7 @@
                                     </div>
                                 </div>
                                 <div class="shrink-0 self-end sm:self-center font-bold text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
-                                    {item.days} {item.days === 1 ? 'day' : 'days'}
+                                    {item.days} {m.days()}
                                 </div>
                             </div>
                         {/each}
@@ -554,7 +554,7 @@
                 {#if previous.length === 0}
                     <div class="py-8 text-center text-gray-400 dark:text-gray-500">
                         <Clock class="w-8 h-8 mx-auto mb-2 opacity-40" />
-                        <p class="text-xs font-medium">No previous absences recorded.</p>
+                        <p class="text-xs font-medium">{m.no_previous_absences_desc()}</p>
                     </div>
                 {:else}
                     <div class="space-y-2">
@@ -588,7 +588,7 @@
                                     </div>
                                 </div>
                                 <div class="shrink-0 self-end sm:self-center font-bold text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
-                                    {item.days} {item.days === 1 ? 'day' : 'days'}
+                                    {item.days} {m.days()}
                                 </div>
                             </div>
                         {/each}

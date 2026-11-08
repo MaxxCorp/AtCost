@@ -80,10 +80,10 @@ export const FEATURES: readonly FeatureMeta[] = [
     },
     {
         key: 'tasks',
-        title: 'Objective Center',
-        description: 'Shared management approvals, experience-based pay raises, and operational objectives.',
+        title: 'Tasks & Approvals',
+        description: 'Shared management approvals, experience-based pay raises, and operational tasks.',
         href: '/tasks',
-        buttonText: 'View Objectives',
+        buttonText: 'View Tasks',
         claim: 'tasks',
         icon: 'checkSquare',
         gradientFrom: 'from-indigo-50',
@@ -96,7 +96,7 @@ export const FEATURES: readonly FeatureMeta[] = [
     {
         key: 'recruitment',
         title: 'Recruitment & Onboarding',
-        description: 'Job roles, hiring pipeline, structured interviews, customizable onboarding, and blockchain custody.',
+        description: 'Job roles, hiring pipeline, structured interviews, customizable onboarding, and audit logging.',
         href: '/recruitment',
         buttonText: 'Open Pipeline',
         claim: 'recruitment',

@@ -54,6 +54,9 @@
     onMount(async () => {
         const session = await authClient.getSession();
         userId = session?.data?.user?.id || null;
+        if (pageState.url.searchParams.get("request") === "true" || pageState.url.searchParams.get("new") === "true") {
+            showQuickCreate = true;
+        }
     });
 
     const timeOffForm = requestTimeOff.preflight(timeOffRequestSchema);
@@ -519,7 +522,7 @@
             {#if formTalentId || myProfile?.id || userId}
                 <div class="mt-4 pt-4 border-t border-gray-100">
                     <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-                        Situational Awareness & Live Balance Impact
+                        {m.situational_awareness()}
                     </h4>
                     <TalentAbsenceContext
                         talentId={formTalentId || myProfile?.id || userId || ""}

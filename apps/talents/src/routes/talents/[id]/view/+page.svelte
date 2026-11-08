@@ -15,12 +15,16 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
         Edit,
         Clock,
         Plane,
+        Banknote,
     } from "@lucide/svelte";
+    import RequestTimeOffModal from "#lib/components/time-off/RequestTimeOffModal.svelte";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 
     const id = $derived(page.params.id as string);
     const talentQuery = $derived(readTalent(id));
     const talent = $derived(talentQuery.current);
+
+    let showTimeOffModal = $state(false);
 
     $effect(() => {
         if (id) {
@@ -118,18 +122,26 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
                                                 Time Tracking
                                             </Button>
                                         </a>
-                                        <a href="/time-off" class="flex-1 min-w-[140px]">
+                                        <Button
+                                            variant="outline"
+                                            onclick={() => (showTimeOffModal = true)}
+                                            class="flex-1 min-w-[140px] justify-start bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700"
+                                        >
+                                            <Plane size={16} class="mr-2" />
+                                            Request Time Off
+                                        </Button>
+                                        <a href="/my-payroll" class="flex-1 min-w-[140px]">
                                             <Button variant="outline" class="w-full justify-start bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700">
-                                                <Plane size={16} class="mr-2" />
-                                                Time Off
+                                                <Banknote size={16} class="mr-2" />
+                                                Payslips
                                             </Button>
                                         </a>
                                     </div>
                                 </section>
 
-                                <!-- Operational Objectives Section -->
+                                <!-- Tasks & Approvals Section -->
                                 <section class="space-y-4">
-                                    <h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 outline-none">Operational Objectives</h2>
+                                    <h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 outline-none">Tasks & Approvals</h2>
                                     <TaskList />
                                 </section>
 
@@ -401,3 +413,8 @@ import TaskList from "#lib/components/tasks/TaskList.svelte";
         {/snippet}
     </svelte:boundary>
 </div>
+
+<RequestTimeOffModal
+    bind:open={showTimeOffModal}
+    talentId={id}
+/>

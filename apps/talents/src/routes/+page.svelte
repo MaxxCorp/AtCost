@@ -5,8 +5,9 @@
     import DashboardTalentCard from "#lib/components/dashboard/DashboardTalentCard.svelte";
     import DashboardTimeTrackingCard from "#lib/components/dashboard/DashboardTimeTrackingCard.svelte";
     import DashboardTimeOffCard from "#lib/components/dashboard/DashboardTimeOffCard.svelte";
-import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelte";
+    import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelte";
     import { authClient } from "#lib/auth.js";
+    import * as m from "#lib/paraglide/messages.js";
     
     import { getMyTalentProfile } from "./talents/talents.remote";
     import { getMyStatus } from "./my-timesheet/timesheets.remote";
@@ -34,18 +35,18 @@ import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelt
                         <div class="space-y-2">
                             <div class="flex items-center gap-3">
                                 <span class="w-2 h-8 bg-indigo-600 rounded-full"></span>
-                                <h1 class="text-5xl font-black text-gray-900 tracking-tighter leading-none uppercase italic">Workspace Cloud</h1>
+                                <h1 class="text-5xl font-black text-gray-900 tracking-tighter leading-none uppercase italic">{m.employee_portal()}</h1>
                             </div>
-                            <p class="text-gray-400 font-bold ml-5 uppercase tracking-widest text-[10px]">Portal for {session.data.user.name || session.data.user.email}</p>
+                            <p class="text-gray-400 font-bold ml-5 uppercase tracking-widest text-[10px]">{m.portal_for_user({ name: session.data.user.name || session.data.user.email })}</p>
                         </div>
                         <div class="flex items-center gap-3 text-xs font-black text-emerald-600 bg-emerald-50 px-6 py-3 rounded-2xl border border-emerald-100 shadow-sm uppercase tracking-widest italic">
                             <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                            Neural Connection Active
+                            {m.system_online()}
                         </div>
                     </div>
 
                     {#await profilePromise}
-                        <LoadingSection message="Synchronizing profile configuration..." />
+                        <LoadingSection message={m.loading ? m.loading() : "Loading..."} />
                     {:then profile}
                         {#if profile}
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
@@ -54,7 +55,7 @@ import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelt
                                 
                                 {#await Promise.all([getMyStatus(profile.id), getMyTimeOffBalances(profile.id), getMyTimeOffRequests(profile.id)])}
                                     <div class="lg:col-span-2 flex items-center justify-center p-12 bg-gray-50/50 rounded-[2.5rem] border border-gray-100">
-                                        <LoadingSection message="Loading operational statistics..." />
+                                        <LoadingSection message={m.loading_summary()} />
                                     </div>
                                 {:then [status, balances, requests]}
                                     <DashboardTimeTrackingCard 
@@ -70,7 +71,7 @@ import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelt
                                     />
                                 {:catch error}
                                     <div class="lg:col-span-2">
-                                        <ErrorSection headline="Modules Sync Failure" message={error.message} />
+                                        <ErrorSection headline={m.sync_failure()} message={error.message} />
                                     </div>
                                 {/await}
                             </div>
@@ -79,8 +80,8 @@ import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelt
                                 <div class="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-8">
                                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                                 </div>
-                                <h2 class="text-2xl font-black text-amber-900 mb-4 tracking-tight uppercase italic">No Linked Talent Profile</h2>
-                                <p class="text-amber-700 font-bold leading-relaxed uppercase tracking-widest text-[10px] max-w-md mx-auto opacity-70">To synchronize your operational statistics, please link your account to a talent profile.</p>
+                                <h2 class="text-2xl font-black text-amber-900 mb-4 tracking-tight uppercase italic">{m.no_linked_talent_title()}</h2>
+                                <p class="text-amber-700 font-bold leading-relaxed uppercase tracking-widest text-[10px] max-w-md mx-auto opacity-70">{m.no_linked_talent_desc()}</p>
                             </div>
                         {/if}
                     {:catch error}
@@ -91,7 +92,7 @@ import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelt
                 <div class="bg-white/40 backdrop-blur-xl rounded-[3rem] p-12 border border-white/40 shadow-sm">
                     <h2 class="text-lg font-bold text-gray-900 mb-8 flex items-center gap-3 uppercase tracking-[0.2em] italic">
                         <span class="w-2 h-6 bg-indigo-500 rounded-full shadow-lg shadow-indigo-100"></span>
-                        Operational Modules
+                        {m.features_quick_access()}
                     </h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {#each getVisibleFeatures(session.data.user, hasAccess) as f (f.key)}
@@ -126,14 +127,13 @@ import DashboardTaskCard from "#lib/components/dashboard/DashboardTaskCard.svelt
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
-                <h2 class="text-5xl font-black text-gray-900 mb-6 tracking-tighter uppercase italic leading-none">Authentication Link Required</h2>
+                <h2 class="text-5xl font-black text-gray-900 mb-6 tracking-tighter uppercase italic leading-none">{m.auth_required_title()}</h2>
                 <p class="text-gray-400 font-bold mb-12 leading-relaxed uppercase tracking-widest text-[10px]">
-                    Please authenticate into the secure neural interface 
-                    to access your personalized operational dashboard.
+                    {m.auth_required_desc()}
                 </p>
                 <div class="flex flex-col sm:flex-row gap-6 justify-center">
-                    <a href="/login" class="px-12 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-widest text-sm italic">Initialize Session</a>
-                    <a href="/signup" class="px-12 py-5 bg-white border-2 border-gray-100 text-gray-900 rounded-[1.5rem] font-black hover:bg-gray-50 transition-all uppercase tracking-widest text-sm italic">New Instance</a>
+                    <a href="/login" class="px-12 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-widest text-sm italic">{m.sign_in()}</a>
+                    <a href="/signup" class="px-12 py-5 bg-white border-2 border-gray-100 text-gray-900 rounded-[1.5rem] font-black hover:bg-gray-50 transition-all uppercase tracking-widest text-sm italic">{m.sign_up()}</a>
                 </div>
             </div>
         {/if}

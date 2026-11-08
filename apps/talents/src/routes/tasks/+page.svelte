@@ -3,8 +3,9 @@
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { listTasks, listCompletedTasks } from '../tasks.remote.js';
     import { TrendingUp, ShieldAlert, Award, CheckCircle2 } from '@lucide/svelte';
+    import * as m from "#lib/paraglide/messages.js";
 
-    breadcrumbState.set({ feature: "tasks", current: 'Objective Center' });
+    breadcrumbState.set({ feature: "tasks", current: m.tasks_and_approvals ? m.tasks_and_approvals() : 'Tasks & Approvals' });
 
     let showCompleted = $state(false);
 
@@ -30,7 +31,7 @@
 </script>
 
 <svelte:head>
-    <title>Objective Center · AC Talents</title>
+    <title>{m.tasks_and_approvals ? m.tasks_and_approvals() : "Tasks & Approvals"} · AC Talents</title>
 </svelte:head>
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -40,11 +41,11 @@
             <div class="flex items-center gap-3">
                 <span class="w-2.5 h-10 bg-indigo-600 rounded-full"></span>
                 <h1 class="text-4xl md:text-5xl font-black text-gray-900 tracking-tighter uppercase italic leading-none">
-                    Objective Center
+                    {m.tasks_and_approvals ? m.tasks_and_approvals() : "Tasks & Approvals"}
                 </h1>
             </div>
             <p class="text-gray-400 font-bold uppercase tracking-widest text-[10px] ml-5">
-                Tarifliche Stufenaufstiege, Dienstjubiläen & strategische Management-Freigaben
+                {m.tasks_and_approvals_desc ? m.tasks_and_approvals_desc() : "Tarifliche Stufenaufstiege, Dienstjubiläen & Management-Freigaben"}
             </p>
         </div>
         

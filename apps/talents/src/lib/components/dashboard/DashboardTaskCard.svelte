@@ -3,6 +3,7 @@
     import { LoadingSection } from '@ac/ui';
     import { format } from 'date-fns';
     import { TrendingUp, ShieldAlert, Award, Clock } from '@lucide/svelte';
+    import * as m from "#lib/paraglide/messages.js";
 
     /**
      * DASHBOARD TASK CARD
@@ -41,8 +42,8 @@
                 </svg>
             </div>
             <div>
-                <h3 class="font-bold text-gray-900 leading-tight">Objective Center</h3>
-                <p class="text-xs text-gray-500 font-medium">Offene Freigaben & Aufgaben</p>
+                <h3 class="font-bold text-gray-900 leading-tight">{m.tasks_and_approvals ? m.tasks_and_approvals() : "Tasks & Approvals"}</h3>
+                <p class="text-xs text-gray-500 font-medium">{m.tasks_and_approvals_desc ? m.tasks_and_approvals_desc() : "Offene Freigaben & Aufgaben"}</p>
             </div>
         </div>
 
@@ -134,7 +135,7 @@
 
     <div class="p-4 bg-gray-50/50 border-t border-gray-50">
         <a href="/tasks" class="block text-center text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
-            Objective Center öffnen →
+            {m.view_all_tasks ? m.view_all_tasks() : "Alle Aufgaben & Freigaben anzeigen →"}
         </a>
     </div>
 </div>
