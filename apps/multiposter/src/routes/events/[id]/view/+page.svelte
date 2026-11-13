@@ -32,6 +32,7 @@
         Utensils,
         Receipt,
         Printer,
+        UserPlus,
     } from "@lucide/svelte";
     import Button from "#lib/components/ui/button/button.svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
@@ -48,6 +49,7 @@
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import PriceListView from "#lib/components/prices/PriceListView.svelte";
     import EventSalesWorkflowSection from "#lib/components/events/EventSalesWorkflowSection.svelte";
+    import EventSignUpDialog from "#lib/components/events/EventSignUpDialog.svelte";
     import {
         formatDateDay,
         formatDateMonth,
@@ -89,6 +91,7 @@
     let copiedLink = $state(false);
     let heroImageFailed = $state(false);
     let pricesDialogOpen = $state(false);
+    let signUpDialogOpen = $state(false);
 
     onMount(() => {
         if (eventId) {
@@ -282,6 +285,30 @@
                             </div>
                         {/if}
                     </div>
+
+                    {#if event.signUpMode === 'recommended' || event.signUpMode === 'required'}
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border {event.signUpMode === 'required' ? 'bg-amber-50/70 border-amber-200' : 'bg-blue-50/70 border-blue-200'}">
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full border inline-flex items-center gap-1 {event.signUpMode === 'required' ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300'}">
+                                    <UserPlus size={12} />
+                                    {event.signUpMode === 'required'
+                                        ? (m.sign_up_required_badge?.() || 'Registration Required')
+                                        : (m.sign_up_recommended_badge?.() || 'Registration Recommended')}
+                                </span>
+                                <span class="text-sm text-gray-700">
+                                    {m.sign_up_modal_intro?.() || 'Reserve your spot or manage an existing reservation.'}
+                                </span>
+                            </div>
+                            <Button
+                                type="button"
+                                onclick={() => (signUpDialogOpen = true)}
+                                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm shrink-0"
+                            >
+                                <UserPlus size={16} />
+                                <span>{m.reservations?.() || 'Reservations'}</span>
+                            </Button>
+                        </div>
+                    {/if}
 
                     <!-- Content Grid (Responsive & Adapting to available data) -->
                     <div class="grid grid-cols-1 {hasContact && hasDescription ? 'md:grid-cols-2 lg:grid-cols-3' : hasContact || hasDescription ? 'md:grid-cols-2' : 'grid-cols-1 max-w-2xl'} gap-6 md:gap-8 items-start">
@@ -610,13 +637,25 @@
                         <EventSalesWorkflowSection
                             eventId={event.id}
                             eventSummary={event.summary}
-                            participantsCount={(event as any).participants?.length || 1}
+                            participantsCount={Math.max(1, Number(event.participantsCount) || 1)}
                             eventCurrency={event.currency || "EUR"}
                             hasPrices={true}
                         />
                     {/if}
                     <div class="flex flex-wrap items-center justify-between gap-3 pt-5 md:pt-6 border-t border-gray-100 mt-6">
                         <div class="flex flex-wrap items-center gap-3">
+                            {#if event.signUpMode === 'recommended' || event.signUpMode === 'required'}
+                                <Button
+                                    type="button"
+                                    variant="default"
+                                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                                    onclick={() => (signUpDialogOpen = true)}
+                                >
+                                    <UserPlus size={16} />
+                                    {m.reservations?.() || 'Reservations'}
+                                </Button>
+                            {/if}
+
                             {#if event.iCalPath}
                                 <Button
                                     href={event.iCalPath}
@@ -748,6 +787,14 @@
                 </div>
 
                 <!-- Prices & Price List Dialog -->
+                <EventSignUpDialog
+                    bind:open={signUpDialogOpen}
+                    eventId={event.id}
+                    eventSummary={event.summary}
+                    signUpMode={event.signUpMode || "off"}
+                    locations={event.locations || []}
+                    onSuccess={() => void eventQuery.refresh()}
+                />
                 {#if event.prices && event.prices.length > 0}
                     <Dialog.Root bind:open={pricesDialogOpen}>
                         <Dialog.Content class="max-w-3xl max-h-[90vh] overflow-y-auto">

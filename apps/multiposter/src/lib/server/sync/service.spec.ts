@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SyncService } from './service';
 import type { SyncConfig } from './types';
+import { matchesContactParticipantRules } from '../../filters/synchronizations';
+import { normalizeSyncSettings } from '../../validations/synchronizations';
 import { db } from '@ac/db';
 import {
 	syncMapping as syncMappingTable,
@@ -1485,6 +1487,67 @@ describe('SyncService - Bulk Sync', () => {
 			expect(service.shouldSyncContactForEvent(locationStaffContact, config)).toBe(false);
 			expect(service.shouldSyncContactForEvent(responsibleStaffContact, config)).toBe(true);
 		});
+
+		it('syncs non-public guests who consented to updates (notifyOnChanges) by default and respects opt-out', () => {
+			const optedInGuest = {
+				id: 'guest-opted-in',
+				displayName: 'Opted-In Guest',
+				isPublic: false,
+				notifyOnChanges: true,
+				emails: [{ value: 'guest@example.com', type: 'home', primary: true }],
+				tags: []
+			};
+			const nonOptedGuest = {
+				id: 'guest-no-notify',
+				displayName: 'Private Guest',
+				isPublic: false,
+				notifyOnChanges: false,
+				emails: [{ value: 'private@example.com', type: 'home', primary: true }],
+				tags: []
+			};
+
+			// Active by default when includeNotifyOnChangesContacts is omitted
+			const defaultConfig = {
+				...baseConfig,
+				providerType: 'google-calendar' as const,
+				settings: {
+					includeEmployeeContacts: true,
+					includePublicContacts: false,
+					includeNonPublicContacts: false
+				}
+			};
+			expect(service.shouldSyncContactForEvent(optedInGuest, defaultConfig)).toBe(true);
+			expect(service.shouldSyncContactForEvent(nonOptedGuest, defaultConfig)).toBe(false);
+			expect(matchesContactParticipantRules(optedInGuest, defaultConfig.settings)).toBe(true);
+			expect(matchesContactParticipantRules(nonOptedGuest, defaultConfig.settings)).toBe(false);
+
+			// Microsoft Contacts & Calendar share the same default-on behavior
+			const msConfig = {
+				...baseConfig,
+				providerType: 'microsoft-contacts' as const,
+				settings: {}
+			};
+			expect(service.shouldSyncContactForEvent(optedInGuest, msConfig)).toBe(true);
+
+			// Explicit opt-out disables syncing of non-public consented guests
+			const disabledConfig = {
+				...baseConfig,
+				settings: {
+					includeEmployeeContacts: true,
+					includePublicContacts: false,
+					includeNonPublicContacts: false,
+					includeNotifyOnChangesContacts: false
+				}
+			};
+			expect(service.shouldSyncContactForEvent(optedInGuest, disabledConfig)).toBe(false);
+			expect(matchesContactParticipantRules(optedInGuest, disabledConfig.settings)).toBe(false);
+
+			// normalizeSyncSettings defaults includeNotifyOnChangesContacts to true
+			const normalizedDefault = normalizeSyncSettings({});
+			expect(normalizedDefault.includeNotifyOnChangesContacts).toBe(true);
+			const normalizedDisabled = normalizeSyncSettings({ includeNotifyOnChangesContacts: 'false' });
+			expect(normalizedDisabled.includeNotifyOnChangesContacts).toBe(false);
+		});
 	});
 });
 
@@ -1972,6 +2035,74 @@ describe('SyncService - Public Data Leak Prevention', () => {
 				start: new Date('2026-11-10T13:30:00.000Z'),
 				end: new Date('2026-11-10T16:15:00.000Z')
 			}));
+		});
+
+		it('includes consented guest home emails in attendees for Google and Microsoft Calendar sync under default privacy settings', async () => {
+			const service = new SyncService();
+			const internalEvent = {
+				id: 'evt-guest-notify',
+				summary: 'Open Workshop',
+				status: 'confirmed',
+				isPublic: true,
+				startDateTime: new Date('2026-10-01T10:00:00Z'),
+				endDateTime: new Date('2026-10-01T11:00:00Z')
+			};
+
+			const assocContacts = [
+				{
+					id: 'ctc-guest-yes',
+					isPublic: false,
+					notifyOnChanges: true,
+					displayName: 'Guest With Updates',
+					emails: [{ value: 'guest.yes@home.example', type: 'home', primary: true }],
+					tags: []
+				},
+				{
+					id: 'ctc-guest-no',
+					isPublic: false,
+					notifyOnChanges: false,
+					displayName: 'Guest Without Updates',
+					emails: [{ value: 'guest.no@home.example', type: 'home', primary: true }],
+					tags: []
+				}
+			];
+
+			const defaultConfig: SyncConfig = {
+				id: 'cfg-default',
+				userId: 'user-1',
+				providerId: 'google',
+				providerType: 'google-calendar',
+				direction: 'push',
+				enabled: true,
+				settings: {
+					includeEmployeeContacts: true,
+					includePublicContacts: false,
+					includeNonPublicContacts: false
+				},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			// Stub db queries needed inside mapInternalToExternal
+			(db.select as any).mockImplementation(() => ({
+				from: vi.fn().mockImplementation(() => ({
+					where: vi.fn().mockImplementation(() => ({
+						limit: vi.fn().mockResolvedValue([])
+					})),
+					innerJoin: vi.fn().mockImplementation(() => ({
+						where: vi.fn().mockResolvedValue([])
+					}))
+				}))
+			}));
+
+			vi.mocked(getEntityContacts).mockResolvedValueOnce(assocContacts as any);
+			const googleExternal = await (service as any).mapInternalToExternal(internalEvent, 'google-calendar', undefined, defaultConfig);
+			expect(googleExternal.attendees.map((a: any) => a.email)).toEqual(['guest.yes@home.example']);
+
+			vi.mocked(getEntityContacts).mockResolvedValueOnce(assocContacts as any);
+			const msConfig: SyncConfig = { ...defaultConfig, providerId: 'microsoft', providerType: 'microsoft-calendar' };
+			const msExternal = await (service as any).mapInternalToExternal(internalEvent, 'microsoft-calendar', undefined, msConfig);
+			expect(msExternal.attendees.map((a: any) => a.email)).toEqual(['guest.yes@home.example']);
 		});
 	});
 });

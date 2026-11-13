@@ -39,6 +39,7 @@
             gender?: string;
             notes: string;
             isPublic: boolean;
+            notifyOnChanges?: boolean;
         };
         emails: any[];
         phones: any[];
@@ -122,6 +123,11 @@
         isPublicDescription:
             labels?.isPublicDescription ??
             "Public contacts are visible to all users.",
+        notifyOnChangesLabel:
+            labels?.notifyOnChangesLabel ?? "Consented to notifications",
+        notifyOnChangesDescription:
+            labels?.notifyOnChangesDescription ??
+            "Contact expressed consent to receive event updates.",
         tagsPlaceholder: labels?.tagsPlaceholder ?? "Add tags...",
         relations: labels?.relations ?? "Relations",
         contactSearchPlaceholder:
@@ -429,6 +435,23 @@
             />
             <label for="isPublic" class="text-sm font-medium text-gray-700">
                 {i18n.isPublicLabel} ({i18n.isPublicDescription})
+            </label>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+            <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
+                <input
+                    {...contactFields?.notifyOnChanges?.as("checkbox")}
+                    type="checkbox"
+                    checked={Boolean(contactData.notifyOnChanges)}
+                    onchange={(e) => {
+                        contactData.notifyOnChanges = e.currentTarget.checked;
+                    }}
+                    class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+                <span>
+                    {i18n.notifyOnChangesLabel} ({i18n.notifyOnChangesDescription})
+                </span>
             </label>
         </div>
 

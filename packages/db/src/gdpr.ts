@@ -372,7 +372,9 @@ export async function obfuscateContact(
             status: 'obfuscated',
             processedAt: now,
             processedBy: adminUserId,
-            notes: notes ? sql`concat(coalesce(${gdprRequest.notes}, ''), ' | ', ${notes})` : undefined,
+            notes: notes
+                ? sql<string>`coalesce(nullif(${gdprRequest.notes}, '') || ' | ', '') || ${notes}::text`
+                : undefined,
             updatedAt: now,
         })
         .where(and(eq(gdprRequest.contactId, contactId), eq(gdprRequest.status, 'pending')));
@@ -427,8 +429,15 @@ export async function obfuscateContact(
                 reason: notes || 'GDPR Art. 17 Obfuscation & Crypto-Shredding',
             });
         }
-        // Clear blind indexes on contact
-        await db.update(contact).set({ fingerprints: {} }).where(eq(contact.id, contactId));
+        // Clear blind indexes and encrypted envelope on contact
+        await db
+            .update(contact)
+            .set({
+                fingerprints: {},
+                encryptedEnvelope: null,
+                encryptionStatus: 'shredded',
+            })
+            .where(eq(contact.id, contactId));
     } catch (shredErr) {
         console.warn('[GDPR Service] Notice during crypto-shredding:', shredErr);
     }

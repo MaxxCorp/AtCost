@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from 'svelte';
     import { toast } from 'svelte-sonner';
     import { ShieldCheck, UserCheck, AlertCircle, CheckCircle2, Lock, FileText, Sparkles } from '@lucide/svelte';
 
@@ -33,6 +34,7 @@
     );
 
     const isMinimumMet = $derived(filledCount >= 3);
+    const rootIssues = $derived((remoteForm?.fields?.issues?.() ?? []) as Array<{ message: string }>);
 </script>
 
 <div class="max-w-3xl mx-auto py-8 px-4 sm:px-6">
@@ -154,15 +156,31 @@
             <form
                 {...remoteForm.preflight(validationSchema).enhance(async ({ submit }) => {
                     isSubmitting = true;
+                    submitResult = null;
                     try {
-                        const res = await submit();
-                        if (res?.data) {
-                            submitResult = res.data;
-                            if (res.data.success) {
-                                toast.success('Antrag erfolgreich registriert!');
+                        const ok = await submit();
+                        if (!ok) {
+                            toast.error('Bitte überprüfen Sie Ihre Eingaben.');
+                            return;
+                        }
+                        const result = untrack(() => remoteForm.result) as {
+                            success: boolean;
+                            reason?: string;
+                            status?: string;
+                        } | undefined;
+                        if (result) {
+                            submitResult = result;
+                            if (result.success) {
+                                toast.success(
+                                    result.status === 'already_pending'
+                                        ? 'Für diesen Kontakt liegt bereits ein offener Antrag vor.'
+                                        : 'Antrag erfolgreich registriert!'
+                                );
                             } else {
-                                toast.error(res.data.reason || 'Identifikation fehlgeschlagen.');
+                                toast.error(result.reason || 'Identifikation fehlgeschlagen.');
                             }
+                        } else {
+                            toast.error('Fehler beim Verarbeiten des Antrags.');
                         }
                     } catch (err: any) {
                         toast.error(err?.message || 'Fehler beim Absenden des Antrags.');
@@ -225,9 +243,8 @@
                             </label>
                             <input
                                 id="gdpr-birthday"
-                                type="date"
                                 bind:value={birthdayVal}
-                                {...remoteForm.fields.birthday.as('text')}
+                                {...remoteForm.fields.birthday.as('date')}
                                 class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-gray-800"
                             />
                             {#each remoteForm.fields.birthday.issues() as issue (issue.message)}
@@ -365,6 +382,28 @@
                         <p class="text-xs font-semibold text-rose-500 ml-7">{issue.message}</p>
                     {/each}
                 </div>
+
+                <!-- Root Validation & Server Error Feedback -->
+                {#if rootIssues.length > 0}
+                    <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-1">
+                        {#each rootIssues as issue (issue.message)}
+                            <p class="text-xs font-semibold text-rose-700 flex items-center gap-2">
+                                <AlertCircle class="w-4 h-4 shrink-0" />
+                                <span>{issue.message}</span>
+                            </p>
+                        {/each}
+                    </div>
+                {/if}
+
+                {#if submitResult && !submitResult.success}
+                    <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3">
+                        <AlertCircle class="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                        <div class="text-xs text-rose-800 space-y-1">
+                            <p class="font-bold">Identifikation fehlgeschlagen</p>
+                            <p>{submitResult.reason || 'Es konnte kein eindeutiger Kontakt ermittelt werden.'}</p>
+                        </div>
+                    </div>
+                {/if}
 
                 <!-- Submit Button -->
                 <div class="flex items-center justify-between gap-4 pt-4 border-t border-gray-100">

@@ -14,6 +14,7 @@ const contactBaseSchema = v.object({
     birthday: v.optional(v.string()),
     notes: v.optional(v.string()),
     isPublic: v.optional(v.union([v.boolean(), v.string()])), // FormData doesn't have null
+    notifyOnChanges: v.optional(v.union([v.boolean(), v.string()])),
 });
 
 const emailSchemaPure = v.object({
@@ -65,6 +66,8 @@ export const contactSchema = v.intersect([
         tags: v.optional(v.array(tagSchemaPure)),
         locationAssociations: v.optional(v.array(v.any())),
         participationStatus: v.optional(v.string()),
+        partySize: v.optional(v.number()),
+        notifyOnChanges: v.optional(v.boolean()),
     })
 ]);
 
@@ -124,6 +127,13 @@ export const updateAssociationSchema = v.object({
     entityId: v.string(),
     contactId: v.pipe(v.string(), v.uuid()),
     status: v.string(),
+});
+
+export const updateAssociationPartySizeSchema = v.object({
+    type: v.literal('event'),
+    entityId: v.string(),
+    contactId: v.pipe(v.string(), v.uuid()),
+    partySize: v.pipe(v.number(), v.integer(), v.minValue(1)),
 });
 
 export const getAssociationsSchema = v.object({

@@ -277,11 +277,13 @@ export async function getEntityContacts(type: string, entityId: string, includeS
         
         const roles = entityRolesMap.get(c.id) || [];
 
-        // Add participation status and roles if present
+        // Add participation status, party size, notification pref, and roles if present
         const result = {
             ...c,
             roles,
-            participationStatus: a.participationStatus || 'needsAction'
+            participationStatus: a.participationStatus || 'needsAction',
+            partySize: a.partySize ?? 1,
+            notifyOnChanges: Boolean(a.notifyOnChanges || c.notifyOnChanges)
         };
 
         if (includeSubEntities) {

@@ -1,0 +1,1 @@
+ALTER TABLE "event_contact" ADD COLUMN "newsletter_subscribed" boolean DEFAULT false NOT NULL;

@@ -100,6 +100,7 @@
         renderSubItems?: Snippet<[T]>;
         participationSnippet?: Snippet<[T]>;
         rolesSnippet?: Snippet<[T]>;
+        footerSnippet?: Snippet;
         toolbarActions?: Snippet<[{ items: T[]; count: number }]> | Snippet;
 
         // Initial state
@@ -170,6 +171,7 @@
         renderSubItems = undefined,
         participationSnippet,
         rolesSnippet,
+        footerSnippet,
         toolbarActions,
         initialItems = [],
         searchPredicate = undefined,
@@ -749,7 +751,9 @@
         const items = currentAssociations;
         if (onchange && items) {
             const ids = items.map((i) => i.id!).filter(Boolean);
-            const key = ids.join(',');
+            const key = items
+                .map((i: any) => `${i.id}:${i.partySize ?? 1}:${i.participationStatus ?? ''}`)
+                .join(',');
             if (prevAssociationsKey !== null && prevAssociationsKey !== key) {
                 prevAssociationsKey = key;
                 onchange(ids, items);
@@ -957,11 +961,12 @@
             await invokeRemote(deleteItemRemote, selectedIds);
             toast.success(i18n.deleteSuccessLabel || "Deleted successfully");
             const idsToDelete = new Set(selectedIds);
+            const remaining = currentAssociations.filter((i) => !i.id || !idsToDelete.has(i.id));
             selectedIds = [];
-            localAssociatedItems = localAssociatedItems.filter((i) => !i.id || !idsToDelete.has(i.id));
+            localAssociatedItems = remaining;
             await refreshAssociations();
             await refreshSelector();
-            onchange?.(localAssociatedItems.map((i) => i.id!).filter(Boolean), localAssociatedItems);
+            onchange?.(remaining.map((i) => i.id!).filter(Boolean), remaining);
         } catch (e: any) {
             toast.error(e?.message || i18n.deleteFailedLabel || "Failed to delete");
         }
@@ -1046,7 +1051,20 @@
         }
 
         const newList = updatedItem
-            ? currentList.map((i) => (i.id === targetId ? updatedItem : i))
+            ? currentList.map((i) =>
+                  i.id === targetId
+                      ? {
+                            ...i,
+                            ...updatedItem,
+                            partySize: updatedItem.partySize ?? (i as any).partySize,
+                            participationStatus:
+                                updatedItem.participationStatus ?? (i as any).participationStatus,
+                            notifyOnChanges:
+                                updatedItem.notifyOnChanges ?? (i as any).notifyOnChanges,
+                            roles: updatedItem.roles ?? (i as any).roles,
+                        }
+                      : i
+              )
             : currentList;
 
         localAssociatedItems = newList;
@@ -1534,6 +1552,9 @@
                 </div>
             {/if}
         </div>
+        {#if footerSnippet}
+            {@render footerSnippet()}
+        {/if}
 
         {#snippet pending()}
             <div class="text-center py-10 animate-pulse text-gray-400 font-medium">

@@ -492,6 +492,7 @@ export function sanitizePublicEvent(event: any): any | null {
 		endDateTime: toIsoSafe(event.endDateTime),
 		isAllDay: Boolean(event.isAllDay),
 		isPublic: true,
+		signUpMode: event.signUpMode ?? 'off',
 		heroImage: event.heroImage ?? null,
 		ticketPrice: event.ticketPrice ?? null,
 		ticketPriceUnknown: Boolean(event.ticketPriceUnknown),

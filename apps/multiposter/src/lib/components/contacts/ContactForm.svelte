@@ -2,6 +2,7 @@
     import * as m from "#lib/paraglide/messages.js";
     import SharedContactForm from "@ac/ui/components/forms/ContactForm.svelte";
     import { listContacts } from "../../../routes/contacts/list.remote";
+    import { checkContactDuplicate } from "../../../routes/contacts/check-duplicate.remote";
     import { type Location, type Contact } from "@ac/validations";
     import { listTags as listTagsRoute } from "../../../routes/tags/list.remote";
     import { createTag as createTagRoute } from "../../../routes/tags/new/create.remote";
@@ -71,6 +72,7 @@
     {loading}
     {children}
     listContactsRemote={listContacts as any}
+    checkDuplicateRemote={checkContactDuplicate as any}
     m={m}
     labels={{
         basicInformation: m.basic_information(),
@@ -88,6 +90,8 @@
         notes: m.notes(),
         isPublicLabel: m.public_profile(),
         isPublicDescription: m.public_profile_description(),
+        notifyOnChangesLabel: m.notification_consent_label(),
+        notifyOnChangesDescription: m.notification_consent_description(),
         tagsPlaceholder: m.tag_placeholder(),
         relations: m.relations(),
         contactSearchPlaceholder: m.search_contact_to_link(),

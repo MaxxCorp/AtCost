@@ -92,6 +92,7 @@ export const resourceContact = pgTable("resource_contact", {
 export const locationContact = pgTable("location_contact", {
     locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
     contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
+    newsletterSubscribed: boolean("newsletter_subscribed").default(false).notNull(),
 }, (table) => [primaryKey({ columns: [table.locationId, table.contactId] })]);
 
 export const locationContactRole = pgTable("location_contact_role", {

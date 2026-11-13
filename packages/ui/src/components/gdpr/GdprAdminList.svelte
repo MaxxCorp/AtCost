@@ -67,7 +67,11 @@
                 notes: 'Durch Administrator im DSGVO Management Center ausgeführt.'
             });
             toast.success('Kontakt erfolgreich anonymisiert und Daten gehasht.');
-            await requestsQuery.refresh();
+            try {
+                await requestsQuery.refresh();
+            } catch {
+                // Single-flight refresh from command handles state synchronization
+            }
         } catch (err: any) {
             toast.error(err?.message || 'Fehler beim Ausführen der Obfuskierung.');
         } finally {

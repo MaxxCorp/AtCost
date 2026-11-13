@@ -2,16 +2,18 @@ import { form, getRequestEvent, requested } from '$app/server';
 import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress,
-    contactRelation, tag, contactTag, locationContact, encryptSingleContact
+    contactRelation, tag, contactTag, locationContact, syncContactEncryption
 } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
 import { updateContactSchema, type Contact } from '#lib/validations/contacts.js';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { generateContactAssets } from '#lib/server/contacts.js';
 import { listContacts } from '../list.remote';
+import { checkContactEncryptionStatus } from '../encryption-migration.remote';
 import { fetchEntityContacts } from '../associate.remote';
 import { readContact } from './read.remote';
 import { invalidateContact } from '#lib/server/cache/index.js';
+import { findMatchingContacts } from '#lib/server/contact-matching.js';
 
 export const updateContact = form(updateContactSchema, async (input) => {
     console.log('--- updateContact START ---');
@@ -59,6 +61,28 @@ export const updateContact = form(updateContactSchema, async (input) => {
 
         const updateData: Partial<any> = { contact: sanitizedContact, emails, phones, addresses, relationIds, tagNames, locationIds };
 
+        // Duplicate prevention based on email(s) and normalized phone number checks
+        const duplicateMatches = await findMatchingContacts({
+            emails: (emails || []).map((e: any) => e?.value).filter(Boolean),
+            phones: (phones || []).map((p: any) => p?.value).filter(Boolean),
+            excludeContactId: id
+        });
+        if (duplicateMatches.length > 0) {
+            const first = duplicateMatches[0];
+            const matchName = first.displayName || `${first.givenName || ''} ${first.familyName || ''}`.trim() || 'Existing Contact';
+            return {
+                success: false,
+                error: {
+                    message: `Another contact with matching ${first.matchedBy.join(' / ')} already exists: ${matchName}`
+                },
+                duplicateContact: {
+                    id: first.id,
+                    displayName: matchName,
+                    matchedBy: first.matchedBy
+                }
+            };
+        }
+
         // --- Logic from updateContact helper ---
         await db.transaction(async (tx) => {
             // Update main contact
@@ -78,6 +102,10 @@ export const updateContact = form(updateContactSchema, async (input) => {
                 if (c.gender !== undefined) updateSet.gender = c.gender;
                 if (c.notes !== undefined) updateSet.notes = c.notes;
                 updateSet.isPublic = !!c.isPublic;
+                updateSet.notifyOnChanges =
+                    c.notifyOnChanges === true ||
+                    c.notifyOnChanges === 'true' ||
+                    c.notifyOnChanges === 'on';
 
                 await tx.update(contact).set(updateSet).where(eq(contact.id, id));
             }
@@ -207,24 +235,17 @@ export const updateContact = form(updateContactSchema, async (input) => {
             }
         });
 
-        // If contact is encrypted at rest, update its encrypted envelope and custody ledger
-        try {
-            const [existingRecord] = await db
-                .select({ encryptionStatus: contact.encryptionStatus })
-                .from(contact)
-                .where(eq(contact.id, id))
-                .limit(1);
-            if (existingRecord?.encryptionStatus === 'migrated') {
-                await encryptSingleContact(id, {
-                    userId: user.id,
-                    name: (user as any).name || user.email,
-                    email: user.email,
-                    role: 'user',
-                });
-            }
-        } catch (encErr) {
-            console.warn('[updateContact] Envelope re-encryption notice:', encErr);
-        }
+        // Encrypt / re-encrypt contact envelope at rest (skips GDPR-shredded contacts)
+        await syncContactEncryption(
+            id,
+            {
+                userId: user.id,
+                name: (user as any).name || user.email,
+                email: user.email,
+                role: Array.isArray((user as any).roles) ? (user as any).roles[0] : 'user',
+            },
+            'updateContact',
+        );
 
         // Re-generate assets
         let origin: string | undefined;
@@ -287,6 +308,7 @@ export const updateContact = form(updateContactSchema, async (input) => {
         } catch { /* ignore */ }
         void listContacts().refresh();
         void listContacts({}).refresh();
+        void checkContactEncryptionStatus().refresh();
         return { success: true, contact: transformed };
 
     } catch (err: any) {

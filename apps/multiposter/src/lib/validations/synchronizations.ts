@@ -81,6 +81,7 @@ export const synchronizationBaseSchema = v.object({
         includeEmployeeContacts: v.optional(v.union([v.boolean(), v.string()])),
         includePublicContacts: v.optional(v.union([v.boolean(), v.string()])),
         includeNonPublicContacts: v.optional(v.union([v.boolean(), v.string()])),
+        includeNotifyOnChangesContacts: v.optional(v.union([v.boolean(), v.string()])),
         participantRoleFilterMode: v.optional(v.union([v.literal('all'), v.literal('include'), v.literal('exclude'), v.string()])),
         includedContactRoles: v.optional(v.union([v.array(v.string()), v.string()])),
         excludedContactRoles: v.optional(v.union([v.array(v.string()), v.string()])),
@@ -115,7 +116,8 @@ export function normalizeSyncSettings(settings: Record<string, any>): Record<str
         'onlyEmployeeContacts',
         'includeEmployeeContacts',
         'includePublicContacts',
-        'includeNonPublicContacts'
+        'includeNonPublicContacts',
+        'includeNotifyOnChangesContacts'
     ];
     for (const bf of boolFields) {
         if (settings[bf] !== undefined) {
@@ -157,6 +159,9 @@ export function normalizeSyncSettings(settings: Record<string, any>): Record<str
     }
     if (settings.includeNonPublicContacts === undefined) {
         settings.includeNonPublicContacts = false;
+    }
+    if (settings.includeNotifyOnChangesContacts === undefined) {
+        settings.includeNotifyOnChangesContacts = true;
     }
     settings.onlyEmployeeContacts = settings.includeEmployeeContacts === true &&
         !settings.includePublicContacts &&

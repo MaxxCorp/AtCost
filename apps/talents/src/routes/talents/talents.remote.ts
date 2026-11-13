@@ -1,6 +1,6 @@
 import { query, form, command } from '$app/server';
 import { dev } from '$app/env';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, computeContactBlindIndexes, recordPersonnelMutation, encryptSingleContact } from '@ac/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, computeContactBlindIndexes, recordPersonnelMutation, syncContactEncryption } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '#lib/server/authorization.js';
 import {
     talentTimelineEntrySchema,
@@ -14,6 +14,7 @@ import { syncTalentTargets } from '#lib/server/sync/talent-sync.js';
 import { listTalents } from './list.remote';
 import { readTalent } from './[id]/read.remote';
 import { invalidateTalent } from '#lib/server/cache/index.js';
+import { checkContactEncryptionStatus } from '../contacts/encryption-migration.remote';
 
 export const bulkDeleteTalents = command(v.array(v.string()), async (ids): Promise<{ success: boolean }> => {
     ensureAccess(getAuthenticatedUser(), 'talents');
@@ -277,26 +278,17 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
                 console.warn('[upsertTalent] Custody recording warning:', custodyErr);
             }
 
-            // Re-encrypt contact envelope if contact is migrated
-            if (result.contactId) {
-                try {
-                    const [existing] = await db
-                        .select({ encryptionStatus: contact.encryptionStatus })
-                        .from(contact)
-                        .where(eq(contact.id, result.contactId))
-                        .limit(1);
-                    if (existing?.encryptionStatus === 'migrated') {
-                        await encryptSingleContact(result.contactId, {
-                            userId: authUser.id,
-                            name: (authUser as any).name || authUser.email,
-                            email: authUser.email,
-                            role: Array.isArray((authUser as any).roles) ? (authUser as any).roles[0] : 'admin',
-                        });
-                    }
-                } catch (encErr) {
-                    console.warn('[upsertTalent] Envelope re-encryption notice:', encErr);
-                }
-            }
+            // Encrypt / re-encrypt contact envelope at rest (skips GDPR-shredded contacts)
+            await syncContactEncryption(
+                result.contactId,
+                {
+                    userId: authUser.id,
+                    name: (authUser as any).name || authUser.email,
+                    email: authUser.email,
+                    role: Array.isArray((authUser as any).roles) ? (authUser as any).roles[0] : 'admin',
+                },
+                'upsertTalent',
+            );
 
             await invalidateTalent(result.talentId);
             void readTalent(result.talentId).refresh();
@@ -304,6 +296,7 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             await invalidateTalent();
         }
         void listTalents().refresh();
+        void checkContactEncryptionStatus().refresh();
 
         return { success: true, id: result.talentId };
     } catch (err: any) {

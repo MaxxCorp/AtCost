@@ -278,7 +278,14 @@ export async function resolveEventIdForAssociations(
 	const masterCtcs = await db.select().from(eventContact).where(eq(eventContact.eventId, masterId));
 	if (masterCtcs.length > 0) {
 		await db.insert(eventContact).values(
-			masterCtcs.map(c => ({ eventId: created.id, contactId: c.contactId, participationStatus: c.participationStatus }))
+			masterCtcs.map(c => ({
+				eventId: created.id,
+				contactId: c.contactId,
+				participationStatus: c.participationStatus,
+				partySize: c.partySize ?? 1,
+				notifyOnChanges: c.notifyOnChanges,
+				newsletterSubscribed: c.newsletterSubscribed
+			}))
 		);
 	}
 

@@ -28,6 +28,7 @@
 
         // Injected dependencies to keep it shared
         listContactsRemote: (input?: any) => Promise<any>;
+        checkDuplicateRemote?: (input: { emails?: string[]; phones?: string[]; excludeContactId?: string }) => Promise<{ matches: Array<{ id: string; displayName: string; matchedBy: string[] }> }>;
         // Optional snippet for additional sections
         children?: Snippet<[{ onLocationsChange: (ids: string[]) => void }]>;
 
@@ -47,6 +48,8 @@
             notes?: string;
             isPublicLabel?: string;
             isPublicDescription?: string;
+            notifyOnChangesLabel?: string;
+            notifyOnChangesDescription?: string;
             tagsPlaceholder?: string;
             relations?: string;
             contactSearchPlaceholder?: string;
@@ -101,6 +104,7 @@
         isUpdating = false,
         loading = false,
         listContactsRemote,
+        checkDuplicateRemote = undefined,
         children,
         tags = $bindable(),
         labels,
@@ -166,6 +170,7 @@
         ),
         notes: d(initialData.notes ?? initialData.contact?.notes, ""),
         isPublic: d(initialData.isPublic ?? initialData.contact?.isPublic, false),
+        notifyOnChanges: d(initialData.notifyOnChanges ?? initialData.contact?.notifyOnChanges, false),
     });
 
     // svelte-ignore state_referenced_locally
@@ -206,6 +211,41 @@
                 .filter(Boolean),
         ),
     );
+
+    let duplicateMatches = $state<Array<{ id: string; displayName: string; matchedBy: string[] }>>([]);
+    $effect(() => {
+        const checker = checkDuplicateRemote;
+        if (!checker) {
+            duplicateMatches = [];
+            return;
+        }
+        const emailVals = emails.map((e: any) => (e?.value ?? "").trim()).filter(Boolean);
+        const phoneVals = phones.map((p: any) => (p?.value ?? "").trim()).filter((p: string) => p.replace(/\D/g, "").length >= 4);
+        if (emailVals.length === 0 && phoneVals.length === 0) {
+            duplicateMatches = [];
+            return;
+        }
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            void checker({
+                emails: emailVals,
+                phones: phoneVals,
+                excludeContactId: contactId || undefined,
+            })
+                .then((res) => {
+                    if (!cancelled) {
+                        duplicateMatches = res?.matches ?? [];
+                    }
+                })
+                .catch(() => {
+                    if (!cancelled) duplicateMatches = [];
+                });
+        }, 350);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    });
 
     const prefix = $derived(contactId ? "data.contact" : "contact");
 
@@ -401,6 +441,31 @@
             )}
             class="hidden"
         />
+    {/if}
+
+    {#if duplicateMatches.length > 0}
+        <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 space-y-1.5">
+            <p class="font-semibold">
+                {m?.duplicate_contact_warning
+                    ? m.duplicate_contact_warning({
+                          name: duplicateMatches[0].displayName,
+                          matchedBy: duplicateMatches[0].matchedBy.join(", "),
+                      })
+                    : `Possible duplicate contact found: ${duplicateMatches[0].displayName} (matched by ${duplicateMatches[0].matchedBy.join(", ")}).`}
+            </p>
+            <div class="flex flex-wrap gap-2">
+                {#each duplicateMatches as match (match.id)}
+                    <a
+                        href={`/contacts/${match.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center gap-1 text-xs font-medium text-amber-800 underline hover:text-amber-950"
+                    >
+                        {match.displayName} ({match.matchedBy.join(", ")})
+                    </a>
+                {/each}
+            </div>
+        </div>
     {/if}
 
     <div class="flex justify-end gap-3 pt-6 border-t">

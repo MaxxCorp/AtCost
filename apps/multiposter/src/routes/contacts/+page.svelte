@@ -32,7 +32,7 @@
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
 	import { page as pageState } from "$app/state";
-	import { goto } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 
 	import {
@@ -114,6 +114,12 @@
 	let selectedIds = $state<string[]>([]);
 
 	const contactsQuery = $derived(listContacts(filterState));
+
+	afterNavigate(({ from }) => {
+		if (from) {
+			void contactsQuery.refresh();
+		}
+	});
 	const contactsRes = $derived(contactsQuery.current);
 	const contactItems = $derived(contactsRes?.data ?? []);
 

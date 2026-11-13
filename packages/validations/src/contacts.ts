@@ -14,6 +14,7 @@ export const contactBaseSchema = v.object({
     department: v.optional(v.string()),
     notes: v.optional(v.string()),
     isPublic: v.optional(v.union([v.boolean(), v.string()])),
+    notifyOnChanges: v.optional(v.union([v.boolean(), v.string()])),
     vCardPath: v.optional(v.string()),
     qrCodePath: v.optional(v.string()),
 });
@@ -73,6 +74,8 @@ export const contactSchema = v.intersect([
         relations: v.optional(v.array(contactRelationSchemaPure)),
         tags: v.optional(v.array(tagSchemaPure)),
         participationStatus: v.optional(v.string()),
+        partySize: v.optional(v.number()),
+        notifyOnChanges: v.optional(v.boolean()),
         user: v.optional(v.any()), // Can define specific user schema if needed
     })
 ]);
@@ -135,6 +138,19 @@ export const updateAssociationSchema = v.object({
     entityId: v.string(),
     contactId: v.pipe(v.string(), v.uuid()),
     status: v.string(),
+});
+
+export const updateAssociationPartySizeSchema = v.object({
+    type: v.literal('event'),
+    entityId: v.string(),
+    contactId: v.pipe(v.string(), v.uuid()),
+    partySize: v.pipe(v.number(), v.integer(), v.minValue(1)),
+});
+
+export const checkContactDuplicateSchema = v.object({
+    emails: v.optional(v.array(v.string())),
+    phones: v.optional(v.array(v.string())),
+    excludeContactId: v.optional(v.string()),
 });
 
 export const getAssociationsSchema = v.object({

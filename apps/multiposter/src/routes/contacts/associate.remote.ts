@@ -2,16 +2,20 @@ import { command, query, requested } from '$app/server';
 import { db } from '@ac/db';
 import { 
     userContact, locationContact, resourceContact, eventContact, announcementContact,
+    event as eventTable,
     eventContact as eventContactTable, eventContactRole, announcementContactRole, locationContactRole
 } from '@ac/db';
-import { eq, and } from '@ac/db';
+import { eq, and, sql } from '@ac/db';
 import { getAuthenticatedUser, hasAccess } from '#lib/server/authorization.js';
-import { type Contact, associationSchema, updateAssociationSchema, getAssociationsSchema } from '#lib/validations/contacts.js';
+import { type Contact, associationSchema, updateAssociationSchema, updateAssociationPartySizeSchema, getAssociationsSchema } from '#lib/validations/contacts.js';
 import { updateContactRolesSchema } from '@ac/validations';
 import { getEntityContacts } from '#lib/server/contacts.js';
 import { addAssociation as dbAddAssociation, removeAssociation as dbRemoveAssociation } from '#lib/server/associations.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
+import { applyEventParticipantsDelta } from '#lib/server/events/participants.js';
+import { getContactHeadcount } from '#lib/utils/participants.js';
 import { readEvent } from '../events/[id]/read.remote.js';
+import { listEvents } from '../events/list.remote.js';
 import { readAnnouncement } from '../announcements/[id]/read.remote.js';
 import { readLocation } from '../locations/[id]/read.remote.js';
 import { invalidateEvent, invalidateAnnouncement, invalidateLocation } from '#lib/server/cache/index.js';
@@ -49,9 +53,22 @@ export const addAssociation = command(associationSchema, async (data) => {
         throw new Error('Forbidden');
     }
 
+    let targetEventId = entityId;
+    let existedBefore = false;
+    if (type === 'event') {
+        targetEventId = entityId.includes('_inst_')
+            ? await resolveEventIdForAssociations(entityId, { materializeIfVirtual: true, userId: user?.id })
+            : entityId;
+        const [existingAssoc] = await db
+            .select({ contactId: eventContactTable.contactId })
+            .from(eventContactTable)
+            .where(and(eq(eventContactTable.eventId, targetEventId), eq(eventContactTable.contactId, contactId)));
+        existedBefore = Boolean(existingAssoc);
+    }
+
     await dbAddAssociation({
         type,
-        entityId,
+        entityId: targetEventId,
         itemId: contactId,
         tableMap,
         fieldMap,
@@ -59,13 +76,23 @@ export const addAssociation = command(associationSchema, async (data) => {
         userId: user?.id
     });
 
+    if (type === 'event' && !existedBefore) {
+        await applyEventParticipantsDelta(db, targetEventId, 1);
+    }
+
     if (type === 'event' && user?.id) {
         await syncService.syncContactAssociationsChange(user.id, entityId, contactId, 'link');
     }
 
     if (type === 'event') {
-        await invalidateEvent(entityId);
+        await invalidateEvent(targetEventId !== entityId ? [entityId, targetEventId] : entityId);
         void readEvent(entityId).refresh();
+        if (targetEventId !== entityId) {
+            void readEvent(targetEventId).refresh();
+        }
+        try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+        void listEvents().refresh();
+        void listEvents({}).refresh();
     } else if (type === 'announcement') {
         await invalidateAnnouncement(entityId);
         void readAnnouncement(entityId).refresh();
@@ -94,9 +121,27 @@ export const removeAssociation = command(associationSchema, async (data) => {
         throw new Error('Forbidden');
     }
 
+    let targetEventId = entityId;
+    let removedCount = 0;
+    if (type === 'event') {
+        targetEventId = entityId.includes('_inst_')
+            ? await resolveEventIdForAssociations(entityId, { materializeIfVirtual: true, userId: user?.id })
+            : entityId;
+        const [existingAssoc] = await db
+            .select({
+                partySize: eventContactTable.partySize,
+                participationStatus: eventContactTable.participationStatus
+            })
+            .from(eventContactTable)
+            .where(and(eq(eventContactTable.eventId, targetEventId), eq(eventContactTable.contactId, contactId)));
+        if (existingAssoc) {
+            removedCount = getContactHeadcount(existingAssoc);
+        }
+    }
+
     await dbRemoveAssociation({
         type,
-        entityId,
+        entityId: targetEventId,
         itemId: contactId,
         tableMap,
         fieldMap,
@@ -104,13 +149,23 @@ export const removeAssociation = command(associationSchema, async (data) => {
         userId: user?.id
     });
 
+    if (type === 'event' && removedCount > 0) {
+        await applyEventParticipantsDelta(db, targetEventId, -removedCount);
+    }
+
     if (type === 'event' && user?.id) {
         await syncService.syncContactAssociationsChange(user.id, entityId, contactId, 'unlink');
     }
 
     if (type === 'event') {
-        await invalidateEvent(entityId);
+        await invalidateEvent(targetEventId !== entityId ? [entityId, targetEventId] : entityId);
         void readEvent(entityId).refresh();
+        if (targetEventId !== entityId) {
+            void readEvent(targetEventId).refresh();
+        }
+        try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+        void listEvents().refresh();
+        void listEvents({}).refresh();
     } else if (type === 'announcement') {
         await invalidateAnnouncement(entityId);
         void readAnnouncement(entityId).refresh();
@@ -140,6 +195,17 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
         targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: true, userId: user?.id });
     }
 
+    const [existingAssoc] = await db
+        .select({
+            partySize: eventContactTable.partySize,
+            participationStatus: eventContactTable.participationStatus
+        })
+        .from(eventContactTable)
+        .where(and(
+            eq(eventContactTable.eventId, targetEntityId),
+            eq(eventContactTable.contactId, contactId)
+        ));
+
     await db.update(eventContactTable)
         .set({ participationStatus: status })
         .where(and(
@@ -147,17 +213,97 @@ export const updateAssociationStatus = command(updateAssociationSchema, async (d
             eq(eventContactTable.contactId, contactId)
         ));
 
+    if (existingAssoc) {
+        const previousCounted = getContactHeadcount(existingAssoc);
+        const nextCounted = getContactHeadcount({
+            partySize: existingAssoc.partySize,
+            participationStatus: status
+        });
+        const delta = nextCounted - previousCounted;
+        if (delta !== 0) {
+            await applyEventParticipantsDelta(db, targetEntityId, delta);
+        }
+    }
+
     if (type === 'event' && user?.id) {
         await syncService.syncContactAssociationsChange(user.id, targetEntityId, contactId, 'status_update');
     }
 
     if (type === 'event') {
-        await invalidateEvent(entityId);
+        await invalidateEvent(targetEntityId !== entityId ? [entityId, targetEntityId] : entityId);
         void readEvent(entityId).refresh();
+        if (targetEntityId !== entityId) {
+            void readEvent(targetEntityId).refresh();
+        }
+        try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+        void listEvents().refresh();
+        void listEvents({}).refresh();
     }
     try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
     await fetchEntityContacts({ type, entityId }).refresh();
     return { success: true };
+});
+
+export const updateAssociationPartySize = command(updateAssociationPartySizeSchema, async (data) => {
+    const user = getAuthenticatedUser();
+    const { type, entityId, contactId, partySize } = data;
+
+    if (!hasAccess(user, 'contacts') && !hasAccess(user, 'events')) {
+        throw new Error('Forbidden');
+    }
+
+    if (type !== 'event') {
+        throw new Error('Only event associations support party size');
+    }
+
+    let targetEntityId = entityId;
+    if (entityId.includes('_inst_')) {
+        targetEntityId = await resolveEventIdForAssociations(entityId, { materializeIfVirtual: true, userId: user?.id });
+    }
+
+    const clampedSize = Math.max(1, Math.trunc(partySize));
+    const [existingAssoc] = await db
+        .select({
+            partySize: eventContactTable.partySize,
+            participationStatus: eventContactTable.participationStatus
+        })
+        .from(eventContactTable)
+        .where(and(
+            eq(eventContactTable.eventId, targetEntityId),
+            eq(eventContactTable.contactId, contactId)
+        ));
+
+    await db.update(eventContactTable)
+        .set({ partySize: clampedSize })
+        .where(and(
+            eq(eventContactTable.eventId, targetEntityId),
+            eq(eventContactTable.contactId, contactId)
+        ));
+
+    if (existingAssoc) {
+        const previousCounted = getContactHeadcount(existingAssoc);
+        const nextCounted = getContactHeadcount({
+            partySize: clampedSize,
+            participationStatus: existingAssoc.participationStatus
+        });
+        const delta = nextCounted - previousCounted;
+        if (delta !== 0) {
+            await applyEventParticipantsDelta(db, targetEntityId, delta);
+        }
+    }
+
+    await invalidateEvent(entityId);
+    if (targetEntityId !== entityId) {
+        await invalidateEvent(targetEntityId);
+        void readEvent(targetEntityId).refresh();
+    }
+    void readEvent(entityId).refresh();
+    try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+    void listEvents().refresh();
+    void listEvents({}).refresh();
+    try { await requested(fetchEntityContacts, 20).refreshAll(); } catch { /* ignore */ }
+    await fetchEntityContacts({ type, entityId }).refresh();
+    return { success: true, partySize: clampedSize };
 });
 
 export const updateContactRoles = command(updateContactRolesSchema, async (data) => {

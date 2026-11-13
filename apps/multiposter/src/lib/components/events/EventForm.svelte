@@ -39,6 +39,7 @@
         removeAssociation,
         fetchEntityContacts,
         updateAssociationStatus as updateAssociationStatusRemote,
+        updateAssociationPartySize as updateAssociationPartySizeRemote,
         updateContactRoles,
     } from "../../../routes/contacts/associate.remote";
     import { createContact } from "../../../routes/contacts/new/create.remote";
@@ -79,6 +80,14 @@
     import type { EventRole } from "@ac/validations";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { isSeriesItem } from "#lib/utils/event-series.js";
+    import {
+        applyManualTotalParticipants,
+        computeInitialBaseline,
+        extractContactParticipantState,
+        normalizeParticipationStatus,
+        normalizePartySize,
+        sumContactsHeadcount,
+    } from "#lib/utils/participants.js";
     import {
         RefreshCw,
         CalendarClock,
@@ -582,8 +591,15 @@
     });
 
     // svelte-ignore state_referenced_locally
-    const initialContacts = (initialData?.contactIds ?? []) as string[];
-    let currentContactIds = $state<string[]>(initialContacts);
+    const initialParticipantState = extractContactParticipantState(
+        initialData?.contacts,
+        initialData?.contactIds,
+    );
+    let currentContactIds = $state<string[]>(initialParticipantState.contactIds);
+    let contactPartySizes = $state<Record<string, number>>(initialParticipantState.partySizes);
+    let contactParticipationStatuses = $state<Record<string, string>>(
+        initialParticipantState.participationStatuses,
+    );
 
     let isRoleManagerOpen = $state(false);
     // svelte-ignore state_referenced_locally
@@ -645,7 +661,23 @@
     async function handleContactsChange(ids: string[], items?: any[]) {
         currentContactIds = ids;
         rf.fields.contactIds.set(JSON.stringify(ids));
-        rf.fields.participantsCount.set(baseline + ids.length);
+
+        const nextPartySizes: Record<string, number> = {};
+        const nextStatuses: Record<string, string> = {};
+        for (const id of ids) {
+            const matchedItem = items?.find((it: any) => (it?.contact?.id ?? it?.id) === id);
+            nextPartySizes[id] = normalizePartySize(
+                matchedItem?.partySize ?? matchedItem?.contact?.partySize ?? contactPartySizes[id] ?? 1
+            );
+            nextStatuses[id] = normalizeParticipationStatus(
+                matchedItem?.participationStatus ?? matchedItem?.contact?.participationStatus ?? contactParticipationStatuses[id]
+            );
+        }
+        contactPartySizes = nextPartySizes;
+        contactParticipationStatuses = nextStatuses;
+        rf.fields.contactPartySizesJson.set(JSON.stringify(nextPartySizes));
+        rf.fields.contactParticipationStatusesJson.set(JSON.stringify(nextStatuses));
+        syncParticipantsField(ids, nextPartySizes, nextStatuses, baseline);
 
         const roles = await loadEventRoles();
         const mainRole = findRole(roles, 'Main Contact');
@@ -709,18 +741,22 @@
     }
 
     // svelte-ignore state_referenced_locally
-    const rawInitialParticipants = initialData?.participantsCount;
-    const initialParticipants = typeof rawInitialParticipants === 'number'
-        ? rawInitialParticipants
-        : (rawInitialParticipants ? parseInt(String(rawInitialParticipants), 10) : undefined);
+    let signUpMode = $state<'off' | 'recommended' | 'required'>((initialData?.signUpMode as any) || 'off');
 
-    let baseline = $state<number>(
-        initialParticipants !== undefined
-            ? Math.max(0, initialParticipants - initialContacts.length)
-            : 0
+    const contactsHeadcount = $derived(
+        sumContactsHeadcount(currentContactIds, contactPartySizes, contactParticipationStatuses)
     );
 
-    let totalParticipants = $derived(baseline + currentContactIds.length);
+    // svelte-ignore state_referenced_locally
+    let baseline = $state<number>(
+        computeInitialBaseline(
+            initialData?.participantsCount,
+            initialData?.contacts,
+            initialData?.contactIds,
+        )
+    );
+
+    let totalParticipants = $derived(baseline + contactsHeadcount);
     // svelte-ignore state_referenced_locally
     let currentPrices = $state<any[]>(initialData?.prices || []);
     $effect(() => {
@@ -729,17 +765,78 @@
         }
     });
 
+    function syncParticipantsField(
+        ids: string[] = currentContactIds,
+        sizes: Record<string, number> = contactPartySizes,
+        statuses: Record<string, string> = contactParticipationStatuses,
+        currentBaseline: number = baseline,
+    ) {
+        const nextHeadcount = sumContactsHeadcount(ids, sizes, statuses);
+        rf.fields.participantsCount.set(currentBaseline + nextHeadcount);
+    }
+
     function updateBaseline(delta: number) {
         baseline = Math.max(0, baseline + delta);
-        rf.fields.participantsCount.set(baseline + currentContactIds.length);
+        syncParticipantsField();
     }
 
     function handleParticipantsInput(e: globalThis.Event) {
         const target = e.target as HTMLInputElement;
         const val = parseInt(target.value, 10);
-        if (!isNaN(val)) {
-            baseline = Math.max(0, val - currentContactIds.length);
-            rf.fields.participantsCount.set(baseline + currentContactIds.length);
+        if (!Number.isNaN(val)) {
+            const next = applyManualTotalParticipants(val, contactsHeadcount);
+            baseline = next.baseline;
+            rf.fields.participantsCount.set(next.total);
+        }
+    }
+
+    function handleParticipantsBlur(e: globalThis.Event) {
+        const target = e.target as HTMLInputElement;
+        const val = parseInt(target.value, 10);
+        const next = applyManualTotalParticipants(
+            Number.isNaN(val) ? totalParticipants : val,
+            contactsHeadcount,
+        );
+        baseline = next.baseline;
+        rf.fields.participantsCount.set(next.total);
+        target.value = String(next.total);
+    }
+
+    function handlePartySizeChange(contactObj: any, rawVal: number) {
+        const clamped = normalizePartySize(rawVal);
+        const nextPartySizes = { ...contactPartySizes, [contactObj.id]: clamped };
+        contactPartySizes = nextPartySizes;
+        contactObj.partySize = clamped;
+        rf.fields.contactPartySizesJson.set(JSON.stringify(nextPartySizes));
+        syncParticipantsField(currentContactIds, nextPartySizes, contactParticipationStatuses, baseline);
+
+        if (initialData?.id) {
+            updateAssociationPartySizeRemote({
+                type: "event",
+                entityId: initialData.id,
+                contactId: contactObj.id,
+                partySize: clamped,
+            }).catch((err: any) => toast.error(err.message || "Failed to update party size"));
+        }
+    }
+
+    function handleParticipationStatusChange(contactObj: any, rawStatus: string) {
+        const nextStatus = normalizeParticipationStatus(rawStatus);
+        const nextStatuses = { ...contactParticipationStatuses, [contactObj.id]: nextStatus };
+        contactParticipationStatuses = nextStatuses;
+        contactObj.participationStatus = nextStatus;
+        rf.fields.contactParticipationStatusesJson.set(JSON.stringify(nextStatuses));
+        syncParticipantsField(currentContactIds, contactPartySizes, nextStatuses, baseline);
+
+        if (initialData?.id) {
+            updateAssociationStatusRemote({
+                type: "event",
+                entityId: initialData.id,
+                contactId: contactObj.id,
+                status: nextStatus,
+            } as any).catch((err: any) =>
+                toast.error(err.message || m.failed_to_update_status()),
+            );
         }
     }
 
@@ -1855,55 +1952,49 @@
         {/if}
     </div>
 
-    <!-- Participants Count Section -->
-    <div class="border border-gray-200 bg-gray-50/70 rounded-lg p-4 space-y-3">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-                <label for="participants-count-input" class="text-base font-semibold flex items-center gap-2 text-gray-900">
-                    <Users size={18} class="text-blue-600" />
-                    {m.participants_count()}
-                </label>
-                <p class="text-xs text-gray-500 mt-1">
-                    {m.participants_baseline_help({
-                        contacts: String(currentContactIds.length),
-                        baseline: String(baseline),
-                    })}
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onclick={() => updateBaseline(-1)}
-                    disabled={baseline <= 0}
-                    aria-label={m.decrease_participants()}
-                    class="h-9 w-9"
-                >
-                    <Minus size={16} />
-                </Button>
-
-                <input
-                    id="participants-count-input"
-                    {...rf.fields.participantsCount.as("number", totalParticipants)}
-                    type="number"
-                    min={currentContactIds.length}
-                    oninput={handleParticipantsInput}
-                    class="w-20 h-9 text-center font-bold text-lg border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onclick={() => updateBaseline(1)}
-                    aria-label={m.increase_participants()}
-                    class="h-9 w-9"
-                >
-                    <Plus size={16} />
-                </Button>
-            </div>
+    <!-- Sign Ups Control -->
+    <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+        <div>
+            <span class="text-base font-semibold text-gray-900 block">
+                {m.sign_ups?.() || "Sign Ups"}
+            </span>
+            <p class="text-xs text-gray-500 mt-1">
+                {m.sign_ups_help?.() || "Choose whether external visitors can register for this event online."}
+            </p>
         </div>
+        <div class="flex flex-wrap gap-3" role="radiogroup" aria-label={m.sign_ups?.() || "Sign Ups"}>
+            {#each [
+                { value: "off", label: m.sign_ups_off?.() || "Off" },
+                { value: "recommended", label: m.sign_ups_recommended?.() || "Recommended" },
+                { value: "required", label: m.sign_ups_required?.() || "Required" },
+            ] as option (option.value)}
+                <label
+                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-sm font-medium cursor-pointer transition-colors {signUpMode === option.value
+                        ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-2xs'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
+                >
+                    <input
+                        type="radio"
+                        checked={signUpMode === option.value}
+                        onchange={() => {
+                            signUpMode = option.value as "off" | "recommended" | "required";
+                            rf.fields.signUpMode.set(signUpMode);
+                        }}
+                        class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span>{option.label}</span>
+                </label>
+            {/each}
+        </div>
+        {#if rf.fields.signUpMode}
+            <input {...rf.fields.signUpMode.as("hidden", signUpMode)} />
+        {/if}
+        {#if rf.fields.contactPartySizesJson}
+            <input {...rf.fields.contactPartySizesJson.as("hidden", JSON.stringify(contactPartySizes))} />
+        {/if}
+        {#if rf.fields.contactParticipationStatusesJson}
+            <input {...rf.fields.contactParticipationStatusesJson.as("hidden", JSON.stringify(contactParticipationStatuses))} />
+        {/if}
     </div>
 
     <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
@@ -2006,31 +2097,85 @@
         {/snippet}
 
         {#snippet participationSnippet(contact: any)}
-            <select
-                value={contact.participationStatus || "needsAction"}
-                onchange={(e) => {
-                    const newStatus = e.currentTarget.value;
-                    if (initialData?.id) {
-                        updateAssociationStatusRemote({
-                            type: "event",
-                            entityId: initialData.id,
-                            contactId: contact.id,
-                            status: newStatus,
-                        } as any).catch((err: any) =>
-                            toast.error(
-                                err.message || m.failed_to_update_status(),
-                            ),
-                        );
-                    }
-                    contact.participationStatus = newStatus;
-                }}
-                class="text-xs bg-transparent border-0 focus:ring-0 cursor-pointer text-gray-500 hover:text-blue-600 font-medium"
-            >
-                <option value="needsAction">{m.needs_action()}</option>
-                <option value="accepted">{m.accepted()}</option>
-                <option value="declined">{m.declined()}</option>
-                <option value="tentative">{m.tentative()}</option>
-            </select>
+            <div class="flex items-center gap-2 flex-wrap">
+                <select
+                    value={contactParticipationStatuses[contact.id] ?? contact.participationStatus ?? "needsAction"}
+                    onchange={(e) => handleParticipationStatusChange(contact, e.currentTarget.value)}
+                    class="text-xs bg-transparent border-0 focus:ring-0 cursor-pointer text-gray-500 hover:text-blue-600 font-medium"
+                >
+                    <option value="needsAction">{m.needs_action()}</option>
+                    <option value="accepted">{m.accepted()}</option>
+                    <option value="declined">{m.declined()}</option>
+                    <option value="tentative">{m.tentative()}</option>
+                </select>
+                <label class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 border border-gray-200" title={m.party_size?.() || "Party Size"}>
+                    <Users size={11} class="text-gray-400" />
+                    <input
+                        type="number"
+                        min="1"
+                        value={contactPartySizes[contact.id] ?? contact.partySize ?? 1}
+                        onchange={(e) => handlePartySizeChange(contact, parseInt(e.currentTarget.value, 10))}
+                        onclick={(e) => e.stopPropagation()}
+                        class="w-10 text-xs text-center bg-transparent border-0 p-0 focus:ring-0 font-semibold text-gray-700"
+                        aria-label={m.party_size?.() || "Party Size"}
+                    />
+                </label>
+            </div>
+        {/snippet}
+
+        {#snippet footerSnippet()}
+            <div class="pt-2 mt-2 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div class="flex items-center gap-2 min-w-0">
+                    <Users size={15} class="text-blue-600 shrink-0" />
+                    <label for="participants-count-input" class="font-semibold text-gray-900 shrink-0">
+                        {m.participants_count()}
+                    </label>
+                    <span class="text-xs text-gray-500 truncate">
+                        ({m.participants_party_help?.({
+                            contacts: String(currentContactIds.length),
+                            headcount: String(contactsHeadcount),
+                            baseline: String(baseline),
+                        }) || m.participants_baseline_help({
+                            contacts: String(currentContactIds.length),
+                            baseline: String(baseline),
+                        })})
+                    </span>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onclick={() => updateBaseline(-1)}
+                        disabled={baseline <= 0}
+                        aria-label={m.decrease_participants()}
+                        class="h-8 w-8"
+                    >
+                        <Minus size={14} />
+                    </Button>
+
+                    <input
+                        id="participants-count-input"
+                        {...rf.fields.participantsCount.as("number", totalParticipants)}
+                        type="number"
+                        min={contactsHeadcount}
+                        oninput={handleParticipantsInput}
+                        onblur={handleParticipantsBlur}
+                        class="w-16 h-8 text-center font-bold text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onclick={() => updateBaseline(1)}
+                        aria-label={m.increase_participants()}
+                        class="h-8 w-8"
+                    >
+                        <Plus size={14} />
+                    </Button>
+                </div>
+            </div>
         {/snippet}
 
         {#snippet renderForm({
@@ -2215,7 +2360,7 @@
     <input
         {...rf.fields.contactIds.as(
             "text",
-            JSON.stringify(initialData?.contactIds || []),
+            JSON.stringify(currentContactIds),
         )}
         class="hidden"
     />

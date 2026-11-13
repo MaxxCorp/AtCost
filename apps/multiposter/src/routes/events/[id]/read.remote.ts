@@ -261,7 +261,9 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		return {
 			...contactObj,
 			roles: contactRolesMap.get(contactObj.id) || [],
-			participationStatus: c.participationStatus || 'needsAction'
+			participationStatus: c.participationStatus || 'needsAction',
+			partySize: c.partySize ?? 1,
+			notifyOnChanges: Boolean(c.notifyOnChanges || contactObj.notifyOnChanges)
 		};
 	}).filter((c: any) => c && c.id);
 

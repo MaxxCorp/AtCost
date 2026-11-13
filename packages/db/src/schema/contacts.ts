@@ -20,6 +20,7 @@ export const contact = pgTable("contact", {
     gender: text("gender"),
     notes: text("notes"),
     isPublic: boolean("is_public").default(false).notNull(),
+    notifyOnChanges: boolean("notify_on_changes").default(false).notNull(),
     vCardPath: text("vcard_path"),
     qrCodePath: text("qrcode_path"),
     fingerprints: jsonb("fingerprints").$type<Record<string, string>>().default({}).notNull(),

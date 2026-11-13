@@ -31,6 +31,7 @@ import {
     recordPersonnelMutation,
     encryptPersonnelPayload,
     decryptContactRecord,
+    syncContactEncryption,
     type CustomOnboardingFieldDef,
     type InterviewCompetencyDef,
 } from "@ac/db";
@@ -929,6 +930,17 @@ export async function submitApplicantIntakeService(
         changeSummary: `Initial application & contact profile created (${resolvedJobTitle}) via ${channel}`,
     });
 
+    await syncContactEncryption(
+        result.contact.id,
+        {
+            userId: actor?.userId || `applicant:${input.email.trim().toLowerCase()}`,
+            name: actor?.name || displayName,
+            email: actor?.email || input.email.trim().toLowerCase(),
+            role: actor?.role || "applicant",
+        },
+        "submitJobApplicationService",
+    );
+
     return {
         success: true,
         talentId: result.talent.id,
@@ -1248,6 +1260,17 @@ export async function submitOnboardingAndPayrollService(
             primary: true,
         });
     }
+
+    await syncContactEncryption(
+        existingTalent.contactId,
+        {
+            userId: actor?.userId || `candidate:${resolvedTalentId}`,
+            name: actor?.name || displayName,
+            email: actor?.email || primaryEmail,
+            role: actor?.role || "candidate",
+        },
+        "submitOnboardingService",
+    );
 
     // 2. Resolve default HMO / BG if not explicitly provided so payroll engine has complete insurer references
     let resolvedHmoId = input.hmoId || existingTalent.payrollProfile?.hmoId || null;

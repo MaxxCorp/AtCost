@@ -1,0 +1,1 @@
+ALTER TABLE "contact" ADD COLUMN "notify_on_changes" boolean DEFAULT false NOT NULL;

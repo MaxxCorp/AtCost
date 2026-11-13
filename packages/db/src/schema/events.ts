@@ -53,6 +53,7 @@ export const event = pgTable("event", {
     heroImage: text("hero_image"),
     attendees: jsonb("attendees"),
     participantsCount: integer("participants_count").default(0).notNull(),
+    signUpMode: text("sign_up_mode", { enum: ["off", "recommended", "required"] }).default("off").notNull(),
     reminders: jsonb("reminders").$type<{ useDefault?: boolean; overrides?: any[] }>(),
     fingerprints: jsonb("fingerprints").$type<Record<string, string>>().default({}).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -65,6 +66,9 @@ export const eventContact = pgTable("event_contact", {
     eventId: uuid("event_id").notNull().references(() => event.id, { onDelete: "cascade" }),
     contactId: uuid("contact_id").notNull().references(() => contact.id, { onDelete: "cascade" }),
     participationStatus: text("participation_status").default("needsAction").notNull(),
+    partySize: integer("party_size").default(1).notNull(),
+    notifyOnChanges: boolean("notify_on_changes").default(false).notNull(),
+    newsletterSubscribed: boolean("newsletter_subscribed").default(false).notNull(),
 }, (table) => [primaryKey({ columns: [table.eventId, table.contactId] })]);
 
 export const eventLocation = pgTable("event_location", {

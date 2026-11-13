@@ -53,6 +53,7 @@
         renderForm?: Snippet<[any]>;
         rolesSnippet?: Snippet<[T]>;
         participationSnippet?: Snippet<[T]>;
+        footerSnippet?: Snippet;
         toolbarActions?: Snippet<[{ items: any[]; count: number }]> | Snippet;
 
         // Search & Sort
@@ -117,6 +118,7 @@
         renderForm: customRenderForm,
         rolesSnippet,
         participationSnippet,
+        footerSnippet,
         toolbarActions,
         searchPredicate = matchContactSearch,
         sortField = "displayName",
@@ -159,6 +161,8 @@
                 return {
                     ...item.contact,
                     participationStatus: item.participationStatus ?? item.contact.participationStatus,
+                    partySize: item.partySize ?? item.contact.partySize ?? 1,
+                    notifyOnChanges: item.notifyOnChanges ?? item.contact.notifyOnChanges ?? false,
                     roles: item.roles ?? item.contact.roles,
                 };
             }
@@ -192,6 +196,7 @@
     {sortField}
     {sortOrder}
     {showQuickCreateButton}
+    {footerSnippet}
     linkItemLabel={linkItemLabel ?? (m?.link_item_label ? m.link_item_label({ item: resolvedTitle }) : undefined)}
     changeItemLabel={changeItemLabel ?? (m?.change_item_label ? m.change_item_label({ item: resolvedTitle }) : (m?.change_contact ? m.change_contact() : undefined))}
     associatedItemLabel={associatedItemLabel ?? (m?.associated_item_label ? m.associated_item_label({ item: resolvedTitle }) : undefined)}

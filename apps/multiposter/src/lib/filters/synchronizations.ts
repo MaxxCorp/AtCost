@@ -86,6 +86,10 @@ export function matchesContactParticipantRules(contactOrAssoc: any, settings: Re
 
     const includePublic = settings.includePublicContacts === true || settings.includePublicContacts === 'true';
     const includeNonPublic = settings.includeNonPublicContacts === true || settings.includeNonPublicContacts === 'true';
+    const includeNotifyOnChanges = settings.includeNotifyOnChangesContacts !== undefined
+        ? (settings.includeNotifyOnChangesContacts === true || settings.includeNotifyOnChangesContacts === 'true')
+        : true;
+    const hasNotifyConsent = contactOrAssoc.notifyOnChanges === true || c.notifyOnChanges === true;
 
     let matchesPrivacyScope = false;
     if (isEmployee && includeEmployee) {
@@ -93,6 +97,8 @@ export function matchesContactParticipantRules(contactOrAssoc: any, settings: Re
     } else if (isPublic && includePublic) {
         matchesPrivacyScope = true;
     } else if (!isEmployee && !isPublic && includeNonPublic) {
+        matchesPrivacyScope = true;
+    } else if (hasNotifyConsent && includeNotifyOnChanges) {
         matchesPrivacyScope = true;
     }
 
@@ -264,6 +270,7 @@ export interface DerivedRecipientContact {
     familyName?: string;
     company?: string;
     isPublic?: boolean;
+    notifyOnChanges?: boolean;
     emails?: Array<{ value: string; primary?: boolean; type?: string }>;
     tags?: any[];
     eventCount: number;
@@ -303,6 +310,9 @@ export function getDerivedEventContacts(events: any[], settings: Record<string, 
                     existing.eventTitles.push(title);
                 }
                 if (isEmployee) existing.isEmployee = true;
+                if (assoc.notifyOnChanges === true || c.notifyOnChanges === true) {
+                    existing.notifyOnChanges = true;
+                }
             } else {
                 contactsMap.set(c.id, {
                     id: c.id,
@@ -311,6 +321,7 @@ export function getDerivedEventContacts(events: any[], settings: Record<string, 
                     familyName: c.familyName,
                     company: c.company,
                     isPublic: c.isPublic === true,
+                    notifyOnChanges: assoc.notifyOnChanges === true || c.notifyOnChanges === true,
                     emails: c.emails || [],
                     tags: c.tags || [],
                     eventCount: 1,

@@ -1970,15 +1970,27 @@ export class SyncService {
 			const allowNonPublicContacts =
 				config?.settings?.includeNonPublicContacts === true ||
 				config?.settings?.includeNonPublicContacts === 'true';
+			const includeNotifyOnChanges =
+				config?.settings?.includeNotifyOnChangesContacts !== undefined
+					? (config.settings.includeNotifyOnChangesContacts === true ||
+						config.settings.includeNotifyOnChangesContacts === 'true')
+					: true;
 
 			// Filter and sync associated contacts based on configuration rules (roles, tags, employee-only)
 			for (const contact of associatedContacts) {
 				if ((contact as any)?.obfuscationStatus === 'obfuscated') continue;
 				if (this.shouldSyncContactForEvent(contact, config)) {
+					const hasNotifyConsent =
+						Boolean((contact as any)?.notifyOnChanges) ||
+						Boolean((contact as any)?.contact?.notifyOnChanges);
+					const allowNonWorkEmail =
+						allowNonPublicContacts ||
+						isEmployeeContact(contact) ||
+						(hasNotifyConsent && includeNotifyOnChanges);
 					const rawEmails = ((contact as any).emails || []) as any[];
 					const workEmails = filterWorkEmails(rawEmails);
-					// Prefer work email; for non-employee public contacts when non-public contacts are disallowed, strictly require work email
-					const email = !allowNonPublicContacts && !isEmployeeContact(contact)
+					// Prefer work email; for non-employee public contacts when non-public/consented personal details are disallowed, strictly require work email
+					const email = !allowNonWorkEmail
 						? (workEmails.find((e: any) => e.primary)?.value || workEmails[0]?.value)
 						: (workEmails.find((e: any) => e.primary)?.value ||
 							workEmails[0]?.value ||
@@ -3778,12 +3790,21 @@ export function shouldSyncContactForEvent(contact: any, config?: SyncConfig): bo
 		? settings.includeNonPublicContacts === true
 		: isLegacyAllowAll;
 
+	const includeNotifyOnChanges = settings.includeNotifyOnChangesContacts !== undefined
+		? (settings.includeNotifyOnChangesContacts === true || settings.includeNotifyOnChangesContacts === 'true')
+		: true;
+
+	const hasNotifyConsent =
+		contact.notifyOnChanges === true || contact.contact?.notifyOnChanges === true;
+
 	let matchesPrivacyScope = false;
 	if (isEmployee && includeEmployee) {
 		matchesPrivacyScope = true;
 	} else if (isPublic && includePublic) {
 		matchesPrivacyScope = true;
 	} else if (!isEmployee && !isPublic && includeNonPublic) {
+		matchesPrivacyScope = true;
+	} else if (hasNotifyConsent && includeNotifyOnChanges) {
 		matchesPrivacyScope = true;
 	}
 

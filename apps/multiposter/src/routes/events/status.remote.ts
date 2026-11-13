@@ -90,6 +90,10 @@ export const updateEventsStatus = command(
 								ticketPriceUnknown: master.ticketPriceUnknown,
 								currency: master.currency ?? 'EUR',
 								categoryBerlinDotDe: master.categoryBerlinDotDe,
+								participantsCount: master.participantsCount,
+								signUpMode: master.signUpMode,
+								prepMinutes: master.prepMinutes,
+								teardownMinutes: master.teardownMinutes,
 							})
 							.returning();
 						affectedEventIds.push(newException.id);
@@ -105,7 +109,14 @@ export const updateEventsStatus = command(
 						}
 						const masterCtcs = await db.select().from(eventContact).where(eq(eventContact.eventId, masterId));
 						if (masterCtcs.length > 0) {
-							await db.insert(eventContact).values(masterCtcs.map((c) => ({ eventId: newException.id, contactId: c.contactId, participationStatus: c.participationStatus })));
+							await db.insert(eventContact).values(masterCtcs.map((c) => ({
+								eventId: newException.id,
+								contactId: c.contactId,
+								participationStatus: c.participationStatus,
+								partySize: c.partySize,
+								notifyOnChanges: c.notifyOnChanges,
+								newsletterSubscribed: c.newsletterSubscribed
+							})));
 						}
 						const masterRoles = await db.select().from(eventContactRole).where(eq(eventContactRole.eventId, masterId));
 						if (masterRoles.length > 0) {

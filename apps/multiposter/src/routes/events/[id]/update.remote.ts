@@ -14,6 +14,7 @@ import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '#lib/server/cache/index.js';
 import { hasVirtualInstanceChanged } from '#lib/server/events/exceptions.js';
+import { getStoredEventContactsHeadcount, reconcileEventParticipantsCount } from '#lib/server/events/participants.js';
 import { isSeriesItem } from '#lib/utils/event-series.js';
 import * as m from '#lib/paraglide/messages.js';
 
@@ -141,6 +142,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
 		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
 		if (data.participantsCount !== undefined) updateData.participantsCount = Number(data.participantsCount) || 0;
+		if (data.signUpMode !== undefined) updateData.signUpMode = data.signUpMode || 'off';
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
@@ -494,17 +496,38 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 
 				// Contacts
 				if (contactIds !== undefined) {
+					const existingAssocs = await client.select().from(eventContact).where(eq(eventContact.eventId, targetEventId));
+					const existingAssocMap = new Map<string, any>(existingAssocs.map((a: any) => [a.contactId, a]));
 					await client.delete(eventContact).where(eq(eventContact.eventId, targetEventId));
 					if (contactIds.length > 0) {
 						await client.insert(eventContact).values(
-							contactIds.map((id: string) => ({ eventId: targetEventId, contactId: id }))
+							contactIds.map((id: string) => {
+								const prev = existingAssocMap.get(id);
+								return {
+									eventId: targetEventId,
+									contactId: id,
+									...(prev ? {
+										participationStatus: prev.participationStatus,
+										partySize: prev.partySize,
+										notifyOnChanges: prev.notifyOnChanges,
+										newsletterSubscribed: prev.newsletterSubscribed
+									} : {})
+								};
+							})
 						);
 					}
 				} else if (isNewException && instMasterId) {
 					const masterCtcs = await client.select().from(eventContact).where(eq(eventContact.eventId, instMasterId));
 					if (masterCtcs.length > 0) {
 						await client.insert(eventContact).values(
-							masterCtcs.map((c: any) => ({ eventId: targetEventId, contactId: c.contactId, participationStatus: c.participationStatus }))
+							masterCtcs.map((c: any) => ({
+								eventId: targetEventId,
+								contactId: c.contactId,
+								participationStatus: c.participationStatus,
+								partySize: c.partySize,
+								notifyOnChanges: c.notifyOnChanges,
+								newsletterSubscribed: c.newsletterSubscribed
+							}))
 						);
 					}
 				}
@@ -534,6 +557,35 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 						await client.insert(eventContactRole).values(
 							masterRoles.map((r: any) => ({ eventId: targetEventId, contactId: r.contactId, roleId: r.roleId }))
 						);
+					}
+				}
+
+				if (data.contactPartySizesJson !== undefined) {
+					try {
+						const partySizesMap: Record<string, number> = data.contactPartySizesJson ? JSON.parse(data.contactPartySizesJson) : {};
+						for (const [cId, size] of Object.entries(partySizesMap)) {
+							const clampedSize = Math.max(1, Math.trunc(Number(size) || 1));
+							await client.update(eventContact)
+								.set({ partySize: clampedSize })
+								.where(and(eq(eventContact.eventId, targetEventId), eq(eventContact.contactId, cId)));
+						}
+					} catch (err) {
+						console.error('Failed to parse or update contact party sizes:', err);
+					}
+				}
+
+				if (data.contactParticipationStatusesJson !== undefined) {
+					try {
+						const statusesMap: Record<string, string> = data.contactParticipationStatusesJson ? JSON.parse(data.contactParticipationStatusesJson) : {};
+						for (const [cId, status] of Object.entries(statusesMap)) {
+							if (typeof status === 'string' && status.trim()) {
+								await client.update(eventContact)
+									.set({ participationStatus: status.trim() })
+									.where(and(eq(eventContact.eventId, targetEventId), eq(eventContact.contactId, cId)));
+							}
+						}
+					} catch (err) {
+						console.error('Failed to parse or update contact participation statuses:', err);
 					}
 				}
 
@@ -580,7 +632,14 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			};
 
 			// Update Associations for Target Event
+			const previousContactsHeadcount = data.participantsCount === undefined
+				? await getStoredEventContactsHeadcount(tx, isNewException && instMasterId ? instMasterId : targetId)
+				: undefined;
 			await linkAssociations(targetId, tx);
+			await reconcileEventParticipantsCount(tx, targetId, {
+				submittedCount: data.participantsCount,
+				previousContactsHeadcount,
+			});
 
 			// Clean up legacy series record if recurrence was explicitly cleared
 			if (data.recurrence === null || (Array.isArray(data.recurrence) && data.recurrence.length === 0)) {

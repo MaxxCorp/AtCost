@@ -1585,6 +1585,9 @@ export async function restorePersonnelVersion(params: {
                 updatedAt: new Date(),
             })
             .where(eq(contact.id, currentTalent.contactId));
+
+        const { syncContactEncryption } = await import("./contact-encryption.js");
+        await syncContactEncryption(currentTalent.contactId, params.actor, "restorePersonnelVersion");
     }
 
     const mutationResult = await recordPersonnelMutation({

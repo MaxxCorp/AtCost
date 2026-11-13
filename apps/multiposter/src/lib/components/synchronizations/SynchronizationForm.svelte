@@ -483,6 +483,13 @@
 			return "staff"; // Default: internal staff only
 		})
 	);
+	let includeNotifyOnChangesContacts = $state<boolean>(
+		untrack(() => {
+			const val = initialData?.settings?.includeNotifyOnChangesContacts;
+			if (val !== undefined) return val === true || val === "true" || val === 1;
+			return true; // Default: active for guests/contacts who requested event updates
+		})
+	);
 
 	let showPrivacyFineTuning = $state<boolean>(false);
 
@@ -493,7 +500,8 @@
 	);
 
 	const activePrivacyPreset = $derived.by<"staff" | "staff_public" | "public_only" | "all" | "none" | "custom">(() => {
-		if (!allowNonPublicContacts && !includePublicContacts) return "none";
+		if (!allowNonPublicContacts && !includePublicContacts && !includeNotifyOnChangesContacts) return "none";
+		if (!allowNonPublicContacts && !includePublicContacts && includeNotifyOnChangesContacts) return "custom";
 		if (allowNonPublicContacts && nonPublicScope === "staff" && !includePublicContacts) return "staff";
 		if (allowNonPublicContacts && nonPublicScope === "staff" && includePublicContacts) return "staff_public";
 		if (!allowNonPublicContacts && includePublicContacts) return "public_only";
@@ -908,6 +916,7 @@
 		includeEmployeeContacts,
 		includePublicContacts,
 		includeNonPublicContacts,
+		includeNotifyOnChangesContacts,
 		onlyEmployeeContacts: onlyEmployeeContactsDerived,
 		participantRoleFilterMode,
 		includedContactRoles: participantRoleFilterMode === 'include' ? includedContactRoles : [],
@@ -2939,6 +2948,33 @@
 						</button>
 					</div>
 
+					<!-- Consent-Based Event Update Guests & Contacts (Active by Default) -->
+					<div class="p-3.5 rounded-xl border transition-colors {includeNotifyOnChangesContacts ? 'bg-emerald-50/70 border-emerald-300' : 'bg-white/70 border-gray-200'}">
+						<label class="flex items-start gap-3 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={includeNotifyOnChangesContacts}
+								onchange={(e) => {
+									includeNotifyOnChangesContacts = e.currentTarget.checked;
+								}}
+								class="mt-0.5 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+							/>
+							<div class="flex-1">
+								<div class="flex items-center justify-between gap-2">
+									<span class="font-semibold text-xs text-gray-900">
+										{m.sync_participants_notify_consent()}
+									</span>
+									<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded {includeNotifyOnChangesContacts ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">
+										{includeNotifyOnChangesContacts ? 'Active (Default)' : 'Disabled'}
+									</span>
+								</div>
+								<p class="text-[11px] text-gray-600 mt-0.5 leading-relaxed">
+									{m.sync_participants_notify_consent_desc()}
+								</p>
+							</div>
+						</label>
+					</div>
+
 					<!-- Fine-tuning disclosure toggle -->
 					<div class="pt-1">
 						<button
@@ -3054,7 +3090,7 @@
 									{/if}
 								</div>
 
-								{#if !includePublicContacts && !allowNonPublicContacts}
+								{#if !includePublicContacts && !allowNonPublicContacts && !includeNotifyOnChangesContacts}
 									<div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
 										<AlertCircle class="w-4 h-4 text-amber-600 shrink-0" />
 										<span>No contact categories are selected. Zero participants will be synchronized.</span>
@@ -3423,6 +3459,11 @@
 									<span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 font-medium">
 										{c.eventCount}x
 									</span>
+									{#if c.notifyOnChanges}
+										<span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-medium">
+											Updates
+										</span>
+									{/if}
 								</span>
 							{/each}
 							{#if previewDerivedContacts.length > 12}
@@ -3451,6 +3492,9 @@
 		{/if}
 		{#if fields?.settings?.includeNonPublicContacts}
 			<input {...fields.settings.includeNonPublicContacts.as("hidden", String(includeNonPublicContacts))} />
+		{/if}
+		{#if fields?.settings?.includeNotifyOnChangesContacts}
+			<input {...fields.settings.includeNotifyOnChangesContacts.as("hidden", String(includeNotifyOnChangesContacts))} />
 		{/if}
 		{#if fields?.settings?.participantRoleFilterMode}
 			<input {...fields.settings.participantRoleFilterMode.as("hidden", participantRoleFilterMode)} />

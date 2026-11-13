@@ -24,7 +24,7 @@
         Check,
     } from "@lucide/svelte";
     import { page as pageState } from "$app/state";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import { listTalents } from "./list.remote";
     import { deleteTalent } from "./[id]/delete.remote";
     import { bulkDeleteTalents } from "./talents.remote";
@@ -92,6 +92,12 @@
     const talentsQuery = $derived(listTalents(filterState));
     const talentsRes = $derived(talentsQuery.current);
     const talentItems = $derived(talentsRes?.data ?? []);
+
+    afterNavigate(({ from }) => {
+        if (from) {
+            void talentsQuery.refresh();
+        }
+    });
 
     async function handleBulkDelete() {
         if (selectedIds.length === 0) return;

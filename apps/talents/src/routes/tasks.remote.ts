@@ -1,6 +1,12 @@
-import { query, form, command } from '$app/server';
-import { db, task, getSubordinateTree, getDirectReports, eq, and, or, desc, asc, inArray, isNull, obfuscateContact } from '@ac/db';
+import { query, form, command, requested } from '$app/server';
+import { db, task, talent, getSubordinateTree, getDirectReports, eq, and, or, desc, asc, inArray, isNull, obfuscateContact } from '@ac/db';
 import { getAuthenticatedUser, getOptionalUser, parseRoles } from '#lib/server/authorization.js';
+import { invalidateContact, invalidateTalent } from '#lib/server/cache/index.js';
+import { listContacts } from './contacts/list.remote.js';
+import { readContact } from './contacts/[id]/read.remote.js';
+import { listGdprRequests } from './contacts/obfuscations/obfuscations.remote.js';
+import { listTalents } from './talents/list.remote.js';
+import { readTalent } from './talents/[id]/read.remote.js';
 import * as v from 'valibot';
 import { getMyTalentIdCore } from '#lib/server/timesheets/service.js';
 import {
@@ -233,6 +239,34 @@ export const executeGdprObfuscationTask = command(executeObfuscationSchema, asyn
 
     const result = await obfuscateContact(data.contactId, user.id, data.notes);
 
+    await invalidateContact(data.contactId);
+    const linkedTalents = await db
+        .select({ id: talent.id })
+        .from(talent)
+        .where(eq(talent.contactId, data.contactId));
+    if (linkedTalents.length > 0) {
+        await invalidateTalent(linkedTalents.map((t) => t.id));
+        for (const t of linkedTalents) {
+            void readTalent(t.id).refresh();
+        }
+    }
+
+    try {
+        await requested(listTasks, 20).refreshAll();
+        await requested(listCompletedTasks, 20).refreshAll();
+        await requested(listGdprRequests, 20).refreshAll();
+        await requested(listContacts, 20).refreshAll();
+        await requested(listTalents, 20).refreshAll();
+    } catch { /* ignore */ }
+
+    void readContact(data.contactId).refresh();
+    void listContacts().refresh();
+    void listContacts({}).refresh();
+    void listTalents().refresh();
+    void listTalents({}).refresh();
+    void listGdprRequests().refresh();
+    void listGdprRequests({}).refresh();
+    void listGdprRequests({ status: 'all' }).refresh();
     void listTasks().refresh();
     void listCompletedTasks().refresh();
 

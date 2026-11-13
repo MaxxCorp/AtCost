@@ -1,9 +1,10 @@
 import { form } from '$app/server';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, encryptSingleContact } from '@ac/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, syncContactEncryption } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { unifiedTalentSchema } from '@ac/validations';
 import { readTalent } from './read.remote';
 import { listTalents } from '../list.remote';
+import { checkContactEncryptionStatus } from '../../contacts/encryption-migration.remote';
 
 export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ success: boolean; id?: string; error?: string }> => {
     const authUser = getAuthenticatedUser();
@@ -120,32 +121,24 @@ export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             return { talentId, contactId };
         });
 
-        // Re-encrypt contact envelope if contact is migrated
-        if (result.contactId) {
-            try {
-                const [existing] = await db
-                    .select({ encryptionStatus: contact.encryptionStatus })
-                    .from(contact)
-                    .where(eq(contact.id, result.contactId))
-                    .limit(1);
-                if (existing?.encryptionStatus === 'migrated') {
-                    await encryptSingleContact(result.contactId, {
-                        userId: authUser.id,
-                        name: (authUser as any).name || authUser.email,
-                        email: authUser.email,
-                        role: 'user',
-                    });
-                }
-            } catch (encErr) {
-                console.warn('[updateTalent] Envelope re-encryption notice:', encErr);
-            }
-        }
+        // Encrypt / re-encrypt contact envelope at rest (skips GDPR-shredded contacts)
+        await syncContactEncryption(
+            result.contactId,
+            {
+                userId: authUser.id,
+                name: (authUser as any).name || authUser.email,
+                email: authUser.email,
+                role: Array.isArray((authUser as any).roles) ? (authUser as any).roles[0] : 'user',
+            },
+            'updateTalent',
+        );
 
         // Refresh the detail view and list to ensure client-side data is in sync
         if (result.talentId) {
             void readTalent(result.talentId).refresh();
         }
         void listTalents().refresh();
+        void checkContactEncryptionStatus().refresh();
 
         return { success: true, id: result.talentId };
     } catch (err: any) {

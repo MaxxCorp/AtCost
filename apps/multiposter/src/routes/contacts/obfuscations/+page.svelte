@@ -5,7 +5,7 @@
 
     breadcrumbState.set({ feature: 'contacts', current: 'DSGVO Obfuskierung' });
 
-    const requestsQuery = listGdprRequests();
+    const requestsQuery = listGdprRequests({ status: 'all' });
 </script>
 
 <svelte:head>

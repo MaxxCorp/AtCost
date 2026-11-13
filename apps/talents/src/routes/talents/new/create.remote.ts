@@ -1,8 +1,9 @@
 import { form } from '$app/server';
-import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql } from '@ac/db';
+import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, syncContactEncryption } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { unifiedTalentSchema } from '@ac/validations';
 import { listTalents } from '../list.remote';
+import { checkContactEncryptionStatus } from '../../contacts/encryption-migration.remote';
 
 export const createTalent = form(unifiedTalentSchema, async (data): Promise<{ success: boolean; id?: string; error?: string }> => {
     const authUser = getAuthenticatedUser();
@@ -116,10 +117,22 @@ export const createTalent = form(unifiedTalentSchema, async (data): Promise<{ su
                 }
             }
 
-            return { talentId };
+            return { talentId, contactId };
         });
 
+        await syncContactEncryption(
+            result.contactId,
+            {
+                userId: authUser.id,
+                name: (authUser as any).name || authUser.email,
+                email: authUser.email,
+                role: Array.isArray((authUser as any).roles) ? (authUser as any).roles[0] : 'user',
+            },
+            'createTalent',
+        );
+
         await listTalents().refresh();
+        void checkContactEncryptionStatus().refresh();
         return { success: true, id: result.talentId };
     } catch (err: any) {
         return { success: false, error: err.message || 'Creation failed' };

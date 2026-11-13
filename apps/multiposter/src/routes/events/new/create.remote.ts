@@ -12,6 +12,7 @@ import { syncService } from '#lib/server/sync/service.js';
 import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '#lib/server/cache/index.js';
+import { reconcileEventParticipantsCount } from '#lib/server/events/participants.js';
 import * as m from '#lib/paraglide/messages.js';
 
 export const createEvent = form(createEventSchema, async (data) => {
@@ -198,6 +199,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 			exdates: [],
 			attendees: (data.attendees as any) || null,
 			participantsCount,
+			signUpMode: data.signUpMode || 'off',
 			reminders: reminders as any,
 			isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
 			heroImage: data.heroImage || null,
@@ -235,10 +237,24 @@ export const createEvent = form(createEventSchema, async (data) => {
 
 			// Contacts
 			const contactIds = typeof data.contactIds === 'string' ? JSON.parse(data.contactIds) : data.contactIds;
+			let partySizesMap: Record<string, number> = {};
+			if (data.contactPartySizesJson) {
+				try {
+					partySizesMap = JSON.parse(data.contactPartySizesJson);
+				} catch { /* ignore */ }
+			}
+			let statusesMap: Record<string, string> = {};
+			if (data.contactParticipationStatusesJson) {
+				try {
+					statusesMap = JSON.parse(data.contactParticipationStatusesJson);
+				} catch { /* ignore */ }
+			}
 			if (contactIds && Array.isArray(contactIds) && contactIds.length > 0) {
 				const associations = (contactIds as string[]).map((contactId: string) => ({
 					eventId: targetEventId,
 					contactId,
+					partySize: Math.max(1, Math.trunc(Number(partySizesMap[contactId]) || 1)),
+					...(statusesMap[contactId] ? { participationStatus: String(statusesMap[contactId]) } : {}),
 				}));
 				await db.insert(eventContact).values(associations);
 			}
@@ -295,6 +311,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 
 		// Link associations for master event
 		await linkAssociations(newEvent.id);
+		await reconcileEventParticipantsCount(db, newEvent.id, { submittedCount: participantsCount });
 
 		// Determine origin for asset generation
 		let origin: string | undefined;

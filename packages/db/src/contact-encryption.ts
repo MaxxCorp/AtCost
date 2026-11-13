@@ -7,7 +7,7 @@ import {
     personnelLedgerBlock,
     type EncryptedEnvelopePayload,
 } from "./schema/index.js";
-import { eq, or, isNull, sql } from "drizzle-orm";
+import { eq, ne, and, or, isNull, sql } from "drizzle-orm";
 import {
     ensureRecruitmentSchema,
     encryptPersonnelPayload,
@@ -30,6 +30,16 @@ export interface ActorContext {
     role?: string | null;
 }
 
+function getUnencryptedContactCondition() {
+    return and(
+        ne(contact.encryptionStatus, "shredded"),
+        or(
+            isNull(contact.encryptedEnvelope),
+            eq(contact.encryptionStatus, "plaintext"),
+        ),
+    );
+}
+
 /**
  * Checks how many contact records in the database are currently unencrypted.
  */
@@ -43,12 +53,7 @@ export async function checkContactEncryptionStatus(): Promise<ContactEncryptionS
     const [unencryptedRow] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(contact)
-        .where(
-            or(
-                isNull(contact.encryptedEnvelope),
-                eq(contact.encryptionStatus, "plaintext"),
-            ),
-        );
+        .where(getUnencryptedContactCondition());
 
     const [migratedRow] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -92,6 +97,10 @@ export async function encryptSingleContact(
         throw new Error(`Contact ${contactId} not found`);
     }
 
+    if (contactRow.encryptionStatus === "shredded") {
+        return { success: false, contactId };
+    }
+
     // 1. Build comprehensive sensitive payload
     const payload = {
         displayName: contactRow.displayName || "",
@@ -100,13 +109,18 @@ export async function encryptSingleContact(
         middleName: contactRow.middleName || "",
         honorificPrefix: contactRow.honorificPrefix || "",
         honorificSuffix: contactRow.honorificSuffix || "",
-        birthday: contactRow.birthday ? contactRow.birthday.toISOString() : null,
+        birthday: contactRow.birthday
+            ? contactRow.birthday instanceof Date
+                ? contactRow.birthday.toISOString()
+                : String(contactRow.birthday)
+            : null,
         gender: contactRow.gender || "",
         company: contactRow.company || "",
         role: contactRow.role || "",
         department: contactRow.department || "",
         notes: contactRow.notes || "",
         isPublic: !!contactRow.isPublic,
+        notifyOnChanges: !!contactRow.notifyOnChanges,
         emails: (contactRow.emails || []).map((e) => ({
             value: e.value,
             type: e.type || "work",
@@ -178,7 +192,7 @@ export async function encryptSingleContact(
             operation: "update",
             channel: "system_automation",
             actor: actorInfo,
-            beforeState: { encryptionStatus: "plaintext" },
+            beforeState: { encryptionStatus: contactRow.encryptionStatus },
             afterState: { encryptionStatus: "migrated", envelopeVersion: envelope.envelopeVersion },
             changeSummary: `Encrypted contact ${contactRow.displayName || contactId} at rest using AES-256-GCM envelope`,
         });
@@ -187,6 +201,25 @@ export async function encryptSingleContact(
     }
 
     return { success: true, contactId };
+}
+
+/**
+ * Ensures a contact record is encrypted at rest after creation or mutation.
+ * Skips GDPR-shredded contacts and logs warnings instead of failing the primary mutation.
+ */
+export async function syncContactEncryption(
+    contactId: string | null | undefined,
+    actor?: ActorContext,
+    context = "syncContactEncryption",
+): Promise<boolean> {
+    if (!contactId) return false;
+    try {
+        const result = await encryptSingleContact(contactId, actor);
+        return result.success;
+    } catch (err) {
+        console.warn(`[${context}] Envelope encryption notice:`, err);
+        return false;
+    }
 }
 
 /**
@@ -219,6 +252,7 @@ export async function decryptContactRecord<T extends { encryptedEnvelope?: Encry
             role: data.role ?? (record as any).role,
             department: data.department ?? (record as any).department,
             notes: data.notes ?? (record as any).notes,
+            notifyOnChanges: data.notifyOnChanges ?? (record as any).notifyOnChanges,
             emails: data.emails?.length ? data.emails : (record as any).emails,
             phones: data.phones?.length ? data.phones : (record as any).phones,
             addresses: data.addresses?.length ? data.addresses : (record as any).addresses,
@@ -301,12 +335,7 @@ export async function processContactEncryptionBatch(params: {
     const unencryptedContacts = await db
         .select({ id: contact.id })
         .from(contact)
-        .where(
-            or(
-                isNull(contact.encryptedEnvelope),
-                eq(contact.encryptionStatus, "plaintext"),
-            ),
-        )
+        .where(getUnencryptedContactCondition())
         .limit(batchSize);
 
     if (unencryptedContacts.length === 0) {

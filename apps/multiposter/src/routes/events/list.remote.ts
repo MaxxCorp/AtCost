@@ -864,7 +864,9 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			return {
 				...cObj,
 				roles: eventContactRolesMap.get(cObj.id) || [],
-				participationStatus: c.participationStatus || 'needsAction'
+				participationStatus: c.participationStatus || 'needsAction',
+				partySize: c.partySize ?? 1,
+				notifyOnChanges: Boolean(c.notifyOnChanges || cObj.notifyOnChanges)
 			};
 		});
 

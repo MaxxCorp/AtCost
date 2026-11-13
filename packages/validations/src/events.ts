@@ -61,6 +61,68 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 
 import { FilterableIdSchema } from './pagination.js';
 
+export type EventSignUpMode = 'off' | 'recommended' | 'required';
+
+export const eventSignUpSchema = v.pipe(
+	v.object({
+		eventId: v.pipe(v.string(), v.minLength(1)),
+		givenName: v.pipe(v.string(), v.trim(), v.minLength(1, 'First name is required')),
+		familyName: v.pipe(v.string(), v.trim(), v.minLength(1, 'Last name is required')),
+		emails: v.optional(
+			v.array(
+				v.union([
+					v.pipe(v.string(), v.trim(), v.email('Please enter a valid email address')),
+					v.pipe(v.string(), v.trim(), v.length(0))
+				])
+			),
+			[]
+		),
+		phones: v.optional(v.array(v.pipe(v.string(), v.trim())), []),
+		partySize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), 1),
+		notifyOnChanges: v.optional(v.boolean(), false),
+		subscribeLocationNewsletter: v.optional(v.boolean(), false),
+		existingContactId: v.optional(v.pipe(v.string(), v.uuid())),
+	}),
+	v.check((input) => {
+		if (input.notifyOnChanges || input.subscribeLocationNewsletter) {
+			return (input.emails ?? []).some((e) => e.trim().length > 0);
+		}
+		return true;
+	}, 'A valid email address is required to receive event updates or location newsletters.')
+);
+
+export const lookupEventReservationSchema = v.pipe(
+	v.object({
+		eventId: v.pipe(v.string(), v.minLength(1)),
+		email: v.optional(
+			v.union([
+				v.pipe(v.string(), v.trim(), v.email('Please enter a valid email address')),
+				v.pipe(v.string(), v.trim(), v.length(0))
+			])
+		),
+		phone: v.optional(v.pipe(v.string(), v.trim())),
+	}),
+	v.check((input) => {
+		const hasEmail = Boolean(input.email && input.email.trim().length > 0);
+		const hasPhone = Boolean(input.phone && input.phone.replace(/\D/g, '').length >= 6);
+		return hasEmail || hasPhone;
+	}, 'Please enter an email address or a phone number (at least 6 digits) to look up your reservation.')
+);
+
+export const cancelEventReservationSchema = v.pipe(
+	v.object({
+		eventId: v.pipe(v.string(), v.minLength(1)),
+		contactId: v.pipe(v.string(), v.uuid()),
+		email: v.optional(v.string()),
+		phone: v.optional(v.string()),
+	}),
+	v.check((input) => {
+		const hasEmail = Boolean(input.email && input.email.trim().length > 0);
+		const hasPhone = Boolean(input.phone && input.phone.replace(/\D/g, '').length >= 6);
+		return hasEmail || hasPhone;
+	}, 'Verification email or phone number is required.')
+);
+
 export const eventPaginationSchema = v.optional(v.object({
 	page: v.optional(v.number(), 1),
 	limit: v.optional(v.number(), 50),

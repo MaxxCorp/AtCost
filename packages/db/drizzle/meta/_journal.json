@@ -281,6 +281,27 @@
       "when": 1794078284429,
       "tag": "0039_condemned_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794591706396,
+      "tag": "0040_unknown_texas_twister",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794593278915,
+      "tag": "0041_material_franklin_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794600129643,
+      "tag": "0042_premium_captain_universe",
+      "breakpoints": true
     }
   ]
 }

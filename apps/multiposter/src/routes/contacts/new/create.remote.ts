@@ -2,13 +2,15 @@ import { form, getRequestEvent, requested } from '$app/server';
 import { db } from '@ac/db';
 import {
     contact, contactEmail, contactPhone, contactAddress,
-    contactRelation, tag, contactTag, locationContact
+    contactRelation, tag, contactTag, locationContact, syncContactEncryption
 } from '@ac/db';
 import { createContactSchema, type Contact } from '#lib/validations/contacts.js';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { generateContactAssets } from '#lib/server/contacts.js';
 import { listContacts } from '../list.remote';
+import { checkContactEncryptionStatus } from '../encryption-migration.remote';
 import { invalidateContact } from '#lib/server/cache/index.js';
+import { findMatchingContacts } from '#lib/server/contact-matching.js';
 
 export const createContact = form(createContactSchema, async (input) => {
     try {
@@ -50,6 +52,27 @@ export const createContact = form(createContactSchema, async (input) => {
             locationIds,
         };
 
+        // Duplicate prevention based on email(s) and normalized phone number checks
+        const duplicateMatches = await findMatchingContacts({
+            emails: (emails || []).map((e: any) => e?.value).filter(Boolean),
+            phones: (phones || []).map((p: any) => p?.value).filter(Boolean)
+        });
+        if (duplicateMatches.length > 0) {
+            const first = duplicateMatches[0];
+            const matchName = first.displayName || `${first.givenName || ''} ${first.familyName || ''}`.trim() || 'Existing Contact';
+            return {
+                success: false,
+                error: {
+                    message: `A contact with matching ${first.matchedBy.join(' / ')} already exists: ${matchName}`
+                },
+                duplicateContact: {
+                    id: first.id,
+                    displayName: matchName,
+                    matchedBy: first.matchedBy
+                }
+            };
+        }
+
         // --- Logic from createContact helper ---
         const contactId = await db.transaction(async (tx) => {
             // Insert main contact
@@ -67,7 +90,11 @@ export const createContact = form(createContactSchema, async (input) => {
                 birthday: createData.contact.birthday || null,
                 gender: createData.contact.gender || null,
                 notes: createData.contact.notes || null,
-                isPublic: !!createData.contact.isPublic
+                isPublic: !!createData.contact.isPublic,
+                notifyOnChanges:
+                    createData.contact.notifyOnChanges === true ||
+                    createData.contact.notifyOnChanges === 'true' ||
+                    createData.contact.notifyOnChanges === 'on'
             }).returning({ id: contact.id });
 
             const id = newContact.id;
@@ -147,6 +174,18 @@ export const createContact = form(createContactSchema, async (input) => {
         } catch (e) { /* ignore */ }
         await generateContactAssets(contactId, origin);
 
+        // Encrypt new contact at rest
+        await syncContactEncryption(
+            contactId,
+            {
+                userId: user.id,
+                name: (user as any).name || user.email,
+                email: user.email,
+                role: Array.isArray((user as any).roles) ? (user as any).roles[0] : 'user',
+            },
+            'createContact',
+        );
+
         const newContact = await db.query.contact.findFirst({
             where: (table, { eq }) => eq(table.id, contactId),
             with: {
@@ -196,6 +235,7 @@ export const createContact = form(createContactSchema, async (input) => {
         try { await requested(listContacts, 20).refreshAll(); } catch { /* ignore */ }
         void listContacts().refresh();
         void listContacts({}).refresh();
+        void checkContactEncryptionStatus().refresh();
         return { success: true, id: contactId, contact: transformed };
 
     } catch (err: any) {
