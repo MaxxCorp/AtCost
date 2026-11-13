@@ -26,7 +26,7 @@
     import AsyncButton from "./AsyncButton.svelte";
     import * as Dialog from "./dialog";
     import { toast } from "svelte-sonner";
-    import { getContactDisplayName } from "../utils.js";
+    import { sortItemsList, sortHierarchically } from "../utils/hierarchy.js";
     import { getPreference, setPreference } from "../utils/idb.js";
     import BulkActionToolbar from "./BulkActionToolbar.svelte";
 
@@ -119,6 +119,7 @@
         sortOrder?: "asc" | "desc";
         selectorSortField?: string;
         selectorSortOrder?: "asc" | "desc";
+        hierarchical?: boolean;
 
         // Localization props
         loadingLabel?: string;
@@ -182,6 +183,7 @@
         sortOrder: propSortOrder = undefined,
         selectorSortField = undefined,
         selectorSortOrder = undefined,
+        hierarchical = false,
 
         // Localization defaults
         loadingLabel = `Loading ${title.toLowerCase()}...`,
@@ -400,49 +402,6 @@
             }
         }
         return true;
-    }
-
-    function getItemSortValue(item: any, field: string) {
-        if (!item) return "";
-        if (field === "displayName" || field === "name") {
-            const displayName = getContactDisplayName(item);
-            if (displayName) return displayName.toLowerCase();
-            return (item.name || item.title || item.company || item.id || "").toString().toLowerCase();
-        }
-        return (item[field] ?? "").toString().toLowerCase();
-    }
-
-    function sortItemsList<I>(items: I[], field: string, order: "asc" | "desc"): I[] {
-        if (!items || !Array.isArray(items)) return [];
-        return [...items].sort((a: any, b: any) => {
-            const rawA = a?.[field];
-            const rawB = b?.[field];
-            const numA = rawA !== null && rawA !== undefined && rawA !== "" && !isNaN(Number(rawA)) ? Number(rawA) : null;
-            const numB = rawB !== null && rawB !== undefined && rawB !== "" && !isNaN(Number(rawB)) ? Number(rawB) : null;
-
-            if (numA !== null && numB === null) {
-                return -1;
-            }
-            if (numA === null && numB !== null) {
-                return 1;
-            }
-
-            let cmp = 0;
-            if (numA !== null && numB !== null) {
-                cmp = numA - numB;
-            } else {
-                const valA = getItemSortValue(a, field);
-                const valB = getItemSortValue(b, field);
-                cmp = valA.localeCompare(valB, undefined, { sensitivity: "base", numeric: true });
-            }
-
-            const res = order === "desc" ? -cmp : cmp;
-            if (res !== 0) return res;
-
-            const nameA = getItemSortValue(a, "displayName");
-            const nameB = getItemSortValue(b, "displayName");
-            return nameA.localeCompare(nameB, undefined, { sensitivity: "base", numeric: true });
-        });
     }
 
     function groupItems<I>(
@@ -670,12 +629,16 @@
     );
 
     const currentAssociations = $derived(
-        sortItemsList<T>(rawAssociations, effectiveSortField, effectiveSortOrder)
+        hierarchical
+            ? sortHierarchically<T>(rawAssociations, effectiveSortField, effectiveSortOrder)
+            : sortItemsList<T>(rawAssociations, effectiveSortField, effectiveSortOrder)
     );
 
     const displayedSortedItems = $derived(
         isStandalone
-            ? sortItemsList<T>(rawSelectorData, effectiveSortField, effectiveSortOrder)
+            ? (hierarchical
+                ? sortHierarchically<T>(rawSelectorData, effectiveSortField, effectiveSortOrder)
+                : sortItemsList<T>(rawSelectorData, effectiveSortField, effectiveSortOrder))
             : currentAssociations
     );
 
@@ -691,14 +654,18 @@
     });
 
     const displayedFilteredItems = $derived.by<T[]>(() => {
-        if (isStandalone) {
-            return displayedSearchedItems.filter((i: any) => matchesFilters(i, activeFilters));
-        }
-        return displayedSearchedItems;
+        const filtered = isStandalone
+            ? displayedSearchedItems.filter((i: any) => matchesFilters(i, activeFilters))
+            : displayedSearchedItems;
+        return hierarchical
+            ? sortHierarchically<T>(filtered, effectiveSortField, effectiveSortOrder)
+            : filtered;
     });
 
     const selectorSortedItems = $derived(
-        sortItemsList<T>(rawSelectorData, effectiveSelectorSortField, effectiveSelectorSortOrder)
+        hierarchical
+            ? sortHierarchically<T>(rawSelectorData, effectiveSelectorSortField, effectiveSelectorSortOrder)
+            : sortItemsList<T>(rawSelectorData, effectiveSelectorSortField, effectiveSelectorSortOrder)
     );
 
     const selectorSearchedItems = $derived.by<T[]>(() => {
@@ -713,7 +680,10 @@
     });
 
     const selectorFilteredItems = $derived.by<T[]>(() => {
-        return selectorSearchedItems.filter((i: any) => matchesFilters(i, activeFilters));
+        const filtered = selectorSearchedItems.filter((i: any) => matchesFilters(i, activeFilters));
+        return hierarchical
+            ? sortHierarchically<T>(filtered, effectiveSelectorSortField, effectiveSelectorSortOrder)
+            : filtered;
     });
 
     async function refreshAssociations() {
@@ -1367,17 +1337,20 @@
                     {#if activeSelectorGroupBy}
                         {@const grouped = groupItems(selectorFilteredItems, activeSelectorGroupBy, i18n.unassignedGroupLabel)}
                         {#each grouped as group (group.name)}
+                            {@const groupItemsSorted = hierarchical
+                                ? sortHierarchically<T>(group.items, effectiveSelectorSortField, effectiveSelectorSortOrder)
+                                : group.items}
                             <div class="pt-2.5 pb-1 px-2 first:pt-1 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xs z-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                                 <div class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                                     <GroupIcon size={13} class="text-gray-400 shrink-0" />
                                     <span>{group.name}</span>
                                 </div>
                                 <span class="text-[11px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-full">
-                                    {group.items.length}
+                                    {groupItemsSorted.length}
                                 </span>
                             </div>
                             <div class="space-y-1">
-                                {#each group.items as item (group.name + '-' + item.id)}
+                                {#each groupItemsSorted as item (group.name + '-' + item.id)}
                                     {@render renderSelectorItem(item)}
                                 {/each}
                             </div>

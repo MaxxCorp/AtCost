@@ -1476,6 +1476,7 @@
                 selectorGroupBy={(r: any) => (r.locationNames?.length ? r.locationNames : (r.locationName || m.no_location?.() || "No Location"))}
                 selectorSortField="maxOccupancy"
                 selectorSortOrder="desc"
+                hierarchical={true}
                 groupIcon={MapPin}
                 addAssociationRemote={async (p: any) => {
                     const res = await addResourceAssociation({ ...p, resourceId: p.itemId } as any);
@@ -1533,7 +1534,10 @@
             >
                 {#snippet renderItemLabel(resItem: any)}
                     {@const hasSyncs = hasAllocationCalendars(resItem)}
-                    <span style="padding-left: {(resItem.level || 0) * 12}px" class="inline-flex items-center gap-2 flex-wrap">
+                    <span style="padding-left: {(resItem.level || 0) * 16}px" class="inline-flex items-center gap-2 flex-wrap">
+                        {#if (resItem.level || 0) > 0}
+                            <span class="text-gray-400 select-none text-xs shrink-0" aria-hidden="true">↳</span>
+                        {/if}
                         <span
                             class="inline-block w-[3.5ch] text-right font-mono text-xs text-gray-500 tabular-nums shrink-0"
                             title={resItem.maxOccupancy != null ? `${m.max_occupancy()}: ${resItem.maxOccupancy}` : ""}

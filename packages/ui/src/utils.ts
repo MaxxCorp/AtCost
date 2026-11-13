@@ -57,5 +57,6 @@ export function translateIssue(message: string, m: any): string {
 }
 
 export { matchContactSearch, getContactDisplayName } from "./utils/contacts.js";
+export { getItemSortValue, compareItems, sortItemsList, sortHierarchically } from "./utils/hierarchy.js";
 
 

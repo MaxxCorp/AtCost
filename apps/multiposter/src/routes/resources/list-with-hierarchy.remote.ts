@@ -4,6 +4,7 @@ import { resource, resourceRelation, location, resourceLocation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { PaginationSchema } from '@ac/validations';
+import { sortHierarchically } from '@ac/ui/utils';
 
 
 export type ResourceWithHierarchy = InferSelectModel<typeof resource> & {
@@ -146,30 +147,6 @@ export const listResourcesWithHierarchy = query(PaginationSchema, async (input):
         resource.childIds = childMap.get(id) || [];
     });
 
-    // Calculate levels (BFS from roots)
-    const roots = Array.from(resourceMap.values()).filter(r => r.parentIds.length === 0);
-    const queue: Array<{ id: string; level: number }> = roots.map(r => ({ id: r.id, level: 0 }));
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-        const { id, level } = queue.shift()!;
-        if (visited.has(id)) continue;
-        visited.add(id);
-
-        const resource = resourceMap.get(id);
-        if (resource) {
-            resource.level = level;
-            resource.childIds.forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push({ id: childId, level: level + 1 });
-                }
-            });
-        }
-    }
-
-    // Convert to array and sort by level, then name
-    return Array.from(resourceMap.values()).sort((a, b) => {
-        if (a.level !== b.level) return a.level - b.level;
-        return a.name.localeCompare(b.name);
-    });
+    // Return resources in pre-order hierarchical traversal (children directly beneath parents)
+    return sortHierarchically(Array.from(resourceMap.values()), 'name', 'asc');
 });

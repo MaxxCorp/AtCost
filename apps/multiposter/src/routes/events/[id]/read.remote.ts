@@ -67,7 +67,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 						}
 					}
 				},
-				resources: { with: { resource: { with: { location: true } } } },
+				resources: { with: { resource: { with: { location: true, parentRelations: true, childRelations: true } } } },
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
@@ -114,7 +114,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 							}
 						}
 					},
-					resources: { with: { resource: { with: { location: true } } } },
+					resources: { with: { resource: { with: { location: true, parentRelations: true, childRelations: true } } } },
 					contactRoles: { with: { role: true } },
 					tags: { with: { tag: true } },
 					campaign: true,
@@ -195,7 +195,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 						}
 					}
 				},
-				resources: { with: { resource: { with: { location: true } } } },
+				resources: { with: { resource: { with: { location: true, parentRelations: true, childRelations: true } } } },
 				contactRoles: { with: { role: true } },
 				tags: { with: { tag: true } },
 				campaign: true,
@@ -454,7 +454,14 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	}
 
 	const allLocations = result.locations.map((l: any) => l.location);
-	const allResources = result.resources.map((r: any) => r.resource).filter(Boolean);
+	const allResources = result.resources
+		.map((r: any) => r.resource)
+		.filter(Boolean)
+		.map((res: any) => ({
+			...res,
+			parentIds: (res.parentRelations || []).map((pr: any) => pr.parentResourceId),
+			childIds: (res.childRelations || []).map((cr: any) => cr.childResourceId),
+		}));
 
 	// Full object
 	return {
