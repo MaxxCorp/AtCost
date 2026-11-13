@@ -301,7 +301,7 @@ describe('WpTheEventsCalendarProvider', () => {
 	});
 
 	describe('Hero Image Deduplication & Media ID Assignment', () => {
-		it('passes numeric media ID to The Events Calendar API instead of image URL to prevent duplicate sideloading', async () => {
+		it('passes media ID as a string to The Events Calendar API instead of image URL to prevent duplicate sideloading', async () => {
 			const imageBuffer = Buffer.from('fake-image-bytes');
 			const mockFetch = vi.fn().mockImplementation((url: string, opts?: any) => {
 				const strUrl = decodeURIComponent(String(url));
@@ -356,8 +356,8 @@ describe('WpTheEventsCalendarProvider', () => {
 			expect(eventCreateCall).toBeDefined();
 			const payload = JSON.parse(eventCreateCall![1].body);
 
-			// CRITICAL: image must be the integer attachment ID (555), NEVER the URL string
-			expect(payload.image).toBe(555);
+			// CRITICAL: image must be the attachment ID as a string ('555') — TEC's REST schema requires type 'string', and NOT the URL string
+			expect(payload.image).toBe('555');
 		});
 
 		it('deduplicates image across multiple series instances using in-memory cache without extra network calls', async () => {
@@ -499,7 +499,7 @@ describe('WpTheEventsCalendarProvider', () => {
 			const updateCall = mockFetch.mock.calls.find(call => decodeURIComponent(String(call[0])).includes('/tribe/events/v1/events/300') && call[1]?.method === 'PUT');
 			expect(updateCall).toBeDefined();
 			const payload = JSON.parse(updateCall![1].body);
-			expect(payload.image).toBe(888);
+			expect(payload.image).toBe('888');
 		});
 	});
 });

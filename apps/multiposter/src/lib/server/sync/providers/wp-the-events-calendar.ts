@@ -164,8 +164,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 				mediaData = await this.ensureImage(event.image);
 				if (mediaData) {
 					console.log(`[WP-Sync] Image ensured with ID: ${mediaData.id}`);
-					// Pass WordPress attachment ID to TEC to link existing media without sideloading duplicates
-					wpEventData.image = mediaData.id;
+					// Pass WordPress attachment ID as a string: TEC's REST schema declares 'image' as type 'string' ("image ID or URL")
+					wpEventData.image = String(mediaData.id);
 				} else {
 					console.warn(`[WP-Sync] Failed to ensure image`);
 				}
@@ -264,8 +264,8 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 			if (event.image) {
 				mediaData = await this.ensureImage(event.image);
 				if (mediaData) {
-					// Pass WordPress attachment ID to TEC to link existing media without sideloading duplicates
-					wpEventData.image = mediaData.id;
+					// Pass WordPress attachment ID as a string: TEC's REST schema declares 'image' as type 'string' ("image ID or URL")
+					wpEventData.image = String(mediaData.id);
 				}
 			}
 
