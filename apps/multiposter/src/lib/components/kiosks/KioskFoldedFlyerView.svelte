@@ -1489,7 +1489,7 @@
 
                 <!-- Summary (Editable inline) -->
                 {#if showDescriptions && (rawDesc || summary)}
-                    {@const compactSignUp = getKioskSignUpText(item as any)}
+                    {@const compactSignUp = getKioskSignUpText(item as any, { showQrCode: Boolean(showEventQrCodes && eventQr && elementSettings.qrCodes.enabled) })}
                     <div class="text-[10px] text-slate-600 leading-snug {itemPercentages[item.id] === undefined ? (density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10') : ''}">
                         {#if compactSignUp}
                             <span class="font-semibold text-amber-800 mr-1">{compactSignUp}.</span>
@@ -1506,10 +1506,10 @@
                 {/if}
 
                 <!-- Tags & Hidden-Description Compact SignUp -->
-                {#if (item.tags && item.tags.length > 0) || (!(showDescriptions && (rawDesc || summary)) && getKioskSignUpText(item as any))}
+                {#if (item.tags && item.tags.length > 0) || (!(showDescriptions && (rawDesc || summary)) && getKioskSignUpText(item as any, { showQrCode: Boolean(showEventQrCodes && eventQr && elementSettings.qrCodes.enabled) }))}
                     <div class="flex items-center gap-1 flex-wrap pt-0.5">
                         {#if !(showDescriptions && (rawDesc || summary))}
-                            {@const compactSignUp = getKioskSignUpText(item as any)}
+                            {@const compactSignUp = getKioskSignUpText(item as any, { showQrCode: Boolean(showEventQrCodes && eventQr && elementSettings.qrCodes.enabled) })}
                             {#if compactSignUp}
                                 <span class="px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[8px] font-semibold">
                                     {compactSignUp}

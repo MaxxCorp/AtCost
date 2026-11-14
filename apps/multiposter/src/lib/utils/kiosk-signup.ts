@@ -23,6 +23,8 @@ export function getKioskSignUpText(
 				seriesDates?: unknown[];
 				seriesInstances?: Array<{ id?: string; signUpClosureDate?: string | Date | null }>;
 				instanceCount?: number;
+				qrCodeDataUrl?: string | null;
+				qrCodePath?: string | null;
 				resolvedSignUpContact?: {
 					name?: string | null;
 					phone?: string | null;
@@ -30,7 +32,10 @@ export function getKioskSignUpText(
 				} | null;
 		  }
 		| null
-		| undefined
+		| undefined,
+	options?: {
+		showQrCode?: boolean;
+	}
 ): string {
 	const locale = getLocale();
 	const recurrenceRules = normalizeSignUpRecurrence(
@@ -71,16 +76,26 @@ export function getKioskSignUpText(
 		}
 	}
 
+	const showQrCode =
+		options?.showQrCode ?? Boolean(event?.qrCodeDataUrl || event?.qrCodePath);
+
 	return formatKioskSignUpCompact(
 		event,
 		{
 			req: m.kiosk_sign_up_req(),
 			by: (date) => m.kiosk_sign_up_by({ date }),
 			orContact: (contact) => m.kiosk_sign_up_or_contact({ contact }),
-			closed: m.kiosk_sign_up_closed()
+			closed: m.kiosk_sign_up_closed(),
+			reqPlain: m.kiosk_sign_up_req_plain(),
+			reqContact: (contact) => m.kiosk_sign_up_req_contact({ contact }),
+			byPlain: (date) => m.kiosk_sign_up_by_plain({ date }),
+			viaContact: (contact) => m.kiosk_sign_up_via_contact({ contact })
 		},
 		locale,
 		undefined,
-		recurringDeadlineLabel ? { recurringDeadlineLabel, allOccurrencesClosed } : undefined
+		{
+			showQrCode,
+			...(recurringDeadlineLabel ? { recurringDeadlineLabel, allOccurrencesClosed } : {})
+		}
 	);
 }

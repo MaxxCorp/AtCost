@@ -368,7 +368,7 @@
                             {/if}
 
                             {#if event.signUpMode === 'required'}
-                                {@const compactSignUp = getKioskSignUpText(event)}
+                                {@const compactSignUp = getKioskSignUpText(event, { showQrCode: Boolean((event as any).qrCodeDataUrl || (event as any).qrCodePath) })}
                                 {@const signUpClosed = isSignUpClosed(event.signUpMode, event.signUpClosureDate)}
                                 {#if compactSignUp}
                                     <div class="flex items-start gap-2 {signUpClosed ? 'text-red-700 font-semibold' : 'text-indigo-800'}">

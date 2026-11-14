@@ -170,7 +170,11 @@ describe('event-signup utilities', () => {
 			req: 'Anmeldung über QR Code',
 			by: (d: string) => `Anmeldung bis ${d} über QR Code`,
 			orContact: (c: string) => ` oder ${c}`,
-			closed: 'Anmeldung geschl.'
+			closed: 'Anmeldung geschl.',
+			reqPlain: 'Anmeldung erf.',
+			reqContact: (c: string) => `Anmeldung über ${c}`,
+			byPlain: (d: string) => `Anmeldung bis ${d}`,
+			viaContact: (c: string) => ` über ${c}`
 		};
 
 		it('returns empty string when signUpMode is not required', () => {
@@ -287,6 +291,82 @@ describe('event-signup utilities', () => {
 					}
 				)
 			).toBe('Anmeldung geschl. (+49(0)305405659)');
+		});
+
+		it('omits QR code phrasing when QR codes are inactive for the item', () => {
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: '2099-12-12T11:00:00.000Z',
+						resolvedSignUpContact: { phone: '+49(0)305405659' }
+					},
+					labels,
+					'de-DE',
+					'Europe/Berlin',
+					{ showQrCode: false }
+				)
+			).toBe('Anmeldung bis 12.12.99 12:00 über +49(0)305405659');
+
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: '2099-12-12T22:59:00.000Z',
+						resolvedSignUpContact: null
+					},
+					labels,
+					'de-DE',
+					'Europe/Berlin',
+					{ showQrCode: false }
+				)
+			).toBe('Anmeldung bis 12.12.99');
+
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: null,
+						resolvedSignUpContact: { email: 'desk@example.org' }
+					},
+					labels,
+					'de-DE',
+					'Europe/Berlin',
+					{ showQrCode: false }
+				)
+			).toBe('Anmeldung über desk@example.org');
+
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: null,
+						resolvedSignUpContact: null
+					},
+					labels,
+					'de-DE',
+					'Europe/Berlin',
+					{ showQrCode: false }
+				)
+			).toBe('Anmeldung erf.');
+
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: '2099-12-12T11:00:00.000Z',
+						signUpRecurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'],
+						resolvedSignUpContact: { phone: '+49(0)305405659' }
+					},
+					labels,
+					'de',
+					undefined,
+					{
+						recurringDeadlineLabel: 'wöchentl. Mo 12:00',
+						showQrCode: false
+					}
+				)
+			).toBe('Anmeldung bis wöchentl. Mo 12:00 über +49(0)305405659');
 		});
 	});
 });

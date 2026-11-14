@@ -1595,7 +1595,7 @@
 
             <!-- Description (if enabled in visibleComponents) -->
             {#if visibleComponents.descriptions && event.description}
-                {@const compactSignUp = getKioskSignUpText(event)}
+                {@const compactSignUp = getKioskSignUpText(event, { showQrCode: Boolean(visibleComponents.qrCodes && (event.qrCodeDataUrl || event.qrCodePath)) })}
                 <div class="text-xs text-slate-600 dark:text-slate-300 print:text-black leading-relaxed pt-0.5">
                     {#if compactSignUp}
                         <span class="font-semibold text-amber-800 dark:text-amber-300 print:text-amber-900 mr-1">{compactSignUp}.</span>
@@ -1620,10 +1620,10 @@
             {/if}
 
             <!-- Tags & Free Pill (if enabled in visibleComponents) -->
-            {#if (visibleComponents.tags && event.tags && event.tags.length > 0) || (visibleComponents.ticketPrice && isEventFree(event.ticketPrice, event.ticketPriceUnknown)) || (!(visibleComponents.descriptions && event.description) && getKioskSignUpText(event))}
+            {#if (visibleComponents.tags && event.tags && event.tags.length > 0) || (visibleComponents.ticketPrice && isEventFree(event.ticketPrice, event.ticketPriceUnknown)) || (!(visibleComponents.descriptions && event.description) && getKioskSignUpText(event, { showQrCode: Boolean(visibleComponents.qrCodes && (event.qrCodeDataUrl || event.qrCodePath)) }))}
                 <div class="flex flex-wrap items-center gap-1.5 pt-1">
                     {#if !(visibleComponents.descriptions && event.description)}
-                        {@const compactSignUp = getKioskSignUpText(event)}
+                        {@const compactSignUp = getKioskSignUpText(event, { showQrCode: Boolean(visibleComponents.qrCodes && (event.qrCodeDataUrl || event.qrCodePath)) })}
                         {#if compactSignUp}
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[10px] font-semibold">
                                 {compactSignUp}

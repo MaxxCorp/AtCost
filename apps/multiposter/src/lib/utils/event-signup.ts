@@ -265,12 +265,17 @@ export function formatKioskSignUpCompact(
 		by: (date: string) => string;
 		orContact: (contact: string) => string;
 		closed: string;
+		reqPlain?: string;
+		reqContact?: (contact: string) => string;
+		byPlain?: (date: string) => string;
+		viaContact?: (contact: string) => string;
 	},
 	locale?: string,
 	timeZone?: string,
 	options?: {
 		recurringDeadlineLabel?: string;
 		allOccurrencesClosed?: boolean;
+		showQrCode?: boolean;
 	}
 ): string {
 	if (!event || event.signUpMode !== 'required') return '';
@@ -278,23 +283,35 @@ export function formatKioskSignUpCompact(
 	const c = event.resolvedSignUpContact;
 	const contactChannel = c?.phone?.trim() || c?.email?.trim() || '';
 	const recurringLabel = options?.recurringDeadlineLabel?.trim();
+	const showQrCode = options?.showQrCode ?? true;
 
-	if (recurringLabel) {
-		if (options?.allOccurrencesClosed) {
-			return contactChannel ? `${labels.closed} (${contactChannel})` : labels.closed;
-		}
-		const base = labels.by(recurringLabel);
-		return contactChannel ? `${base}${labels.orContact(contactChannel)}` : base;
-	}
+	const isClosed = recurringLabel
+		? Boolean(options?.allOccurrencesClosed)
+		: isSignUpClosed(event.signUpMode, event.signUpClosureDate);
 
-	const closed = isSignUpClosed(event.signUpMode, event.signUpClosureDate);
-	if (closed) {
+	if (isClosed) {
 		return contactChannel ? `${labels.closed} (${contactChannel})` : labels.closed;
 	}
 
-	const shortDate = formatSignUpClosureDateShort(event.signUpClosureDate, locale, timeZone);
-	const base = shortDate ? labels.by(shortDate) : labels.req;
-	return contactChannel ? `${base}${labels.orContact(contactChannel)}` : base;
+	const deadlineText =
+		recurringLabel || formatSignUpClosureDateShort(event.signUpClosureDate, locale, timeZone);
+
+	if (showQrCode) {
+		const base = deadlineText ? labels.by(deadlineText) : labels.req;
+		return contactChannel ? `${base}${labels.orContact(contactChannel)}` : base;
+	}
+
+	if (deadlineText) {
+		const base = labels.byPlain ? labels.byPlain(deadlineText) : deadlineText;
+		return contactChannel && labels.viaContact
+			? `${base}${labels.viaContact(contactChannel)}`
+			: base;
+	}
+
+	if (contactChannel && labels.reqContact) {
+		return labels.reqContact(contactChannel);
+	}
+	return labels.reqPlain ?? labels.req;
 }
 
 /**

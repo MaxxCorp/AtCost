@@ -1963,7 +1963,7 @@
                                     <!-- Description -->
                                     {#if visibleComponents.descriptions && descriptionStyle !== "none"}
                                         {@const rawDesc = isEvt ? (item as Event).description : (item as Announcement).content}
-                                        {@const compactSignUp = isEvt ? getKioskSignUpText(item as any) : ""}
+                                        {@const compactSignUp = isEvt ? getKioskSignUpText(item as any, { showQrCode: showEventQr }) : ""}
                                         {#if (rawDesc && rawDesc.trim()) || compactSignUp}
                                             <div class="mt-0.5 text-slate-600 leading-relaxed font-normal {itemPercentages[item.id] === undefined && descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
                                                 {#if compactSignUp}
@@ -1992,10 +1992,10 @@
                                     {/if}
 
                                     <!-- Tags & Hidden-Description Compact SignUp -->
-                                    {#if (visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0) || ((!(visibleComponents.descriptions && descriptionStyle !== "none")) && isEvt && getKioskSignUpText(item as any))}
+                                    {#if (visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0) || ((!(visibleComponents.descriptions && descriptionStyle !== "none")) && isEvt && getKioskSignUpText(item as any, { showQrCode: showEventQr }))}
                                         <div class="mt-0.5 [&>*]:mr-1 [&>*]:align-middle">
                                             {#if !(visibleComponents.descriptions && descriptionStyle !== "none") && isEvt}
-                                                {@const compactSignUp = getKioskSignUpText(item as any)}
+                                                {@const compactSignUp = getKioskSignUpText(item as any, { showQrCode: showEventQr })}
                                                 {#if compactSignUp}
                                                     <span class="inline-block px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[8px] font-semibold">
                                                         {compactSignUp}
