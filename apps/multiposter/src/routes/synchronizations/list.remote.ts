@@ -83,7 +83,7 @@ export const list = query(PaginationSchema, async (input: v.InferOutput<typeof P
         providerId: row.providerId ?? undefined,
         syncToken: row.syncToken ?? undefined,
         webhookId: row.webhookId ?? undefined,
-        credentials: row.credentials ?? undefined,
+        credentials: undefined,
         settings: row.settings ?? undefined,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),

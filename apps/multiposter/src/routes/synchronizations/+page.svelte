@@ -101,6 +101,8 @@
 			return m.berlin_de_main_calendar();
 		if (providerType === "berlin-de-mh-calendar")
 			return m.berlin_de_mh_calendar();
+		if (providerType === "kultur-ring")
+			return m.kultur_ring ? m.kultur_ring() : "Kultur Ring";
 		if (providerType === "wp-the-events-calendar")
 			return m.wp_the_events_calendar();
 		if (providerType === "email") return m.email_brevo();

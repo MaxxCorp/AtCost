@@ -77,6 +77,7 @@
         if (providerType === "microsoft-resources") return "Microsoft Resources & Rooms";
         if (providerType === "berlin-de-main-calendar") return m.berlin_de_main_calendar ? m.berlin_de_main_calendar() : "Berlin.de (Main)";
         if (providerType === "berlin-de-mh-calendar") return m.berlin_de_mh_calendar ? m.berlin_de_mh_calendar() : "Berlin.de (MH)";
+        if (providerType === "kultur-ring") return m.kultur_ring ? m.kultur_ring() : "Kultur Ring";
         if (providerType === "wp-the-events-calendar") return m.wp_the_events_calendar ? m.wp_the_events_calendar() : "WP Events Calendar";
         if (providerType === "email") return m.email_brevo ? m.email_brevo() : "Email (Brevo)";
         if (providerType === "instagram") return "Instagram";

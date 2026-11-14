@@ -115,6 +115,13 @@
 			available: true,
 		},
 		{
+			id: "kultur-ring" as const,
+			name: "Kultur Ring",
+			description: "Push events to Kultur Ring (db.kulturring.berlin)",
+			icon: Calendar,
+			available: true,
+		},
+		{
 			id: "wp-the-events-calendar" as const,
 			name: "WP The Events Calendar",
 			description:
@@ -219,6 +226,9 @@
 	let wpAppPassword = $state(untrack(() => initialData?.settings?.applicationPassword || ""));
 	let mhUsername = $state(untrack(() => initialData?.credentials?.username || ""));
 	let mhPassword = $state(untrack(() => initialData?.credentials?.password || ""));
+	let krUsername = $state(untrack(() => initialData?.credentials?.username || ""));
+	let krPassword = $state(untrack(() => initialData?.credentials?.password || ""));
+	let krEinrichtungId = $state(untrack(() => initialData?.settings?.einrichtungId || ""));
 	let nebenanEmail = $state(untrack(() => initialData?.credentials?.email || ""));
 	let nebenanPassword = $state(untrack(() => initialData?.credentials?.password || ""));
 	let nebenanProfileId = $state(untrack(() => initialData?.settings?.profileId || ""));
@@ -1031,6 +1041,7 @@
 			!isUpdating && (
 			selectedProvider === "berlin-de-main-calendar" ||
 			selectedProvider === "berlin-de-mh-calendar" ||
+			selectedProvider === "kultur-ring" ||
 			selectedProvider === "wp-the-events-calendar" ||
 			selectedProvider === "eventbrite" ||
 			selectedProvider === "meetup" ||
@@ -1991,6 +2002,50 @@
 			</div>
 		{/if}
 
+		{#if selectedProvider === "kultur-ring"}
+			<div>
+				<label for="krUsername" class="block text-sm font-medium text-gray-700 mb-1">
+					Kultur Ring Username
+				</label>
+				<input
+					{...fields.credentials.username.as("text")}
+					id="krUsername"
+					bind:value={krUsername}
+					required
+					placeholder="e.g. Ball-EV-berlin.de"
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+			</div>
+			<div>
+				<label for="krPassword" class="block text-sm font-medium text-gray-700 mb-1">
+					Kultur Ring Password
+				</label>
+				<input
+					{...fields.credentials.password.as("password")}
+					id="krPassword"
+					bind:value={krPassword}
+					required
+					placeholder="Password"
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+			</div>
+			<div>
+				<label for="krEinrichtungId" class="block text-sm font-medium text-gray-700 mb-1">
+					Default Einrichtung ID (Optional)
+				</label>
+				<input
+					{...fields.settings.einrichtungId.as("text")}
+					id="krEinrichtungId"
+					bind:value={krEinrichtungId}
+					placeholder="e.g. 210 or 219 (auto-matched by venue if blank)"
+					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+				/>
+				<p class="text-xs text-gray-500 mt-1">
+					Automatically matched against your event venue/location name if left blank.
+				</p>
+			</div>
+		{/if}
+
 		{#if selectedProvider === "nebenan-de"}
 			<div>
 				<label for="nebenanEmail" class="block text-sm font-medium text-gray-700 mb-1">
@@ -2360,6 +2415,7 @@
 					: 'border-gray-200 hover:border-gray-300'} {(selectedProvider ===
 					'berlin-de-main-calendar' ||
 					selectedProvider === 'berlin-de-mh-calendar' ||
+					selectedProvider === 'kultur-ring' ||
 					selectedProvider === 'wp-the-events-calendar' ||
 					selectedProvider === 'seniorennetz-berlin' ||
 					selectedProvider === 'email' ||
@@ -2381,6 +2437,7 @@
 					}}
 					disabled={(selectedProvider === "berlin-de-main-calendar" ||
 						selectedProvider === "berlin-de-mh-calendar" ||
+						selectedProvider === "kultur-ring" ||
 						selectedProvider === "wp-the-events-calendar" ||
 						selectedProvider === "seniorennetz-berlin" ||
 						selectedProvider === "email" ||
@@ -2400,13 +2457,15 @@
 					<div class="text-sm text-gray-600">
 						{dir.description}
 					</div>
-					{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "berlin-de-mh-calendar" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email" || selectedProvider === "nebenan-de" || selectedProvider === "instagram" || selectedProvider === "bewegungsatlas-berlin" || selectedProvider === "eventbrite" || selectedProvider === "meetup") && dir.value !== "push"}
+					{#if (selectedProvider === "berlin-de-main-calendar" || selectedProvider === "berlin-de-mh-calendar" || selectedProvider === "kultur-ring" || selectedProvider === "wp-the-events-calendar" || selectedProvider === "seniorennetz-berlin" || selectedProvider === "email" || selectedProvider === "nebenan-de" || selectedProvider === "instagram" || selectedProvider === "bewegungsatlas-berlin" || selectedProvider === "eventbrite" || selectedProvider === "meetup") && dir.value !== "push"}
 						<div class="text-xs text-orange-600 mt-1">
 							Not supported for {selectedProvider === "berlin-de-main-calendar"
 								? "Berlin.de"
 								: selectedProvider === "berlin-de-mh-calendar"
 									? "Berlin.de (MH)"
-									: selectedProvider === "wp-the-events-calendar"
+									: selectedProvider === "kultur-ring"
+										? "Kultur Ring"
+										: selectedProvider === "wp-the-events-calendar"
 										? "WordPress Events Calendar"
 										: selectedProvider === "seniorennetz-berlin"
 											? "Seniorennetz Berlin"

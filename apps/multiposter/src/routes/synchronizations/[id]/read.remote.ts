@@ -1,7 +1,7 @@
 import { query } from '$app/server';
 import * as v from 'valibot';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
-import { db, syncConfig, syncOperation, eq, and, desc, type SyncConfig, type SyncOperation } from '@ac/db';
+import { db, syncConfig, syncOperation, decryptSyncCredentials, eq, and, desc, type SyncConfig, type SyncOperation } from '@ac/db';
 
 /**
  * Query: Get a sync configuration and its recent logs
@@ -19,7 +19,12 @@ export const readSynchronization = query(v.string(), async (id: string): Promise
 		throw new Error('Sync configuration not found');
 	}
 
-	return config;
+	const decryptedCredentials = await decryptSyncCredentials(config.credentials);
+
+	return {
+		...config,
+		credentials: decryptedCredentials ?? null
+	};
 });
 
 /**

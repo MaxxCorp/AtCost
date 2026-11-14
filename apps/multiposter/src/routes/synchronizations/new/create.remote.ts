@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import { form } from '$app/server';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
-import { syncConfig, account } from '@ac/db'; // Updated syncConfig import path
+import { syncConfig, account, encryptSyncCredentials } from '@ac/db'; // Updated syncConfig import path
 import { eq, and } from '@ac/db';
 import { syncService } from '#lib/server/sync/service.js';
 import { MicrosoftGraphClient } from '#lib/server/sync/providers/microsoft/index.js';
@@ -64,14 +64,18 @@ export const create = form(createSynchronizationSchema, async (input) => {
 			console.log('Using direct credentials from input');
 		}
 
+		const syncConfigId = crypto.randomUUID();
+		const encryptedCredentials = await encryptSyncCredentials(syncConfigId, credentials);
+
 		const insertData: any = {
+			id: syncConfigId,
 			userId: user.id,
 			name: input.name || input.providerId || 'Sync',
 			providerId: input.providerId || input.name,
 			providerType: input.providerType,
 			direction: input.direction,
 			enabled: true,
-			credentials,
+			credentials: encryptedCredentials,
 			settings,
 			createdAt: new Date(),
 			updatedAt: new Date()
@@ -105,7 +109,7 @@ export const create = form(createSynchronizationSchema, async (input) => {
 					providerType: config.providerType as any,
 					direction: config.direction as any,
 					enabled: config.enabled,
-					credentials: config.credentials as any,
+					credentials: (credentials ?? config.credentials) as any,
 					settings: config.settings as any,
 					createdAt: config.createdAt,
 					updatedAt: config.updatedAt

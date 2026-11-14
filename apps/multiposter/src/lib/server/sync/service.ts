@@ -7,7 +7,7 @@ import type {
 	SyncDirection,
 	ProviderType
 } from './types';
-import { db } from '@ac/db';
+import { db, decryptSyncCredentials } from '@ac/db';
 import {
 	syncConfig as syncConfigTable,
 	syncOperation as syncOperationTable,
@@ -55,6 +55,7 @@ import {
 } from './providers/microsoft/index.js';
 import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
 import { BerlinDeMhCalendarProvider } from './providers/berlin-de-mh-calendar';
+import { KulturRingProvider } from './providers/kultur-ring';
 import { WpTheEventsCalendarProvider } from './providers/wp-the-events-calendar';
 import { EventbriteProvider } from './providers/eventbrite';
 import { MeetupProvider } from './providers/meetup';
@@ -106,6 +107,7 @@ export class SyncService {
 		this.registerProvider('email', EmailProvider);
 		this.registerProvider('nebenan-de', NebenanDeProvider);
 		this.registerProvider('instagram', InstagramProvider);
+		this.registerProvider('kultur-ring', KulturRingProvider);
 	}
 
 	/**
@@ -124,8 +126,15 @@ export class SyncService {
 			throw new Error(`Unknown provider type: ${config.providerType}`);
 		}
 
+		const credentials = config.credentials
+			? await decryptSyncCredentials(config.credentials)
+			: undefined;
+
 		const provider = new ProviderClass();
-		await provider.initialize(config);
+		await provider.initialize({
+			...config,
+			credentials
+		});
 
 		return provider;
 	}

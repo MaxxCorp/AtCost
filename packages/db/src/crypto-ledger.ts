@@ -747,7 +747,7 @@ function rsaOaepUnwrapDek(privateKeyPem: string, wrappedDekBase64: string): Buff
  * wrapped with the PKI public keys of authorized recipients.
  */
 export async function ensureSubjectDataKey(
-    subjectType: "talent" | "contact",
+    subjectType: "talent" | "contact" | "sync_config",
     subjectId: string,
 ): Promise<{ record: typeof cryptoDataKey.$inferSelect; rawDek: Buffer }> {
     await ensureRecruitmentSchema();
@@ -821,7 +821,7 @@ export async function ensureSubjectDataKey(
  * Encrypts sensitive personnel/onboarding/version data at rest using the subject's PKI-wrapped DEK.
  */
 export async function encryptPersonnelPayload(params: {
-    subjectType: "talent" | "contact";
+    subjectType: "talent" | "contact" | "sync_config";
     subjectId: string;
     aadText: string;
     payload: unknown;

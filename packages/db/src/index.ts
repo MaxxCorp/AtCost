@@ -4,6 +4,7 @@ export * from "./reporting-line.js";
 export * from "./locations.js";
 export * from "./contacts.js";
 export * from "./contact-encryption.js";
+export * from "./sync-encryption.js";
 export * from "./gdpr.js";
 export * from "./crypto-ledger.js";
 

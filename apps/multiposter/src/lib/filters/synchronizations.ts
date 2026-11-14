@@ -14,6 +14,7 @@ export function getSynchronizationFilterGroups(m?: any): FilterGroup[] {
                 { id: "microsoft-resources", label: "Microsoft Resources & Rooms" },
                 { id: "berlin-de-main-calendar", label: "Berlin.de (Main)" },
                 { id: "berlin-de-mh-calendar", label: "Berlin.de (M-H)" },
+                { id: "kultur-ring", label: m?.kultur_ring ? m.kultur_ring() : "Kultur Ring" },
                 { id: "wp-the-events-calendar", label: "WP The Events Calendar" },
                 { id: "email", label: "E-Mail (Brevo)" },
                 { id: "instagram", label: "Instagram" },

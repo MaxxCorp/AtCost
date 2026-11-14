@@ -91,7 +91,7 @@ export const cryptoDataKey = pgTable(
     "crypto_data_key",
     {
         id: uuid("id").primaryKey().defaultRandom(),
-        subjectType: text("subject_type", { enum: ["talent", "contact"] }).notNull(),
+        subjectType: text("subject_type", { enum: ["talent", "contact", "sync_config"] }).notNull(),
         subjectId: uuid("subject_id").notNull(),
         keyVersion: integer("key_version").default(1).notNull(),
         algorithm: text("algorithm").default("AES-256-GCM").notNull(),
