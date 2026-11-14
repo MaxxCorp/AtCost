@@ -5,7 +5,9 @@ import {
 	isSignUpClosed,
 	extractSignUpFields,
 	findDefaultKontaktContact,
-	isKontaktRoleName
+	isKontaktRoleName,
+	formatSignUpClosureDateShort,
+	formatKioskSignUpCompact
 } from './event-signup';
 
 describe('event-signup utilities', () => {
@@ -105,6 +107,56 @@ describe('event-signup utilities', () => {
 
 			expect(findDefaultKontaktContact([alice, bob], { 'c-alice': ['r-kontakt'] }, [])?.id).toBe('c-alice');
 			expect(findDefaultKontaktContact([alice, bob], { 'c-bob': ['r-contact'] }, roles)?.id).toBe('c-bob');
+		});
+	});
+
+	describe('formatKioskSignUpCompact', () => {
+		const labels = {
+			req: 'Anmeldung erf.',
+			by: (d: string) => `Anmeldung bis ${d}`,
+			closed: 'Anmeldung geschl.'
+		};
+
+		it('returns empty string when signUpMode is not required', () => {
+			expect(formatKioskSignUpCompact({ signUpMode: 'off' }, labels, 'de')).toBe('');
+			expect(formatKioskSignUpCompact({ signUpMode: 'recommended' }, labels, 'de')).toBe('');
+		});
+
+		it('formats compact closure date and prefers phone over email', () => {
+			const futureDate = '2099-11-20T00:00:00.000Z';
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: futureDate,
+						resolvedSignUpContact: {
+							name: 'Anna',
+							phone: '030-1234',
+							email: 'anna@example.org'
+						}
+					},
+					labels,
+					'de'
+				)
+			).toBe(`Anmeldung bis ${formatSignUpClosureDateShort(futureDate, 'de')} (Anna, 030-1234)`);
+		});
+
+		it('falls back to email when phone is absent and marks closed when date is past', () => {
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: '2020-01-10T00:00:00.000Z',
+						resolvedSignUpContact: {
+							name: 'Desk',
+							phone: '',
+							email: 'desk@example.org'
+						}
+					},
+					labels,
+					'de'
+				)
+			).toBe('Anmeldung geschl. (Desk, desk@example.org)');
 		});
 	});
 });

@@ -71,6 +71,59 @@ export function formatSignUpClosureDateDisplay(
 }
 
 /**
+ * Formats a compact closure date string (without year) for space-constrained kiosk layouts.
+ */
+export function formatSignUpClosureDateShort(
+	val: string | Date | null | undefined,
+	locale?: string
+): string {
+	const d = parseSignUpClosureDate(val);
+	if (!d) return '';
+	const isDe = (locale || '').toLowerCase().startsWith('de');
+	return d.toLocaleDateString(locale || undefined, {
+		month: isDe ? '2-digit' : 'short',
+		day: isDe ? '2-digit' : 'numeric',
+		timeZone: 'UTC'
+	});
+}
+
+/**
+ * Produces a single, ultra-compact signup cue string for kiosk layouts when `signUpMode === 'required'`.
+ * Returns `""` when not required so callers can guard rendering easily.
+ */
+export function formatKioskSignUpCompact(
+	event: {
+		signUpMode?: string | null;
+		signUpClosureDate?: string | Date | null;
+		resolvedSignUpContact?: { name?: string | null; phone?: string | null; email?: string | null } | null;
+	} | null | undefined,
+	labels: {
+		req: string;
+		by: (date: string) => string;
+		closed: string;
+	},
+	locale?: string
+): string {
+	if (!event || event.signUpMode !== 'required') return '';
+
+	const closed = isSignUpClosed(event.signUpMode, event.signUpClosureDate);
+	const shortDate = formatSignUpClosureDateShort(event.signUpClosureDate, locale);
+	const statusPart = closed
+		? labels.closed
+		: shortDate
+			? labels.by(shortDate)
+			: labels.req;
+
+	const c = event.resolvedSignUpContact;
+	const contactName = c?.name?.trim() || '';
+	const contactChannel = c?.phone?.trim() || c?.email?.trim() || '';
+	const contactPart = [contactName, contactChannel].filter(Boolean).join(', ');
+
+	if (!contactPart) return statusPart;
+	return `${statusPart} (${contactPart})`;
+}
+
+/**
  * Normalizes event sign-up persistence fields. When signUpMode is not `'required'`,
  * closure date and signup contact overrides are cleared to null/false.
  */

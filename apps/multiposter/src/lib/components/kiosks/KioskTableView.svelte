@@ -10,6 +10,7 @@
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isNonSeriesEvent } from "#lib/utils/event-series.js";
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
+    import { getKioskSignUpText } from "#lib/utils/kiosk-signup.js";
     import * as m from "#lib/paraglide/messages.js";
 
     interface LocationInfo {
@@ -306,6 +307,11 @@
                                 </td>
                                 <td class="py-4 px-6 align-middle">
                                     <div class="flex flex-wrap gap-1.5 max-h-[8vh] overflow-hidden">
+                                        {#if getKioskSignUpText(item as any)}
+                                            <span class="px-2.5 py-0.5 bg-amber-500/15 border border-amber-400/30 rounded-full text-amber-300 text-xs font-semibold inline-flex items-center gap-1">
+                                                {getKioskSignUpText(item as any)}
+                                            </span>
+                                        {/if}
                                         {#if isEventFree((item as any).ticketPrice, (item as any).ticketPriceUnknown)}
                                             <span class="px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1">
                                                 <Ticket class="w-3 h-3" />

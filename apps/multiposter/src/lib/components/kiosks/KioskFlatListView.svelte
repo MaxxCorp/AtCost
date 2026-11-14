@@ -28,6 +28,7 @@
         FileImage
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { getKioskSignUpText } from "#lib/utils/kiosk-signup.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
 
     import { getEventRooms } from "#lib/utils/format-rooms.js";
@@ -1516,8 +1517,14 @@
 
             <!-- Description (if enabled in visibleComponents) -->
             {#if visibleComponents.descriptions && event.description}
-                <div class="rich-description text-xs text-slate-600 dark:text-slate-300 print:text-black leading-relaxed pt-0.5">
-                    {@html event.description}
+                {@const compactSignUp = getKioskSignUpText(event)}
+                <div class="text-xs text-slate-600 dark:text-slate-300 print:text-black leading-relaxed pt-0.5">
+                    {#if compactSignUp}
+                        <span class="font-semibold text-amber-800 dark:text-amber-300 print:text-amber-900 mr-1">{compactSignUp}.</span>
+                    {/if}
+                    <span class="rich-description [&>p:first-child]:inline [&>p]:mb-0 [&>p+p]:mt-1">
+                        {@html event.description}
+                    </span>
                 </div>
             {/if}
 
@@ -1535,8 +1542,16 @@
             {/if}
 
             <!-- Tags & Free Pill (if enabled in visibleComponents) -->
-            {#if (visibleComponents.tags && event.tags && event.tags.length > 0) || (visibleComponents.ticketPrice && isEventFree(event.ticketPrice, event.ticketPriceUnknown))}
-                <div class="flex flex-wrap gap-1.5 pt-1">
+            {#if (visibleComponents.tags && event.tags && event.tags.length > 0) || (visibleComponents.ticketPrice && isEventFree(event.ticketPrice, event.ticketPriceUnknown)) || (!(visibleComponents.descriptions && event.description) && getKioskSignUpText(event))}
+                <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                    {#if !(visibleComponents.descriptions && event.description)}
+                        {@const compactSignUp = getKioskSignUpText(event)}
+                        {#if compactSignUp}
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[10px] font-semibold">
+                                {compactSignUp}
+                            </span>
+                        {/if}
+                    {/if}
                     {#if visibleComponents.ticketPrice && isEventFree(event.ticketPrice, event.ticketPriceUnknown)}
                         <span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold inline-flex items-center gap-1">
                             <Ticket class="w-2.5 h-2.5 text-emerald-600" />

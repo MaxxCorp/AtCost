@@ -27,6 +27,7 @@
         Ticket
     } from "@lucide/svelte";
     import { summarizeFlyerItems } from "../../../routes/kiosks/[id]/view/summarize.remote";
+    import { getKioskSignUpText } from "#lib/utils/kiosk-signup.js";
     import type { FlyerItemSummary, FlyerDensity } from "#lib/validations/flyer.js";
     import PrintSettingsModal from "./PrintSettingsModal.svelte";
     import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
@@ -1454,20 +1455,34 @@
 
                 <!-- Summary (Editable inline) -->
                 {#if showDescriptions && (rawDesc || summary)}
-                    <div
-                        class="rich-description text-[10px] text-slate-600 leading-snug {itemPercentages[item.id] === undefined ? (density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10') : ''} outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
-                        contenteditable="true"
-                        onblur={(e) => handleInlineEdit(item.id, title, summary, e)}
-                        title={m.edit_summary_tooltip()}
-                    >
-                        {@html (itemPercentages[item.id] === 100 ? (rawDesc || '') : summary)}
+                    {@const compactSignUp = getKioskSignUpText(item as any)}
+                    <div class="text-[10px] text-slate-600 leading-snug {itemPercentages[item.id] === undefined ? (density === 'compact' ? 'line-clamp-3' : density === 'standard' ? 'line-clamp-5' : 'line-clamp-10') : ''}">
+                        {#if compactSignUp}
+                            <span class="font-semibold text-amber-800 mr-1">{compactSignUp}.</span>
+                        {/if}
+                        <span
+                            class="rich-description [&>p:first-child]:inline [&>p]:mb-0 [&>p+p]:mt-0.5 outline-hidden focus:bg-amber-50 focus:p-1 rounded cursor-text"
+                            contenteditable="true"
+                            onblur={(e) => handleInlineEdit(item.id, title, summary, e)}
+                            title={m.edit_summary_tooltip()}
+                        >
+                            {@html (itemPercentages[item.id] === 100 ? (rawDesc || '') : summary)}
+                        </span>
                     </div>
                 {/if}
 
-                <!-- Tags -->
-                {#if item.tags && item.tags.length > 0}
+                <!-- Tags & Hidden-Description Compact SignUp -->
+                {#if (item.tags && item.tags.length > 0) || (!(showDescriptions && (rawDesc || summary)) && getKioskSignUpText(item as any))}
                     <div class="flex items-center gap-1 flex-wrap pt-0.5">
-                        {#each item.tags.slice(0, 3) as tag}
+                        {#if !(showDescriptions && (rawDesc || summary))}
+                            {@const compactSignUp = getKioskSignUpText(item as any)}
+                            {#if compactSignUp}
+                                <span class="px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[8px] font-semibold">
+                                    {compactSignUp}
+                                </span>
+                            {/if}
+                        {/if}
+                        {#each (item.tags ?? []).slice(0, 3) as tag}
                             <span class="text-[8px] font-medium bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
                                 #{typeof tag === 'string' ? tag : tag.name}
                             </span>

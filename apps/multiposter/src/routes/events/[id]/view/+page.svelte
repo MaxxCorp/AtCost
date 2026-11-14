@@ -310,24 +310,6 @@
                                             : (m.sign_up_modal_intro?.() || 'Reserve your spot or manage an existing reservation.')}
                                     </span>
                                 </div>
-                                {#if event.signUpMode === 'required' && event.resolvedSignUpContact}
-                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-700">
-                                        <span class="font-medium text-gray-600">{m.sign_up_non_self_service_contact()}</span>
-                                        <span class="font-semibold text-gray-900">{event.resolvedSignUpContact.name}</span>
-                                        {#if event.resolvedSignUpContact.phone}
-                                            <a href="tel:{event.resolvedSignUpContact.phone}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
-                                                <Phone size={12} />
-                                                {event.resolvedSignUpContact.phone}
-                                            </a>
-                                        {/if}
-                                        {#if event.resolvedSignUpContact.email}
-                                            <a href="mailto:{event.resolvedSignUpContact.email}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
-                                                <Mail size={12} />
-                                                {event.resolvedSignUpContact.email}
-                                            </a>
-                                        {/if}
-                                    </div>
-                                {/if}
                             </div>
                             <Button
                                 type="button"

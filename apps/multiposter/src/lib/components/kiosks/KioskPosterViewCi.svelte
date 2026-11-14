@@ -47,6 +47,7 @@
     import { DEFAULT_PRESETS, DEFAULT_PRINT_OPTIONS, DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, type CiPreset, type CiPrintOptions, type CiSponsorItem, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
     import { uploadMedia } from "../../../routes/cms/media/create.remote";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
+    import { getKioskSignUpText } from "#lib/utils/kiosk-signup.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
 
     import { getEventRooms } from "#lib/utils/format-rooms.js";
@@ -1874,9 +1875,17 @@
                                     <!-- Description -->
                                     {#if visibleComponents.descriptions && descriptionStyle !== "none"}
                                         {@const rawDesc = isEvt ? (item as Event).description : (item as Announcement).content}
-                                        {#if rawDesc && rawDesc.trim()}
-                                            <div class="rich-description mt-0.5 text-slate-600 leading-relaxed font-normal {itemPercentages[item.id] === undefined && descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
-                                                {@html (itemPercentages[item.id] === 100 ? rawDesc : (itemDescriptions[item.id] ?? rawDesc))}
+                                        {@const compactSignUp = isEvt ? getKioskSignUpText(item as any) : ""}
+                                        {#if (rawDesc && rawDesc.trim()) || compactSignUp}
+                                            <div class="mt-0.5 text-slate-600 leading-relaxed font-normal {itemPercentages[item.id] === undefined && descriptionStyle === 'short' ? (wrapAroundQr ? 'max-h-[3.25em] overflow-clip' : 'line-clamp-2') : ''} text-[10px]">
+                                                {#if compactSignUp}
+                                                    <span class="font-semibold text-amber-800 mr-1">{compactSignUp}.</span>
+                                                {/if}
+                                                {#if rawDesc && rawDesc.trim()}
+                                                    <span class="rich-description [&>p:first-child]:inline [&>p]:mb-0 [&>p+p]:mt-0.5">
+                                                        {@html (itemPercentages[item.id] === 100 ? rawDesc : (itemDescriptions[item.id] ?? rawDesc))}
+                                                    </span>
+                                                {/if}
                                             </div>
                                         {/if}
                                     {/if}
@@ -1894,9 +1903,17 @@
                                         </div>
                                     {/if}
 
-                                    <!-- Tags -->
-                                    {#if visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0}
+                                    <!-- Tags & Hidden-Description Compact SignUp -->
+                                    {#if (visibleComponents.tags && (item as any).tags && (item as any).tags.length > 0) || ((!(visibleComponents.descriptions && descriptionStyle !== "none")) && isEvt && getKioskSignUpText(item as any))}
                                         <div class="mt-0.5 [&>*]:mr-1 [&>*]:align-middle">
+                                            {#if !(visibleComponents.descriptions && descriptionStyle !== "none") && isEvt}
+                                                {@const compactSignUp = getKioskSignUpText(item as any)}
+                                                {#if compactSignUp}
+                                                    <span class="inline-block px-1 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[8px] font-semibold">
+                                                        {compactSignUp}
+                                                    </span>
+                                                {/if}
+                                            {/if}
                                             {#each (item as any).tags as t}
                                                 <span class="text-[8.5px] px-1 py-0.2 bg-slate-100 text-slate-500 rounded border border-slate-200">
                                                     #{typeof t === 'string' ? t : t.name || t.tag?.name}

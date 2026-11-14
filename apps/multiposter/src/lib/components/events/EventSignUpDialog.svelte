@@ -296,6 +296,32 @@
 		</Dialog.Header>
 
 		<div class="space-y-4 mt-2">
+			{#snippet signUpContactFallback()}
+				{#if signUpMode === "required" && resolvedSignUpContact}
+					<div class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5">
+						<p class="text-gray-600 font-medium">{m.sign_up_non_self_service_contact()}</p>
+						<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-900">
+							<span class="inline-flex items-center gap-1.5 font-semibold">
+								<User class="w-3.5 h-3.5 text-blue-600" />
+								{resolvedSignUpContact.name}
+							</span>
+							{#if resolvedSignUpContact.phone}
+								<a href="tel:{resolvedSignUpContact.phone}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
+									<Phone class="w-3.5 h-3.5" />
+									{resolvedSignUpContact.phone}
+								</a>
+							{/if}
+							{#if resolvedSignUpContact.email}
+								<a href="mailto:{resolvedSignUpContact.email}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
+									<Mail class="w-3.5 h-3.5" />
+									{resolvedSignUpContact.email}
+								</a>
+							{/if}
+						</div>
+					</div>
+				{/if}
+			{/snippet}
+
 			<p class="text-xs text-gray-600 bg-blue-50/70 border border-blue-100 rounded-lg p-3 leading-relaxed">
 				{m.sign_up_modal_intro?.() ||
 					"Reserve your spot for this event. Only your first and last name are required; provide an email address if you would like to receive event updates or location newsletters."}
@@ -309,30 +335,6 @@
 							? m.sign_up_closed_on({ date: formattedClosureDate })
 							: m.sign_up_closes_on({ date: formattedClosureDate })}
 					</span>
-				</div>
-			{/if}
-
-			{#if signUpMode === "required" && resolvedSignUpContact}
-				<div class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5">
-					<p class="text-gray-600 font-medium">{m.sign_up_non_self_service_contact()}</p>
-					<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-900">
-						<span class="inline-flex items-center gap-1.5 font-semibold">
-							<User class="w-3.5 h-3.5 text-blue-600" />
-							{resolvedSignUpContact.name}
-						</span>
-						{#if resolvedSignUpContact.phone}
-							<a href="tel:{resolvedSignUpContact.phone}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
-								<Phone class="w-3.5 h-3.5" />
-								{resolvedSignUpContact.phone}
-							</a>
-						{/if}
-						{#if resolvedSignUpContact.email}
-							<a href="mailto:{resolvedSignUpContact.email}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
-								<Mail class="w-3.5 h-3.5" />
-								{resolvedSignUpContact.email}
-							</a>
-						{/if}
-					</div>
 				</div>
 			{/if}
 
@@ -434,14 +436,17 @@
 					</div>
 				</div>
 			{:else if isClosed && !existingContactId}
-				<div class="flex items-start gap-2.5 text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl p-4">
-					<AlertCircle class="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
-					<div class="space-y-1">
-						<p class="font-semibold">{m.sign_up_closed_notice()}</p>
-						{#if formattedClosureDate}
-							<p class="text-xs text-red-700">{m.sign_up_closed_on({ date: formattedClosureDate })}</p>
-						{/if}
+				<div class="space-y-3">
+					<div class="flex items-start gap-2.5 text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl p-4">
+						<AlertCircle class="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+						<div class="space-y-1">
+							<p class="font-semibold">{m.sign_up_closed_notice()}</p>
+							{#if formattedClosureDate}
+								<p class="text-xs text-red-700">{m.sign_up_closed_on({ date: formattedClosureDate })}</p>
+							{/if}
+						</div>
 					</div>
+					{@render signUpContactFallback()}
 				</div>
 			{:else}
 				{#if existingContactId}
@@ -619,6 +624,8 @@
 							</span>
 						</label>
 					</div>
+
+					{@render signUpContactFallback()}
 
 					{#if formError}
 						<div class="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2.5">
