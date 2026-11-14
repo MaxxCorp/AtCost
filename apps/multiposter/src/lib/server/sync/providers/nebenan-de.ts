@@ -7,6 +7,7 @@ import type {
 } from '../types';
 import { NEBENAN_DE_API_URL } from '$app/env/private';
 import { htmlToPlainText } from '../utils/html';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * Nebenan.de Sync Provider
@@ -21,6 +22,8 @@ export class NebenanDeProvider implements SyncProvider {
     readonly supportsWebhooks = false;
     readonly supportedDirections: SyncDirection[] = ['push'];
     readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+    readonly defaultLanguage = 'de';
+    readonly supportsNativeSignUp = false;
 
     private config?: SyncConfig;
     private sessionToken?: string;
@@ -225,7 +228,14 @@ export class NebenanDeProvider implements SyncProvider {
         const summary = event.summary || 'Untitled Event';
         
         // Convert HTML description to readable plain text
-        const rawDescription = event.description || summary;
+        const rawDescription =
+            formatProviderDescription(event, {
+                supportsHtml: false,
+                defaultLanguage: this.defaultLanguage,
+                configLanguage: this.config?.settings?.preferredLanguage,
+                skipSignUpPrompt: this.supportsNativeSignUp,
+                fallbackDescription: summary
+            }) || summary;
         const plainDescription = htmlToPlainText(rawDescription);
 
         const locationName = event.venue?.name || event.location || '';

@@ -13,6 +13,7 @@ import { db } from '@ac/db';
 import { contact, emailCampaign, emailEvent } from '@ac/db';
 import { inArray } from '@ac/db';
 import { renderEmailTemplate, type EmailTemplateData } from '../../email-templates';
+import { formatProviderDescription } from '../utils/signup';
 import { BREVO_API_KEY } from '$app/env/private';
 import fs from 'fs';
 import path from 'path';
@@ -28,6 +29,7 @@ export class EmailProvider implements SyncProvider {
 	readonly supportsWebhooks = true;
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event', 'announcement'];
+	readonly supportsNativeSignUp = false;
 
 	private config?: SyncConfig;
 	private brevoApiKey?: string;
@@ -441,10 +443,16 @@ export class EmailProvider implements SyncProvider {
 			console.warn('[EmailProvider] Warning resolving event contact:', error);
 		}
 
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: true,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
+
 		const templateData: EmailTemplateData = {
 			event: {
 				summary: event.summary,
-				description: event.description,
+				description: formattedDescription,
 				startDateTime: event.startDateTime,
 				endDateTime: event.endDateTime,
 				location: event.location,

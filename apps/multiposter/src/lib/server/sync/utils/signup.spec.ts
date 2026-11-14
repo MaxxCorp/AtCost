@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
+	DEFAULT_SYNC_PREFERRED_LANGUAGE,
 	SYNC_PROVIDER_CAPABILITIES,
 	providerSupportsHtmlDescription,
+	resolveSyncLanguage,
+	normalizeSyncLocale,
+	getLocalizedSyncSignUpLabels,
 	buildEventSignUpUrl,
 	buildSyncSignUpPrompt,
 	prependSignUpPromptToDescription,
+	formatProviderDescription,
 	sanitizeEmailDescriptionHtml
 } from './signup';
 import type { ProviderType } from '../types';
@@ -30,6 +35,27 @@ const enLabels = {
 };
 
 describe('sync signup utilities', () => {
+	describe('language resolution & localization infrastructure', () => {
+		it('defaults to German (de) hardcoded in the sync layer', () => {
+			expect(DEFAULT_SYNC_PREFERRED_LANGUAGE).toBe('de');
+			expect(resolveSyncLanguage(undefined, null, '  ')).toBe('de');
+			expect(resolveSyncLanguage('en-US', 'de')).toBe('en-US');
+			expect(normalizeSyncLocale('de-DE')).toBe('de');
+			expect(normalizeSyncLocale('en-GB')).toBe('en');
+			expect(normalizeSyncLocale(undefined)).toBe('de');
+		});
+
+		it('resolves Paraglide labels explicitly for German and English without relying on cookie locale', () => {
+			const de = getLocalizedSyncSignUpLabels('de-DE');
+			expect(de.recommended).toBe('Anmeldung empfohlen');
+			expect(de.linkKeyword).toBe('Anmeldung');
+
+			const en = getLocalizedSyncSignUpLabels('en-US');
+			expect(en.recommended).toBe('Sign up recommended');
+			expect(en.linkKeyword).toBe('Sign up');
+		});
+	});
+
 	describe('providerSupportsHtmlDescription', () => {
 		it('classifies HTML-capable sync providers', () => {
 			const htmlProviders: ProviderType[] = [
@@ -226,6 +252,45 @@ describe('sync signup utilities', () => {
 				'Anmeldung empfohlen\n\nEvent details'
 			);
 			expect(prependSignUpPromptToDescription('', prompt, false)).toBe('Anmeldung empfohlen');
+		});
+	});
+
+	describe('formatProviderDescription', () => {
+		const eventWithSignUp = {
+			description: '<p>Weekly meetup details.</p>',
+			preferredLanguage: 'en',
+			startTimeZone: 'Europe/Berlin',
+			signUp: {
+				mode: 'required' as const,
+				closureDate: '2099-12-12T11:00:00.000Z',
+				signUpUrl: 'https://events.example.org/events/evt-1/view?signup=true',
+				contact: { phone: '+49305405659' }
+			}
+		};
+
+		it('translates prompt to event preferredLanguage on multi-language HTML providers', () => {
+			const res = formatProviderDescription(eventWithSignUp, { supportsHtml: true });
+			expect(res).toBe(
+				'<p><a href="https://events.example.org/events/evt-1/view?signup=true">Sign up</a> by 12/12/99 12:00 PM via +49305405659</p><p>Weekly meetup details.</p>'
+			);
+		});
+
+		it('enforces single-language provider defaultLanguage over event.preferredLanguage', () => {
+			const res = formatProviderDescription(eventWithSignUp, {
+				supportsHtml: false,
+				defaultLanguage: 'de'
+			});
+			expect(res).toBe(
+				'Anmeldung bis 12.12.99 12:00 über +49305405659\n\n<p>Weekly meetup details.</p>'
+			);
+		});
+
+		it('skips sign-up prompt generation when provider handles sign-ups natively via API', () => {
+			const res = formatProviderDescription(eventWithSignUp, {
+				supportsHtml: true,
+				skipSignUpPrompt: true
+			});
+			expect(res).toBe('<p>Weekly meetup details.</p>');
 		});
 	});
 

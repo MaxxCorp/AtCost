@@ -6,6 +6,7 @@ import type {
 	SyncDirection
 } from '../types';
 import { renderInstagramTemplate } from '../../instagram-templates';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * Instagram Sync Provider
@@ -17,6 +18,7 @@ export class InstagramProvider implements SyncProvider {
 	readonly supportsWebhooks = false;
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event', 'announcement'];
+	readonly supportsNativeSignUp = false;
 
 	private config?: SyncConfig;
 	private accessToken?: string;
@@ -54,13 +56,17 @@ export class InstagramProvider implements SyncProvider {
 		throw new Error('Instagram provider only supports push operations');
 	}
 
-	async pushEvent(event: ExternalEvent): Promise<{ externalId: string; etag?: string }> {
-		if (!this.config) throw new Error('Instagram provider not initialized');
+	private buildTemplateData(event: ExternalEvent) {
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: false,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
 
-		const templateData = {
+		return {
 			event: {
 				summary: event.summary,
-				description: event.description,
+				description: formattedDescription,
 				startDateTime: event.startDateTime,
 				endDateTime: event.endDateTime,
 				location: event.location,
@@ -69,6 +75,12 @@ export class InstagramProvider implements SyncProvider {
 			},
 			hashtags: this.defaultHashtags
 		};
+	}
+
+	async pushEvent(event: ExternalEvent): Promise<{ externalId: string; etag?: string }> {
+		if (!this.config) throw new Error('Instagram provider not initialized');
+
+		const templateData = this.buildTemplateData(event);
 
 		// Render caption & HTML using selected Svelte template
 		const { caption } = renderInstagramTemplate(this.selectedTemplate, templateData);
@@ -136,18 +148,7 @@ export class InstagramProvider implements SyncProvider {
 	async updateEvent(externalId: string, event: ExternalEvent): Promise<{ etag?: string }> {
 		if (!this.config) throw new Error('Instagram provider not initialized');
 
-		const templateData = {
-			event: {
-				summary: event.summary,
-				description: event.description,
-				startDateTime: event.startDateTime,
-				endDateTime: event.endDateTime,
-				location: event.location,
-				ticketPrice: event.ticketPrice,
-				organizer: event.organizer
-			},
-			hashtags: this.defaultHashtags
-		};
+		const templateData = this.buildTemplateData(event);
 
 		const { caption } = renderInstagramTemplate(this.selectedTemplate, templateData);
 

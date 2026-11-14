@@ -3,6 +3,7 @@ import type {
 	SyncConfig,
 	SyncMapping,
 	ExternalEvent,
+	ExternalEventSignUp,
 	SyncResult,
 	SyncDirection,
 	ProviderType
@@ -79,9 +80,8 @@ import { invalidateEvent } from '#lib/server/cache/index.js';
 import { expandRecurrence, computeOccurrenceSignUpClosureDate } from '#lib/server/events/recurrence.js';
 import {
 	buildEventSignUpUrl,
-	buildSyncSignUpPrompt,
-	prependSignUpPromptToDescription,
-	providerSupportsHtmlDescription
+	DEFAULT_SYNC_PREFERRED_LANGUAGE,
+	resolveSyncLanguage
 } from './utils/signup';
 import { isSeriesItem, getSeriesRootId } from '#lib/utils/event-series.js';
 import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from '#lib/utils/kiosk-dates.js';
@@ -2288,7 +2288,14 @@ export class SyncService {
 			);
 		}
 
-		// Prepend computed sign-up requirement/recommendation prompt for events
+		const preferredLanguage = resolveSyncLanguage(
+			config?.settings?.preferredLanguage as string | undefined,
+			DEFAULT_SYNC_PREFERRED_LANGUAGE
+		);
+
+		let signUp: ExternalEventSignUp | undefined;
+
+		// Build structured sign-up metadata so providers can translate prompts or map native signup APIs
 		if (isEvent && (internal.signUpMode === 'recommended' || internal.signUpMode === 'required')) {
 			let resolvedSignUpContact: { name: string; email?: string; phone?: string } | null = null;
 			if (internal.signUpMode === 'required') {
@@ -2331,25 +2338,16 @@ export class SyncService {
 				!isVirtual &&
 				!isException &&
 				Boolean(internal.seriesId || (recurrenceRules && recurrenceRules.length > 0));
-			const signUpPrompt = buildSyncSignUpPrompt(
-				{
-					id: internal.id,
-					signUpMode: internal.signUpMode,
-					signUpClosureDate: internal.signUpClosureDate,
-					signUpRecurrence: internal.signUpRecurrence,
-					startTimeZone: internal.startTimeZone,
-					resolvedSignUpContact
-				},
-				{
-					signUpUrl: buildEventSignUpUrl(baseUrl, internal.id),
-					isRecurringSeries
-				}
-			);
-			description = prependSignUpPromptToDescription(
-				description,
-				signUpPrompt,
-				providerSupportsHtmlDescription(providerId)
-			);
+
+			signUp = {
+				mode: internal.signUpMode,
+				closureDate: internal.signUpClosureDate ?? null,
+				recurrence: internal.signUpRecurrence ?? null,
+				isRecurringSeries,
+				startTimeZone: internal.startTimeZone ?? null,
+				signUpUrl: buildEventSignUpUrl(baseUrl, internal.id),
+				contact: resolvedSignUpContact
+			};
 		}
 
 		return {
@@ -2358,6 +2356,8 @@ export class SyncService {
 			summary,
 			status: internal.status,
 			description,
+			preferredLanguage,
+			signUp,
 			location: venue?.name || internal.location || undefined,
 			startDateTime: internal.startDateTime || internal.createdAt || new Date(),
 			startTimeZone: internal.startTimeZone || 'UTC',

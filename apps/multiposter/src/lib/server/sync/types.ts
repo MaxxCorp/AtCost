@@ -26,6 +26,20 @@ export interface SyncConfig {
 	updatedAt: Date;
 }
 
+export interface ExternalEventSignUp {
+	mode: 'off' | 'recommended' | 'required';
+	closureDate?: Date | string | null;
+	recurrence?: string[] | null;
+	isRecurringSeries?: boolean;
+	startTimeZone?: string | null;
+	signUpUrl?: string;
+	contact?: {
+		name?: string | null;
+		phone?: string | null;
+		email?: string | null;
+	} | null;
+}
+
 /**
  * Represents an external event from a provider
  */
@@ -65,6 +79,16 @@ export interface ExternalEvent {
 	};
 	ticketPrice?: string;
 	ticketPriceUnknown?: boolean;
+	/**
+	 * Preferred BCP-47 language/locale tag (e.g. 'de', 'en') for outbound content when
+	 * synchronizations target a single content language/version.
+	 */
+	preferredLanguage?: string;
+	/**
+	 * Structured event sign-up configuration so sync providers can either map to native
+	 * registration API fields or localize and prepend a sign-up prompt to their description.
+	 */
+	signUp?: ExternalEventSignUp;
 
 	tags?: Array<{ id: string; name: string }>;
 	venueId?: string; // Internal ID reference for mapping lookups
@@ -181,6 +205,15 @@ export interface SyncProvider {
 	 * When false or undefined, recurring series are expanded into individual instances for the provider.
 	 */
 	readonly supportsNativeRecurrence?: boolean;
+	/**
+	 * Default target language when a provider only supports one content language (e.g. 'de').
+	 */
+	readonly defaultLanguage?: string;
+	/**
+	 * Whether the provider natively supports event sign-ups/registration via its own API,
+	 * making text prompt generation in the description unnecessary.
+	 */
+	readonly supportsNativeSignUp?: boolean;
 
 	/**
 	 * Determine if a specific event should be synced by this provider.

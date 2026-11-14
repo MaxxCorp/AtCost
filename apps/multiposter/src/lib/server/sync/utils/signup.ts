@@ -1,5 +1,4 @@
 import * as m from '#lib/paraglide/messages.js';
-import { getLocale } from '#lib/paraglide/runtime.js';
 import { formatRecurrenceText } from '#lib/utils/format-recurrence.js';
 import {
 	escapeHtml,
@@ -8,9 +7,17 @@ import {
 	normalizeSignUpRecurrence,
 	sanitizeEmailDescriptionHtml
 } from '#lib/utils/event-signup.js';
-import type { ProviderType } from '../types';
+import type { ExternalEvent, ProviderType } from '../types';
 
 export { escapeHtml, sanitizeEmailDescriptionHtml };
+
+/**
+ * Hardcoded default target content language for outbound synchronizations when no
+ * provider- or config-specific language is supplied.
+ */
+export const DEFAULT_SYNC_PREFERRED_LANGUAGE = 'de';
+
+export type SupportedSyncLocale = 'de' | 'en';
 
 export interface SyncProviderCapabilities {
 	supportsHtmlDescription: boolean;
@@ -44,6 +51,23 @@ export function providerSupportsHtmlDescription(providerId: ProviderType): boole
 	return SYNC_PROVIDER_CAPABILITIES[providerId]?.supportsHtmlDescription ?? false;
 }
 
+export function resolveSyncLanguage(
+	...candidates: Array<string | null | undefined>
+): string {
+	for (const candidate of candidates) {
+		if (typeof candidate === 'string') {
+			const trimmed = candidate.trim();
+			if (trimmed.length > 0) return trimmed;
+		}
+	}
+	return DEFAULT_SYNC_PREFERRED_LANGUAGE;
+}
+
+export function normalizeSyncLocale(language?: string | null): SupportedSyncLocale {
+	const base = (language || DEFAULT_SYNC_PREFERRED_LANGUAGE).trim().toLowerCase().split(/[-_]/)[0];
+	return base === 'en' ? 'en' : 'de';
+}
+
 export function buildEventSignUpUrl(baseUrl: string, eventId: string): string {
 	const cleanBase = (baseUrl || '').replace(/\/+$/, '');
 	const cleanId = encodeURIComponent(eventId);
@@ -60,15 +84,16 @@ export interface SyncSignUpPromptLabels {
 	linkKeyword: string;
 }
 
-function getDefaultSyncSignUpLabels(): SyncSignUpPromptLabels {
+export function getLocalizedSyncSignUpLabels(language?: string | null): SyncSignUpPromptLabels {
+	const locale = normalizeSyncLocale(language);
 	return {
-		recommended: m.sync_sign_up_recommended(),
-		req: m.sync_sign_up_required(),
-		reqContact: (contact) => m.sync_sign_up_via_contact({ contact }),
-		by: (date) => m.sync_sign_up_by({ date }),
-		viaContact: (contact) => m.kiosk_sign_up_via_contact({ contact }),
-		closed: m.sync_sign_up_closed(),
-		linkKeyword: m.sync_sign_up_link_keyword()
+		recommended: m.sync_sign_up_recommended({}, { locale }),
+		req: m.sync_sign_up_required({}, { locale }),
+		reqContact: (contact) => m.sync_sign_up_via_contact({ contact }, { locale }),
+		by: (date) => m.sync_sign_up_by({ date }, { locale }),
+		viaContact: (contact) => m.kiosk_sign_up_via_contact({ contact }, { locale }),
+		closed: m.sync_sign_up_closed({}, { locale }),
+		linkKeyword: m.sync_sign_up_link_keyword({}, { locale })
 	};
 }
 
@@ -87,13 +112,14 @@ export interface SyncSignUpPromptEventInput {
 
 /**
  * Formats an event's sign-up prompt into both plain text and an HTML paragraph with the
- * sign-up keyword linked to the self-service registration form. Returns `null` when
- * sign-up is disabled (`off` or unset).
+ * sign-up keyword linked to the self-service registration form, translated to the resolved
+ * sync target language. Returns `null` when sign-up is disabled (`off` or unset).
  */
 export function buildSyncSignUpPrompt(
 	event: SyncSignUpPromptEventInput | null | undefined,
 	options: {
 		signUpUrl: string;
+		language?: string;
 		locale?: string;
 		timeZone?: string;
 		isRecurringSeries?: boolean;
@@ -104,8 +130,9 @@ export function buildSyncSignUpPrompt(
 	const mode = event.signUpMode;
 	if (mode !== 'recommended' && mode !== 'required') return null;
 
-	const labels = options.labels ?? getDefaultSyncSignUpLabels();
-	const locale = options.locale ?? getLocale();
+	const targetLanguage = resolveSyncLanguage(options.language, options.locale);
+	const messageLocale = normalizeSyncLocale(targetLanguage);
+	const labels = options.labels ?? getLocalizedSyncSignUpLabels(targetLanguage);
 	const timeZone = options.timeZone ?? event.startTimeZone ?? undefined;
 
 	let text = '';
@@ -118,13 +145,13 @@ export function buildSyncSignUpPrompt(
 			const recText = formatRecurrenceText(recurrenceRules, {
 				short: true,
 				includeEnd: false,
-				locale,
+				locale: messageLocale,
 				dtstart: event.signUpClosureDate ?? undefined
 			});
 			if (recText) {
 				const timeText = formatSignUpClosureTimeText(
 					event.signUpClosureDate,
-					locale,
+					targetLanguage,
 					timeZone,
 					true
 				);
@@ -144,7 +171,7 @@ export function buildSyncSignUpPrompt(
 				byPlain: labels.by,
 				viaContact: labels.viaContact
 			},
-			locale,
+			targetLanguage,
 			timeZone,
 			{
 				showQrCode: false,
@@ -194,4 +221,49 @@ export function prependSignUpPromptToDescription(
 	}
 
 	return trimmed ? `${prompt.text}\n\n${trimmed}` : prompt.text;
+}
+
+/**
+ * Formats an event's outbound description at the sync-provider level, translating any
+ * structured `event.signUp` info to the provider's/event's target language and prepending
+ * it when the provider does not handle sign-ups natively via API.
+ */
+export function formatProviderDescription(
+	event: Pick<ExternalEvent, 'description' | 'signUp' | 'preferredLanguage' | 'startTimeZone'>,
+	options: {
+		supportsHtml: boolean;
+		defaultLanguage?: string;
+		configLanguage?: string;
+		fallbackDescription?: string;
+		skipSignUpPrompt?: boolean;
+	}
+): string | undefined {
+	const baseDescription = event.description || options.fallbackDescription || undefined;
+	if (options.skipSignUpPrompt || !event.signUp) {
+		return baseDescription;
+	}
+
+	const language = resolveSyncLanguage(
+		options.defaultLanguage,
+		options.configLanguage,
+		event.preferredLanguage
+	);
+
+	const prompt = buildSyncSignUpPrompt(
+		{
+			signUpMode: event.signUp.mode,
+			signUpClosureDate: event.signUp.closureDate,
+			signUpRecurrence: event.signUp.recurrence,
+			startTimeZone: event.signUp.startTimeZone ?? event.startTimeZone,
+			resolvedSignUpContact: event.signUp.contact
+		},
+		{
+			signUpUrl: event.signUp.signUpUrl ?? '',
+			language,
+			timeZone: event.signUp.startTimeZone ?? event.startTimeZone ?? undefined,
+			isRecurringSeries: event.signUp.isRecurringSeries
+		}
+	);
+
+	return prependSignUpPromptToDescription(baseDescription, prompt, options.supportsHtml);
 }

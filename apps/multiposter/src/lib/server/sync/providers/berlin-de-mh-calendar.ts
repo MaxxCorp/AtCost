@@ -9,6 +9,7 @@ import { parsePricing } from '../utils/pricing';
 import { resolveContactForEventId } from '#lib/server/contact-resolution.js';
 import { BERLIN_DE_MH_API_URL, ORG_NAME, ORG_WWW } from '$app/env/private';
 import { htmlToPlainText } from '../utils/html';
+import { formatProviderDescription } from '../utils/signup';
 import { isSeriesItem } from '#lib/utils/event-series.js';
 
 /**
@@ -28,6 +29,8 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
     readonly supportedDirections: SyncDirection[] = ['push'];
     readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
     readonly supportsNativeRecurrence = false;
+    readonly defaultLanguage = 'de';
+    readonly supportsNativeSignUp = false;
 
     shouldSyncEvent(event: any): boolean {
         if (event.status === 'cancelled') return false;
@@ -493,7 +496,14 @@ export class BerlinDeMhCalendarProvider implements SyncProvider {
      */
     private async submitText(editId: string, event: ExternalEvent): Promise<void> {
         // Convert HTML description to readable plain text
-        const rawDescription = event.description || event.summary;
+        const rawDescription =
+            formatProviderDescription(event, {
+                supportsHtml: false,
+                defaultLanguage: this.defaultLanguage,
+                configLanguage: this.config?.settings?.preferredLanguage,
+                skipSignUpPrompt: this.supportsNativeSignUp,
+                fallbackDescription: event.summary
+            }) || event.summary;
         const plainDescription = htmlToPlainText(rawDescription);
 
         await this.postForm(this.editUrl(editId, 'text'), {

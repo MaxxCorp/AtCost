@@ -9,6 +9,7 @@ import { getAuthenticatedUser } from '#lib/server/authorization.js';
 import { resolveEventContact } from '../../contact-resolution';
 import { db } from '@ac/db';
 import { user } from '@ac/db';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * Bewegungsatlas.Berlin sync provider implementation
@@ -20,6 +21,8 @@ export class BewegungsatlasBerlinProvider implements SyncProvider {
 	readonly supportsWebhooks = false;
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly defaultLanguage = 'de';
+	readonly supportsNativeSignUp = false;
 
 
 	private config?: SyncConfig;
@@ -235,8 +238,14 @@ export class BewegungsatlasBerlinProvider implements SyncProvider {
 
 		// Basic event information
 		formData['event_title'] = event.summary;
-		if (event.description) {
-			formData['event_description'] = event.description;
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: true,
+			defaultLanguage: this.defaultLanguage,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
+		if (formattedDescription) {
+			formData['event_description'] = formattedDescription;
 		}
 
 		// Date and time
@@ -290,7 +299,7 @@ export class BewegungsatlasBerlinProvider implements SyncProvider {
 			formData['event_target_audience'] = event.metadata.targetAudience;
 		}
 
-		if (event.metadata?.registrationRequired) {
+		if (event.signUp?.mode === 'required' || event.metadata?.registrationRequired) {
 			formData['event_registration_required'] = '1';
 		}
 

@@ -11,6 +11,7 @@ import { eq } from '@ac/db';
 import { resolveEventContact } from '#lib/server/contact-resolution.js';
 import { parsePricing } from '../utils/pricing';
 import { htmlToPlainText } from '../utils/html';
+import { formatProviderDescription } from '../utils/signup';
 import { isSeriesItem } from '#lib/utils/event-series.js';
 
 /**
@@ -24,6 +25,8 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 	readonly supportsNativeRecurrence = false;
+	readonly defaultLanguage = 'de';
+	readonly supportsNativeSignUp = false;
 
 	shouldSyncEvent(event: any): boolean {
 		if (event.status === 'cancelled') return false;
@@ -169,8 +172,14 @@ export class BerlinDeMainCalendarProvider implements SyncProvider {
 
 		// Map basic fields
 		formData[this.fieldMappings.titel] = event.summary;
-		if (event.description) {
-			formData[this.fieldMappings.beschreibung] = htmlToPlainText(event.description);
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: false,
+			defaultLanguage: this.defaultLanguage,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
+		if (formattedDescription) {
+			formData[this.fieldMappings.beschreibung] = htmlToPlainText(formattedDescription);
 		}
 		if (event.location) {
 			formData[this.fieldMappings.veranstaltungsort] = event.location;

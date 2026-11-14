@@ -6,6 +6,7 @@ import type {
 	SyncDirection
 } from '../types';
 import { htmlToPlainText } from '../utils/html';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * Seniorennetz.Berlin sync provider implementation
@@ -17,6 +18,8 @@ export class SeniorennetzBerlinProvider implements SyncProvider {
 	readonly supportsWebhooks = false; // Web form submission doesn't support webhooks
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly defaultLanguage = 'de';
+	readonly supportsNativeSignUp = false;
 
 
 	private config?: SyncConfig;
@@ -130,7 +133,15 @@ export class SeniorennetzBerlinProvider implements SyncProvider {
 
 		// Basic event information
 		formData['title'] = event.summary;
-		formData['description'] = htmlToPlainText(event.description || event.summary);
+		const formattedDescription =
+			formatProviderDescription(event, {
+				supportsHtml: false,
+				defaultLanguage: this.defaultLanguage,
+				configLanguage: this.config?.settings?.preferredLanguage,
+				skipSignUpPrompt: this.supportsNativeSignUp,
+				fallbackDescription: event.summary
+			}) || event.summary;
+		formData['description'] = htmlToPlainText(formattedDescription);
 
 		// Date and time handling
 		if (event.startDateTime) {

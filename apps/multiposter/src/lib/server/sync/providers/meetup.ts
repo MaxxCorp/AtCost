@@ -9,6 +9,7 @@ import { MEETUP_CLIENT_ID, MEETUP_CLIENT_SECRET } from '$app/env/private';
 import { db } from '@ac/db';
 import { account } from '@ac/db';
 import { eq, and } from '@ac/db';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * Meetup sync provider implementation
@@ -20,6 +21,7 @@ export class MeetupProvider implements SyncProvider {
 	readonly supportsWebhooks = false; // Meetup doesn't support webhooks for push-only sync
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeSignUp = false;
 
 
 	private config?: SyncConfig;
@@ -290,10 +292,17 @@ export class MeetupProvider implements SyncProvider {
 	}
 
 	private mapToMeetupEvent(event: ExternalEvent): any {
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: true,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp,
+			fallbackDescription: event.summary
+		});
+
 		const meetupEvent: any = {
 			groupUrlname: this.config?.settings?.groupUrlname || '',
 			title: event.summary,
-			description: event.description || event.summary,
+			description: formattedDescription || event.summary,
 			startDateTime: event.startDateTime?.toISOString(),
 			publishStatus: 'PUBLISHED' // Create events as published by default
 		};

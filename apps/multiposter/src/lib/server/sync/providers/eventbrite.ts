@@ -9,6 +9,7 @@ import { EVENTBRITE_CLIENT_ID, EVENTBRITE_CLIENT_SECRET } from '$app/env/private
 import { db } from '@ac/db';
 import { account } from '@ac/db';
 import { eq, and } from '@ac/db';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * Eventbrite sync provider implementation
@@ -20,6 +21,7 @@ export class EventbriteProvider implements SyncProvider {
 	readonly supportsWebhooks = false; // Eventbrite doesn't support webhooks for push-only sync
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
+	readonly supportsNativeSignUp = false;
 
 
 	private config?: SyncConfig;
@@ -203,12 +205,19 @@ export class EventbriteProvider implements SyncProvider {
 	}
 
 	private mapToEventbriteEvent(event: ExternalEvent): any {
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: true,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp,
+			fallbackDescription: event.summary
+		});
+
 		const eventbriteEvent: any = {
 			name: {
 				html: event.summary
 			},
 			description: {
-				html: event.description || event.summary
+				html: formattedDescription || event.summary
 			},
 			start: {
 				timezone: event.startTimeZone || 'UTC',

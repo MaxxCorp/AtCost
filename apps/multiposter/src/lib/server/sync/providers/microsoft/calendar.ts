@@ -13,6 +13,7 @@ import {
 	mapRRuleToMicrosoftRecurrence,
 	mapMicrosoftRecurrenceToRRule
 } from './recurrence';
+import { formatProviderDescription } from '../../utils/signup';
 
 export class MicrosoftCalendarProvider implements SyncProvider {
 	readonly type: ProviderType = 'microsoft-calendar';
@@ -21,6 +22,7 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 	readonly supportedDirections: SyncDirection[] = ['pull', 'push', 'bidirectional'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 	readonly supportsNativeRecurrence = true;
+	readonly supportsNativeSignUp = false;
 
 	private client = new MicrosoftGraphClient();
 	private config?: SyncConfig;
@@ -417,10 +419,16 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			subject = `[Cancelled] ${subject}`;
 		}
 
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: true,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
+
 		const msEvent: any = {
 			subject,
 			showAs,
-			body: event.description ? { contentType: 'HTML', content: event.description } : undefined,
+			body: formattedDescription ? { contentType: 'HTML', content: formattedDescription } : undefined,
 			location: event.location ? { displayName: event.location } : undefined,
 			isAllDay: event.isAllDay,
 			transactionId: event.metadata?.app_event_id

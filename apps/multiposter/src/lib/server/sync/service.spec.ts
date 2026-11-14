@@ -18,6 +18,7 @@ import { getEntityContacts } from '../contacts';
 import { WpTheEventsCalendarProvider } from './providers/wp-the-events-calendar';
 import { BerlinDeMhCalendarProvider } from './providers/berlin-de-mh-calendar';
 import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
+import { GoogleCalendarProvider } from './providers/google-calendar';
 
 // Mock the database
 vi.mock('@ac/db', async (importOriginal) => {
@@ -2162,15 +2163,39 @@ describe('SyncService - Public Data Leak Prevention', () => {
 				undefined,
 				configBase
 			);
-			expect(googleExternal.description).toMatch(
-				/^<p><a href="[^"]+\/events\/evt-signup-1\/view\?signup=true">(Anmeldung|Sign up)<\/a>/
-			);
-			expect(googleExternal.description).toContain('+49305405659');
-			expect(googleExternal.description).toContain('<p>Join our weekly course.</p>');
+			expect(googleExternal.preferredLanguage).toBe('de');
+			expect(googleExternal.description).toBe('<p>Join our weekly course.</p>');
+			expect(googleExternal.signUp).toMatchObject({
+				mode: 'required',
+				signUpUrl: expect.stringMatching(/\/events\/evt-signup-1\/view\?signup=true$/),
+				contact: { phone: '+49305405659', email: 'desk@work.example' }
+			});
 			expect(googleExternal.metadata?.registrationRequired).toBe(true);
 			expect(googleExternal.metadata?.signUpMode).toBe('required');
 
-			// Plain-text provider with a NON-public contact: must omit private phone/email and use plain text paragraph
+			// Provider-level formatting: Google Calendar translates prompt in German by default
+			const googleProvider = new GoogleCalendarProvider();
+			const mappedGoogle = (googleProvider as any).mapToGoogleEvent(googleExternal);
+			expect(mappedGoogle.description).toMatch(
+				/^<p><a href="[^"]+\/events\/evt-signup-1\/view\?signup=true">Anmeldung<\/a> bis 12\.12\.99 12:00 über \+49305405659<\/p><p>Join our weekly course\.<\/p>$/
+			);
+
+			// Config override to English translates the provider prompt to English
+			const enConfig: SyncConfig = { ...configBase, settings: { preferredLanguage: 'en' } };
+			vi.mocked(getEntityContacts).mockResolvedValueOnce(assocContacts as any);
+			const enExternal = await (service as any).mapInternalToExternal(
+				internalEvent,
+				'google-calendar',
+				undefined,
+				enConfig
+			);
+			expect(enExternal.preferredLanguage).toBe('en');
+			const mappedGoogleEn = (googleProvider as any).mapToGoogleEvent(enExternal);
+			expect(mappedGoogleEn.description).toMatch(
+				/^<p><a href="[^"]+\/events\/evt-signup-1\/view\?signup=true">Sign up<\/a> by 12\/12\/99 12:00 PM via \+49305405659<\/p><p>Join our weekly course\.<\/p>$/
+			);
+
+			// Single-language plain-text provider with a NON-public contact: must omit private phone/email and enforce German plain text
 			const privateContactEvent = {
 				...internalEvent,
 				id: 'evt-signup-private-ctc',
@@ -2191,11 +2216,22 @@ describe('SyncService - Public Data Leak Prevention', () => {
 				privateContactEvent,
 				'berlin-de-main-calendar',
 				undefined,
-				{ ...configBase, providerId: 'berlin', providerType: 'berlin-de-main-calendar' }
+				{
+					...configBase,
+					providerId: 'berlin',
+					providerType: 'berlin-de-main-calendar',
+					settings: { preferredLanguage: 'en' }
+				}
 			);
-			expect(berlinExternal.description).toMatch(/^(Anmeldung bis|Sign up by) .+\n\n<p>Join our weekly course\.<\/p>$/);
-			expect(berlinExternal.description).not.toContain('<a href');
-			expect(berlinExternal.description).not.toContain('+491709999999');
+			expect(berlinExternal.signUp?.contact).toBeNull();
+			const berlinProvider = new BerlinDeMainCalendarProvider();
+			const berlinFormData = await (berlinProvider as any).mapEventToFormData(berlinExternal, {
+				name: 'Organizer',
+				email: 'org@example.org'
+			});
+			expect(berlinFormData.description).toBe('Anmeldung bis 12.12.99 12:00\n\nJoin our weekly course.');
+			expect(berlinFormData.description).not.toContain('<a href');
+			expect(berlinFormData.description).not.toContain('+491709999999');
 		});
 
 		it('computes occurrence-specific signUpClosureDate when getEventRecord synthesizes a _inst_ event with signUpRecurrence', async () => {

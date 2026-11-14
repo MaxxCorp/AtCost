@@ -19,6 +19,7 @@ import {
 import { db } from '@ac/db';
 import { account } from '@ac/db';
 import { eq, and } from '@ac/db';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * Google Calendar sync provider implementation
@@ -28,6 +29,7 @@ export class GoogleCalendarProvider implements SyncProvider {
 	readonly name = 'Google Calendar';
 	readonly supportsWebhooks = true;
 	readonly supportedDirections: SyncDirection[] = ['pull', 'push', 'bidirectional'];
+	readonly supportsNativeSignUp = false;
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 	readonly supportsNativeRecurrence = true;
 
@@ -502,10 +504,16 @@ export class GoogleCalendarProvider implements SyncProvider {
 	}
 
 	private mapToGoogleEvent(event: ExternalEvent): calendar_v3.Schema$Event {
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: true,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
+
 		const gcalEvent: calendar_v3.Schema$Event = {
 			summary: event.summary,
 			status: event.status,
-			description: event.description,
+			description: formattedDescription,
 			location: event.location,
 			start: {},
 			end: {},

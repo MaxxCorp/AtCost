@@ -15,6 +15,7 @@ import {
 
 import crypto from 'crypto';
 import { parsePricing } from '../utils/pricing';
+import { formatProviderDescription } from '../utils/signup';
 
 /**
  * WordPress The Events Calendar sync provider implementation
@@ -27,6 +28,7 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	readonly supportedDirections: SyncDirection[] = ['push'];
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 	readonly supportsNativeRecurrence = false;
+	readonly supportsNativeSignUp = false;
 
 	private config?: SyncConfig;
 	private baseUrl = '';
@@ -729,11 +731,17 @@ export class WpTheEventsCalendarProvider implements SyncProvider {
 	}
 
 	private mapEventToWpFormat(event: ExternalEvent): any {
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: true,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
+
 		// If description is empty or contains no meaningful content, use an invisible string
 		// (zero-width space) so the sync will not be rejected by The Events Calendar WP plugin API.
-		const hasContent = Boolean(event.description && (event.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/[\s\u200B\uFEFF]/g, '').length > 0 || (/<(img|iframe|svg|video|audio|figure)\b/i).test(event.description)));
+		const hasContent = Boolean(formattedDescription && (formattedDescription.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/[\s\u200B\uFEFF]/g, '').length > 0 || (/<(img|iframe|svg|video|audio|figure)\b/i).test(formattedDescription)));
 
-		const description = hasContent ? event.description! : '\u200B';
+		const description = hasContent ? formattedDescription! : '\u200B';
 
 		// Map our internal event format to WordPress Events Calendar REST API format
 		const wpEvent: any = {

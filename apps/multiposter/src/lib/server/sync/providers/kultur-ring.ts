@@ -5,6 +5,7 @@ import type {
 	SyncDirection,
 	SyncProvider
 } from '../types';
+import { formatProviderDescription } from '../utils/signup';
 
 export interface KulturRingOption {
 	id: string;
@@ -378,6 +379,8 @@ export class KulturRingProvider implements SyncProvider {
 	readonly supportedEntityTypes: ('event' | 'announcement')[] = ['event'];
 	readonly supportsWebhooks = false;
 	readonly supportsNativeRecurrence = false;
+	readonly defaultLanguage = 'de';
+	readonly supportsNativeSignUp = false;
 
 	private config?: SyncConfig;
 	private baseUrl = 'https://db.kulturring.berlin/db';
@@ -604,7 +607,13 @@ export class KulturRingProvider implements SyncProvider {
 		const rawTitle = event.summary?.trim() || 'Veranstaltung';
 		const titel = truncateWithEllipsis(rawTitle, 40);
 
-		const plainDescription = event.description ? htmlToPlainText(event.description) : '';
+		const formattedDescription = formatProviderDescription(event, {
+			supportsHtml: false,
+			defaultLanguage: this.defaultLanguage,
+			configLanguage: this.config?.settings?.preferredLanguage,
+			skipSignUpPrompt: this.supportsNativeSignUp
+		});
+		const plainDescription = formattedDescription ? htmlToPlainText(formattedDescription) : '';
 		const text = plainDescription ? truncateWithEllipsis(plainDescription, 200) : '';
 
 		const eintritt = parsePricingForKulturRing(event.ticketPrice);
