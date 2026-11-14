@@ -192,7 +192,8 @@ export function formatSignUpClosureDateShort(
 	if (!d) return '';
 	const isDe = (locale || '').toLowerCase().startsWith('de');
 	const datePart = d.toLocaleDateString(locale || undefined, {
-		month: isDe ? '2-digit' : 'short',
+		year: '2-digit',
+		month: isDe ? '2-digit' : 'numeric',
 		day: isDe ? '2-digit' : 'numeric',
 		...(timeZone ? { timeZone } : {})
 	});
@@ -204,7 +205,7 @@ export function formatSignUpClosureDateShort(
 		minute: '2-digit',
 		...(timeZone ? { timeZone } : {})
 	});
-	return `${datePart}, ${timePart}`;
+	return `${datePart} ${timePart}`;
 }
 
 /**
@@ -220,6 +221,7 @@ export function formatKioskSignUpCompact(
 	labels: {
 		req: string;
 		by: (date: string) => string;
+		orContact: (contact: string) => string;
 		closed: string;
 	},
 	locale?: string,
@@ -228,20 +230,16 @@ export function formatKioskSignUpCompact(
 	if (!event || event.signUpMode !== 'required') return '';
 
 	const closed = isSignUpClosed(event.signUpMode, event.signUpClosureDate);
-	const shortDate = formatSignUpClosureDateShort(event.signUpClosureDate, locale, timeZone);
-	const statusPart = closed
-		? labels.closed
-		: shortDate
-			? labels.by(shortDate)
-			: labels.req;
-
 	const c = event.resolvedSignUpContact;
-	const contactName = c?.name?.trim() || '';
 	const contactChannel = c?.phone?.trim() || c?.email?.trim() || '';
-	const contactPart = [contactName, contactChannel].filter(Boolean).join(', ');
 
-	if (!contactPart) return statusPart;
-	return `${statusPart} (${contactPart})`;
+	if (closed) {
+		return contactChannel ? `${labels.closed} (${contactChannel})` : labels.closed;
+	}
+
+	const shortDate = formatSignUpClosureDateShort(event.signUpClosureDate, locale, timeZone);
+	const base = shortDate ? labels.by(shortDate) : labels.req;
+	return contactChannel ? `${base}${labels.orContact(contactChannel)}` : base;
 }
 
 /**

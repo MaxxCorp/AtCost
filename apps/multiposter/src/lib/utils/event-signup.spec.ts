@@ -60,10 +60,10 @@ describe('event-signup utilities', () => {
 			expect(customFullDe).toContain('18:30');
 
 			const defaultShortDe = formatSignUpClosureDateShort(defaultIso, 'de-DE', 'Europe/Berlin');
-			expect(defaultShortDe).toBe('20.11.');
+			expect(defaultShortDe).toBe('20.11.26');
 
 			const customShortDe = formatSignUpClosureDateShort(customIso, 'de-DE', 'Europe/Berlin');
-			expect(customShortDe).toBe('20.11., 18:30');
+			expect(customShortDe).toBe('20.11.26 18:30');
 		});
 
 		it('enforces closure at the exact closure timestamp and only for required mode', () => {
@@ -154,8 +154,9 @@ describe('event-signup utilities', () => {
 
 	describe('formatKioskSignUpCompact', () => {
 		const labels = {
-			req: 'Anmeldung erf.',
-			by: (d: string) => `Anmeldung bis ${d}`,
+			req: 'Anmeldung über QR Code',
+			by: (d: string) => `Anmeldung bis ${d} über QR Code`,
+			orContact: (c: string) => ` oder ${c}`,
 			closed: 'Anmeldung geschl.'
 		};
 
@@ -164,8 +165,8 @@ describe('event-signup utilities', () => {
 			expect(formatKioskSignUpCompact({ signUpMode: 'recommended' }, labels, 'de')).toBe('');
 		});
 
-		it('formats compact closure date (omitting 23:59, showing custom time) and prefers phone over email', () => {
-			const futureDefault = '2099-11-20T22:59:00.000Z';
+		it('omits contact name, directs to QR code, omits 23:59, and shows custom time', () => {
+			const futureDefault = '2099-12-12T22:59:00.000Z';
 			expect(
 				formatKioskSignUpCompact(
 					{
@@ -173,7 +174,7 @@ describe('event-signup utilities', () => {
 						signUpClosureDate: futureDefault,
 						resolvedSignUpContact: {
 							name: 'Anna',
-							phone: '030-1234',
+							phone: '+49(0)305405659',
 							email: 'anna@example.org'
 						}
 					},
@@ -181,9 +182,9 @@ describe('event-signup utilities', () => {
 					'de-DE',
 					'Europe/Berlin'
 				)
-			).toBe('Anmeldung bis 20.11. (Anna, 030-1234)');
+			).toBe('Anmeldung bis 12.12.99 über QR Code oder +49(0)305405659');
 
-			const futureCustom = '2099-11-20T17:30:00.000Z';
+			const futureCustom = '2099-12-12T11:00:00.000Z';
 			expect(
 				formatKioskSignUpCompact(
 					{
@@ -191,7 +192,7 @@ describe('event-signup utilities', () => {
 						signUpClosureDate: futureCustom,
 						resolvedSignUpContact: {
 							name: 'Anna',
-							phone: '030-1234',
+							phone: '+49(0)305405659',
 							email: 'anna@example.org'
 						}
 					},
@@ -199,10 +200,23 @@ describe('event-signup utilities', () => {
 					'de-DE',
 					'Europe/Berlin'
 				)
-			).toBe('Anmeldung bis 20.11., 18:30 (Anna, 030-1234)');
+			).toBe('Anmeldung bis 12.12.99 12:00 über QR Code oder +49(0)305405659');
+
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: null,
+						resolvedSignUpContact: null
+					},
+					labels,
+					'de-DE',
+					'Europe/Berlin'
+				)
+			).toBe('Anmeldung über QR Code');
 		});
 
-		it('falls back to email when phone is absent and marks closed when date is past', () => {
+		it('falls back to email when phone is absent, omits name, and marks closed when date is past', () => {
 			expect(
 				formatKioskSignUpCompact(
 					{
@@ -217,7 +231,7 @@ describe('event-signup utilities', () => {
 					labels,
 					'de'
 				)
-			).toBe('Anmeldung geschl. (Desk, desk@example.org)');
+			).toBe('Anmeldung geschl. (desk@example.org)');
 		});
 	});
 });

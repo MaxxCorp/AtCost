@@ -25,6 +25,7 @@ export function getKioskSignUpText(
 		{
 			req: m.kiosk_sign_up_req(),
 			by: (date) => m.kiosk_sign_up_by({ date }),
+			orContact: (contact) => m.kiosk_sign_up_or_contact({ contact }),
 			closed: m.kiosk_sign_up_closed()
 		},
 		getLocale()
