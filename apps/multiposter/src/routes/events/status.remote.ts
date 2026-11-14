@@ -7,6 +7,7 @@ import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js
 import { syncService } from '#lib/server/sync/service.js';
 import { publishEventChange } from '#lib/server/realtime.js';
 import { invalidateEvent } from '#lib/server/cache/index.js';
+import { computeOccurrenceSignUpClosureDate } from '#lib/server/events/recurrence.js';
 import { updateEventsStatusSchema } from '#lib/validations/events.js';
 import type { CampaignContent } from '@ac/validations';
 
@@ -66,6 +67,16 @@ export const updateEventsStatus = command(
 								? new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime()
 								: 3600000;
 						const targetEnd = new Date(targetStart.getTime() + duration);
+						const targetSignUpClosureDate =
+							master.signUpMode === 'required'
+								? computeOccurrenceSignUpClosureDate({
+										masterStart: master.startDateTime,
+										masterClosureDate: master.signUpClosureDate,
+										signUpRecurrence: master.signUpRecurrence,
+										occurrenceStart: targetStart,
+										timeZone: master.startTimeZone
+									})
+								: master.signUpClosureDate;
 
 						const [newException] = await db
 							.insert(event)
@@ -92,7 +103,8 @@ export const updateEventsStatus = command(
 								categoryBerlinDotDe: master.categoryBerlinDotDe,
 								participantsCount: master.participantsCount,
 								signUpMode: master.signUpMode,
-								signUpClosureDate: master.signUpClosureDate,
+								signUpClosureDate: targetSignUpClosureDate,
+								signUpRecurrence: null,
 								signUpContactId: master.signUpContactId,
 								signUpContactOverridden: master.signUpContactOverridden,
 								prepMinutes: master.prepMinutes,

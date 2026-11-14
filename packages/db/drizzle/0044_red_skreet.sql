@@ -1,0 +1,1 @@
+ALTER TABLE "event" ADD COLUMN "sign_up_recurrence" jsonb;

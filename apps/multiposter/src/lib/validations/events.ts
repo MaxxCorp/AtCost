@@ -62,6 +62,7 @@ export const eventBaseSchema = v.object({
 	participantsCount: v.optional(v.union([v.number(), v.string()])),
 	signUpMode: v.optional(v.picklist(['off', 'recommended', 'required']), 'off'),
 	signUpClosureDate: v.optional(v.string()),
+	signUpRecurrence: v.optional(recurrenceSchema),
 	signUpContactId: v.optional(v.string()),
 	signUpContactOverridden: v.optional(v.union([v.boolean(), v.string()])),
 	contactPartySizesJson: v.optional(v.string()),

@@ -40,7 +40,12 @@
 
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { formatEventStatus, getStatusBadgeClass, getStatusDotClass } from "#lib/utils/format-event-status.js";
-    import { isSignUpClosed, formatSignUpClosureDateDisplay } from "#lib/utils/event-signup.js";
+    import {
+        isSignUpClosed,
+        formatSignUpClosureDateDisplay,
+        formatSignUpClosureTimeText,
+        normalizeSignUpRecurrence,
+    } from "#lib/utils/event-signup.js";
     import { getLocale } from "#lib/paraglide/runtime.js";
 
     import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
@@ -285,8 +290,17 @@
                     </div>
 
                     {#if event.signUpMode === 'recommended' || event.signUpMode === 'required'}
-                        {@const signUpClosed = isSignUpClosed(event.signUpMode, event.signUpClosureDate)}
-                        {@const formattedClosure = event.signUpMode === 'required' ? formatSignUpClosureDateDisplay(event.signUpClosureDate, getLocale()) : ''}
+                        {@const signUpRecRules = !event.recurringEventId && !String(event.id || '').includes('_inst_') && isSeriesEvent(event) ? normalizeSignUpRecurrence(event.signUpRecurrence) : null}
+                        {@const signUpClosed = signUpRecRules
+                            ? eventInstances.length > 0 && eventInstances.every((inst: any) => inst.signUpClosureDate && isSignUpClosed(event.signUpMode, inst.signUpClosureDate))
+                            : isSignUpClosed(event.signUpMode, event.signUpClosureDate)}
+                        {@const signUpRecText = signUpRecRules ? formatRecurrenceText(signUpRecRules, { includeEnd: false, locale: getLocale(), dtstart: event.signUpClosureDate }) : ''}
+                        {@const signUpRecTime = signUpRecRules ? formatSignUpClosureTimeText(event.signUpClosureDate, getLocale()) : ''}
+                        {@const formattedClosure = event.signUpMode === 'required'
+                            ? (signUpRecText
+                                ? (signUpRecTime ? `${signUpRecText}, ${signUpRecTime}` : signUpRecText)
+                                : formatSignUpClosureDateDisplay(event.signUpClosureDate, getLocale()))
+                            : ''}
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border {event.signUpMode === 'required' ? (signUpClosed ? 'bg-red-50/70 border-red-200' : 'bg-amber-50/70 border-amber-200') : 'bg-blue-50/70 border-blue-200'}">
                             <div class="space-y-1.5 min-w-0">
                                 <div class="flex items-center gap-2.5 flex-wrap">

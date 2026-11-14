@@ -31,7 +31,7 @@
     import type { FlyerItemSummary, FlyerDensity } from "#lib/validations/flyer.js";
     import PrintSettingsModal from "./PrintSettingsModal.svelte";
     import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
-    import { DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
+    import { DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, getDocumentTypographyStyle, getItemTypographyStyle, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
     import { resolve } from '$app/paths';
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
@@ -110,6 +110,8 @@
     let itemPercentages = $state<Record<string, number>>({});
     let selectedCardId = $state<string | null>(null);
     let cardSettings = $state<Record<string, CardPrintConfig>>({});
+    let docFontFamily = $state<string>("default");
+    let docFontScale = $state<number>(1);
     let selectedItem = $derived.by(() => {
         if (!selectedCardId) return null;
         const it = items.find(i => i.id === selectedCardId);
@@ -226,7 +228,9 @@
                 showDescriptions,
                 showFooters,
                 showEndTimes,
-                compressSeries
+                compressSeries,
+                docFontFamily,
+                docFontScale
             };
             localStorage.setItem(storageKeyFlyer, JSON.stringify(prefs));
         } catch (e) {
@@ -235,7 +239,7 @@
     }
 
     $effect(() => {
-        const _ = [elementSettings, previewGreyscaleOnScreen, itemPercentages, cardSettings, density, showFoldGuides, showQrCodes, showEventQrCodes, showDescriptions, showFooters, showEndTimes, compressSeries];
+        const _ = [elementSettings, previewGreyscaleOnScreen, itemPercentages, cardSettings, density, showFoldGuides, showQrCodes, showEventQrCodes, showDescriptions, showFooters, showEndTimes, compressSeries, docFontFamily, docFontScale];
         saveFlyerPrefs();
     });
 
@@ -258,6 +262,8 @@
                 if (parsed.showFooters !== undefined) showFooters = parsed.showFooters;
                 if (parsed.showEndTimes !== undefined) showEndTimes = parsed.showEndTimes;
                 if (parsed.compressSeries !== undefined) compressSeries = parsed.compressSeries;
+                if (typeof parsed.docFontFamily === 'string') docFontFamily = parsed.docFontFamily;
+                if (typeof parsed.docFontScale === 'number') docFontScale = parsed.docFontScale;
             }
         } catch (e) {
             console.error("Failed to load flyer settings", e);
@@ -598,7 +604,7 @@
     }
 </script>
 
-<div class="min-h-screen bg-slate-100 dark:bg-slate-900 py-6 px-2 sm:px-4 lg:px-6 text-slate-800 dark:text-slate-100 print:bg-white print:p-0 print:m-0 print:min-h-0 print:h-auto print:text-black">
+<div class="min-h-screen bg-slate-100 dark:bg-slate-900 py-6 pb-24 px-2 sm:px-4 lg:px-6 text-slate-800 dark:text-slate-100 print:bg-white print:p-0 print:pb-0 print:m-0 print:min-h-0 print:h-auto print:text-black">
     <!-- SCREEN ONLY: Floating Toolbar & Controls -->
     <header class="max-w-6xl mx-auto mb-6 print:hidden">
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 flex flex-col gap-4">
@@ -824,8 +830,8 @@
                 <!-- SHEET 1: OUTSIDE (Flap / Back Cover / Front Cover) -->
                 <div class="flyer-wrapper w-full flex justify-center overflow-x-auto print:overflow-visible">
                     <div
-                        class="flyer-sheet side-outside bg-white text-black shadow-xl print:shadow-none relative"
-                        style="--zoom: {zoomLevel}; transform-origin: top center;"
+                        class="kiosk-typography-scope {docFontFamily && docFontFamily !== 'default' ? 'kiosk-has-custom-font' : ''} flyer-sheet side-outside bg-white text-black shadow-xl print:shadow-none relative"
+                        style="--zoom: {zoomLevel}; transform-origin: top center; {getDocumentTypographyStyle(docFontFamily, docFontScale)}"
                     >
                         <!-- Fold marks / guides on screen and print if enabled -->
                         {#if showFoldGuides && elementSettings.foldGuides.enabled}
@@ -1111,8 +1117,8 @@
                 <!-- SHEET 2: INSIDE SPREAD (3 Continuous Panels: Left, Center, Right) -->
                 <div class="flyer-wrapper w-full flex justify-center overflow-x-auto print:overflow-visible">
                     <div
-                        class="flyer-sheet side-inside bg-white text-black shadow-xl print:shadow-none relative"
-                        style="--zoom: {zoomLevel}; transform-origin: top center;"
+                        class="kiosk-typography-scope {docFontFamily && docFontFamily !== 'default' ? 'kiosk-has-custom-font' : ''} flyer-sheet side-inside bg-white text-black shadow-xl print:shadow-none relative"
+                        style="--zoom: {zoomLevel}; transform-origin: top center; {getDocumentTypographyStyle(docFontFamily, docFontScale)}"
                     >
                         <!-- Fold marks / guides on screen and print if enabled -->
                         {#if showFoldGuides && elementSettings.foldGuides.enabled}
@@ -1238,66 +1244,93 @@
             onSettingsChange={saveFlyerPrefs}
         />
 
-        {#if selectedItem}
-            <CardLayoutActionBar
-                {selectedItem}
-                kioskId={kiosk?.id || 'default'}
-                currentPercentage={itemPercentages[selectedItem.id]}
-                currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior}
-                currentColor={cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor}
-                hideSeriesDates={Boolean(cardSettings[selectedItem.id]?.hideSeriesDates)}
-                hideEndTime={cardSettings[selectedItem.id]?.hideEndTime ?? !showEndTimes}
-                onPercentageChange={(percentage, text) => {
-                    if (!selectedItem) return;
-                    itemPercentages[selectedItem.id] = percentage;
-                    aiSummaries = {
-                        ...aiSummaries,
-                        [selectedItem.id]: {
-                            id: selectedItem.id,
-                            title: selectedItem.title,
-                            summary: text
-                        }
-                    };
-                    saveSummariesToCache(aiSummaries);
-                    saveFlyerPrefs();
-                }}
-                onBehaviorChange={(behavior) => {
-                    if (!selectedItem) return;
-                    cardSettings[selectedItem.id] = {
-                        ...cardSettings[selectedItem.id],
-                        printBehavior: behavior
-                    };
-                    saveFlyerPrefs();
-                }}
-                onColorChange={(color) => {
-                    if (!selectedItem) return;
-                    cardSettings[selectedItem.id] = {
-                        ...cardSettings[selectedItem.id],
-                        printColor: color
-                    };
-                    saveFlyerPrefs();
-                }}
-                onToggleSeriesDates={(hide) => {
-                    if (!selectedItem) return;
-                    cardSettings[selectedItem.id] = {
-                        ...cardSettings[selectedItem.id],
-                        hideSeriesDates: hide
-                    };
-                    saveFlyerPrefs();
-                }}
-                onToggleEndTime={(hide) => {
-                    if (!selectedItem) return;
-                    cardSettings[selectedItem.id] = {
-                        ...cardSettings[selectedItem.id],
-                        hideEndTime: hide
-                    };
-                    saveFlyerPrefs();
-                }}
-                onClose={() => {
-                    selectedCardId = null;
-                }}
-            />
-        {/if}
+        <CardLayoutActionBar
+            {selectedItem}
+            kioskId={kiosk?.id || 'default'}
+            scopeLabel="Flyer"
+            {docFontFamily}
+            {docFontScale}
+            onDocFontFamilyChange={(fontFamily) => {
+                docFontFamily = fontFamily;
+                saveFlyerPrefs();
+            }}
+            onDocFontScaleChange={(fontScale) => {
+                docFontScale = fontScale;
+                saveFlyerPrefs();
+            }}
+            itemFontFamily={selectedItem ? (cardSettings[selectedItem.id]?.fontFamily ?? "") : ""}
+            itemFontScale={selectedItem ? (cardSettings[selectedItem.id]?.fontScale ?? 1) : 1}
+            onItemFontFamilyChange={(fontFamily) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    fontFamily: fontFamily || undefined
+                };
+                saveFlyerPrefs();
+            }}
+            onItemFontScaleChange={(fontScale) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    fontScale
+                };
+                saveFlyerPrefs();
+            }}
+            currentPercentage={selectedItem ? itemPercentages[selectedItem.id] : undefined}
+            currentBehavior={selectedItem ? (cardSettings[selectedItem.id]?.printBehavior ?? elementSettings.events.printBehavior) : 'print'}
+            currentColor={selectedItem ? (cardSettings[selectedItem.id]?.printColor ?? elementSettings.events.printColor) : 'color'}
+            hideSeriesDates={selectedItem ? Boolean(cardSettings[selectedItem.id]?.hideSeriesDates) : false}
+            hideEndTime={selectedItem ? (cardSettings[selectedItem.id]?.hideEndTime ?? !showEndTimes) : false}
+            onPercentageChange={(percentage, text) => {
+                if (!selectedItem) return;
+                itemPercentages[selectedItem.id] = percentage;
+                aiSummaries = {
+                    ...aiSummaries,
+                    [selectedItem.id]: {
+                        id: selectedItem.id,
+                        title: selectedItem.title,
+                        summary: text
+                    }
+                };
+                saveSummariesToCache(aiSummaries);
+                saveFlyerPrefs();
+            }}
+            onBehaviorChange={(behavior) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    printBehavior: behavior
+                };
+                saveFlyerPrefs();
+            }}
+            onColorChange={(color) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    printColor: color
+                };
+                saveFlyerPrefs();
+            }}
+            onToggleSeriesDates={(hide) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    hideSeriesDates: hide
+                };
+                saveFlyerPrefs();
+            }}
+            onToggleEndTime={(hide) => {
+                if (!selectedItem) return;
+                cardSettings[selectedItem.id] = {
+                    ...cardSettings[selectedItem.id],
+                    hideEndTime: hide
+                };
+                saveFlyerPrefs();
+            }}
+            onClose={() => {
+                selectedCardId = null;
+            }}
+        />
     </main>
 </div>
 
@@ -1321,9 +1354,10 @@
 
     <div
         role="button"
-        class="event-item-card p-2 rounded-lg transition-colors cursor-pointer space-y-1 print:break-inside-avoid {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries
+        class="kiosk-item-typography {cardSettings[item.id]?.fontFamily ? 'kiosk-has-custom-font' : ''} event-item-card p-2 rounded-lg transition-colors cursor-pointer space-y-1 print:break-inside-avoid {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries
             ? 'border-amber-400/90 bg-linear-to-r from-amber-50/70 via-amber-50/20 to-white shadow-xs border-l-4 border-l-amber-500 ring-1 ring-amber-400/30'
             : 'border border-slate-200/90 bg-white hover:border-slate-300')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, previewGreyscaleOnScreen)}"
+        style={getItemTypographyStyle(cardSettings[item.id]?.fontFamily, cardSettings[item.id]?.fontScale)}
         onclick={() => { selectedCardId = selectedCardId === item.id ? null : item.id; }}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedCardId = selectedCardId === item.id ? null : item.id; } }}
         tabindex="0"

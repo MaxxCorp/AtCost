@@ -61,6 +61,14 @@
         formatTimeRange,
         formatFullDate
     } from "#lib/utils/kiosk-flat-helpers.js";
+    import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
+    import {
+        DEFAULT_ELEMENT_SETTINGS,
+        getCardPrintClasses,
+        getDocumentTypographyStyle,
+        getItemTypographyStyle,
+        type CardPrintConfig
+    } from "./ci/types.js";
 
     interface LocationInfo {
         id: string;
@@ -115,6 +123,38 @@
         ...defaultVisibleComponents
     });
 
+    // Typography & per-item overrides (whole document + per-item)
+    let docFontFamily = $state<string>("default");
+    let docFontScale = $state<number>(1);
+    let selectedCardId = $state<string | null>(null);
+    let cardSettings = $state<Record<string, CardPrintConfig>>({});
+    let itemDescriptions = $state<Record<string, string>>({});
+    let itemPercentages = $state<Record<string, number>>({});
+
+    let selectedItem = $derived.by(() => {
+        if (!selectedCardId) return null;
+        const it =
+            events.find((i) => i.id === selectedCardId) ??
+            items.find((i) => i.id === selectedCardId);
+        if (!it) return null;
+        const isEvt = "startDateTime" in it;
+        const evt = it as EnrichedEvent;
+        const isCompressed = Boolean(
+            isEvt &&
+            evt.isCompressedSeries &&
+            ((evt.seriesInstances && evt.seriesInstances.length >= 1) ||
+                (evt.seriesDates && evt.seriesDates.length >= 1))
+        );
+        const hasEndTime = Boolean(isEvt && evt.endDateTime && !evt.isAllDay);
+        return {
+            id: it.id,
+            title: isEvt ? (it as Event).summary : (it as Announcement).title,
+            description: isEvt ? (it as Event).description : (it as Announcement).content,
+            hasSeriesDates: isCompressed,
+            hasEndTime
+        };
+    });
+
     const storageKey = $derived(`kiosk_flat_list_prefs_${kiosk?.id || 'default'}`);
 
     onMount(() => {
@@ -142,6 +182,21 @@
                         days: Boolean(parsed.grouping.days),
                     };
                 }
+                if (typeof parsed.docFontFamily === "string") {
+                    docFontFamily = parsed.docFontFamily;
+                }
+                if (typeof parsed.docFontScale === "number") {
+                    docFontScale = parsed.docFontScale;
+                }
+                if (parsed.cardSettings && typeof parsed.cardSettings === "object") {
+                    cardSettings = parsed.cardSettings;
+                }
+                if (parsed.itemDescriptions && typeof parsed.itemDescriptions === "object") {
+                    itemDescriptions = parsed.itemDescriptions;
+                }
+                if (parsed.itemPercentages && typeof parsed.itemPercentages === "object") {
+                    itemPercentages = parsed.itemPercentages;
+                }
             }
         } catch (e) {
             console.error("Failed to restore flat list preferences", e);
@@ -155,7 +210,12 @@
                 compressSeries,
                 density,
                 visibleComponents,
-                grouping
+                grouping,
+                docFontFamily,
+                docFontScale,
+                cardSettings,
+                itemDescriptions,
+                itemPercentages
             }));
         } catch (e) {
             console.error("Failed to save flat list preferences", e);
@@ -352,7 +412,7 @@
     }
 </script>
 
-<div class="min-h-screen bg-slate-100 dark:bg-slate-900 py-6 px-3 sm:px-6 lg:px-8 text-slate-800 dark:text-slate-100 print:bg-white print:p-0 print:m-0 print:text-black">
+<div class="min-h-screen bg-slate-100 dark:bg-slate-900 py-6 pb-24 px-3 sm:px-6 lg:px-8 text-slate-800 dark:text-slate-100 print:bg-white print:p-0 print:pb-0 print:m-0 print:text-black">
     <!-- Screen-Only Controls & Export Toolbar -->
     <header class="max-w-5xl mx-auto mb-6 print:hidden">
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -852,7 +912,10 @@
     </header>
 
     <!-- Document Paper Preview Container -->
-    <main class="max-w-5xl mx-auto bg-white text-slate-900 shadow-xl print:shadow-none border border-slate-200 print:border-none rounded-2xl print:rounded-none p-6 sm:p-10 print:p-0">
+    <main
+        class="kiosk-typography-scope {docFontFamily && docFontFamily !== 'default' ? 'kiosk-has-custom-font' : ''} max-w-5xl mx-auto bg-white text-slate-900 shadow-xl print:shadow-none border border-slate-200 print:border-none rounded-2xl print:rounded-none p-6 sm:p-10 print:p-0"
+        style={getDocumentTypographyStyle(docFontFamily, docFontScale)}
+    >
         <!-- Printable Document Header -->
         <div class="border-b-2 border-slate-900 print:border-black pb-6 mb-8">
             <div class="flex flex-col md:flex-row justify-between items-start gap-6">
@@ -988,7 +1051,14 @@
 
                     <div class="grid grid-cols-1 {density === 'standard' ? 'gap-4' : 'gap-3'}">
                         {#each announcements as announcement (announcement.id)}
-                            <article class="p-4 sm:p-5 rounded-xl border border-amber-200/80 bg-amber-50/40 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col sm:flex-row justify-between gap-4">
+                            <div
+                                role="button"
+                                tabindex="0"
+                                onclick={() => { selectedCardId = selectedCardId === announcement.id ? null : announcement.id; }}
+                                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedCardId = selectedCardId === announcement.id ? null : announcement.id; } }}
+                                class="kiosk-item-typography {cardSettings[announcement.id]?.fontFamily ? 'kiosk-has-custom-font' : ''} p-4 sm:p-5 rounded-xl border border-amber-200/80 bg-amber-50/40 print:bg-white print:border-slate-300 print:break-inside-avoid flex flex-col sm:flex-row justify-between gap-4 cursor-pointer transition-all outline-hidden {selectedCardId === announcement.id ? 'ring-2 ring-amber-400 bg-amber-100/80 print:ring-0 print:bg-white' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings[announcement.id], DEFAULT_ELEMENT_SETTINGS.events, false)}"
+                                style={getItemTypographyStyle(cardSettings[announcement.id]?.fontFamily, cardSettings[announcement.id]?.fontScale)}
+                            >
                                 <div class="space-y-2 flex-1">
                                     <div class="flex items-center justify-between gap-3">
                                         <div class="flex items-center gap-2 flex-wrap">
@@ -1018,7 +1088,7 @@
 
                                     {#if visibleComponents.descriptions && announcement.content}
                                         <div class="rich-description text-xs sm:text-sm text-slate-700 dark:text-slate-300 print:text-black leading-relaxed">
-                                            {@html announcement.content}
+                                            {@html itemDescriptions[announcement.id] || announcement.content}
                                         </div>
                                     {/if}
 
@@ -1083,7 +1153,7 @@
                                         {/if}
                                     </div>
                                 {/if}
-                            </article>
+                            </div>
                         {/each}
                     </div>
                 </section>
@@ -1206,7 +1276,15 @@
     {@const cancelledCount = event.seriesInstances ? event.seriesInstances.filter(i => i.status === 'cancelled').length : 0}
     {@const tentativeCount = event.seriesInstances ? event.seriesInstances.filter(i => i.status === 'tentative').length : 0}
     {@const totalInstances = event.seriesInstances ? event.seriesInstances.length : (event.seriesDates ? event.seriesDates.length : (event.instanceCount ?? 1))}
-    <article class="{density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid transition-all {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 pl-3 sm:pl-4 bg-linear-to-r from-amber-50/60 via-amber-50/20 to-transparent print:bg-slate-50/60 rounded-r-xl my-1.5' : isCompressed ? 'border-l-4 border-l-indigo-500 pl-3 sm:pl-4 bg-linear-to-r from-indigo-50/40 via-indigo-50/10 to-transparent print:bg-slate-50/40 rounded-r-xl my-1.5' : ''}">
+    {@const showEnd = cardSettings[event.id]?.hideEndTime !== undefined ? !cardSettings[event.id]!.hideEndTime : visibleComponents.endTimes}
+    <div
+        role="button"
+        tabindex="0"
+        onclick={() => { selectedCardId = selectedCardId === event.id ? null : event.id; }}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedCardId = selectedCardId === event.id ? null : event.id; } }}
+        class="kiosk-item-typography {cardSettings[event.id]?.fontFamily ? 'kiosk-has-custom-font' : ''} {density === 'standard' ? 'py-4 sm:py-5' : 'py-2.5 sm:py-3'} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:break-inside-avoid transition-all cursor-pointer outline-hidden {selectedCardId === event.id ? 'ring-2 ring-amber-400 bg-amber-100/70 rounded-xl px-2 print:ring-0 print:bg-transparent print:px-0' : 'hover:ring-1 hover:ring-amber-300/50 rounded-xl'} {isSpecialNonSeries ? 'border-l-4 border-l-amber-500 pl-3 sm:pl-4 bg-linear-to-r from-amber-50/60 via-amber-50/20 to-transparent print:bg-slate-50/60 rounded-r-xl my-1.5' : isCompressed ? 'border-l-4 border-l-indigo-500 pl-3 sm:pl-4 bg-linear-to-r from-indigo-50/40 via-indigo-50/10 to-transparent print:bg-slate-50/40 rounded-r-xl my-1.5' : ''} {getCardPrintClasses(cardSettings[event.id], DEFAULT_ELEMENT_SETTINGS.events, false)}"
+        style={getItemTypographyStyle(cardSettings[event.id]?.fontFamily, cardSettings[event.id]?.fontScale)}
+    >
         <!-- Left Date & Time Column -->
         <div class="flex items-center gap-3 shrink-0 min-w-[130px]">
             <!-- Date / Series Badge -->
@@ -1251,7 +1329,7 @@
                 {#if isCompressed}
                     <div class="flex items-center gap-1 font-bold text-slate-900 dark:text-slate-100">
                         <Clock class="w-3 h-3 text-slate-400" />
-                        <span>{formatTimeRange(event.startDateTime, event.endDateTime, event.isAllDay, visibleComponents.endTimes)}</span>
+                        <span>{formatTimeRange(event.startDateTime, event.endDateTime, event.isAllDay, showEnd)}</span>
                     </div>
                 {:else if multiDay}
                     {#if event.isAllDay}
@@ -1263,7 +1341,7 @@
                             <Clock class="w-3 h-3 text-slate-400" />
                             <span>{formatTime(event.startDateTime)}</span>
                         </div>
-                        {#if visibleComponents.endTimes && event.endDateTime}
+                        {#if showEnd && event.endDateTime}
                             <div class="text-slate-500 pl-4 text-[11px]">
                                 – {dateParts.endWeekday} {formatTime(event.endDateTime)}
                             </div>
@@ -1279,7 +1357,7 @@
                             <Clock class="w-3 h-3 text-slate-400" />
                             <span>{formatTime(event.startDateTime)}</span>
                         </div>
-                        {#if visibleComponents.endTimes && event.endDateTime}
+                        {#if showEnd && event.endDateTime}
                             <div class="text-slate-500 pl-4 text-[11px]">
                                 – {formatTime(event.endDateTime)}
                             </div>
@@ -1359,7 +1437,7 @@
             </div>
 
             <!-- Multiple dates list if Compressed Series (Feature 3: per-instance cancelled and tentative status) -->
-            {#if isCompressed && event.seriesInstances && event.seriesInstances.length >= 1}
+            {#if isCompressed && !cardSettings[event.id]?.hideSeriesDates && event.seriesInstances && event.seriesInstances.length >= 1}
                 <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
                     <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
                         <Calendar class="w-3 h-3 text-indigo-500" />
@@ -1392,7 +1470,7 @@
                         {/if}
                     {/each}
                 </div>
-            {:else if isCompressed && event.seriesDates && event.seriesDates.length >= 1}
+            {:else if isCompressed && !cardSettings[event.id]?.hideSeriesDates && event.seriesDates && event.seriesDates.length >= 1}
                 <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
                     <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
                         <Calendar class="w-3 h-3 text-indigo-500" />
@@ -1483,12 +1561,12 @@
                                         {/each}
                                     {/if}
                                     {#if cEmail}
-                                        <a href="mailto:{cEmail}" class="text-slate-400 hover:text-blue-600 print:text-slate-600 text-[10px]" title={cEmail}>
+                                        <a href="mailto:{cEmail}" onclick={(e) => e.stopPropagation()} class="text-slate-400 hover:text-blue-600 print:text-slate-600 text-[10px]" title={cEmail}>
                                             • {cEmail}
                                         </a>
                                     {/if}
                                     {#if cPhone}
-                                        <a href="tel:{cPhone}" class="text-slate-400 hover:text-blue-600 print:text-slate-600 text-[10px]" title={cPhone}>
+                                        <a href="tel:{cPhone}" onclick={(e) => e.stopPropagation()} class="text-slate-400 hover:text-blue-600 print:text-slate-600 text-[10px]" title={cPhone}>
                                             • {cPhone}
                                         </a>
                                     {/if}
@@ -1523,7 +1601,7 @@
                         <span class="font-semibold text-amber-800 dark:text-amber-300 print:text-amber-900 mr-1">{compactSignUp}.</span>
                     {/if}
                     <span class="rich-description [&>p:first-child]:inline [&>p]:mb-0 [&>p+p]:mt-1">
-                        {@html event.description}
+                        {@html itemDescriptions[event.id] || event.description}
                     </span>
                 </div>
             {/if}
@@ -1599,7 +1677,7 @@
                 {/if}
             </div>
         {/if}
-    </article>
+    </div>
 {/snippet}
 
         <!-- Printable Document Footer -->
@@ -1612,6 +1690,86 @@
             </div>
         </footer>
     </main>
+
+    <CardLayoutActionBar
+        {selectedItem}
+        kioskId={kiosk?.id || 'default'}
+        scopeLabel="Liste"
+        {docFontFamily}
+        {docFontScale}
+        onDocFontFamilyChange={(fontFamily) => {
+            docFontFamily = fontFamily;
+            savePrefs();
+        }}
+        onDocFontScaleChange={(fontScale) => {
+            docFontScale = fontScale;
+            savePrefs();
+        }}
+        itemFontFamily={selectedItem ? (cardSettings[selectedItem.id]?.fontFamily ?? "") : ""}
+        itemFontScale={selectedItem ? (cardSettings[selectedItem.id]?.fontScale ?? 1) : 1}
+        onItemFontFamilyChange={(fontFamily) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                fontFamily: fontFamily || undefined
+            };
+            savePrefs();
+        }}
+        onItemFontScaleChange={(fontScale) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                fontScale
+            };
+            savePrefs();
+        }}
+        currentPercentage={selectedItem ? itemPercentages[selectedItem.id] : undefined}
+        currentBehavior={selectedItem ? (cardSettings[selectedItem.id]?.printBehavior ?? DEFAULT_ELEMENT_SETTINGS.events.printBehavior) : 'print'}
+        currentColor={selectedItem ? (cardSettings[selectedItem.id]?.printColor ?? DEFAULT_ELEMENT_SETTINGS.events.printColor) : 'color'}
+        hideSeriesDates={selectedItem ? Boolean(cardSettings[selectedItem.id]?.hideSeriesDates) : false}
+        hideEndTime={selectedItem ? (cardSettings[selectedItem.id]?.hideEndTime ?? !visibleComponents.endTimes) : false}
+        onPercentageChange={(percentage, text) => {
+            if (!selectedItem) return;
+            itemPercentages[selectedItem.id] = percentage;
+            itemDescriptions[selectedItem.id] = text;
+            savePrefs();
+        }}
+        onBehaviorChange={(behavior) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                printBehavior: behavior
+            };
+            savePrefs();
+        }}
+        onColorChange={(color) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                printColor: color
+            };
+            savePrefs();
+        }}
+        onToggleSeriesDates={(hide) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                hideSeriesDates: hide
+            };
+            savePrefs();
+        }}
+        onToggleEndTime={(hide) => {
+            if (!selectedItem) return;
+            cardSettings[selectedItem.id] = {
+                ...cardSettings[selectedItem.id],
+                hideEndTime: hide
+            };
+            savePrefs();
+        }}
+        onClose={() => {
+            selectedCardId = null;
+        }}
+    />
 </div>
 
 <style>

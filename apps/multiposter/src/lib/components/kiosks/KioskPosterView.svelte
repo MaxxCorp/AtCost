@@ -71,7 +71,15 @@
     } from "#lib/utils/kiosk-flat-helpers.js";
     import PrintSettingsModal from "./PrintSettingsModal.svelte";
     import CardLayoutActionBar from "./CardLayoutActionBar.svelte";
-    import { DEFAULT_ELEMENT_SETTINGS, getElementPrintClasses, getCardPrintClasses, type KioskElementSettings, type CardPrintConfig } from "./ci/types.js";
+    import {
+        DEFAULT_ELEMENT_SETTINGS,
+        getElementPrintClasses,
+        getCardPrintClasses,
+        getDocumentTypographyStyle,
+        getItemTypographyStyle,
+        type KioskElementSettings,
+        type CardPrintConfig
+    } from "./ci/types.js";
 
     interface LocationContact {
         name: string;
@@ -319,6 +327,8 @@
     let itemPercentages = $state<Record<string, number>>({});
     let selectedCardId = $state<string | null>(null);
     let cardSettings = $state<Record<string, CardPrintConfig>>({});
+    let docFontFamily = $state<string>("default");
+    let docFontScale = $state<number>(1);
     let selectedItem = $derived.by(() => {
         if (!selectedCardId) return null;
 
@@ -326,7 +336,8 @@
             return {
                 id: 'location_logo',
                 title: `${currentLocation?.name || 'Standort'} Logo`,
-                description: undefined
+                description: undefined,
+                isLogo: true
             };
         }
 
@@ -334,7 +345,8 @@
             return {
                 id: 'partner_logo',
                 title: 'Partnerlogo',
-                description: undefined
+                description: undefined,
+                isLogo: true
             };
         }
 
@@ -343,7 +355,8 @@
             return {
                 id: sp.id,
                 title: sp.name ? `${sp.name} (Logo)` : 'Sponsor / Partner Logo',
-                description: undefined
+                description: undefined,
+                isLogo: true
             };
         }
 
@@ -423,6 +436,8 @@
                 if (prefs.itemDescriptions) itemDescriptions = prefs.itemDescriptions;
                 if (prefs.itemPercentages) itemPercentages = prefs.itemPercentages;
                 if (prefs.cardSettings && typeof prefs.cardSettings === 'object') cardSettings = prefs.cardSettings;
+                if (typeof prefs.docFontFamily === 'string') docFontFamily = prefs.docFontFamily;
+                if (typeof prefs.docFontScale === 'number') docFontScale = prefs.docFontScale;
                 if (Array.isArray(prefs.customSections)) {
                     customSections = prefs.customSections;
                 }
@@ -467,7 +482,9 @@
                 previewGreyscaleOnScreen,
                 itemDescriptions,
                 itemPercentages,
-                cardSettings
+                cardSettings,
+                docFontFamily,
+                docFontScale
             };
             localStorage.setItem(storageKey, JSON.stringify(prefs));
         } catch (e) {
@@ -494,7 +511,9 @@
             previewGreyscaleOnScreen,
             itemDescriptions,
             itemPercentages,
-            cardSettings
+            cardSettings,
+            docFontFamily,
+            docFontScale
         ];
         savePrefs();
     });
@@ -618,7 +637,8 @@
             displayItems.length, density, effectiveColumns, isLetterheadMode, paperSize,
             descriptionStyle, compressSeries, visibleComponents.descriptions,
             visibleComponents.contacts, visibleComponents.participants, visibleComponents.heroImage,
-            visibleComponents.internalNotes, visibleComponents.rooms, visibleComponents.ticketPrice
+            visibleComponents.internalNotes, visibleComponents.rooms, visibleComponents.ticketPrice,
+            docFontFamily, docFontScale, cardSettings
         ];
         // Wait for DOM update
         setTimeout(checkPageOverflow, 150);
@@ -842,7 +862,8 @@
         tabindex="0"
         onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === sec.id ? null : sec.id; }}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === sec.id ? null : sec.id; } }}
-        class="custom-section-item p-2.5 rounded-r-md border border-slate-200/60 border-l-[3.5px] {colorBorder} {colorBg} break-inside-avoid {slotContext === 'banner' ? 'mb-2' : 'mb-3.5'} cursor-pointer transition-all outline-hidden {selectedCardId === sec.id ? 'ring-2 ring-amber-400 bg-amber-100/70 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings[sec.id], elementSettings.customSections, previewGreyscaleOnScreen)}"
+        class="kiosk-item-typography {cardSettings[sec.id]?.fontFamily ? 'kiosk-has-custom-font' : ''} custom-section-item p-2.5 rounded-r-md border border-slate-200/60 border-l-[3.5px] {colorBorder} {colorBg} break-inside-avoid {slotContext === 'banner' ? 'mb-2' : 'mb-3.5'} cursor-pointer transition-all outline-hidden {selectedCardId === sec.id ? 'ring-2 ring-amber-400 bg-amber-100/70 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings[sec.id], elementSettings.customSections, previewGreyscaleOnScreen)}"
+        style={getItemTypographyStyle(cardSettings[sec.id]?.fontFamily, cardSettings[sec.id]?.fontScale)}
     >
         <div class="flex items-start gap-3">
             {#if sec.imageUrl}
@@ -1414,7 +1435,7 @@
 </header>
 
 <!-- Main Canvas / Workbench -->
-<main class="w-full min-h-[calc(100vh-60px)] bg-slate-200 dark:bg-slate-950 p-4 sm:p-8 flex justify-center items-start overflow-auto print:block print:w-auto print:p-0 print:m-0 print:bg-white print:min-h-0 print:overflow-visible">
+<main class="w-full min-h-[calc(100vh-60px)] bg-slate-200 dark:bg-slate-950 p-4 sm:p-8 pb-24 flex justify-center items-start overflow-auto print:block print:w-auto print:p-0 print:pb-0 print:m-0 print:bg-white print:min-h-0 print:overflow-visible">
     <div
         class="poster-preview-scaler transition-transform duration-150 origin-top flex justify-center print:block print:w-auto print:m-0 print:p-0 print:transform-none"
         style="transform: scale({zoomLevel});"
@@ -1422,7 +1443,8 @@
         <!-- The Poster Document Sheet (Single Page A4 or A3) -->
         <article
             bind:this={posterContentElement}
-            class="poster-sheet {paperSize === 'A3' ? 'paper-a3' : 'paper-a4'} {letterheadMonochrome ? 'monochrome-mode' : ''} bg-white text-slate-900 shadow-2xl print:shadow-none print:border-none print:m-0 print:p-0 relative flex flex-col justify-between"
+            class="kiosk-typography-scope {docFontFamily && docFontFamily !== 'default' ? 'kiosk-has-custom-font' : ''} poster-sheet {paperSize === 'A3' ? 'paper-a3' : 'paper-a4'} {letterheadMonochrome ? 'monochrome-mode' : ''} bg-white text-slate-900 shadow-2xl print:shadow-none print:border-none print:m-0 print:p-0 relative flex flex-col justify-between"
+            style={getDocumentTypographyStyle(docFontFamily, docFontScale)}
         >
             <!-- Top Section: Header or Blank Letterhead Space -->
             <div class="poster-top-container shrink-0">
@@ -1652,7 +1674,8 @@
                         <div
                             role="button"
                             tabindex="0"
-                            class="poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs cursor-pointer {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, previewGreyscaleOnScreen)} {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'}"
+                            class="kiosk-item-typography {cardSettings[item.id]?.fontFamily ? 'kiosk-has-custom-font' : ''} poster-event-item mb-3 pb-2 break-inside-avoid transition-all rounded-r-md border-y border-r p-2 shadow-2xs cursor-pointer {selectedCardId === item.id ? 'bg-amber-100/90 dark:bg-amber-950/40 ring-2 ring-amber-400 dark:ring-amber-500 shadow-md print:bg-white print:ring-0 print:shadow-none' : (isSpecialNonSeries ? 'border-l-4 border-l-amber-500 bg-amber-50/85 border-y-amber-200/80 border-r-amber-200/80 ring-1 ring-amber-400/20' : isCompressed ? 'border-l-[3.5px] border-l-indigo-400 bg-slate-50/70 border-slate-200/60' : 'border-l-[3.5px] border-l-slate-300 bg-white border-slate-200/60')} {getCardPrintClasses(cardSettings[item.id], elementSettings.events, previewGreyscaleOnScreen)} {density === 'compact' ? 'mb-1.5 pb-1.5 text-[11px]' : density === 'relaxed' ? 'mb-4 pb-2.5 text-[13px]' : 'text-xs'}"
+                            style={getItemTypographyStyle(cardSettings[item.id]?.fontFamily, cardSettings[item.id]?.fontScale)}
                             onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === item.id ? null : item.id; }}
                             onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === item.id ? null : item.id; } }}
                         >
@@ -2808,63 +2831,85 @@
     onSettingsChange={savePrefs}
 />
 
-{#if selectedItem}
-    {@const isLocationLogo = selectedItem.id === 'location_logo'}
-    {@const isSponsorOrPartner = selectedItem.id === 'partner_logo' || sponsors.some(s => s.id === selectedItem?.id)}
-    {@const isCustomSection = customSections.some(s => s.id === selectedItem?.id)}
-    {@const fallbackBehavior = isLocationLogo ? elementSettings.header.printBehavior : isSponsorOrPartner ? elementSettings.sponsors.printBehavior : isCustomSection ? elementSettings.customSections.printBehavior : elementSettings.events.printBehavior}
-    {@const fallbackColor = isLocationLogo ? elementSettings.header.printColor : isSponsorOrPartner ? elementSettings.sponsors.printColor : isCustomSection ? elementSettings.customSections.printColor : elementSettings.events.printColor}
-    <CardLayoutActionBar
-        {selectedItem}
-        kioskId={kiosk?.id || 'default'}
-        currentPercentage={itemPercentages[selectedItem.id]}
-        currentBehavior={cardSettings[selectedItem.id]?.printBehavior ?? fallbackBehavior}
-        currentColor={cardSettings[selectedItem.id]?.printColor ?? fallbackColor}
-        hideSeriesDates={Boolean(cardSettings[selectedItem.id]?.hideSeriesDates)}
-        hideEndTime={cardSettings[selectedItem.id]?.hideEndTime ?? !visibleComponents.endTimes}
-        onPercentageChange={(percentage, text) => {
-            if (!selectedItem) return;
-            itemPercentages[selectedItem.id] = percentage;
-            itemDescriptions[selectedItem.id] = text;
-            savePrefs();
-        }}
-        onBehaviorChange={(behavior) => {
-            if (!selectedItem) return;
-            cardSettings[selectedItem.id] = {
-                ...cardSettings[selectedItem.id],
-                printBehavior: behavior
-            };
-            savePrefs();
-        }}
-        onColorChange={(color) => {
-            if (!selectedItem) return;
-            cardSettings[selectedItem.id] = {
-                ...cardSettings[selectedItem.id],
-                printColor: color
-            };
-            savePrefs();
-        }}
-        onToggleSeriesDates={(hide) => {
-            if (!selectedItem) return;
-            cardSettings[selectedItem.id] = {
-                ...cardSettings[selectedItem.id],
-                hideSeriesDates: hide
-            };
-            savePrefs();
-        }}
-        onToggleEndTime={(hide) => {
-            if (!selectedItem) return;
-            cardSettings[selectedItem.id] = {
-                ...cardSettings[selectedItem.id],
-                hideEndTime: hide
-            };
-            savePrefs();
-        }}
-        onClose={() => {
-            selectedCardId = null;
-        }}
-    />
-{/if}
+<CardLayoutActionBar
+    {selectedItem}
+    kioskId={kiosk?.id || 'default'}
+    scopeLabel="Poster"
+    {docFontFamily}
+    {docFontScale}
+    onDocFontFamilyChange={(fontFamily) => {
+        docFontFamily = fontFamily;
+        savePrefs();
+    }}
+    onDocFontScaleChange={(fontScale) => {
+        docFontScale = fontScale;
+        savePrefs();
+    }}
+    itemFontFamily={selectedItem ? (cardSettings[selectedItem.id]?.fontFamily ?? "") : ""}
+    itemFontScale={selectedItem ? (cardSettings[selectedItem.id]?.fontScale ?? 1) : 1}
+    onItemFontFamilyChange={(fontFamily) => {
+        if (!selectedItem) return;
+        cardSettings[selectedItem.id] = {
+            ...cardSettings[selectedItem.id],
+            fontFamily: fontFamily || undefined
+        };
+        savePrefs();
+    }}
+    onItemFontScaleChange={(fontScale) => {
+        if (!selectedItem) return;
+        cardSettings[selectedItem.id] = {
+            ...cardSettings[selectedItem.id],
+            fontScale
+        };
+        savePrefs();
+    }}
+    currentPercentage={selectedItem ? itemPercentages[selectedItem.id] : undefined}
+    currentBehavior={selectedItem ? (cardSettings[selectedItem.id]?.printBehavior ?? (selectedItem.id === 'location_logo' ? elementSettings.header.printBehavior : (selectedItem.id === 'partner_logo' || sponsors.some(s => s.id === selectedItem.id)) ? elementSettings.sponsors.printBehavior : customSections.some(s => s.id === selectedItem.id) ? elementSettings.customSections.printBehavior : elementSettings.events.printBehavior)) : 'print'}
+    currentColor={selectedItem ? (cardSettings[selectedItem.id]?.printColor ?? (selectedItem.id === 'location_logo' ? elementSettings.header.printColor : (selectedItem.id === 'partner_logo' || sponsors.some(s => s.id === selectedItem.id)) ? elementSettings.sponsors.printColor : customSections.some(s => s.id === selectedItem.id) ? elementSettings.customSections.printColor : elementSettings.events.printColor)) : 'color'}
+    hideSeriesDates={selectedItem ? Boolean(cardSettings[selectedItem.id]?.hideSeriesDates) : false}
+    hideEndTime={selectedItem ? (cardSettings[selectedItem.id]?.hideEndTime ?? !visibleComponents.endTimes) : false}
+    onPercentageChange={(percentage, text) => {
+        if (!selectedItem) return;
+        itemPercentages[selectedItem.id] = percentage;
+        itemDescriptions[selectedItem.id] = text;
+        savePrefs();
+    }}
+    onBehaviorChange={(behavior) => {
+        if (!selectedItem) return;
+        cardSettings[selectedItem.id] = {
+            ...cardSettings[selectedItem.id],
+            printBehavior: behavior
+        };
+        savePrefs();
+    }}
+    onColorChange={(color) => {
+        if (!selectedItem) return;
+        cardSettings[selectedItem.id] = {
+            ...cardSettings[selectedItem.id],
+            printColor: color
+        };
+        savePrefs();
+    }}
+    onToggleSeriesDates={(hide) => {
+        if (!selectedItem) return;
+        cardSettings[selectedItem.id] = {
+            ...cardSettings[selectedItem.id],
+            hideSeriesDates: hide
+        };
+        savePrefs();
+    }}
+    onToggleEndTime={(hide) => {
+        if (!selectedItem) return;
+        cardSettings[selectedItem.id] = {
+            ...cardSettings[selectedItem.id],
+            hideEndTime: hide
+        };
+        savePrefs();
+    }}
+    onClose={() => {
+        selectedCardId = null;
+    }}
+/>
 
 <style>
     /* PREVIEW CONTAINER SIZING */

@@ -946,6 +946,29 @@
             : "";
         rf.fields.signUpClosureDate?.set(nextIso);
     }
+    const initialSignUpRecurrence = untrack(() =>
+        Array.isArray(initialData?.signUpRecurrence)
+            ? initialData.signUpRecurrence[0] || ""
+            : typeof initialData?.signUpRecurrence === "string"
+              ? initialData.signUpRecurrence
+              : "",
+    );
+    let signUpRecurrence = $state<string>(initialSignUpRecurrence);
+    let showSignUpRecurrenceDialog = $state(false);
+    const isSeriesMasterForm = $derived(
+        isSeries &&
+            !initialData?.recurringEventId &&
+            !initialData?.isException &&
+            !String(initialData?.id || "").includes("_inst_"),
+    );
+    const signUpRecurrenceText = $derived(
+        signUpRecurrence
+            ? formatRecurrenceText(signUpRecurrence, {
+                  includeEnd: true,
+                  dtstart: signUpClosureDatePart || undefined,
+              })
+            : m.sign_up_recurrence(),
+    );
     // svelte-ignore state_referenced_locally
     let signUpContactOverridden = $state<boolean>(
         Boolean(initialData?.signUpContactOverridden),
@@ -3070,7 +3093,9 @@
                                             DEFAULT_SIGN_UP_CLOSURE_TIME;
                                         signUpClosureTimeZone = browserTimezone;
                                         showClosureTimeZone = false;
+                                        signUpRecurrence = "";
                                         rf.fields.signUpClosureDate?.set("");
+                                        rf.fields.signUpRecurrence?.set("");
                                     }}
                                     class="inline-flex items-center gap-1 text-xs h-9"
                                 >
@@ -3124,6 +3149,47 @@
                     <p class="text-xs text-gray-500">
                         {m.sign_up_closure_date_help()}
                     </p>
+
+                    {#if isSeriesMasterForm}
+                        <div class="pt-1 flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                disabled={!signUpClosureDatePart}
+                                class="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border transition-colors {signUpClosureDatePart
+                                    ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 cursor-pointer'
+                                    : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}"
+                                onclick={() => {
+                                    if (signUpClosureDatePart) {
+                                        showSignUpRecurrenceDialog = true;
+                                    }
+                                }}
+                            >
+                                <RefreshCw size={15} class={signUpRecurrence ? "text-blue-600" : ""} />
+                                <span class="text-left">{signUpRecurrenceText}</span>
+                            </button>
+                            {#if !signUpClosureDatePart}
+                                <span class="text-xs text-gray-500">
+                                    {m.sign_up_recurrence_requires_date()}
+                                </span>
+                            {/if}
+                        </div>
+
+                        <RecurrenceDialog
+                            bind:open={showSignUpRecurrenceDialog}
+                            value={signUpRecurrence || null}
+                            startDate={signUpClosureDatePart ||
+                                rf.fields.startDate.value() ||
+                                currentStartDateVal}
+                            title={m.sign_up_recurrence_title()}
+                            description={m.sign_up_recurrence_description()}
+                            onchange={(val: string | null) => {
+                                signUpRecurrence = val ?? "";
+                                rf.fields.signUpRecurrence?.set(
+                                    signUpRecurrence,
+                                );
+                            }}
+                        />
+                    {/if}
                 </div>
 
                 <!-- Sign-up Contact (defaults to "Kontakt" role, overridable via shared ContactManager) -->
@@ -3204,6 +3270,19 @@
                 {...rf.fields.signUpClosureDate.as(
                     "text",
                     signUpMode === "required" ? combinedSignUpClosureIso : "",
+                )}
+                class="hidden"
+            />
+        {/if}
+        {#if rf.fields.signUpRecurrence}
+            <input
+                {...rf.fields.signUpRecurrence.as(
+                    "text",
+                    signUpMode === "required" &&
+                        isSeriesMasterForm &&
+                        signUpClosureDatePart
+                        ? signUpRecurrence
+                        : "",
                 )}
                 class="hidden"
             />

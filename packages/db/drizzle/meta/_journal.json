@@ -309,6 +309,13 @@
       "when": 1794660636438,
       "tag": "0043_skinny_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794670164160,
+      "tag": "0044_red_skreet",
+      "breakpoints": true
     }
   ]
 }

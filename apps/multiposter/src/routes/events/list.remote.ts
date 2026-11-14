@@ -662,8 +662,17 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					}
 				}
 
-				const { expandRecurrenceRange } = await import('#lib/server/events/recurrence.js');
+				const { expandRecurrenceRange, createSignUpClosureResolver } = await import('#lib/server/events/recurrence.js');
 				const masterExdates = Array.isArray(master.exdates) ? (master.exdates as string[]) : [];
+				const resolveClosureDate =
+					master.signUpMode === 'required'
+						? createSignUpClosureResolver({
+								masterStart: master.startDateTime,
+								masterClosureDate: master.signUpClosureDate,
+								signUpRecurrence: master.signUpRecurrence,
+								timeZone: master.startTimeZone
+							})
+						: () => master.signUpClosureDate;
 
 				const instances = expandRecurrenceRange(
 					rruleStr,
@@ -686,7 +695,8 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 							id: `${master.id}_inst_${inst.date.toISOString()}`,
 							recurringEventId: master.id,
 							startDateTime: inst.date,
-							endDateTime: inst.end || master.endDateTime
+							endDateTime: inst.end || master.endDateTime,
+							signUpClosureDate: resolveClosureDate(inst.date)
 						} as any);
 						existingKeys.add(key);
 						if (seriesKey) existingKeys.add(seriesKey);
@@ -921,6 +931,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			startDateTime: e.startDateTime ? (e.startDateTime instanceof Date ? e.startDateTime.toISOString() : new Date(e.startDateTime).toISOString()) : null,
 			endDateTime: e.endDateTime ? (e.endDateTime instanceof Date ? e.endDateTime.toISOString() : new Date(e.endDateTime).toISOString()) : null,
 			signUpClosureDate: e.signUpClosureDate ? (e.signUpClosureDate instanceof Date ? e.signUpClosureDate.toISOString() : new Date(e.signUpClosureDate).toISOString()) : null,
+			signUpRecurrence: e.signUpRecurrence ?? null,
 			createdAt: e.createdAt ? (e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString()) : null,
 			updatedAt: e.updatedAt ? (e.updatedAt instanceof Date ? e.updatedAt.toISOString() : new Date(e.updatedAt).toISOString()) : null,
 			locations: evtLocations,

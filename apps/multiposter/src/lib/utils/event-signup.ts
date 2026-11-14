@@ -209,6 +209,47 @@ export function formatSignUpClosureDateShort(
 }
 
 /**
+ * Formats only the time part of a signup closure date when it differs from the default 23:59.
+ * Returns `""` when unset or equal to default 23:59.
+ */
+export function formatSignUpClosureTimeText(
+	val: string | Date | null | undefined,
+	locale?: string,
+	timeZone?: string,
+	compact = false
+): string {
+	const d = parseSignUpClosureDate(val);
+	if (!d || isSignUpClosureDefaultTime(d, timeZone)) return '';
+	const isDe = (locale || '').toLowerCase().startsWith('de');
+	return d.toLocaleTimeString(locale || undefined, {
+		hour: compact && !isDe ? 'numeric' : '2-digit',
+		minute: '2-digit',
+		...(timeZone ? { timeZone } : {})
+	});
+}
+
+/**
+ * Normalizes a signup recurrence field (`string | string[] | null | undefined`) into
+ * a non-empty `string[]` (matching `event.recurrence`), or `null` when empty.
+ */
+export function normalizeSignUpRecurrence(
+	val: string | string[] | null | undefined
+): string[] | null {
+	if (!val) return null;
+	if (Array.isArray(val)) {
+		const cleaned = val
+			.map((s) => (typeof s === 'string' ? s.trim() : ''))
+			.filter((s) => s.length > 0);
+		return cleaned.length > 0 ? cleaned : null;
+	}
+	if (typeof val === 'string') {
+		const trimmed = val.trim();
+		return trimmed.length > 0 ? [trimmed] : null;
+	}
+	return null;
+}
+
+/**
  * Produces a single, ultra-compact signup cue string for kiosk layouts when `signUpMode === 'required'`.
  * Returns `""` when not required so callers can guard rendering easily.
  */
@@ -216,6 +257,7 @@ export function formatKioskSignUpCompact(
 	event: {
 		signUpMode?: string | null;
 		signUpClosureDate?: string | Date | null;
+		signUpRecurrence?: string[] | string | null;
 		resolvedSignUpContact?: { name?: string | null; phone?: string | null; email?: string | null } | null;
 	} | null | undefined,
 	labels: {
@@ -225,14 +267,27 @@ export function formatKioskSignUpCompact(
 		closed: string;
 	},
 	locale?: string,
-	timeZone?: string
+	timeZone?: string,
+	options?: {
+		recurringDeadlineLabel?: string;
+		allOccurrencesClosed?: boolean;
+	}
 ): string {
 	if (!event || event.signUpMode !== 'required') return '';
 
-	const closed = isSignUpClosed(event.signUpMode, event.signUpClosureDate);
 	const c = event.resolvedSignUpContact;
 	const contactChannel = c?.phone?.trim() || c?.email?.trim() || '';
+	const recurringLabel = options?.recurringDeadlineLabel?.trim();
 
+	if (recurringLabel) {
+		if (options?.allOccurrencesClosed) {
+			return contactChannel ? `${labels.closed} (${contactChannel})` : labels.closed;
+		}
+		const base = labels.by(recurringLabel);
+		return contactChannel ? `${base}${labels.orContact(contactChannel)}` : base;
+	}
+
+	const closed = isSignUpClosed(event.signUpMode, event.signUpClosureDate);
 	if (closed) {
 		return contactChannel ? `${labels.closed} (${contactChannel})` : labels.closed;
 	}
@@ -244,11 +299,12 @@ export function formatKioskSignUpCompact(
 
 /**
  * Normalizes event sign-up persistence fields. When signUpMode is not `'required'`,
- * closure date and signup contact overrides are cleared to null/false.
+ * closure date, signup recurrence, and signup contact overrides are cleared to null/false.
  */
 export function extractSignUpFields(data: {
 	signUpMode?: string | null;
 	signUpClosureDate?: string | Date | null;
+	signUpRecurrence?: string[] | string | null;
 	signUpContactId?: string | null;
 	signUpContactOverridden?: boolean | string | null;
 }) {
@@ -257,17 +313,20 @@ export function extractSignUpFields(data: {
 		return {
 			signUpMode: mode,
 			signUpClosureDate: null as Date | null,
+			signUpRecurrence: null as string[] | null,
 			signUpContactId: null as string | null,
 			signUpContactOverridden: false
 		};
 	}
 
+	const closureDate = parseSignUpClosureDate(data.signUpClosureDate);
 	const rawContactId =
 		typeof data.signUpContactId === 'string' ? data.signUpContactId.trim() : '';
 
 	return {
 		signUpMode: mode,
-		signUpClosureDate: parseSignUpClosureDate(data.signUpClosureDate),
+		signUpClosureDate: closureDate,
+		signUpRecurrence: closureDate ? normalizeSignUpRecurrence(data.signUpRecurrence) : null,
 		signUpContactId: rawContactId.length > 0 ? rawContactId : null,
 		signUpContactOverridden: parseBoolFlag(data.signUpContactOverridden)
 	};

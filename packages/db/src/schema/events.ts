@@ -55,6 +55,7 @@ export const event = pgTable("event", {
     participantsCount: integer("participants_count").default(0).notNull(),
     signUpMode: text("sign_up_mode", { enum: ["off", "recommended", "required"] }).default("off").notNull(),
     signUpClosureDate: timestamp("sign_up_closure_date"),
+    signUpRecurrence: jsonb("sign_up_recurrence").$type<string[]>(),
     signUpContactId: uuid("sign_up_contact_id").references(() => contact.id, { onDelete: "set null" }),
     signUpContactOverridden: boolean("sign_up_contact_overridden").default(false).notNull(),
     reminders: jsonb("reminders").$type<{ useDefault?: boolean; overrides?: any[] }>(),

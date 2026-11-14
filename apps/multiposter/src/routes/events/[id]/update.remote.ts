@@ -14,9 +14,10 @@ import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, getCampaignTargetIds, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '#lib/server/cache/index.js';
 import { hasVirtualInstanceChanged } from '#lib/server/events/exceptions.js';
+import { computeOccurrenceSignUpClosureDate } from '#lib/server/events/recurrence.js';
 import { getStoredEventContactsHeadcount, reconcileEventParticipantsCount } from '#lib/server/events/participants.js';
 import { isSeriesItem } from '#lib/utils/event-series.js';
-import { extractSignUpFields, parseBoolFlag, parseSignUpClosureDate } from '#lib/utils/event-signup.js';
+import { extractSignUpFields, normalizeSignUpRecurrence, parseBoolFlag, parseSignUpClosureDate } from '#lib/utils/event-signup.js';
 import * as m from '#lib/paraglide/messages.js';
 
 // Complete rewrite to support recurrence and use helper
@@ -148,11 +149,15 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			updateData.signUpMode = signUpFields.signUpMode;
 			if (signUpFields.signUpMode !== 'required') {
 				updateData.signUpClosureDate = null;
+				updateData.signUpRecurrence = null;
 				updateData.signUpContactId = null;
 				updateData.signUpContactOverridden = false;
 			} else {
 				if (data.signUpClosureDate !== undefined) {
 					updateData.signUpClosureDate = signUpFields.signUpClosureDate;
+				}
+				if (data.signUpRecurrence !== undefined) {
+					updateData.signUpRecurrence = signUpFields.signUpRecurrence;
 				}
 				if (data.signUpContactId !== undefined) {
 					updateData.signUpContactId = signUpFields.signUpContactId;
@@ -164,6 +169,9 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		} else {
 			if (data.signUpClosureDate !== undefined) {
 				updateData.signUpClosureDate = parseSignUpClosureDate(data.signUpClosureDate);
+			}
+			if (data.signUpRecurrence !== undefined) {
+				updateData.signUpRecurrence = normalizeSignUpRecurrence(data.signUpRecurrence);
 			}
 			if (data.signUpContactId !== undefined) {
 				const trimmed = typeof data.signUpContactId === 'string' ? data.signUpContactId.trim() : '';
@@ -265,6 +273,17 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							masterPriceIds = masterPrices.map(m => m.id);
 						}
 
+						const targetSignUpClosureDate =
+							master.signUpMode === 'required'
+								? computeOccurrenceSignUpClosureDate({
+										masterStart: master.startDateTime,
+										masterClosureDate: master.signUpClosureDate,
+										signUpRecurrence: master.signUpRecurrence,
+										occurrenceStart: targetStart,
+										timeZone: master.startTimeZone
+									})
+								: master.signUpClosureDate;
+
 						const hasChanges = hasVirtualInstanceChanged({
 							master,
 							submitted: {
@@ -293,6 +312,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							},
 							targetStart,
 							targetEnd,
+							targetSignUpClosureDate,
 							submittedStart: updateData.startDateTime,
 							submittedEnd: updateData.endDateTime,
 							associations: {
@@ -324,7 +344,9 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 							isException: true,
 							recurrence: null,
 							seriesId: null,
+							signUpClosureDate: targetSignUpClosureDate,
 							...updateData,
+							signUpRecurrence: null,
 							userId: user.id
 						}).returning();
 

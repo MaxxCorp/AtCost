@@ -9,6 +9,7 @@ import { getEventRooms } from '#lib/utils/format-rooms.js';
 import { extractContactDetails, resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
 import { getSeriesInstances } from '#lib/server/events/instances.js';
+import { computeOccurrenceSignUpClosureDate } from '#lib/server/events/recurrence.js';
 import { sanitizePublicEvent, filterPublicTags } from '#lib/server/public-sanitization.js';
 
 /**
@@ -171,12 +172,24 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 						const duration = (master.startDateTime && master.endDateTime)
 							? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
 							: 3600000;
+						const targetSignUpClosureDate =
+							master.signUpMode === 'required'
+								? computeOccurrenceSignUpClosureDate({
+										masterStart: master.startDateTime,
+										masterClosureDate: master.signUpClosureDate,
+										signUpRecurrence: master.signUpRecurrence,
+										occurrenceStart: targetDate,
+										timeZone: master.startTimeZone
+									})
+								: master.signUpClosureDate;
 						result = {
 							...master,
 							id: eventId,
 							recurringEventId: master.id,
 							isException: false,
 							recurrence: null,
+							signUpRecurrence: null,
+							signUpClosureDate: targetSignUpClosureDate,
 							startDateTime: targetDate,
 							endDateTime: new Date(targetDate.getTime() + duration),
 						} as any;
@@ -503,6 +516,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		startDateTime: toIsoSafe(result.startDateTime),
 		endDateTime: toIsoSafe(result.endDateTime),
 		signUpClosureDate: toIsoSafe(result.signUpClosureDate),
+		signUpRecurrence: result.signUpMode === 'required' ? (result.signUpRecurrence ?? null) : null,
 		locations: allLocations,
 		resources: allResources,
 		contacts: sortedContacts,

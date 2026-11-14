@@ -204,5 +204,22 @@ describe('hasVirtualInstanceChanged', () => {
 				submitted: { ...unchanged.submitted, signUpContactId: 'c-2', signUpContactOverridden: 'true' }
 			})
 		).toBe(true);
+
+		// When master has signUpRecurrence, targetSignUpClosureDate is compared instead of master.signUpClosureDate
+		expect(
+			hasVirtualInstanceChanged({
+				...unchanged,
+				targetSignUpClosureDate: new Date('2026-11-27T11:00:00.000Z'),
+				submitted: { ...unchanged.submitted, signUpClosureDate: '2026-11-27T11:00:00.000Z' }
+			})
+		).toBe(false);
+
+		expect(
+			hasVirtualInstanceChanged({
+				...unchanged,
+				targetSignUpClosureDate: new Date('2026-11-27T11:00:00.000Z'),
+				submitted: { ...unchanged.submitted, signUpClosureDate: '2026-11-27T15:00:00.000Z' }
+			})
+		).toBe(true);
 	});
 });

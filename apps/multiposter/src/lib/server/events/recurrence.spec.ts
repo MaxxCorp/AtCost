@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { expandRecurrence } from './recurrence';
+import { expandRecurrence, computeOccurrenceSignUpClosureDate } from './recurrence';
 import { RRule } from '#lib/utils/rrule-compat.js';
 
 describe('Recurrence Expansion', () => {
@@ -118,5 +118,80 @@ describe('Recurrence Expansion', () => {
 
         expect(marchTime).toBe('16:00');
         expect(aprilTime).toBe('16:00');
+    });
+});
+
+describe('computeOccurrenceSignUpClosureDate', () => {
+    it('computes weekly Monday 12:00 closure for a weekly Wednesday event', () => {
+        // Master event: Wed 2026-03-04 18:00 UTC; Closure: Mon 2026-03-02 12:00 UTC
+        const masterStart = new Date('2026-03-04T18:00:00.000Z');
+        const masterClosureDate = new Date('2026-03-02T12:00:00.000Z');
+        const signUpRecurrence = ['RRULE:FREQ=WEEKLY;BYDAY=MO'];
+
+        // Second Wednesday: 2026-03-11 18:00 UTC -> Mon 2026-03-09 12:00 UTC
+        const occ2 = computeOccurrenceSignUpClosureDate({
+            masterStart,
+            masterClosureDate,
+            signUpRecurrence,
+            occurrenceStart: new Date('2026-03-11T18:00:00.000Z'),
+            timeZone: 'UTC',
+        });
+        expect(occ2?.toISOString()).toBe('2026-03-09T12:00:00.000Z');
+
+        // Skipped week (e.g. exdated 2026-03-18) -> 2026-03-25 still yields Mon 2026-03-23 12:00 UTC without index drift
+        const occ4 = computeOccurrenceSignUpClosureDate({
+            masterStart,
+            masterClosureDate,
+            signUpRecurrence,
+            occurrenceStart: new Date('2026-03-25T18:00:00.000Z'),
+            timeZone: 'UTC',
+        });
+        expect(occ4?.toISOString()).toBe('2026-03-23T12:00:00.000Z');
+    });
+
+    it('preserves local wall-clock 12:00 across Europe/Berlin DST transition', () => {
+        // Master event: Wed 2026-03-04 18:00 CET (17:00Z); Closure: Mon 2026-03-02 12:00 CET (11:00Z)
+        const masterStart = new Date('2026-03-04T17:00:00.000Z');
+        const masterClosureDate = new Date('2026-03-02T11:00:00.000Z');
+        const signUpRecurrence = ['RRULE:FREQ=WEEKLY;BYDAY=MO'];
+
+        // After DST switch (March 29, 2026): Wed 2026-04-01 18:00 CEST (16:00Z)
+        // Closure should be Mon 2026-03-30 12:00 CEST (10:00Z)
+        const postDst = computeOccurrenceSignUpClosureDate({
+            masterStart,
+            masterClosureDate,
+            signUpRecurrence,
+            occurrenceStart: new Date('2026-04-01T16:00:00.000Z'),
+            timeZone: 'Europe/Berlin',
+        });
+        expect(postDst?.toISOString()).toBe('2026-03-30T10:00:00.000Z');
+    });
+
+    it('supports lead offsets larger than 7 days (e.g. Monday 9 days before event)', () => {
+        // Master event: Wed 2026-03-18 18:00 UTC; Closure: Mon 2026-03-09 12:00 UTC (9d 6h lead)
+        const masterStart = new Date('2026-03-18T18:00:00.000Z');
+        const masterClosureDate = new Date('2026-03-09T12:00:00.000Z');
+        const signUpRecurrence = ['RRULE:FREQ=WEEKLY;BYDAY=MO'];
+
+        const nextOcc = computeOccurrenceSignUpClosureDate({
+            masterStart,
+            masterClosureDate,
+            signUpRecurrence,
+            occurrenceStart: new Date('2026-03-25T18:00:00.000Z'),
+            timeZone: 'UTC',
+        });
+        expect(nextOcc?.toISOString()).toBe('2026-03-16T12:00:00.000Z');
+    });
+
+    it('falls back to masterClosureDate when signUpRecurrence is empty', () => {
+        const masterClosureDate = new Date('2026-03-02T12:00:00.000Z');
+        const res = computeOccurrenceSignUpClosureDate({
+            masterStart: new Date('2026-03-04T18:00:00.000Z'),
+            masterClosureDate,
+            signUpRecurrence: null,
+            occurrenceStart: new Date('2026-03-11T18:00:00.000Z'),
+            timeZone: 'UTC',
+        });
+        expect(res?.toISOString()).toBe('2026-03-02T12:00:00.000Z');
     });
 });

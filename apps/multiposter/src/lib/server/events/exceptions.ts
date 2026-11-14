@@ -1,4 +1,5 @@
 import { parseSignUpClosureDate } from '#lib/utils/event-signup.js';
+import { computeOccurrenceSignUpClosureDate } from './recurrence.js';
 
 export interface VirtualInstanceDiffInput {
 	master: {
@@ -53,6 +54,7 @@ export interface VirtualInstanceDiffInput {
 	};
 	targetStart: Date;
 	targetEnd: Date;
+	targetSignUpClosureDate?: Date | string | null;
 	submittedStart?: Date | null;
 	submittedEnd?: Date | null;
 	associations?: {
@@ -110,7 +112,11 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	if (submitted.signUpMode !== undefined && strNorm(submitted.signUpMode || 'off') !== strNorm(master.signUpMode || 'off')) return true;
 	if (submitted.signUpClosureDate !== undefined) {
 		const normClosure = (v: Date | string | null | undefined) => parseSignUpClosureDate(v)?.getTime() ?? null;
-		if (normClosure(submitted.signUpClosureDate) !== normClosure(master.signUpClosureDate)) return true;
+		const expectedClosure =
+			input.targetSignUpClosureDate !== undefined
+				? input.targetSignUpClosureDate
+				: master.signUpClosureDate;
+		if (normClosure(submitted.signUpClosureDate) !== normClosure(expectedClosure)) return true;
 	}
 	if (submitted.signUpContactId !== undefined && strNorm(submitted.signUpContactId) !== strNorm(master.signUpContactId)) return true;
 	if (submitted.signUpContactOverridden !== undefined) {
@@ -266,6 +272,15 @@ export async function resolveEventIdForAssociations(
 		? (new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime())
 		: 3600000;
 	const targetEnd = new Date(targetStart.getTime() + duration);
+	const targetSignUpClosureDate = master.signUpMode === 'required'
+		? computeOccurrenceSignUpClosureDate({
+				masterStart: master.startDateTime,
+				masterClosureDate: master.signUpClosureDate,
+				signUpRecurrence: master.signUpRecurrence,
+				occurrenceStart: targetStart,
+				timeZone: master.startTimeZone
+			})
+		: master.signUpClosureDate;
 
 	const { id: _, createdAt: _c, updatedAt: _u, ...masterRest } = master;
 	const [created] = await db.insert(event).values({
@@ -274,6 +289,8 @@ export async function resolveEventIdForAssociations(
 		originalStartTime: { dateTime: decodedIso },
 		isException: true,
 		recurrence: null,
+		signUpRecurrence: null,
+		signUpClosureDate: targetSignUpClosureDate,
 		seriesId: null,
 		startDateTime: targetStart,
 		endDateTime: targetEnd,

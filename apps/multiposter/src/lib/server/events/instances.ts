@@ -1,11 +1,12 @@
 import { db, event, recurringSeries, inArray, eq, asc } from '@ac/db';
-import { expandRecurrence } from './recurrence';
+import { expandRecurrence, createSignUpClosureResolver } from './recurrence';
 
 export interface SeriesInstanceItem {
 	id: string;
 	summary?: string | null;
 	startDateTime: string | null;
 	endDateTime: string | null;
+	signUpClosureDate?: string | null;
 	status?: string | null;
 	isPublic?: boolean;
 }
@@ -16,6 +17,7 @@ export interface SeriesMasterSummary {
 	startDateTime: string | null;
 	endDateTime: string | null;
 	recurrence?: string[] | null;
+	signUpRecurrence?: string[] | null;
 	isPublic?: boolean;
 	instances?: SeriesInstanceItem[];
 }
@@ -44,6 +46,9 @@ export async function getSeriesInstances(
 		recurringEventId?: string | null;
 		seriesId?: string | null;
 		isPublic?: boolean | null;
+		signUpMode?: string | null;
+		signUpClosureDate?: Date | string | null;
+		signUpRecurrence?: string[] | null;
 	},
 	maxProjected: number = 100,
 	options: { publicOnly?: boolean } = {}
@@ -66,6 +71,7 @@ export async function getSeriesInstances(
 		summary: inst.summary,
 		startDateTime: toIsoSafe(inst.startDateTime),
 		endDateTime: toIsoSafe(inst.endDateTime),
+		signUpClosureDate: toIsoSafe(inst.signUpClosureDate),
 		status: inst.status,
 		isPublic: Boolean(inst.isPublic),
 	}));
@@ -113,6 +119,16 @@ export async function getSeriesInstances(
 			}
 		}
 
+		const resolveClosureDate =
+			master.signUpMode === 'required'
+				? createSignUpClosureResolver({
+						masterStart: startDate,
+						masterClosureDate: master.signUpClosureDate,
+						signUpRecurrence: master.signUpRecurrence,
+						timeZone: master.startTimeZone
+					})
+				: () => master.signUpClosureDate ?? null;
+
 		for (const p of projected) {
 			const pTime = p.date.getTime();
 			if (!existingTimes.has(pTime)) {
@@ -121,6 +137,7 @@ export async function getSeriesInstances(
 					summary: master.summary,
 					startDateTime: p.date.toISOString(),
 					endDateTime: p.end ? p.end.toISOString() : null,
+					signUpClosureDate: toIsoSafe(resolveClosureDate(p.date)),
 					status: 'published',
 					isPublic: master.isPublic !== false,
 				});
@@ -210,6 +227,7 @@ export async function populateSeriesInstances(
 			summary: inst.summary,
 			startDateTime: toIsoSafe(inst.startDateTime),
 			endDateTime: toIsoSafe(inst.endDateTime),
+			signUpClosureDate: toIsoSafe(inst.signUpClosureDate),
 			status: inst.status,
 			isPublic: Boolean(inst.isPublic),
 		}));
@@ -259,6 +277,16 @@ export async function populateSeriesInstances(
 				}
 			}
 
+			const resolveClosureDate =
+				master.signUpMode === 'required'
+					? createSignUpClosureResolver({
+							masterStart: startDate,
+							masterClosureDate: master.signUpClosureDate,
+							signUpRecurrence: master.signUpRecurrence,
+							timeZone: master.startTimeZone
+						})
+					: () => master.signUpClosureDate ?? null;
+
 			for (const p of projected) {
 				const pTime = p.date.getTime();
 				if (!existingTimes.has(pTime)) {
@@ -267,6 +295,7 @@ export async function populateSeriesInstances(
 						summary: master.summary,
 						startDateTime: p.date.toISOString(),
 						endDateTime: p.end ? p.end.toISOString() : null,
+						signUpClosureDate: toIsoSafe(resolveClosureDate(p.date)),
 						status: 'published',
 						isPublic: master.isPublic !== false,
 					});
@@ -284,6 +313,7 @@ export async function populateSeriesInstances(
 			startDateTime: toIsoSafe(master.startDateTime),
 			endDateTime: toIsoSafe(master.endDateTime),
 			recurrence: master.recurrence,
+			signUpRecurrence: master.signUpRecurrence ?? null,
 			isPublic: master.isPublic !== false,
 			instances,
 		};

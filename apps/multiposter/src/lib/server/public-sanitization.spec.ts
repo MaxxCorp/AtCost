@@ -449,6 +449,7 @@ describe('Centralized Public Sanitization', () => {
 				status: 'confirmed',
 				signUpMode: 'required',
 				signUpClosureDate: '2026-11-20T00:00:00.000Z',
+				signUpRecurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'],
 				signUpContactId: 'c-pub',
 				signUpContact: {
 					id: 'c-pub',
@@ -469,6 +470,7 @@ describe('Centralized Public Sanitization', () => {
 
 			const sanitized = sanitizePublicEvent(rawReqEvent)!;
 			expect(sanitized.signUpClosureDate).toBe('2026-11-20T00:00:00.000Z');
+			expect(sanitized.signUpRecurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO']);
 			expect(sanitized.signUpContact).toBeNull();
 			expect(sanitized.resolvedSignUpContact).toEqual({
 				id: 'c-pub',
@@ -489,12 +491,13 @@ describe('Centralized Public Sanitization', () => {
 			})!;
 			expect(privSignUpContact.resolvedSignUpContact).toBeNull();
 
-			// Recommended mode strips closure date & signup contact
+			// Recommended mode strips closure date, recurrence & signup contact
 			const recEvent = sanitizePublicEvent({
 				...rawReqEvent,
 				signUpMode: 'recommended'
 			})!;
 			expect(recEvent.signUpClosureDate).toBeNull();
+			expect(recEvent.signUpRecurrence).toBeNull();
 			expect(recEvent.resolvedSignUpContact).toBeNull();
 		});
 	});

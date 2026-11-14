@@ -260,3 +260,104 @@ export function expandRecurrenceRange(
 	}
 }
 
+export interface SignUpClosureRecurrenceInput {
+	masterStart: Date | string | null | undefined;
+	masterClosureDate: Date | string | null | undefined;
+	signUpRecurrence: string[] | string | null | undefined;
+	timeZone?: string | null;
+}
+
+function toValidDate(val: Date | string | null | undefined): Date | null {
+	if (!val) return null;
+	const d = val instanceof Date ? val : new Date(val);
+	return isNaN(d.getTime()) ? null : d;
+}
+
+function extractRRuleString(rules: string[] | string | null | undefined): string | null {
+	if (!rules) return null;
+	const arr = Array.isArray(rules) ? rules : [rules];
+	const rrule = arr.find((r) => typeof r === 'string' && r.trim().toUpperCase().startsWith('RRULE:'));
+	if (rrule) return rrule.trim();
+	const first = arr.find((r) => typeof r === 'string' && r.trim().length > 0);
+	return first ? first.trim() : null;
+}
+
+function toWallClockUtc(date: Date, tz: string): Date {
+	const wc = getWallClockComponents(date, tz);
+	return new Date(Date.UTC(wc.year, wc.month - 1, wc.day, wc.hour, wc.minute, wc.second));
+}
+
+/**
+ * Builds a fast per-series resolver that maps any occurrence `occurrenceStart`
+ * to its concrete sign-up closure `Date` according to the series' `signUpRecurrence`
+ * (or falls back to `masterClosureDate` when no signup recurrence is set).
+ */
+export function createSignUpClosureResolver(
+	input: SignUpClosureRecurrenceInput
+): (occurrenceStart: Date | string) => Date | null {
+	const mClosure = toValidDate(input.masterClosureDate);
+	if (!mClosure) return () => null;
+
+	const ruleStr = extractRRuleString(input.signUpRecurrence);
+	if (!ruleStr) return () => mClosure;
+
+	try {
+		const tz = input.timeZone || 'UTC';
+		const mStart = toValidDate(input.masterStart);
+		const leadOffsetMs = mStart ? mStart.getTime() - mClosure.getTime() : 0;
+
+		const ruleOptions = RRule.parseString(ruleStr);
+		ruleOptions.dtstart = toWallClockUtc(mClosure, tz);
+		const rruleObj = new RRule(ruleOptions);
+
+		const HALF_WINDOW_MS = 200 * 24 * 60 * 60 * 1000;
+		let boundedAll: Date[] | null = null;
+
+		return (occurrenceStart: Date | string): Date | null => {
+			const occDate = toValidDate(occurrenceStart);
+			if (!occDate) return mClosure;
+
+			const expectedTargetMs = occDate.getTime() - leadOffsetMs;
+			const winStart = toWallClockUtc(new Date(expectedTargetMs - HALF_WINDOW_MS), tz);
+			const winEnd = toWallClockUtc(new Date(expectedTargetMs + HALF_WINDOW_MS), tz);
+
+			let rawCandidates = rruleObj.between(winStart, winEnd, true);
+			if (rawCandidates.length === 0 && (ruleOptions.count || ruleOptions.until)) {
+				if (!boundedAll) {
+					boundedAll = rruleObj.all();
+				}
+				rawCandidates = boundedAll;
+			}
+
+			if (rawCandidates.length === 0) {
+				return new Date(expectedTargetMs);
+			}
+
+			let best: Date | null = null;
+			let bestDist = Infinity;
+			for (const raw of rawCandidates) {
+				const zoned = rruleDateToZoned(raw, tz);
+				const dist = Math.abs(zoned.getTime() - expectedTargetMs);
+				if (dist < bestDist) {
+					bestDist = dist;
+					best = zoned;
+				}
+			}
+
+			return best ?? mClosure;
+		};
+	} catch (e) {
+		console.error('Error building signUpRecurrence resolver:', e);
+		return () => mClosure;
+	}
+}
+
+/**
+ * Convenience single-occurrence helper to compute an occurrence's concrete sign-up closure date.
+ */
+export function computeOccurrenceSignUpClosureDate(
+	input: SignUpClosureRecurrenceInput & { occurrenceStart: Date | string }
+): Date | null {
+	return createSignUpClosureResolver(input)(input.occurrenceStart);
+}
+

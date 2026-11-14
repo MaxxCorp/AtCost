@@ -10,11 +10,15 @@
         open = $bindable(false), 
         value = $bindable<string | null>(null),
         startDate = null,
+        title,
+        description,
         onchange
     }: {
         open?: boolean;
         value?: string | null;
         startDate?: string | Date | null;
+        title?: string;
+        description?: string;
         onchange?: (value: string | null) => void;
     } = $props();
 
@@ -376,9 +380,9 @@
 <Dialog.Root bind:open>
     <Dialog.Content class="sm:max-w-[500px]">
         <Dialog.Header>
-            <Dialog.Title>{m.recurrence_settings()}</Dialog.Title>
+            <Dialog.Title>{title || m.recurrence_settings()}</Dialog.Title>
             <Dialog.Description>
-                {m.recurrence_description()}
+                {description || m.recurrence_description()}
             </Dialog.Description>
             {#if previewText}
                 <div class="mt-2 text-sm font-medium text-blue-700 bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center gap-2">

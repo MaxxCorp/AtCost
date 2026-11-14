@@ -75,6 +75,52 @@ export interface CardPrintConfig {
     printColor?: 'color' | 'greyscale';
     hideSeriesDates?: boolean;
     hideEndTime?: boolean;
+    fontFamily?: string;
+    fontScale?: number;
+}
+
+export interface KioskFontOption {
+    id: string;
+    label: string;
+    cssFamily: string;
+}
+
+export const KIOSK_FONT_OPTIONS: KioskFontOption[] = [
+    { id: 'default', label: 'Standard (System)', cssFamily: '' },
+    { id: 'inter', label: 'Modern Sans (Inter)', cssFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+    { id: 'poppins', label: 'Geometrisch (Poppins)', cssFamily: "'Poppins', 'Segoe UI', sans-serif" },
+    { id: 'lora', label: 'Klassisch Serif (Lora)', cssFamily: "'Lora', Georgia, 'Times New Roman', serif" },
+    { id: 'playfair', label: 'Plakat Serif (Playfair)', cssFamily: "'Playfair Display', Georgia, 'Times New Roman', serif" },
+    { id: 'roboto_slab', label: 'Kräftig Slab (Roboto Slab)', cssFamily: "'Roboto Slab', Georgia, serif" },
+    { id: 'patrick_hand', label: 'Handschrift (Patrick Hand)', cssFamily: "'Patrick Hand', 'Comic Sans MS', cursive" },
+    { id: 'jetbrains_mono', label: 'Schreibmaschine (Mono)', cssFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace" },
+];
+
+export const KIOSK_FONT_SCALE_MIN = 0.7;
+export const KIOSK_FONT_SCALE_MAX = 1.6;
+export const KIOSK_FONT_SCALE_STEP = 0.05;
+
+export function clampKioskFontScale(scale: number | undefined | null): number {
+    if (typeof scale !== 'number' || Number.isNaN(scale)) return 1;
+    const rounded = Math.round(scale * 100) / 100;
+    return Math.min(KIOSK_FONT_SCALE_MAX, Math.max(KIOSK_FONT_SCALE_MIN, rounded));
+}
+
+export function getKioskFontCss(fontId?: string): string {
+    if (!fontId || fontId === 'default') return '';
+    return KIOSK_FONT_OPTIONS.find((f) => f.id === fontId)?.cssFamily ?? '';
+}
+
+export function getDocumentTypographyStyle(fontFamily?: string, fontScale?: number): string {
+    const scale = clampKioskFontScale(fontScale);
+    const cssFont = getKioskFontCss(fontFamily);
+    return `--kiosk-doc-font-scale: ${scale};${cssFont ? ` font-family: ${cssFont};` : ''}`;
+}
+
+export function getItemTypographyStyle(fontFamily?: string, fontScale?: number): string {
+    const scale = clampKioskFontScale(fontScale);
+    const cssFont = getKioskFontCss(fontFamily);
+    return `--kiosk-item-font-scale: ${scale};${cssFont ? ` font-family: ${cssFont};` : ''}`;
 }
 
 export function getCardPrintClasses(

@@ -78,33 +78,46 @@ describe('event-signup utilities', () => {
 	});
 
 	describe('extractSignUpFields', () => {
-		it('clears closure date and signup contact when signUpMode is not required', () => {
+		it('clears closure date, recurrence, and signup contact when signUpMode is not required', () => {
 			expect(
 				extractSignUpFields({
 					signUpMode: 'recommended',
 					signUpClosureDate: '2026-11-20',
+					signUpRecurrence: 'RRULE:FREQ=WEEKLY;BYDAY=MO',
 					signUpContactId: 'c-1',
 					signUpContactOverridden: 'true'
 				})
 			).toEqual({
 				signUpMode: 'recommended',
 				signUpClosureDate: null,
+				signUpRecurrence: null,
 				signUpContactId: null,
 				signUpContactOverridden: false
 			});
 		});
 
-		it('preserves closure timestamp, signup contact, and override flag for required mode', () => {
+		it('preserves closure timestamp, signUpRecurrence, signup contact, and override flag for required mode', () => {
 			const res = extractSignUpFields({
 				signUpMode: 'required',
 				signUpClosureDate: '2026-11-20T17:30:00.000Z',
+				signUpRecurrence: 'RRULE:FREQ=WEEKLY;BYDAY=MO',
 				signUpContactId: '  c-42 ',
 				signUpContactOverridden: 'true'
 			});
 			expect(res.signUpMode).toBe('required');
 			expect(res.signUpClosureDate?.toISOString()).toBe('2026-11-20T17:30:00.000Z');
+			expect(res.signUpRecurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO']);
 			expect(res.signUpContactId).toBe('c-42');
 			expect(res.signUpContactOverridden).toBe(true);
+
+			// signUpRecurrence requires a closure date anchor
+			const noDate = extractSignUpFields({
+				signUpMode: 'required',
+				signUpClosureDate: '',
+				signUpRecurrence: 'RRULE:FREQ=WEEKLY;BYDAY=MO'
+			});
+			expect(noDate.signUpClosureDate).toBeNull();
+			expect(noDate.signUpRecurrence).toBeNull();
 		});
 	});
 
@@ -232,6 +245,48 @@ describe('event-signup utilities', () => {
 					'de'
 				)
 			).toBe('Anmeldung geschl. (desk@example.org)');
+		});
+
+		it('uses recurringDeadlineLabel on multi-occurrence compressed series unless all occurrences are closed', () => {
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: '2020-01-10T11:00:00.000Z',
+						signUpRecurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'],
+						resolvedSignUpContact: {
+							phone: '+49(0)305405659'
+						}
+					},
+					labels,
+					'de',
+					undefined,
+					{
+						recurringDeadlineLabel: 'wöchentl. Mo 12:00',
+						allOccurrencesClosed: false
+					}
+				)
+			).toBe('Anmeldung bis wöchentl. Mo 12:00 über QR Code oder +49(0)305405659');
+
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: '2020-01-10T11:00:00.000Z',
+						signUpRecurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'],
+						resolvedSignUpContact: {
+							phone: '+49(0)305405659'
+						}
+					},
+					labels,
+					'de',
+					undefined,
+					{
+						recurringDeadlineLabel: 'wöchentl. Mo 12:00',
+						allOccurrencesClosed: true
+					}
+				)
+			).toBe('Anmeldung geschl. (+49(0)305405659)');
 		});
 	});
 });

@@ -372,3 +372,67 @@ img.print\:card-greyscale {
     image-rendering: -webkit-optimize-contrast;
   }
 }
+
+/* Kiosk print-template typography scaling (whole poster/flyer/list + per-item overrides) */
+.kiosk-typography-scope {
+  --kiosk-font-scale: var(--kiosk-doc-font-scale, 1);
+  font-size: calc(1rem * var(--kiosk-font-scale, 1));
+}
+
+.kiosk-item-typography {
+  --kiosk-font-scale: calc(var(--kiosk-doc-font-scale, 1) * var(--kiosk-item-font-scale, 1));
+  font-size: calc(1rem * var(--kiosk-font-scale, 1));
+}
+
+.kiosk-typography-scope,
+.kiosk-item-typography {
+  --text-xs: calc(0.75rem * var(--kiosk-font-scale, 1));
+  --text-sm: calc(0.875rem * var(--kiosk-font-scale, 1));
+  --text-base: calc(1rem * var(--kiosk-font-scale, 1));
+  --text-lg: calc(1.125rem * var(--kiosk-font-scale, 1));
+  --text-xl: calc(1.25rem * var(--kiosk-font-scale, 1));
+  --text-2xl: calc(1.5rem * var(--kiosk-font-scale, 1));
+  --text-3xl: calc(1.875rem * var(--kiosk-font-scale, 1));
+  --text-4xl: calc(2.25rem * var(--kiosk-font-scale, 1));
+}
+
+.kiosk-typography-scope .ci-area {
+  --kiosk-font-scale: 1;
+  font-size: 1rem;
+}
+
+.kiosk-typography-scope.kiosk-has-custom-font .font-mono:not(.kiosk-keep-mono),
+.kiosk-item-typography.kiosk-has-custom-font .font-mono:not(.kiosk-keep-mono) {
+  font-family: inherit;
+}
+
+.kiosk-typography-scope .text-\[7\.5px\] {
+  font-size: calc(7.5px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[8px\] {
+  font-size: calc(8px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[8\.5px\] {
+  font-size: calc(8.5px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[9px\] {
+  font-size: calc(9px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[9\.5px\] {
+  font-size: calc(9.5px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[10px\] {
+  font-size: calc(10px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[10\.5px\] {
+  font-size: calc(10.5px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[11px\] {
+  font-size: calc(11px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[11\.5px\] {
+  font-size: calc(11.5px * var(--kiosk-font-scale, 1));
+}
+.kiosk-typography-scope .text-\[13px\] {
+  font-size: calc(13px * var(--kiosk-font-scale, 1));
+}

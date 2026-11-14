@@ -8,6 +8,7 @@ export type SeriesInstanceInfo = {
     id: string;
     startDateTime: string;
     endDateTime?: string | null;
+    signUpClosureDate?: string | null;
     status?: string | null;
     isAllDay?: boolean;
 };
