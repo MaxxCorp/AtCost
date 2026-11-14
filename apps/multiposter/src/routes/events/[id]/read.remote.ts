@@ -424,6 +424,12 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				startDateTime: masterRecord.startDateTime ? (masterRecord.startDateTime instanceof Date ? masterRecord.startDateTime.toISOString() : new Date(masterRecord.startDateTime).toISOString()) : null,
 				endDateTime: masterRecord.endDateTime ? (masterRecord.endDateTime instanceof Date ? masterRecord.endDateTime.toISOString() : new Date(masterRecord.endDateTime).toISOString()) : null,
 				recurrence: masterRrule,
+				signUpMode: masterRecord.signUpMode ?? 'off',
+				signUpRecurrence:
+					masterRecord.signUpMode === 'required'
+						? (masterRecord.signUpRecurrence ?? masterRrule ?? null)
+						: null,
+				signUpClosureDate: masterRecord.signUpClosureDate ? (masterRecord.signUpClosureDate instanceof Date ? masterRecord.signUpClosureDate.toISOString() : new Date(masterRecord.signUpClosureDate).toISOString()) : null,
 				isPublic: Boolean(masterRecord.isPublic),
 				instances: instances.length > 0 ? instances : undefined,
 			};
@@ -516,7 +522,11 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		startDateTime: toIsoSafe(result.startDateTime),
 		endDateTime: toIsoSafe(result.endDateTime),
 		signUpClosureDate: toIsoSafe(result.signUpClosureDate),
-		signUpRecurrence: result.signUpMode === 'required' ? (result.signUpRecurrence ?? null) : null,
+		signUpRecurrence:
+			result.signUpMode === 'required'
+				? (result.signUpRecurrence ??
+					(!result.recurringEventId && !result.isException ? (result.recurrence ?? null) : null))
+				: null,
 		locations: allLocations,
 		resources: allResources,
 		contacts: sortedContacts,

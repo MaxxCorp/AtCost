@@ -946,6 +946,28 @@
             : "";
         rf.fields.signUpClosureDate?.set(nextIso);
     }
+    const seriesMasterMeta = $derived((initialData as any)?.seriesMaster ?? null);
+    const seriesRecurrenceRule = $derived(
+        (rf.fields.recurrence.value()
+            ? String(rf.fields.recurrence.value()).trim()
+            : "") ||
+            initialData?.recurrence?.[0] ||
+            seriesMasterMeta?.recurrence?.[0] ||
+            "",
+    );
+    const seriesMasterId = $derived(
+        seriesMasterMeta?.id ||
+            initialData?.recurringEventId ||
+            (String(initialData?.id || "").includes("_inst_")
+                ? String(initialData?.id).split("_inst_")[0]
+                : ""),
+    );
+    const initialSeriesRecurrence = untrack(
+        () =>
+            initialData?.recurrence?.[0] ||
+            (initialData as any)?.seriesMaster?.recurrence?.[0] ||
+            "",
+    );
     const initialSignUpRecurrence = untrack(() =>
         Array.isArray(initialData?.signUpRecurrence)
             ? initialData.signUpRecurrence[0] || ""
@@ -953,7 +975,14 @@
               ? initialData.signUpRecurrence
               : "",
     );
-    let signUpRecurrence = $state<string>(initialSignUpRecurrence);
+    let customSignUpRecurrence = $state<string>(initialSignUpRecurrence);
+    let signUpRecurrenceOverridden = $state<boolean>(
+        Boolean(
+            initialSignUpRecurrence &&
+                initialSeriesRecurrence &&
+                initialSignUpRecurrence !== initialSeriesRecurrence,
+        ),
+    );
     let showSignUpRecurrenceDialog = $state(false);
     const isSeriesMasterForm = $derived(
         isSeries &&
@@ -961,11 +990,32 @@
             !initialData?.isException &&
             !String(initialData?.id || "").includes("_inst_"),
     );
+    const effectiveSignUpRecurrence = $derived(
+        !isSeriesMasterForm
+            ? ""
+            : signUpRecurrenceOverridden
+              ? customSignUpRecurrence
+              : seriesRecurrenceRule || customSignUpRecurrence,
+    );
+    const masterSignUpRecurrence = $derived(
+        Array.isArray(seriesMasterMeta?.signUpRecurrence)
+            ? seriesMasterMeta.signUpRecurrence[0] || ""
+            : typeof seriesMasterMeta?.signUpRecurrence === "string"
+              ? seriesMasterMeta.signUpRecurrence
+              : seriesMasterMeta?.recurrence?.[0] || "",
+    );
+    const displaySignUpRecurrence = $derived(
+        isSeriesMasterForm ? effectiveSignUpRecurrence : masterSignUpRecurrence,
+    );
     const signUpRecurrenceText = $derived(
-        signUpRecurrence
-            ? formatRecurrenceText(signUpRecurrence, {
+        displaySignUpRecurrence
+            ? formatRecurrenceText(displaySignUpRecurrence, {
                   includeEnd: true,
-                  dtstart: signUpClosureDatePart || undefined,
+                  dtstart:
+                      signUpClosureDatePart ||
+                      rf.fields.startDate.value() ||
+                      currentStartDateVal ||
+                      undefined,
               })
             : m.sign_up_recurrence(),
     );
@@ -1790,7 +1840,13 @@
             initialData?.recurrence?.[0] ??
             ""}
         startDate={rf.fields.startDate.value() || currentStartDateVal}
-        onchange={(val: string | null) => rf.fields.recurrence.set(val ?? "")}
+        onchange={(val: string | null) => {
+            const nextVal = val ?? "";
+            rf.fields.recurrence.set(nextVal);
+            if (!signUpRecurrenceOverridden && signUpMode === "required") {
+                rf.fields.signUpRecurrence?.set(nextVal);
+            }
+        }}
     />
     {#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
         <input
@@ -2987,6 +3043,14 @@
                                 | "recommended"
                                 | "required";
                             rf.fields.signUpMode.set(signUpMode);
+                            if (
+                                signUpMode === "required" &&
+                                isSeriesMasterForm
+                            ) {
+                                rf.fields.signUpRecurrence?.set(
+                                    effectiveSignUpRecurrence,
+                                );
+                            }
                         }}
                         class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                     />
@@ -3093,9 +3157,7 @@
                                             DEFAULT_SIGN_UP_CLOSURE_TIME;
                                         signUpClosureTimeZone = browserTimezone;
                                         showClosureTimeZone = false;
-                                        signUpRecurrence = "";
                                         rf.fields.signUpClosureDate?.set("");
-                                        rf.fields.signUpRecurrence?.set("");
                                     }}
                                     class="inline-flex items-center gap-1 text-xs h-9"
                                 >
@@ -3151,44 +3213,101 @@
                     </p>
 
                     {#if isSeriesMasterForm}
-                        <div class="pt-1 flex flex-wrap items-center gap-3">
-                            <button
-                                type="button"
-                                disabled={!signUpClosureDatePart}
-                                class="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border transition-colors {signUpClosureDatePart
-                                    ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 cursor-pointer'
-                                    : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}"
-                                onclick={() => {
-                                    if (signUpClosureDatePart) {
+                        <div class="pt-1 space-y-1.5">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border transition-colors bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 cursor-pointer"
+                                    onclick={() => {
                                         showSignUpRecurrenceDialog = true;
-                                    }
-                                }}
-                            >
-                                <RefreshCw size={15} class={signUpRecurrence ? "text-blue-600" : ""} />
-                                <span class="text-left">{signUpRecurrenceText}</span>
-                            </button>
+                                    }}
+                                >
+                                    <RefreshCw
+                                        size={15}
+                                        class={effectiveSignUpRecurrence
+                                            ? "text-blue-600"
+                                            : ""}
+                                    />
+                                    <span class="text-left"
+                                        >{signUpRecurrenceText}</span
+                                    >
+                                </button>
+                                {#if signUpRecurrenceOverridden}
+                                    <span
+                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
+                                    >
+                                        {m.sign_up_recurrence_overridden_badge()}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 underline"
+                                        onclick={() => {
+                                            signUpRecurrenceOverridden = false;
+                                            customSignUpRecurrence =
+                                                seriesRecurrenceRule;
+                                            rf.fields.signUpRecurrence?.set(
+                                                seriesRecurrenceRule,
+                                            );
+                                        }}
+                                    >
+                                        <RotateCcw size={12} />
+                                        {m.sign_up_recurrence_reset_default()}
+                                    </button>
+                                {:else if effectiveSignUpRecurrence}
+                                    <span
+                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700"
+                                    >
+                                        {m.sign_up_recurrence_default_badge()}
+                                    </span>
+                                {/if}
+                            </div>
                             {#if !signUpClosureDatePart}
-                                <span class="text-xs text-gray-500">
-                                    {m.sign_up_recurrence_requires_date()}
-                                </span>
+                                <p class="text-xs text-gray-500">
+                                    {m.sign_up_recurrence_optional_date_hint()}
+                                </p>
                             {/if}
                         </div>
 
                         <RecurrenceDialog
                             bind:open={showSignUpRecurrenceDialog}
-                            value={signUpRecurrence || null}
+                            value={effectiveSignUpRecurrence || null}
                             startDate={signUpClosureDatePart ||
                                 rf.fields.startDate.value() ||
                                 currentStartDateVal}
                             title={m.sign_up_recurrence_title()}
                             description={m.sign_up_recurrence_description()}
                             onchange={(val: string | null) => {
-                                signUpRecurrence = val ?? "";
+                                const next = val ?? "";
+                                customSignUpRecurrence = next;
+                                signUpRecurrenceOverridden =
+                                    next !== seriesRecurrenceRule;
                                 rf.fields.signUpRecurrence?.set(
-                                    signUpRecurrence,
+                                    signUpRecurrenceOverridden
+                                        ? customSignUpRecurrence
+                                        : seriesRecurrenceRule,
                                 );
                             }}
                         />
+                    {:else if isSeries}
+                        <div
+                            class="pt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600"
+                        >
+                            <span
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-700"
+                            >
+                                <RefreshCw size={13} class="text-blue-600" />
+                                <span>{signUpRecurrenceText}</span>
+                            </span>
+                            <span>{m.sign_up_recurrence_instance_hint()}</span>
+                            {#if seriesMasterId}
+                                <a
+                                    href="/events/{seriesMasterId}"
+                                    class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium underline"
+                                >
+                                    {m.edit_series()}
+                                </a>
+                            {/if}
+                        </div>
                     {/if}
                 </div>
 
@@ -3278,10 +3397,8 @@
             <input
                 {...rf.fields.signUpRecurrence.as(
                     "text",
-                    signUpMode === "required" &&
-                        isSeriesMasterForm &&
-                        signUpClosureDatePart
-                        ? signUpRecurrence
+                    signUpMode === "required" && isSeriesMasterForm
+                        ? effectiveSignUpRecurrence
                         : "",
                 )}
                 class="hidden"

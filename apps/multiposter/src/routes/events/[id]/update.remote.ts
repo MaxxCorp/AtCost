@@ -144,8 +144,16 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
 		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
 		if (data.participantsCount !== undefined) updateData.participantsCount = Number(data.participantsCount) || 0;
+		const isMasterUpdate = !isVirtualInstance && !oldEvent.recurringEventId && !oldEvent.isException;
+		const resolvedSeriesRecurrence = isMasterUpdate
+			? (data.recurrence !== undefined ? data.recurrence : oldEvent.recurrence)
+			: null;
+
 		if (data.signUpMode !== undefined) {
-			const signUpFields = extractSignUpFields(data);
+			const signUpFields = extractSignUpFields({
+				...data,
+				recurrence: resolvedSeriesRecurrence,
+			});
 			updateData.signUpMode = signUpFields.signUpMode;
 			if (signUpFields.signUpMode !== 'required') {
 				updateData.signUpClosureDate = null;
@@ -156,7 +164,10 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				if (data.signUpClosureDate !== undefined) {
 					updateData.signUpClosureDate = signUpFields.signUpClosureDate;
 				}
-				if (data.signUpRecurrence !== undefined) {
+				if (
+					data.signUpRecurrence !== undefined ||
+					(isMasterUpdate && signUpFields.signUpRecurrence && !oldEvent.signUpRecurrence)
+				) {
 					updateData.signUpRecurrence = signUpFields.signUpRecurrence;
 				}
 				if (data.signUpContactId !== undefined) {
@@ -172,6 +183,16 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			}
 			if (data.signUpRecurrence !== undefined) {
 				updateData.signUpRecurrence = normalizeSignUpRecurrence(data.signUpRecurrence);
+			} else if (
+				oldEvent.signUpMode === 'required' &&
+				isMasterUpdate &&
+				!oldEvent.signUpRecurrence &&
+				resolvedSeriesRecurrence
+			) {
+				const defaultSignUpRecurrence = normalizeSignUpRecurrence(resolvedSeriesRecurrence);
+				if (defaultSignUpRecurrence) {
+					updateData.signUpRecurrence = defaultSignUpRecurrence;
+				}
 			}
 			if (data.signUpContactId !== undefined) {
 				const trimmed = typeof data.signUpContactId === 'string' ? data.signUpContactId.trim() : '';

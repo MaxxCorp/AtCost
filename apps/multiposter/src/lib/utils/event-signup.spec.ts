@@ -110,14 +110,29 @@ describe('event-signup utilities', () => {
 			expect(res.signUpContactId).toBe('c-42');
 			expect(res.signUpContactOverridden).toBe(true);
 
-			// signUpRecurrence requires a closure date anchor
+			// signUpRecurrence is preserved even when closure date is omitted, and defaults to series recurrence when omitted
 			const noDate = extractSignUpFields({
 				signUpMode: 'required',
 				signUpClosureDate: '',
 				signUpRecurrence: 'RRULE:FREQ=WEEKLY;BYDAY=MO'
 			});
 			expect(noDate.signUpClosureDate).toBeNull();
-			expect(noDate.signUpRecurrence).toBeNull();
+			expect(noDate.signUpRecurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO']);
+
+			const defaultSeries = extractSignUpFields({
+				signUpMode: 'required',
+				signUpClosureDate: '',
+				recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=WE']
+			});
+			expect(defaultSeries.signUpRecurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=WE']);
+
+			const explicitCleared = extractSignUpFields({
+				signUpMode: 'required',
+				signUpClosureDate: '',
+				signUpRecurrence: '',
+				recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=WE']
+			});
+			expect(explicitCleared.signUpRecurrence).toBeNull();
 		});
 	});
 

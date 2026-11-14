@@ -353,6 +353,7 @@ export function extractSignUpFields(data: {
 	signUpRecurrence?: string[] | string | null;
 	signUpContactId?: string | null;
 	signUpContactOverridden?: boolean | string | null;
+	recurrence?: string[] | string | null;
 }) {
 	const mode = (data.signUpMode || 'off') as 'off' | 'recommended' | 'required';
 	if (mode !== 'required') {
@@ -369,10 +370,17 @@ export function extractSignUpFields(data: {
 	const rawContactId =
 		typeof data.signUpContactId === 'string' ? data.signUpContactId.trim() : '';
 
+	const explicitSignUpRecurrence = normalizeSignUpRecurrence(data.signUpRecurrence);
+	const seriesRecurrence = normalizeSignUpRecurrence(data.recurrence);
+	const explicitlyCleared =
+		typeof data.signUpRecurrence === 'string' && data.signUpRecurrence.trim() === '';
+	const effectiveSignUpRecurrence =
+		explicitSignUpRecurrence ?? (explicitlyCleared ? null : seriesRecurrence);
+
 	return {
 		signUpMode: mode,
 		signUpClosureDate: closureDate,
-		signUpRecurrence: closureDate ? normalizeSignUpRecurrence(data.signUpRecurrence) : null,
+		signUpRecurrence: effectiveSignUpRecurrence,
 		signUpContactId: rawContactId.length > 0 ? rawContactId : null,
 		signUpContactOverridden: parseBoolFlag(data.signUpContactOverridden)
 	};
