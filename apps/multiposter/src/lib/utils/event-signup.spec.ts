@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
 	parseSignUpClosureDate,
+	combineSignUpClosureDateTime,
+	extractSignUpClosureParts,
 	formatSignUpClosureDateYmd,
+	formatSignUpClosureDateDisplay,
+	isSignUpClosureDefaultTime,
 	isSignUpClosed,
 	extractSignUpFields,
 	findDefaultKontaktContact,
@@ -11,27 +15,65 @@ import {
 } from './event-signup';
 
 describe('event-signup utilities', () => {
-	describe('date formatting & parsing', () => {
-		it('parses YYYY-MM-DD cleanly into UTC midnight Date and formats back', () => {
-			const parsed = parseSignUpClosureDate('2026-11-20');
-			expect(parsed).toBeInstanceOf(Date);
-			expect(parsed?.toISOString()).toBe('2026-11-20T00:00:00.000Z');
-			expect(formatSignUpClosureDateYmd(parsed)).toBe('2026-11-20');
-			expect(formatSignUpClosureDateYmd('2026-11-20T23:59:59.000Z')).toBe('2026-11-20');
+	describe('date, time, timezone & display formatting', () => {
+		it('combines date, optional time (default 23:59), and client timezone into ISO string', () => {
+			// Europe/Berlin in November is UTC+1
+			expect(combineSignUpClosureDateTime('2026-11-20', '', 'Europe/Berlin')).toBe(
+				'2026-11-20T22:59:00.000Z'
+			);
+			expect(combineSignUpClosureDateTime('2026-11-20', '18:30', 'Europe/Berlin')).toBe(
+				'2026-11-20T17:30:00.000Z'
+			);
+			expect(combineSignUpClosureDateTime('', '18:30', 'Europe/Berlin')).toBe('');
+		});
+
+		it('parses full timestamps preserving time and defaults bare YYYY-MM-DD to 23:59 UTC', () => {
+			const bare = parseSignUpClosureDate('2026-11-20');
+			expect(bare).toBeInstanceOf(Date);
+			expect(bare?.toISOString()).toBe('2026-11-20T23:59:00.000Z');
+
+			const full = parseSignUpClosureDate('2026-11-20T17:30:00.000Z');
+			expect(full?.toISOString()).toBe('2026-11-20T17:30:00.000Z');
+
+			expect(extractSignUpClosureParts(full, 'Europe/Berlin')).toEqual({
+				date: '2026-11-20',
+				time: '18:30'
+			});
+			expect(formatSignUpClosureDateYmd('2026-11-20T22:59:00.000Z', 'Europe/Berlin')).toBe('2026-11-20');
 			expect(parseSignUpClosureDate('')).toBeNull();
 			expect(parseSignUpClosureDate(null)).toBeNull();
 		});
 
-		it('enforces closure only after the closure calendar day and only for required mode', () => {
+		it('omits time in display/short formats when time is 23:59, and shows time only when it differs', () => {
+			// 2026-11-20 23:59 Europe/Berlin
+			const defaultIso = '2026-11-20T22:59:00.000Z';
+			// 2026-11-20 18:30 Europe/Berlin
+			const customIso = '2026-11-20T17:30:00.000Z';
+
+			expect(isSignUpClosureDefaultTime(defaultIso, 'Europe/Berlin')).toBe(true);
+			expect(isSignUpClosureDefaultTime(customIso, 'Europe/Berlin')).toBe(false);
+
+			const defaultFullDe = formatSignUpClosureDateDisplay(defaultIso, 'de-DE', 'Europe/Berlin');
+			expect(defaultFullDe).not.toContain('23:59');
+
+			const customFullDe = formatSignUpClosureDateDisplay(customIso, 'de-DE', 'Europe/Berlin');
+			expect(customFullDe).toContain('18:30');
+
+			const defaultShortDe = formatSignUpClosureDateShort(defaultIso, 'de-DE', 'Europe/Berlin');
+			expect(defaultShortDe).toBe('20.11.');
+
+			const customShortDe = formatSignUpClosureDateShort(customIso, 'de-DE', 'Europe/Berlin');
+			expect(customShortDe).toBe('20.11., 18:30');
+		});
+
+		it('enforces closure at the exact closure timestamp and only for required mode', () => {
 			expect(isSignUpClosed('off', '2020-01-01', new Date('2026-11-20T12:00:00Z'))).toBe(false);
 			expect(isSignUpClosed('recommended', '2020-01-01', new Date('2026-11-20T12:00:00Z'))).toBe(false);
 			expect(isSignUpClosed('required', null, new Date('2026-11-20T12:00:00Z'))).toBe(false);
-			// Open before closure day
-			expect(isSignUpClosed('required', '2026-11-20', new Date('2026-11-19T23:59:59Z'))).toBe(false);
-			// Still open on closure day itself
-			expect(isSignUpClosed('required', '2026-11-20', new Date('2026-11-20T23:59:59Z'))).toBe(false);
-			// Closed starting the next UTC day
-			expect(isSignUpClosed('required', '2026-11-20', new Date('2026-11-21T00:00:00Z'))).toBe(true);
+			// Custom closure 2026-11-20 18:30 Berlin (17:30Z)
+			const customClosure = '2026-11-20T17:30:00.000Z';
+			expect(isSignUpClosed('required', customClosure, new Date('2026-11-20T17:29:59Z'))).toBe(false);
+			expect(isSignUpClosed('required', customClosure, new Date('2026-11-20T17:30:00Z'))).toBe(true);
 		});
 	});
 
@@ -52,15 +94,15 @@ describe('event-signup utilities', () => {
 			});
 		});
 
-		it('preserves closure date, signup contact, and override flag for required mode', () => {
+		it('preserves closure timestamp, signup contact, and override flag for required mode', () => {
 			const res = extractSignUpFields({
 				signUpMode: 'required',
-				signUpClosureDate: '2026-11-20',
+				signUpClosureDate: '2026-11-20T17:30:00.000Z',
 				signUpContactId: '  c-42 ',
 				signUpContactOverridden: 'true'
 			});
 			expect(res.signUpMode).toBe('required');
-			expect(res.signUpClosureDate?.toISOString()).toBe('2026-11-20T00:00:00.000Z');
+			expect(res.signUpClosureDate?.toISOString()).toBe('2026-11-20T17:30:00.000Z');
 			expect(res.signUpContactId).toBe('c-42');
 			expect(res.signUpContactOverridden).toBe(true);
 		});
@@ -122,13 +164,13 @@ describe('event-signup utilities', () => {
 			expect(formatKioskSignUpCompact({ signUpMode: 'recommended' }, labels, 'de')).toBe('');
 		});
 
-		it('formats compact closure date and prefers phone over email', () => {
-			const futureDate = '2099-11-20T00:00:00.000Z';
+		it('formats compact closure date (omitting 23:59, showing custom time) and prefers phone over email', () => {
+			const futureDefault = '2099-11-20T22:59:00.000Z';
 			expect(
 				formatKioskSignUpCompact(
 					{
 						signUpMode: 'required',
-						signUpClosureDate: futureDate,
+						signUpClosureDate: futureDefault,
 						resolvedSignUpContact: {
 							name: 'Anna',
 							phone: '030-1234',
@@ -136,9 +178,28 @@ describe('event-signup utilities', () => {
 						}
 					},
 					labels,
-					'de'
+					'de-DE',
+					'Europe/Berlin'
 				)
-			).toBe(`Anmeldung bis ${formatSignUpClosureDateShort(futureDate, 'de')} (Anna, 030-1234)`);
+			).toBe('Anmeldung bis 20.11. (Anna, 030-1234)');
+
+			const futureCustom = '2099-11-20T17:30:00.000Z';
+			expect(
+				formatKioskSignUpCompact(
+					{
+						signUpMode: 'required',
+						signUpClosureDate: futureCustom,
+						resolvedSignUpContact: {
+							name: 'Anna',
+							phone: '030-1234',
+							email: 'anna@example.org'
+						}
+					},
+					labels,
+					'de-DE',
+					'Europe/Berlin'
+				)
+			).toBe('Anmeldung bis 20.11., 18:30 (Anna, 030-1234)');
 		});
 
 		it('falls back to email when phone is absent and marks closed when date is past', () => {

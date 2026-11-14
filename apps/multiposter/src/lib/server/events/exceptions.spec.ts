@@ -173,14 +173,14 @@ describe('hasVirtualInstanceChanged', () => {
 			master: {
 				...baseMaster,
 				signUpMode: 'required',
-				signUpClosureDate: new Date('2026-11-20T00:00:00.000Z'),
+				signUpClosureDate: new Date('2026-11-20T23:59:00.000Z'),
 				signUpContactId: 'c-1',
 				signUpContactOverridden: false
 			} as any,
 			submitted: {
 				summary: baseMaster.summary,
 				signUpMode: 'required',
-				signUpClosureDate: '2026-11-20',
+				signUpClosureDate: '2026-11-20T23:59:00.000Z',
 				signUpContactId: 'c-1',
 				signUpContactOverridden: 'false'
 			},
@@ -194,7 +194,7 @@ describe('hasVirtualInstanceChanged', () => {
 		expect(
 			hasVirtualInstanceChanged({
 				...unchanged,
-				submitted: { ...unchanged.submitted, signUpClosureDate: '2026-11-25' }
+				submitted: { ...unchanged.submitted, signUpClosureDate: '2026-11-20T18:30:00.000Z' }
 			})
 		).toBe(true);
 

@@ -1,3 +1,5 @@
+import { parseSignUpClosureDate } from '#lib/utils/event-signup.js';
+
 export interface VirtualInstanceDiffInput {
 	master: {
 		summary?: string | null;
@@ -107,11 +109,7 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	if (submitted.participantsCount !== undefined && Number(submitted.participantsCount || 0) !== Number(master.participantsCount || 0)) return true;
 	if (submitted.signUpMode !== undefined && strNorm(submitted.signUpMode || 'off') !== strNorm(master.signUpMode || 'off')) return true;
 	if (submitted.signUpClosureDate !== undefined) {
-		const normClosure = (v: Date | string | null | undefined) => {
-			if (!v) return '';
-			if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10);
-			return String(v).trim().slice(0, 10);
-		};
+		const normClosure = (v: Date | string | null | undefined) => parseSignUpClosureDate(v)?.getTime() ?? null;
 		if (normClosure(submitted.signUpClosureDate) !== normClosure(master.signUpClosureDate)) return true;
 	}
 	if (submitted.signUpContactId !== undefined && strNorm(submitted.signUpContactId) !== strNorm(master.signUpContactId)) return true;

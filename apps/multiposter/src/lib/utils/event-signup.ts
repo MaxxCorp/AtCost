@@ -3,43 +3,142 @@
  * and default "Kontakt" contact resolution.
  */
 
+import { parseDateTime, toZoned } from '@internationalized/date';
+
+export const DEFAULT_SIGN_UP_CLOSURE_TIME = '23:59';
+
 export function parseBoolFlag(val: unknown): boolean {
 	return val === true || val === 'true' || val === 'on' || val === '1' || val === 1;
 }
 
 /**
- * Extracts a normalized YYYY-MM-DD string from a Date or ISO/date string, or "" if empty/invalid.
+ * Combines a local YYYY-MM-DD date, optional HH:mm time (defaulting to 23:59),
+ * and an optional IANA timezone (defaulting to runtime local timezone) into a UTC ISO string.
  */
-export function formatSignUpClosureDateYmd(val: string | Date | null | undefined): string {
-	if (!val) return '';
-	if (val instanceof Date) {
-		return isNaN(val.getTime()) ? '' : val.toISOString().slice(0, 10);
+export function combineSignUpClosureDateTime(
+	dateStr: string | null | undefined,
+	timeStr?: string | null,
+	timeZone?: string | null
+): string {
+	const cleanDate = (dateStr || '').trim();
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) return '';
+
+	const rawTime = (timeStr || '').trim();
+	const normalizedTime = /^\d{2}:\d{2}(:\d{2})?$/.test(rawTime)
+		? rawTime.length === 5
+			? `${rawTime}:00`
+			: rawTime
+		: `${DEFAULT_SIGN_UP_CLOSURE_TIME}:00`;
+
+	const dString = `${cleanDate}T${normalizedTime}`;
+	const calendarDate = parseDateTime(dString);
+
+	const candidates = [
+		(timeZone || '').trim(),
+		Intl.DateTimeFormat().resolvedOptions().timeZone
+	].filter(Boolean);
+
+	for (const tz of candidates) {
+		try {
+			return toZoned(calendarDate, tz).toDate().toISOString();
+		} catch {
+			// Ignore invalid/partial timezone while typing and try fallback
+		}
 	}
-	const trimmed = String(val).trim();
-	if (!trimmed) return '';
-	const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
-	if (match) {
-		const check = new Date(`${match[1]}T00:00:00.000Z`);
-		return isNaN(check.getTime()) ? '' : match[1];
-	}
-	const parsed = new Date(trimmed);
-	return isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+
+	const fallback = new Date(dString);
+	return isNaN(fallback.getTime()) ? '' : fallback.toISOString();
 }
 
 /**
- * Parses a signup closure date into UTC midnight Date (or null if empty/invalid).
+ * Parses a signup closure date/timestamp into a Date instant (or null if empty/invalid).
+ * Bare YYYY-MM-DD strings without a time component default to 23:59 UTC.
  */
 export function parseSignUpClosureDate(val: string | Date | null | undefined): Date | null {
-	const ymd = formatSignUpClosureDateYmd(val);
-	if (!ymd) return null;
-	const d = new Date(`${ymd}T00:00:00.000Z`);
-	return isNaN(d.getTime()) ? null : d;
+	if (!val) return null;
+	if (val instanceof Date) {
+		return isNaN(val.getTime()) ? null : val;
+	}
+	const trimmed = String(val).trim();
+	if (!trimmed) return null;
+	if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+		const d = new Date(`${trimmed}T${DEFAULT_SIGN_UP_CLOSURE_TIME}:00.000Z`);
+		return isNaN(d.getTime()) ? null : d;
+	}
+	const parsed = new Date(trimmed);
+	return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Extracts `{ date: 'YYYY-MM-DD', time: 'HH:mm' }` for a signup closure timestamp
+ * in the given IANA timezone (or the runtime local timezone if omitted).
+ */
+export function extractSignUpClosureParts(
+	val: string | Date | null | undefined,
+	timeZone?: string
+): { date: string; time: string } {
+	const d = parseSignUpClosureDate(val);
+	if (!d) return { date: '', time: '' };
+
+	try {
+		const formatter = new Intl.DateTimeFormat('en-CA', {
+			...(timeZone ? { timeZone } : {}),
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit',
+			hour12: false
+		});
+		const parts = formatter.formatToParts(d);
+		const get = (t: string) => parts.find((p) => p.type === t)?.value || '';
+		const year = get('year');
+		const month = get('month');
+		const day = get('day');
+		let hour = get('hour');
+		if (hour === '24') hour = '00';
+		const minute = get('minute');
+		if (year && month && day && hour && minute) {
+			return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` };
+		}
+	} catch {
+		// Fall through to local getters if timeZone is invalid
+	}
+
+	const year = d.getFullYear();
+	const month = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	const hours = String(d.getHours()).padStart(2, '0');
+	const minutes = String(d.getMinutes()).padStart(2, '0');
+	return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+}
+
+/**
+ * Extracts a normalized YYYY-MM-DD string from a Date or ISO/date string in the given
+ * timezone (or runtime local timezone), or "" if empty/invalid.
+ */
+export function formatSignUpClosureDateYmd(
+	val: string | Date | null | undefined,
+	timeZone?: string
+): string {
+	return extractSignUpClosureParts(val, timeZone).date;
+}
+
+/**
+ * Returns true if the closure timestamp resolves to the default end-of-day time (23:59)
+ * in the target timezone (or runtime local timezone).
+ */
+export function isSignUpClosureDefaultTime(
+	val: string | Date | null | undefined,
+	timeZone?: string
+): boolean {
+	return extractSignUpClosureParts(val, timeZone).time === DEFAULT_SIGN_UP_CLOSURE_TIME;
 }
 
 /**
  * Checks whether online registration has closed for an event.
- * Closure applies only to mandatory sign-up (`signUpMode === 'required'`) with a closure date,
- * and closes after the end of the closure calendar day (UTC).
+ * Closure applies only to mandatory sign-up (`signUpMode === 'required'`) with a closure timestamp,
+ * closing once `now` reaches or passes the closure instant.
  */
 export function isSignUpClosed(
 	signUpMode: string | null | undefined,
@@ -47,44 +146,65 @@ export function isSignUpClosed(
 	now: Date = new Date()
 ): boolean {
 	if (signUpMode !== 'required') return false;
-	const closureYmd = formatSignUpClosureDateYmd(signUpClosureDate);
-	if (!closureYmd) return false;
-	const todayYmd = now.toISOString().slice(0, 10);
-	return todayYmd > closureYmd;
+	const closure = parseSignUpClosureDate(signUpClosureDate);
+	if (!closure) return false;
+	return now.getTime() >= closure.getTime();
 }
 
 /**
- * Formats a signup closure date for UI display in a timezone-stable UTC calendar format.
+ * Formats a signup closure date (and optional time when differing from default 23:59)
+ * for UI display in the viewer's local timezone (or explicit `timeZone`).
  */
 export function formatSignUpClosureDateDisplay(
 	val: string | Date | null | undefined,
-	locale?: string
+	locale?: string,
+	timeZone?: string
 ): string {
 	const d = parseSignUpClosureDate(val);
 	if (!d) return '';
-	return d.toLocaleDateString(locale || undefined, {
+	const datePart = d.toLocaleDateString(locale || undefined, {
 		year: 'numeric',
 		month: 'short',
 		day: 'numeric',
-		timeZone: 'UTC'
+		...(timeZone ? { timeZone } : {})
 	});
+	if (isSignUpClosureDefaultTime(d, timeZone)) {
+		return datePart;
+	}
+	const timePart = d.toLocaleTimeString(locale || undefined, {
+		hour: '2-digit',
+		minute: '2-digit',
+		...(timeZone ? { timeZone } : {})
+	});
+	return `${datePart}, ${timePart}`;
 }
 
 /**
- * Formats a compact closure date string (without year) for space-constrained kiosk layouts.
+ * Formats a compact closure date string (without year) for space-constrained kiosk layouts,
+ * appending the time only when it differs from the default 23:59.
  */
 export function formatSignUpClosureDateShort(
 	val: string | Date | null | undefined,
-	locale?: string
+	locale?: string,
+	timeZone?: string
 ): string {
 	const d = parseSignUpClosureDate(val);
 	if (!d) return '';
 	const isDe = (locale || '').toLowerCase().startsWith('de');
-	return d.toLocaleDateString(locale || undefined, {
+	const datePart = d.toLocaleDateString(locale || undefined, {
 		month: isDe ? '2-digit' : 'short',
 		day: isDe ? '2-digit' : 'numeric',
-		timeZone: 'UTC'
+		...(timeZone ? { timeZone } : {})
 	});
+	if (isSignUpClosureDefaultTime(d, timeZone)) {
+		return datePart;
+	}
+	const timePart = d.toLocaleTimeString(locale || undefined, {
+		hour: isDe ? '2-digit' : 'numeric',
+		minute: '2-digit',
+		...(timeZone ? { timeZone } : {})
+	});
+	return `${datePart}, ${timePart}`;
 }
 
 /**
@@ -102,12 +222,13 @@ export function formatKioskSignUpCompact(
 		by: (date: string) => string;
 		closed: string;
 	},
-	locale?: string
+	locale?: string,
+	timeZone?: string
 ): string {
 	if (!event || event.signUpMode !== 'required') return '';
 
 	const closed = isSignUpClosed(event.signUpMode, event.signUpClosureDate);
-	const shortDate = formatSignUpClosureDateShort(event.signUpClosureDate, locale);
+	const shortDate = formatSignUpClosureDateShort(event.signUpClosureDate, locale, timeZone);
 	const statusPart = closed
 		? labels.closed
 		: shortDate

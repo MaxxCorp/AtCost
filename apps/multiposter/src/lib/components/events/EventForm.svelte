@@ -80,7 +80,12 @@
     import type { EventRole } from "@ac/validations";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { isSeriesItem } from "#lib/utils/event-series.js";
-    import { findDefaultKontaktContact, formatSignUpClosureDateYmd } from "#lib/utils/event-signup.js";
+    import {
+        DEFAULT_SIGN_UP_CLOSURE_TIME,
+        combineSignUpClosureDateTime,
+        extractSignUpClosureParts,
+        findDefaultKontaktContact,
+    } from "#lib/utils/event-signup.js";
     import {
         applyManualTotalParticipants,
         computeInitialBaseline,
@@ -93,6 +98,7 @@
         RefreshCw,
         CalendarClock,
         Calendar,
+        Clock,
         RotateCcw,
         User,
         Users,
@@ -752,8 +758,40 @@
 
     // svelte-ignore state_referenced_locally
     let signUpMode = $state<'off' | 'recommended' | 'required'>((initialData?.signUpMode as any) || 'off');
-    // svelte-ignore state_referenced_locally
-    let signUpClosureDate = $state<string>(formatSignUpClosureDateYmd(initialData?.signUpClosureDate));
+    const initialClosureParts = untrack(() => extractSignUpClosureParts(initialData?.signUpClosureDate, browserTimezone));
+    let signUpClosureDatePart = $state<string>(initialClosureParts.date);
+    let signUpClosureTime = $state<string>(
+        initialClosureParts.date
+            ? (initialClosureParts.time || DEFAULT_SIGN_UP_CLOSURE_TIME)
+            : DEFAULT_SIGN_UP_CLOSURE_TIME
+    );
+    let signUpClosureTimeZone = $state<string>(browserTimezone);
+    let showClosureTimeZone = $state<boolean>(false);
+
+    const combinedSignUpClosureIso = $derived(
+        signUpClosureDatePart
+            ? combineSignUpClosureDateTime(
+                  signUpClosureDatePart,
+                  signUpClosureTime || DEFAULT_SIGN_UP_CLOSURE_TIME,
+                  signUpClosureTimeZone || browserTimezone
+              )
+            : ""
+    );
+
+    function syncSignUpClosureField(
+        dateVal = signUpClosureDatePart,
+        timeVal = signUpClosureTime,
+        tzVal = signUpClosureTimeZone
+    ) {
+        const nextIso = dateVal
+            ? combineSignUpClosureDateTime(
+                  dateVal,
+                  timeVal || DEFAULT_SIGN_UP_CLOSURE_TIME,
+                  tzVal || browserTimezone
+              )
+            : "";
+        rf.fields.signUpClosureDate?.set(nextIso);
+    }
     // svelte-ignore state_referenced_locally
     let signUpContactOverridden = $state<boolean>(Boolean(initialData?.signUpContactOverridden));
     // svelte-ignore state_referenced_locally
@@ -2459,37 +2497,113 @@
 
         {#if signUpMode === "required"}
             <div class="pt-3 border-t border-gray-200 space-y-4">
-                <!-- Optional Sign-up Closure Date -->
-                <div class="space-y-1.5">
-                    <label for="sign-up-closure-date" class="text-sm font-medium text-gray-800 flex items-center gap-1.5">
-                        <Calendar size={15} class="text-blue-600" />
-                        <span>{m.sign_up_closure_date()} ({m.optional()})</span>
-                    </label>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <input
-                            id="sign-up-closure-date"
-                            {...rf.fields.signUpClosureDate.as("date", signUpClosureDate)}
-                            oninput={(e) => {
-                                signUpClosureDate = e.currentTarget.value;
-                            }}
-                            class="w-full sm:w-auto px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
-                        />
-                        {#if signUpClosureDate}
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onclick={() => {
-                                    signUpClosureDate = "";
-                                    rf.fields.signUpClosureDate?.set("");
+                <!-- Optional Sign-up Closure Date, Time & Timezone -->
+                <div class="space-y-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                        <div class="sm:col-span-5">
+                            <label for="sign-up-closure-date" class="text-sm font-medium text-gray-800 flex items-center gap-1.5 mb-1">
+                                <Calendar size={15} class="text-blue-600" />
+                                <span>{m.sign_up_closure_date()} ({m.optional()})</span>
+                            </label>
+                            <input
+                                id="sign-up-closure-date"
+                                type="date"
+                                value={signUpClosureDatePart}
+                                oninput={(e) => {
+                                    signUpClosureDatePart = e.currentTarget.value;
+                                    if (!signUpClosureTime) {
+                                        signUpClosureTime = DEFAULT_SIGN_UP_CLOSURE_TIME;
+                                    }
+                                    syncSignUpClosureField(signUpClosureDatePart, signUpClosureTime, signUpClosureTimeZone);
                                 }}
-                                class="inline-flex items-center gap-1 text-xs"
-                            >
-                                <X size={13} />
-                                <span>{m.sign_up_closure_date_clear()}</span>
-                            </Button>
+                                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
+                            />
+                        </div>
+
+                        <div class="sm:col-span-4">
+                            <div class="flex items-center justify-between mb-1">
+                                <label for="sign-up-closure-time" class="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                                    <Clock size={15} class="text-blue-600" />
+                                    <span>{m.sign_up_closure_time()} ({m.optional()})</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showClosureTimeZone || (signUpClosureTimeZone && signUpClosureTimeZone !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
+                                    title="{m.timezone()}: {signUpClosureTimeZone || browserTimezone}"
+                                    onclick={() => (showClosureTimeZone = !showClosureTimeZone)}
+                                    aria-label="{m.timezone()}: {signUpClosureTimeZone || browserTimezone}"
+                                >
+                                    <Globe size={16} />
+                                </button>
+                            </div>
+                            <input
+                                id="sign-up-closure-time"
+                                type="time"
+                                value={signUpClosureTime}
+                                placeholder={DEFAULT_SIGN_UP_CLOSURE_TIME}
+                                oninput={(e) => {
+                                    signUpClosureTime = e.currentTarget.value || DEFAULT_SIGN_UP_CLOSURE_TIME;
+                                    syncSignUpClosureField(signUpClosureDatePart, signUpClosureTime, signUpClosureTimeZone);
+                                }}
+                                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
+                            />
+                        </div>
+
+                        {#if signUpClosureDatePart}
+                            <div class="sm:col-span-3 flex items-end">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onclick={() => {
+                                        signUpClosureDatePart = "";
+                                        signUpClosureTime = DEFAULT_SIGN_UP_CLOSURE_TIME;
+                                        signUpClosureTimeZone = browserTimezone;
+                                        showClosureTimeZone = false;
+                                        rf.fields.signUpClosureDate?.set("");
+                                    }}
+                                    class="inline-flex items-center gap-1 text-xs h-9"
+                                >
+                                    <X size={13} />
+                                    <span>{m.sign_up_closure_date_clear()}</span>
+                                </Button>
+                            </div>
                         {/if}
                     </div>
+
+                    {#if showClosureTimeZone}
+                        <div class="sm:w-1/2 pt-1">
+                            <div class="flex items-center justify-between mb-1">
+                                <label
+                                    for="sign-up-closure-timezone"
+                                    class="block text-sm font-medium text-gray-700"
+                                >
+                                    {m.timezone()}
+                                </label>
+                                <button
+                                    type="button"
+                                    class="text-gray-400 hover:text-gray-600 p-0.5 rounded"
+                                    title={m.close?.() ?? "Close"}
+                                    onclick={() => (showClosureTimeZone = false)}
+                                >
+                                    <X size={13} />
+                                </button>
+                            </div>
+                            <input
+                                id="sign-up-closure-timezone"
+                                type="text"
+                                list="timezones"
+                                value={signUpClosureTimeZone}
+                                placeholder={browserTimezone}
+                                oninput={(e) => {
+                                    signUpClosureTimeZone = e.currentTarget.value;
+                                    syncSignUpClosureField(signUpClosureDatePart, signUpClosureTime, signUpClosureTimeZone);
+                                }}
+                                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
+                            />
+                        </div>
+                    {/if}
+
                     <p class="text-xs text-gray-500">
                         {m.sign_up_closure_date_help()}
                     </p>
@@ -2556,8 +2670,16 @@
                     {/key}
                 </div>
             </div>
-        {:else if rf.fields.signUpClosureDate}
-            <input {...rf.fields.signUpClosureDate.as("text", "")} class="hidden" />
+        {/if}
+
+        {#if rf.fields.signUpClosureDate}
+            <input
+                {...rf.fields.signUpClosureDate.as(
+                    "text",
+                    signUpMode === "required" ? combinedSignUpClosureIso : "",
+                )}
+                class="hidden"
+            />
         {/if}
 
         {#if rf.fields.signUpContactId}
