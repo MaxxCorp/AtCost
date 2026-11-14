@@ -2104,5 +2104,133 @@ describe('SyncService - Public Data Leak Prevention', () => {
 			const msExternal = await (service as any).mapInternalToExternal(internalEvent, 'microsoft-calendar', undefined, msConfig);
 			expect(msExternal.attendees.map((a: any) => a.email)).toEqual(['guest.yes@home.example']);
 		});
+
+		it('prepends HTML sign-up link paragraph for HTML providers and plain paragraph for plain-text providers without leaking non-public contacts', async () => {
+			const service = new SyncService();
+			const internalEvent = {
+				id: 'evt-signup-1',
+				summary: 'Sign-up Course',
+				description: '<p>Join our weekly course.</p>',
+				status: 'confirmed',
+				isPublic: true,
+				signUpMode: 'required',
+				signUpClosureDate: new Date('2099-12-12T11:00:00.000Z'),
+				startTimeZone: 'Europe/Berlin',
+				signUpContactId: 'ctc-signup-public',
+				startDateTime: new Date('2099-12-15T10:00:00Z'),
+				endDateTime: new Date('2099-12-15T12:00:00Z')
+			};
+
+			const assocContacts = [
+				{
+					id: 'ctc-signup-public',
+					isPublic: true,
+					displayName: 'Front Desk',
+					phones: [{ value: '+49305405659', type: 'work', primary: true }],
+					emails: [{ value: 'desk@work.example', type: 'work', primary: true }],
+					tags: []
+				}
+			];
+
+			(db.select as any).mockImplementation(() => ({
+				from: vi.fn().mockImplementation(() => ({
+					where: vi.fn().mockImplementation(() => ({
+						limit: vi.fn().mockResolvedValue([])
+					})),
+					innerJoin: vi.fn().mockImplementation(() => ({
+						where: vi.fn().mockResolvedValue([])
+					}))
+				}))
+			}));
+
+			const configBase: SyncConfig = {
+				id: 'cfg-signup',
+				userId: 'user-1',
+				providerId: 'google',
+				providerType: 'google-calendar',
+				direction: 'push',
+				enabled: true,
+				settings: {},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			vi.mocked(getEntityContacts).mockResolvedValueOnce(assocContacts as any);
+			const googleExternal = await (service as any).mapInternalToExternal(
+				internalEvent,
+				'google-calendar',
+				undefined,
+				configBase
+			);
+			expect(googleExternal.description).toMatch(
+				/^<p><a href="[^"]+\/events\/evt-signup-1\/view\?signup=true">(Anmeldung|Sign up)<\/a>/
+			);
+			expect(googleExternal.description).toContain('+49305405659');
+			expect(googleExternal.description).toContain('<p>Join our weekly course.</p>');
+			expect(googleExternal.metadata?.registrationRequired).toBe(true);
+			expect(googleExternal.metadata?.signUpMode).toBe('required');
+
+			// Plain-text provider with a NON-public contact: must omit private phone/email and use plain text paragraph
+			const privateContactEvent = {
+				...internalEvent,
+				id: 'evt-signup-private-ctc',
+				signUpMode: 'required',
+				signUpContactId: 'ctc-signup-private'
+			};
+			vi.mocked(getEntityContacts).mockResolvedValueOnce([
+				{
+					id: 'ctc-signup-private',
+					isPublic: false,
+					displayName: 'Private Contact',
+					phones: [{ value: '+491709999999', type: 'work', primary: true }],
+					emails: [],
+					tags: []
+				}
+			] as any);
+			const berlinExternal = await (service as any).mapInternalToExternal(
+				privateContactEvent,
+				'berlin-de-main-calendar',
+				undefined,
+				{ ...configBase, providerId: 'berlin', providerType: 'berlin-de-main-calendar' }
+			);
+			expect(berlinExternal.description).toMatch(/^(Anmeldung bis|Sign up by) .+\n\n<p>Join our weekly course\.<\/p>$/);
+			expect(berlinExternal.description).not.toContain('<a href');
+			expect(berlinExternal.description).not.toContain('+491709999999');
+		});
+
+		it('computes occurrence-specific signUpClosureDate when getEventRecord synthesizes a _inst_ event with signUpRecurrence', async () => {
+			const service = new SyncService();
+			const master = {
+				id: 'master-1',
+				summary: 'Weekly Event',
+				startDateTime: new Date('2026-11-18T17:00:00.000Z'), // Wed
+				endDateTime: new Date('2026-11-18T18:00:00.000Z'),
+				startTimeZone: 'Europe/Berlin',
+				signUpMode: 'required',
+				signUpClosureDate: new Date('2026-11-16T11:00:00.000Z'), // Mon 12:00 CET
+				signUpRecurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'],
+				recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=WE']
+			};
+
+			(db.select as any)
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockReturnValueOnce({
+							limit: vi.fn().mockResolvedValueOnce([])
+						})
+					})
+				})
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockResolvedValueOnce([master])
+					})
+				});
+
+			const inst = await service.getEventRecord('master-1_inst_2026-11-25T17%3A00%3A00.000Z');
+			expect(inst).toBeTruthy();
+			expect(inst?.signUpRecurrence).toBeNull();
+			// Next Monday before Wed Nov 25 is Mon Nov 23 11:00Z (12:00 CET)
+			expect(new Date(inst!.signUpClosureDate as any).toISOString()).toBe('2026-11-23T11:00:00.000Z');
+		});
 	});
 });

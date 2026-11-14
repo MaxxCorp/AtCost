@@ -1254,5 +1254,11 @@
 	"subscribe_location_newsletter_named": "Newsletter für {locations} abonnieren",
 	"email_required_for_notifications": "Bitte gib mindestens eine gültige E-Mail-Adresse an, um Veranstaltungsupdates oder den Newsletter zu erhalten.",
 	"participants_party_help": "Berechnet aus {contacts} verknüpften Kontakt(en) ({headcount} Personen inkl. Gruppengrößen) + {baseline} zusätzliche manuelle Basis.",
-	"duplicate_contact_warning": "Möglicher doppelter Kontakt gefunden: {name} (Übereinstimmung bei {matchedBy})."
+	"duplicate_contact_warning": "Möglicher doppelter Kontakt gefunden: {name} (Übereinstimmung bei {matchedBy}).",
+	"sync_sign_up_recommended": "Anmeldung empfohlen",
+	"sync_sign_up_required": "Anmeldung erforderlich",
+	"sync_sign_up_via_contact": "Anmeldung über {contact}",
+	"sync_sign_up_by": "Anmeldung bis {date}",
+	"sync_sign_up_closed": "Anmeldung geschlossen",
+	"sync_sign_up_link_keyword": "Anmeldung"
 }

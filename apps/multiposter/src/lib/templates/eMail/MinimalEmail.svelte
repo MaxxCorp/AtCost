@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { sanitizeEmailDescriptionHtml } from '#lib/utils/event-signup.js';
+
 	interface Props {
 		event: {
 			summary: string;
@@ -60,7 +62,7 @@
 			{/if}
 		</div>
 		{#if event.description}
-			<div class="desc">{event.description}</div>
+			<div class="desc">{@html sanitizeEmailDescriptionHtml(event.description)}</div>
 		{/if}
 	</div>
 

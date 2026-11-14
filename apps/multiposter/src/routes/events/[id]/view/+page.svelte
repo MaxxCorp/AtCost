@@ -95,6 +95,23 @@
     let heroImageFailed = $state(false);
     let pricesDialogOpen = $state(false);
     let signUpDialogOpen = $state(false);
+    let autoOpenedSignUpKey: string | null = null;
+
+    $effect(() => {
+        const ev = eventQuery.current;
+        const signupParam = page.url.searchParams.get("signup");
+        if (
+            ev &&
+            (signupParam === "true" || signupParam === "1") &&
+            (ev.signUpMode === "recommended" || ev.signUpMode === "required")
+        ) {
+            const key = `${ev.id}:${signupParam}`;
+            if (autoOpenedSignUpKey !== key) {
+                autoOpenedSignUpKey = key;
+                signUpDialogOpen = true;
+            }
+        }
+    });
 
     onMount(() => {
         if (eventId) {

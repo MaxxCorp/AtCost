@@ -17,6 +17,7 @@ import {
 	announcement as announcementTable,
 	announcementLocation,
 	announcementTag,
+	contact as contactTable,
 	eventContact as eventContactTable,
 	tag as tagTable,
 	contactTag as contactTagTable,
@@ -68,13 +69,20 @@ import { InstagramProvider } from './providers/instagram';
 import {
 	SYNC_WEBHOOK_URL,
 	BETTER_AUTH_URL,
+	PUBLIC_BASE_URL,
 	SYNC_MAX_DURATION_SECONDS,
 	MAX_DURATION
 } from '$app/env/private';
 
 import { publishEventChange } from '../realtime';
 import { invalidateEvent } from '#lib/server/cache/index.js';
-import { expandRecurrence } from '#lib/server/events/recurrence.js';
+import { expandRecurrence, computeOccurrenceSignUpClosureDate } from '#lib/server/events/recurrence.js';
+import {
+	buildEventSignUpUrl,
+	buildSyncSignUpPrompt,
+	prependSignUpPromptToDescription,
+	providerSupportsHtmlDescription
+} from './utils/signup';
 import { isSeriesItem, getSeriesRootId } from '#lib/utils/event-series.js';
 import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from '#lib/utils/kiosk-dates.js';
 
@@ -207,12 +215,25 @@ export class SyncService {
 					? new Date(master.endDateTime).getTime() - new Date(master.startDateTime).getTime()
 					: 3600000;
 
+				const targetSignUpClosureDate =
+					master.signUpMode === 'required'
+						? computeOccurrenceSignUpClosureDate({
+								masterStart: master.startDateTime,
+								masterClosureDate: master.signUpClosureDate,
+								signUpRecurrence: master.signUpRecurrence,
+								occurrenceStart: targetDate,
+								timeZone: master.startTimeZone
+							})
+						: master.signUpClosureDate;
+
 				result = {
 					...master,
 					id: itemId,
 					recurringEventId: master.id,
 					isException: false,
 					recurrence: null,
+					signUpRecurrence: null,
+					signUpClosureDate: targetSignUpClosureDate,
 					startDateTime: targetDate,
 					endDateTime: new Date(targetDate.getTime() + durationMs),
 				} as typeof eventTable.$inferSelect;
@@ -1956,6 +1977,7 @@ export class SyncService {
 		let organizer: ExternalEvent['organizer'] | undefined;
 		let organizerId: string | undefined;
 		let locationHeroImage: string | null | undefined = undefined;
+		let rawAssociatedContacts: any[] = [];
 		const tags: Array<{ id: string; name: string }> = [];
 
 		const assocCacheKey = `${config?.id || providerId}:${directEventId}`;
@@ -1968,6 +1990,7 @@ export class SyncService {
 			organizer = cachedAssoc.organizer;
 			organizerId = cachedAssoc.organizerId;
 			locationHeroImage = cachedAssoc.locationHeroImage;
+			rawAssociatedContacts = cachedAssoc.rawAssociatedContacts ?? [];
 			tags.push(...cachedAssoc.tags);
 		} else {
 			// Fetch associated contacts (check direct event first, fallback to master if exception has no contacts linked)
@@ -1975,6 +1998,7 @@ export class SyncService {
 			if (associatedContacts.length === 0 && fallbackMasterId && fallbackMasterId !== directEventId) {
 				associatedContacts = await getEntityContacts(entityType, fallbackMasterId) || [];
 			}
+			rawAssociatedContacts = associatedContacts;
 
 			const allowNonPublicContacts =
 				config?.settings?.includeNonPublicContacts === true ||
@@ -2207,6 +2231,7 @@ export class SyncService {
 					organizer,
 					organizerId,
 					locationHeroImage,
+					rawAssociatedContacts,
 					tags: [...tags]
 				});
 			}
@@ -2263,6 +2288,70 @@ export class SyncService {
 			);
 		}
 
+		// Prepend computed sign-up requirement/recommendation prompt for events
+		if (isEvent && (internal.signUpMode === 'recommended' || internal.signUpMode === 'required')) {
+			let resolvedSignUpContact: { name: string; email?: string; phone?: string } | null = null;
+			if (internal.signUpMode === 'required') {
+				let contactCandidate: any = internal.signUpContact ?? null;
+				const signUpContactId = internal.signUpContactId as string | null | undefined;
+
+				if (!contactCandidate && signUpContactId) {
+					contactCandidate =
+						rawAssociatedContacts.find(
+							(c: any) => (c?.contact?.id || c?.contactId || c?.id) === signUpContactId
+						) ?? null;
+				}
+
+				if (!contactCandidate && signUpContactId) {
+					try {
+						const queried = await (db.query as any)?.contact?.findFirst?.({
+							where: eq(contactTable.id, signUpContactId),
+							with: { emails: true, phones: true }
+						});
+						if (queried) {
+							contactCandidate = queried;
+						}
+					} catch {
+						// Ignore DB lookup errors in partial mock environments
+					}
+				}
+
+				if (contactCandidate) {
+					resolvedSignUpContact = extractPublicWorkContactInfo(contactCandidate);
+				}
+			}
+
+			const baseUrl =
+				PUBLIC_BASE_URL ||
+				BETTER_AUTH_URL ||
+				(typeof process !== 'undefined' && process.env?.PUBLIC_BASE_URL) ||
+				(typeof process !== 'undefined' && process.env?.BETTER_AUTH_URL) ||
+				'http://localhost:5173';
+			const isRecurringSeries =
+				!isVirtual &&
+				!isException &&
+				Boolean(internal.seriesId || (recurrenceRules && recurrenceRules.length > 0));
+			const signUpPrompt = buildSyncSignUpPrompt(
+				{
+					id: internal.id,
+					signUpMode: internal.signUpMode,
+					signUpClosureDate: internal.signUpClosureDate,
+					signUpRecurrence: internal.signUpRecurrence,
+					startTimeZone: internal.startTimeZone,
+					resolvedSignUpContact
+				},
+				{
+					signUpUrl: buildEventSignUpUrl(baseUrl, internal.id),
+					isRecurringSeries
+				}
+			);
+			description = prependSignUpPromptToDescription(
+				description,
+				signUpPrompt,
+				providerSupportsHtmlDescription(providerId)
+			);
+		}
+
 		return {
 			externalId: '',
 			providerId,
@@ -2295,7 +2384,9 @@ export class SyncService {
 				organizerId,
 				locationId: venueId,
 				categoryBerlinDotDe: internal.categoryBerlinDotDe ?? undefined,
-				ticketPriceUnknown: Boolean(internal.ticketPriceUnknown)
+				ticketPriceUnknown: Boolean(internal.ticketPriceUnknown),
+				registrationRequired: isEvent ? internal.signUpMode === 'required' : undefined,
+				signUpMode: isEvent ? (internal.signUpMode ?? 'off') : undefined
 			}
 		};
 

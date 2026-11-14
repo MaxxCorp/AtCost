@@ -1254,5 +1254,11 @@
 	"subscribe_location_newsletter_named": "Subscribe to the newsletter for {locations}",
 	"email_required_for_notifications": "Please provide at least one valid email address to receive event updates or location newsletters.",
 	"participants_party_help": "Calculated from {contacts} linked contact(s) ({headcount} total people incl. party sizes) + {baseline} additional walk-in/manual baseline.",
-	"duplicate_contact_warning": "Possible duplicate contact found: {name} (matched by {matchedBy})."
+	"duplicate_contact_warning": "Possible duplicate contact found: {name} (matched by {matchedBy}).",
+	"sync_sign_up_recommended": "Sign up recommended",
+	"sync_sign_up_required": "Sign up required",
+	"sync_sign_up_via_contact": "Sign up via {contact}",
+	"sync_sign_up_by": "Sign up by {date}",
+	"sync_sign_up_closed": "Sign up closed",
+	"sync_sign_up_link_keyword": "Sign up"
 }

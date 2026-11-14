@@ -7,6 +7,35 @@ import { parseDateTime, toZoned } from '@internationalized/date';
 
 export const DEFAULT_SIGN_UP_CLOSURE_TIME = '23:59';
 
+export function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
+/**
+ * Lightweight HTML sanitizer for email templates that strips dangerous executable tags and
+ * attributes while preserving safe rich-text markup such as `<p>` and `<a href="...">`.
+ * Plain-text input without HTML tags is escaped safely so line breaks still render.
+ */
+export function sanitizeEmailDescriptionHtml(raw: string | null | undefined): string {
+	if (!raw) return '';
+
+	const hasHtmlTags = /<[a-z][\s\S]*>/i.test(raw);
+	if (!hasHtmlTags) {
+		return escapeHtml(raw);
+	}
+
+	return raw
+		.replace(/<\s*(script|iframe|object|embed|style)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+		.replace(/<\s*(script|iframe|object|embed)\b[^>]*\/?>/gi, '')
+		.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+		.replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+}
+
 export function parseBoolFlag(val: unknown): boolean {
 	return val === true || val === 'true' || val === 'on' || val === '1' || val === 1;
 }

@@ -102,6 +102,28 @@ describe('Email Templates & EmailProvider', () => {
 		expect(result.text).toContain('Sommerfest Community');
 	});
 
+	it('renders HTML sign-up link paragraph unescaped across all email templates while keeping text clean', () => {
+		const desc =
+			'<p><a href="https://events.example.org/events/ev-1/view?signup=true">Anmeldung</a> empfohlen</p><p>Details zum Treffen</p>';
+
+		for (const tpl of ['standard', 'minimal', 'newsletter'] as const) {
+			const result = renderEmailTemplate(tpl, {
+				event: {
+					summary: 'Workshop',
+					description: desc,
+					startDateTime: new Date('2026-09-10T10:00:00Z')
+				}
+			});
+			expect(result.html).toContain(
+				'<a href="https://events.example.org/events/ev-1/view?signup=true">Anmeldung</a> empfohlen'
+			);
+			expect(result.html).not.toContain('&lt;a href=');
+			expect(result.text).toContain('Anmeldung empfohlen');
+			expect(result.text).toContain('Details zum Treffen');
+			expect(result.text).not.toContain('<a href=');
+		}
+	});
+
 	it('should initialize and push event in sandbox mock mode when no API key is set', async () => {
 		const provider = new EmailProvider();
 		await provider.initialize({
