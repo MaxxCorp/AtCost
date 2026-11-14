@@ -1,15 +1,30 @@
 <script lang="ts">
-	import { LoadingSection, ErrorSection } from "@ac/ui";
+    import { LoadingSection, ErrorSection } from "@ac/ui";
     import * as m from "#lib/paraglide/messages.js";
-    import { type Event, type Tag, createTagSchema, updateTagSchema, SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from "@ac/validations";
-
+    import {
+        type Event,
+        type Tag,
+        createTagSchema,
+        updateTagSchema,
+        SUPPORTED_CURRENCIES,
+        formatCurrency,
+        getCurrencySymbol,
+    } from "@ac/validations";
 
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
     import SyncCheckboxBlock from "#lib/components/sync/SyncCheckboxBlock.svelte";
     import EventSalesWorkflowSection from "#lib/components/events/EventSalesWorkflowSection.svelte";
     import { toast } from "svelte-sonner";
     import { Button } from "#lib/components/ui/button/index.js";
-    import { EntityManager, TagManager, ContactManager, LocationForm, translateIssue, matchContactSearch, useFormValidationFeedback } from "@ac/ui";
+    import {
+        EntityManager,
+        TagManager,
+        ContactManager,
+        LocationForm,
+        translateIssue,
+        matchContactSearch,
+        useFormValidationFeedback,
+    } from "@ac/ui";
     import { listResourcesWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import type { ResourceWithHierarchy } from "../../../routes/resources/list-with-hierarchy.remote";
     import ResourceForm from "#lib/components/resources/ResourceForm.svelte";
@@ -18,7 +33,10 @@
     import { readResource } from "../../../routes/resources/[id]/read.remote";
     import { deleteResource as deleteResourceRemote } from "../../../routes/resources/[id]/delete.remote";
     import { listResources } from "../../../routes/resources/list.remote";
-    import { createResourceSchema, updateResourceSchema } from "#lib/validations/resources.js";
+    import {
+        createResourceSchema,
+        updateResourceSchema,
+    } from "#lib/validations/resources.js";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { type Location } from "@ac/validations";
 
@@ -32,7 +50,7 @@
         listTagCategories as listTagCategoriesRemote,
         createTagCategoryCommand,
         updateTagCategoryCommand,
-        deleteTagCategoryAction
+        deleteTagCategoryAction,
     } from "../../../routes/tags/categories.remote";
     import {
         addAssociation,
@@ -130,14 +148,14 @@
     import { updatePrice } from "../../../routes/prices/[id]/update.remote";
     import { readPrice } from "../../../routes/prices/[id]/read.remote";
     import { deletePrices } from "../../../routes/prices/[id]/delete.remote";
-    import {
-        createPriceSchema,
-        updatePriceSchema,
-    } from "@ac/validations";
+    import { createPriceSchema, updatePriceSchema } from "@ac/validations";
     import PriceForm from "#lib/components/prices/PriceForm.svelte";
     import PriceItemsSectionList from "#lib/components/prices/PriceItemsSectionList.svelte";
     import * as v from "valibot";
-    import { FieldCollaboratorBadge, type CollaborationRoom } from "#lib/client/collaboration/index.js";
+    import {
+        FieldCollaboratorBadge,
+        type CollaborationRoom,
+    } from "#lib/client/collaboration/index.js";
 
     let {
         remoteFunction,
@@ -190,7 +208,10 @@
         "Sonstiges",
     ];
 
-    function parseDateTime(dt: string | null | undefined, timeZone?: string | null) {
+    function parseDateTime(
+        dt: string | null | undefined,
+        timeZone?: string | null,
+    ) {
         if (!dt) return { date: "", time: "" };
         try {
             const d = new Date(dt);
@@ -208,7 +229,8 @@
                         hour12: false,
                     });
                     const parts = formatter.formatToParts(d);
-                    const getPart = (type: string) => parts.find((p) => p.type === type)?.value || "";
+                    const getPart = (type: string) =>
+                        parts.find((p) => p.type === type)?.value || "";
                     const year = getPart("year");
                     const month = getPart("month");
                     const day = getPart("day");
@@ -274,8 +296,15 @@
 
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    const startParsed = $derived(parseDateTime(initialData?.startDateTime, initialData?.startTimeZone));
-    const endParsed = $derived(parseDateTime(initialData?.endDateTime, initialData?.endTimeZone || initialData?.startTimeZone));
+    const startParsed = $derived(
+        parseDateTime(initialData?.startDateTime, initialData?.startTimeZone),
+    );
+    const endParsed = $derived(
+        parseDateTime(
+            initialData?.endDateTime,
+            initialData?.endTimeZone || initialData?.startTimeZone,
+        ),
+    );
     const localNow = getLocalNow();
     const initialEnd = $derived(
         getInitialEndDateTime(startParsed, endParsed, localNow),
@@ -287,8 +316,12 @@
 
     let showRecurrenceDialog = $state(false);
 
-    const tagCategoriesQuery = $derived(listTagCategoriesRemote({ limit: 100 }));
-    const availableTagCategories = $derived(tagCategoriesQuery.current?.data ?? []);
+    const tagCategoriesQuery = $derived(
+        listTagCategoriesRemote({ limit: 100 }),
+    );
+    const availableTagCategories = $derived(
+        tagCategoriesQuery.current?.data ?? [],
+    );
 
     // Date/Time handling
     const timezones = Intl.supportedValuesOf
@@ -299,31 +332,33 @@
     let showEndDate = $state(
         Boolean(
             startParsed.date &&
-            endParsed.date &&
-            startParsed.date !== endParsed.date
-        )
+                endParsed.date &&
+                startParsed.date !== endParsed.date,
+        ),
     );
 
     // svelte-ignore state_referenced_locally
     let showStartTimeZone = $state(
         Boolean(
             initialData?.startTimeZone &&
-            initialData.startTimeZone !== browserTimezone
-        )
+                initialData.startTimeZone !== browserTimezone,
+        ),
     );
 
     // svelte-ignore state_referenced_locally
     let showEndTimeZone = $state(
         Boolean(
             initialData?.endTimeZone &&
-            initialData.endTimeZone !== browserTimezone &&
-            initialData.endTimeZone !== (initialData.startTimeZone || browserTimezone)
-        )
+                initialData.endTimeZone !== browserTimezone &&
+                initialData.endTimeZone !==
+                    (initialData.startTimeZone || browserTimezone),
+        ),
     );
 
     function enableEndDate() {
         showEndDate = true;
-        const currentStartDate = rf.fields.startDate.value() || startParsed.date || localNow.date;
+        const currentStartDate =
+            rf.fields.startDate.value() || startParsed.date || localNow.date;
         if (!rf.fields.endDate.value()) {
             rf.fields.endDate.set(currentStartDate);
         }
@@ -331,18 +366,21 @@
 
     function disableEndDate() {
         showEndDate = false;
-        const currentStartDate = rf.fields.startDate.value() || startParsed.date || localNow.date;
+        const currentStartDate =
+            rf.fields.startDate.value() || startParsed.date || localNow.date;
         rf.fields.endDate.set(currentStartDate);
     }
 
     // svelte-ignore state_referenced_locally
     let showPrepTime = $state(
-        Boolean(initialData?.prepMinutes && initialData.prepMinutes > 0)
+        Boolean(initialData?.prepMinutes && initialData.prepMinutes > 0),
     );
 
     // svelte-ignore state_referenced_locally
     let showTeardownTime = $state(
-        Boolean(initialData?.teardownMinutes && initialData.teardownMinutes > 0)
+        Boolean(
+            initialData?.teardownMinutes && initialData.teardownMinutes > 0,
+        ),
     );
 
     function enablePrepTime() {
@@ -376,12 +414,12 @@
         if (isAllDay) return null;
         const sTime = currentStartTimeVal;
         if (!sTime) return null;
-        const [h, min] = sTime.split(':').map(Number);
+        const [h, min] = sTime.split(":").map(Number);
         if (isNaN(h) || isNaN(min)) return null;
         const totalMinutes = h * 60 + min - prep;
-        const effH = Math.floor(((totalMinutes % 1440) + 1440) % 1440 / 60);
+        const effH = Math.floor((((totalMinutes % 1440) + 1440) % 1440) / 60);
         const effMin = ((totalMinutes % 60) + 60) % 60;
-        return `${String(effH).padStart(2, '0')}:${String(effMin).padStart(2, '0')} Uhr (${m.prep_padding()})`;
+        return `${String(effH).padStart(2, "0")}:${String(effMin).padStart(2, "0")} Uhr (${m.prep_padding()})`;
     });
 
     const effectiveTeardownEndTimeText = $derived.by(() => {
@@ -391,17 +429,21 @@
         if (isAllDay) return null;
         const eTime = currentEndTimeVal;
         if (!eTime) return null;
-        const [h, min] = eTime.split(':').map(Number);
+        const [h, min] = eTime.split(":").map(Number);
         if (isNaN(h) || isNaN(min)) return null;
         const totalMinutes = h * 60 + min + teardown;
-        const effH = Math.floor(((totalMinutes % 1440) + 1440) % 1440 / 60);
+        const effH = Math.floor((((totalMinutes % 1440) + 1440) % 1440) / 60);
         const effMin = ((totalMinutes % 60) + 60) % 60;
-        return `${String(effH).padStart(2, '0')}:${String(effMin).padStart(2, '0')} Uhr (${m.teardown_padding()})`;
+        return `${String(effH).padStart(2, "0")}:${String(effMin).padStart(2, "0")} Uhr (${m.teardown_padding()})`;
     });
 
     function handleStartTimeZoneChange(e: globalThis.Event) {
         const val = (e.target as HTMLInputElement).value;
-        if (!showEndTimeZone && (!initialData?.endTimeZone || initialData.endTimeZone === initialData.startTimeZone)) {
+        if (
+            !showEndTimeZone &&
+            (!initialData?.endTimeZone ||
+                initialData.endTimeZone === initialData.startTimeZone)
+        ) {
             rf.fields.endTimeZone.set(val);
         }
     }
@@ -409,19 +451,21 @@
     function updateEndDateTime(e: globalThis.Event, isDate: boolean) {
         const target = e.target as HTMLInputElement;
         const newVal = target.value;
-        const currentStartDate = rf.fields.startDate.value() || startParsed.date || localNow.date;
-        const currentStartTime = rf.fields.startTime.value() || startParsed.time || localNow.time;
-        
+        const currentStartDate =
+            rf.fields.startDate.value() || startParsed.date || localNow.date;
+        const currentStartTime =
+            rf.fields.startTime.value() || startParsed.time || localNow.time;
+
         const startDate = isDate ? newVal : currentStartDate;
         const startTime = !isDate ? newVal : currentStartTime;
-        
+
         if (!startDate || !startTime) return;
 
         const start = new Date(`${startDate}T${startTime}:00`);
         if (isNaN(start.getTime())) return;
 
         const end = new Date(start.getTime() + 60 * 60000);
-        
+
         const year = end.getFullYear();
         const month = String(end.getMonth() + 1).padStart(2, "0");
         const day = String(end.getDate()).padStart(2, "0");
@@ -449,8 +493,7 @@
     }
 
     function addReminder(rf: any) {
-        const currentReminders =
-            rf.fields.reminders.overrides.value() ?? [];
+        const currentReminders = rf.fields.reminders.overrides.value() ?? [];
         rf.fields.reminders.overrides.set([
             ...currentReminders,
             { method: "popup", minutes: 10 },
@@ -458,8 +501,7 @@
     }
 
     function removeReminder(rf: any, index: number) {
-        const currentReminders =
-            rf.fields.reminders.overrides.value() ?? [];
+        const currentReminders = rf.fields.reminders.overrides.value() ?? [];
         rf.fields.reminders.overrides.set(
             currentReminders.filter((_: any, i: number) => i !== index),
         );
@@ -468,92 +510,141 @@
     let recurrenceText = $derived(
         rf.fields.recurrence.value()
             ? formatRecurrenceText(rf.fields.recurrence.value() as string, {
-                    includeEnd: true,
-                    dtstart: rf.fields.startDate.value() || startParsed.date || localNow.date
+                  includeEnd: true,
+                  dtstart:
+                      rf.fields.startDate.value() ||
+                      startParsed.date ||
+                      localNow.date,
               })
             : m.recurrence(),
     );
 
     let isSeries = $derived(
         Boolean(
-            (rf.fields.recurrence.value() && String(rf.fields.recurrence.value()).trim() !== "") ||
-            (initialData?.recurrence && initialData.recurrence.length > 0) ||
-            initialData?.seriesId ||
-            isSeriesItem(initialData)
-        )
+            (rf.fields.recurrence.value() &&
+                String(rf.fields.recurrence.value()).trim() !== "") ||
+                (initialData?.recurrence &&
+                    initialData.recurrence.length > 0) ||
+                initialData?.seriesId ||
+                isSeriesItem(initialData),
+        ),
     );
 
     let isAllDay = $derived(
         rf.fields.isAllDay.value() !== undefined
-            ? (rf.fields.isAllDay.value() === true ||
-               rf.fields.isAllDay.value() === "true" ||
-               rf.fields.isAllDay.value() === "on")
+            ? rf.fields.isAllDay.value() === true ||
+                  rf.fields.isAllDay.value() === "true" ||
+                  rf.fields.isAllDay.value() === "on"
             : (initialData?.isAllDay ?? false),
     );
 
     let useDefaultReminders = $derived(
         rf.fields.reminders.useDefault.value() !== undefined
-            ? (rf.fields.reminders.useDefault.value() === true ||
-               rf.fields.reminders.useDefault.value() === "true" ||
-               rf.fields.reminders.useDefault.value() === "on")
+            ? rf.fields.reminders.useDefault.value() === true ||
+                  rf.fields.reminders.useDefault.value() === "true" ||
+                  rf.fields.reminders.useDefault.value() === "on"
             : ((initialData?.reminders as any)?.useDefault ?? true),
     );
-    let reminders = $derived(
-        rf.fields.reminders.overrides.value() ?? [],
-    );
+    let reminders = $derived(rf.fields.reminders.overrides.value() ?? []);
 
     import { checkEventAvailability } from "../../../routes/events/availability/check.remote";
 
     let isTicketPriceUnknown = $derived(
         rf.fields.ticketPriceUnknown.dirty()
-            ? (rf.fields.ticketPriceUnknown.value() === true ||
-               rf.fields.ticketPriceUnknown.value() === "true" ||
-               rf.fields.ticketPriceUnknown.value() === "on")
-            : (initialData?.id ? !!initialData.ticketPriceUnknown : true),
+            ? rf.fields.ticketPriceUnknown.value() === true ||
+                  rf.fields.ticketPriceUnknown.value() === "true" ||
+                  rf.fields.ticketPriceUnknown.value() === "on"
+            : initialData?.id
+              ? !!initialData.ticketPriceUnknown
+              : true,
     );
 
-    let eventCurrency = $derived((rf.fields.currency?.value?.() as string) || initialData?.currency || "EUR");
+    let eventCurrency = $derived(
+        (rf.fields.currency?.value?.() as string) ||
+            initialData?.currency ||
+            "EUR",
+    );
 
-    let resourceAvailability = $state<Record<string, { available: boolean; reason?: string; eventId?: string; eventTitle?: string }>>({});
-    let contactAvailability = $state<Record<string, { available: boolean; reason?: string; eventId?: string; eventTitle?: string }>>({});
+    let resourceAvailability = $state<
+        Record<
+            string,
+            {
+                available: boolean;
+                reason?: string;
+                eventId?: string;
+                eventTitle?: string;
+            }
+        >
+    >({});
+    let contactAvailability = $state<
+        Record<
+            string,
+            {
+                available: boolean;
+                reason?: string;
+                eventId?: string;
+                eventTitle?: string;
+            }
+        >
+    >({});
     let availabilityLoading = $state(false);
 
     function hasAllocationCalendars(resItem: any): boolean {
         if (!resItem || !resItem.allocationCalendars) return false;
         let cals = resItem.allocationCalendars;
-        if (typeof cals === 'string') {
-            try { cals = JSON.parse(cals); } catch { return false; }
+        if (typeof cals === "string") {
+            try {
+                cals = JSON.parse(cals);
+            } catch {
+                return false;
+            }
         }
         return Array.isArray(cals) && cals.length > 0;
     }
 
-    const currentStartDateVal = $derived(rf.fields.startDate.value() || startParsed.date || localNow.date);
-    const currentStartTimeVal = $derived(rf.fields.startTime.value() || startParsed.time || localNow.time);
-    const currentEndDateVal = $derived(rf.fields.endDate.value() || initialEnd.date || currentStartDateVal);
-    const currentEndTimeVal = $derived(rf.fields.endTime.value() || initialEnd.time || currentStartTimeVal);
+    const currentStartDateVal = $derived(
+        rf.fields.startDate.value() || startParsed.date || localNow.date,
+    );
+    const currentStartTimeVal = $derived(
+        rf.fields.startTime.value() || startParsed.time || localNow.time,
+    );
+    const currentEndDateVal = $derived(
+        rf.fields.endDate.value() || initialEnd.date || currentStartDateVal,
+    );
+    const currentEndTimeVal = $derived(
+        rf.fields.endTime.value() || initialEnd.time || currentStartTimeVal,
+    );
 
     const activeStartIso = $derived.by(() => {
-        if (!currentStartDateVal) return '';
-        const timeStr = isAllDay ? '00:00:00' : `${currentStartTimeVal || '00:00'}:00`;
+        if (!currentStartDateVal) return "";
+        const timeStr = isAllDay
+            ? "00:00:00"
+            : `${currentStartTimeVal || "00:00"}:00`;
         const d = new Date(`${currentStartDateVal}T${timeStr}`);
-        return isNaN(d.getTime()) ? '' : d.toISOString();
+        return isNaN(d.getTime()) ? "" : d.toISOString();
     });
 
     const activeEndIso = $derived.by(() => {
-        if (!currentEndDateVal) return '';
-        const timeStr = isAllDay ? '23:59:59' : `${currentEndTimeVal || '23:59'}:00`;
+        if (!currentEndDateVal) return "";
+        const timeStr = isAllDay
+            ? "23:59:59"
+            : `${currentEndTimeVal || "23:59"}:00`;
         const d = new Date(`${currentEndDateVal}T${timeStr}`);
-        return isNaN(d.getTime()) ? '' : d.toISOString();
+        return isNaN(d.getTime()) ? "" : d.toISOString();
     });
 
-    let lastQueryKey = '';
+    let lastQueryKey = "";
 
     function refreshAvailability() {
         const startIso = activeStartIso;
         const endIso = activeEndIso;
         if (!startIso || !endIso) return;
-        const prep = showPrepTime ? (Number(rf.fields.prepMinutes?.value?.()) || 0) : 0;
-        const teardown = showTeardownTime ? (Number(rf.fields.teardownMinutes?.value?.()) || 0) : 0;
+        const prep = showPrepTime
+            ? Number(rf.fields.prepMinutes?.value?.()) || 0
+            : 0;
+        const teardown = showTeardownTime
+            ? Number(rf.fields.teardownMinutes?.value?.()) || 0
+            : 0;
         availabilityLoading = true;
         checkEventAvailability({
             startDateTime: startIso,
@@ -561,24 +652,30 @@
             eventId: initialData?.id,
             prepMinutes: prep,
             teardownMinutes: teardown,
-        }).then((res) => {
-            if (res) {
-                resourceAvailability = res.resourceAvailability || {};
-                contactAvailability = res.contactAvailability || {};
-            }
-            availabilityLoading = false;
-        }).catch((err) => {
-            console.error('[EventForm] availability error:', err);
-            availabilityLoading = false;
-        });
+        })
+            .then((res) => {
+                if (res) {
+                    resourceAvailability = res.resourceAvailability || {};
+                    contactAvailability = res.contactAvailability || {};
+                }
+                availabilityLoading = false;
+            })
+            .catch((err) => {
+                console.error("[EventForm] availability error:", err);
+                availabilityLoading = false;
+            });
     }
 
     $effect(() => {
         const startIso = activeStartIso;
         const endIso = activeEndIso;
-        const prep = showPrepTime ? (Number(rf.fields.prepMinutes?.value?.()) || 0) : 0;
-        const teardown = showTeardownTime ? (Number(rf.fields.teardownMinutes?.value?.()) || 0) : 0;
-        const queryKey = `${startIso}_${endIso}_${initialData?.id || 'new'}_p${prep}_t${teardown}`;
+        const prep = showPrepTime
+            ? Number(rf.fields.prepMinutes?.value?.()) || 0
+            : 0;
+        const teardown = showTeardownTime
+            ? Number(rf.fields.teardownMinutes?.value?.()) || 0
+            : 0;
+        const queryKey = `${startIso}_${endIso}_${initialData?.id || "new"}_p${prep}_t${teardown}`;
 
         if (!startIso || !endIso || queryKey === lastQueryKey) return;
         lastQueryKey = queryKey;
@@ -589,13 +686,13 @@
     });
 
     $effect(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === "undefined") return;
         const handleFocus = () => {
             refreshAvailability();
         };
-        window.addEventListener('focus', handleFocus);
+        window.addEventListener("focus", handleFocus);
         return () => {
-            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener("focus", handleFocus);
         };
     });
 
@@ -604,27 +701,33 @@
         initialData?.contacts,
         initialData?.contactIds,
     );
-    let currentContactIds = $state<string[]>(initialParticipantState.contactIds);
+    let currentContactIds = $state<string[]>(
+        initialParticipantState.contactIds,
+    );
     // svelte-ignore state_referenced_locally
     let currentContacts = $state<any[]>(initialData?.contacts || []);
-    let contactPartySizes = $state<Record<string, number>>(initialParticipantState.partySizes);
+    let contactPartySizes = $state<Record<string, number>>(
+        initialParticipantState.partySizes,
+    );
     let contactParticipationStatuses = $state<Record<string, string>>(
         initialParticipantState.participationStatuses,
     );
 
     let isRoleManagerOpen = $state(false);
     // svelte-ignore state_referenced_locally
-    let contactRolesState = $state<Record<string, string[]>>((() => {
-        const map: Record<string, string[]> = {};
-        if (initialData?.contacts) {
-            for (const c of initialData.contacts as any[]) {
-                if (c.id && Array.isArray(c.roles)) {
-                    map[c.id] = c.roles.map((r: any) => r.id || r);
+    let contactRolesState = $state<Record<string, string[]>>(
+        (() => {
+            const map: Record<string, string[]> = {};
+            if (initialData?.contacts) {
+                for (const c of initialData.contacts as any[]) {
+                    if (c.id && Array.isArray(c.roles)) {
+                        map[c.id] = c.roles.map((r: any) => r.id || r);
+                    }
                 }
             }
-        }
-        return map;
-    })());
+            return map;
+        })(),
+    );
 
     const rolesQuery = listEventRoles();
     const availableRoles = $derived(rolesQuery.current?.data || []);
@@ -650,8 +753,14 @@
         if (!contactItem) return false;
         const tags = contactItem.tags || [];
         return tags.some((t: any) => {
-            const name = (t?.name || t?.tag?.name || (typeof t === 'string' ? t : '')).trim().toLowerCase();
-            return name === 'employee' || name === 'employees';
+            const name = (
+                t?.name ||
+                t?.tag?.name ||
+                (typeof t === "string" ? t : "")
+            )
+                .trim()
+                .toLowerCase();
+            return name === "employee" || name === "employees";
         });
     }
 
@@ -659,14 +768,25 @@
         if (!contactItem) return false;
         const tags = contactItem.tags || [];
         return tags.some((t: any) => {
-            const name = (t?.name || t?.tag?.name || (typeof t === 'string' ? t : '')).trim().toLowerCase();
-            return name === 'partner' || name === 'partners';
+            const name = (
+                t?.name ||
+                t?.tag?.name ||
+                (typeof t === "string" ? t : "")
+            )
+                .trim()
+                .toLowerCase();
+            return name === "partner" || name === "partners";
         });
     }
 
-    function findRole(roles: EventRole[], roleName: string): EventRole | undefined {
+    function findRole(
+        roles: EventRole[],
+        roleName: string,
+    ): EventRole | undefined {
         const target = roleName.trim().toLowerCase();
-        return roles.find((r) => (r.name || '').trim().toLowerCase() === target);
+        return roles.find(
+            (r) => (r.name || "").trim().toLowerCase() === target,
+        );
     }
 
     async function handleContactsChange(ids: string[], items?: any[]) {
@@ -674,31 +794,42 @@
         if (items !== undefined) {
             currentContacts = items;
         } else {
-            currentContacts = currentContacts.filter((c: any) => ids.includes(c?.id));
+            currentContacts = currentContacts.filter((c: any) =>
+                ids.includes(c?.id),
+            );
         }
         rf.fields.contactIds.set(JSON.stringify(ids));
 
         const nextPartySizes: Record<string, number> = {};
         const nextStatuses: Record<string, string> = {};
         for (const id of ids) {
-            const matchedItem = items?.find((it: any) => (it?.contact?.id ?? it?.id) === id);
+            const matchedItem = items?.find(
+                (it: any) => (it?.contact?.id ?? it?.id) === id,
+            );
             nextPartySizes[id] = normalizePartySize(
-                matchedItem?.partySize ?? matchedItem?.contact?.partySize ?? contactPartySizes[id] ?? 1
+                matchedItem?.partySize ??
+                    matchedItem?.contact?.partySize ??
+                    contactPartySizes[id] ??
+                    1,
             );
             nextStatuses[id] = normalizeParticipationStatus(
-                matchedItem?.participationStatus ?? matchedItem?.contact?.participationStatus ?? contactParticipationStatuses[id]
+                matchedItem?.participationStatus ??
+                    matchedItem?.contact?.participationStatus ??
+                    contactParticipationStatuses[id],
             );
         }
         contactPartySizes = nextPartySizes;
         contactParticipationStatuses = nextStatuses;
         rf.fields.contactPartySizesJson.set(JSON.stringify(nextPartySizes));
-        rf.fields.contactParticipationStatusesJson.set(JSON.stringify(nextStatuses));
+        rf.fields.contactParticipationStatusesJson.set(
+            JSON.stringify(nextStatuses),
+        );
         syncParticipantsField(ids, nextPartySizes, nextStatuses, baseline);
 
         const roles = await loadEventRoles();
-        const mainRole = findRole(roles, 'Main Contact');
-        const pmRole = findRole(roles, 'Project Manager');
-        const participantRole = findRole(roles, 'Participant');
+        const mainRole = findRole(roles, "Main Contact");
+        const pmRole = findRole(roles, "Project Manager");
+        const participantRole = findRole(roles, "Participant");
 
         const newRolesState: Record<string, string[]> = {};
         for (const id of ids) {
@@ -708,15 +839,20 @@
         }
 
         // Check if any currently assigned contact already has the Main Contact role
-        let hasMainContact = Object.entries(newRolesState).some(([id, roleIds]) => {
-            return mainRole ? roleIds.includes(mainRole.id) : false;
-        });
+        let hasMainContact = Object.entries(newRolesState).some(
+            ([id, roleIds]) => {
+                return mainRole ? roleIds.includes(mainRole.id) : false;
+            },
+        );
 
         if (items && items.length > 0) {
             for (const contactItem of items) {
                 if (!contactItem?.id || !ids.includes(contactItem.id)) continue;
 
-                if (!newRolesState[contactItem.id] || newRolesState[contactItem.id].length === 0) {
+                if (
+                    !newRolesState[contactItem.id] ||
+                    newRolesState[contactItem.id].length === 0
+                ) {
                     let assignedRole: EventRole | undefined;
 
                     if (!hasMainContact) {
@@ -727,7 +863,10 @@
                             assignedRole = participantRole;
                         }
                     } else {
-                        if (isEmployeeContact(contactItem) || isPartnerContact(contactItem)) {
+                        if (
+                            isEmployeeContact(contactItem) ||
+                            isPartnerContact(contactItem)
+                        ) {
                             assignedRole = pmRole;
                         } else {
                             assignedRole = participantRole;
@@ -740,12 +879,20 @@
                             void updateContactRoles({
                                 eventId: initialData.id,
                                 contactId: contactItem.id,
-                                roleIds: [assignedRole.id]
-                            }).catch((err) => console.error("Failed to update contact role:", err));
+                                roleIds: [assignedRole.id],
+                            }).catch((err) =>
+                                console.error(
+                                    "Failed to update contact role:",
+                                    err,
+                                ),
+                            );
                         }
                     }
                 } else {
-                    if (mainRole && newRolesState[contactItem.id].includes(mainRole.id)) {
+                    if (
+                        mainRole &&
+                        newRolesState[contactItem.id].includes(mainRole.id)
+                    ) {
                         hasMainContact = true;
                     }
                 }
@@ -757,13 +904,20 @@
     }
 
     // svelte-ignore state_referenced_locally
-    let signUpMode = $state<'off' | 'recommended' | 'required'>((initialData?.signUpMode as any) || 'off');
-    const initialClosureParts = untrack(() => extractSignUpClosureParts(initialData?.signUpClosureDate, browserTimezone));
+    let signUpMode = $state<"off" | "recommended" | "required">(
+        (initialData?.signUpMode as any) || "off",
+    );
+    const initialClosureParts = untrack(() =>
+        extractSignUpClosureParts(
+            initialData?.signUpClosureDate,
+            browserTimezone,
+        ),
+    );
     let signUpClosureDatePart = $state<string>(initialClosureParts.date);
     let signUpClosureTime = $state<string>(
         initialClosureParts.date
-            ? (initialClosureParts.time || DEFAULT_SIGN_UP_CLOSURE_TIME)
-            : DEFAULT_SIGN_UP_CLOSURE_TIME
+            ? initialClosureParts.time || DEFAULT_SIGN_UP_CLOSURE_TIME
+            : DEFAULT_SIGN_UP_CLOSURE_TIME,
     );
     let signUpClosureTimeZone = $state<string>(browserTimezone);
     let showClosureTimeZone = $state<boolean>(false);
@@ -773,36 +927,44 @@
             ? combineSignUpClosureDateTime(
                   signUpClosureDatePart,
                   signUpClosureTime || DEFAULT_SIGN_UP_CLOSURE_TIME,
-                  signUpClosureTimeZone || browserTimezone
+                  signUpClosureTimeZone || browserTimezone,
               )
-            : ""
+            : "",
     );
 
     function syncSignUpClosureField(
         dateVal = signUpClosureDatePart,
         timeVal = signUpClosureTime,
-        tzVal = signUpClosureTimeZone
+        tzVal = signUpClosureTimeZone,
     ) {
         const nextIso = dateVal
             ? combineSignUpClosureDateTime(
                   dateVal,
                   timeVal || DEFAULT_SIGN_UP_CLOSURE_TIME,
-                  tzVal || browserTimezone
+                  tzVal || browserTimezone,
               )
             : "";
         rf.fields.signUpClosureDate?.set(nextIso);
     }
     // svelte-ignore state_referenced_locally
-    let signUpContactOverridden = $state<boolean>(Boolean(initialData?.signUpContactOverridden));
+    let signUpContactOverridden = $state<boolean>(
+        Boolean(initialData?.signUpContactOverridden),
+    );
     // svelte-ignore state_referenced_locally
-    let overriddenSignUpContactItem = $state<any | null>(initialData?.signUpContact ?? null);
+    let overriddenSignUpContactItem = $state<any | null>(
+        initialData?.signUpContact ?? null,
+    );
     // svelte-ignore state_referenced_locally
     let lockedSignUpContactKey = $state<string>(
-        initialData?.signUpContactOverridden ? 'manual-initial' : 'auto'
+        initialData?.signUpContactOverridden ? "manual-initial" : "auto",
     );
 
     const defaultKontaktContact = $derived(
-        findDefaultKontaktContact(currentContacts, contactRolesState, availableRoles)
+        findDefaultKontaktContact(
+            currentContacts,
+            contactRolesState,
+            availableRoles,
+        ),
     );
 
     const rolesLoaded = $derived(rolesQuery.current !== undefined);
@@ -812,19 +974,23 @@
             initialData?.signUpContact &&
             initialData?.signUpContact?.id === initialData?.signUpContactId
             ? initialData.signUpContact
-            : null
+            : null,
     );
 
     const effectiveSignUpContact = $derived(
         signUpContactOverridden
             ? overriddenSignUpContactItem
-            : (rolesLoaded ? defaultKontaktContact : (defaultKontaktContact ?? fallbackInitialSignUpContact))
+            : rolesLoaded
+              ? defaultKontaktContact
+              : (defaultKontaktContact ?? fallbackInitialSignUpContact),
     );
-    const effectiveSignUpContactId = $derived(effectiveSignUpContact?.id ?? null);
+    const effectiveSignUpContactId = $derived(
+        effectiveSignUpContact?.id ?? null,
+    );
     const signUpContactKey = $derived(
         signUpContactOverridden
             ? lockedSignUpContactKey
-            : `auto-${effectiveSignUpContactId ?? 'none'}-${effectiveSignUpContact?.updatedAt ?? ''}`
+            : `auto-${effectiveSignUpContactId ?? "none"}-${effectiveSignUpContact?.updatedAt ?? ""}`,
     );
 
     function handleSignUpContactChange(ids: string[], items?: any[]) {
@@ -836,22 +1002,26 @@
                 : null);
         overriddenSignUpContactItem = nextItem;
         if (!signUpContactOverridden) {
-            lockedSignUpContactKey = `manual-${nextId ?? 'none'}`;
+            lockedSignUpContactKey = `manual-${nextId ?? "none"}`;
             signUpContactOverridden = true;
         }
-        rf.fields.signUpContactId?.set(nextId ?? '');
-        rf.fields.signUpContactOverridden?.set('true');
+        rf.fields.signUpContactId?.set(nextId ?? "");
+        rf.fields.signUpContactOverridden?.set("true");
     }
 
     function resetSignUpContactToDefault() {
         signUpContactOverridden = false;
         overriddenSignUpContactItem = null;
-        rf.fields.signUpContactOverridden?.set('false');
-        rf.fields.signUpContactId?.set(defaultKontaktContact?.id ?? '');
+        rf.fields.signUpContactOverridden?.set("false");
+        rf.fields.signUpContactId?.set(defaultKontaktContact?.id ?? "");
     }
 
     const contactsHeadcount = $derived(
-        sumContactsHeadcount(currentContactIds, contactPartySizes, contactParticipationStatuses)
+        sumContactsHeadcount(
+            currentContactIds,
+            contactPartySizes,
+            contactParticipationStatuses,
+        ),
     );
 
     // svelte-ignore state_referenced_locally
@@ -860,7 +1030,7 @@
             initialData?.participantsCount,
             initialData?.contacts,
             initialData?.contactIds,
-        )
+        ),
     );
 
     let totalParticipants = $derived(baseline + contactsHeadcount);
@@ -911,11 +1081,19 @@
 
     function handlePartySizeChange(contactObj: any, rawVal: number) {
         const clamped = normalizePartySize(rawVal);
-        const nextPartySizes = { ...contactPartySizes, [contactObj.id]: clamped };
+        const nextPartySizes = {
+            ...contactPartySizes,
+            [contactObj.id]: clamped,
+        };
         contactPartySizes = nextPartySizes;
         contactObj.partySize = clamped;
         rf.fields.contactPartySizesJson.set(JSON.stringify(nextPartySizes));
-        syncParticipantsField(currentContactIds, nextPartySizes, contactParticipationStatuses, baseline);
+        syncParticipantsField(
+            currentContactIds,
+            nextPartySizes,
+            contactParticipationStatuses,
+            baseline,
+        );
 
         if (initialData?.id) {
             updateAssociationPartySizeRemote({
@@ -923,17 +1101,32 @@
                 entityId: initialData.id,
                 contactId: contactObj.id,
                 partySize: clamped,
-            }).catch((err: any) => toast.error(err.message || "Failed to update party size"));
+            }).catch((err: any) =>
+                toast.error(err.message || "Failed to update party size"),
+            );
         }
     }
 
-    function handleParticipationStatusChange(contactObj: any, rawStatus: string) {
+    function handleParticipationStatusChange(
+        contactObj: any,
+        rawStatus: string,
+    ) {
         const nextStatus = normalizeParticipationStatus(rawStatus);
-        const nextStatuses = { ...contactParticipationStatuses, [contactObj.id]: nextStatus };
+        const nextStatuses = {
+            ...contactParticipationStatuses,
+            [contactObj.id]: nextStatus,
+        };
         contactParticipationStatuses = nextStatuses;
         contactObj.participationStatus = nextStatus;
-        rf.fields.contactParticipationStatusesJson.set(JSON.stringify(nextStatuses));
-        syncParticipantsField(currentContactIds, contactPartySizes, nextStatuses, baseline);
+        rf.fields.contactParticipationStatusesJson.set(
+            JSON.stringify(nextStatuses),
+        );
+        syncParticipantsField(
+            currentContactIds,
+            contactPartySizes,
+            nextStatuses,
+            baseline,
+        );
 
         if (initialData?.id) {
             updateAssociationStatusRemote({
@@ -948,14 +1141,18 @@
     }
 
     function handlePriceItemRemoved(priceListId: string, itemId: string) {
-        const found = currentPrices.find(p => p.id === priceListId);
+        const found = currentPrices.find((p) => p.id === priceListId);
         if (found && found.items) {
             found.items = found.items.filter((it: any) => it.id !== itemId);
             let totalP = 0;
             let totalC = 0;
             for (const it of found.items) {
-                totalP += (Number(it.unitPrice) || 0) * (Number(it.portionAmount) || 1);
-                totalC += (Number(it.costPrice) || 0) * (Number(it.portionAmount) || 1);
+                totalP +=
+                    (Number(it.unitPrice) || 0) *
+                    (Number(it.portionAmount) || 1);
+                totalC +=
+                    (Number(it.costPrice) || 0) *
+                    (Number(it.portionAmount) || 1);
             }
             found.totalPricePerPortion = Math.round(totalP * 100) / 100;
             found.totalCostPerPortion = Math.round(totalC * 100) / 100;
@@ -964,16 +1161,22 @@
     }
 
     function handlePriceItemUpdated(priceListId: string, updatedItem: any) {
-        const found = currentPrices.find(p => p.id === priceListId);
+        const found = currentPrices.find((p) => p.id === priceListId);
         if (found && found.items) {
-            const idx = found.items.findIndex((it: any) => it.id === updatedItem.id);
+            const idx = found.items.findIndex(
+                (it: any) => it.id === updatedItem.id,
+            );
             if (idx !== -1) {
                 found.items[idx] = { ...found.items[idx], ...updatedItem };
                 let totalP = 0;
                 let totalC = 0;
                 for (const it of found.items) {
-                    totalP += (Number(it.unitPrice) || 0) * (Number(it.portionAmount) || 1);
-                    totalC += (Number(it.costPrice) || 0) * (Number(it.portionAmount) || 1);
+                    totalP +=
+                        (Number(it.unitPrice) || 0) *
+                        (Number(it.portionAmount) || 1);
+                    totalC +=
+                        (Number(it.costPrice) || 0) *
+                        (Number(it.portionAmount) || 1);
                 }
                 found.totalPricePerPortion = Math.round(totalP * 100) / 100;
                 found.totalCostPerPortion = Math.round(totalC * 100) / 100;
@@ -1014,24 +1217,30 @@
             >
                 {m.title()} <span class="text-red-500">*</span>
             </label>
-            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('summary')} />
+            <FieldCollaboratorBadge
+                collaborator={collab?.getFieldCollaborator("summary")}
+            />
         </div>
         <input
             {...rf.fields.summary.as("text", initialData?.summary ?? "")}
             required
-            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.summary.issues() ?? []).length > 0
+            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(
+                rf.fields.summary.issues() ?? []
+            ).length > 0
                 ? 'border-red-500'
                 : 'border-gray-300'}"
-            style={getCollaboratorStyle('summary')}
+            style={getCollaboratorStyle("summary")}
             placeholder={m.title()}
-            onfocus={() => collab?.setFocus('summary')}
+            onfocus={() => collab?.setFocus("summary")}
             onblur={() => {
                 collab?.setFocus(null);
                 void rf.validate().catch(() => {});
             }}
         />
         {#each rf.fields.summary.issues() ?? [] as issue}
-            <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+            <p class="mt-1 text-sm text-red-600">
+                {translateIssue(issue.message, m)}
+            </p>
         {/each}
     </div>
 
@@ -1066,7 +1275,10 @@
                     id="isAllDay"
                     class="w-4 h-4 text-blue-600 rounded border-gray-300"
                 />
-                <label for="isAllDay" class="text-sm font-medium text-gray-700 cursor-pointer">
+                <label
+                    for="isAllDay"
+                    class="text-sm font-medium text-gray-700 cursor-pointer"
+                >
                     {m.all_day_event()}
                 </label>
             </div>
@@ -1107,7 +1319,11 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-6">
             <!-- Start Date -->
-            <div class={isAllDay && !showEndDate ? "sm:col-span-12" : "sm:col-span-6"}>
+            <div
+                class={isAllDay && !showEndDate
+                    ? "sm:col-span-12"
+                    : "sm:col-span-6"}
+            >
                 <div class="flex items-center justify-between mb-1">
                     <label
                         for="startDate"
@@ -1117,14 +1333,26 @@
                         <span class="text-red-500">*</span>
                     </label>
                     <div class="flex items-center gap-1.5">
-                        <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startDate')} />
+                        <FieldCollaboratorBadge
+                            collaborator={collab?.getFieldCollaborator(
+                                "startDate",
+                            )}
+                        />
                         {#if isAllDay}
                             <button
                                 type="button"
-                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone || (rf.fields.startTimeZone.value() && rf.fields.startTimeZone.value() !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
-                                title="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
-                                onclick={() => (showStartTimeZone = !showStartTimeZone)}
-                                aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone ||
+                                (rf.fields.startTimeZone.value() &&
+                                    rf.fields.startTimeZone.value() !==
+                                        browserTimezone)
+                                    ? 'text-blue-600 bg-blue-50'
+                                    : ''}"
+                                title="{m.timezone()}: {rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
+                                onclick={() =>
+                                    (showStartTimeZone = !showStartTimeZone)}
+                                aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
                             >
                                 <Globe size={16} />
                             </button>
@@ -1137,10 +1365,10 @@
                         startParsed.date || localNow.date,
                     )}
                     required
-                    onfocus={() => collab?.setFocus('startDate')}
+                    onfocus={() => collab?.setFocus("startDate")}
                     onblur={() => collab?.setFocus(null)}
                     oninput={(e) => updateEndDateTime(e, true)}
-                    style={getCollaboratorStyle('startDate')}
+                    style={getCollaboratorStyle("startDate")}
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                 />
             </div>
@@ -1157,13 +1385,25 @@
                             <span class="text-red-500">*</span>
                         </label>
                         <div class="flex items-center gap-1.5">
-                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('startTime')} />
+                            <FieldCollaboratorBadge
+                                collaborator={collab?.getFieldCollaborator(
+                                    "startTime",
+                                )}
+                            />
                             <button
                                 type="button"
-                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone || (rf.fields.startTimeZone.value() && rf.fields.startTimeZone.value() !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
-                                title="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
-                                onclick={() => (showStartTimeZone = !showStartTimeZone)}
-                                aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() || browserTimezone}"
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showStartTimeZone ||
+                                (rf.fields.startTimeZone.value() &&
+                                    rf.fields.startTimeZone.value() !==
+                                        browserTimezone)
+                                    ? 'text-blue-600 bg-blue-50'
+                                    : ''}"
+                                title="{m.timezone()}: {rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
+                                onclick={() =>
+                                    (showStartTimeZone = !showStartTimeZone)}
+                                aria-label="{m.timezone()}: {rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
                             >
                                 <Globe size={16} />
                             </button>
@@ -1175,10 +1415,10 @@
                             startParsed.time || localNow.time,
                         )}
                         required
-                        onfocus={() => collab?.setFocus('startTime')}
+                        onfocus={() => collab?.setFocus("startTime")}
                         onblur={() => collab?.setFocus(null)}
                         oninput={(e) => updateEndDateTime(e, false)}
-                        style={getCollaboratorStyle('startTime')}
+                        style={getCollaboratorStyle("startTime")}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     />
                 </div>
@@ -1195,14 +1435,29 @@
                         <span class="text-red-500">*</span>
                     </label>
                     <div class="flex items-center gap-2">
-                        <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endDate')} />
+                        <FieldCollaboratorBadge
+                            collaborator={collab?.getFieldCollaborator(
+                                "endDate",
+                            )}
+                        />
                         {#if isAllDay}
                             <button
                                 type="button"
-                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone || (rf.fields.endTimeZone.value() && rf.fields.endTimeZone.value() !== (rf.fields.startTimeZone.value() || browserTimezone)) ? 'text-blue-600 bg-blue-50' : ''}"
-                                title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
-                                onclick={() => (showEndTimeZone = !showEndTimeZone)}
-                                aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone ||
+                                (rf.fields.endTimeZone.value() &&
+                                    rf.fields.endTimeZone.value() !==
+                                        (rf.fields.startTimeZone.value() ||
+                                            browserTimezone))
+                                    ? 'text-blue-600 bg-blue-50'
+                                    : ''}"
+                                title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() ||
+                                    rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
+                                onclick={() =>
+                                    (showEndTimeZone = !showEndTimeZone)}
+                                aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() ||
+                                    rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
                             >
                                 <Globe size={16} />
                             </button>
@@ -1222,9 +1477,9 @@
                     {...rf.fields.endDate.as("date", initialEnd.date)}
                     placeholder={rf.fields.startDate.value()}
                     required={showEndDate}
-                    onfocus={() => collab?.setFocus('endDate')}
+                    onfocus={() => collab?.setFocus("endDate")}
                     onblur={() => collab?.setFocus(null)}
-                    style={getCollaboratorStyle('endDate')}
+                    style={getCollaboratorStyle("endDate")}
                     class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                 />
             </div>
@@ -1241,13 +1496,28 @@
                             <span class="text-red-500">*</span>
                         </label>
                         <div class="flex items-center gap-1.5">
-                            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('endTime')} />
+                            <FieldCollaboratorBadge
+                                collaborator={collab?.getFieldCollaborator(
+                                    "endTime",
+                                )}
+                            />
                             <button
                                 type="button"
-                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone || (rf.fields.endTimeZone.value() && rf.fields.endTimeZone.value() !== (rf.fields.startTimeZone.value() || browserTimezone)) ? 'text-blue-600 bg-blue-50' : ''}"
-                                title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
-                                onclick={() => (showEndTimeZone = !showEndTimeZone)}
-                                aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() || rf.fields.startTimeZone.value() || browserTimezone}"
+                                class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showEndTimeZone ||
+                                (rf.fields.endTimeZone.value() &&
+                                    rf.fields.endTimeZone.value() !==
+                                        (rf.fields.startTimeZone.value() ||
+                                            browserTimezone))
+                                    ? 'text-blue-600 bg-blue-50'
+                                    : ''}"
+                                title="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() ||
+                                    rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
+                                onclick={() =>
+                                    (showEndTimeZone = !showEndTimeZone)}
+                                aria-label="{m.end_time()} {m.timezone()}: {rf.fields.endTimeZone.value() ||
+                                    rf.fields.startTimeZone.value() ||
+                                    browserTimezone}"
                             >
                                 <Globe size={16} />
                             </button>
@@ -1257,9 +1527,9 @@
                         {...rf.fields.endTime.as("time", initialEnd.time)}
                         placeholder={getDefaultEndTime(rf)}
                         required
-                        onfocus={() => collab?.setFocus('endTime')}
+                        onfocus={() => collab?.setFocus("endTime")}
                         onblur={() => collab?.setFocus(null)}
-                        style={getCollaboratorStyle('endTime')}
+                        style={getCollaboratorStyle("endTime")}
                         class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300"
                     />
                 </div>
@@ -1267,7 +1537,11 @@
         </div>
 
         <!-- Timezones (hidden by default unless globe clicked) -->
-        <div class={(showStartTimeZone || showEndTimeZone) ? "grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" : "hidden"}>
+        <div
+            class={showStartTimeZone || showEndTimeZone
+                ? "grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6"
+                : "hidden"}
+        >
             <div class={showStartTimeZone ? "" : "hidden"}>
                 <div class="flex items-center justify-between mb-1">
                     <label
@@ -1297,13 +1571,19 @@
                 />
             </div>
 
-            <div class="{showEndTimeZone ? '' : 'hidden'} {showEndTimeZone && !showStartTimeZone ? 'sm:col-start-2' : ''}">
+            <div
+                class="{showEndTimeZone ? '' : 'hidden'} {showEndTimeZone &&
+                !showStartTimeZone
+                    ? 'sm:col-start-2'
+                    : ''}"
+            >
                 <div class="flex items-center justify-between mb-1">
                     <label
                         for="endTimeZone"
                         class="block text-sm font-medium text-gray-700"
                     >
-                        {m.end_time()} {m.timezone()}
+                        {m.end_time()}
+                        {m.timezone()}
                     </label>
                     <button
                         type="button"
@@ -1332,9 +1612,14 @@
         {#if showPrepTime || showTeardownTime}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 {#if showPrepTime}
-                    <div class="p-3 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg border border-amber-200/80 dark:border-amber-900/40 space-y-2">
+                    <div
+                        class="p-3 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg border border-amber-200/80 dark:border-amber-900/40 space-y-2"
+                    >
                         <div class="flex items-center justify-between">
-                            <label for="prepMinutes" class="block text-xs font-semibold text-amber-900 dark:text-amber-200">
+                            <label
+                                for="prepMinutes"
+                                class="block text-xs font-semibold text-amber-900 dark:text-amber-200"
+                            >
                                 {m.prep_time()} ({m.prep_padding()})
                             </label>
                             <button
@@ -1349,7 +1634,10 @@
                         </div>
                         <div class="flex items-center gap-2">
                             <input
-                                {...rf.fields.prepMinutes.as("number", initialData?.prepMinutes ?? 0)}
+                                {...rf.fields.prepMinutes.as(
+                                    "number",
+                                    initialData?.prepMinutes ?? 0,
+                                )}
                                 id="prepMinutes"
                                 type="number"
                                 min="0"
@@ -1357,13 +1645,16 @@
                                 placeholder="0"
                                 class="w-24 px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border rounded-md border-amber-300 dark:border-amber-700 focus:ring-2 focus:ring-amber-500"
                             />
-                            <span class="text-xs text-gray-500 font-medium">Min.</span>
+                            <span class="text-xs text-gray-500 font-medium"
+                                >Min.</span
+                            >
                             <div class="flex items-center gap-1 ml-auto">
                                 {#each [15, 30, 60] as min}
                                     <button
                                         type="button"
                                         class="text-[11px] px-2 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-gray-700 dark:text-gray-300 transition-colors font-medium"
-                                        onclick={() => rf.fields.prepMinutes.set(min)}
+                                        onclick={() =>
+                                            rf.fields.prepMinutes.set(min)}
                                     >
                                         +{min}m
                                     </button>
@@ -1371,7 +1662,9 @@
                             </div>
                         </div>
                         {#if effectivePrepStartTimeText}
-                            <p class="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                            <p
+                                class="text-[11px] text-amber-800 dark:text-amber-300 font-medium"
+                            >
                                 {m.room_booking_window()}: {effectivePrepStartTimeText}
                             </p>
                         {/if}
@@ -1379,9 +1672,16 @@
                 {/if}
 
                 {#if showTeardownTime}
-                    <div class="p-3 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg border border-amber-200/80 dark:border-amber-900/40 space-y-2 {!showPrepTime ? 'sm:col-start-2' : ''}">
+                    <div
+                        class="p-3 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg border border-amber-200/80 dark:border-amber-900/40 space-y-2 {!showPrepTime
+                            ? 'sm:col-start-2'
+                            : ''}"
+                    >
                         <div class="flex items-center justify-between">
-                            <label for="teardownMinutes" class="block text-xs font-semibold text-amber-900 dark:text-amber-200">
+                            <label
+                                for="teardownMinutes"
+                                class="block text-xs font-semibold text-amber-900 dark:text-amber-200"
+                            >
                                 {m.teardown_time()} ({m.teardown_padding()})
                             </label>
                             <button
@@ -1396,7 +1696,10 @@
                         </div>
                         <div class="flex items-center gap-2">
                             <input
-                                {...rf.fields.teardownMinutes.as("number", initialData?.teardownMinutes ?? 0)}
+                                {...rf.fields.teardownMinutes.as(
+                                    "number",
+                                    initialData?.teardownMinutes ?? 0,
+                                )}
                                 id="teardownMinutes"
                                 type="number"
                                 min="0"
@@ -1404,13 +1707,16 @@
                                 placeholder="0"
                                 class="w-24 px-2.5 py-1.5 text-sm bg-white dark:bg-gray-800 border rounded-md border-amber-300 dark:border-amber-700 focus:ring-2 focus:ring-amber-500"
                             />
-                            <span class="text-xs text-gray-500 font-medium">Min.</span>
+                            <span class="text-xs text-gray-500 font-medium"
+                                >Min.</span
+                            >
                             <div class="flex items-center gap-1 ml-auto">
                                 {#each [15, 30, 60] as min}
                                     <button
                                         type="button"
                                         class="text-[11px] px-2 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-gray-700 dark:text-gray-300 transition-colors font-medium"
-                                        onclick={() => rf.fields.teardownMinutes.set(min)}
+                                        onclick={() =>
+                                            rf.fields.teardownMinutes.set(min)}
                                     >
                                         +{min}m
                                     </button>
@@ -1418,7 +1724,9 @@
                             </div>
                         </div>
                         {#if effectiveTeardownEndTimeText}
-                            <p class="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                            <p
+                                class="text-[11px] text-amber-800 dark:text-amber-300 font-medium"
+                            >
                                 {m.room_booking_window()}: {effectiveTeardownEndTimeText}
                             </p>
                         {/if}
@@ -1435,7 +1743,9 @@
         {/if}
 
         <!-- Recurrence Button -->
-        <div class="pt-4 border-t flex flex-wrap items-center justify-between gap-4">
+        <div
+            class="pt-4 border-t flex flex-wrap items-center justify-between gap-4"
+        >
             <button
                 type="button"
                 class="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
@@ -1446,23 +1756,25 @@
             </button>
 
             {#if initialData}
-                <SeriesModeSelector
-                    event={initialData}
-                    variant="inline"
-                />
+                <SeriesModeSelector event={initialData} variant="inline" />
             {/if}
         </div>
     </div>
 
     <RecurrenceDialog
         bind:open={showRecurrenceDialog}
-        value={rf.fields.recurrence.value() ?? initialData?.recurrence?.[0] ?? ""}
+        value={rf.fields.recurrence.value() ??
+            initialData?.recurrence?.[0] ??
+            ""}
         startDate={rf.fields.startDate.value() || currentStartDateVal}
         onchange={(val: string | null) => rf.fields.recurrence.set(val ?? "")}
     />
     {#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
         <input
-            {...rf.fields.recurrence.as("text", initialData?.recurrence?.[0] ?? "")}
+            {...rf.fields.recurrence.as(
+                "text",
+                initialData?.recurrence?.[0] ?? "",
+            )}
             class="hidden"
         />
     {/if}
@@ -1475,7 +1787,10 @@
         />
         {#if (rf.fields.heroImage.value() ?? initialData?.heroImage) !== undefined && (rf.fields.heroImage.value() ?? initialData?.heroImage) !== null}
             <input
-                {...rf.fields.heroImage.as("text", initialData?.heroImage ?? "")}
+                {...rf.fields.heroImage.as(
+                    "text",
+                    initialData?.heroImage ?? "",
+                )}
                 class="hidden"
             />
         {/if}
@@ -1488,21 +1803,28 @@
                 class="block text-sm font-medium text-gray-700"
                 >{m.description()}</label
             >
-            <FieldCollaboratorBadge collaborator={collab?.getFieldCollaborator('description')} />
+            <FieldCollaboratorBadge
+                collaborator={collab?.getFieldCollaborator("description")}
+            />
         </div>
         <div
             class="prose max-w-none rounded-md transition-shadow"
-            style={getCollaboratorOutlineStyle('description')}
-            onfocusin={() => collab?.setFocus('description')}
+            style={getCollaboratorOutlineStyle("description")}
+            onfocusin={() => collab?.setFocus("description")}
             onfocusout={() => collab?.setFocus(null)}
         >
-            <RichTextEditor 
-                value={rf.fields.description.value() ?? initialData?.description ?? ""} 
+            <RichTextEditor
+                value={rf.fields.description.value() ??
+                    initialData?.description ??
+                    ""}
                 onchange={(v: string) => rf.fields.description.set(v)}
             />
             {#if (rf.fields.description.value() ?? initialData?.description) !== undefined && (rf.fields.description.value() ?? initialData?.description) !== null}
                 <input
-                    {...rf.fields.description.as("text", initialData?.description ?? "")}
+                    {...rf.fields.description.as(
+                        "text",
+                        initialData?.description ?? "",
+                    )}
                     class="hidden"
                 />
             {/if}
@@ -1516,13 +1838,18 @@
             >{m.internal_notes()}</label
         >
         <div class="prose max-w-none">
-            <RichTextEditor 
-                value={rf.fields.internalNotes.value() ?? initialData?.internalNotes ?? ""} 
+            <RichTextEditor
+                value={rf.fields.internalNotes.value() ??
+                    initialData?.internalNotes ??
+                    ""}
                 onchange={(v: string) => rf.fields.internalNotes.set(v)}
             />
             {#if (rf.fields.internalNotes.value() ?? initialData?.internalNotes) !== undefined && (rf.fields.internalNotes.value() ?? initialData?.internalNotes) !== null}
                 <input
-                    {...rf.fields.internalNotes.as("text", initialData?.internalNotes ?? "")}
+                    {...rf.fields.internalNotes.as(
+                        "text",
+                        initialData?.internalNotes ?? "",
+                    )}
                     class="hidden"
                 />
             {/if}
@@ -1543,7 +1870,9 @@
                 initialItems={initialData?.tags || []}
                 listItemsRemote={listTagsRemote}
                 onchange={(ids: any, items: any[]) => {
-                    rf.fields.tags.set(items.map((i: any) => i.name).join(", "));
+                    rf.fields.tags.set(
+                        items.map((i: any) => i.name).join(", "),
+                    );
                 }}
                 createRemote={createTagRemote}
                 createSchema={createTagSchema}
@@ -1556,9 +1885,15 @@
                 createCategoryRemote={createTagCategoryCommand}
                 updateCategoryRemote={updateTagCategoryCommand}
                 deleteCategoryRemote={deleteTagCategoryAction}
-                onCategoryCreated={() => { void tagCategoriesQuery.refresh(); }}
-                onCategoryUpdated={() => { void tagCategoriesQuery.refresh(); }}
-                onCategoryDeleted={() => { void tagCategoriesQuery.refresh(); }}
+                onCategoryCreated={() => {
+                    void tagCategoriesQuery.refresh();
+                }}
+                onCategoryUpdated={() => {
+                    void tagCategoriesQuery.refresh();
+                }}
+                onCategoryDeleted={() => {
+                    void tagCategoriesQuery.refresh();
+                }}
                 {m}
             />
         {/key}
@@ -1570,7 +1905,8 @@
             {m.feature_resources_title()} ({m.optional()})
         </h3>
         {#key initialData?.id || "new"}
-            <EntityManager {m}
+            <EntityManager
+                {m}
                 title={m.feature_resources_title()}
                 icon={Database}
                 mode="embedded"
@@ -1580,20 +1916,31 @@
                 filters={getResourceFilterGroups(m)}
                 listItemsRemote={listResourcesWithHierarchy as any}
                 fetchAssociationsRemote={fetchEntityResources as any}
-                selectorGroupBy={(r: any) => (r.locationNames?.length ? r.locationNames : (r.locationName || m.no_location?.() || "No Location"))}
+                selectorGroupBy={(r: any) =>
+                    r.locationNames?.length
+                        ? r.locationNames
+                        : r.locationName || m.no_location?.() || "No Location"}
                 selectorSortField="maxOccupancy"
                 selectorSortOrder="desc"
                 hierarchical={true}
                 groupIcon={MapPin}
                 addAssociationRemote={async (p: any) => {
-                    const res = await addResourceAssociation({ ...p, resourceId: p.itemId } as any);
-                    if (res?.success) toast.success(m.resource_synced_success());
+                    const res = await addResourceAssociation({
+                        ...p,
+                        resourceId: p.itemId,
+                    } as any);
+                    if (res?.success)
+                        toast.success(m.resource_synced_success());
                     else toast.error(m.resource_sync_failed());
                     return res;
                 }}
                 removeAssociationRemote={async (p: any) => {
-                    const res = await removeResourceAssociation({ ...p, resourceId: p.itemId } as any);
-                    if (res?.success) toast.success(m.resource_unlinked_sync_cleaned());
+                    const res = await removeResourceAssociation({
+                        ...p,
+                        resourceId: p.itemId,
+                    } as any);
+                    if (res?.success)
+                        toast.success(m.resource_unlinked_sync_cleaned());
                     else toast.error(m.resource_sync_failed());
                     return res;
                 }}
@@ -1641,15 +1988,25 @@
             >
                 {#snippet renderItemLabel(resItem: any)}
                     {@const hasSyncs = hasAllocationCalendars(resItem)}
-                    <span style="padding-left: {(resItem.level || 0) * 16}px" class="inline-flex items-center gap-2 flex-wrap">
+                    <span
+                        style="padding-left: {(resItem.level || 0) * 16}px"
+                        class="inline-flex items-center gap-2 flex-wrap"
+                    >
                         {#if (resItem.level || 0) > 0}
-                            <span class="text-gray-400 select-none text-xs shrink-0" aria-hidden="true">↳</span>
+                            <span
+                                class="text-gray-400 select-none text-xs shrink-0"
+                                aria-hidden="true">↳</span
+                            >
                         {/if}
                         <span
                             class="inline-block w-[3.5ch] text-right font-mono text-xs text-gray-500 tabular-nums shrink-0"
-                            title={resItem.maxOccupancy != null ? `${m.max_occupancy()}: ${resItem.maxOccupancy}` : ""}
+                            title={resItem.maxOccupancy != null
+                                ? `${m.max_occupancy()}: ${resItem.maxOccupancy}`
+                                : ""}
                         >
-                            {resItem.maxOccupancy != null ? resItem.maxOccupancy : ""}
+                            {resItem.maxOccupancy != null
+                                ? resItem.maxOccupancy
+                                : ""}
                         </span>
                         <span>{resItem.name}</span>
                         <span class="text-xs text-gray-500 font-normal">
@@ -1660,8 +2017,13 @@
                         {#if hasSyncs}
                             {@const avail = resourceAvailability[resItem.id]}
                             {#if availabilityLoading && !avail}
-                                <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-100">
-                                    <Loader2 size={12} class="animate-spin text-blue-600" />
+                                <span
+                                    class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-100"
+                                >
+                                    <Loader2
+                                        size={12}
+                                        class="animate-spin text-blue-600"
+                                    />
                                     {m.checking_availability()}
                                 </span>
                             {:else if avail && !avail.available}
@@ -1671,28 +2033,42 @@
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium hover:bg-red-200 hover:text-red-900 transition-colors underline-offset-2 hover:underline"
-                                        title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
+                                        title={avail.reason ||
+                                            (avail.eventTitle
+                                                ? `${m.busy_conflict()}: ${avail.eventTitle}`
+                                                : m.conflict_details())}
                                         onclick={(e) => e.stopPropagation()}
                                     >
                                         <span>🔴</span>
                                         <span class="max-w-[200px] truncate">
-                                            {avail.eventTitle || m.busy_conflict()}
+                                            {avail.eventTitle ||
+                                                m.busy_conflict()}
                                         </span>
-                                        <ExternalLink size={12} class="shrink-0 opacity-70" />
+                                        <ExternalLink
+                                            size={12}
+                                            class="shrink-0 opacity-70"
+                                        />
                                     </a>
                                 {:else}
                                     <span
                                         class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium"
-                                        title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
+                                        title={avail.reason ||
+                                            (avail.eventTitle
+                                                ? `${m.busy_conflict()}: ${avail.eventTitle}`
+                                                : m.conflict_details())}
                                     >
                                         <span>🔴</span>
                                         <span class="max-w-[200px] truncate">
-                                            {avail.eventTitle || m.busy_conflict()}
+                                            {avail.eventTitle ||
+                                                m.busy_conflict()}
                                         </span>
                                     </span>
                                 {/if}
                             {:else}
-                                <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium" title={m.available()}>
+                                <span
+                                    class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium"
+                                    title={m.available()}
+                                >
                                     🟢 {m.available()}
                                 </span>
                             {/if}
@@ -1712,8 +2088,12 @@
                             <LoadingSection />
                         </div>
                     {:else if locationsQuery.error || resourcesQuery.error}
-                        <div class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center">
-                            {locationsQuery.error?.message || resourcesQuery.error?.message || m.something_went_wrong()}
+                        <div
+                            class="p-4 border border-dashed rounded-lg text-sm text-red-500 text-center"
+                        >
+                            {locationsQuery.error?.message ||
+                                resourcesQuery.error?.message ||
+                                m.something_went_wrong()}
                         </div>
                     {:else}
                         <div class="p-4">
@@ -1777,38 +2157,63 @@
                                 "text",
                                 initialData?.ticketPrice?.toString() ?? "",
                             )}
-                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(rf.fields.ticketPrice.issues() ?? []).length > 0
+                            class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 {(
+                                rf.fields.ticketPrice.issues() ?? []
+                            ).length > 0
                                 ? 'border-red-500'
                                 : 'border-gray-300'}"
                             placeholder="e.g. 15.50"
-                            onblur={() => { void rf.validate().catch(() => {}); }}
+                            onblur={() => {
+                                void rf.validate().catch(() => {});
+                            }}
                         />
                     </div>
                     <div class="w-28 shrink-0">
                         <select
-                            {...rf.fields.currency.as("text", initialData?.currency || "EUR")}
+                            {...rf.fields.currency.as(
+                                "text",
+                                initialData?.currency || "EUR",
+                            )}
                             class="w-full px-2 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 text-sm font-mono"
                         >
                             {#each SUPPORTED_CURRENCIES as c}
-                                <option value={c.code}>{c.symbol} {c.code}</option>
+                                <option value={c.code}
+                                    >{c.symbol} {c.code}</option
+                                >
                             {/each}
                         </select>
                     </div>
                 {:else}
                     <input {...rf.fields.ticketPrice.as("hidden", "0")} />
-                    <input {...rf.fields.currency.as("hidden", initialData?.currency || "EUR")} />
+                    <input
+                        {...rf.fields.currency.as(
+                            "hidden",
+                            initialData?.currency || "EUR",
+                        )}
+                    />
                 {/if}
                 <div class="flex items-center gap-2 whitespace-nowrap">
                     <input
-                        {...rf.fields.ticketPriceUnknown.as("checkbox", initialData?.id ? !!initialData.ticketPriceUnknown : true)}
+                        {...rf.fields.ticketPriceUnknown.as(
+                            "checkbox",
+                            initialData?.id
+                                ? !!initialData.ticketPriceUnknown
+                                : true,
+                        )}
                         id="ticketPriceUnknown"
                         class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                    <label for="ticketPriceUnknown" class="text-sm text-gray-700 cursor-pointer">{m.ticket_price_unknown()}</label>
+                    <label
+                        for="ticketPriceUnknown"
+                        class="text-sm text-gray-700 cursor-pointer"
+                        >{m.ticket_price_unknown()}</label
+                    >
                 </div>
             </div>
             {#each rf.fields.ticketPrice.issues() ?? [] as issue}
-                <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
+                <p class="mt-1 text-sm text-red-600">
+                    {translateIssue(issue.message, m)}
+                </p>
             {/each}
         </div>
     </div>
@@ -1819,7 +2224,8 @@
             {m.feature_locations_title()}
         </h3>
         {#key initialData?.id || "new"}
-            <EntityManager {m}
+            <EntityManager
+                {m}
                 title={m.feature_locations_title()}
                 icon={MapPin}
                 mode="embedded"
@@ -1830,9 +2236,15 @@
                 listItemsRemote={listLocations as any}
                 fetchAssociationsRemote={fetchEntityLocations as any}
                 addAssociationRemote={async (p: any) =>
-                    addLocationAssociation({ ...p, locationId: p.itemId } as any)}
+                    addLocationAssociation({
+                        ...p,
+                        locationId: p.itemId,
+                    } as any)}
                 removeAssociationRemote={async (p: any) =>
-                    removeLocationAssociation({ ...p, locationId: p.itemId } as any)}
+                    removeLocationAssociation({
+                        ...p,
+                        locationId: p.itemId,
+                    } as any)}
                 onchange={(ids: string[]) =>
                     rf.fields.locationIds.set(JSON.stringify(ids))}
                 deleteItemRemote={deleteLocation}
@@ -1844,7 +2256,8 @@
                 searchPredicate={(l: Location, q: string) => {
                     return (
                         l.name.toLowerCase().includes(q.toLowerCase()) ||
-                        (l.roomId?.toLowerCase().includes(q.toLowerCase()) ?? false)
+                        (l.roomId?.toLowerCase().includes(q.toLowerCase()) ??
+                            false)
                     );
                 }}
                 loadingLabel={m.loading_item({
@@ -1925,7 +2338,8 @@
                             errorSomethingWentWrong: m.something_went_wrong(),
                             enterLocationName: m.enter_location_name(),
                             streetName: m.street_placeholder(),
-                            houseNumberPlaceholder: m.house_number_placeholder(),
+                            houseNumberPlaceholder:
+                                m.house_number_placeholder(),
                             addressSuffixPlaceholder:
                                 m.address_suffix_placeholder(),
                             zipCodePlaceholder: m.zip_code_placeholder(),
@@ -1936,7 +2350,8 @@
                             latitudePlaceholder: m.latitude_placeholder(),
                             longitudePlaceholder: m.longitude_placeholder(),
                             what3wordsPlaceholder: m.what3words_placeholder(),
-                            inclusivitySupportPlaceholder: m.accessibility_info(),
+                            inclusivitySupportPlaceholder:
+                                m.accessibility_info(),
                         }}
                     />
                 {/snippet}
@@ -1952,8 +2367,6 @@
         />
     </div>
 </div>
-
-
 
 <div class="bg-white shadow rounded-lg p-6 space-y-4">
     <h2 class="text-xl font-semibold mb-4 border-b pb-2">
@@ -1999,9 +2412,7 @@
                 )}
                 class="w-4 h-4 text-blue-600"
             />
-            <span class="text-sm text-gray-700"
-                >{m.public_event()}</span
-            >
+            <span class="text-sm text-gray-700">{m.public_event()}</span>
         </label>
     </div>
 
@@ -2028,7 +2439,9 @@
                     <div class="flex gap-2 items-center">
                         <div class="flex-1">
                             <select
-                                {...rf.fields.reminders.overrides[i].method.as("text")}
+                                {...rf.fields.reminders.overrides[i].method.as(
+                                    "text",
+                                )}
                                 class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="popup">{m.notification()}</option
@@ -2038,7 +2451,9 @@
                         </div>
                         <div class="flex-1">
                             <input
-                                {...rf.fields.reminders.overrides[i].minutes.as("number")}
+                                {...rf.fields.reminders.overrides[i].minutes.as(
+                                    "number",
+                                )}
                                 class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                                 min="0"
                             />
@@ -2064,10 +2479,20 @@
     </div>
 
     {#if rf.fields.contactPartySizesJson}
-        <input {...rf.fields.contactPartySizesJson.as("hidden", JSON.stringify(contactPartySizes))} />
+        <input
+            {...rf.fields.contactPartySizesJson.as(
+                "hidden",
+                JSON.stringify(contactPartySizes),
+            )}
+        />
     {/if}
     {#if rf.fields.contactParticipationStatusesJson}
-        <input {...rf.fields.contactParticipationStatusesJson.as("hidden", JSON.stringify(contactParticipationStatuses))} />
+        <input
+            {...rf.fields.contactParticipationStatusesJson.as(
+                "hidden",
+                JSON.stringify(contactParticipationStatuses),
+            )}
+        />
     {/if}
 
     {#snippet sharedContactRenderForm({
@@ -2095,154 +2520,157 @@
                         {m.feature_locations_title()}
                     </h3>
                     {#key id || "new"}
-                        <EntityManager {m}
-                        title={m.feature_locations_title()}
-                        icon={MapPin}
-                        mode="embedded"
-                        type="contact"
-                        entityId={id}
-                        initialItems={(
-                            (formData as any)?.locationAssociations || []
-                        ).map((la: any) => la.location).filter(Boolean)}
-                        filters={getLocationFilterGroups(m)}
-                        onchange={onLocationsChange}
-                        listItemsRemote={listLocations as any}
-                        fetchAssociationsRemote={fetchEntityLocations as any}
-                        addAssociationRemote={async (p: any) =>
-                            addLocationAssociation({
-                                ...p,
-                                locationId: p.itemId,
-                            } as any)}
-                        removeAssociationRemote={async (p: any) =>
-                            removeLocationAssociation({
-                                ...p,
-                                locationId: p.itemId,
-                            } as any)}
-                        deleteItemRemote={deleteLocation}
-                        createRemote={createLocation}
-                        createSchema={createLocationSchema}
-                        updateRemote={updateLocation}
-                        updateSchema={updateLocationSchema}
-                        readItemRemote={readLocation}
-                        searchPredicate={(l: any, q: string) => {
-                            return (
-                                l.name
-                                    .toLowerCase()
-                                    .includes(q.toLowerCase()) ||
-                                (l.roomId
-                                    ?.toLowerCase()
-                                    .includes(q.toLowerCase()) ??
-                                    false)
-                            );
-                        }}
-                        loadingLabel={m.loading_item({
-                            item: m.feature_locations_title(),
-                        })}
-                        noItemsLabel={m.no_items_associated_label({
-                            item: m.feature_locations_title(),
-                        })}
-                        noItemsFoundLabel={m.no_items_found({
-                            item: m.feature_locations_title(),
-                        })}
-                        searchPlaceholder={m.search_placeholder({
-                            item: m.feature_locations_title(),
-                        })}
-                        linkItemLabel={m.link_item_label({
-                            item: m.feature_locations_title(),
-                        })}
-                        associatedItemLabel={m.associated_item_label({
-                            item: m.feature_locations_title(),
-                        })}
-                        quickCreateLabel={m.quick_create()}
-                        closeSearchLabel={m.close_search()}
-                        editLabel={m.edit()}
-                        deleteLabel={m.delete()}
-                        unlinkLabel={m.unlink()}
-                        deleteForeverLabel={m.delete_forever({
-                            item: m.location(),
-                        })}
-                        bulkDeleteLabel={m.delete_selected({
-                            count: 0,
-                        })}
-                        selectAllLabel={m.select_all()}
-                        deselectAllLabel={m.deselect_all()}
-                        confirmUnlinkLabel={m.confirm_unlink_label({
-                            item: m.location(),
-                        })}
-                    >
-                        {#snippet renderItemLabel(location: any)}
-                            {location.name}
-                            {location.roomId ? `(${location.roomId})` : ""}
-                        {/snippet}
-                        {#snippet renderForm({
-                            remoteFunction: rfLocation,
-                            schema: locSchema,
-                            id: locId,
-                            initialData: locFormData = null,
-                            onSuccess: locSuccess,
-                            onCancel: locCancel,
-                        }: any)}
-                            <LocationForm
-                                remoteFunction={rfLocation}
-                                validationSchema={locSchema}
-                                isUpdating={!!locId}
-                                initialData={locFormData}
-                                onSuccess={locSuccess}
-                                onCancel={locCancel}
-                                labels={{
-                                    name: m.location_name(),
-                                    street: m.street(),
-                                    houseNumber: m.house_number(),
-                                    addressSuffix: m.address_suffix(),
-                                    zip: m.zip_code(),
-                                    city: m.city(),
-                                    state: m.state_region(),
-                                    country: m.country(),
-                                    roomId: m.room_id(),
-                                    latitude: m.latitude(),
-                                    longitude: m.longitude(),
-                                    what3words: m.what3words(),
-                                    inclusivitySupport:
-                                        m.inclusivity_support(),
-                                    isPublic: m.public(),
-                                    heroImage: m.hero_image(),
-                                    saveChanges: m.save_changes(),
-                                    createLocation: m.create_location(),
-                                    cancel: m.cancel(),
-                                    saving: m.loading(),
-                                    creating: m.creating(),
-                                    successfullySaved:
-                                        m.successfully_saved(),
-                                    errorSomethingWentWrong:
-                                        m.something_went_wrong(),
-                                    enterLocationName:
-                                        m.enter_location_name(),
-                                    streetName: m.street_placeholder(),
-                                    houseNumberPlaceholder:
-                                        m.house_number_placeholder(),
-                                    addressSuffixPlaceholder:
-                                        m.address_suffix_placeholder(),
-                                    zipCodePlaceholder:
-                                        m.zip_code_placeholder(),
-                                    cityNamePlaceholder:
-                                        m.city_placeholder(),
-                                    statePlaceholder: m.state_placeholder(),
-                                    countryPlaceholder:
-                                        m.country_placeholder(),
-                                    enterRoomId: m.room_id_placeholder(),
-                                    latitudePlaceholder:
-                                        m.latitude_placeholder(),
-                                    longitudePlaceholder:
-                                        m.longitude_placeholder(),
-                                    what3wordsPlaceholder:
-                                        m.what3words_placeholder(),
-                                    inclusivitySupportPlaceholder:
-                                        m.accessibility_info(),
-                                }}
-                            />
-                        {/snippet}
-                    </EntityManager>
-        {/key}
+                        <EntityManager
+                            {m}
+                            title={m.feature_locations_title()}
+                            icon={MapPin}
+                            mode="embedded"
+                            type="contact"
+                            entityId={id}
+                            initialItems={(
+                                (formData as any)?.locationAssociations || []
+                            )
+                                .map((la: any) => la.location)
+                                .filter(Boolean)}
+                            filters={getLocationFilterGroups(m)}
+                            onchange={onLocationsChange}
+                            listItemsRemote={listLocations as any}
+                            fetchAssociationsRemote={fetchEntityLocations as any}
+                            addAssociationRemote={async (p: any) =>
+                                addLocationAssociation({
+                                    ...p,
+                                    locationId: p.itemId,
+                                } as any)}
+                            removeAssociationRemote={async (p: any) =>
+                                removeLocationAssociation({
+                                    ...p,
+                                    locationId: p.itemId,
+                                } as any)}
+                            deleteItemRemote={deleteLocation}
+                            createRemote={createLocation}
+                            createSchema={createLocationSchema}
+                            updateRemote={updateLocation}
+                            updateSchema={updateLocationSchema}
+                            readItemRemote={readLocation}
+                            searchPredicate={(l: any, q: string) => {
+                                return (
+                                    l.name
+                                        .toLowerCase()
+                                        .includes(q.toLowerCase()) ||
+                                    (l.roomId
+                                        ?.toLowerCase()
+                                        .includes(q.toLowerCase()) ??
+                                        false)
+                                );
+                            }}
+                            loadingLabel={m.loading_item({
+                                item: m.feature_locations_title(),
+                            })}
+                            noItemsLabel={m.no_items_associated_label({
+                                item: m.feature_locations_title(),
+                            })}
+                            noItemsFoundLabel={m.no_items_found({
+                                item: m.feature_locations_title(),
+                            })}
+                            searchPlaceholder={m.search_placeholder({
+                                item: m.feature_locations_title(),
+                            })}
+                            linkItemLabel={m.link_item_label({
+                                item: m.feature_locations_title(),
+                            })}
+                            associatedItemLabel={m.associated_item_label({
+                                item: m.feature_locations_title(),
+                            })}
+                            quickCreateLabel={m.quick_create()}
+                            closeSearchLabel={m.close_search()}
+                            editLabel={m.edit()}
+                            deleteLabel={m.delete()}
+                            unlinkLabel={m.unlink()}
+                            deleteForeverLabel={m.delete_forever({
+                                item: m.location(),
+                            })}
+                            bulkDeleteLabel={m.delete_selected({
+                                count: 0,
+                            })}
+                            selectAllLabel={m.select_all()}
+                            deselectAllLabel={m.deselect_all()}
+                            confirmUnlinkLabel={m.confirm_unlink_label({
+                                item: m.location(),
+                            })}
+                        >
+                            {#snippet renderItemLabel(location: any)}
+                                {location.name}
+                                {location.roomId ? `(${location.roomId})` : ""}
+                            {/snippet}
+                            {#snippet renderForm({
+                                remoteFunction: rfLocation,
+                                schema: locSchema,
+                                id: locId,
+                                initialData: locFormData = null,
+                                onSuccess: locSuccess,
+                                onCancel: locCancel,
+                            }: any)}
+                                <LocationForm
+                                    remoteFunction={rfLocation}
+                                    validationSchema={locSchema}
+                                    isUpdating={!!locId}
+                                    initialData={locFormData}
+                                    onSuccess={locSuccess}
+                                    onCancel={locCancel}
+                                    labels={{
+                                        name: m.location_name(),
+                                        street: m.street(),
+                                        houseNumber: m.house_number(),
+                                        addressSuffix: m.address_suffix(),
+                                        zip: m.zip_code(),
+                                        city: m.city(),
+                                        state: m.state_region(),
+                                        country: m.country(),
+                                        roomId: m.room_id(),
+                                        latitude: m.latitude(),
+                                        longitude: m.longitude(),
+                                        what3words: m.what3words(),
+                                        inclusivitySupport:
+                                            m.inclusivity_support(),
+                                        isPublic: m.public(),
+                                        heroImage: m.hero_image(),
+                                        saveChanges: m.save_changes(),
+                                        createLocation: m.create_location(),
+                                        cancel: m.cancel(),
+                                        saving: m.loading(),
+                                        creating: m.creating(),
+                                        successfullySaved:
+                                            m.successfully_saved(),
+                                        errorSomethingWentWrong:
+                                            m.something_went_wrong(),
+                                        enterLocationName:
+                                            m.enter_location_name(),
+                                        streetName: m.street_placeholder(),
+                                        houseNumberPlaceholder:
+                                            m.house_number_placeholder(),
+                                        addressSuffixPlaceholder:
+                                            m.address_suffix_placeholder(),
+                                        zipCodePlaceholder:
+                                            m.zip_code_placeholder(),
+                                        cityNamePlaceholder:
+                                            m.city_placeholder(),
+                                        statePlaceholder: m.state_placeholder(),
+                                        countryPlaceholder:
+                                            m.country_placeholder(),
+                                        enterRoomId: m.room_id_placeholder(),
+                                        latitudePlaceholder:
+                                            m.latitude_placeholder(),
+                                        longitudePlaceholder:
+                                            m.longitude_placeholder(),
+                                        what3wordsPlaceholder:
+                                            m.what3words_placeholder(),
+                                        inclusivitySupportPlaceholder:
+                                            m.accessibility_info(),
+                                    }}
+                                />
+                            {/snippet}
+                        </EntityManager>
+                    {/key}
                 </div>
             {/snippet}
         </ContactForm>
@@ -2253,189 +2681,234 @@
         {m.feature_contacts_title()}
     </h3>
     {#key initialData?.id || "new"}
-    <ContactManager {m}
-        title={m.feature_contacts_title()}
-        icon={User}
-        mode="embedded"
-        type="event"
-        entityId={initialData?.id}
-        initialItems={initialData?.contacts || []}
-        filters={getContactFilterGroups(m)}
-        onchange={(ids: string[], items?: any[]) => {
-            void handleContactsChange(ids, items);
-        }}
-        listItemsRemote={listContacts as any}
-        fetchAssociationsRemote={fetchEntityContacts as any}
-        addAssociationRemote={async (p: any) =>
-            addAssociation({ ...p, contactId: p.itemId } as any)}
-        removeAssociationRemote={async (p: any) =>
-            removeAssociation({ ...p, contactId: p.itemId } as any)}
-        deleteItemRemote={deleteContact}
-        createRemote={createContact}
-        createSchema={createContactSchema}
-        updateRemote={updateContact}
-        updateSchema={updateContactSchema}
-        readItemRemote={readContact}
-        searchPredicate={matchContactSearch}
-        renderForm={sharedContactRenderForm}
-    >
-        {#snippet renderItemLabel(contactItem: any)}
-            {@const contactName = contactItem.displayName ||
-                `${contactItem.givenName || ""} ${contactItem.familyName || ""}`.trim() ||
-                contactItem.company ||
-                m.unnamed_contact()}
-            {@const contactTags = contactItem.tags || []}
-            {@const isEmployee = contactTags.some((ct: any) => {
-                const tagName = (ct.name || ct.tag?.name || '').toLowerCase();
-                return tagName === 'employee' || tagName === 'employees';
-            })}
-            <span class="inline-flex items-center gap-2 flex-wrap">
-                <span>{contactName}</span>
-                {#if isEmployee}
-                    {@const avail = contactAvailability[contactItem.id]}
-                    {#if availabilityLoading && !avail}
-                        <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-100">
-                            <Loader2 size={12} class="animate-spin text-blue-600" />
-                            {m.checking_availability()}
-                        </span>
-                    {:else if avail && !avail.available}
-                        {#if avail.eventId}
-                            <a
-                                href={`/events/${avail.eventId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium hover:bg-red-200 hover:text-red-900 transition-colors underline-offset-2 hover:underline"
-                                title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
-                                onclick={(e) => e.stopPropagation()}
+        <ContactManager
+            {m}
+            title={m.feature_contacts_title()}
+            icon={User}
+            mode="embedded"
+            type="event"
+            entityId={initialData?.id}
+            initialItems={initialData?.contacts || []}
+            filters={getContactFilterGroups(m)}
+            onchange={(ids: string[], items?: any[]) => {
+                void handleContactsChange(ids, items);
+            }}
+            listItemsRemote={listContacts as any}
+            fetchAssociationsRemote={fetchEntityContacts as any}
+            addAssociationRemote={async (p: any) =>
+                addAssociation({ ...p, contactId: p.itemId } as any)}
+            removeAssociationRemote={async (p: any) =>
+                removeAssociation({ ...p, contactId: p.itemId } as any)}
+            deleteItemRemote={deleteContact}
+            createRemote={createContact}
+            createSchema={createContactSchema}
+            updateRemote={updateContact}
+            updateSchema={updateContactSchema}
+            readItemRemote={readContact}
+            searchPredicate={matchContactSearch}
+            renderForm={sharedContactRenderForm}
+        >
+            {#snippet renderItemLabel(contactItem: any)}
+                {@const contactName =
+                    contactItem.displayName ||
+                    `${contactItem.givenName || ""} ${contactItem.familyName || ""}`.trim() ||
+                    contactItem.company ||
+                    m.unnamed_contact()}
+                {@const contactTags = contactItem.tags || []}
+                {@const isEmployee = contactTags.some((ct: any) => {
+                    const tagName = (
+                        ct.name ||
+                        ct.tag?.name ||
+                        ""
+                    ).toLowerCase();
+                    return tagName === "employee" || tagName === "employees";
+                })}
+                <span class="inline-flex items-center gap-2 flex-wrap">
+                    <span>{contactName}</span>
+                    {#if isEmployee}
+                        {@const avail = contactAvailability[contactItem.id]}
+                        {#if availabilityLoading && !avail}
+                            <span
+                                class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-100"
                             >
-                                <span>🔴</span>
-                                <span class="max-w-[200px] truncate">
-                                    {avail.eventTitle || m.busy_conflict()}
+                                <Loader2
+                                    size={12}
+                                    class="animate-spin text-blue-600"
+                                />
+                                {m.checking_availability()}
+                            </span>
+                        {:else if avail && !avail.available}
+                            {#if avail.eventId}
+                                <a
+                                    href={`/events/${avail.eventId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium hover:bg-red-200 hover:text-red-900 transition-colors underline-offset-2 hover:underline"
+                                    title={avail.reason ||
+                                        (avail.eventTitle
+                                            ? `${m.busy_conflict()}: ${avail.eventTitle}`
+                                            : m.conflict_details())}
+                                    onclick={(e) => e.stopPropagation()}
+                                >
+                                    <span>🔴</span>
+                                    <span class="max-w-[200px] truncate">
+                                        {avail.eventTitle || m.busy_conflict()}
+                                    </span>
+                                    <ExternalLink
+                                        size={12}
+                                        class="shrink-0 opacity-70"
+                                    />
+                                </a>
+                            {:else}
+                                <span
+                                    class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium"
+                                    title={avail.reason ||
+                                        (avail.eventTitle
+                                            ? `${m.busy_conflict()}: ${avail.eventTitle}`
+                                            : m.conflict_details())}
+                                >
+                                    <span>🔴</span>
+                                    <span class="max-w-[200px] truncate">
+                                        {avail.eventTitle || m.busy_conflict()}
+                                    </span>
                                 </span>
-                                <ExternalLink size={12} class="shrink-0 opacity-70" />
-                            </a>
+                            {/if}
                         {:else}
                             <span
-                                class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-red-100 text-red-800 font-medium"
-                                title={avail.reason || (avail.eventTitle ? `${m.busy_conflict()}: ${avail.eventTitle}` : m.conflict_details())}
+                                class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium"
+                                title={m.available()}
                             >
-                                <span>🔴</span>
-                                <span class="max-w-[200px] truncate">
-                                    {avail.eventTitle || m.busy_conflict()}
-                                </span>
+                                🟢 {m.available()}
                             </span>
                         {/if}
-                    {:else}
-                        <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium" title={m.available()}>
-                            🟢 {m.available()}
-                        </span>
                     {/if}
-                {/if}
-            </span>
-        {/snippet}
+                </span>
+            {/snippet}
 
+            {#snippet rolesSnippet(contact: any)}
+                <EventContactRoleSelector
+                    {contact}
+                    eventId={initialData?.id}
+                    selectedRoleIds={contactRolesState[contact.id] ?? []}
+                    onchange={(newRoleIds: string[]) => {
+                        contactRolesState[contact.id] = newRoleIds;
+                        rf.fields.contactRolesJson.set(
+                            JSON.stringify(contactRolesState),
+                        );
+                    }}
+                    onopenManager={() => (isRoleManagerOpen = true)}
+                />
+            {/snippet}
 
-        {#snippet rolesSnippet(contact: any)}
-            <EventContactRoleSelector
-                {contact}
-                eventId={initialData?.id}
-                selectedRoleIds={contactRolesState[contact.id] ?? []}
-                onchange={(newRoleIds: string[]) => {
-                    contactRolesState[contact.id] = newRoleIds;
-                    rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
-                }}
-                onopenManager={() => (isRoleManagerOpen = true)}
-            />
-        {/snippet}
-
-        {#snippet participationSnippet(contact: any)}
-            <div class="flex items-center gap-2 flex-wrap">
-                <select
-                    value={contactParticipationStatuses[contact.id] ?? contact.participationStatus ?? "needsAction"}
-                    onchange={(e) => handleParticipationStatusChange(contact, e.currentTarget.value)}
-                    class="text-xs bg-transparent border-0 focus:ring-0 cursor-pointer text-gray-500 hover:text-blue-600 font-medium"
-                >
-                    <option value="needsAction">{m.needs_action()}</option>
-                    <option value="accepted">{m.accepted()}</option>
-                    <option value="declined">{m.declined()}</option>
-                    <option value="tentative">{m.tentative()}</option>
-                </select>
-                <label class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 border border-gray-200" title={m.party_size?.() || "Party Size"}>
-                    <Users size={11} class="text-gray-400" />
-                    <input
-                        type="number"
-                        min="1"
-                        value={contactPartySizes[contact.id] ?? contact.partySize ?? 1}
-                        onchange={(e) => handlePartySizeChange(contact, parseInt(e.currentTarget.value, 10))}
-                        onclick={(e) => e.stopPropagation()}
-                        class="w-10 text-xs text-center bg-transparent border-0 p-0 focus:ring-0 font-semibold text-gray-700"
-                        aria-label={m.party_size?.() || "Party Size"}
-                    />
-                </label>
-            </div>
-        {/snippet}
-
-        {#snippet footerSnippet()}
-            <div class="pt-2 mt-2 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 text-sm">
-                <div class="flex items-center gap-2 min-w-0">
-                    <Users size={15} class="text-blue-600 shrink-0" />
-                    <label for="participants-count-input" class="font-semibold text-gray-900 shrink-0">
-                        {m.participants_count()}
+            {#snippet participationSnippet(contact: any)}
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select
+                        value={contactParticipationStatuses[contact.id] ??
+                            contact.participationStatus ??
+                            "needsAction"}
+                        onchange={(e) =>
+                            handleParticipationStatusChange(
+                                contact,
+                                e.currentTarget.value,
+                            )}
+                        class="text-xs bg-transparent border-0 focus:ring-0 cursor-pointer text-gray-500 hover:text-blue-600 font-medium"
+                    >
+                        <option value="needsAction">{m.needs_action()}</option>
+                        <option value="accepted">{m.accepted()}</option>
+                        <option value="declined">{m.declined()}</option>
+                        <option value="tentative">{m.tentative()}</option>
+                    </select>
+                    <label
+                        class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 border border-gray-200"
+                        title={m.party_size?.() || "Party Size"}
+                    >
+                        <Users size={11} class="text-gray-400" />
+                        <input
+                            type="number"
+                            min="1"
+                            value={contactPartySizes[contact.id] ??
+                                contact.partySize ??
+                                1}
+                            onchange={(e) =>
+                                handlePartySizeChange(
+                                    contact,
+                                    parseInt(e.currentTarget.value, 10),
+                                )}
+                            onclick={(e) => e.stopPropagation()}
+                            class="w-10 text-xs text-center bg-transparent border-0 p-0 focus:ring-0 font-semibold text-gray-700"
+                            aria-label={m.party_size?.() || "Party Size"}
+                        />
                     </label>
-                    <span class="text-xs text-gray-500 truncate">
-                        ({m.participants_party_help?.({
-                            contacts: String(currentContactIds.length),
-                            headcount: String(contactsHeadcount),
-                            baseline: String(baseline),
-                        }) || m.participants_baseline_help({
-                            contacts: String(currentContactIds.length),
-                            baseline: String(baseline),
-                        })})
-                    </span>
                 </div>
-                <div class="flex items-center gap-1.5 shrink-0">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onclick={() => updateBaseline(-1)}
-                        disabled={baseline <= 0}
-                        aria-label={m.decrease_participants()}
-                        class="h-8 w-8"
-                    >
-                        <Minus size={14} />
-                    </Button>
+            {/snippet}
 
-                    <input
-                        id="participants-count-input"
-                        {...rf.fields.participantsCount.as("number", totalParticipants)}
-                        type="number"
-                        min={contactsHeadcount}
-                        oninput={handleParticipantsInput}
-                        onblur={handleParticipantsBlur}
-                        class="w-16 h-8 text-center font-bold text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+            {#snippet footerSnippet()}
+                <div
+                    class="pt-2 mt-2 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                    <div class="flex items-center gap-2 min-w-0">
+                        <Users size={15} class="text-blue-600 shrink-0" />
+                        <label
+                            for="participants-count-input"
+                            class="font-semibold text-gray-900 shrink-0"
+                        >
+                            {m.participants_count()}
+                        </label>
+                        <span class="text-xs text-gray-500 truncate">
+                            ({m.participants_party_help?.({
+                                contacts: String(currentContactIds.length),
+                                headcount: String(contactsHeadcount),
+                                baseline: String(baseline),
+                            }) ||
+                                m.participants_baseline_help({
+                                    contacts: String(currentContactIds.length),
+                                    baseline: String(baseline),
+                                })})
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onclick={() => updateBaseline(-1)}
+                            disabled={baseline <= 0}
+                            aria-label={m.decrease_participants()}
+                            class="h-8 w-8"
+                        >
+                            <Minus size={14} />
+                        </Button>
 
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onclick={() => updateBaseline(1)}
-                        aria-label={m.increase_participants()}
-                        class="h-8 w-8"
-                    >
-                        <Plus size={14} />
-                    </Button>
+                        <input
+                            id="participants-count-input"
+                            {...rf.fields.participantsCount.as(
+                                "number",
+                                totalParticipants,
+                            )}
+                            type="number"
+                            min={contactsHeadcount}
+                            oninput={handleParticipantsInput}
+                            onblur={handleParticipantsBlur}
+                            class="w-16 h-8 text-center font-bold text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onclick={() => updateBaseline(1)}
+                            aria-label={m.increase_participants()}
+                            class="h-8 w-8"
+                        >
+                            <Plus size={14} />
+                        </Button>
+                    </div>
                 </div>
-            </div>
-        {/snippet}
-    </ContactManager>
+            {/snippet}
+        </ContactManager>
     {/key}
     <input
-        {...rf.fields.contactIds.as(
-            "text",
-            JSON.stringify(currentContactIds),
-        )}
+        {...rf.fields.contactIds.as("text", JSON.stringify(currentContactIds))}
         class="hidden"
     />
     <input
@@ -2458,23 +2931,27 @@
     />
 
     <!-- Sign Ups Control (below Contacts Manager) -->
-    <div class="mt-6 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4">
+    <div
+        class="mt-6 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4"
+    >
         <div>
             <span class="text-base font-semibold text-gray-900 block">
                 {m.sign_ups?.() || "Sign Ups"}
             </span>
             <p class="text-xs text-gray-500 mt-1">
-                {m.sign_ups_help?.() || "Choose whether external visitors can register for this event online."}
+                {m.sign_ups_help?.() ||
+                    "Choose whether external visitors can register for this event online."}
             </p>
         </div>
-        <div class="flex flex-wrap gap-3" role="radiogroup" aria-label={m.sign_ups?.() || "Sign Ups"}>
-            {#each [
-                { value: "off", label: m.sign_ups_off?.() || "Off" },
-                { value: "recommended", label: m.sign_ups_recommended?.() || "Recommended" },
-                { value: "required", label: m.sign_ups_required?.() || "Required" },
-            ] as option (option.value)}
+        <div
+            class="flex flex-wrap gap-3"
+            role="radiogroup"
+            aria-label={m.sign_ups?.() || "Sign Ups"}
+        >
+            {#each [{ value: "off", label: m.sign_ups_off?.() || "Off" }, { value: "recommended", label: m.sign_ups_recommended?.() || "Recommended" }, { value: "required", label: m.sign_ups_required?.() || "Required" }] as option (option.value)}
                 <label
-                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-sm font-medium cursor-pointer transition-colors {signUpMode === option.value
+                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-sm font-medium cursor-pointer transition-colors {signUpMode ===
+                    option.value
                         ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-2xs'
                         : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
                 >
@@ -2482,7 +2959,10 @@
                         type="radio"
                         checked={signUpMode === option.value}
                         onchange={() => {
-                            signUpMode = option.value as "off" | "recommended" | "required";
+                            signUpMode = option.value as
+                                | "off"
+                                | "recommended"
+                                | "required";
                             rf.fields.signUpMode.set(signUpMode);
                         }}
                         class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
@@ -2499,22 +2979,33 @@
             <div class="pt-3 border-t border-gray-200 space-y-4">
                 <!-- Optional Sign-up Closure Date, Time & Timezone -->
                 <div class="space-y-2">
-                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <div
+                        class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end"
+                    >
                         <div class="sm:col-span-5">
-                            <label for="sign-up-closure-date" class="text-sm font-medium text-gray-800 flex items-center gap-1.5 mb-1">
+                            <label
+                                for="sign-up-closure-date"
+                                class="text-sm font-medium text-gray-800 flex items-center gap-1.5 mb-1"
+                            >
                                 <Calendar size={15} class="text-blue-600" />
-                                <span>{m.sign_up_closure_date()} ({m.optional()})</span>
+                                <span>{m.sign_up_closure_date()}</span>
                             </label>
                             <input
                                 id="sign-up-closure-date"
                                 type="date"
                                 value={signUpClosureDatePart}
                                 oninput={(e) => {
-                                    signUpClosureDatePart = e.currentTarget.value;
+                                    signUpClosureDatePart =
+                                        e.currentTarget.value;
                                     if (!signUpClosureTime) {
-                                        signUpClosureTime = DEFAULT_SIGN_UP_CLOSURE_TIME;
+                                        signUpClosureTime =
+                                            DEFAULT_SIGN_UP_CLOSURE_TIME;
                                     }
-                                    syncSignUpClosureField(signUpClosureDatePart, signUpClosureTime, signUpClosureTimeZone);
+                                    syncSignUpClosureField(
+                                        signUpClosureDatePart,
+                                        signUpClosureTime,
+                                        signUpClosureTimeZone,
+                                    );
                                 }}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
                             />
@@ -2522,16 +3013,28 @@
 
                         <div class="sm:col-span-4">
                             <div class="flex items-center justify-between mb-1">
-                                <label for="sign-up-closure-time" class="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                                <label
+                                    for="sign-up-closure-time"
+                                    class="text-sm font-medium text-gray-800 flex items-center gap-1.5"
+                                >
                                     <Clock size={15} class="text-blue-600" />
-                                    <span>{m.sign_up_closure_time()} ({m.optional()})</span>
+                                    <span>{m.sign_up_closure_time()}</span>
                                 </label>
                                 <button
                                     type="button"
-                                    class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showClosureTimeZone || (signUpClosureTimeZone && signUpClosureTimeZone !== browserTimezone) ? 'text-blue-600 bg-blue-50' : ''}"
-                                    title="{m.timezone()}: {signUpClosureTimeZone || browserTimezone}"
-                                    onclick={() => (showClosureTimeZone = !showClosureTimeZone)}
-                                    aria-label="{m.timezone()}: {signUpClosureTimeZone || browserTimezone}"
+                                    class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors {showClosureTimeZone ||
+                                    (signUpClosureTimeZone &&
+                                        signUpClosureTimeZone !==
+                                            browserTimezone)
+                                        ? 'text-blue-600 bg-blue-50'
+                                        : ''}"
+                                    title="{m.timezone()}: {signUpClosureTimeZone ||
+                                        browserTimezone}"
+                                    onclick={() =>
+                                        (showClosureTimeZone =
+                                            !showClosureTimeZone)}
+                                    aria-label="{m.timezone()}: {signUpClosureTimeZone ||
+                                        browserTimezone}"
                                 >
                                     <Globe size={16} />
                                 </button>
@@ -2542,8 +3045,14 @@
                                 value={signUpClosureTime}
                                 placeholder={DEFAULT_SIGN_UP_CLOSURE_TIME}
                                 oninput={(e) => {
-                                    signUpClosureTime = e.currentTarget.value || DEFAULT_SIGN_UP_CLOSURE_TIME;
-                                    syncSignUpClosureField(signUpClosureDatePart, signUpClosureTime, signUpClosureTimeZone);
+                                    signUpClosureTime =
+                                        e.currentTarget.value ||
+                                        DEFAULT_SIGN_UP_CLOSURE_TIME;
+                                    syncSignUpClosureField(
+                                        signUpClosureDatePart,
+                                        signUpClosureTime,
+                                        signUpClosureTimeZone,
+                                    );
                                 }}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
                             />
@@ -2557,7 +3066,8 @@
                                     size="sm"
                                     onclick={() => {
                                         signUpClosureDatePart = "";
-                                        signUpClosureTime = DEFAULT_SIGN_UP_CLOSURE_TIME;
+                                        signUpClosureTime =
+                                            DEFAULT_SIGN_UP_CLOSURE_TIME;
                                         signUpClosureTimeZone = browserTimezone;
                                         showClosureTimeZone = false;
                                         rf.fields.signUpClosureDate?.set("");
@@ -2565,7 +3075,8 @@
                                     class="inline-flex items-center gap-1 text-xs h-9"
                                 >
                                     <X size={13} />
-                                    <span>{m.sign_up_closure_date_clear()}</span>
+                                    <span>{m.sign_up_closure_date_clear()}</span
+                                    >
                                 </Button>
                             </div>
                         {/if}
@@ -2584,7 +3095,8 @@
                                     type="button"
                                     class="text-gray-400 hover:text-gray-600 p-0.5 rounded"
                                     title={m.close?.() ?? "Close"}
-                                    onclick={() => (showClosureTimeZone = false)}
+                                    onclick={() =>
+                                        (showClosureTimeZone = false)}
                                 >
                                     <X size={13} />
                                 </button>
@@ -2596,8 +3108,13 @@
                                 value={signUpClosureTimeZone}
                                 placeholder={browserTimezone}
                                 oninput={(e) => {
-                                    signUpClosureTimeZone = e.currentTarget.value;
-                                    syncSignUpClosureField(signUpClosureDatePart, signUpClosureTime, signUpClosureTimeZone);
+                                    signUpClosureTimeZone =
+                                        e.currentTarget.value;
+                                    syncSignUpClosureField(
+                                        signUpClosureDatePart,
+                                        signUpClosureTime,
+                                        signUpClosureTimeZone,
+                                    );
                                 }}
                                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
                             />
@@ -2611,18 +3128,26 @@
 
                 <!-- Sign-up Contact (defaults to "Kontakt" role, overridable via shared ContactManager) -->
                 <div class="space-y-2 pt-3 border-t border-gray-200/70">
-                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div
+                        class="flex items-center justify-between gap-2 flex-wrap"
+                    >
                         <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                            <span
+                                class="text-sm font-medium text-gray-800 flex items-center gap-1.5"
+                            >
                                 <User size={15} class="text-blue-600" />
                                 <span>{m.sign_up_contact()}</span>
                             </span>
                             {#if signUpContactOverridden}
-                                <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                <span
+                                    class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800 border border-amber-200"
+                                >
                                     {m.sign_up_contact_overridden_badge()}
                                 </span>
                             {:else}
-                                <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                <span
+                                    class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200"
+                                >
                                     {m.sign_up_contact_default_badge()}
                                 </span>
                             {/if}
@@ -2651,7 +3176,9 @@
                             icon={User}
                             mode="embedded"
                             singleSelect={true}
-                            initialItems={effectiveSignUpContact ? [effectiveSignUpContact] : []}
+                            initialItems={effectiveSignUpContact
+                                ? [effectiveSignUpContact]
+                                : []}
                             filters={getContactFilterGroups(m)}
                             onchange={(ids: string[], items?: any[]) => {
                                 handleSignUpContactChange(ids, items);
@@ -2686,7 +3213,9 @@
             <input
                 {...rf.fields.signUpContactId.as(
                     "text",
-                    signUpMode === "required" ? (effectiveSignUpContactId ?? "") : "",
+                    signUpMode === "required"
+                        ? (effectiveSignUpContactId ?? "")
+                        : "",
                 )}
                 class="hidden"
             />
@@ -2695,7 +3224,9 @@
             <input
                 {...rf.fields.signUpContactOverridden.as(
                     "text",
-                    signUpMode === "required" ? String(signUpContactOverridden) : "false",
+                    signUpMode === "required"
+                        ? String(signUpContactOverridden)
+                        : "false",
                 )}
                 class="hidden"
             />
@@ -2705,11 +3236,13 @@
     <div class="pt-4 border-t border-gray-100">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
             <Receipt size={18} class="text-blue-600" />
-            {m.feature_prices_title?.() || 'Prices'} ({m.optional?.() || 'optional'})
+            {m.feature_prices_title?.() || "Prices"} ({m.optional?.() ||
+                "optional"})
         </h3>
         {#key initialData?.id || "new"}
-            <EntityManager {m}
-                title={m.feature_prices_title?.() || 'Prices'}
+            <EntityManager
+                {m}
+                title={m.feature_prices_title?.() || "Prices"}
                 icon={Receipt}
                 mode="embedded"
                 type="event"
@@ -2740,26 +3273,45 @@
                         priceItem.description?.toLowerCase().includes(qLower)
                     );
                 }}
-                loadingLabel={m.loading_item?.({ item: m.prices?.() || 'Prices' }) || 'Loading prices...'}
-                noItemsLabel={m.no_items_associated_label?.({ item: m.prices?.() || 'Prices' }) || 'No prices associated'}
-                noItemsFoundLabel={m.no_items_found?.({ item: m.prices?.() || 'Prices' }) || 'No prices found'}
-                searchPlaceholder={m.search_placeholder?.({ item: m.prices?.() || 'Prices' }) || 'Search prices...'}
-                linkItemLabel={m.link_item_label?.({ item: m.price_list?.() || 'Price List' }) || 'Link Price List'}
-                associatedItemLabel={m.associated_item_label?.({ item: m.prices?.() || 'Prices' }) || 'Associated Prices'}
-                quickCreateLabel={m.quick_create?.() || 'Quick Create'}
-                closeSearchLabel={m.close_search?.() || 'Close'}
-                editLabel={m.edit?.() || 'Edit'}
-                deleteLabel={m.delete?.() || 'Delete'}
-                unlinkLabel={m.unlink?.() || 'Unlink'}
-                deleteForeverLabel={m.delete_forever?.({ item: m.price_list?.() || 'Price List' }) || 'Delete Price List'}
-                confirmUnlinkLabel={m.confirm_unlink_label?.({ item: m.price_list?.() || 'Price List' }) || 'Unlink Price List'}
-                selectAllLabel={m.select_all?.() || 'Select All'}
-                deselectAllLabel={m.deselect_all?.() || 'Deselect All'}
+                loadingLabel={m.loading_item?.({
+                    item: m.prices?.() || "Prices",
+                }) || "Loading prices..."}
+                noItemsLabel={m.no_items_associated_label?.({
+                    item: m.prices?.() || "Prices",
+                }) || "No prices associated"}
+                noItemsFoundLabel={m.no_items_found?.({
+                    item: m.prices?.() || "Prices",
+                }) || "No prices found"}
+                searchPlaceholder={m.search_placeholder?.({
+                    item: m.prices?.() || "Prices",
+                }) || "Search prices..."}
+                linkItemLabel={m.link_item_label?.({
+                    item: m.price_list?.() || "Price List",
+                }) || "Link Price List"}
+                associatedItemLabel={m.associated_item_label?.({
+                    item: m.prices?.() || "Prices",
+                }) || "Associated Prices"}
+                quickCreateLabel={m.quick_create?.() || "Quick Create"}
+                closeSearchLabel={m.close_search?.() || "Close"}
+                editLabel={m.edit?.() || "Edit"}
+                deleteLabel={m.delete?.() || "Delete"}
+                unlinkLabel={m.unlink?.() || "Unlink"}
+                deleteForeverLabel={m.delete_forever?.({
+                    item: m.price_list?.() || "Price List",
+                }) || "Delete Price List"}
+                confirmUnlinkLabel={m.confirm_unlink_label?.({
+                    item: m.price_list?.() || "Price List",
+                }) || "Unlink Price List"}
+                selectAllLabel={m.select_all?.() || "Select All"}
+                deselectAllLabel={m.deselect_all?.() || "Deselect All"}
             >
-
-
-                {#snippet toolbarActions(manager?: { items: any[]; count: number })}
-                    {@const count = manager ? manager.count : currentPrices.length}
+                {#snippet toolbarActions(manager?: {
+                    items: any[];
+                    count: number;
+                })}
+                    {@const count = manager
+                        ? manager.count
+                        : currentPrices.length}
                     {#if initialData?.id && count > 0}
                         <Button
                             variant="ghost"
@@ -2770,20 +3322,28 @@
                             class="h-9 rounded-xl px-3 text-violet-700 hover:bg-violet-50"
                         >
                             <Printer size={16} class="mr-1.5" />
-                            <span class="text-sm font-semibold">{m.price_menu_open()}</span>
+                            <span class="text-sm font-semibold"
+                                >{m.price_menu_open()}</span
+                            >
                         </Button>
                     {/if}
                 {/snippet}
 
                 {#snippet renderItemLabel(item: any)}
                     <div class="flex items-center gap-2">
-                        <span class="font-semibold text-gray-900">{item.name}</span>
+                        <span class="font-semibold text-gray-900"
+                            >{item.name}</span
+                        >
                         {#if item.isTemplate}
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
-                                {m.template?.() || 'Template'}
+                            <span
+                                class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200"
+                            >
+                                {m.template?.() || "Template"}
                             </span>
                         {:else}
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            <span
+                                class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                            >
                                 Event
                             </span>
                         {/if}
@@ -2792,22 +3352,40 @@
 
                 {#snippet renderItemBadge(item: any)}
                     <span class="text-xs text-gray-500">
-                        {item.items?.length || 0} {item.items?.length === 1 ? 'item' : 'items'}
+                        {item.items?.length || 0}
+                        {item.items?.length === 1 ? "item" : "items"}
                     </span>
                 {/snippet}
 
                 {#snippet renderItemDetail(item: any)}
-                    <div class="flex items-center gap-1.5 text-xs text-gray-600 font-mono">
-                        <span>{formatCurrency(Number(item.totalPricePerPortion) || 0, item.currency || eventCurrency)} / {m.portion?.() || 'portion'}</span>
+                    <div
+                        class="flex items-center gap-1.5 text-xs text-gray-600 font-mono"
+                    >
+                        <span
+                            >{formatCurrency(
+                                Number(item.totalPricePerPortion) || 0,
+                                item.currency || eventCurrency,
+                            )} / {m.portion?.() || "portion"}</span
+                        >
                     </div>
                 {/snippet}
 
                 {#snippet participationSnippet(item: any)}
-                    <div class="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs font-medium shrink-0">
+                    <div
+                        class="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs font-medium shrink-0"
+                    >
                         <Calculator size={13} class="text-emerald-600" />
                         <span>
-                            {formatCurrency((Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1), item.currency || eventCurrency)}
-                            <span class="text-emerald-600 text-[11px] font-normal">({totalParticipants} {m.participants?.() || 'participants'})</span>
+                            {formatCurrency(
+                                (Number(item.totalPricePerPortion) || 0) *
+                                    (totalParticipants || 1),
+                                item.currency || eventCurrency,
+                            )}
+                            <span
+                                class="text-emerald-600 text-[11px] font-normal"
+                                >({totalParticipants}
+                                {m.participants?.() || "participants"})</span
+                            >
                         </span>
                     </div>
                 {/snippet}
@@ -2842,7 +3420,6 @@
             </EntityManager>
         {/key}
 
-
         <input
             {...rf.fields.priceIds.as(
                 "text",
@@ -2852,19 +3429,55 @@
         />
 
         {#if currentPrices.length > 0}
-            {@const cateringTotal = currentPrices.reduce((sum, item) => sum + (Number(item.totalPricePerPortion) || 0) * (totalParticipants || 1), 0)}
-            {@const cateringCost = currentPrices.reduce((sum, item) => sum + (Number(item.totalCostPerPortion) || 0) * (totalParticipants || 1), 0)}
+            {@const cateringTotal = currentPrices.reduce(
+                (sum, item) =>
+                    sum +
+                    (Number(item.totalPricePerPortion) || 0) *
+                        (totalParticipants || 1),
+                0,
+            )}
+            {@const cateringCost = currentPrices.reduce(
+                (sum, item) =>
+                    sum +
+                    (Number(item.totalCostPerPortion) || 0) *
+                        (totalParticipants || 1),
+                0,
+            )}
             {@const cateringProfit = cateringTotal - cateringCost}
-            <div class="mt-3 p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div
+                class="mt-3 p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-sm"
+            >
                 <div class="flex items-center gap-2">
                     <Receipt size={18} class="text-emerald-600" />
-                    <span class="font-semibold text-gray-800">{m.catering_calculation?.() || 'Total Price Calculation'}:</span>
-                    <span class="text-xs text-gray-600">({currentPrices.length} {currentPrices.length === 1 ? (m.price_list?.() || 'price list') : (m.prices?.() || 'prices')} × {totalParticipants} {m.participants?.() || 'participants'})</span>
+                    <span class="font-semibold text-gray-800"
+                        >{m.catering_calculation?.() ||
+                            "Total Price Calculation"}:</span
+                    >
+                    <span class="text-xs text-gray-600"
+                        >({currentPrices.length}
+                        {currentPrices.length === 1
+                            ? m.price_list?.() || "price list"
+                            : m.prices?.() || "prices"} × {totalParticipants}
+                        {m.participants?.() || "participants"})</span
+                    >
                 </div>
                 <div class="flex items-center gap-3 text-right">
                     {#if cateringCost > 0}
                         <div class="text-xs text-gray-600">
-                            Cost: <span class="font-mono text-gray-800">{formatCurrency(cateringCost, eventCurrency)}</span> • Profit: <span class="font-mono font-semibold text-emerald-700">+{formatCurrency(cateringProfit, eventCurrency)}</span>
+                            Cost: <span class="font-mono text-gray-800"
+                                >{formatCurrency(
+                                    cateringCost,
+                                    eventCurrency,
+                                )}</span
+                            >
+                            • Profit:
+                            <span
+                                class="font-mono font-semibold text-emerald-700"
+                                >+{formatCurrency(
+                                    cateringProfit,
+                                    eventCurrency,
+                                )}</span
+                            >
                         </div>
                     {/if}
                     <div class="font-bold text-base text-emerald-900 font-mono">
