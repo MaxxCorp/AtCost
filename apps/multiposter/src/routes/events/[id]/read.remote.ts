@@ -6,7 +6,7 @@ import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { type Event, getCampaignTargetIds } from '@ac/validations';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
-import { resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
+import { extractContactDetails, resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { getCache, setCache, cacheKeys } from '#lib/server/cache/index.js';
 import { getSeriesInstances } from '#lib/server/events/instances.js';
 import { sanitizePublicEvent, filterPublicTags } from '#lib/server/public-sanitization.js';
@@ -69,6 +69,13 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				},
 				resources: { with: { resource: { with: { location: true, parentRelations: true, childRelations: true } } } },
 				contactRoles: { with: { role: true } },
+				signUpContact: {
+					with: {
+						emails: true,
+						phones: true,
+						tags: { with: { tag: true } }
+					}
+				},
 				tags: { with: { tag: true } },
 				campaign: true,
 				prices: {
@@ -116,6 +123,13 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 					},
 					resources: { with: { resource: { with: { location: true, parentRelations: true, childRelations: true } } } },
 					contactRoles: { with: { role: true } },
+					signUpContact: {
+						with: {
+							emails: true,
+							phones: true,
+							tags: { with: { tag: true } }
+						}
+					},
 					tags: { with: { tag: true } },
 					campaign: true,
 					prices: {
@@ -197,6 +211,13 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 				},
 				resources: { with: { resource: { with: { location: true, parentRelations: true, childRelations: true } } } },
 				contactRoles: { with: { role: true } },
+				signUpContact: {
+					with: {
+						emails: true,
+						phones: true,
+						tags: { with: { tag: true } }
+					}
+				},
 				tags: { with: { tag: true } },
 				campaign: true,
 				prices: {
@@ -336,6 +357,13 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		fallbackToFirst: true
 	});
 
+	const resolvedSignUpContact = result.signUpMode === 'required' && result.signUpContact
+		? extractContactDetails(result.signUpContact, {
+			filterWorkOnly: true,
+			publicOnly: true
+		})
+		: null;
+
 	// 3.5. Fetch instances & series master info
 	let instances: any[] = [];
 	let seriesMaster: any = null;
@@ -443,6 +471,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			resources: evtResources,
 			prices: eventPrices,
 			resolvedContact,
+			resolvedSignUpContact,
 			seriesMaster,
 			instances: instances.length > 0 ? instances : undefined,
 			iCalPath,
@@ -473,6 +502,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		updatedAt: toIsoSafe(result.updatedAt) ?? new Date().toISOString(),
 		startDateTime: toIsoSafe(result.startDateTime),
 		endDateTime: toIsoSafe(result.endDateTime),
+		signUpClosureDate: toIsoSafe(result.signUpClosureDate),
 		locations: allLocations,
 		resources: allResources,
 		contacts: sortedContacts,
@@ -485,6 +515,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		tags: result.tags.map((t: any) => ({ id: t.tag.id, name: t.tag.name, visibility: t.tag.visibility })),
 		syncIds: getCampaignTargetIds(result.campaign?.content),
 		resolvedContact,
+		resolvedSignUpContact,
 		seriesMaster: seriesMaster ?? undefined,
 		instances: instances.length > 0 ? instances : undefined,
 	} as any;

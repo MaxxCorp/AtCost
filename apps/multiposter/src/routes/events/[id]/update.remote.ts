@@ -16,6 +16,7 @@ import { invalidateEvent } from '#lib/server/cache/index.js';
 import { hasVirtualInstanceChanged } from '#lib/server/events/exceptions.js';
 import { getStoredEventContactsHeadcount, reconcileEventParticipantsCount } from '#lib/server/events/participants.js';
 import { isSeriesItem } from '#lib/utils/event-series.js';
+import { extractSignUpFields, parseBoolFlag, parseSignUpClosureDate } from '#lib/utils/event-signup.js';
 import * as m from '#lib/paraglide/messages.js';
 
 // Complete rewrite to support recurrence and use helper
@@ -142,7 +143,36 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 		updateData.guestsCanSeeOtherGuests = data.guestsCanSeeOtherGuests === 'true' || data.guestsCanSeeOtherGuests === true || data.guestsCanSeeOtherGuests === 'on';
 		if (data.heroImage !== undefined) updateData.heroImage = data.heroImage || null;
 		if (data.participantsCount !== undefined) updateData.participantsCount = Number(data.participantsCount) || 0;
-		if (data.signUpMode !== undefined) updateData.signUpMode = data.signUpMode || 'off';
+		if (data.signUpMode !== undefined) {
+			const signUpFields = extractSignUpFields(data);
+			updateData.signUpMode = signUpFields.signUpMode;
+			if (signUpFields.signUpMode !== 'required') {
+				updateData.signUpClosureDate = null;
+				updateData.signUpContactId = null;
+				updateData.signUpContactOverridden = false;
+			} else {
+				if (data.signUpClosureDate !== undefined) {
+					updateData.signUpClosureDate = signUpFields.signUpClosureDate;
+				}
+				if (data.signUpContactId !== undefined) {
+					updateData.signUpContactId = signUpFields.signUpContactId;
+				}
+				if (data.signUpContactOverridden !== undefined) {
+					updateData.signUpContactOverridden = signUpFields.signUpContactOverridden;
+				}
+			}
+		} else {
+			if (data.signUpClosureDate !== undefined) {
+				updateData.signUpClosureDate = parseSignUpClosureDate(data.signUpClosureDate);
+			}
+			if (data.signUpContactId !== undefined) {
+				const trimmed = typeof data.signUpContactId === 'string' ? data.signUpContactId.trim() : '';
+				updateData.signUpContactId = trimmed.length > 0 ? trimmed : null;
+			}
+			if (data.signUpContactOverridden !== undefined) {
+				updateData.signUpContactOverridden = parseBoolFlag(data.signUpContactOverridden);
+			}
+		}
 
 		console.log('Update payload:', JSON.stringify(updateData, null, 2));
 
@@ -253,6 +283,10 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 								guestsCanModify: updateData.guestsCanModify,
 								guestsCanSeeOtherGuests: updateData.guestsCanSeeOtherGuests,
 								participantsCount: data.participantsCount,
+								signUpMode: updateData.signUpMode,
+								signUpClosureDate: updateData.signUpClosureDate,
+								signUpContactId: updateData.signUpContactId,
+								signUpContactOverridden: updateData.signUpContactOverridden,
 								prepMinutes: data.prepMinutes,
 								teardownMinutes: data.teardownMinutes,
 								reminders

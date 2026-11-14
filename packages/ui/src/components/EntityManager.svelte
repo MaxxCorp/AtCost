@@ -975,6 +975,23 @@
                 newItem = { id: newId, ...(result?.data || result || {}) } as any;
             }
 
+            if (singleSelect && entityId && removeAssociationRemote) {
+                try {
+                    for (const existing of currentList) {
+                        if (existing.id && existing.id !== newId) {
+                            await removeAssociationRemote({
+                                type,
+                                entityId,
+                                itemId: existing.id,
+                            });
+                        }
+                    }
+                } catch (err: any) {
+                    toast.error(err.message || i18n.updateAssociationFailedLabel);
+                    return;
+                }
+            }
+
             if (entityId && addAssociationRemote) {
                 try {
                     await addAssociationRemote({
@@ -988,13 +1005,18 @@
                 }
             }
 
-            const newList = newItem ? [...currentList.filter(i => i.id !== newId), newItem] : currentList;
+            const newList = singleSelect
+                ? (newItem ? [newItem] : [])
+                : (newItem ? [...currentList.filter(i => i.id !== newId), newItem] : currentList);
             localAssociatedItems = newList;
 
             await refreshAssociations();
             await refreshSelector();
 
             onchange?.(newList.map((i) => i.id!).filter(Boolean), newList);
+            if (singleSelect) {
+                showSelector = false;
+            }
             if (mounted) toast.success(i18n.createSuccessLabel);
         }
     }

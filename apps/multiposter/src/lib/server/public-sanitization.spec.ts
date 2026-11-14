@@ -440,6 +440,63 @@ describe('Centralized Public Sanitization', () => {
 			const sanitized = sanitizePublicEvent(cachedEventWithUnverifiedContact)!;
 			expect(sanitized.resolvedContact).toBeNull();
 		});
+
+		it('exposes signUpClosureDate and public work-only resolvedSignUpContact only for required mode', () => {
+			const rawReqEvent = {
+				id: 'evt-req',
+				summary: 'Workshop',
+				isPublic: true,
+				status: 'confirmed',
+				signUpMode: 'required',
+				signUpClosureDate: '2026-11-20T00:00:00.000Z',
+				signUpContactId: 'c-pub',
+				signUpContact: {
+					id: 'c-pub',
+					isPublic: true,
+					displayName: 'Registration Desk',
+					emails: [
+						{ value: 'personal@home.test', type: 'home', primary: true },
+						{ value: 'desk@org.test', type: 'work', primary: false }
+					],
+					phones: [
+						{ value: '+49-111', type: 'mobile', primary: true },
+						{ value: '+49-222', type: 'work', primary: false }
+					]
+				},
+				contacts: [],
+				locations: []
+			};
+
+			const sanitized = sanitizePublicEvent(rawReqEvent)!;
+			expect(sanitized.signUpClosureDate).toBe('2026-11-20T00:00:00.000Z');
+			expect(sanitized.signUpContact).toBeNull();
+			expect(sanitized.resolvedSignUpContact).toEqual({
+				id: 'c-pub',
+				name: 'Registration Desk',
+				email: 'desk@org.test',
+				phone: '+49-222',
+				qrCodePath: '/api/contacts/c-pub/qr.png',
+				isPublic: true
+			});
+
+			// Non-public signUpContact must be dropped
+			const privSignUpContact = sanitizePublicEvent({
+				...rawReqEvent,
+				signUpContact: {
+					...rawReqEvent.signUpContact,
+					isPublic: false
+				}
+			})!;
+			expect(privSignUpContact.resolvedSignUpContact).toBeNull();
+
+			// Recommended mode strips closure date & signup contact
+			const recEvent = sanitizePublicEvent({
+				...rawReqEvent,
+				signUpMode: 'recommended'
+			})!;
+			expect(recEvent.signUpClosureDate).toBeNull();
+			expect(recEvent.resolvedSignUpContact).toBeNull();
+		});
 	});
 
 	describe('Announcements (sanitizePublicAnnouncement)', () => {

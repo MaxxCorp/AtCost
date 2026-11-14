@@ -80,6 +80,7 @@
     import type { EventRole } from "@ac/validations";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { isSeriesItem } from "#lib/utils/event-series.js";
+    import { findDefaultKontaktContact, formatSignUpClosureDateYmd } from "#lib/utils/event-signup.js";
     import {
         applyManualTotalParticipants,
         computeInitialBaseline,
@@ -91,6 +92,8 @@
     import {
         RefreshCw,
         CalendarClock,
+        Calendar,
+        RotateCcw,
         User,
         Users,
         Plus,
@@ -596,6 +599,8 @@
         initialData?.contactIds,
     );
     let currentContactIds = $state<string[]>(initialParticipantState.contactIds);
+    // svelte-ignore state_referenced_locally
+    let currentContacts = $state<any[]>(initialData?.contacts || []);
     let contactPartySizes = $state<Record<string, number>>(initialParticipantState.partySizes);
     let contactParticipationStatuses = $state<Record<string, string>>(
         initialParticipantState.participationStatuses,
@@ -660,6 +665,11 @@
 
     async function handleContactsChange(ids: string[], items?: any[]) {
         currentContactIds = ids;
+        if (items !== undefined) {
+            currentContacts = items;
+        } else {
+            currentContacts = currentContacts.filter((c: any) => ids.includes(c?.id));
+        }
         rf.fields.contactIds.set(JSON.stringify(ids));
 
         const nextPartySizes: Record<string, number> = {};
@@ -742,6 +752,65 @@
 
     // svelte-ignore state_referenced_locally
     let signUpMode = $state<'off' | 'recommended' | 'required'>((initialData?.signUpMode as any) || 'off');
+    // svelte-ignore state_referenced_locally
+    let signUpClosureDate = $state<string>(formatSignUpClosureDateYmd(initialData?.signUpClosureDate));
+    // svelte-ignore state_referenced_locally
+    let signUpContactOverridden = $state<boolean>(Boolean(initialData?.signUpContactOverridden));
+    // svelte-ignore state_referenced_locally
+    let overriddenSignUpContactItem = $state<any | null>(initialData?.signUpContact ?? null);
+    // svelte-ignore state_referenced_locally
+    let lockedSignUpContactKey = $state<string>(
+        initialData?.signUpContactOverridden ? 'manual-initial' : 'auto'
+    );
+
+    const defaultKontaktContact = $derived(
+        findDefaultKontaktContact(currentContacts, contactRolesState, availableRoles)
+    );
+
+    const rolesLoaded = $derived(rolesQuery.current !== undefined);
+
+    const fallbackInitialSignUpContact = $derived(
+        !initialData?.signUpContactOverridden &&
+            initialData?.signUpContact &&
+            initialData?.signUpContact?.id === initialData?.signUpContactId
+            ? initialData.signUpContact
+            : null
+    );
+
+    const effectiveSignUpContact = $derived(
+        signUpContactOverridden
+            ? overriddenSignUpContactItem
+            : (rolesLoaded ? defaultKontaktContact : (defaultKontaktContact ?? fallbackInitialSignUpContact))
+    );
+    const effectiveSignUpContactId = $derived(effectiveSignUpContact?.id ?? null);
+    const signUpContactKey = $derived(
+        signUpContactOverridden
+            ? lockedSignUpContactKey
+            : `auto-${effectiveSignUpContactId ?? 'none'}-${effectiveSignUpContact?.updatedAt ?? ''}`
+    );
+
+    function handleSignUpContactChange(ids: string[], items?: any[]) {
+        const nextId = ids[0] ?? null;
+        const nextItem =
+            items?.[0] ??
+            (nextId && overriddenSignUpContactItem?.id === nextId
+                ? overriddenSignUpContactItem
+                : null);
+        overriddenSignUpContactItem = nextItem;
+        if (!signUpContactOverridden) {
+            lockedSignUpContactKey = `manual-${nextId ?? 'none'}`;
+            signUpContactOverridden = true;
+        }
+        rf.fields.signUpContactId?.set(nextId ?? '');
+        rf.fields.signUpContactOverridden?.set('true');
+    }
+
+    function resetSignUpContactToDefault() {
+        signUpContactOverridden = false;
+        overriddenSignUpContactItem = null;
+        rf.fields.signUpContactOverridden?.set('false');
+        rf.fields.signUpContactId?.set(defaultKontaktContact?.id ?? '');
+    }
 
     const contactsHeadcount = $derived(
         sumContactsHeadcount(currentContactIds, contactPartySizes, contactParticipationStatuses)
@@ -1956,50 +2025,190 @@
         {/if}
     </div>
 
-    <!-- Sign Ups Control -->
-    <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-        <div>
-            <span class="text-base font-semibold text-gray-900 block">
-                {m.sign_ups?.() || "Sign Ups"}
-            </span>
-            <p class="text-xs text-gray-500 mt-1">
-                {m.sign_ups_help?.() || "Choose whether external visitors can register for this event online."}
-            </p>
-        </div>
-        <div class="flex flex-wrap gap-3" role="radiogroup" aria-label={m.sign_ups?.() || "Sign Ups"}>
-            {#each [
-                { value: "off", label: m.sign_ups_off?.() || "Off" },
-                { value: "recommended", label: m.sign_ups_recommended?.() || "Recommended" },
-                { value: "required", label: m.sign_ups_required?.() || "Required" },
-            ] as option (option.value)}
-                <label
-                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-sm font-medium cursor-pointer transition-colors {signUpMode === option.value
-                        ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-2xs'
-                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
-                >
-                    <input
-                        type="radio"
-                        checked={signUpMode === option.value}
-                        onchange={() => {
-                            signUpMode = option.value as "off" | "recommended" | "required";
-                            rf.fields.signUpMode.set(signUpMode);
+    {#if rf.fields.contactPartySizesJson}
+        <input {...rf.fields.contactPartySizesJson.as("hidden", JSON.stringify(contactPartySizes))} />
+    {/if}
+    {#if rf.fields.contactParticipationStatusesJson}
+        <input {...rf.fields.contactParticipationStatusesJson.as("hidden", JSON.stringify(contactParticipationStatuses))} />
+    {/if}
+
+    {#snippet sharedContactRenderForm({
+        remoteFunction: rfContact,
+        schema,
+        initialData: formData = {},
+        onSuccess,
+        onCancel,
+        id,
+    }: any)}
+        <ContactForm
+            remoteFunction={rfContact}
+            {schema}
+            initialData={formData}
+            {onSuccess}
+            {onCancel}
+            contactId={id}
+        >
+            {#snippet children({ onLocationsChange }: any)}
+                <div class="mt-8 border-t pt-8">
+                    <h3
+                        class="text-lg font-semibold mb-2 flex items-center gap-2"
+                    >
+                        <MapPin size={18} class="text-blue-600" />
+                        {m.feature_locations_title()}
+                    </h3>
+                    {#key id || "new"}
+                        <EntityManager {m}
+                        title={m.feature_locations_title()}
+                        icon={MapPin}
+                        mode="embedded"
+                        type="contact"
+                        entityId={id}
+                        initialItems={(
+                            (formData as any)?.locationAssociations || []
+                        ).map((la: any) => la.location).filter(Boolean)}
+                        filters={getLocationFilterGroups(m)}
+                        onchange={onLocationsChange}
+                        listItemsRemote={listLocations as any}
+                        fetchAssociationsRemote={fetchEntityLocations as any}
+                        addAssociationRemote={async (p: any) =>
+                            addLocationAssociation({
+                                ...p,
+                                locationId: p.itemId,
+                            } as any)}
+                        removeAssociationRemote={async (p: any) =>
+                            removeLocationAssociation({
+                                ...p,
+                                locationId: p.itemId,
+                            } as any)}
+                        deleteItemRemote={deleteLocation}
+                        createRemote={createLocation}
+                        createSchema={createLocationSchema}
+                        updateRemote={updateLocation}
+                        updateSchema={updateLocationSchema}
+                        readItemRemote={readLocation}
+                        searchPredicate={(l: any, q: string) => {
+                            return (
+                                l.name
+                                    .toLowerCase()
+                                    .includes(q.toLowerCase()) ||
+                                (l.roomId
+                                    ?.toLowerCase()
+                                    .includes(q.toLowerCase()) ??
+                                    false)
+                            );
                         }}
-                        class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                    />
-                    <span>{option.label}</span>
-                </label>
-            {/each}
-        </div>
-        {#if rf.fields.signUpMode}
-            <input {...rf.fields.signUpMode.as("hidden", signUpMode)} />
-        {/if}
-        {#if rf.fields.contactPartySizesJson}
-            <input {...rf.fields.contactPartySizesJson.as("hidden", JSON.stringify(contactPartySizes))} />
-        {/if}
-        {#if rf.fields.contactParticipationStatusesJson}
-            <input {...rf.fields.contactParticipationStatusesJson.as("hidden", JSON.stringify(contactParticipationStatuses))} />
-        {/if}
-    </div>
+                        loadingLabel={m.loading_item({
+                            item: m.feature_locations_title(),
+                        })}
+                        noItemsLabel={m.no_items_associated_label({
+                            item: m.feature_locations_title(),
+                        })}
+                        noItemsFoundLabel={m.no_items_found({
+                            item: m.feature_locations_title(),
+                        })}
+                        searchPlaceholder={m.search_placeholder({
+                            item: m.feature_locations_title(),
+                        })}
+                        linkItemLabel={m.link_item_label({
+                            item: m.feature_locations_title(),
+                        })}
+                        associatedItemLabel={m.associated_item_label({
+                            item: m.feature_locations_title(),
+                        })}
+                        quickCreateLabel={m.quick_create()}
+                        closeSearchLabel={m.close_search()}
+                        editLabel={m.edit()}
+                        deleteLabel={m.delete()}
+                        unlinkLabel={m.unlink()}
+                        deleteForeverLabel={m.delete_forever({
+                            item: m.location(),
+                        })}
+                        bulkDeleteLabel={m.delete_selected({
+                            count: 0,
+                        })}
+                        selectAllLabel={m.select_all()}
+                        deselectAllLabel={m.deselect_all()}
+                        confirmUnlinkLabel={m.confirm_unlink_label({
+                            item: m.location(),
+                        })}
+                    >
+                        {#snippet renderItemLabel(location: any)}
+                            {location.name}
+                            {location.roomId ? `(${location.roomId})` : ""}
+                        {/snippet}
+                        {#snippet renderForm({
+                            remoteFunction: rfLocation,
+                            schema: locSchema,
+                            id: locId,
+                            initialData: locFormData = null,
+                            onSuccess: locSuccess,
+                            onCancel: locCancel,
+                        }: any)}
+                            <LocationForm
+                                remoteFunction={rfLocation}
+                                validationSchema={locSchema}
+                                isUpdating={!!locId}
+                                initialData={locFormData}
+                                onSuccess={locSuccess}
+                                onCancel={locCancel}
+                                labels={{
+                                    name: m.location_name(),
+                                    street: m.street(),
+                                    houseNumber: m.house_number(),
+                                    addressSuffix: m.address_suffix(),
+                                    zip: m.zip_code(),
+                                    city: m.city(),
+                                    state: m.state_region(),
+                                    country: m.country(),
+                                    roomId: m.room_id(),
+                                    latitude: m.latitude(),
+                                    longitude: m.longitude(),
+                                    what3words: m.what3words(),
+                                    inclusivitySupport:
+                                        m.inclusivity_support(),
+                                    isPublic: m.public(),
+                                    heroImage: m.hero_image(),
+                                    saveChanges: m.save_changes(),
+                                    createLocation: m.create_location(),
+                                    cancel: m.cancel(),
+                                    saving: m.loading(),
+                                    creating: m.creating(),
+                                    successfullySaved:
+                                        m.successfully_saved(),
+                                    errorSomethingWentWrong:
+                                        m.something_went_wrong(),
+                                    enterLocationName:
+                                        m.enter_location_name(),
+                                    streetName: m.street_placeholder(),
+                                    houseNumberPlaceholder:
+                                        m.house_number_placeholder(),
+                                    addressSuffixPlaceholder:
+                                        m.address_suffix_placeholder(),
+                                    zipCodePlaceholder:
+                                        m.zip_code_placeholder(),
+                                    cityNamePlaceholder:
+                                        m.city_placeholder(),
+                                    statePlaceholder: m.state_placeholder(),
+                                    countryPlaceholder:
+                                        m.country_placeholder(),
+                                    enterRoomId: m.room_id_placeholder(),
+                                    latitudePlaceholder:
+                                        m.latitude_placeholder(),
+                                    longitudePlaceholder:
+                                        m.longitude_placeholder(),
+                                    what3wordsPlaceholder:
+                                        m.what3words_placeholder(),
+                                    inclusivitySupportPlaceholder:
+                                        m.accessibility_info(),
+                                }}
+                            />
+                        {/snippet}
+                    </EntityManager>
+        {/key}
+                </div>
+            {/snippet}
+        </ContactForm>
+    {/snippet}
 
     <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
         <User size={18} class="text-blue-600" />
@@ -2030,6 +2239,7 @@
         updateSchema={updateContactSchema}
         readItemRemote={readContact}
         searchPredicate={matchContactSearch}
+        renderForm={sharedContactRenderForm}
     >
         {#snippet renderItemLabel(contactItem: any)}
             {@const contactName = contactItem.displayName ||
@@ -2181,184 +2391,6 @@
                 </div>
             </div>
         {/snippet}
-
-        {#snippet renderForm({
-            remoteFunction: rfContact,
-            schema,
-            initialData: formData = {},
-            onSuccess,
-            onCancel,
-            id,
-        }: any)}
-            <ContactForm
-                remoteFunction={rfContact}
-                {schema}
-                initialData={formData}
-                {onSuccess}
-                {onCancel}
-                contactId={id}
-            >
-                {#snippet children({ onLocationsChange }: any)}
-                    <div class="mt-8 border-t pt-8">
-                        <h3
-                            class="text-lg font-semibold mb-2 flex items-center gap-2"
-                        >
-                            <MapPin size={18} class="text-blue-600" />
-                            {m.feature_locations_title()}
-                        </h3>
-                        {#key id || "new"}
-                            <EntityManager {m}
-                            title={m.feature_locations_title()}
-                            icon={MapPin}
-                            mode="embedded"
-                            type="contact"
-                            entityId={id}
-                            initialItems={(
-                                (formData as any)?.locationAssociations || []
-                            ).map((la: any) => la.location).filter(Boolean)}
-                            filters={getLocationFilterGroups(m)}
-                            onchange={onLocationsChange}
-                            listItemsRemote={listLocations as any}
-                            fetchAssociationsRemote={fetchEntityLocations as any}
-                            addAssociationRemote={async (p: any) =>
-                                addLocationAssociation({
-                                    ...p,
-                                    locationId: p.itemId,
-                                } as any)}
-                            removeAssociationRemote={async (p: any) =>
-                                removeLocationAssociation({
-                                    ...p,
-                                    locationId: p.itemId,
-                                } as any)}
-                            deleteItemRemote={deleteLocation}
-                            createRemote={createLocation}
-                            createSchema={createLocationSchema}
-                            updateRemote={updateLocation}
-                            updateSchema={updateLocationSchema}
-                            readItemRemote={readLocation}
-                            searchPredicate={(l: any, q: string) => {
-                                return (
-                                    l.name
-                                        .toLowerCase()
-                                        .includes(q.toLowerCase()) ||
-                                    (l.roomId
-                                        ?.toLowerCase()
-                                        .includes(q.toLowerCase()) ??
-                                        false)
-                                );
-                            }}
-                            loadingLabel={m.loading_item({
-                                item: m.feature_locations_title(),
-                            })}
-                            noItemsLabel={m.no_items_associated_label({
-                                item: m.feature_locations_title(),
-                            })}
-                            noItemsFoundLabel={m.no_items_found({
-                                item: m.feature_locations_title(),
-                            })}
-                            searchPlaceholder={m.search_placeholder({
-                                item: m.feature_locations_title(),
-                            })}
-                            linkItemLabel={m.link_item_label({
-                                item: m.feature_locations_title(),
-                            })}
-                            associatedItemLabel={m.associated_item_label({
-                                item: m.feature_locations_title(),
-                            })}
-                            quickCreateLabel={m.quick_create()}
-                            closeSearchLabel={m.close_search()}
-                            editLabel={m.edit()}
-                            deleteLabel={m.delete()}
-                            unlinkLabel={m.unlink()}
-                            deleteForeverLabel={m.delete_forever({
-                                item: m.location(),
-                            })}
-                            bulkDeleteLabel={m.delete_selected({
-                                count: 0,
-                            })}
-                            selectAllLabel={m.select_all()}
-                            deselectAllLabel={m.deselect_all()}
-                            confirmUnlinkLabel={m.confirm_unlink_label({
-                                item: m.location(),
-                            })}
-                        >
-                            {#snippet renderItemLabel(location: any)}
-                                {location.name}
-                                {location.roomId ? `(${location.roomId})` : ""}
-                            {/snippet}
-                            {#snippet renderForm({
-                                remoteFunction: rfLocation,
-                                schema: locSchema,
-                                id: locId,
-                                initialData: locFormData = null,
-                                onSuccess: locSuccess,
-                                onCancel: locCancel,
-                            }: any)}
-                                <LocationForm
-                                    remoteFunction={rfLocation}
-                                    validationSchema={locSchema}
-                                    isUpdating={!!locId}
-                                    initialData={locFormData}
-                                    onSuccess={locSuccess}
-                                    onCancel={locCancel}
-                                    labels={{
-                                        name: m.location_name(),
-                                        street: m.street(),
-                                        houseNumber: m.house_number(),
-                                        addressSuffix: m.address_suffix(),
-                                        zip: m.zip_code(),
-                                        city: m.city(),
-                                        state: m.state_region(),
-                                        country: m.country(),
-                                        roomId: m.room_id(),
-                                        latitude: m.latitude(),
-                                        longitude: m.longitude(),
-                                        what3words: m.what3words(),
-                                        inclusivitySupport:
-                                            m.inclusivity_support(),
-                                        isPublic: m.public(),
-                                        heroImage: m.hero_image(),
-                                        saveChanges: m.save_changes(),
-                                        createLocation: m.create_location(),
-                                        cancel: m.cancel(),
-                                        saving: m.loading(),
-                                        creating: m.creating(),
-                                        successfullySaved:
-                                            m.successfully_saved(),
-                                        errorSomethingWentWrong:
-                                            m.something_went_wrong(),
-                                        enterLocationName:
-                                            m.enter_location_name(),
-                                        streetName: m.street_placeholder(),
-                                        houseNumberPlaceholder:
-                                            m.house_number_placeholder(),
-                                        addressSuffixPlaceholder:
-                                            m.address_suffix_placeholder(),
-                                        zipCodePlaceholder:
-                                            m.zip_code_placeholder(),
-                                        cityNamePlaceholder:
-                                            m.city_placeholder(),
-                                        statePlaceholder: m.state_placeholder(),
-                                        countryPlaceholder:
-                                            m.country_placeholder(),
-                                        enterRoomId: m.room_id_placeholder(),
-                                        latitudePlaceholder:
-                                            m.latitude_placeholder(),
-                                        longitudePlaceholder:
-                                            m.longitude_placeholder(),
-                                        what3wordsPlaceholder:
-                                            m.what3words_placeholder(),
-                                        inclusivitySupportPlaceholder:
-                                            m.accessibility_info(),
-                                    }}
-                                />
-                            {/snippet}
-                        </EntityManager>
-        {/key}
-                    </div>
-                {/snippet}
-            </ContactForm>
-        {/snippet}
     </ContactManager>
     {/key}
     <input
@@ -2386,6 +2418,167 @@
             }
         }}
     />
+
+    <!-- Sign Ups Control (below Contacts Manager) -->
+    <div class="mt-6 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4">
+        <div>
+            <span class="text-base font-semibold text-gray-900 block">
+                {m.sign_ups?.() || "Sign Ups"}
+            </span>
+            <p class="text-xs text-gray-500 mt-1">
+                {m.sign_ups_help?.() || "Choose whether external visitors can register for this event online."}
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-3" role="radiogroup" aria-label={m.sign_ups?.() || "Sign Ups"}>
+            {#each [
+                { value: "off", label: m.sign_ups_off?.() || "Off" },
+                { value: "recommended", label: m.sign_ups_recommended?.() || "Recommended" },
+                { value: "required", label: m.sign_ups_required?.() || "Required" },
+            ] as option (option.value)}
+                <label
+                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-sm font-medium cursor-pointer transition-colors {signUpMode === option.value
+                        ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-2xs'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
+                >
+                    <input
+                        type="radio"
+                        checked={signUpMode === option.value}
+                        onchange={() => {
+                            signUpMode = option.value as "off" | "recommended" | "required";
+                            rf.fields.signUpMode.set(signUpMode);
+                        }}
+                        class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span>{option.label}</span>
+                </label>
+            {/each}
+        </div>
+        {#if rf.fields.signUpMode}
+            <input {...rf.fields.signUpMode.as("hidden", signUpMode)} />
+        {/if}
+
+        {#if signUpMode === "required"}
+            <div class="pt-3 border-t border-gray-200 space-y-4">
+                <!-- Optional Sign-up Closure Date -->
+                <div class="space-y-1.5">
+                    <label for="sign-up-closure-date" class="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                        <Calendar size={15} class="text-blue-600" />
+                        <span>{m.sign_up_closure_date()} ({m.optional()})</span>
+                    </label>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <input
+                            id="sign-up-closure-date"
+                            {...rf.fields.signUpClosureDate.as("date", signUpClosureDate)}
+                            oninput={(e) => {
+                                signUpClosureDate = e.currentTarget.value;
+                            }}
+                            class="w-full sm:w-auto px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 border-gray-300 bg-white text-sm"
+                        />
+                        {#if signUpClosureDate}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onclick={() => {
+                                    signUpClosureDate = "";
+                                    rf.fields.signUpClosureDate?.set("");
+                                }}
+                                class="inline-flex items-center gap-1 text-xs"
+                            >
+                                <X size={13} />
+                                <span>{m.sign_up_closure_date_clear()}</span>
+                            </Button>
+                        {/if}
+                    </div>
+                    <p class="text-xs text-gray-500">
+                        {m.sign_up_closure_date_help()}
+                    </p>
+                </div>
+
+                <!-- Sign-up Contact (defaults to "Kontakt" role, overridable via shared ContactManager) -->
+                <div class="space-y-2 pt-3 border-t border-gray-200/70">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                                <User size={15} class="text-blue-600" />
+                                <span>{m.sign_up_contact()}</span>
+                            </span>
+                            {#if signUpContactOverridden}
+                                <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                    {m.sign_up_contact_overridden_badge()}
+                                </span>
+                            {:else}
+                                <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                    {m.sign_up_contact_default_badge()}
+                                </span>
+                            {/if}
+                        </div>
+                        {#if signUpContactOverridden}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onclick={resetSignUpContactToDefault}
+                                class="inline-flex items-center gap-1.5 text-xs"
+                            >
+                                <RotateCcw size={13} />
+                                <span>{m.sign_up_contact_reset_default()}</span>
+                            </Button>
+                        {/if}
+                    </div>
+                    <p class="text-xs text-gray-500">
+                        {m.sign_up_contact_help()}
+                    </p>
+
+                    {#key signUpContactKey}
+                        <ContactManager
+                            {m}
+                            title={m.sign_up_contact()}
+                            icon={User}
+                            mode="embedded"
+                            singleSelect={true}
+                            initialItems={effectiveSignUpContact ? [effectiveSignUpContact] : []}
+                            filters={getContactFilterGroups(m)}
+                            onchange={(ids: string[], items?: any[]) => {
+                                handleSignUpContactChange(ids, items);
+                            }}
+                            listItemsRemote={listContacts as any}
+                            deleteItemRemote={deleteContact}
+                            createRemote={createContact}
+                            createSchema={createContactSchema}
+                            updateRemote={updateContact}
+                            updateSchema={updateContactSchema}
+                            readItemRemote={readContact}
+                            searchPredicate={matchContactSearch}
+                            renderForm={sharedContactRenderForm}
+                            noItemsLabel={m.sign_up_contact_none()}
+                        />
+                    {/key}
+                </div>
+            </div>
+        {:else if rf.fields.signUpClosureDate}
+            <input {...rf.fields.signUpClosureDate.as("text", "")} class="hidden" />
+        {/if}
+
+        {#if rf.fields.signUpContactId}
+            <input
+                {...rf.fields.signUpContactId.as(
+                    "text",
+                    signUpMode === "required" ? (effectiveSignUpContactId ?? "") : "",
+                )}
+                class="hidden"
+            />
+        {/if}
+        {#if rf.fields.signUpContactOverridden}
+            <input
+                {...rf.fields.signUpContactOverridden.as(
+                    "text",
+                    signUpMode === "required" ? String(signUpContactOverridden) : "false",
+                )}
+                class="hidden"
+            />
+        {/if}
+    </div>
 
     <div class="pt-4 border-t border-gray-100">
         <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">

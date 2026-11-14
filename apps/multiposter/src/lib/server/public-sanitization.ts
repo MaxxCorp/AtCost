@@ -1,10 +1,26 @@
 import {
+	extractContactDetails,
 	resolveEventContactSync,
 	resolveAnnouncementContactSync,
 	resolveLocationContactSync,
 	type ResolvedContact
 } from './contact-resolution.js';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
+
+function sanitizePreResolvedContact(rc: any): ResolvedContact | null {
+	if (!rc || rc.isPublic !== true) return null;
+	return {
+		id: rc.id,
+		name: rc.name,
+		email: rc.email || '',
+		phone: rc.phone || '',
+		isPublic: true,
+		...(rc.role ? { role: rc.role } : {}),
+		...(rc.roles ? { roles: rc.roles } : {}),
+		...(rc.qrCodePath ? { qrCodePath: rc.qrCodePath } : {}),
+		...(rc.qrCodeDataUrl ? { qrCodeDataUrl: rc.qrCodeDataUrl } : {})
+	};
+}
 
 /**
  * Helper to safely convert dates or date strings to ISO strings.
@@ -398,20 +414,20 @@ export function sanitizePublicEvent(event: any): any | null {
 			fallbackToLocation: true,
 			fallbackToFirst: true
 		});
-	} else if (event.resolvedContact && event.resolvedContact.isPublic === true) {
-		resolvedContact = {
-			id: event.resolvedContact.id,
-			name: event.resolvedContact.name,
-			email: event.resolvedContact.email || '',
-			phone: event.resolvedContact.phone || '',
-			isPublic: true,
-			...(event.resolvedContact.role ? { role: event.resolvedContact.role } : {}),
-			...(event.resolvedContact.roles ? { roles: event.resolvedContact.roles } : {}),
-			...(event.resolvedContact.qrCodePath ? { qrCodePath: event.resolvedContact.qrCodePath } : {}),
-			...(event.resolvedContact.qrCodeDataUrl
-				? { qrCodeDataUrl: event.resolvedContact.qrCodeDataUrl }
-				: {})
-		};
+	} else {
+		resolvedContact = sanitizePreResolvedContact(event.resolvedContact);
+	}
+
+	let resolvedSignUpContact: ResolvedContact | null = null;
+	if (event.signUpMode === 'required') {
+		if (event.signUpContact) {
+			resolvedSignUpContact = extractContactDetails(event.signUpContact, {
+				filterWorkOnly: true,
+				publicOnly: true
+			});
+		} else {
+			resolvedSignUpContact = sanitizePreResolvedContact(event.resolvedSignUpContact);
+		}
 	}
 
 	const publicInstances = Array.isArray(event.instances)
@@ -493,6 +509,9 @@ export function sanitizePublicEvent(event: any): any | null {
 		isAllDay: Boolean(event.isAllDay),
 		isPublic: true,
 		signUpMode: event.signUpMode ?? 'off',
+		signUpClosureDate: event.signUpMode === 'required' ? toIsoSafe(event.signUpClosureDate) : null,
+		signUpContact: null,
+		resolvedSignUpContact,
 		heroImage: event.heroImage ?? null,
 		ticketPrice: event.ticketPrice ?? null,
 		ticketPriceUnknown: Boolean(event.ticketPriceUnknown),

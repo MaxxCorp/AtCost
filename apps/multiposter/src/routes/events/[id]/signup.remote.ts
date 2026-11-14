@@ -16,13 +16,8 @@ import {
 	inArray,
 	sql
 } from '@ac/db';
-import {
-	eventSignUpSchema,
-	lookupEventReservationSchema,
-	cancelEventReservationSchema,
-	normalizeEmail,
-	phonesMatch
-} from '@ac/validations';
+import { eventSignUpSchema, lookupEventReservationSchema, cancelEventReservationSchema, normalizeEmail, phonesMatch } from '@ac/validations';
+import { isSignUpClosed } from '#lib/utils/event-signup.js';
 import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { findMatchingContacts } from '#lib/server/contact-matching.js';
 import { resolveEventIdForAssociations } from '#lib/server/events/exceptions.js';
@@ -108,6 +103,9 @@ export const submitEventSignUp = command(eventSignUpSchema, async (data) => {
 
 	if (evt.signUpMode === 'off') {
 		error(400, 'Sign-ups are not enabled for this event');
+	}
+	if (isSignUpClosed(evt.signUpMode, evt.signUpClosureDate)) {
+		error(400, 'Sign-up for this event has closed');
 	}
 
 	const cleanEmails = Array.from(

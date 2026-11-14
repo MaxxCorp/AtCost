@@ -167,4 +167,42 @@ describe('hasVirtualInstanceChanged', () => {
 
 		expect(hasVirtualInstanceChanged(input)).toBe(false);
 	});
+
+	it('returns true when signUpMode, closure date, or signUpContact changes', () => {
+		const unchanged: VirtualInstanceDiffInput = {
+			master: {
+				...baseMaster,
+				signUpMode: 'required',
+				signUpClosureDate: new Date('2026-11-20T00:00:00.000Z'),
+				signUpContactId: 'c-1',
+				signUpContactOverridden: false
+			} as any,
+			submitted: {
+				summary: baseMaster.summary,
+				signUpMode: 'required',
+				signUpClosureDate: '2026-11-20',
+				signUpContactId: 'c-1',
+				signUpContactOverridden: 'false'
+			},
+			targetStart: baseTargetStart,
+			targetEnd: baseTargetEnd,
+			submittedStart: baseTargetStart,
+			submittedEnd: baseTargetEnd
+		};
+		expect(hasVirtualInstanceChanged(unchanged)).toBe(false);
+
+		expect(
+			hasVirtualInstanceChanged({
+				...unchanged,
+				submitted: { ...unchanged.submitted, signUpClosureDate: '2026-11-25' }
+			})
+		).toBe(true);
+
+		expect(
+			hasVirtualInstanceChanged({
+				...unchanged,
+				submitted: { ...unchanged.submitted, signUpContactId: 'c-2', signUpContactOverridden: 'true' }
+			})
+		).toBe(true);
+	});
 });

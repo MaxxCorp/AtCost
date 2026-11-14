@@ -15,6 +15,10 @@ export interface VirtualInstanceDiffInput {
 		guestsCanModify?: boolean | null;
 		guestsCanSeeOtherGuests?: boolean | null;
 		participantsCount?: number | null;
+		signUpMode?: string | null;
+		signUpClosureDate?: Date | string | null;
+		signUpContactId?: string | null;
+		signUpContactOverridden?: boolean | null;
 		prepMinutes?: number | null;
 		teardownMinutes?: number | null;
 		startDateTime?: Date | string | null;
@@ -37,6 +41,10 @@ export interface VirtualInstanceDiffInput {
 		guestsCanModify?: boolean | string | null;
 		guestsCanSeeOtherGuests?: boolean | string | null;
 		participantsCount?: number | string | null;
+		signUpMode?: string | null;
+		signUpClosureDate?: Date | string | null;
+		signUpContactId?: string | null;
+		signUpContactOverridden?: boolean | string | null;
 		prepMinutes?: number | string | null;
 		teardownMinutes?: number | string | null;
 		reminders?: any;
@@ -97,6 +105,20 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	if (submitted.ticketPriceUnknown !== undefined && Boolean(submitted.ticketPriceUnknown) !== Boolean(master.ticketPriceUnknown)) return true;
 	if (submitted.currency !== undefined && strNorm(submitted.currency || 'EUR') !== strNorm(master.currency || 'EUR')) return true;
 	if (submitted.participantsCount !== undefined && Number(submitted.participantsCount || 0) !== Number(master.participantsCount || 0)) return true;
+	if (submitted.signUpMode !== undefined && strNorm(submitted.signUpMode || 'off') !== strNorm(master.signUpMode || 'off')) return true;
+	if (submitted.signUpClosureDate !== undefined) {
+		const normClosure = (v: Date | string | null | undefined) => {
+			if (!v) return '';
+			if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10);
+			return String(v).trim().slice(0, 10);
+		};
+		if (normClosure(submitted.signUpClosureDate) !== normClosure(master.signUpClosureDate)) return true;
+	}
+	if (submitted.signUpContactId !== undefined && strNorm(submitted.signUpContactId) !== strNorm(master.signUpContactId)) return true;
+	if (submitted.signUpContactOverridden !== undefined) {
+		const subOverridden = submitted.signUpContactOverridden === true || submitted.signUpContactOverridden === 'true' || submitted.signUpContactOverridden === 'on';
+		if (subOverridden !== Boolean(master.signUpContactOverridden)) return true;
+	}
 	if (submitted.prepMinutes !== undefined && Number(submitted.prepMinutes || 0) !== Number(master.prepMinutes || 0)) return true;
 	if (submitted.teardownMinutes !== undefined && Number(submitted.teardownMinutes || 0) !== Number(master.teardownMinutes || 0)) return true;
 

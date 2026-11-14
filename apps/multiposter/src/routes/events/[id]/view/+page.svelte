@@ -39,11 +39,9 @@
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
 
     import { getEventRooms } from "#lib/utils/format-rooms.js";
-    import {
-        formatEventStatus,
-        getStatusBadgeClass,
-        getStatusDotClass,
-    } from "#lib/utils/format-event-status.js";
+    import { formatEventStatus, getStatusBadgeClass, getStatusDotClass } from "#lib/utils/format-event-status.js";
+    import { isSignUpClosed, formatSignUpClosureDateDisplay } from "#lib/utils/event-signup.js";
+    import { getLocale } from "#lib/paraglide/runtime.js";
 
     import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.js";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
@@ -287,17 +285,49 @@
                     </div>
 
                     {#if event.signUpMode === 'recommended' || event.signUpMode === 'required'}
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border {event.signUpMode === 'required' ? 'bg-amber-50/70 border-amber-200' : 'bg-blue-50/70 border-blue-200'}">
-                            <div class="flex items-center gap-2.5 flex-wrap">
-                                <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full border inline-flex items-center gap-1 {event.signUpMode === 'required' ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300'}">
-                                    <UserPlus size={12} />
-                                    {event.signUpMode === 'required'
-                                        ? (m.sign_up_required_badge?.() || 'Registration Required')
-                                        : (m.sign_up_recommended_badge?.() || 'Registration Recommended')}
-                                </span>
-                                <span class="text-sm text-gray-700">
-                                    {m.sign_up_modal_intro?.() || 'Reserve your spot or manage an existing reservation.'}
-                                </span>
+                        {@const signUpClosed = isSignUpClosed(event.signUpMode, event.signUpClosureDate)}
+                        {@const formattedClosure = event.signUpMode === 'required' ? formatSignUpClosureDateDisplay(event.signUpClosureDate, getLocale()) : ''}
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border {event.signUpMode === 'required' ? (signUpClosed ? 'bg-red-50/70 border-red-200' : 'bg-amber-50/70 border-amber-200') : 'bg-blue-50/70 border-blue-200'}">
+                            <div class="space-y-1.5 min-w-0">
+                                <div class="flex items-center gap-2.5 flex-wrap">
+                                    <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full border inline-flex items-center gap-1 {event.signUpMode === 'required' ? (signUpClosed ? 'bg-red-100 text-red-800 border-red-300' : 'bg-amber-100 text-amber-800 border-amber-300') : 'bg-blue-100 text-blue-800 border-blue-300'}">
+                                        <UserPlus size={12} />
+                                        {event.signUpMode === 'required'
+                                            ? (m.sign_up_required_badge?.() || 'Registration Required')
+                                            : (m.sign_up_recommended_badge?.() || 'Registration Recommended')}
+                                    </span>
+                                    {#if formattedClosure}
+                                        <span class="px-2.5 py-0.5 text-xs font-medium rounded-full border inline-flex items-center gap-1 {signUpClosed ? 'bg-red-100 text-red-800 border-red-300' : 'bg-white text-amber-900 border-amber-200'}">
+                                            <Calendar size={12} />
+                                            {signUpClosed
+                                                ? m.sign_up_closed_on({ date: formattedClosure })
+                                                : m.sign_up_closes_on({ date: formattedClosure })}
+                                        </span>
+                                    {/if}
+                                    <span class="text-sm text-gray-700">
+                                        {signUpClosed
+                                            ? m.sign_up_closed_notice()
+                                            : (m.sign_up_modal_intro?.() || 'Reserve your spot or manage an existing reservation.')}
+                                    </span>
+                                </div>
+                                {#if event.signUpMode === 'required' && event.resolvedSignUpContact}
+                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-700">
+                                        <span class="font-medium text-gray-600">{m.sign_up_non_self_service_contact()}</span>
+                                        <span class="font-semibold text-gray-900">{event.resolvedSignUpContact.name}</span>
+                                        {#if event.resolvedSignUpContact.phone}
+                                            <a href="tel:{event.resolvedSignUpContact.phone}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
+                                                <Phone size={12} />
+                                                {event.resolvedSignUpContact.phone}
+                                            </a>
+                                        {/if}
+                                        {#if event.resolvedSignUpContact.email}
+                                            <a href="mailto:{event.resolvedSignUpContact.email}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
+                                                <Mail size={12} />
+                                                {event.resolvedSignUpContact.email}
+                                            </a>
+                                        {/if}
+                                    </div>
+                                {/if}
                             </div>
                             <Button
                                 type="button"
@@ -792,6 +822,8 @@
                     eventId={event.id}
                     eventSummary={event.summary}
                     signUpMode={event.signUpMode || "off"}
+                    signUpClosureDate={event.signUpClosureDate ?? null}
+                    resolvedSignUpContact={event.resolvedSignUpContact ?? null}
                     locations={event.locations || []}
                     onSuccess={() => void eventQuery.refresh()}
                 />

@@ -13,6 +13,7 @@ import { parseDateTime, toZoned } from '@internationalized/date';
 import { createDefaultCampaignContent, type CampaignContent } from '@ac/validations';
 import { invalidateEvent } from '#lib/server/cache/index.js';
 import { reconcileEventParticipantsCount } from '#lib/server/events/participants.js';
+import { extractSignUpFields } from '#lib/utils/event-signup.js';
 import * as m from '#lib/paraglide/messages.js';
 
 export const createEvent = form(createEventSchema, async (data) => {
@@ -199,7 +200,7 @@ export const createEvent = form(createEventSchema, async (data) => {
 			exdates: [],
 			attendees: (data.attendees as any) || null,
 			participantsCount,
-			signUpMode: data.signUpMode || 'off',
+			...extractSignUpFields(data),
 			reminders: reminders as any,
 			isPublic: data.isPublic === 'true' || data.isPublic === true || data.isPublic === 'on',
 			heroImage: data.heroImage || null,

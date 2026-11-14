@@ -92,6 +92,9 @@ export const updateEventsStatus = command(
 								categoryBerlinDotDe: master.categoryBerlinDotDe,
 								participantsCount: master.participantsCount,
 								signUpMode: master.signUpMode,
+								signUpClosureDate: master.signUpClosureDate,
+								signUpContactId: master.signUpContactId,
+								signUpContactOverridden: master.signUpContactOverridden,
 								prepMinutes: master.prepMinutes,
 								teardownMinutes: master.teardownMinutes,
 							})

@@ -5,11 +5,24 @@ import type { Tag } from './tags.js';
 /**
  * Event interface matching the database schema, with dates serialized to strings
  */
-export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 'endDateTime'> & {
+export type ResolvedEventContact = {
+	id?: string | null;
+	name: string;
+	email: string;
+	phone: string;
+	isPublic?: boolean;
+	role?: string | null;
+	roles?: string[] | null;
+	qrCodeDataUrl?: string;
+	qrCodePath?: string;
+};
+
+export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 'endDateTime' | 'signUpClosureDate'> & {
 	createdAt: string;
 	updatedAt: string;
 	startDateTime: string | null;
 	endDateTime: string | null;
+	signUpClosureDate: string | null;
 	resourceIds?: string[];
 	contactIds?: string[];
 	locationIds?: string[];
@@ -36,17 +49,9 @@ export type Event = Omit<DbEvent, 'createdAt' | 'updatedAt' | 'startDateTime' | 
 	syncIds?: string[];
 	participationStatuses?: Record<string, string>;
 	maxOccupancy?: number | null;
-	resolvedContact?: {
-		id?: string | null;
-		name: string;
-		email: string;
-		phone: string;
-		isPublic?: boolean;
-		role?: string | null;
-		roles?: string[] | null;
-		qrCodeDataUrl?: string;
-		qrCodePath?: string;
-	} | null;
+	resolvedContact?: ResolvedEventContact | null;
+	signUpContact?: any | null;
+	resolvedSignUpContact?: ResolvedEventContact | null;
 	qrCodePath?: string | null;
 	iCalPath?: string | null;
 	isSeries?: boolean;

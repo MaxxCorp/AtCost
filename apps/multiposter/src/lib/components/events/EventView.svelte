@@ -15,12 +15,16 @@
         RefreshCw,
         Info,
         Ticket,
+        UserPlus,
+        Phone,
+        Mail,
     } from "@lucide/svelte";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
 
     import { getEventRooms } from "#lib/utils/format-rooms.js";
     import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from '#lib/utils/format-event-date.js';
+    import { isSignUpClosed, formatSignUpClosureDateDisplay } from '#lib/utils/event-signup.js';
     import { page } from '$app/state';
     const isLoggedIn = $derived(Boolean(page.data?.user));
 
@@ -84,6 +88,7 @@
         !!(event as any).qrCodeDataUrl ||
         !!event.qrCodePath ||
         !!displayTicketPrice ||
+        event.signUpMode === 'required' ||
         !!(event as any).categoryBerlinDotDe ||
         (((event as any).inclusivityInformation) && (event as any).inclusivityInformation.length > 0)
     );
@@ -344,7 +349,7 @@
                 {/if}
 
                 <!-- Event Details Sidebar -->
-                {#if displayTicketPrice || (event as any).categoryBerlinDotDe || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
+                {#if displayTicketPrice || event.signUpMode === 'required' || (event as any).categoryBerlinDotDe || ((event as any).inclusivityInformation && (event as any).inclusivityInformation.length > 0)}
                     <div
                         class="bg-indigo-50/70 rounded-xl p-4 border border-indigo-100 space-y-3"
                     >
@@ -360,6 +365,45 @@
                                 <div class="flex items-center gap-2 text-indigo-800">
                                     <Ticket class="w-4 h-4 opacity-75" />
                                     <span class="font-semibold">{displayTicketPrice}</span>
+                                </div>
+                            {/if}
+
+                            {#if event.signUpMode === 'required'}
+                                {@const signUpClosed = isSignUpClosed(event.signUpMode, event.signUpClosureDate)}
+                                {@const formattedClosure = formatSignUpClosureDateDisplay(event.signUpClosureDate, getLocale())}
+                                <div class="pt-2 border-t border-indigo-200/70 space-y-1.5 text-indigo-900">
+                                    <div class="flex items-center gap-1.5 font-semibold">
+                                        <UserPlus class="w-4 h-4 opacity-75" />
+                                        <span>{m.sign_up_required_badge()}</span>
+                                    </div>
+                                    {#if formattedClosure}
+                                        <div class="flex items-center gap-1.5 {signUpClosed ? 'text-red-700 font-semibold' : ''}">
+                                            <Calendar class="w-3.5 h-3.5 opacity-75" />
+                                            <span>
+                                                {signUpClosed
+                                                    ? m.sign_up_closed_on({ date: formattedClosure })
+                                                    : m.sign_up_closes_on({ date: formattedClosure })}
+                                            </span>
+                                        </div>
+                                    {/if}
+                                    {#if event.resolvedSignUpContact}
+                                        <div class="bg-white/70 rounded-lg p-2 space-y-1 border border-indigo-100">
+                                            <p class="text-[11px] text-indigo-800 font-medium">{m.sign_up_non_self_service_contact()}</p>
+                                            <p class="font-semibold text-gray-900">{event.resolvedSignUpContact.name}</p>
+                                            {#if event.resolvedSignUpContact.phone}
+                                                <a href="tel:{event.resolvedSignUpContact.phone}" class="flex items-center gap-1 text-blue-700 hover:underline">
+                                                    <Phone class="w-3 h-3" />
+                                                    <span>{event.resolvedSignUpContact.phone}</span>
+                                                </a>
+                                            {/if}
+                                            {#if event.resolvedSignUpContact.email}
+                                                <a href="mailto:{event.resolvedSignUpContact.email}" class="flex items-center gap-1 text-blue-700 hover:underline break-all">
+                                                    <Mail class="w-3 h-3" />
+                                                    <span>{event.resolvedSignUpContact.email}</span>
+                                                </a>
+                                            {/if}
+                                        </div>
+                                    {/if}
                                 </div>
                             {/if}
 

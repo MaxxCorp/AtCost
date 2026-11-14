@@ -3,7 +3,9 @@
 	import { Button } from "#lib/components/ui/button/index.js";
 	import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
 	import * as m from "#lib/paraglide/messages.js";
+	import { getLocale } from "#lib/paraglide/runtime.js";
 	import { toast } from "svelte-sonner";
+	import { isSignUpClosed, formatSignUpClosureDateDisplay } from "#lib/utils/event-signup.js";
 	import {
 		submitEventSignUp,
 		lookupEventReservation,
@@ -20,6 +22,8 @@
 		Phone,
 		CheckCircle2,
 		AlertCircle,
+		Calendar,
+		User,
 	} from "@lucide/svelte";
 
 	interface Props {
@@ -27,6 +31,8 @@
 		eventId: string;
 		eventSummary: string;
 		signUpMode: "off" | "recommended" | "required" | string;
+		signUpClosureDate?: string | null;
+		resolvedSignUpContact?: { id?: string | null; name: string; email?: string; phone?: string } | null;
 		locations?: Array<{ id?: string; name: string }>;
 		onSuccess?: () => void;
 	}
@@ -36,9 +42,18 @@
 		eventId,
 		eventSummary,
 		signUpMode,
+		signUpClosureDate = null,
+		resolvedSignUpContact = null,
 		locations = [],
 		onSuccess,
 	}: Props = $props();
+
+	const isClosed = $derived(isSignUpClosed(signUpMode, signUpClosureDate));
+	const formattedClosureDate = $derived(
+		signUpMode === "required"
+			? formatSignUpClosureDateDisplay(signUpClosureDate, getLocale())
+			: ""
+	);
 
 	let activeTab = $state<"new" | "lookup">("new");
 	let lookupEmail = $state("");
@@ -286,6 +301,41 @@
 					"Reserve your spot for this event. Only your first and last name are required; provide an email address if you would like to receive event updates or location newsletters."}
 			</p>
 
+			{#if signUpMode === "required" && formattedClosureDate}
+				<div class="flex items-center gap-2 text-xs rounded-lg p-2.5 border {isClosed ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}">
+					<Calendar class="w-4 h-4 shrink-0" />
+					<span class="font-medium">
+						{isClosed
+							? m.sign_up_closed_on({ date: formattedClosureDate })
+							: m.sign_up_closes_on({ date: formattedClosureDate })}
+					</span>
+				</div>
+			{/if}
+
+			{#if signUpMode === "required" && resolvedSignUpContact}
+				<div class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5">
+					<p class="text-gray-600 font-medium">{m.sign_up_non_self_service_contact()}</p>
+					<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-900">
+						<span class="inline-flex items-center gap-1.5 font-semibold">
+							<User class="w-3.5 h-3.5 text-blue-600" />
+							{resolvedSignUpContact.name}
+						</span>
+						{#if resolvedSignUpContact.phone}
+							<a href="tel:{resolvedSignUpContact.phone}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
+								<Phone class="w-3.5 h-3.5" />
+								{resolvedSignUpContact.phone}
+							</a>
+						{/if}
+						{#if resolvedSignUpContact.email}
+							<a href="mailto:{resolvedSignUpContact.email}" class="inline-flex items-center gap-1 text-blue-600 hover:underline">
+								<Mail class="w-3.5 h-3.5" />
+								{resolvedSignUpContact.email}
+							</a>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
 			<!-- Mode Switcher -->
 			<div class="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
 				<button
@@ -381,6 +431,16 @@
 							<Search class="w-4 h-4" />
 							<span>{m.find_reservation?.() || "Find Reservation"}</span>
 						</AsyncButton>
+					</div>
+				</div>
+			{:else if isClosed && !existingContactId}
+				<div class="flex items-start gap-2.5 text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl p-4">
+					<AlertCircle class="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+					<div class="space-y-1">
+						<p class="font-semibold">{m.sign_up_closed_notice()}</p>
+						{#if formattedClosureDate}
+							<p class="text-xs text-red-700">{m.sign_up_closed_on({ date: formattedClosureDate })}</p>
+						{/if}
 					</div>
 				</div>
 			{:else}

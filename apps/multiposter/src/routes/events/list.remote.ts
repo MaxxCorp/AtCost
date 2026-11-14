@@ -4,7 +4,7 @@ import { db, event, recurringSeries, eventContact, eventLocation, eventResource,
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
-import { resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
+import { extractContactDetails, resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 import { populateSeriesInstances } from '#lib/server/events/instances.js';
 import { sanitizePublicEvent } from '#lib/server/public-sanitization.js';
@@ -391,6 +391,13 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					role: true
 				}
 			},
+			signUpContact: {
+				with: {
+					emails: true,
+					phones: true,
+					tags: { with: { tag: true } }
+				}
+			},
 			campaign: true,
 			user: true
 		},
@@ -539,6 +546,13 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				locations: { with: { location: true } },
 				resources: { with: { resource: { with: { location: true } } } },
 				contactRoles: { with: { role: true } },
+				signUpContact: {
+					with: {
+						emails: true,
+						phones: true,
+						tags: { with: { tag: true } }
+					}
+				},
 				tags: { with: { tag: true } },
 				campaign: true,
 				user: true
@@ -884,6 +898,13 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			fallbackToFirst: true
 		});
 
+		const resolvedSignUpContact = e.signUpMode === 'required' && e.signUpContact
+			? extractContactDetails(e.signUpContact, {
+				filterWorkOnly: true,
+				publicOnly: true
+			})
+			: null;
+
 		const isSeries = Boolean(
 			e.seriesId ||
 			e.recurringEventId ||
@@ -899,6 +920,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			iCalPath: e.id.includes('_inst_') ? `/api/events/${e.id}/event.ics` : (e.iCalPath?.includes('/api/') ? e.iCalPath : `/api/events/${e.id}/event.ics`),
 			startDateTime: e.startDateTime ? (e.startDateTime instanceof Date ? e.startDateTime.toISOString() : new Date(e.startDateTime).toISOString()) : null,
 			endDateTime: e.endDateTime ? (e.endDateTime instanceof Date ? e.endDateTime.toISOString() : new Date(e.endDateTime).toISOString()) : null,
+			signUpClosureDate: e.signUpClosureDate ? (e.signUpClosureDate instanceof Date ? e.signUpClosureDate.toISOString() : new Date(e.signUpClosureDate).toISOString()) : null,
 			createdAt: e.createdAt ? (e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString()) : null,
 			updatedAt: e.updatedAt ? (e.updatedAt instanceof Date ? e.updatedAt.toISOString() : new Date(e.updatedAt).toISOString()) : null,
 			locations: evtLocations,
@@ -908,6 +930,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			resourceIds: evtResources.map((r: any) => r.id),
 			tags: (e.tags?.map((t: any) => t.tag || t).filter(Boolean) || []).filter((tagItem: any) => !isPublicView || tagItem?.visibility === 'external'),
 			resolvedContact,
+			resolvedSignUpContact,
 		};
 	});
 

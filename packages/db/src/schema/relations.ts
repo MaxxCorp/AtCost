@@ -74,6 +74,7 @@ export const contactRelations = relations(contact, ({ many, one }) => ({
     relatedTo: many(contactRelation, { relationName: 'toRelations' }),
     tags: many(contactTag),
     talents: many(talent),
+    signUpEvents: many(event, { relationName: 'signUpContact' }),
     gdprRequests: many(gdprRequest),
 }));
 
@@ -127,6 +128,7 @@ export const eventRelations = relations(event, ({ many, one }) => ({
     prices: many(eventPrice),
     sales: many(eventSale),
     series: one(recurringSeries, { fields: [event.seriesId], references: [recurringSeries.id] }),
+    signUpContact: one(contact, { fields: [event.signUpContactId], references: [contact.id], relationName: 'signUpContact' }),
     user: one(user, { fields: [event.userId], references: [user.id] }),
     campaign: one(campaign, { fields: [event.campaignId], references: [campaign.id] }),
     master: one(event, { fields: [event.recurringEventId], references: [event.id], relationName: 'instances' }),
