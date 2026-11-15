@@ -1206,7 +1206,6 @@
 	"sign_up_recurrence": "Anmeldefrist-Wiederholung",
 	"sign_up_recurrence_title": "Wiederholung des Anmeldeschlusses",
 	"sign_up_recurrence_description": "Wiederhole Datum und Uhrzeit des Anmeldeschlusses für Serientermine.",
-	"sign_up_recurrence_requires_date": "Lege oben ein Anmeldeschluss-Datum fest, um wiederkehrende Fristen für die Serie einzustellen.",
 	"sign_up_recurrence_default_badge": "Standard (Serie)",
 	"sign_up_recurrence_overridden_badge": "Überschrieben",
 	"sign_up_recurrence_reset_default": "Serien-Standard verwenden",

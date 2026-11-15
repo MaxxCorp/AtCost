@@ -525,7 +525,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		signUpRecurrence:
 			result.signUpMode === 'required'
 				? (result.signUpRecurrence ??
-					(!result.recurringEventId && !result.isException ? (result.recurrence ?? null) : null))
+					(!result.recurringEventId ? (result.recurrence ?? null) : null))
 				: null,
 		locations: allLocations,
 		resources: allResources,

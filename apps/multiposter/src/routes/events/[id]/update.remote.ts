@@ -132,6 +132,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			updateData.recurrence = data.recurrence ? (Array.isArray(data.recurrence) ? data.recurrence : [data.recurrence]) : null;
 			if (updateData.recurrence) {
 				updateData.recurringEventId = null;
+				updateData.isException = false;
 			}
 		}
 
@@ -164,10 +165,7 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 				if (data.signUpClosureDate !== undefined) {
 					updateData.signUpClosureDate = signUpFields.signUpClosureDate;
 				}
-				if (
-					data.signUpRecurrence !== undefined ||
-					(isMasterUpdate && signUpFields.signUpRecurrence && !oldEvent.signUpRecurrence)
-				) {
+				if (data.signUpRecurrence !== undefined || (isMasterUpdate && !oldEvent.signUpRecurrence)) {
 					updateData.signUpRecurrence = signUpFields.signUpRecurrence;
 				}
 				if (data.signUpContactId !== undefined) {
@@ -183,16 +181,8 @@ export const updateEvent = form(updateEventSchema, async (data) => {
 			}
 			if (data.signUpRecurrence !== undefined) {
 				updateData.signUpRecurrence = normalizeSignUpRecurrence(data.signUpRecurrence);
-			} else if (
-				oldEvent.signUpMode === 'required' &&
-				isMasterUpdate &&
-				!oldEvent.signUpRecurrence &&
-				resolvedSeriesRecurrence
-			) {
-				const defaultSignUpRecurrence = normalizeSignUpRecurrence(resolvedSeriesRecurrence);
-				if (defaultSignUpRecurrence) {
-					updateData.signUpRecurrence = defaultSignUpRecurrence;
-				}
+			} else if (oldEvent.signUpMode === 'required' && isMasterUpdate && !oldEvent.signUpRecurrence) {
+				updateData.signUpRecurrence = normalizeSignUpRecurrence(resolvedSeriesRecurrence);
 			}
 			if (data.signUpContactId !== undefined) {
 				const trimmed = typeof data.signUpContactId === 'string' ? data.signUpContactId.trim() : '';

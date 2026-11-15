@@ -97,12 +97,17 @@
     import { listEventRoles } from "../../../routes/event-roles/list.remote.js";
     import type { EventRole } from "@ac/validations";
     import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
-    import { isSeriesItem } from "#lib/utils/event-series.js";
+    import {
+        isSeriesItem,
+        isVirtualInstanceId,
+        parseVirtualInstanceId,
+    } from "#lib/utils/event-series.js";
     import {
         DEFAULT_SIGN_UP_CLOSURE_TIME,
         combineSignUpClosureDateTime,
         extractSignUpClosureParts,
         findDefaultKontaktContact,
+        normalizeSignUpRecurrence,
     } from "#lib/utils/event-signup.js";
     import {
         applyManualTotalParticipants,
@@ -171,8 +176,7 @@
         collab?: CollaborationRoom | null;
     } = $props();
 
-    // svelte-ignore state_referenced_locally
-    const rf = (remoteFunction as any).preflight(validationSchema);
+    const rf = $derived((remoteFunction as any).preflight(validationSchema));
     const type = "event";
     const locationsQuery = listLocations();
     const resourcesQuery = listResources();
@@ -507,9 +511,16 @@
         );
     }
 
-    let recurrenceText = $derived(
-        rf.fields.recurrence.value()
-            ? formatRecurrenceText(rf.fields.recurrence.value() as string, {
+    const seriesMasterMeta = $derived((initialData as any)?.seriesMaster ?? null);
+    const eventRecurrenceRule = $derived.by(() => {
+        const fieldVal = rf.fields.recurrence.value();
+        return fieldVal !== undefined
+            ? (normalizeSignUpRecurrence(fieldVal)?.[0] ?? "")
+            : (normalizeSignUpRecurrence(initialData?.recurrence)?.[0] ?? "");
+    });
+    const recurrenceText = $derived(
+        eventRecurrenceRule
+            ? formatRecurrenceText(eventRecurrenceRule, {
                   includeEnd: true,
                   dtstart:
                       rf.fields.startDate.value() ||
@@ -519,15 +530,20 @@
             : m.recurrence(),
     );
 
-    let isSeries = $derived(
-        Boolean(
-            (rf.fields.recurrence.value() &&
-                String(rf.fields.recurrence.value()).trim() !== "") ||
-                (initialData?.recurrence &&
-                    initialData.recurrence.length > 0) ||
-                initialData?.seriesId ||
-                isSeriesItem(initialData),
-        ),
+    const hasExplicitClearedRecurrence = $derived(
+        rf.fields.recurrence.value() !== undefined &&
+            eventRecurrenceRule === "" &&
+            !initialData?.seriesId &&
+            !initialData?.recurringEventId &&
+            !isVirtualInstanceId(initialData?.id),
+    );
+    const isSeries = $derived(
+        !hasExplicitClearedRecurrence &&
+            Boolean(
+                eventRecurrenceRule ||
+                    initialData?.seriesId ||
+                    isSeriesItem(initialData),
+            ),
     );
 
     let isAllDay = $derived(
@@ -903,9 +919,15 @@
         rf.fields.contactRolesJson.set(JSON.stringify(contactRolesState));
     }
 
-    // svelte-ignore state_referenced_locally
-    let signUpMode = $state<"off" | "recommended" | "required">(
-        (initialData?.signUpMode as any) || "off",
+    const initialSignUpMode = untrack(
+        () => (initialData?.signUpMode as "off" | "recommended" | "required") || "off",
+    );
+    const signUpMode = $derived<"off" | "recommended" | "required">(
+        (rf.fields.signUpMode.value() as
+            | "off"
+            | "recommended"
+            | "required"
+            | undefined) ?? initialSignUpMode,
     );
     const initialClosureParts = untrack(() =>
         extractSignUpClosureParts(
@@ -946,66 +968,56 @@
             : "";
         rf.fields.signUpClosureDate?.set(nextIso);
     }
-    const seriesMasterMeta = $derived((initialData as any)?.seriesMaster ?? null);
+
     const seriesRecurrenceRule = $derived(
-        (rf.fields.recurrence.value()
-            ? String(rf.fields.recurrence.value()).trim()
-            : "") ||
-            initialData?.recurrence?.[0] ||
-            seriesMasterMeta?.recurrence?.[0] ||
+        eventRecurrenceRule ||
+            normalizeSignUpRecurrence(seriesMasterMeta?.recurrence)?.[0] ||
             "",
     );
     const seriesMasterId = $derived(
         seriesMasterMeta?.id ||
             initialData?.recurringEventId ||
-            (String(initialData?.id || "").includes("_inst_")
-                ? String(initialData?.id).split("_inst_")[0]
-                : ""),
-    );
-    const initialSeriesRecurrence = untrack(
-        () =>
-            initialData?.recurrence?.[0] ||
-            (initialData as any)?.seriesMaster?.recurrence?.[0] ||
+            parseVirtualInstanceId(initialData?.id)?.masterId ||
             "",
     );
-    const initialSignUpRecurrence = untrack(() =>
-        Array.isArray(initialData?.signUpRecurrence)
-            ? initialData.signUpRecurrence[0] || ""
-            : typeof initialData?.signUpRecurrence === "string"
-              ? initialData.signUpRecurrence
-              : "",
-    );
-    let customSignUpRecurrence = $state<string>(initialSignUpRecurrence);
-    let signUpRecurrenceOverridden = $state<boolean>(
-        Boolean(
-            initialSignUpRecurrence &&
-                initialSeriesRecurrence &&
-                initialSignUpRecurrence !== initialSeriesRecurrence,
-        ),
-    );
+    const initialCustomSignUpRecurrence = untrack(() => {
+        const initSignUp =
+            normalizeSignUpRecurrence(initialData?.signUpRecurrence)?.[0] ?? "";
+        const initSeries =
+            normalizeSignUpRecurrence(initialData?.recurrence)?.[0] ??
+            normalizeSignUpRecurrence(
+                (initialData as any)?.seriesMaster?.recurrence,
+            )?.[0] ??
+            "";
+        return initSignUp && initSignUp !== initSeries ? initSignUp : "";
+    });
     let showSignUpRecurrenceDialog = $state(false);
     const isSeriesMasterForm = $derived(
         isSeries &&
             !initialData?.recurringEventId &&
-            !initialData?.isException &&
-            !String(initialData?.id || "").includes("_inst_"),
+            !isVirtualInstanceId(initialData?.id),
     );
-    const effectiveSignUpRecurrence = $derived(
-        !isSeriesMasterForm
-            ? ""
-            : signUpRecurrenceOverridden
-              ? customSignUpRecurrence
-              : seriesRecurrenceRule || customSignUpRecurrence,
-    );
-    const masterSignUpRecurrence = $derived(
-        Array.isArray(seriesMasterMeta?.signUpRecurrence)
-            ? seriesMasterMeta.signUpRecurrence[0] || ""
-            : typeof seriesMasterMeta?.signUpRecurrence === "string"
-              ? seriesMasterMeta.signUpRecurrence
-              : seriesMasterMeta?.recurrence?.[0] || "",
+    const effectiveSignUpRecurrence = $derived.by(() => {
+        if (!isSeriesMasterForm) return "";
+        const fieldVal = rf.fields.signUpRecurrence.value();
+        if (fieldVal !== undefined) {
+            return (
+                normalizeSignUpRecurrence(fieldVal)?.[0] ?? seriesRecurrenceRule
+            );
+        }
+        return initialCustomSignUpRecurrence || seriesRecurrenceRule;
+    });
+    const signUpRecurrenceOverridden = $derived(
+        Boolean(
+            effectiveSignUpRecurrence &&
+                effectiveSignUpRecurrence !== seriesRecurrenceRule,
+        ),
     );
     const displaySignUpRecurrence = $derived(
-        isSeriesMasterForm ? effectiveSignUpRecurrence : masterSignUpRecurrence,
+        isSeriesMasterForm
+            ? effectiveSignUpRecurrence
+            : (normalizeSignUpRecurrence(seriesMasterMeta?.signUpRecurrence)?.[0] ??
+                  seriesRecurrenceRule),
     );
     const signUpRecurrenceText = $derived(
         displaySignUpRecurrence
@@ -1836,26 +1848,14 @@
 
     <RecurrenceDialog
         bind:open={showRecurrenceDialog}
-        value={rf.fields.recurrence.value() ??
-            initialData?.recurrence?.[0] ??
-            ""}
+        value={eventRecurrenceRule || null}
         startDate={rf.fields.startDate.value() || currentStartDateVal}
         onchange={(val: string | null) => {
-            const nextVal = val ?? "";
-            rf.fields.recurrence.set(nextVal);
-            if (!signUpRecurrenceOverridden && signUpMode === "required") {
-                rf.fields.signUpRecurrence?.set(nextVal);
-            }
+            rf.fields.recurrence.set(val ?? "");
         }}
     />
-    {#if (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== undefined && (rf.fields.recurrence.value() ?? initialData?.recurrence?.[0]) !== null}
-        <input
-            {...rf.fields.recurrence.as(
-                "text",
-                initialData?.recurrence?.[0] ?? "",
-            )}
-            class="hidden"
-        />
+    {#if eventRecurrenceRule || initialData?.recurrence}
+        <input {...rf.fields.recurrence.as("hidden", eventRecurrenceRule)} />
     {/if}
 
     <div>
@@ -3035,32 +3035,17 @@
                         : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}"
                 >
                     <input
-                        type="radio"
-                        checked={signUpMode === option.value}
-                        onchange={() => {
-                            signUpMode = option.value as
-                                | "off"
-                                | "recommended"
-                                | "required";
-                            rf.fields.signUpMode.set(signUpMode);
-                            if (
-                                signUpMode === "required" &&
-                                isSeriesMasterForm
-                            ) {
-                                rf.fields.signUpRecurrence?.set(
-                                    effectiveSignUpRecurrence,
-                                );
-                            }
-                        }}
+                        {...rf.fields.signUpMode.as(
+                            "radio",
+                            option.value,
+                            initialSignUpMode === option.value,
+                        )}
                         class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                     />
                     <span>{option.label}</span>
                 </label>
             {/each}
         </div>
-        {#if rf.fields.signUpMode}
-            <input {...rf.fields.signUpMode.as("hidden", signUpMode)} />
-        {/if}
 
         {#if signUpMode === "required"}
             <div class="pt-3 border-t border-gray-200 space-y-4">
@@ -3242,12 +3227,7 @@
                                         type="button"
                                         class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 underline"
                                         onclick={() => {
-                                            signUpRecurrenceOverridden = false;
-                                            customSignUpRecurrence =
-                                                seriesRecurrenceRule;
-                                            rf.fields.signUpRecurrence?.set(
-                                                seriesRecurrenceRule,
-                                            );
+                                            rf.fields.signUpRecurrence?.set("");
                                         }}
                                     >
                                         <RotateCcw size={12} />
@@ -3277,14 +3257,11 @@
                             title={m.sign_up_recurrence_title()}
                             description={m.sign_up_recurrence_description()}
                             onchange={(val: string | null) => {
-                                const next = val ?? "";
-                                customSignUpRecurrence = next;
-                                signUpRecurrenceOverridden =
-                                    next !== seriesRecurrenceRule;
+                                const next = (val ?? "").trim();
                                 rf.fields.signUpRecurrence?.set(
-                                    signUpRecurrenceOverridden
-                                        ? customSignUpRecurrence
-                                        : seriesRecurrenceRule,
+                                    next && next !== seriesRecurrenceRule
+                                        ? next
+                                        : "",
                                 );
                             }}
                         />
@@ -3384,47 +3361,42 @@
             </div>
         {/if}
 
-        {#if rf.fields.signUpClosureDate}
+        {#if (signUpMode === "required" && combinedSignUpClosureIso) || initialData?.signUpClosureDate}
             <input
                 {...rf.fields.signUpClosureDate.as(
-                    "text",
+                    "hidden",
                     signUpMode === "required" ? combinedSignUpClosureIso : "",
                 )}
-                class="hidden"
             />
         {/if}
-        {#if rf.fields.signUpRecurrence}
+        {#if (signUpMode === "required" && isSeriesMasterForm && effectiveSignUpRecurrence) || initialData?.signUpRecurrence}
             <input
                 {...rf.fields.signUpRecurrence.as(
-                    "text",
+                    "hidden",
                     signUpMode === "required" && isSeriesMasterForm
                         ? effectiveSignUpRecurrence
                         : "",
                 )}
-                class="hidden"
             />
         {/if}
-
-        {#if rf.fields.signUpContactId}
+        {#if (signUpMode === "required" && effectiveSignUpContactId) || initialData?.signUpContactId}
             <input
                 {...rf.fields.signUpContactId.as(
-                    "text",
+                    "hidden",
                     signUpMode === "required"
                         ? (effectiveSignUpContactId ?? "")
                         : "",
                 )}
-                class="hidden"
             />
         {/if}
-        {#if rf.fields.signUpContactOverridden}
+        {#if (signUpMode === "required" && signUpContactOverridden) || initialData?.signUpContactOverridden}
             <input
                 {...rf.fields.signUpContactOverridden.as(
-                    "text",
+                    "hidden",
                     signUpMode === "required"
                         ? String(signUpContactOverridden)
                         : "false",
                 )}
-                class="hidden"
             />
         {/if}
     </div>
