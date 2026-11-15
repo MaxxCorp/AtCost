@@ -1,0 +1,16 @@
+{
+    "installCommand": "npm i -g pnpm@12.4.2 && npx pnpm install --no-frozen-lockfile",
+    "buildCommand": "pnpm build",
+    "outputDirectory": ".vercel/output",
+    "headers": [
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "no-store, max-age=0"
+                }
+            ]
+        }
+    ]
+}
