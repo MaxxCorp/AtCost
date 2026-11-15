@@ -262,6 +262,9 @@ export async function deleteBlock(blockId: string) {
 }
 
 export async function getBlock(blockId: string) {
+    const user = getAuthenticatedUser();
+    ensureAccess(user, 'cms');
+
     const block = await db.query.cmsBlock.findFirst({
         where: eq(cmsBlock.id, blockId),
     });

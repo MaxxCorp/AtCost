@@ -1,6 +1,6 @@
 import { query, form, command, requested } from '$app/server';
 import { db, tagCategory, eq } from '@ac/db';
-import { getAuthenticatedUser, getOptionalUser } from '#lib/server/authorization.js';
+import { getAuthenticatedUser, getOptionalUser, ensureOperator } from '#lib/server/authorization.js';
 import {
     tagCategoryPaginationSchema,
     createTagCategorySchema,
@@ -20,6 +20,9 @@ export const listTagCategories = query(tagCategoryPaginationSchema, async (input
 });
 
 export const readTagCategory = query(v.object({ id: v.string() }), async ({ id }) => {
+    const user = getAuthenticatedUser();
+    ensureOperator(user);
+
     const cat = await db.query.tagCategory.findFirst({
         where: eq(tagCategory.id, id),
     });
@@ -34,7 +37,8 @@ export const readTagCategory = query(v.object({ id: v.string() }), async ({ id }
 });
 
 export const createTagCategoryAction = form(createTagCategorySchema, async (input) => {
-    getAuthenticatedUser();
+    const user = getAuthenticatedUser();
+    ensureOperator(user);
 
     const created = await createCategory(input);
 
@@ -48,7 +52,8 @@ export const createTagCategoryAction = form(createTagCategorySchema, async (inpu
 });
 
 export const createTagCategoryCommand = command(createTagCategorySchema, async (input) => {
-    getAuthenticatedUser();
+    const user = getAuthenticatedUser();
+    ensureOperator(user);
 
     const created = await createCategory(input);
 
@@ -62,7 +67,8 @@ export const createTagCategoryCommand = command(createTagCategorySchema, async (
 });
 
 export const updateTagCategoryAction = form(updateTagCategorySchema, async (input) => {
-    getAuthenticatedUser();
+    const user = getAuthenticatedUser();
+    ensureOperator(user);
 
     const updated = await updateCategory(input);
 
@@ -77,7 +83,8 @@ export const updateTagCategoryAction = form(updateTagCategorySchema, async (inpu
 });
 
 export const updateTagCategoryCommand = command(updateTagCategorySchema, async (input) => {
-    getAuthenticatedUser();
+    const user = getAuthenticatedUser();
+    ensureOperator(user);
 
     const updated = await updateCategory(input);
 
@@ -97,7 +104,8 @@ export const deleteTagCategoryAction = command(
         v.array(v.string())
     ]),
     async (input) => {
-        getAuthenticatedUser();
+        const user = getAuthenticatedUser();
+        ensureOperator(user);
 
         const ids = Array.isArray(input) ? input : [input.id];
         for (const id of ids) {

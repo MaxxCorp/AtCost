@@ -9,7 +9,8 @@ export const readGoalCampaign = query(v.string(), async (id) => {
     const isAuthorizedOperator = isOperator(user);
     return await getGoalCampaignById(id, {
         incrementVisit: true,
-        isAuthorizedOperator
+        isAuthorizedOperator,
+        currentUserId: user?.id ?? null
     });
 });
 

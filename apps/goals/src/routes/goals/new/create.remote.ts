@@ -130,7 +130,7 @@ export const createGoalCampaign = form(createGoalCampaignSchema, async (data) =>
         data.stretchGoalsJson
     );
     await syncGoalCampaignLocations(created.id, data.locationIds);
-    await assignTagsToGoalCampaign(created.id, tagNames, user.id);
+    await assignTagsToGoalCampaign(created.id, tagNames, user.id, { allowCreate: isOp });
     if (segregatedCreator.contactId) {
         await ensureEncryptedUserContact(
             {

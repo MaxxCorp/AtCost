@@ -1,12 +1,13 @@
 import { form, requested } from '$app/server';
 import { db, tag, eq } from '@ac/db';
-import { getAuthenticatedUser } from '#lib/server/authorization.js';
+import { getAuthenticatedUser, ensureOperator } from '#lib/server/authorization.js';
 import { updateTagSchema } from '@ac/validations';
 import { readTag } from './read.remote.js';
 import { listTags } from '../list.remote.js';
 
 export const updateTag = form(updateTagSchema, async (input) => {
-    getAuthenticatedUser();
+    const user = getAuthenticatedUser();
+    ensureOperator(user);
 
     const [updatedTag] = await db.update(tag)
         .set({

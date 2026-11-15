@@ -1,4 +1,5 @@
 import { query, command, getRequestEvent, requested } from '$app/server';
+import { dev } from '$app/env';
 import * as v from 'valibot';
 import { goalPaginationSchema } from '@ac/validations';
 import { queryGoalCampaigns, getShowcaseData } from '#lib/server/goals/service.js';
@@ -25,9 +26,10 @@ export const getCurrentSessionUser = query(v.optional(v.object({}), {}), async (
     const event = getRequestEvent();
     const user = event.locals.user ?? null;
     const isOperatorFlag = isOperator(user);
-    const devPersona =
-        (event.cookies.get('ac_goals_dev_persona') as 'operator' | 'community' | 'guest') ||
-        'operator';
+    const devPersona = dev
+        ? (event.cookies.get('ac_goals_dev_persona') as 'operator' | 'community' | 'guest') ||
+          'operator'
+        : null;
     return {
         user: user
             ? {
@@ -47,6 +49,10 @@ export const getCurrentSessionUser = query(v.optional(v.object({}), {}), async (
 export const switchDevPersona = command(
     v.picklist(['operator', 'community', 'guest']),
     async (persona) => {
+        if (!dev) {
+            throw new Error('Forbidden: Dev persona switching is disabled in production.');
+        }
+
         const event = getRequestEvent();
         event.cookies.set('ac_goals_dev_persona', persona, {
             path: '/',

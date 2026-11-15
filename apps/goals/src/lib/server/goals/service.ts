@@ -1359,19 +1359,34 @@ export async function getShowcaseData(options?: {
 
 export async function getGoalCampaignById(
     id: string,
-    options?: { incrementVisit?: boolean; isAuthorizedOperator?: boolean }
+    options?: {
+        incrementVisit?: boolean;
+        isAuthorizedOperator?: boolean;
+        currentUserId?: string | null;
+    }
 ): Promise<GoalCampaign | null> {
     await ensureGoalsTablesAndSeed();
+
+    const [row] = await db.select().from(goalCampaign).where(eq(goalCampaign.id, id));
+    if (!row) return null;
+
+    const isPublicStatus =
+        row.status === 'published' ||
+        row.status === 'completed_successful' ||
+        row.status === 'completed_unsuccessful';
+    const isOwner = Boolean(options?.currentUserId && row.userId === options.currentUserId);
+
+    if (!options?.isAuthorizedOperator && !isPublicStatus && !isOwner) {
+        return null;
+    }
 
     if (options?.incrementVisit) {
         await db
             .update(goalCampaign)
             .set({ visitsCount: sql`${goalCampaign.visitsCount} + 1` })
             .where(eq(goalCampaign.id, id));
+        row.visitsCount = Number(row.visitsCount || 0) + 1;
     }
-
-    const [row] = await db.select().from(goalCampaign).where(eq(goalCampaign.id, id));
-    if (!row) return null;
 
     const [hydrated] = await hydrateGoalCampaigns([row], {
         includeDetails: true,

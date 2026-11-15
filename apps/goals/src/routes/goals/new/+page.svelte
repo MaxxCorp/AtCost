@@ -14,6 +14,7 @@
 	import { createGoalCampaign } from './create.remote.js';
 	import { createGoalCampaignSchema } from '@ac/validations';
 	import GoalForm from '#lib/components/goals/GoalForm.svelte';
+	import { dev } from '$app/env';
 	import { toast } from 'svelte-sonner';
 
 	const sessionQuery = getCurrentSessionUser({});
@@ -97,22 +98,42 @@
 
 			<div class="flex flex-wrap items-center justify-center gap-3 pt-2">
 				<Button
+					href="/login?redirectTo=%2Fgoals%2Fnew"
 					variant="primary"
-					onclick={() => void handlePersonaSwitch('community')}
 					class="inline-flex items-center gap-2"
 				>
 					<UserCheck class="w-4 h-4" />
-					Sign In as Registered Community Member
+					Sign In
 				</Button>
 				<Button
-					variant="secondary"
-					onclick={() => void handlePersonaSwitch('operator')}
+					href="/signup?redirectTo=%2Fgoals%2Fnew"
+					variant="outline"
 					class="inline-flex items-center gap-2"
 				>
-					<ShieldCheck class="w-4 h-4" />
-					Sign In as Internal Operator
+					Create Account
 				</Button>
 			</div>
+
+			{#if dev}
+				<div class="flex flex-wrap items-center justify-center gap-2 pt-2 border-t border-amber-200/70">
+					<Button
+						variant="ghost"
+						onclick={() => void handlePersonaSwitch('community')}
+						class="inline-flex items-center gap-2 text-xs"
+					>
+						<UserCheck class="w-3.5 h-3.5" />
+						Dev: Community Member
+					</Button>
+					<Button
+						variant="ghost"
+						onclick={() => void handlePersonaSwitch('operator')}
+						class="inline-flex items-center gap-2 text-xs"
+					>
+						<ShieldCheck class="w-3.5 h-3.5" />
+						Dev: Internal Operator
+					</Button>
+				</div>
+			{/if}
 		</div>
 	{:else}
 		<GoalForm

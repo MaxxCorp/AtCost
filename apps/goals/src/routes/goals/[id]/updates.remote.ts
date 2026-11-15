@@ -61,7 +61,8 @@ export const postGoalUpdate = form(createGoalUpdateSchema, async (data) => {
 
     const updated = await getGoalCampaignById(data.campaignId, {
         incrementVisit: false,
-        isAuthorizedOperator: isOp
+        isAuthorizedOperator: isOp,
+        currentUserId: user.id
     });
 
     try {

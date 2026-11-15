@@ -1,8 +1,14 @@
 import { getRequestEvent } from '$app/server';
 import type { UserWithRolesAndClaims } from '../auth.d';
-import { hasAccess as sharedHasAccess, isOperator, parseRoles, parseClaims } from '../authorization';
+import {
+    hasAccess as appHasAccess,
+    isOperator,
+    parseRoles,
+    parseClaims,
+    type GoalFeature,
+} from '../authorization';
 
-export { parseRoles, parseClaims, isOperator, sharedHasAccess as hasAccess };
+export { parseRoles, parseClaims, isOperator, appHasAccess as hasAccess };
 
 export function getAuthenticatedUser(): UserWithRolesAndClaims {
     const event = getRequestEvent();
@@ -17,12 +23,18 @@ export function getOptionalUser(): UserWithRolesAndClaims | null {
     return event.locals.user as UserWithRolesAndClaims | null;
 }
 
-export function ensureAccess(user: UserWithRolesAndClaims, feature: any) {
-    if (sharedHasAccess(user, feature)) return;
-    throw new Error('Forbidden');
+export function ensureAccess(user: UserWithRolesAndClaims | null | undefined, feature: GoalFeature) {
+    if (!user) {
+        throw new Error('Unauthorized: Authentication required.');
+    }
+    if (appHasAccess(user, feature)) return;
+    throw new Error('Forbidden: Operator or Admin privileges required.');
 }
 
-export function ensureOperator(user: UserWithRolesAndClaims) {
+export function ensureOperator(user: UserWithRolesAndClaims | null | undefined) {
+    if (!user) {
+        throw new Error('Unauthorized: Authentication required.');
+    }
     if (isOperator(user)) return;
     throw new Error('Forbidden: Internal operator permissions required.');
 }

@@ -1,3 +1,4 @@
+import { redirect } from '@sveltejs/kit';
 import { sequence, type Handle } from '@sveltejs/kit/hooks';
 import { DATABASE_URL } from '$app/env/private';
 
@@ -6,6 +7,7 @@ if (DATABASE_URL) {
 }
 
 import { auth } from "#lib/server/auth.js";
+import { isOperator } from "#lib/authorization.js";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { building, dev } from '$app/env';
 import { paraglideMiddleware } from '#lib/paraglide/server.js';
@@ -76,6 +78,43 @@ const handleMockAuth: Handle = async ({ event, resolve }) => {
     return resolve(event);
 };
 
+const handleRouteGuard: Handle = async ({ event, resolve }) => {
+    if (building) return resolve(event);
+
+    const pathname = event.url.pathname;
+    if (pathname.startsWith('/_app/') || pathname.startsWith('/api/')) {
+        return resolve(event);
+    }
+
+    const operatorRoots = ['/locations', '/tags', '/goals/approvals', '/contacts', '/users'];
+    const isOperatorRoute = operatorRoots.some(
+        (root) => pathname === root || pathname.startsWith(`${root}/`)
+    );
+
+    if (isOperatorRoute) {
+        if (!event.locals.user) {
+            const fromUrl = event.url.pathname + event.url.search;
+            throw redirect(303, `/login?redirectTo=${encodeURIComponent(fromUrl)}`);
+        }
+        if (!isOperator(event.locals.user as any)) {
+            throw redirect(303, '/goals');
+        }
+        return resolve(event);
+    }
+
+    const isAuthRequiredRoute =
+        pathname === '/goals/new' ||
+        pathname.startsWith('/goals/new/') ||
+        /^\/goals\/[^/]+\/edit(\/|$)/.test(pathname);
+
+    if (isAuthRequiredRoute && !event.locals.user) {
+        const fromUrl = event.url.pathname + event.url.search;
+        throw redirect(303, `/login?redirectTo=${encodeURIComponent(fromUrl)}`);
+    }
+
+    return resolve(event);
+};
+
 const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(event.request, ({ locale }) => {
     return resolve(event, {
         transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale)
@@ -83,5 +122,5 @@ const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(even
 });
 
 export const handle: Handle = dev
-    ? sequence(handleBetterAuth, handleMockAuth, handleParaglide)
-    : sequence(handleBetterAuth, handleParaglide);
+    ? sequence(handleBetterAuth, handleMockAuth, handleRouteGuard, handleParaglide)
+    : sequence(handleBetterAuth, handleRouteGuard, handleParaglide);

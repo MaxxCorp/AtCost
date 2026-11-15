@@ -216,74 +216,76 @@
 				</div>
 			</a>
 
-			<a
-				href="/goals/approvals"
-				class="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-amber-400"
-			>
-				<div class="space-y-3">
-					<div
-						class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors"
-					>
-						<ShieldCheck class="h-6 w-6" />
+			{#if isOperator}
+				<a
+					href="/goals/approvals"
+					class="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-amber-400"
+				>
+					<div class="space-y-3">
+						<div
+							class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors"
+						>
+							<ShieldCheck class="h-6 w-6" />
+						</div>
+						<h3 class="text-lg font-bold text-gray-900 group-hover:text-amber-700 transition-colors">
+							{m.feature_approvals_title()}
+						</h3>
+						<p class="text-sm text-gray-600 leading-relaxed">
+							{m.feature_approvals_description()} Includes external payment provider architecture.
+						</p>
 					</div>
-					<h3 class="text-lg font-bold text-gray-900 group-hover:text-amber-700 transition-colors">
-						{m.feature_approvals_title()}
-					</h3>
-					<p class="text-sm text-gray-600 leading-relaxed">
-						{m.feature_approvals_description()} Includes external payment provider architecture.
-					</p>
-				</div>
-				<div class="mt-6 flex items-center text-sm font-semibold text-amber-600">
-					Open Governance Hub
-					<ArrowRight class="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" />
-				</div>
-			</a>
+					<div class="mt-6 flex items-center text-sm font-semibold text-amber-600">
+						Open Governance Hub
+						<ArrowRight class="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" />
+					</div>
+				</a>
 
-			<a
-				href="/locations"
-				class="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-blue-400"
-			>
-				<div class="space-y-3">
-					<div
-						class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors"
-					>
-						<MapPin class="h-6 w-6" />
+				<a
+					href="/locations"
+					class="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-blue-400"
+				>
+					<div class="space-y-3">
+						<div
+							class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors"
+						>
+							<MapPin class="h-6 w-6" />
+						</div>
+						<h3 class="text-lg font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+							{m.feature_locations_title()}
+						</h3>
+						<p class="text-sm text-gray-600 leading-relaxed">
+							Manage physical hubs, neighborhoods, and rooms associated with goal campaigns.
+						</p>
 					</div>
-					<h3 class="text-lg font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
-						{m.feature_locations_title()}
-					</h3>
-					<p class="text-sm text-gray-600 leading-relaxed">
-						Manage physical hubs, neighborhoods, and rooms associated with goal campaigns.
-					</p>
-				</div>
-				<div class="mt-6 flex items-center text-sm font-semibold text-blue-600">
-					Manage Locations
-					<ArrowRight class="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" />
-				</div>
-			</a>
+					<div class="mt-6 flex items-center text-sm font-semibold text-blue-600">
+						Manage Locations
+						<ArrowRight class="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" />
+					</div>
+				</a>
 
-			<a
-				href="/tags"
-				class="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-purple-400"
-			>
-				<div class="space-y-3">
-					<div
-						class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors"
-					>
-						<Tags class="h-6 w-6" />
+				<a
+					href="/tags"
+					class="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-purple-400"
+				>
+					<div class="space-y-3">
+						<div
+							class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors"
+						>
+							<Tags class="h-6 w-6" />
+						</div>
+						<h3 class="text-lg font-bold text-gray-900 group-hover:text-purple-700 transition-colors">
+							{m.feature_tags_title()}
+						</h3>
+						<p class="text-sm text-gray-600 leading-relaxed">
+							Organize campaigns with categorized tags for fast filtering and topic discovery.
+						</p>
 					</div>
-					<h3 class="text-lg font-bold text-gray-900 group-hover:text-purple-700 transition-colors">
-						{m.feature_tags_title()}
-					</h3>
-					<p class="text-sm text-gray-600 leading-relaxed">
-						Organize campaigns with categorized tags for fast filtering and topic discovery.
-					</p>
-				</div>
-				<div class="mt-6 flex items-center text-sm font-semibold text-purple-600">
-					Explore Tags
-					<ArrowRight class="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" />
-				</div>
-			</a>
+					<div class="mt-6 flex items-center text-sm font-semibold text-purple-600">
+						Explore Tags
+						<ArrowRight class="ml-1.5 h-4 w-4 transition-transform group-hover:translate-x-1" />
+					</div>
+				</a>
+			{/if}
 
 			<div
 				class="flex flex-col justify-between rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-teal-50/50 p-6"

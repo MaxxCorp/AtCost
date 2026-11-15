@@ -249,7 +249,11 @@
 				Tag Categorization & Associated Locations
 			</h2>
 			<p class="text-xs text-gray-600 mt-1">
-				Associate tags and physical locations with this goal campaign (reusing the shared TagManager and Location EntityManager patterns) so users can filter and discover it.
+				{#if isOperator}
+					Associate existing tags and physical locations with this goal campaign (or create new ones inline) so users can filter and discover it.
+				{:else}
+					Associate existing tags and physical locations with this goal campaign so users can filter and discover it.
+				{/if}
 			</p>
 		</div>
 
@@ -266,22 +270,23 @@
 						icon={TagIcon}
 						mode="embedded"
 						preferenceKey="em_filters_goal_tags"
+						showQuickCreateButton={isOperator}
 						initialItems={initialData?.tags || []}
 						listItemsRemote={listTags}
 						onchange={(_ids: any, items: any[]) => {
 							selectedTagNames = (items || []).map((i: any) => String(i.name));
 						}}
-						createRemote={createTag}
+						createRemote={isOperator ? createTag : undefined}
 						createSchema={createTagSchema}
-						updateRemote={updateTag}
+						updateRemote={isOperator ? updateTag : undefined}
 						updateSchema={updateTagSchema}
-						readItemRemote={readTag}
-						deleteItemRemote={deleteTag}
+						readItemRemote={isOperator ? readTag : undefined}
+						deleteItemRemote={isOperator ? deleteTag : undefined}
 						categories={availableTagCategories}
 						categoriesRemote={listTagCategories}
-						createCategoryRemote={createTagCategoryCommand}
-						updateCategoryRemote={updateTagCategoryCommand}
-						deleteCategoryRemote={deleteTagCategoryAction}
+						createCategoryRemote={isOperator ? createTagCategoryCommand : undefined}
+						updateCategoryRemote={isOperator ? updateTagCategoryCommand : undefined}
+						deleteCategoryRemote={isOperator ? deleteTagCategoryAction : undefined}
 						onCategoryCreated={() => {
 							void tagCategoriesQuery.refresh();
 						}}
@@ -309,6 +314,7 @@
 						icon={MapPin}
 						mode="embedded"
 						type="goal"
+						showQuickCreateButton={isOperator}
 						entityId={initialData?.id}
 						initialItems={initialData?.locations || []}
 						filters={getLocationFilterGroups(m)}
@@ -327,12 +333,12 @@
 						onchange={(ids: string[]) => {
 							selectedLocationIds = ids;
 						}}
-						deleteItemRemote={deleteLocation}
-						createRemote={createLocation}
+						deleteItemRemote={isOperator ? deleteLocation : undefined}
+						createRemote={isOperator ? createLocation : undefined}
 						createSchema={createLocationSchema}
-						updateRemote={updateLocation}
+						updateRemote={isOperator ? updateLocation : undefined}
 						updateSchema={updateLocationSchema}
-						readItemRemote={readLocation}
+						readItemRemote={isOperator ? readLocation : undefined}
 						searchPredicate={(l: Location, q: string) =>
 							l.name.toLowerCase().includes(q.toLowerCase()) ||
 							(l.city?.toLowerCase().includes(q.toLowerCase()) ?? false)}

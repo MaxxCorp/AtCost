@@ -41,6 +41,8 @@
 		type GoalShowcaseSelectionMode
 	} from '@ac/validations';
 	import { getContributionPlugin } from '#lib/plugins/registry.js';
+	import { dev } from '$app/env';
+	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 
 	const campaignsQuery = listGoalCampaigns({
@@ -52,6 +54,7 @@
 	const sessionQuery = getCurrentSessionUser({});
 	const paymentProposalsQuery = getPaymentProviderProposals({});
 
+	const currentUser = $derived(sessionQuery.current?.user ?? null);
 	const isOperator = $derived(sessionQuery.current?.isOperator ?? false);
 	const allCampaigns = $derived(campaignsQuery.current?.data ?? []);
 	const showcaseData = $derived(showcaseQuery.current);
@@ -161,25 +164,46 @@
 				Community Approvals, Showcase & Payment Architecture
 			</h1>
 		</div>
-
-		{#if !isOperator}
-			<div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-center gap-3">
-				<Lock class="w-5 h-5 text-amber-600 shrink-0" />
-				<div class="text-xs text-amber-900">
-					<p class="font-bold">Operator Privileges Required for Mutations</p>
-					<p>Switch to the Operator persona to approve campaigns or save showcase config.</p>
-				</div>
-				<Button
-					variant="primary"
-					onclick={handleSwitchToOperator}
-					class="text-xs px-3 py-1.5 shrink-0"
-				>
-					Switch to Operator
-				</Button>
-			</div>
-		{/if}
 	</div>
 
+	{#if sessionQuery.loading && !sessionQuery.current}
+		<LoadingSection message="Verifying operator privileges..." />
+	{:else if !currentUser || !isOperator}
+		<div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-8 text-center space-y-5 shadow-sm">
+			<div class="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+				<Lock class="w-7 h-7" />
+			</div>
+			<div class="space-y-2 max-w-xl mx-auto">
+				<h2 class="text-xl font-bold text-gray-900">
+					{!currentUser ? 'Authentication Required' : 'Operator or Admin Privileges Required'}
+				</h2>
+				<p class="text-sm text-gray-600 leading-relaxed">
+					{!currentUser
+						? 'Please sign in with an Operator or Administrator account to review pending campaigns and manage showcase settings.'
+						: 'Only platform operators and administrators can access the Approval Queue, Showcase Settings, and Payment Governance.'}
+				</p>
+			</div>
+			<div class="flex flex-wrap items-center justify-center gap-3 pt-1">
+				{#if !currentUser}
+					<Button
+						href="/login?redirectTo={encodeURIComponent(page.url.pathname)}"
+						variant="primary"
+					>
+						Sign In as Operator
+					</Button>
+				{:else}
+					<Button href="/goals" variant="outline">
+						Back to Campaigns
+					</Button>
+				{/if}
+				{#if dev}
+					<Button variant="secondary" onclick={handleSwitchToOperator}>
+						Switch to Operator (Dev)
+					</Button>
+				{/if}
+			</div>
+		</div>
+	{:else}
 	<!-- Governance Tabs Navigation -->
 	<div class="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
 		<button
@@ -652,5 +676,6 @@
 				{/each}
 			</div>
 		</div>
+	{/if}
 	{/if}
 </div>

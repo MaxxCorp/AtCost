@@ -5,7 +5,7 @@
 	import * as Sidebar from "@ac/ui/components/sidebar";
 	import * as Breadcrumb from "@ac/ui/components/breadcrumb";
 	import { onMount } from "svelte";
-	import { browser } from "$app/env";
+	import { browser, dev } from "$app/env";
 	import { page } from "$app/state";
 	import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
 	import { FEATURES } from "#lib/features.js";
@@ -33,6 +33,8 @@
 	);
 
 	const sessionQuery = getCurrentSessionUser({});
+	const currentUser = $derived(sessionQuery.current?.user ?? null);
+	const isOperator = $derived(Boolean(sessionQuery.current?.isOperator));
 	const activePersona = $derived(sessionQuery.current?.devPersona ?? "operator");
 	let switchingPersona = $state(false);
 
@@ -125,54 +127,74 @@
 				{/if}
 
 				<div class="ml-auto flex items-center gap-2">
-					<div
-						class="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-100/80 p-1 text-xs"
-						title="Switch active persona to test Operator vs Community Member vs Guest permissions"
-					>
-						<button
-							type="button"
-							disabled={switchingPersona}
-							onclick={() => handlePersonaChange("operator")}
-							class={[
-								"flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer",
-								activePersona === "operator"
-									? "bg-indigo-600 text-white shadow-xs"
-									: "text-gray-600 hover:text-gray-900",
-							]}
+					{#if dev}
+						<div
+							class="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-100/80 p-1 text-xs"
+							title="Switch active persona to test Operator vs Community Member vs Guest permissions"
 						>
-							<ShieldIcon class="size-3.5" />
-							<span>Operator</span>
-						</button>
-						<button
-							type="button"
-							disabled={switchingPersona}
-							onclick={() => handlePersonaChange("community")}
-							class={[
-								"flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer",
-								activePersona === "community"
-									? "bg-emerald-600 text-white shadow-xs"
-									: "text-gray-600 hover:text-gray-900",
-							]}
+							<button
+								type="button"
+								disabled={switchingPersona}
+								onclick={() => handlePersonaChange("operator")}
+								class={[
+									"flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer",
+									activePersona === "operator"
+										? "bg-indigo-600 text-white shadow-xs"
+										: "text-gray-600 hover:text-gray-900",
+								]}
+							>
+								<ShieldIcon class="size-3.5" />
+								<span>Operator</span>
+							</button>
+							<button
+								type="button"
+								disabled={switchingPersona}
+								onclick={() => handlePersonaChange("community")}
+								class={[
+									"flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer",
+									activePersona === "community"
+										? "bg-emerald-600 text-white shadow-xs"
+										: "text-gray-600 hover:text-gray-900",
+								]}
+							>
+								<UsersIcon class="size-3.5" />
+								<span class="hidden md:inline">Community Member</span>
+								<span class="md:hidden">Member</span>
+							</button>
+							<button
+								type="button"
+								disabled={switchingPersona}
+								onclick={() => handlePersonaChange("guest")}
+								class={[
+									"flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer",
+									activePersona === "guest"
+										? "bg-slate-700 text-white shadow-xs"
+										: "text-gray-600 hover:text-gray-900",
+								]}
+							>
+								<EyeIcon class="size-3.5" />
+								<span>Guest</span>
+							</button>
+						</div>
+					{/if}
+
+					{#if !currentUser}
+						<a
+							href="/login"
+							class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
 						>
-							<UsersIcon class="size-3.5" />
-							<span class="hidden md:inline">Community Member</span>
-							<span class="md:hidden">Member</span>
-						</button>
-						<button
-							type="button"
-							disabled={switchingPersona}
-							onclick={() => handlePersonaChange("guest")}
-							class={[
-								"flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold transition-all cursor-pointer",
-								activePersona === "guest"
-									? "bg-slate-700 text-white shadow-xs"
-									: "text-gray-600 hover:text-gray-900",
-							]}
-						>
-							<EyeIcon class="size-3.5" />
-							<span>Guest</span>
-						</button>
-					</div>
+							Sign In
+						</a>
+					{:else}
+						<div class="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700">
+							<span class="max-w-[10rem] truncate">{currentUser.name || currentUser.email}</span>
+							{#if isOperator}
+								<span class="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+									Operator
+								</span>
+							{/if}
+						</div>
+					{/if}
 
 					<a
 						href="/goals/new"
@@ -199,7 +221,9 @@
 						<a href="/gdpr-self-service" class="text-indigo-600 hover:text-indigo-700 transition-colors">
 							GDPR Art. 17 Self-Service
 						</a>
-						<a href="/contacts" class="hover:text-indigo-600 transition-colors">Encrypted Contacts</a>
+						{#if isOperator}
+							<a href="/contacts" class="hover:text-indigo-600 transition-colors">Encrypted Contacts</a>
+						{/if}
 					</nav>
 				</div>
 			</footer>

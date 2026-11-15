@@ -3,6 +3,8 @@
 	import { Button } from "@ac/ui/components/button";
 	import { cn, type WithElementRef } from "#lib/utils.js";
 	import type { HTMLAttributes } from "svelte/elements";
+	import { dev } from "$app/env";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { switchDevPersona } from "../../routes/goals/list.remote.js";
 	import ShieldIcon from "@lucide/svelte/icons/shield";
@@ -19,6 +21,11 @@
 	let signingIn = $state(false);
 	let errorMessage = $state<string | null>(null);
 
+	const redirectTo = $derived.by(() => {
+		const r = page.url.searchParams.get("redirectTo");
+		return r && r.startsWith("/") && !r.startsWith("//") ? r : "/goals";
+	});
+
 	async function handleEmailSignIn(e: SubmitEvent) {
 		e.preventDefault();
 		if (!email || !password) return;
@@ -28,14 +35,14 @@
 			const res = await authClient.signIn.email({
 				email,
 				password,
-				callbackURL: "/goals",
+				callbackURL: redirectTo,
 			});
 			if (res?.error) {
 				errorMessage = res.error.message || "Invalid credentials";
 				signingIn = false;
 				return;
 			}
-			await goto("/goals");
+			await goto(redirectTo);
 		} catch (error: any) {
 			errorMessage = error?.message || "Sign in failed";
 			signingIn = false;
@@ -48,7 +55,7 @@
 			errorMessage = null;
 			await authClient.signIn.social({
 				provider,
-				callbackURL: "/goals",
+				callbackURL: redirectTo,
 			});
 		} catch (error: any) {
 			errorMessage = error?.message || "Social sign in failed";
@@ -60,7 +67,7 @@
 		try {
 			signingIn = true;
 			await switchDevPersona(persona);
-			await goto("/goals");
+			await goto(redirectTo);
 		} finally {
 			signingIn = false;
 		}
@@ -162,34 +169,36 @@
 		</Button>
 	</div>
 
-	<div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 space-y-2.5">
-		<p class="text-xs font-semibold text-indigo-950">Quick Demo Persona Switcher</p>
-		<p class="text-[11px] text-indigo-700 leading-relaxed">
-			Immediately activate an evaluator session without external OAuth setup:
-		</p>
-		<div class="grid grid-cols-1 gap-2">
-			<Button
-				type="button"
-				variant="outline"
-				class="w-full justify-start gap-2 border-indigo-200 bg-white text-xs font-semibold text-indigo-900 hover:bg-indigo-100"
-				onclick={() => handlePersonaSwitch("operator")}
-				disabled={signingIn}
-			>
-				<ShieldIcon class="size-3.5 text-indigo-600" />
-				Sign in as Internal Operator
-			</Button>
-			<Button
-				type="button"
-				variant="outline"
-				class="w-full justify-start gap-2 border-emerald-200 bg-white text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
-				onclick={() => handlePersonaSwitch("community")}
-				disabled={signingIn}
-			>
-				<UsersIcon class="size-3.5 text-emerald-600" />
-				Sign in as Registered Community Member
-			</Button>
+	{#if dev}
+		<div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 space-y-2.5">
+			<p class="text-xs font-semibold text-indigo-950">Quick Demo Persona Switcher</p>
+			<p class="text-[11px] text-indigo-700 leading-relaxed">
+				Immediately activate an evaluator session without external OAuth setup:
+			</p>
+			<div class="grid grid-cols-1 gap-2">
+				<Button
+					type="button"
+					variant="outline"
+					class="w-full justify-start gap-2 border-indigo-200 bg-white text-xs font-semibold text-indigo-900 hover:bg-indigo-100"
+					onclick={() => handlePersonaSwitch("operator")}
+					disabled={signingIn}
+				>
+					<ShieldIcon class="size-3.5 text-indigo-600" />
+					Sign in as Internal Operator
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					class="w-full justify-start gap-2 border-emerald-200 bg-white text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+					onclick={() => handlePersonaSwitch("community")}
+					disabled={signingIn}
+				>
+					<UsersIcon class="size-3.5 text-emerald-600" />
+					Sign in as Registered Community Member
+				</Button>
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<div class="text-center text-sm text-muted-foreground">
 		Want to participate in campaigns?

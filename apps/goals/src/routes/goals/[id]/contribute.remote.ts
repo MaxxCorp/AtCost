@@ -16,7 +16,8 @@ export const contributeToGoalCampaign = form(createGoalContributionSchema, async
 
     const updatedCampaign = await getGoalCampaignById(data.campaignId, {
         incrementVisit: false,
-        isAuthorizedOperator: isOperator(user)
+        isAuthorizedOperator: isOperator(user),
+        currentUserId: user.id
     });
 
     try {

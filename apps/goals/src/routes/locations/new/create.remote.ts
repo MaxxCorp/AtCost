@@ -1,13 +1,14 @@
 import { form, requested } from '$app/server';
 import { createLocation as insertLocation } from '@ac/db';
 import { listLocations } from '../list.remote';
-import { getAuthenticatedUser } from '#lib/server/authorization.js';
+import { getAuthenticatedUser, ensureOperator } from '#lib/server/authorization.js';
 import { createLocationSchema } from '@ac/validations';
 import { invalidateLocation } from '#lib/server/cache/index.js';
 
 export const createLocation = form(createLocationSchema, async (data) => {
     try {
         const user = getAuthenticatedUser();
+        ensureOperator(user);
 
         const newLocation = await insertLocation(data, user.id);
         await invalidateLocation(newLocation.id);

@@ -1,11 +1,15 @@
 <script lang="ts">
+	import { page } from "$app/state";
 	import {
 		EntityManager,
 		ContactEncryptionBanner,
 		ContactEncryptionMigrationDialog,
+		LoadingSection,
+		Button,
 	} from "@ac/ui";
 	import { listContacts } from "./list.remote.js";
 	import { deleteContact } from "./[id]/delete.remote.js";
+	import { getCurrentSessionUser } from "../goals/list.remote.js";
 	import {
 		getEncryptionStatus,
 		beginEncryptionMigration,
@@ -29,9 +33,13 @@
 		current: "Encrypted Participant Contacts",
 	});
 
+	const sessionQuery = getCurrentSessionUser({});
+	const currentUser = $derived(sessionQuery.current?.user ?? null);
+	const isOperator = $derived(Boolean(sessionQuery.current?.isOperator));
+
 	let showEncryptionMigrationDialog = $state(false);
-	const encryptionStatusQuery = getEncryptionStatus();
-	const encryptionStatus = $derived(encryptionStatusQuery.current);
+	const encryptionStatusQuery = $derived(isOperator ? getEncryptionStatus() : null);
+	const encryptionStatus = $derived(encryptionStatusQuery?.current);
 </script>
 
 <svelte:head>
@@ -39,7 +47,35 @@
 </svelte:head>
 
 <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6">
-	<!-- Header -->
+	{#if sessionQuery.loading && !sessionQuery.current}
+		<LoadingSection message="Verifying operator access..." />
+	{:else if !currentUser || !isOperator}
+		<div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-8 text-center space-y-5 shadow-sm">
+			<div class="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+				<Lock class="w-7 h-7" />
+			</div>
+			<div class="space-y-2 max-w-xl mx-auto">
+				<h1 class="text-xl font-bold text-gray-900">
+					{!currentUser ? "Authentication Required" : "Operator or Admin Privileges Required"}
+				</h1>
+				<p class="text-sm text-gray-600 leading-relaxed">
+					{!currentUser
+						? "Please sign in with an Operator or Administrator account to access segregated participant contacts."
+						: "Only platform operators and administrators can access the Encrypted Contacts vault."}
+				</p>
+			</div>
+			<div class="flex flex-wrap items-center justify-center gap-3">
+				{#if !currentUser}
+					<Button href="/login?redirectTo={encodeURIComponent(page.url.pathname)}" variant="primary">
+						Sign In
+					</Button>
+				{:else}
+					<Button href="/goals" variant="outline">Back to Campaigns</Button>
+				{/if}
+			</div>
+		</div>
+	{:else}
+		<!-- Header -->
 	<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-200/80 shadow-2xs">
 		<div class="space-y-1">
 			<div class="flex items-center gap-2">
@@ -101,7 +137,7 @@
 			startMigrationRemote={beginEncryptionMigration}
 			processBatchRemote={runEncryptionBatch}
 			oncomplete={async () => {
-				await encryptionStatusQuery.refresh();
+				await encryptionStatusQuery?.refresh();
 			}}
 			onclose={() => (showEncryptionMigrationDialog = false)}
 		/>
@@ -181,4 +217,5 @@
 			</div>
 		{/snippet}
 	</EntityManager>
+	{/if}
 </div>

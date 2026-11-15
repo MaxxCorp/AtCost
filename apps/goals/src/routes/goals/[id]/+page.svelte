@@ -614,17 +614,28 @@
 							</h3>
 							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 								{#each campaign.locations ?? [] as loc (loc.id)}
-									<a
-										href="/locations/{loc.id}"
-										class="rounded-xl border border-gray-200 p-3.5 hover:border-blue-400 hover:bg-blue-50/30 transition-all block"
-									>
-										<div class="font-bold text-sm text-gray-900">{loc.name}</div>
-										<div class="text-xs text-gray-600 mt-0.5">
-											{[loc.street, loc.houseNumber, loc.zip, loc.city, loc.country]
-												.filter(Boolean)
-												.join(' ')}
+									{#if isOperator}
+										<a
+											href="/locations/{loc.id}"
+											class="rounded-xl border border-gray-200 p-3.5 hover:border-blue-400 hover:bg-blue-50/30 transition-all block"
+										>
+											<div class="font-bold text-sm text-gray-900">{loc.name}</div>
+											<div class="text-xs text-gray-600 mt-0.5">
+												{[loc.street, loc.houseNumber, loc.zip, loc.city, loc.country]
+													.filter(Boolean)
+													.join(' ')}
+											</div>
+										</a>
+									{:else}
+										<div class="rounded-xl border border-gray-200 p-3.5 block">
+											<div class="font-bold text-sm text-gray-900">{loc.name}</div>
+											<div class="text-xs text-gray-600 mt-0.5">
+												{[loc.street, loc.houseNumber, loc.zip, loc.city, loc.country]
+													.filter(Boolean)
+													.join(' ')}
+											</div>
 										</div>
-									</a>
+									{/if}
 								{/each}
 							</div>
 						</div>

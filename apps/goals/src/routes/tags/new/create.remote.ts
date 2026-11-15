@@ -1,12 +1,13 @@
 import { form, requested } from '$app/server';
 import { db, tag, eq } from '@ac/db';
-import { getAuthenticatedUser } from '#lib/server/authorization.js';
+import { getAuthenticatedUser, ensureOperator } from '#lib/server/authorization.js';
 import { createTagSchema } from '@ac/validations';
 import { listTags } from '../list.remote.js';
 import { readTag } from '../[id]/read.remote.js';
 
 export const createTag = form(createTagSchema, async (input) => {
     const user = getAuthenticatedUser();
+    ensureOperator(user);
 
     const existing = await db.query.tag.findFirst({
         where: eq(tag.name, input.name)

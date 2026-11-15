@@ -3,6 +3,8 @@
 	import { Button } from "@ac/ui/components/button";
 	import { cn, type WithElementRef } from "#lib/utils.js";
 	import type { HTMLAttributes } from "svelte/elements";
+	import { dev } from "$app/env";
+	import { page } from "$app/state";
 	import { goto } from "$app/navigation";
 	import { switchDevPersona } from "../../routes/goals/list.remote.js";
 	import UsersIcon from "@lucide/svelte/icons/users";
@@ -19,6 +21,11 @@
 	let signingUp = $state(false);
 	let errorMessage = $state<string | null>(null);
 
+	const redirectTo = $derived.by(() => {
+		const r = page.url.searchParams.get("redirectTo");
+		return r && r.startsWith("/") && !r.startsWith("//") ? r : "/goals";
+	});
+
 	async function handleEmailSignUp(e: SubmitEvent) {
 		e.preventDefault();
 		if (!name || !email || !password) return;
@@ -29,14 +36,14 @@
 				name,
 				email,
 				password,
-				callbackURL: "/goals",
+				callbackURL: redirectTo,
 			});
 			if (res?.error) {
 				errorMessage = res.error.message || "Registration failed";
 				signingUp = false;
 				return;
 			}
-			await goto("/goals");
+			await goto(redirectTo);
 		} catch (error: any) {
 			errorMessage = error?.message || "Registration failed";
 			signingUp = false;
@@ -49,7 +56,7 @@
 			errorMessage = null;
 			await authClient.signIn.social({
 				provider,
-				callbackURL: "/goals",
+				callbackURL: redirectTo,
 			});
 		} catch (error: any) {
 			errorMessage = error?.message || "Social registration failed";
@@ -61,7 +68,7 @@
 		try {
 			signingUp = true;
 			await switchDevPersona("community");
-			await goto("/goals");
+			await goto(redirectTo);
 		} finally {
 			signingUp = false;
 		}
@@ -175,19 +182,21 @@
 		</Button>
 	</div>
 
-	<div class="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-2">
-		<p class="text-xs font-semibold text-emerald-950">Instant Evaluator Registration</p>
-		<Button
-			type="button"
-			variant="outline"
-			class="w-full justify-center gap-2 border-emerald-300 bg-white text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
-			onclick={handleActivateCommunitySession}
-			disabled={signingUp}
-		>
-			<UsersIcon class="size-3.5 text-emerald-600" />
-			Activate Registered Community Member Session
-		</Button>
-	</div>
+	{#if dev}
+		<div class="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-2">
+			<p class="text-xs font-semibold text-emerald-950">Instant Evaluator Registration</p>
+			<Button
+				type="button"
+				variant="outline"
+				class="w-full justify-center gap-2 border-emerald-300 bg-white text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+				onclick={handleActivateCommunitySession}
+				disabled={signingUp}
+			>
+				<UsersIcon class="size-3.5 text-emerald-600" />
+				Activate Registered Community Member Session
+			</Button>
+		</div>
+	{/if}
 
 	<div class="text-center text-sm text-muted-foreground">
 		Already have an account?

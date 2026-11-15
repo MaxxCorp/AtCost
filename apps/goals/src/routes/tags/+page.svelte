@@ -21,11 +21,17 @@
 		updateTagCategorySchema,
 	} from "@ac/validations";
 
-	import { EntityManager, TagForm, TagCategoryForm } from "@ac/ui";
+	import { page } from "$app/state";
+	import { EntityManager, TagForm, TagCategoryForm, LoadingSection, Button } from "@ac/ui";
 	import { Tag as TagIcon, FolderTree, Globe, Lock } from "@lucide/svelte";
 	import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
+	import { getCurrentSessionUser } from "../goals/list.remote.js";
 
 	breadcrumbState.set({ feature: "tags" });
+
+	const sessionQuery = getCurrentSessionUser({});
+	const currentUser = $derived(sessionQuery.current?.user ?? null);
+	const isOperator = $derived(Boolean(sessionQuery.current?.isOperator));
 
 	let activeTab = $state<"tags" | "categories">("tags");
 
@@ -53,7 +59,35 @@
 </script>
 
 <div class="container mx-auto px-4 py-8 max-w-6xl">
-	<div class="space-y-6">
+	{#if sessionQuery.loading && !sessionQuery.current}
+		<LoadingSection message="Verifying operator access..." />
+	{:else if !currentUser || !isOperator}
+		<div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-8 text-center space-y-5 shadow-sm">
+			<div class="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+				<Lock class="w-7 h-7" />
+			</div>
+			<div class="space-y-2 max-w-xl mx-auto">
+				<h1 class="text-xl font-bold text-gray-900">
+					{!currentUser ? "Authentication Required" : "Operator or Admin Privileges Required"}
+				</h1>
+				<p class="text-sm text-gray-600 leading-relaxed">
+					{!currentUser
+						? "Please sign in with an Operator or Administrator account to manage tags and categories."
+						: "Only platform operators and administrators can manage tags and tag categories."}
+				</p>
+			</div>
+			<div class="flex flex-wrap items-center justify-center gap-3">
+				{#if !currentUser}
+					<Button href="/login?redirectTo={encodeURIComponent(page.url.pathname)}" variant="primary">
+						Sign In
+					</Button>
+				{:else}
+					<Button href="/goals" variant="outline">Back to Campaigns</Button>
+				{/if}
+			</div>
+		</div>
+	{:else}
+		<div class="space-y-6">
 		<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 			<div>
 				<h1 class="text-3xl font-black tracking-tight text-gray-900 flex items-center gap-3">
@@ -236,4 +270,5 @@
 			</div>
 		{/if}
 	</div>
+	{/if}
 </div>

@@ -123,7 +123,7 @@ export const updateGoalCampaign = form(updateGoalCampaignSchema, async (data) =>
         data.stretchGoalsJson
     );
     await syncGoalCampaignLocations(data.id, data.locationIds);
-    await assignTagsToGoalCampaign(data.id, tagNames, user.id);
+    await assignTagsToGoalCampaign(data.id, tagNames, user.id, { allowCreate: isOp });
 
     if (status !== existing.status) {
         await settleOrReverseCampaignFinancialContributions(data.id, status, {

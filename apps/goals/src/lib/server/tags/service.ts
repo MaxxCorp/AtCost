@@ -89,7 +89,8 @@ export async function ensureDefaultCategoriesAndTags(): Promise<void> {
 export async function assignTagsToGoalCampaign(
     campaignId: string,
     tagInputs: string[],
-    userId: string
+    userId: string,
+    options?: { allowCreate?: boolean }
 ): Promise<void> {
     await ensureDefaultCategoriesAndTags();
 
@@ -101,9 +102,12 @@ export async function assignTagsToGoalCampaign(
 
     if (cleanInputs.length === 0) return;
 
-    const defaultCat = await db.query.tagCategory.findFirst({
-        where: or(eq(tagCategory.slug, 'goals-impact'), eq(tagCategory.isDefault, true))
-    });
+    const allowCreate = options?.allowCreate === true;
+    const defaultCat = allowCreate
+        ? await db.query.tagCategory.findFirst({
+              where: or(eq(tagCategory.slug, 'goals-impact'), eq(tagCategory.isDefault, true))
+          })
+        : null;
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const resolvedTagIds = new Set<string>();
@@ -113,7 +117,7 @@ export async function assignTagsToGoalCampaign(
             const existingById = await db.query.tag.findFirst({
                 where: eq(tag.id, item)
             });
-            if (existingById) {
+            if (existingById && (allowCreate || existingById.visibility === 'external')) {
                 resolvedTagIds.add(existingById.id);
                 continue;
             }
@@ -123,8 +127,10 @@ export async function assignTagsToGoalCampaign(
             where: ilike(tag.name, item)
         });
         if (existingByName) {
-            resolvedTagIds.add(existingByName.id);
-        } else {
+            if (allowCreate || existingByName.visibility === 'external') {
+                resolvedTagIds.add(existingByName.id);
+            }
+        } else if (allowCreate) {
             const [created] = await db.insert(tag).values({
                 name: item,
                 visibility: 'external',
