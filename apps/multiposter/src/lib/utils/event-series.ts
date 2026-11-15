@@ -84,6 +84,19 @@ export function isSeriesInstance(event: any): boolean {
 }
 
 /**
+ * Checks if an event is a persisted materialized exception of a recurring series
+ * (as opposed to a virtual instance or series master).
+ */
+export function isMaterializedException(event: any): boolean {
+    if (!event) return false;
+    return Boolean(
+        !isVirtualInstanceId(event.id) &&
+        event.recurringEventId &&
+        (event.isException || event.originalStartTime)
+    );
+}
+
+/**
  * Resolves the root series master UUID from a master event, a virtual instance, or a materialized exception.
  */
 export function getSeriesRootId(event: any): string | null {

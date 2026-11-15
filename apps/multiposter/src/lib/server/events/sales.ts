@@ -630,6 +630,25 @@ async function restoreInventoryFromSale(sale: {
     }
 }
 
+/**
+ * Restores deducted consumable inventory for any sales recorded on the given events.
+ */
+export async function restoreInventoryForEvents(eventIds: string[]): Promise<void> {
+    if (!eventIds || eventIds.length === 0) return;
+    try {
+        await ensureEventSaleTable();
+        const sales = await db
+            .select()
+            .from(eventSale)
+            .where(inArray(eventSale.eventId, eventIds));
+        for (const sale of sales) {
+            await restoreInventoryFromSale(sale);
+        }
+    } catch (err) {
+        console.warn('[sales] Failed to restore inventory for deleted events:', err);
+    }
+}
+
 export async function recordEventSales(params: {
     eventId: string;
     items: { priceItemId: string; quantity: number; unitPriceOverride?: number }[];

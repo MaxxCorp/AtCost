@@ -3617,7 +3617,14 @@ export class SyncService {
 								if (!deletedExternalKeys.has(dedupeKey)) {
 									deletedExternalKeys.add(dedupeKey);
 									try {
-										await provider.deleteEvent(mapping.externalId);
+										if (config.providerType === 'microsoft-resources') {
+											const roomEmail = (mapping.metadata as any)?.roomEmail;
+											if (roomEmail && typeof (provider as any).releaseRoom === 'function') {
+												await (provider as any).releaseRoom(roomEmail, mapping.externalId);
+											}
+										} else {
+											await provider.deleteEvent(mapping.externalId);
+										}
 									} catch (error: any) {
 										console.error(`[SyncService] Failed to delete event ${mapping.externalId} from provider:`, error);
 									}

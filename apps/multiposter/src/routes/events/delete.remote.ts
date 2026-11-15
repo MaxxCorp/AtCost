@@ -3,23 +3,55 @@ import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { inArray, or, eq, and, sql } from '@ac/db';
 import { listEvents } from './list.remote';
+import { readEvent } from './[id]/read.remote';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { syncService } from '#lib/server/sync/service.js';
 import { publishEventChange } from '#lib/server/realtime.js';
 import { getStorageProvider } from '#lib/server/blob-storage/index.js';
 import { invalidateEvent } from '#lib/server/cache/index.js';
+import { revertMaterializedExceptions } from '#lib/server/events/exceptions.js';
 
 export const deleteEvents = command(
 	v.object({
 		ids: v.array(v.string()),
-		deleteSeries: v.optional(v.boolean())
+		deleteSeries: v.optional(v.boolean()),
+		deleteException: v.optional(v.boolean())
 	}),
-	async ({ ids, deleteSeries }) => {
+	async ({ ids, deleteSeries, deleteException }) => {
 		const user = getAuthenticatedUser();
 		ensureAccess(user, 'events');
 
-		if (ids.length === 0) return { success: true, deletedCount: 0 };
+		if (ids.length === 0) return { success: true, deletedCount: 0, revertedVirtualIds: [] as string[] };
+
+		if (deleteException) {
+			const result = await revertMaterializedExceptions({
+				userId: user.id,
+				eventIds: ids
+			});
+
+			try {
+				await requested(readEvent, 20).refreshAll();
+			} catch (e) {
+				console.warn('[deleteEvents] requested readEvent refresh warning:', e);
+			}
+			for (const id of new Set([...ids, ...result.deletedIds, ...result.affectedMasterIds, ...result.revertedVirtualIds])) {
+				void readEvent(id).refresh();
+			}
+			try {
+				await requested(listEvents, 20).refreshAll();
+			} catch (e) {
+				console.warn('[deleteEvents] requested listEvents refresh warning:', e);
+			}
+			void listEvents().refresh();
+			void listEvents({}).refresh();
+
+			return {
+				success: true,
+				deletedCount: result.deletedIds.length,
+				revertedVirtualIds: result.revertedVirtualIds
+			};
+		}
 
 		const storage = getStorageProvider();
 
@@ -190,7 +222,7 @@ export const deleteEvents = command(
 		}
 		void listEvents().refresh();
 		void listEvents({}).refresh();
-		return { success: true, deletedCount: eventIdsToDelete.length };
+		return { success: true, deletedCount: eventIdsToDelete.length, revertedVirtualIds: [] as string[] };
 	}
 );
 

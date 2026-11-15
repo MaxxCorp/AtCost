@@ -210,8 +210,13 @@ export function hasVirtualInstanceChanged(input: VirtualInstanceDiffInput): bool
 	return false;
 }
 
-import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventPrice, eq, and, or, sql } from '@ac/db';
-import { parseVirtualInstanceId } from '#lib/utils/event-series.js';
+import { db, event, eventLocation, eventResource, eventContact, eventContactRole, eventTag, eventPrice, emailCampaign, syncMapping, campaign, announcement, eq, and, or, inArray, sql } from '@ac/db';
+import { parseVirtualInstanceId, isVirtualInstanceId } from '#lib/utils/event-series.js';
+import { syncService } from '#lib/server/sync/service.js';
+import { getStorageProvider } from '#lib/server/blob-storage/index.js';
+import { publishEventChange } from '#lib/server/realtime.js';
+import { invalidateEvent } from '#lib/server/cache/index.js';
+import { restoreInventoryForEvents } from './sales.js';
 
 /**
  * Resolves an event entityId for associations.
@@ -349,4 +354,212 @@ export async function resolveEventIdForAssociations(
 
 	return created.id;
 }
+
+function extractExceptionSlotIso(row: {
+	originalStartTime?: any;
+	startDateTime?: Date | string | null;
+}): { rawIso: string; canonicalIso: string; timestamp: number | null } | null {
+	const origDateTime =
+		row.originalStartTime && typeof row.originalStartTime === 'object' && 'dateTime' in row.originalStartTime
+			? row.originalStartTime.dateTime
+			: null;
+
+	let rawIso: string | null = null;
+	if (typeof origDateTime === 'string' && origDateTime.trim()) {
+		rawIso = origDateTime.trim();
+	} else if (row.startDateTime) {
+		const dt = row.startDateTime instanceof Date ? row.startDateTime : new Date(row.startDateTime);
+		if (!Number.isNaN(dt.getTime())) {
+			rawIso = dt.toISOString();
+		}
+	}
+
+	if (!rawIso) return null;
+	const parsed = new Date(rawIso);
+	const ts = parsed.getTime();
+	return {
+		rawIso,
+		canonicalIso: Number.isNaN(ts) ? rawIso : parsed.toISOString(),
+		timestamp: Number.isNaN(ts) ? null : ts
+	};
+}
+
+export interface RevertExceptionsResult {
+	deletedIds: string[];
+	affectedMasterIds: string[];
+	revertedVirtualIds: string[];
+}
+
+/**
+ * Deletes materialized series exception row(s) so each occurrence reverts back to
+ * a standard virtual instance of its master series without adding master exdates.
+ * Performs full cleanup of sync mappings, storage assets, lazy references, deducted
+ * inventory, orphaned campaigns, caches, and triggers master re-sync.
+ */
+export async function revertMaterializedExceptions(params: {
+	userId: string;
+	eventIds: string[];
+}): Promise<RevertExceptionsResult> {
+	const { userId, eventIds } = params;
+	if (!eventIds || eventIds.length === 0) {
+		return { deletedIds: [], affectedMasterIds: [], revertedVirtualIds: [] };
+	}
+
+	const realIds = new Set<string>();
+	for (const id of eventIds) {
+		if (!id) continue;
+		if (!isVirtualInstanceId(id)) {
+			realIds.add(id);
+			continue;
+		}
+		// Resolve virtual ID to an existing materialized exception if one already exists
+		const parsed = parseVirtualInstanceId(id);
+		if (!parsed) continue;
+		const instIso = id.split('_inst_')[1];
+		const existing = await db.query.event.findFirst({
+			where: and(
+				eq(event.recurringEventId, parsed.masterId),
+				or(
+					sql`${event.originalStartTime}->>'dateTime' = ${instIso}`,
+					sql`${event.originalStartTime}->>'dateTime' = ${parsed.iso}`
+				)
+			)
+		});
+		if (existing) {
+			realIds.add(existing.id);
+		}
+	}
+
+	const candidateIds = Array.from(realIds);
+	if (candidateIds.length === 0) {
+		return { deletedIds: [], affectedMasterIds: [], revertedVirtualIds: [] };
+	}
+
+	const candidateRows = await db
+		.select({
+			id: event.id,
+			recurringEventId: event.recurringEventId,
+			campaignId: event.campaignId,
+			qrCodePath: event.qrCodePath,
+			iCalPath: event.iCalPath,
+			startDateTime: event.startDateTime,
+			originalStartTime: event.originalStartTime,
+			isException: event.isException
+		})
+		.from(event)
+		.where(inArray(event.id, candidateIds));
+
+	const exceptions = candidateRows.filter((row) =>
+		Boolean(row.recurringEventId && (row.isException || row.originalStartTime))
+	);
+	if (exceptions.length === 0) {
+		return { deletedIds: [], affectedMasterIds: [], revertedVirtualIds: [] };
+	}
+
+	const exceptionIds = exceptions.map((e) => e.id);
+	const affectedMasterIdSet = new Set<string>();
+	const candidateCampaignIds = new Set<string>();
+	const revertedVirtualIds: string[] = [];
+	const slotsByMaster = new Map<string, { rawIsos: Set<string>; timestamps: Set<number> }>();
+
+	for (const exc of exceptions) {
+		const masterId = exc.recurringEventId!;
+		affectedMasterIdSet.add(masterId);
+		if (exc.campaignId) {
+			candidateCampaignIds.add(exc.campaignId);
+		}
+		const slot = extractExceptionSlotIso(exc);
+		if (slot) {
+			revertedVirtualIds.push(`${masterId}_inst_${slot.canonicalIso}`);
+			let entry = slotsByMaster.get(masterId);
+			if (!entry) {
+				entry = { rawIsos: new Set<string>(), timestamps: new Set<number>() };
+				slotsByMaster.set(masterId, entry);
+			}
+			entry.rawIsos.add(slot.rawIso);
+			entry.rawIsos.add(slot.canonicalIso);
+			if (slot.timestamp !== null) {
+				entry.timestamps.add(slot.timestamp);
+			}
+		}
+	}
+
+	const affectedMasterIds = Array.from(affectedMasterIdSet);
+
+	// 1. Restore any inventory deducted for sales linked to these exceptions before cascade deletion
+	await restoreInventoryForEvents(exceptionIds);
+
+	// 2. Clean up external blob storage assets
+	const storage = getStorageProvider();
+	for (const exc of exceptions) {
+		if (exc.qrCodePath?.startsWith('http')) await storage.delete(exc.qrCodePath).catch(() => {});
+		if (exc.iCalPath?.startsWith('http')) await storage.delete(exc.iCalPath).catch(() => {});
+	}
+
+	// 3. Delete external provider mappings & campaign sync entries BEFORE deleting local rows/relations
+	await syncService.deleteEventMappings(userId, exceptionIds).catch(console.error);
+
+	// 4. Clean up lazy / non-FK references to these exception IDs
+	await db.delete(emailCampaign).where(inArray(emailCampaign.eventId, exceptionIds));
+	await db.delete(syncMapping).where(inArray(syncMapping.eventId, exceptionIds));
+
+	// 5. Ensure restored slots are not suppressed by master.exdates (never add exdates)
+	for (const [masterId, slotInfo] of slotsByMaster) {
+		const [master] = await db
+			.select({ id: event.id, exdates: event.exdates })
+			.from(event)
+			.where(eq(event.id, masterId));
+		if (master && Array.isArray(master.exdates) && master.exdates.length > 0) {
+			const existingExdates = master.exdates as string[];
+			const filtered = existingExdates.filter((ex) => {
+				if (slotInfo.rawIsos.has(ex)) return false;
+				const exTs = new Date(ex).getTime();
+				if (!Number.isNaN(exTs) && slotInfo.timestamps.has(exTs)) return false;
+				return true;
+			});
+			if (filtered.length !== existingExdates.length) {
+				await db.update(event).set({ exdates: filtered }).where(eq(event.id, master.id));
+			}
+		}
+	}
+
+	// 6. Delete local exception rows (FK cascades clean up join tables & prices/sales)
+	await db.delete(event).where(inArray(event.id, exceptionIds));
+
+	// 7. Remove any orphaned campaign rows previously owned exclusively by deleted exceptions
+	for (const campId of candidateCampaignIds) {
+		const remainingEvents = await db
+			.select({ id: event.id })
+			.from(event)
+			.where(eq(event.campaignId, campId));
+		if (remainingEvents.length > 0) continue;
+
+		const remainingAnnouncements = await db
+			.select({ id: announcement.id })
+			.from(announcement)
+			.where(eq(announcement.campaignId, campId));
+		if (remainingAnnouncements.length > 0) continue;
+
+		await db.delete(campaign).where(eq(campaign.id, campId));
+	}
+
+	// 8. Re-sync affected masters so non-native recurrence providers restore the standard instance
+	for (const masterId of affectedMasterIds) {
+		await syncService.syncItems(userId, [masterId], 'event').catch(console.error);
+	}
+
+	// 9. Notify subscribers and invalidate cached event/list entries
+	await publishEventChange('delete', exceptionIds).catch(console.error);
+	if (affectedMasterIds.length > 0) {
+		await publishEventChange('update', affectedMasterIds).catch(console.error);
+	}
+	await invalidateEvent([...exceptionIds, ...affectedMasterIds, ...revertedVirtualIds]);
+
+	return {
+		deletedIds: exceptionIds,
+		affectedMasterIds,
+		revertedVirtualIds
+	};
+}
+
 

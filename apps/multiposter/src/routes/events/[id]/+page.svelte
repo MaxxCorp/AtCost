@@ -20,7 +20,9 @@
         Trash2,
         ChevronDown,
         RefreshCw,
+        RotateCcw,
     } from "@lucide/svelte";
+    import { isMaterializedException } from "#lib/utils/event-series.js";
     import { authClient } from "#lib/auth.js";
     import {
         createCollaborationRoom,
@@ -133,6 +135,37 @@
                                         {m.delete()}
                                         {m.instance()}
                                         </DropdownMenu.Item>
+                                        {#if isMaterializedException(event)}
+                                            <DropdownMenu.Item
+                                                onclick={async () => {
+                                                    if (!confirm(m.delete_exception_confirm())) return;
+                                                    try {
+                                                        const res = await deleteEventAction({
+                                                            ids: [event.id],
+                                                            deleteException: true,
+                                                        });
+                                                        toast.success(m.exception_deleted());
+                                                        const targetVirtualId = res?.revertedVirtualIds?.[0];
+                                                        if (targetVirtualId) {
+                                                            if (eventId === targetVirtualId) {
+                                                                await eventQuery.refresh();
+                                                            } else {
+                                                                await goto(`/events/${targetVirtualId}`);
+                                                            }
+                                                        } else {
+                                                            await goto(getLastListUrl("events", "/events"));
+                                                        }
+                                                    } catch (err: any) {
+                                                        toast.error(
+                                                            err?.message || m.failed_to_delete_exception(),
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                <RotateCcw size={14} class="mr-2" />
+                                                {m.delete_exception()}
+                                            </DropdownMenu.Item>
+                                        {/if}
                                         <DropdownMenu.Item
                                             class="text-red-600"
                                             onclick={async () => {

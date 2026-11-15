@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSeriesItem, isNonSeriesEvent, isVirtualInstanceId, parseVirtualInstanceId, isSeriesMaster, isSeriesInstance, getSeriesRootId, getAllSeriesOccurrences, getUpcomingOccurrence } from "./event-series";
+import { isSeriesItem, isNonSeriesEvent, isVirtualInstanceId, parseVirtualInstanceId, isSeriesMaster, isSeriesInstance, isMaterializedException, getSeriesRootId, getAllSeriesOccurrences, getUpcomingOccurrence } from "./event-series";
 
 describe("event-series helper", () => {
     it("identifies standard single one-off events as non-series events", () => {
@@ -173,6 +173,23 @@ describe("event-series helper", () => {
         expect(isSeriesInstance(master)).toBe(false);
         expect(isSeriesInstance(virtual)).toBe(true);
         expect(isSeriesInstance(exception)).toBe(true);
+
+        expect(isMaterializedException(master)).toBe(false);
+        expect(isMaterializedException(virtual)).toBe(false);
+        expect(isMaterializedException(exception)).toBe(true);
+        expect(isMaterializedException({
+            id: "exception-790",
+            recurringEventId: "master-123",
+            isException: false,
+            originalStartTime: { dateTime: "2026-10-15T14:00:00.000Z" }
+        })).toBe(true);
+        expect(isMaterializedException({
+            id: "legacy-child-791",
+            recurringEventId: "master-123",
+            isException: false,
+            originalStartTime: null
+        })).toBe(false);
+        expect(isMaterializedException(null)).toBe(false);
 
         expect(getSeriesRootId(master)).toBe("master-123");
         expect(getSeriesRootId(virtual)).toBe("master-123");
