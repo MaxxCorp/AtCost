@@ -1,6 +1,6 @@
 node_modules
 .svelte-kit
-project.inlang
+#project.inlang
 test-results
 /build
 .vercel
