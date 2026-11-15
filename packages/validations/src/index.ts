@@ -26,3 +26,5 @@ export * from './hmos.js';
 export * from './gdpr.js';
 export * from './currencies.js';
 export * from './recruitment.js';
+export * from './goals.js';
+

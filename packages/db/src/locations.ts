@@ -5,6 +5,7 @@ import {
     kioskLocation,
     resourceLocation,
     announcementLocation,
+    goalCampaignLocation,
     locationContact,
     talent,
     type OpeningHoursData,
@@ -96,6 +97,9 @@ export async function listLocations(input?: LocationListInput) {
         } else if (associatedWith.type === 'announcement') {
             baseQuery = baseQuery.innerJoin(announcementLocation, eq(location.id, announcementLocation.locationId)) as any;
             conditions.push(eq(announcementLocation.announcementId, associatedWith.id));
+        } else if (associatedWith.type === 'goal' || associatedWith.type === 'goalCampaign') {
+            baseQuery = baseQuery.innerJoin(goalCampaignLocation, eq(location.id, goalCampaignLocation.locationId)) as any;
+            conditions.push(eq(goalCampaignLocation.campaignId, associatedWith.id));
         } else if (associatedWith.type === 'talent') {
             baseQuery = baseQuery
                 .innerJoin(locationContact, eq(location.id, locationContact.locationId))
@@ -299,6 +303,8 @@ export async function addLocationAssociation(data: { type: string; entityId: str
         await db.insert(kioskLocation).values({ kioskId: entityId, locationId }).onConflictDoNothing();
     } else if (type === 'announcement') {
         await db.insert(announcementLocation).values({ announcementId: entityId, locationId }).onConflictDoNothing();
+    } else if (type === 'goal' || type === 'goalCampaign') {
+        await db.insert(goalCampaignLocation).values({ campaignId: entityId, locationId }).onConflictDoNothing();
     } else {
         throw new Error(`Unsupported association type: ${type}`);
     }
@@ -322,6 +328,8 @@ export async function removeLocationAssociation(data: { type: string; entityId: 
         await db.delete(kioskLocation).where(and(eq(kioskLocation.kioskId, entityId), eq(kioskLocation.locationId, locationId)));
     } else if (type === 'announcement') {
         await db.delete(announcementLocation).where(and(eq(announcementLocation.announcementId, entityId), eq(announcementLocation.locationId, locationId)));
+    } else if (type === 'goal' || type === 'goalCampaign') {
+        await db.delete(goalCampaignLocation).where(and(eq(goalCampaignLocation.campaignId, entityId), eq(goalCampaignLocation.locationId, locationId)));
     } else {
         throw new Error(`Unsupported association type: ${type}`);
     }
@@ -349,6 +357,8 @@ export async function fetchEntityLocations(data: { type: string; entityId: strin
         results = await db.select({ location }).from(kioskLocation).innerJoin(location, eq(kioskLocation.locationId, location.id)).where(eq(kioskLocation.kioskId, entityId));
     } else if (type === 'announcement') {
         results = await db.select({ location }).from(announcementLocation).innerJoin(location, eq(announcementLocation.locationId, location.id)).where(eq(announcementLocation.announcementId, entityId));
+    } else if (type === 'goal' || type === 'goalCampaign') {
+        results = await db.select({ location }).from(goalCampaignLocation).innerJoin(location, eq(goalCampaignLocation.locationId, location.id)).where(eq(goalCampaignLocation.campaignId, entityId));
     } else {
         throw new Error(`Unsupported association type: ${type}`);
     }

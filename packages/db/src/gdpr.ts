@@ -7,6 +7,9 @@ import {
     gdprRequest,
     task,
     talent,
+    goalCampaign,
+    goalContribution,
+    goalUpdate,
 } from './schema/index.js';
 import { eq, and, or, sql, inArray, desc, isNull } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
@@ -440,6 +443,35 @@ export async function obfuscateContact(
             .where(eq(contact.id, contactId));
     } catch (shredErr) {
         console.warn('[GDPR Service] Notice during crypto-shredding:', shredErr);
+    }
+
+    // 8. Obfuscate any linked AC-Goals campaigns, contributions, and updates
+    try {
+        await db
+            .update(goalCampaign)
+            .set({
+                creatorName: `Obfuscated Creator (${dispHash})`,
+                updatedAt: now,
+            })
+            .where(eq(goalCampaign.contactId, contactId));
+
+        await db
+            .update(goalContribution)
+            .set({
+                contributorName: `Obfuscated Supporter (${dispHash})`,
+                isAnonymous: true,
+            })
+            .where(eq(goalContribution.contactId, contactId));
+
+        await db
+            .update(goalUpdate)
+            .set({
+                authorName: `Obfuscated Author (${dispHash})`,
+                updatedAt: now,
+            })
+            .where(eq(goalUpdate.contactId, contactId));
+    } catch (goalErr) {
+        console.warn('[GDPR Service] Notice during goal obfuscation:', goalErr);
     }
 
     return { success: true, contactId };

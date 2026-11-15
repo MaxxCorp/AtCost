@@ -1,7 +1,9 @@
 node_modules
-/.svelte-kit
+.svelte-kit
+project.inlang
+test-results
 /build
-/.vercel
+.vercel
 .env
 .env.*
 !.env.example

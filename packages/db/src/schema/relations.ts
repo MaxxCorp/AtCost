@@ -27,6 +27,15 @@ import {
     personnelLedgerBlock,
     personnelDataVersion,
 } from "./recruitment";
+import {
+    goalCampaign,
+    goalStage,
+    goalContribution,
+    goalUpdate,
+    goalCampaignLocation,
+    goalCampaignTag,
+    goalCampaignContact,
+} from "./goals";
 
 export const userRelations = relations(user, ({ many }) => ({
     contacts: many(contact),
@@ -47,6 +56,9 @@ export const userRelations = relations(user, ({ many }) => ({
     consumables: many(consumable),
     recipes: many(recipe),
     prices: many(price),
+    goalCampaigns: many(goalCampaign),
+    goalContributions: many(goalContribution),
+    goalUpdates: many(goalUpdate),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -76,6 +88,10 @@ export const contactRelations = relations(contact, ({ many, one }) => ({
     talents: many(talent),
     signUpEvents: many(event, { relationName: 'signUpContact' }),
     gdprRequests: many(gdprRequest),
+    goalCampaigns: many(goalCampaign),
+    goalContributions: many(goalContribution),
+    goalUpdates: many(goalUpdate),
+    goalCampaignAssociations: many(goalCampaignContact),
 }));
 
 export const gdprRequestRelations = relations(gdprRequest, ({ one }) => ({
@@ -112,6 +128,7 @@ export const tagRelations = relations(tag, ({ many, one }) => ({
     talentAssociations: many(talentTag),
     consumableAssociations: many(consumableTag),
     recipeAssociations: many(recipeTag),
+    goalCampaignAssociations: many(goalCampaignTag),
 }));
 
 export const contactTagRelations = relations(contactTag, ({ one }) => ({
@@ -169,6 +186,7 @@ export const locationRelations = relations(location, ({ many, one }) => ({
     resourceLocations: many(resourceLocation),
     locationContacts: many(locationContact),
     contactRoles: many(locationContactRole),
+    goalCampaignLocations: many(goalCampaignLocation),
     user: one(user, { fields: [location.userId], references: [user.id] }),
 }));
 
@@ -559,4 +577,47 @@ export const personnelDataVersionRelations = relations(personnelDataVersion, ({ 
     contact: one(contact, { fields: [personnelDataVersion.contactId], references: [contact.id] }),
     ledgerBlock: one(personnelLedgerBlock, { fields: [personnelDataVersion.ledgerBlockId], references: [personnelLedgerBlock.id] }),
 }));
+
+export const goalCampaignRelations = relations(goalCampaign, ({ one, many }) => ({
+    user: one(user, { fields: [goalCampaign.userId], references: [user.id] }),
+    contact: one(contact, { fields: [goalCampaign.contactId], references: [contact.id] }),
+    stages: many(goalStage),
+    contributions: many(goalContribution),
+    updates: many(goalUpdate),
+    locations: many(goalCampaignLocation),
+    tags: many(goalCampaignTag),
+    contacts: many(goalCampaignContact),
+}));
+
+export const goalStageRelations = relations(goalStage, ({ one }) => ({
+    campaign: one(goalCampaign, { fields: [goalStage.campaignId], references: [goalCampaign.id] }),
+}));
+
+export const goalContributionRelations = relations(goalContribution, ({ one }) => ({
+    campaign: one(goalCampaign, { fields: [goalContribution.campaignId], references: [goalCampaign.id] }),
+    user: one(user, { fields: [goalContribution.userId], references: [user.id] }),
+    contact: one(contact, { fields: [goalContribution.contactId], references: [contact.id] }),
+}));
+
+export const goalUpdateRelations = relations(goalUpdate, ({ one }) => ({
+    campaign: one(goalCampaign, { fields: [goalUpdate.campaignId], references: [goalCampaign.id] }),
+    author: one(user, { fields: [goalUpdate.authorId], references: [user.id] }),
+    contact: one(contact, { fields: [goalUpdate.contactId], references: [contact.id] }),
+}));
+
+export const goalCampaignLocationRelations = relations(goalCampaignLocation, ({ one }) => ({
+    campaign: one(goalCampaign, { fields: [goalCampaignLocation.campaignId], references: [goalCampaign.id] }),
+    location: one(location, { fields: [goalCampaignLocation.locationId], references: [location.id] }),
+}));
+
+export const goalCampaignTagRelations = relations(goalCampaignTag, ({ one }) => ({
+    campaign: one(goalCampaign, { fields: [goalCampaignTag.campaignId], references: [goalCampaign.id] }),
+    tag: one(tag, { fields: [goalCampaignTag.tagId], references: [tag.id] }),
+}));
+
+export const goalCampaignContactRelations = relations(goalCampaignContact, ({ one }) => ({
+    campaign: one(goalCampaign, { fields: [goalCampaignContact.campaignId], references: [goalCampaign.id] }),
+    contact: one(contact, { fields: [goalCampaignContact.contactId], references: [contact.id] }),
+}));
+
 

@@ -12,6 +12,7 @@ import {
     userContact,
     resourceContact,
     announcementContact,
+    goalCampaignContact,
     talent,
     tag,
     location,
@@ -88,6 +89,9 @@ export async function listContacts(input?: ContactListInput) {
         } else if (associatedWith.type === 'talent') {
             baseQuery = baseQuery.innerJoin(talent, eq(contact.id, talent.contactId)) as any;
             conditions.push(eq(talent.id, associatedWith.id));
+        } else if (associatedWith.type === 'goal') {
+            baseQuery = baseQuery.innerJoin(goalCampaignContact, eq(contact.id, goalCampaignContact.contactId)) as any;
+            conditions.push(eq(goalCampaignContact.campaignId, associatedWith.id));
         } else {
             conditions.push(sql`1 = 0`);
         }

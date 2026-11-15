@@ -31,6 +31,10 @@
         "./pagination": {
             "types": "./src/pagination.ts",
             "default": "./src/pagination.ts"
+        },
+        "./goals": {
+            "types": "./src/goals.ts",
+            "default": "./src/goals.ts"
         }
     },
     "dependencies": {
