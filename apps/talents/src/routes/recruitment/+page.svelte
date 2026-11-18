@@ -15,7 +15,6 @@
 	import { createLocation } from "../locations/new/create.remote";
 	import { updateLocation } from "../locations/[id]/update.remote";
 	import { readLocation } from "../locations/[id]/read.remote";
-	import { deleteLocation } from "../locations/[id]/delete.remote";
 	import { listContacts } from "../contacts/list.remote";
 	import {
 		jobPostingSchema,
@@ -35,7 +34,6 @@
 		LocationForm,
 		LoadingSection,
 		ErrorSection,
-		handleDelete,
 		matchContactSearch,
 	} from "@ac/ui";
 	import * as m from "#lib/paraglide/messages.js";
@@ -266,7 +264,11 @@
 		showJobEditor = true;
 	}
 
-	async function handleDeleteJob(id: string) {
+	async function handleDeleteJob(id: string, title?: string) {
+		const confirmMsg = title
+			? `Stellenausschreibung "${title}" wirklich löschen?`
+			: "Möchten Sie diese Stellenausschreibung wirklich löschen?";
+		if (!window.confirm(confirmMsg)) return;
 		try {
 			await deleteJobPostings([id]);
 			toast.success("Stellenausschreibung gelöscht.");
@@ -1084,13 +1086,6 @@
 									updateRemote={updateLocation}
 									updateSchema={updateLocationSchema}
 									readItemRemote={readLocation}
-									deleteItemRemote={async (ids: string[]) => {
-										return await handleDelete({
-											ids,
-											deleteFn: deleteLocation,
-											itemName: "location",
-										});
-									}}
 									searchPredicate={(item: any, term: string) =>
 										item.name.toLowerCase().includes(term.toLowerCase())}
 								>
@@ -1240,7 +1235,7 @@
 
 							<button
 								type="button"
-								onclick={() => handleDeleteJob(jp.id)}
+								onclick={() => handleDeleteJob(jp.id, jp.title)}
 								class="p-2 text-slate-400 hover:text-rose-600"
 								title="Stelle löschen"
 							>

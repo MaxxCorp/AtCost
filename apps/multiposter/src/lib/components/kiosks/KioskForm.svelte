@@ -9,14 +9,13 @@
     import * as m from "#lib/paraglide/messages.js";
     import Button from "#lib/components/ui/button/button.svelte";
     import AsyncButton from "#lib/components/ui/AsyncButton.svelte";
-    import { EntityManager, LocationForm, handleDelete, translateIssue, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
+    import { EntityManager, LocationForm, translateIssue, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
     } from "@ac/validations";
-    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
     import { MapPin } from "@lucide/svelte";
     import { getLocationFilterGroups } from "#lib/filters/index.js";
@@ -272,13 +271,6 @@
                         filters={getLocationFilterGroups(m)}
                         onchange={(ids: string[]) => selectedLocationIds = ids}
                         listItemsRemote={listLocations as any}
-                        deleteItemRemote={async (ids: string[]) => {
-                            return await handleDelete({
-                                ids,
-                                deleteFn: deleteLocation,
-                                itemName: m.location(),
-                            });
-                        }}
                         createRemote={createLocation}
                         createSchema={createLocationSchema}
                         updateRemote={updateLocation}

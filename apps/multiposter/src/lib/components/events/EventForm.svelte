@@ -31,7 +31,6 @@
     import { createResource } from "../../../routes/resources/new/create.remote";
     import { updateResource } from "../../../routes/resources/[id]/update.remote";
     import { readResource } from "../../../routes/resources/[id]/read.remote";
-    import { deleteResource as deleteResourceRemote } from "../../../routes/resources/[id]/delete.remote";
     import { listResources } from "../../../routes/resources/list.remote";
     import {
         createResourceSchema,
@@ -64,7 +63,6 @@
     import { updateContact } from "../../../routes/contacts/[id]/update.remote";
     import { readContact } from "../../../routes/contacts/[id]/read.remote";
     import { createContactSchema, updateContactSchema } from "@ac/validations";
-    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
@@ -72,7 +70,6 @@
         createLocationSchema,
         updateLocationSchema,
     } from "@ac/validations";
-    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import {
         addLocationAssociation,
         removeLocationAssociation,
@@ -142,7 +139,6 @@
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
-    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import { listPrices } from "../../../routes/prices/list.remote";
     import {
         addPriceAssociation,
@@ -152,7 +148,6 @@
     import { createPrice } from "../../../routes/prices/new/create.remote";
     import { updatePrice } from "../../../routes/prices/[id]/update.remote";
     import { readPrice } from "../../../routes/prices/[id]/read.remote";
-    import { deletePrices } from "../../../routes/prices/[id]/delete.remote";
     import { createPriceSchema, updatePriceSchema } from "@ac/validations";
     import PriceForm from "#lib/components/prices/PriceForm.svelte";
     import PriceItemsSectionList from "#lib/components/prices/PriceItemsSectionList.svelte";
@@ -1958,7 +1953,6 @@
                 updateRemote={updateTagRemote}
                 updateSchema={updateTagSchema}
                 readItemRemote={readTag}
-                deleteItemRemote={deleteTagRemote}
                 categories={availableTagCategories}
                 categoriesRemote={listTagCategoriesRemote}
                 createCategoryRemote={createTagCategoryCommand}
@@ -2025,7 +2019,6 @@
                 }}
                 onchange={(ids: string[]) =>
                     rf.fields.resourceIds.set(JSON.stringify(ids))}
-                deleteItemRemote={deleteResourceRemote}
                 createRemote={createResource}
                 createSchema={createResourceSchema}
                 updateRemote={updateResource}
@@ -2326,7 +2319,6 @@
                     } as any)}
                 onchange={(ids: string[]) =>
                     rf.fields.locationIds.set(JSON.stringify(ids))}
-                deleteItemRemote={deleteLocation}
                 createRemote={createLocation}
                 createSchema={createLocationSchema}
                 updateRemote={updateLocation}
@@ -2625,7 +2617,6 @@
                                     ...p,
                                     locationId: p.itemId,
                                 } as any)}
-                            deleteItemRemote={deleteLocation}
                             createRemote={createLocation}
                             createSchema={createLocationSchema}
                             updateRemote={updateLocation}
@@ -2778,7 +2769,6 @@
                 addAssociation({ ...p, contactId: p.itemId } as any)}
             removeAssociationRemote={async (p: any) =>
                 removeAssociation({ ...p, contactId: p.itemId } as any)}
-            deleteItemRemote={deleteContact}
             createRemote={createContact}
             createSchema={createContactSchema}
             updateRemote={updateContact}
@@ -3346,7 +3336,6 @@
                                 handleSignUpContactChange(ids, items);
                             }}
                             listItemsRemote={listContacts as any}
-                            deleteItemRemote={deleteContact}
                             createRemote={createContact}
                             createSchema={createContactSchema}
                             updateRemote={updateContact}
@@ -3428,7 +3417,6 @@
                     currentPrices = items;
                     rf.fields.priceIds.set(JSON.stringify(ids));
                 }}
-                deleteItemRemote={deletePrices}
                 createRemote={createPrice}
                 createSchema={createPriceSchema}
                 updateRemote={updatePrice}

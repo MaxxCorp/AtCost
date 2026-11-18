@@ -24,7 +24,6 @@
 	import { createTag } from '../../../routes/tags/new/create.remote.js';
 	import { updateTag } from '../../../routes/tags/[id]/update.remote.js';
 	import { readTag } from '../../../routes/tags/[id]/read.remote.js';
-	import { deleteTag } from '../../../routes/tags/[id]/delete.remote.js';
 	import {
 		listTagCategories,
 		createTagCategoryCommand,
@@ -35,7 +34,6 @@
 	import { createLocation } from '../../../routes/locations/new/create.remote.js';
 	import { updateLocation } from '../../../routes/locations/[id]/update.remote.js';
 	import { readLocation } from '../../../routes/locations/[id]/read.remote.js';
-	import { deleteLocation } from '../../../routes/locations/[id]/delete.remote.js';
 	import {
 		fetchEntityLocations,
 		addLocationAssociation,
@@ -281,7 +279,6 @@
 						updateRemote={isOperator ? updateTag : undefined}
 						updateSchema={updateTagSchema}
 						readItemRemote={isOperator ? readTag : undefined}
-						deleteItemRemote={isOperator ? deleteTag : undefined}
 						categories={availableTagCategories}
 						categoriesRemote={listTagCategories}
 						createCategoryRemote={isOperator ? createTagCategoryCommand : undefined}
@@ -333,7 +330,6 @@
 						onchange={(ids: string[]) => {
 							selectedLocationIds = ids;
 						}}
-						deleteItemRemote={isOperator ? deleteLocation : undefined}
 						createRemote={isOperator ? createLocation : undefined}
 						createSchema={createLocationSchema}
 						updateRemote={isOperator ? updateLocation : undefined}

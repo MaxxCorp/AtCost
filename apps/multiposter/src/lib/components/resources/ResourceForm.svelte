@@ -9,10 +9,9 @@
     import type { updateResource } from "../../../routes/resources/[id]/update.remote";
     import type { AllocationCalendar } from "#lib/validations/resources.js";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
-    import { EntityManager, LocationForm, handleDelete, translateIssue, matchContactSearch, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
+    import { EntityManager, LocationForm, translateIssue, matchContactSearch, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
     import { listLocations } from "../../../routes/locations/list.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
-    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listContacts } from "../../../routes/contacts/list.remote";
     import { readContact } from "../../../routes/contacts/[id]/read.remote";
     import {
@@ -22,7 +21,6 @@
     } from "../../../routes/contacts/associate.remote";
     import { createContact } from "../../../routes/contacts/new/create.remote";
     import { updateContact } from "../../../routes/contacts/[id]/update.remote";
-    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import {
         createLocationSchema,
         updateLocationSchema,
@@ -282,13 +280,6 @@
                     addLocationAssociation({ ...p, locationId: p.itemId } as any)}
                 removeAssociationRemote={async (p: any) =>
                     removeLocationAssociation({ ...p, locationId: p.itemId } as any)}
-                deleteItemRemote={async (ids: string[]) => {
-                    return await handleDelete({
-                        ids,
-                        deleteFn: deleteLocation,
-                        itemName: m.location_label(),
-                    });
-                }}
                 createRemote={createLocation}
                 createSchema={createLocationSchema}
                 updateRemote={updateLocation}
@@ -593,13 +584,6 @@
                     addAssociation({ ...p, contactId: p.itemId } as any)}
                 removeAssociationRemote={async (p: any) =>
                     removeAssociation({ ...p, contactId: p.itemId } as any)}
-                deleteItemRemote={async (ids: string[]) => {
-                    return await handleDelete({
-                        ids,
-                        deleteFn: deleteContact,
-                        itemName: m.feature_contacts_title(),
-                    });
-                }}
                 createRemote={createContact}
                 createSchema={createContactSchema}
                 updateRemote={updateContact}

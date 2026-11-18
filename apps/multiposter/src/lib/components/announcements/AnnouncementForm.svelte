@@ -12,7 +12,6 @@
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
-    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import { readTag as readTagRemote } from "../../../routes/tags/[id]/read.remote";
     import {
         listTagCategories as listTagCategoriesRemote,
@@ -35,7 +34,6 @@
         createLocationSchema,
         updateLocationSchema,
     } from "@ac/validations";
-    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import {
         fetchEntityLocations,
         addLocationAssociation,
@@ -56,7 +54,6 @@
         createContactSchema,
         updateContactSchema,
     } from "@ac/validations";
-    import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
     import { onMount, untrack } from "svelte";
     import { MapPin, User } from "@lucide/svelte";
 
@@ -176,12 +173,14 @@
                 variant="destructive"
                 loading={deleteAnnouncementAction.pending}
                 onclick={async () => {
-                    await handleDelete({
+                    const ok = await handleDelete({
                         ids: [initialData.id],
                         deleteFn: deleteAnnouncementAction,
                         itemName: m.announcement().toLowerCase(),
                     });
-                    goto(getLastListUrl("announcements", "/announcements"));
+                    if (ok) {
+                        goto(getLastListUrl("announcements", "/announcements"));
+                    }
                 }}
             >
                 {m.delete()}
@@ -312,7 +311,6 @@
                         updateRemote={updateTagRemote}
                         updateSchema={updateTagSchema}
                         readItemRemote={readTagRemote}
-                        deleteItemRemote={deleteTagRemote}
                         categories={availableTagCategories}
                         categoriesRemote={listTagCategoriesRemote}
                         createCategoryRemote={createTagCategoryCommand}
@@ -367,13 +365,6 @@
                                     locationId: p.itemId,
                                     // @ts-ignore
                                 } as any)}
-                            deleteItemRemote={async (ids: string[]) => {
-                                return await handleDelete({
-                                    ids,
-                                    deleteFn: deleteLocation,
-                                    itemName: m.location().toLowerCase(),
-                                });
-                            }}
                             createRemote={createLocation}
                             createSchema={createLocationSchema}
                             updateRemote={updateLocation}
@@ -555,13 +546,6 @@
                         addAssociation({ ...p, contactId: p.itemId } as any)}
                     removeAssociationRemote={async (p: any) =>
                         removeAssociation({ ...p, contactId: p.itemId } as any)}
-                    deleteItemRemote={async (ids: string[]) => {
-                        return await handleDelete({
-                            ids,
-                            deleteFn: deleteContact,
-                            itemName: m.contact().toLowerCase(),
-                        });
-                    }}
                     createRemote={createContact}
                     createSchema={createContactSchema}
                     updateRemote={updateContact}

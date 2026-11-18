@@ -12,7 +12,6 @@
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
-    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import { readTag as readTagRemote } from "../../../routes/tags/[id]/read.remote";
     import {
         listTagCategories as listTagCategoriesRemote,
@@ -288,7 +287,6 @@
                 updateRemote={updateTagRemote}
                 updateSchema={updateTagSchema}
                 readItemRemote={readTagRemote}
-                deleteItemRemote={deleteTagRemote}
                 categories={availableTagCategories}
                 categoriesRemote={listTagCategoriesRemote}
                 createCategoryRemote={createTagCategoryCommand}

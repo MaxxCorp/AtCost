@@ -33,7 +33,7 @@
 	} from "@lucide/svelte";
 	import { toast } from "svelte-sonner";
 	import * as m from "#lib/paraglide/messages.js";
-	import { translateIssue, EntityManager, handleDelete, matchContactSearch, useFormValidationFeedback } from "@ac/ui";
+	import { translateIssue, EntityManager, matchContactSearch, useFormValidationFeedback } from "@ac/ui";
 	import TemplateSelector from "./TemplateSelector.svelte";
 	import ContactForm from "../contacts/ContactForm.svelte";
 	import KioskMultiSelect from "../kiosks/KioskMultiSelect.svelte";
@@ -54,7 +54,6 @@
 	import { updateContact } from "../../../routes/contacts/[id]/update.remote";
 	import { readContact } from "../../../routes/contacts/[id]/read.remote";
 	import { createContactSchema, updateContactSchema } from "@ac/validations";
-	import { deleteContact } from "../../../routes/contacts/[id]/delete.remote";
 	import { getContactFilterGroups } from "#lib/filters/index.js";
 	import { getDerivedEventContacts, type DerivedRecipientContact, isEmployeeContact } from "#lib/filters/synchronizations.js";
 	import { testMicrosoftTarget } from "../../../routes/synchronizations/test-target.remote";
@@ -2227,13 +2226,6 @@
 					filters={getContactFilterGroups(m)}
 					onchange={handleRecipientsChange}
 					listItemsRemote={listContacts as any}
-					deleteItemRemote={async (ids: string[]) => {
-						return await handleDelete({
-							ids,
-							deleteFn: deleteContact,
-							itemName: "contact",
-						});
-					}}
 					createRemote={createContact}
 					createSchema={createContactSchema}
 					updateRemote={updateContact}

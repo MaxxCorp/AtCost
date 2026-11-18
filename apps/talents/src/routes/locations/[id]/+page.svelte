@@ -1,7 +1,7 @@
 <script lang="ts">
     import * as m from "#lib/paraglide/messages.js";
     import { Users } from "@lucide/svelte";
-    import { LocationDetailView, EntityManager, handleDelete } from "@ac/ui";
+    import { LocationDetailView, EntityManager } from "@ac/ui";
     import TalentForm from "#lib/components/talent/TalentForm.svelte";
     import { page } from "$app/state";
     import { readLocation } from "./read.remote";
@@ -10,7 +10,6 @@
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { listTalents } from "../../talents/list.remote";
     import { getEntityTalents, associateTalent, dissociateTalent } from "../../talents/associate.remote";
-    import { deleteTalent } from "../../talents/[id]/delete.remote";
     import { updateTalent } from "../../talents/[id]/update.remote";
     import { readTalent } from "../../talents/[id]/read.remote";
     import { unifiedTalentSchema, updateLocationSchema } from "@ac/validations";
@@ -54,18 +53,6 @@
                 searchPredicate={(t: any, q: string) => {
                     const name = (t.contact?.displayName || t.jobTitle || "").toLowerCase();
                     return name.includes(q.toLowerCase());
-                }}
-                deleteItemRemote={async (ids: string[]) => {
-                    return await handleDelete({
-                        ids,
-                        deleteFn: async (targetIds: string[]) => {
-                            for (const tid of targetIds) {
-                                await deleteTalent(tid);
-                            }
-                            return { success: true };
-                        },
-                        itemName: "talent"
-                    });
                 }}
                 createRemote={updateTalent}
                 createSchema={unifiedTalentSchema}

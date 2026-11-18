@@ -93,15 +93,17 @@
         if (!deleteLocationRemote || !location) return;
         isDeleting = true;
         try {
-            await handleDelete({
+            const ok = await handleDelete({
                 ids: [location.id],
                 deleteFn: deleteLocationRemote,
                 itemName: m?.location?.()?.toLowerCase() ?? "location",
             });
-            if (onDeleted) {
-                onDeleted();
-            } else {
-                await goto(effectiveCancelHref);
+            if (ok) {
+                if (onDeleted) {
+                    onDeleted();
+                } else {
+                    await goto(effectiveCancelHref);
+                }
             }
         } finally {
             isDeleting = false;

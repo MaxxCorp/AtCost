@@ -18,7 +18,6 @@
     import { listLocations } from "../../locations/list.remote";
     import { createLocation } from "../../locations/new/create.remote";
     import { updateLocation } from "../../locations/[id]/update.remote";
-    import { deleteLocation } from "../../locations/[id]/delete.remote";
     import { readLocation } from "../../locations/[id]/read.remote";
     import {
         createLocationSchema,
@@ -87,12 +86,14 @@
                                     loading={deleteContact.pending}
                                     variant="destructive"
                                     onclick={async () => {
-                                        await handleDelete({
+                                        const ok = await handleDelete({
                                             ids: [contact.id],
                                             deleteFn: deleteContact,
                                             itemName: m.contacts().toLowerCase(),
                                         });
-                                        goto(getLastListUrl("contacts", "/contacts"));
+                                        if (ok) {
+                                            goto(getLastListUrl("contacts", "/contacts"));
+                                        }
                                     }}
                                 >
                                     {m.delete()}
@@ -148,17 +149,6 @@
                                                     ...p,
                                                     locationId: p.itemId,
                                                 } as any)}
-                                            deleteItemRemote={async (ids: any) => {
-                                                return await handleDelete({
-                                                    ids: Array.isArray(ids)
-                                                        ? ids
-                                                        : [ids],
-                                                    deleteFn: deleteLocation,
-                                                    itemName: m
-                                                        .location()
-                                                        .toLowerCase(),
-                                                });
-                                            }}
                                             createRemote={createLocation}
                                             createSchema={createLocationSchema}
                                             updateRemote={updateLocation}

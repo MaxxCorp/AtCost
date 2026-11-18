@@ -6,14 +6,13 @@
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 
     import { createContactSchema } from "#lib/validations/contacts.js";
-    import { EntityManager, LocationForm, handleDelete, getLastListUrl } from "@ac/ui";
+    import { EntityManager, LocationForm, getLastListUrl } from "@ac/ui";
     import { MapPin } from "@lucide/svelte";
     import { getLocationFilterGroups } from "#lib/filters/index.js";
     import * as m from "#lib/paraglide/messages.js";
     import { listLocations } from "../../locations/list.remote";
     import { createLocation } from "../../locations/new/create.remote";
     import { updateLocation } from "../../locations/[id]/update.remote";
-    import { deleteLocation } from "../../locations/[id]/delete.remote";
     import { readLocation } from "../../locations/[id]/read.remote";
     import {
         createLocationSchema,
@@ -82,17 +81,6 @@
                                             ...p,
                                             locationId: p.itemId,
                                         } as any)}
-                            deleteItemRemote={async (ids: any) => {
-                                return await handleDelete({
-                                    ids: Array.isArray(ids)
-                                        ? ids
-                                        : [ids],
-                                    deleteFn: deleteLocation,
-                                    itemName: m
-                                        .location()
-                                        .toLowerCase(),
-                                });
-                            }}
                             createRemote={createLocation}
                             createSchema={createLocationSchema}
                             updateRemote={updateLocation}

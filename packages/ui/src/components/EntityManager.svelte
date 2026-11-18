@@ -328,8 +328,9 @@
     const activeSelectorGroupBy = $derived(selectorGroupBy ?? groupBy);
     const GroupIcon = $derived(groupIcon || Folder);
     const isStandalone = $derived(
-        mode === "standalone" || (!type && !entityId && !fetchAssociationsRemote && !onchange && (!initialItems || initialItems.length === 0))
+        mode === "standalone" || (mode !== "embedded" && !type && !entityId && !fetchAssociationsRemote && !onchange && (!initialItems || initialItems.length === 0))
     );
+    const canDelete = $derived(mode === "standalone" && Boolean(deleteItemRemote));
     const activeSearch = $derived(!isStandalone ? selectorSearchQuery : searchQuery);
 
     const filterState = $derived({
@@ -888,7 +889,7 @@
     }
 
     async function deleteItem(item: T, currentList: T[]) {
-        if (!item.id || !deleteItemRemote) return;
+        if (!item.id || !canDelete || !deleteItemRemote) return;
         deletingItemId = item.id;
         try {
             const result = await invokeRemote(deleteItemRemote, [item.id]);
@@ -924,7 +925,7 @@
     }
 
     async function handleBulkDelete() {
-        if (selectedIds.length === 0 || !deleteItemRemote) return;
+        if (selectedIds.length === 0 || !canDelete || !deleteItemRemote) return;
         const confirmMsg = `${i18n.deleteConfirmLabel || "Delete selected items?"} (${selectedIds.length})`;
         if (!window.confirm(confirmMsg)) return;
         try {
@@ -1333,7 +1334,7 @@
                                         <Link size={16} />
                                     {/if}
                                 </AsyncButton>
-                                {#if deleteItemRemote}
+                                {#if canDelete}
                                     <AsyncButton
                                         type="button"
                                         variant="ghost"
@@ -1430,7 +1431,7 @@
                                 : 'border-gray-100 hover:border-blue-100 hover:shadow-sm'}"
                         >
                             <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-3">
-                                {#if deleteItemRemote && item.id}
+                                {#if canDelete && item.id}
                                     <input
                                         type="checkbox"
                                         bind:group={selectedIds}
@@ -1507,7 +1508,7 @@
                                     >
                                         <Unlink size={15} />
                                     </AsyncButton>
-                                    {#if deleteItemRemote}
+                                    {#if canDelete}
                                         <AsyncButton
                                             type="button"
                                             variant="ghost"
@@ -1652,7 +1653,7 @@
     </Dialog.Root>
 {/if}
 
-{#if deleteItemRemote}
+{#if canDelete}
     <BulkActionToolbar
         {selectedIds}
         totalCount={displayedFilteredItems.length}

@@ -66,12 +66,14 @@
                         loading={deleteCampaigns.pending}
                         variant="destructive"
                         onclick={async () => {
-                            await handleDelete({
+                            const ok = await handleDelete({
                                 ids: [initialData.id],
                                 deleteFn: deleteCampaigns,
                                 itemName: m.feature_campaigns_title().toLowerCase(),
                             });
-                            goto(getLastListUrl("campaigns", "/campaigns"));
+                            if (ok) {
+                                goto(getLastListUrl("campaigns", "/campaigns"));
+                            }
                         }}
                     >
                         {m.delete()}

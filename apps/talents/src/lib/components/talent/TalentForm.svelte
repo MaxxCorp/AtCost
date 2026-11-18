@@ -21,11 +21,9 @@
     import { createLocation } from "../../../routes/locations/new/create.remote";
     import { updateLocation } from "../../../routes/locations/[id]/update.remote";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
-    import { deleteLocation } from "../../../routes/locations/[id]/delete.remote";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
-    import { deleteTag as deleteTagRemote } from "../../../routes/tags/[id]/delete.remote";
     import {
         unifiedTalentSchema,
         createLocationSchema,
@@ -42,7 +40,6 @@
         ContactManager,
         EntityManager,
         LocationForm,
-        handleDelete,
         matchContactSearch,
         getLastListUrl,
         useFormValidationFeedback,
@@ -75,7 +72,6 @@
     const listTagsHandle = listTagsRemote;
     const createTagHandle = createTagRemote;
     const updateTagHandle = updateTagRemote;
-    const deleteTagHandle = deleteTagRemote;
 
     const d = (val: any, def: any) =>
         val === undefined || val === null ? def : val;
@@ -797,13 +793,6 @@
                         updateRemote={updateLocation}
                         updateSchema={updateLocationSchema}
                         readItemRemote={readLocation}
-                        deleteItemRemote={async (ids: string[]) => {
-                            return await handleDelete({
-                                ids,
-                                deleteFn: deleteLocation,
-                                itemName: "location",
-                            });
-                        }}
                         searchPredicate={(item: any, term: string) =>
                             item.name
                                 .toLowerCase()

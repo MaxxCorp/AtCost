@@ -476,7 +476,6 @@
                     updateRemote={updateTagRemote}
                     updateSchema={updateTagSchema}
                     readItemRemote={readTagRemote}
-                    deleteItemRemote={deleteTagRemote}
                     {labels}
                     {m}
                 />

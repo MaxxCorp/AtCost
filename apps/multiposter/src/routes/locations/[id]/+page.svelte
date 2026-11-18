@@ -4,14 +4,13 @@
     import { readLocation } from "./read.remote";
     import { updateLocation } from "./update.remote";
     import { deleteLocation } from "./delete.remote";
-    import { LocationDetailView, EntityManager, handleDelete, matchContactSearch } from "@ac/ui";
+    import { LocationDetailView, EntityManager, matchContactSearch } from "@ac/ui";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { User } from "@lucide/svelte";
     import { getContactFilterGroups } from "#lib/filters/index.js";
     import ContactForm from "#lib/components/contacts/ContactForm.svelte";
     import { listContacts } from "../../contacts/list.remote";
     import { fetchEntityContacts, addAssociation, removeAssociation } from "../../contacts/associate.remote";
-    import { deleteContact } from "../../contacts/[id]/delete.remote";
     import { createContact } from "../../contacts/new/create.remote";
     import { updateContact } from "../../contacts/[id]/update.remote";
     import { readContact } from "../../contacts/[id]/read.remote";
@@ -77,13 +76,6 @@
                     addAssociation({ ...p, contactId: p.itemId } as any)}
                 removeAssociationRemote={async (p: any) =>
                     removeAssociation({ ...p, contactId: p.itemId } as any)}
-                deleteItemRemote={async (ids: string[]) => {
-                    return await handleDelete({
-                        ids,
-                        deleteFn: deleteContact,
-                        itemName: m.contact_label().toLowerCase(),
-                    });
-                }}
                 createRemote={createContact}
                 createSchema={createContactSchema}
                 updateRemote={updateContact}

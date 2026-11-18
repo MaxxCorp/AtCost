@@ -21,7 +21,6 @@
     import { readTag } from '../../tags/[id]/read.remote.js';
     import { createTag } from '../../tags/new/create.remote.js';
     import { updateTag } from '../../tags/[id]/update.remote.js';
-    import { deleteTag } from '../../tags/[id]/delete.remote.js';
     import {
         listTagCategories,
         createTagCategoryCommand,
@@ -494,7 +493,6 @@
                                 updateRemote={updateTag}
                                 updateSchema={updateTagSchema}
                                 readItemRemote={readTag}
-                                deleteItemRemote={deleteTag}
                                 categories={availableTagCategories}
                                 categoriesRemote={listTagCategories}
                                 createCategoryRemote={createTagCategoryCommand}

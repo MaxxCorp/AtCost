@@ -269,6 +269,7 @@
 
 	async function handleDeleteSale(saleId: string) {
 		if (!eventId) return;
+		if (!window.confirm('Delete this sale record and restore deducted inventory?')) return;
 		deletingSaleId = saleId;
 		try {
 			await deleteSaleCommand({
