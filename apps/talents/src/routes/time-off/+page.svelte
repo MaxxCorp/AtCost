@@ -5,7 +5,7 @@
     import { getMyTalentProfile } from "../talents/talents.remote";
     import AbsenceApprovalModal from "#lib/components/time-off/AbsenceApprovalModal.svelte";
     import TalentAbsenceContext from "#lib/components/time-off/TalentAbsenceContext.svelte";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import { page as pageState } from "$app/state";
     import {
         Button,
@@ -150,6 +150,10 @@
     });
 
     const timeOffQuery = $derived(listTimeOffRequests(filterState));
+
+    afterNavigate(({ from }) => {
+        if (from) void timeOffQuery.refresh();
+    });
     const timeOffRes = $derived(timeOffQuery.current);
     const timeOffItems = $derived(timeOffRes?.data ?? []);
     let selectedIds = $state<string[]>([]);

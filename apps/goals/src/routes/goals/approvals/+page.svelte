@@ -42,6 +42,7 @@
 	} from '@ac/validations';
 	import { getContributionPlugin } from '#lib/plugins/registry.js';
 	import { dev } from '$app/env';
+	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 
@@ -53,6 +54,15 @@
 	const showcaseQuery = getShowcaseCampaigns({});
 	const sessionQuery = getCurrentSessionUser({});
 	const paymentProposalsQuery = getPaymentProviderProposals({});
+
+	afterNavigate(({ from }) => {
+		if (from) {
+			void campaignsQuery.refresh();
+			void showcaseQuery.refresh();
+			void paymentProposalsQuery.refresh();
+			void sessionQuery.refresh();
+		}
+	});
 
 	const currentUser = $derived(sessionQuery.current?.user ?? null);
 	const isOperator = $derived(sessionQuery.current?.isOperator ?? false);

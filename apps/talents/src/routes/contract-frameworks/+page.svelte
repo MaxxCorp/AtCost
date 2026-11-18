@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import { FileSignature } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
     import ContractFrameworkForm from "./ContractFrameworkForm.svelte";
@@ -7,11 +8,17 @@
     import { contractFrameworkSchema } from "@ac/validations/contracts";
 
     breadcrumbState.set({ feature: "contract-frameworks" });
+    let entityManagerRef = $state<{ refresh: () => Promise<void> } | undefined>();
+
+    afterNavigate(({ from }) => {
+        if (from) void entityManagerRef?.refresh();
+    });
 </script>
 
 <div class="space-y-6">
     <h1 class="text-2xl font-black text-gray-900 px-1">Contract Frameworks</h1>
     <EntityManager
+        bind:this={entityManagerRef}
         title="Contract Frameworks"
         icon={FileSignature}
         mode="standalone"

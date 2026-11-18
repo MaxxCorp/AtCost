@@ -4,7 +4,7 @@
     import { deletePrices } from "./[id]/delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { page as pageState } from "$app/state";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import {
         LoadingSection,
         ErrorSection,
@@ -58,6 +58,10 @@
 
     let selectedIds = $state<string[]>([]);
     const pricesQuery = $derived(listPrices(filterState));
+
+    afterNavigate(({ from }) => {
+        if (from) void pricesQuery.refresh();
+    });
     const result = $derived(pricesQuery.current);
     const priceItems = $derived(result?.data ?? []);
     const total = $derived(result?.total ?? 0);
@@ -82,6 +86,7 @@
         try {
             await deletePrices([item.id]);
             toast.success(m.delete_successful?.() || `${item.name} deleted successfully`);
+            selectedIds = selectedIds.filter((id) => id !== item.id);
             if (currentCount <= 1 && page > 1) {
                 setPage(page - 1);
             } else {

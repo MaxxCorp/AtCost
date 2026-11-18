@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from "$app/navigation";
 	import { page } from "$app/state";
 	import {
 		EntityManager,
@@ -38,8 +39,16 @@
 	const isOperator = $derived(Boolean(sessionQuery.current?.isOperator));
 
 	let showEncryptionMigrationDialog = $state(false);
+	let entityManagerRef = $state<{ refresh: () => Promise<void> } | undefined>();
 	const encryptionStatusQuery = $derived(isOperator ? getEncryptionStatus() : null);
 	const encryptionStatus = $derived(encryptionStatusQuery?.current);
+
+	afterNavigate(({ from }) => {
+		if (from) {
+			void encryptionStatusQuery?.refresh();
+			void entityManagerRef?.refresh();
+		}
+	});
 </script>
 
 <svelte:head>
@@ -138,12 +147,14 @@
 			processBatchRemote={runEncryptionBatch}
 			oncomplete={async () => {
 				await encryptionStatusQuery?.refresh();
+				await entityManagerRef?.refresh();
 			}}
 			onclose={() => (showEncryptionMigrationDialog = false)}
 		/>
 	{/if}
 
 	<EntityManager
+		bind:this={entityManagerRef}
 		title="Segregated Contacts"
 		icon={Users}
 		mode="standalone"

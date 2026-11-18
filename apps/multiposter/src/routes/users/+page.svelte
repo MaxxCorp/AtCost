@@ -26,7 +26,7 @@
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 	import { page as pageState } from "$app/state";
-	import { goto } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 
 	import {
 		FilterMenu,
@@ -86,6 +86,10 @@
 
 	let selectedIds = $state<string[]>([]);
 	const usersQuery = $derived(listUsers(filterState));
+
+	afterNavigate(({ from }) => {
+		if (from) void usersQuery.refresh();
+	});
 	const usersRes = $derived(usersQuery.current);
 	const userItems = $derived(usersRes?.data ?? []);
 	const total = $derived(usersRes?.total ?? 0);
@@ -110,6 +114,7 @@
 		try {
 			await deleteUser([user.id]);
 			toast.success(m.delete_successful());
+			selectedIds = selectedIds.filter((id) => id !== user.id);
 			await usersQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());

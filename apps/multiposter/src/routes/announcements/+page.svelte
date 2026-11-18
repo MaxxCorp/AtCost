@@ -5,7 +5,7 @@
 
 	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 	import Button from "#lib/components/ui/button/button.svelte";
-	import { goto } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { page as pageState } from "$app/state";
 	import {
 		FilterMenu,
@@ -89,6 +89,10 @@
 
 	let selectedIds = $state<string[]>([]);
 	const announcementsQuery = $derived(listAnnouncements(filterState));
+
+	afterNavigate(({ from }) => {
+		if (from) void announcementsQuery.refresh();
+	});
 	const announcementsRes = $derived(announcementsQuery.current);
 	const announcementItems = $derived(announcementsRes?.data ?? []);
 	const total = $derived(announcementsRes?.total ?? 0);
@@ -113,6 +117,7 @@
 		try {
 			await deleteAnnouncements([announcement.id]);
 			toast.success(m.delete_successful());
+			selectedIds = selectedIds.filter((id) => id !== announcement.id);
 			await announcementsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());

@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import TaskList from "#lib/components/tasks/TaskList.svelte";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { listTasks, listCompletedTasks } from '../tasks.remote.js';
@@ -11,6 +12,13 @@
 
     const activeQuery = listTasks();
     const completedQuery = listCompletedTasks();
+
+    afterNavigate(({ from }) => {
+        if (from) {
+            void activeQuery.refresh();
+            void completedQuery.refresh();
+        }
+    });
 
     const activeData = $derived(activeQuery.current);
     const completedData = $derived(completedQuery.current);

@@ -1,15 +1,19 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, talent, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 
 import { listTalents } from '../list.remote';
+import { invalidateTalent } from '#lib/server/cache/index.js';
 
 export const deleteTalent = command(v.string(), async (id): Promise<{ success: boolean }> => {
     const user = getAuthenticatedUser();
     ensureAccess(user, 'talents');
 
     await db.delete(talent).where(eq(talent.id, id));
+    await invalidateTalent(id);
+    try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
     void listTalents().refresh();
+    void listTalents({}).refresh();
     return { success: true };
 });

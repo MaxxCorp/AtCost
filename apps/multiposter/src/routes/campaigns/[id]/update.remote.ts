@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { db } from '@ac/db';
 import { campaign } from '@ac/db';
@@ -49,7 +49,9 @@ export const updateCampaign = form(updateCampaignSchema, async (data) => {
 	// Update both queries
 	// @ts-ignore - The type mismatch between DbCampaign and the remote query's Campaign type
 	await readCampaign(data.id).set(updatedCampaign);
-	await listCampaigns().refresh();
+	try { await requested(listCampaigns, 20).refreshAll(); } catch { /* ignore */ }
+	void listCampaigns().refresh();
+	void listCampaigns({}).refresh();
 
 	return { updatedCampaign, success: true };
 });

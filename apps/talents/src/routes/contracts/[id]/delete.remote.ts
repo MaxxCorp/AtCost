@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, eq } from '@ac/db';
 import { contract } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -11,7 +11,9 @@ export const deleteContract = command(v.object({ id: v.string() }), async ({ id 
 
     const [c] = await db.select({ talentId: contract.talentId }).from(contract).where(eq(contract.id, id));
     await db.delete(contract).where(eq(contract.id, id));
-    await listContracts().refresh();
+    try { await requested(listContracts, 20).refreshAll(); } catch { /* ignore */ }
+    void listContracts().refresh();
+    void listContracts({}).refresh();
     if (c?.talentId) {
         await readTalentEffectiveContract({ talentId: c.talentId }).refresh();
     }

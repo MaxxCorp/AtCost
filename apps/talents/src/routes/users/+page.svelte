@@ -1,7 +1,7 @@
 <script lang="ts">
     import * as m from "#lib/paraglide/messages.js";
     import { page as pageState } from "$app/state";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import {
         Button,
         AsyncButton,
@@ -86,6 +86,10 @@
 
     let selectedIds = $state<string[]>([]);
     const usersQuery = $derived(listUsers(filterState));
+
+    afterNavigate(({ from }) => {
+        if (from) void usersQuery.refresh();
+    });
     const usersRes = $derived(usersQuery.current);
     const userItems = $derived(usersRes?.data ?? []);
 

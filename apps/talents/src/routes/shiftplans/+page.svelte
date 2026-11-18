@@ -5,7 +5,7 @@
     import ShiftScheduleMatrix from "#lib/components/shiftplans/ShiftScheduleMatrix.svelte";
     import SchedulingGroupsManager from "#lib/components/shiftplans/SchedulingGroupsManager.svelte";
     import { SvelteSet } from "svelte/reactivity";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import { page as pageState } from "$app/state";
     import {
         Button,
@@ -86,6 +86,13 @@
     const templatesList = $derived(shiftplansQuery.current?.data ?? []);
     const templatesTotal = $derived(shiftplansQuery.current?.total ?? 0);
 
+    afterNavigate(({ from }) => {
+        if (from) {
+            void shiftplansQuery.refresh();
+            void locationsQuery.refresh();
+        }
+    });
+
     let selectedIds = $state<string[]>([]);
 
     async function handleBulkDelete() {
@@ -96,7 +103,7 @@
             await deleteShiftplans(selectedIds);
             toast.success(m.successfully_saved ? m.successfully_saved() : 'Deleted successfully');
             selectedIds = [];
-            void shiftplansQuery.refresh();
+            await shiftplansQuery.refresh();
         } catch (e: any) {
             toast.error(e?.message || (m.something_went_wrong ? m.something_went_wrong() : 'Failed to delete'));
         }
@@ -107,7 +114,8 @@
         try {
             await deleteShiftplans([plan.id]);
             toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
-            void shiftplansQuery.refresh();
+            selectedIds = selectedIds.filter((id) => id !== plan.id);
+            await shiftplansQuery.refresh();
         } catch (error: any) {
             toast.error(error?.message || (m.something_went_wrong ? m.something_went_wrong() : "Something went wrong"));
         }

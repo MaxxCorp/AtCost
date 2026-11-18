@@ -20,7 +20,7 @@
 	import { toast } from "svelte-sonner";
 	import { onMount } from "svelte";
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
-	import { goto } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { page as pageState } from "$app/state";
 	import {
 		FilterMenu,
@@ -80,6 +80,10 @@
 
 	let selectedIds = $state<string[]>([]);
 	const query = $derived(listKiosks(filterState));
+
+	afterNavigate(({ from }) => {
+		if (from) void query.refresh();
+	});
 	const res = $derived(query.current);
 	const kioskItems = $derived(res?.data ?? []);
 	const total = $derived(res?.total ?? 0);
@@ -109,6 +113,7 @@
 		try {
 			await deleteKiosk([kiosk.id]);
 			toast.success(m.delete_successful());
+			selectedIds = selectedIds.filter((id) => id !== kiosk.id);
 			await query.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());

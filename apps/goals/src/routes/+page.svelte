@@ -20,11 +20,18 @@
 	import { toggleCampaignShowcase } from './goals/showcase.remote.js';
 	import GoalShowcaseSection from '#lib/components/goals/GoalShowcaseSection.svelte';
 	import type { GoalCampaign } from '@ac/validations';
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 
 	const showcaseQuery = getShowcaseCampaigns({});
 	const sessionQuery = getCurrentSessionUser({});
+
+	afterNavigate(({ from }) => {
+		if (from) {
+			void showcaseQuery.refresh();
+			void sessionQuery.refresh();
+		}
+	});
 
 	const isOperator = $derived(sessionQuery.current?.isOperator ?? false);
 	const currentUser = $derived(sessionQuery.current?.user ?? null);

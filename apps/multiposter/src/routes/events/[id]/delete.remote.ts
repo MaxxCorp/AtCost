@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { eq, and, or, inArray, sql } from '@ac/db';
@@ -80,7 +80,9 @@ export const deleteEvents = command(
 			}
 
 			if (realIds.length === 0) {
-				await listEvents().refresh();
+				try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+				void listEvents().refresh();
+				void listEvents({}).refresh();
 				return { success: true };
 			}
 		}
@@ -147,7 +149,9 @@ export const deleteEvents = command(
 
 		await publishEventChange('delete', idsToDelete);
 		await invalidateEvent(idsToDelete);
-		await listEvents().refresh();
+		try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+		void listEvents().refresh();
+		void listEvents({}).refresh();
 		console.log(`[deleteEvents] Successfully deleted events.`);
 		return { success: true };
 	});

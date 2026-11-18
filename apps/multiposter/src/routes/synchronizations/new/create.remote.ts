@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
 import { syncConfig, account, encryptSyncCredentials } from '@ac/db'; // Updated syncConfig import path
@@ -135,7 +135,9 @@ export const create = form(createSynchronizationSchema, async (input) => {
 			}
 		}
 
-		await listSynchronizations().refresh();
+		try { await requested(listSynchronizations, 20).refreshAll(); } catch { /* ignore */ }
+		void listSynchronizations().refresh();
+		void listSynchronizations({}).refresh();
 
 		console.log('--- createSynchronization SUCCESS ---');
 		return { success: true, synchronization: config };

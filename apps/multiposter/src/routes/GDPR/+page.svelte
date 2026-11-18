@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
 	import { LoadingSection, ErrorSection } from "@ac/ui";
     import ContentBlockEditor from "#lib/components/cms/ContentBlockEditor.svelte";
     import { readContent } from "./read.remote";
@@ -8,9 +9,13 @@
     import { deleteBlockFunction } from "./delete.remote";
     import { listBlocksFunction } from "./list.remote";
     import { renameBlockFunction } from "./rename.remote";
-            import * as m from "#lib/paraglide/messages.js";
+    import * as m from "#lib/paraglide/messages.js";
 
-    let contentPromise = $state(readContent({}));
+    const contentQuery = readContent({});
+
+    afterNavigate(({ from }) => {
+        if (from) void contentQuery.refresh();
+    });
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -26,12 +31,17 @@
             </a>
         </div>
 
-        {#await contentPromise}
+        {#if contentQuery.loading && !contentQuery.current}
             <LoadingSection />
-        {:then result}
+        {:else if contentQuery.error}
+            <ErrorSection
+                headline={m.error_loading_gdpr()}
+                message={contentQuery.error instanceof Error ? contentQuery.error.message : String(contentQuery.error)}
+            />
+        {:else if contentQuery.current}
             <ContentBlockEditor
                 slotName="main"
-                currentResult={result}
+                currentResult={contentQuery.current}
                 remoteRead={readContent}
                 remoteUpdate={updateContent}
                 remoteCreate={createBlockFunction}
@@ -40,11 +50,6 @@
                 remoteList={listBlocksFunction}
                 remoteRename={renameBlockFunction}
             />
-        {:catch error}
-            <ErrorSection
-                headline={m.error_loading_gdpr()}
-                message={error.message}
-            />
-        {/await}
+        {/if}
     </div>
 </div>

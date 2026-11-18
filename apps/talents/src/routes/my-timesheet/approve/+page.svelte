@@ -1,24 +1,24 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { afterNavigate } from '$app/navigation';
     import { listPendingApprovals, invokeManageTimesheets } from '../timesheets.remote';
     import { breadcrumbState } from '#lib/stores/breadcrumb.svelte.js';
-    import { LoadingSection, AsyncButton } from '@ac/ui';
+    import { LoadingSection, ErrorSection, AsyncButton } from '@ac/ui';
     import { toast } from 'svelte-sonner';
     import { format, differenceInMinutes, parseISO } from 'date-fns';
 
-    let pendingEntries = $state<any[]>([]);
-    let loading = $state(true);
+    breadcrumbState.set({ feature: 'timesheets', segments: [{ label: 'Time Tracking', href: '/my-timesheet' }], current: 'Approve Entries' });
 
-    onMount(async () => {
-        breadcrumbState.set({ feature: 'timesheets', segments: [{ label: 'Time Tracking', href: '/my-timesheet' }], current: 'Approve Entries' });
-        pendingEntries = await listPendingApprovals();
-        loading = false;
+    const pendingQuery = listPendingApprovals();
+    const pendingEntries = $derived(pendingQuery.current ?? []);
+
+    afterNavigate(({ from }) => {
+        if (from) void pendingQuery.refresh();
     });
 
     async function handleApprove(entryId: string, talentId: string) {
         try {
             await invokeManageTimesheets({ action: 'approve', entryId });
-            pendingEntries = await listPendingApprovals();
+            await pendingQuery.refresh();
             toast.success('Approved');
         } catch (e: any) {
             toast.error('Failed to approve');
@@ -30,7 +30,7 @@
         if (comment === null) return;
         try {
             await invokeManageTimesheets({ action: 'reject', entryId, comment });
-            pendingEntries = await listPendingApprovals();
+            await pendingQuery.refresh();
             toast.success('Rejected');
         } catch (e: any) {
             toast.error('Failed to reject');
@@ -53,8 +53,14 @@
         <div class="text-sm text-gray-500">{pendingEntries.length} entries awaiting review</div>
     </div>
 
-    {#if loading}
+    {#if pendingQuery.loading && !pendingQuery.current}
         <LoadingSection message="Loading pending approvals..." />
+    {:else if pendingQuery.error}
+        <ErrorSection
+            headline="Error loading pending approvals"
+            message={pendingQuery.error instanceof Error ? pendingQuery.error.message : String(pendingQuery.error)}
+            onRetry={() => void pendingQuery.refresh()}
+        />
     {:else if pendingEntries.length === 0}
         <div class="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
             <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

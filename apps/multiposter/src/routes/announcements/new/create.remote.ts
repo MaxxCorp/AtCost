@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, announcementTag, announcementContact, announcementContactRole, tag, announcementLocation, campaign, syncConfig } from '@ac/db';
 import { createAnnouncementSchema } from '#lib/validations/announcements.js';
@@ -173,7 +173,9 @@ export const createAnnouncement = form(createAnnouncementSchema, async (input) =
 
         await invalidateAnnouncement(announcementId);
         // Refresh list cache if applicable
-        await listAnnouncements().refresh();
+        try { await requested(listAnnouncements, 20).refreshAll(); } catch { /* ignore */ }
+        void listAnnouncements().refresh();
+        void listAnnouncements({}).refresh();
 
         // Trigger background sync to external providers
         await syncService.triggerPushSync(user.id, announcementId, 'announcement');

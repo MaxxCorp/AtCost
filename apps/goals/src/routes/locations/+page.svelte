@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from "$app/navigation";
 	import * as m from "#lib/paraglide/messages.js";
 	import { page } from "$app/state";
 	import { listLocations } from "./list.remote.js";
@@ -15,6 +16,11 @@
 	const currentUser = $derived(sessionQuery.current?.user ?? null);
 	const isOperator = $derived(Boolean(sessionQuery.current?.isOperator));
 	const filterGroups = $derived(getLocationFilterGroups(m));
+	let locationListRef = $state<ReturnType<typeof LocationList> | undefined>();
+
+	afterNavigate(({ from }) => {
+		if (from) void locationListRef?.refresh();
+	});
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -48,6 +54,7 @@
 			</div>
 		{:else}
 			<LocationList
+				bind:this={locationListRef}
 				listLocationsRemote={listLocations}
 				deleteLocationRemote={deleteLocation}
 				{filterGroups}

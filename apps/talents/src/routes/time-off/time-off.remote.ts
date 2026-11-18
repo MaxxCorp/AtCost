@@ -1,4 +1,4 @@
-import { query, form, command } from '$app/server';
+import { query, form, command, requested } from '$app/server';
 import { 
     db, timeOffRequest, timeOffBalance, talent, contract,
     unionContractCondition, contactTag, talentTag, tag, locationContact,
@@ -174,6 +174,7 @@ export const requestTimeOff = form(timeOffRequestSchema, async (data) => {
         });
     }
 
+    try { await requested(listTimeOffRequests, 20).refreshAll(); } catch { /* ignore */ }
     void listTimeOffRequests().refresh();
     void listTimeOffRequests({}).refresh();
     void getMyTimeOffRequests(data.talentId).refresh();
@@ -186,6 +187,7 @@ export const deleteTimeOffRequests = command(v.array(v.string()), async (ids) =>
     ensureAccess(getAuthenticatedUser(), 'timesheets');
     if (!ids || ids.length === 0) return { success: true };
     await db.delete(timeOffRequest).where(inArray(timeOffRequest.id, ids));
+    try { await requested(listTimeOffRequests, 20).refreshAll(); } catch { /* ignore */ }
     void listTimeOffRequests().refresh();
     void listTimeOffRequests({}).refresh();
     return { success: true };
@@ -712,6 +714,7 @@ export const reviewTimeOffRequest = command(reviewTimeOffSchema, async (data) =>
         }).where(eq(timeOffBalance.id, balance.id));
     }
 
+    try { await requested(listTimeOffRequests, 20).refreshAll(); } catch { /* ignore */ }
     void listTimeOffRequests().refresh();
     void listTimeOffRequests({}).refresh();
     void getMyTimeOffRequests(req.talentId).refresh();

@@ -288,6 +288,7 @@
                 await deleteLocationRemote([location.id]);
             }
             toast.success(i18n.deleteSuccessful);
+            selectedIds = selectedIds.filter((id) => id !== location.id);
             if (typeof (query as any)?.refresh === 'function') {
                 await (query as any).refresh();
             } else if (typeof (listLocationsRemote as any)?.refresh === 'function') {
@@ -296,6 +297,13 @@
         } catch (error: any) {
             toast.error(error?.message || i18n.somethingWentWrong);
         }
+    }
+
+    export function refresh() {
+        if (typeof (query as any)?.refresh === 'function') {
+            return (query as any).refresh();
+        }
+        return undefined;
     }
 
     async function handleBulkDelete() {

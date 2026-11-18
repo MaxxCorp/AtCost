@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from "$app/navigation";
 	import { listJobPostings, submitApplicantIntake } from "../recruitment/recruitment.remote";
 	import { applicantIntakeSchema } from "@ac/validations";
 	import { Button, AsyncButton } from "@ac/ui";
@@ -43,6 +44,10 @@
 	const jobsQuery = listJobPostings({ onlyPublic: true, limit: 100 });
 	const allJobs = $derived(jobsQuery.current?.data ?? []);
 	const departments = $derived(jobsQuery.current?.departments ?? []);
+
+	afterNavigate(({ from }) => {
+		if (from) void jobsQuery.refresh();
+	});
 
 	const filteredJobs = $derived.by(() => {
 		return allJobs.filter((job: any) => {

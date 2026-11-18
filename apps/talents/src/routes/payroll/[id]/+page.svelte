@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import { page } from "$app/state";
     import { 
         readPayrollRun, 
@@ -41,6 +42,13 @@
 
     const payslipsQuery = $derived(listRunPayslips({ payrollRunId: runId, limit: 100 }));
     const payslips = $derived(payslipsQuery.current?.data ?? []);
+
+    afterNavigate(({ from }) => {
+        if (from) {
+            void runQuery.refresh();
+            void payslipsQuery.refresh();
+        }
+    });
 
     let search = $state("");
     let selectedPayslip = $state<any>(null);

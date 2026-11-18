@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import {
         HeartPulse,
         RefreshCw,
@@ -27,6 +28,11 @@
 
     let isCheckingTerms = $state(false);
     let selectedCategory = $state<string>("all");
+    let entityManagerRef = $state<{ refresh: () => Promise<void> } | undefined>();
+
+    afterNavigate(({ from }) => {
+        if (from) void entityManagerRef?.refresh();
+    });
 
     async function handleCheckTerms() {
         isCheckingTerms = true;
@@ -39,8 +45,7 @@
             } else {
                 toast.info("Konditionenprüfung abgeschlossen: Alle Träger-Konditionen, Zusatzbeiträge und gesetzlichen Tarife sind aktuell.");
             }
-            void listHmos().refresh();
-            void listHmos({}).refresh();
+            await entityManagerRef?.refresh();
         } catch (err: any) {
             toast.error(err?.message || "Fehler bei der Prüfung der Konditionen");
         } finally {
@@ -123,6 +128,7 @@
     <!-- Unified Entity Manager -->
     {#key selectedCategory}
         <EntityManager
+            bind:this={entityManagerRef}
             title="Versicherer & Versorgungsträger"
             icon={HeartPulse}
             mode="standalone"

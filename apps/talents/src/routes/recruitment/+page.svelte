@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from "$app/navigation";
 	import { onMount } from "svelte";
 	import {
 		listJobPostings,
@@ -101,6 +102,15 @@
 
 	const pkiQuery = getPkiStatus();
 	const pkiStatus = $derived(pkiQuery.current);
+
+	afterNavigate(({ from }) => {
+		if (from) {
+			void pipelineQuery.refresh();
+			void jobsQuery.refresh();
+			void globalCustodyQuery.refresh();
+			void pkiQuery.refresh();
+		}
+	});
 
 	// Quick Action Modal State
 	let activeModal = $state<

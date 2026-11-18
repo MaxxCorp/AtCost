@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import * as v from 'valibot';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { db } from '@ac/db';
@@ -37,7 +37,9 @@ export const remove = command(v.string(), async (id: string) => {
 	// Delete (cascade will handle related records)
 	await db.delete(syncConfig).where(eq(syncConfig.id, id));
 
-	await listSynchronizations().refresh();
+	try { await requested(listSynchronizations, 20).refreshAll(); } catch { /* ignore */ }
+	void listSynchronizations().refresh();
+	void listSynchronizations({}).refresh();
 
 	return { success: true };
 });
@@ -76,7 +78,9 @@ export const removeBulk = command(v.array(v.string()), async (ids: string[]) => 
 		.delete(syncConfig)
 		.where(inArray(syncConfig.id, ids));
 
-	await listSynchronizations().refresh();
+	try { await requested(listSynchronizations, 20).refreshAll(); } catch { /* ignore */ }
+	void listSynchronizations().refresh();
+	void listSynchronizations({}).refresh();
 
 	return { success: true };
 });

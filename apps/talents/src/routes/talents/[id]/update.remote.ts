@@ -1,10 +1,11 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, syncContactEncryption } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { unifiedTalentSchema } from '@ac/validations';
 import { readTalent } from './read.remote';
 import { listTalents } from '../list.remote';
 import { checkContactEncryptionStatus } from '../../contacts/encryption-migration.remote';
+import { invalidateTalent, invalidateContact } from '#lib/server/cache/index.js';
 
 export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ success: boolean; id?: string; error?: string }> => {
     const authUser = getAuthenticatedUser();
@@ -134,10 +135,15 @@ export const updateTalent = form(unifiedTalentSchema, async (data): Promise<{ su
         );
 
         // Refresh the detail view and list to ensure client-side data is in sync
+        await invalidateTalent(result.talentId);
+        await invalidateContact(result.contactId);
         if (result.talentId) {
+            try { await requested(readTalent, 20).refreshAll(); } catch { /* ignore */ }
             void readTalent(result.talentId).refresh();
         }
+        try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
         void listTalents().refresh();
+        void listTalents({}).refresh();
         void checkContactEncryptionStatus().refresh();
 
         return { success: true, id: result.talentId };

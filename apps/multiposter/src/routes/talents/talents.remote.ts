@@ -1,4 +1,4 @@
-import { query, form } from '$app/server';
+import { query, form, requested } from '$app/server';
 import { db, talent, type Talent, type Contact } from '@ac/db';
 import { eq, desc } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -44,7 +44,8 @@ export const createTalent = form(createTalentSchema, async (data) => {
         internalNotes: data.internalNotes,
     } as any).returning();
 
-    await listTalents().refresh();
+    try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
+    void listTalents().refresh();
     return { success: true, id: newTalent.id };
 });
 
@@ -63,6 +64,7 @@ export const updateTalent = form(updateTalentSchema as any, async (data: any) =>
         internalNotes: data.internalNotes,
     } as any).where((eq as any)((talent as any).id, data.id)).returning();
 
-    await listTalents().refresh();
+    try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
+    void listTalents().refresh();
     return { success: true, id: updatedTalent.id };
 });

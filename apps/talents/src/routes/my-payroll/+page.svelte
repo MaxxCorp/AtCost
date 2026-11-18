@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import { listMyPayslips } from "./my-payroll.remote.js";
     import { Button, LoadingSection, ErrorSection } from "@ac/ui";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
@@ -21,6 +22,10 @@
 
     const query = $derived(listMyPayslips({}));
     const payslips = $derived(query.current?.data ?? []);
+
+    afterNavigate(({ from }) => {
+        if (from) void query.refresh();
+    });
 
     let selectedPayslip = $state<any>(null);
 

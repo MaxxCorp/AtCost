@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import * as m from "#lib/paraglide/messages.js";
     import { FileText } from "@lucide/svelte";
     import { EntityManager } from "@ac/ui";
@@ -13,11 +14,17 @@
     import { getContractFilterGroups } from "#lib/filters/index.js";
 
     breadcrumbState.set({ feature: "contracts" });
+    let entityManagerRef = $state<{ refresh: () => Promise<void> } | undefined>();
+
+    afterNavigate(({ from }) => {
+        if (from) void entityManagerRef?.refresh();
+    });
 </script>
 
 <div class="space-y-6">
     <h1 class="text-2xl font-black text-gray-900 px-1">{m.contracts ? m.contracts() : "Contracts"}</h1>
     <EntityManager
+        bind:this={entityManagerRef}
         title={m.contracts ? m.contracts() : "Contracts"}
         icon={FileText}
         mode="standalone"

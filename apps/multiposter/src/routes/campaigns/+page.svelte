@@ -5,7 +5,7 @@
 
 	import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
 	import Button from "#lib/components/ui/button/button.svelte";
-	import { goto } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { page as pageState } from "$app/state";
 	import {
 		initPageFromUrl,
@@ -72,6 +72,10 @@
 
 	let selectedIds = $state<string[]>([]);
 	const campaignsQuery = $derived(listCampaigns(filterState));
+
+	afterNavigate(({ from }) => {
+		if (from) void campaignsQuery.refresh();
+	});
 	const campaignsRes = $derived(campaignsQuery.current);
 	const campaignItems = $derived(campaignsRes?.data ?? []);
 	const total = $derived(campaignsRes?.total ?? 0);
@@ -96,6 +100,7 @@
 		try {
 			await deleteCampaigns([campaign.id]);
 			toast.success(m.delete_successful());
+			selectedIds = selectedIds.filter((id) => id !== campaign.id);
 			await campaignsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());

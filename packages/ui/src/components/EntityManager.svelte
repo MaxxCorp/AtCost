@@ -709,6 +709,10 @@
         }
     }
 
+    export async function refresh() {
+        await Promise.all([refreshAssociations(), refreshSelector()]);
+    }
+
     let prevEntityId = $state(entityId);
     $effect(() => {
         if (entityId !== prevEntityId) {
@@ -899,6 +903,7 @@
 
             const newList = currentList.filter((i) => i.id !== item.id);
             localAssociatedItems = newList;
+            selectedIds = selectedIds.filter((id) => id !== item.id);
 
             await refreshAssociations();
             await refreshSelector();

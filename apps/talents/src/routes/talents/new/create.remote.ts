@@ -1,9 +1,10 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, syncContactEncryption } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { unifiedTalentSchema } from '@ac/validations';
 import { listTalents } from '../list.remote';
 import { checkContactEncryptionStatus } from '../../contacts/encryption-migration.remote';
+import { invalidateTalent, invalidateContact } from '#lib/server/cache/index.js';
 
 export const createTalent = form(unifiedTalentSchema, async (data): Promise<{ success: boolean; id?: string; error?: string }> => {
     const authUser = getAuthenticatedUser();
@@ -131,7 +132,11 @@ export const createTalent = form(unifiedTalentSchema, async (data): Promise<{ su
             'createTalent',
         );
 
-        await listTalents().refresh();
+        await invalidateTalent(result.talentId);
+        await invalidateContact(result.contactId);
+        try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
+        void listTalents().refresh();
+        void listTalents({}).refresh();
         void checkContactEncryptionStatus().refresh();
         return { success: true, id: result.talentId };
     } catch (err: any) {

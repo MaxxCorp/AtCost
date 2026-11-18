@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db, user } from '@ac/db';
 import { eq } from '@ac/db';
 import { listUsers } from '../list.remote';
@@ -45,8 +45,10 @@ export const updateUser = form(updateUserSchema, async (data) => {
         const updated = result[0];
 
         // Refresh lists/reads (non-blocking)
-        readUser(data.id).refresh();
-        listUsers().refresh();
+        void readUser(data.id).refresh();
+        try { await requested(listUsers, 20).refreshAll(); } catch { /* ignore */ }
+        void listUsers().refresh();
+        void listUsers({}).refresh();
 
         return { success: true, user: updated };
     } catch (err: any) {

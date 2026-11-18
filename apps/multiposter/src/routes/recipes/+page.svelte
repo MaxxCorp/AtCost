@@ -4,7 +4,7 @@
     import { deleteRecipes } from "./[id]/delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { page as pageState } from "$app/state";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import {
         Button,
         LoadingSection,
@@ -50,6 +50,10 @@
     let selectedIds = $state<string[]>([]);
 
     const recipesQuery = $derived(listRecipes(filterState));
+
+    afterNavigate(({ from }) => {
+        if (from) void recipesQuery.refresh();
+    });
     const recipesRes = $derived(recipesQuery.current);
     const recipeItems = $derived(recipesRes?.data ?? []);
     const total = $derived(recipesRes?.total ?? 0);
@@ -74,6 +78,7 @@
         try {
             await deleteRecipes([item.id]);
             toast.success(m.delete_successful?.() || `${item.name} deleted successfully`);
+            selectedIds = selectedIds.filter((id) => id !== item.id);
             if (currentCount <= 1 && page > 1) {
                 setPage(page - 1);
             } else {

@@ -245,7 +245,7 @@
 	}
 
 	import { page as pageState } from "$app/state";
-	import { goto } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import {
 		FilterMenu,
 		ActiveFilterChips,
@@ -313,7 +313,7 @@
 			const startRes = await startBulkSync(configId);
 			if (startRes.done) {
 				toast.success(m.bulk_sync_completed({ pushed: 0, pulled: startRes.pulled || 0 }));
-				list(filterState).refresh();
+				await syncsQuery.refresh();
 				return;
 			}
 
@@ -337,7 +337,7 @@
 				pushed: lastResult?.pushed ?? 0,
 				pulled: startRes.pulled ?? 0
 			}));
-			list(filterState).refresh();
+			await syncsQuery.refresh();
 		} catch (e: any) {
 			toast.error(m.bulk_sync_failed() + ": " + (e.message || e));
 		} finally {
@@ -348,10 +348,19 @@
 
 	let selectedIds = $state<string[]>([]);
 	const syncsQuery = $derived(list(filterState));
+	const migrationStatusQuery = checkMigrationStatus();
+	const migStatus = $derived(migrationStatusQuery.current);
 	const syncsRes = $derived(syncsQuery.current);
 	const syncItems = $derived(syncsRes?.data ?? []);
 	const total = $derived(syncsRes?.total ?? 0);
 	const totalPages = $derived(Math.ceil(total / limit));
+
+	afterNavigate(({ from }) => {
+		if (from) {
+			void syncsQuery.refresh();
+			void migrationStatusQuery.refresh();
+		}
+	});
 
 	async function handleBulkDelete() {
 		if (selectedIds.length === 0) return;
@@ -372,6 +381,7 @@
 		try {
 			await removeBulk([config.id]);
 			toast.success(m.delete_successful());
+			selectedIds = selectedIds.filter((id) => id !== config.id);
 			await syncsQuery.refresh();
 		} catch (error: any) {
 			toast.error(error?.message || m.something_went_wrong());
@@ -402,33 +412,31 @@
 				</p>
 			</div>
 			<div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-				{#await checkMigrationStatus() then migStatus}
-					{#if migStatus?.hasLegacyData && isAdmin}
-						<Button
-							variant="outline"
-							onclick={() => (showMigrationDialog = true)}
-							class="border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60 shadow-sm"
-						>
-							<Database class="w-4 h-4 mr-2 text-amber-600 dark:text-amber-400" />
-							Migrate Data
-							<span class="ml-2 px-1.5 py-0.5 text-xs font-semibold rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100">
-								{migStatus.totalItems}
-							</span>
-						</Button>
+				{#if migStatus?.hasLegacyData && isAdmin}
+					<Button
+						variant="outline"
+						onclick={() => (showMigrationDialog = true)}
+						class="border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-900/60 shadow-sm"
+					>
+						<Database class="w-4 h-4 mr-2 text-amber-600 dark:text-amber-400" />
+						Migrate Data
+						<span class="ml-2 px-1.5 py-0.5 text-xs font-semibold rounded-full bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100">
+							{migStatus.totalItems}
+						</span>
+					</Button>
 
-						{#if showMigrationDialog}
-							<MigrationDialog
-								bind:open={showMigrationDialog}
-								statusData={migStatus}
-								oncomplete={() => {
-									checkMigrationStatus().refresh();
-									list(filterState).refresh();
-								}}
-								onclose={() => (showMigrationDialog = false)}
-							/>
-						{/if}
+					{#if showMigrationDialog}
+						<MigrationDialog
+							bind:open={showMigrationDialog}
+							statusData={migStatus}
+							oncomplete={async () => {
+								await migrationStatusQuery.refresh();
+								await syncsQuery.refresh();
+							}}
+							onclose={() => (showMigrationDialog = false)}
+						/>
 					{/if}
-				{/await}
+				{/if}
 
 				{#if isAdmin}
 					<Button href="/synchronizations/new" class="w-full md:w-auto shadow-sm">

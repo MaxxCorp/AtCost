@@ -4,7 +4,7 @@
     import { Button, AsyncButton, LoadingSection, ErrorSection, recordActiveItem, activeItemAnchor, useFormValidationFeedback } from "@ac/ui";
     import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
     import { toast } from "svelte-sonner";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import { 
         Plus, 
         Calendar, 
@@ -67,6 +67,13 @@
 
     const runs = $derived(query.current?.data ?? []);
     const totalRuns = $derived(query.current?.total ?? 0);
+
+    afterNavigate(({ from }) => {
+        if (from) {
+            void query.refresh();
+            void tagsQuery.refresh();
+        }
+    });
 
     // Aggregate statistics from current runs
     const totalGrossSum = $derived(runs.reduce((acc, r) => acc + (r.totalGross || 0), 0));

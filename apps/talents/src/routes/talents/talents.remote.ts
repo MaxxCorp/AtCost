@@ -1,4 +1,4 @@
-import { query, form, command } from '$app/server';
+import { query, form, command, requested } from '$app/server';
 import { dev } from '$app/env';
 import { db, talent, talentTimelineEntry, contact, user, contactEmail, contactPhone, contactTag, contactRelation, tag, contactAddress, locationContact, userContact, userTalent, eq, desc, inArray, sql, computeContactBlindIndexes, recordPersonnelMutation, syncContactEncryption } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess, getOptionalUser } from '#lib/server/authorization.js';
@@ -22,7 +22,9 @@ export const bulkDeleteTalents = command(v.array(v.string()), async (ids): Promi
         await db.delete(talent).where(eq(talent.id, id));
     }
     await invalidateTalent(ids);
-    await (listTalents as any).refresh();
+    try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
+    void (listTalents as any).refresh();
+    void listTalents({}).refresh();
     return { success: true };
 });
 
@@ -295,7 +297,9 @@ export const upsertTalent = form(unifiedTalentSchema, async (data): Promise<{ su
         } else {
             await invalidateTalent();
         }
+        try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
         void listTalents().refresh();
+        void listTalents({}).refresh();
         void checkContactEncryptionStatus().refresh();
 
         return { success: true, id: result.talentId };

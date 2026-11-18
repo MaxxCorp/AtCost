@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { afterNavigate } from "$app/navigation";
 	import { page } from "$app/state";
 	import { GdprAdminList, LoadingSection, Button } from "@ac/ui";
 	import { breadcrumbState } from "#lib/stores/breadcrumb.svelte.js";
@@ -21,6 +22,10 @@
 	const currentUser = $derived(sessionQuery.current?.user ?? null);
 	const isOperator = $derived(Boolean(sessionQuery.current?.isOperator));
 	const requestsQuery = $derived(isOperator ? listGdprRequests({ status: "all" }) : null);
+
+	afterNavigate(({ from }) => {
+		if (from) void requestsQuery?.refresh();
+	});
 </script>
 
 <svelte:head>

@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, user, session, account, inArray } from '@ac/db';
 import { listUsers } from '../list.remote';
 import { getAuthenticatedUser, ensureAccess, parseRoles } from '#lib/server/authorization.js';
@@ -29,7 +29,13 @@ export const deleteUser = command(deleteUserSchema, async (userIds: string[]) =>
     const deletedIds = result.map(u => u.id);
 
     try {
-        await listUsers().refresh();
+        await requested(listUsers, 20).refreshAll();
+    } catch (e) {
+        console.warn('[deleteUser] requested listUsers refresh ignored error:', e);
+    }
+    try {
+        void listUsers().refresh();
+        void listUsers({}).refresh();
     } catch (e) {
         console.warn('[deleteUser] listUsers().refresh() ignored error:', e);
     }

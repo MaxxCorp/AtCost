@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { user } from '@ac/db';
 import { eq } from '@ac/db';
@@ -56,7 +56,9 @@ export const updateUser = form(updateUserSchema, async (data) => {
 
         // Refresh lists/reads
         readUser(data.id).set(updated);
-        await listUsers().refresh();
+        try { await requested(listUsers, 20).refreshAll(); } catch { /* ignore */ }
+        void listUsers().refresh();
+        void listUsers({}).refresh();
         console.log('--- updateUser SUCCESS ---');
         return { success: true, user: updated };
     } catch (err: any) {

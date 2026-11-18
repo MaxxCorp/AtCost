@@ -1,4 +1,4 @@
-import { query, form, command } from '$app/server';
+import { query, form, command, requested } from '$app/server';
 import { db, desc, and, or, ilike, sql, eq, inArray, contractFramework } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { PaginationSchema, type PaginatedResult } from '@ac/validations/pagination';
@@ -63,7 +63,9 @@ export const createContractFramework = form(contractFrameworkSchema, async (data
         defaultValues: data.defaultValues || null,
     }).returning();
 
-    await listContractFrameworks().refresh();
+    try { await requested(listContractFrameworks, 20).refreshAll(); } catch { /* ignore */ }
+    void listContractFrameworks().refresh();
+    void listContractFrameworks({}).refresh();
     return { success: true, id: newFramework.id, framework: newFramework };
 });
 
@@ -83,7 +85,9 @@ export const updateContractFramework = form(v.intersect([v.object({ id: v.string
         .where(eq(contractFramework.id, data.id))
         .returning();
 
-    await listContractFrameworks().refresh();
+    try { await requested(listContractFrameworks, 20).refreshAll(); } catch { /* ignore */ }
+    void listContractFrameworks().refresh();
+    void listContractFrameworks({}).refresh();
     await readContractFramework({ id: data.id }).set({
         ...updatedFramework,
         createdAt: updatedFramework.createdAt.toISOString(),
@@ -98,7 +102,9 @@ export const deleteContractFramework = command(v.array(v.string()), async (ids: 
     ensureAccess(user, 'contract-frameworks');
 
     await db.delete(contractFramework).where(inArray(contractFramework.id, ids));
-    await listContractFrameworks().refresh();
+    try { await requested(listContractFrameworks, 20).refreshAll(); } catch { /* ignore */ }
+    void listContractFrameworks().refresh();
+    void listContractFrameworks({}).refresh();
 
     return { success: true };
 });

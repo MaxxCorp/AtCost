@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { db } from '@ac/db';
 import { eq, inArray } from '@ac/db';
@@ -25,7 +25,9 @@ export const deleteCampaigns = command(deleteCampaignSchema, async (campaignIds:
 	}
 
 	// Refresh the list
-	await listCampaigns().refresh();
+	try { await requested(listCampaigns, 20).refreshAll(); } catch { /* ignore */ }
+	void listCampaigns().refresh();
+	void listCampaigns({}).refresh();
 
 	return { success: true, count: campaignIds.length };
 });

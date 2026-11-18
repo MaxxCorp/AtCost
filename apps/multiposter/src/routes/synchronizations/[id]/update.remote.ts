@@ -97,8 +97,9 @@ export const updateSynchronization = form(updateSynchronizationSchema, async (da
 		}
 
 		read(id).set(updated);
-		await requested(listSynchronizations, 50).refreshAll();
-		await listSynchronizations().refresh();
+		try { await requested(listSynchronizations, 20).refreshAll(); } catch { /* ignore */ }
+		void listSynchronizations().refresh();
+		void listSynchronizations({}).refresh();
 
 		console.log('--- updateSynchronization SUCCESS ---');
 		return { success: true, synchronization: updated };

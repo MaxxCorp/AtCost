@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
@@ -83,7 +83,9 @@ export const createKiosk = form(createKioskSchema, async (data) => {
         }
 
         await invalidateKiosk(newKiosk.id);
-        await listKiosks().refresh();
+        try { await requested(listKiosks, 20).refreshAll(); } catch { /* ignore */ }
+        void listKiosks().refresh();
+        void listKiosks({}).refresh();
         return { success: true, id: newKiosk.id };
     } catch (e: any) {
         console.error('Failed to create kiosk', e);

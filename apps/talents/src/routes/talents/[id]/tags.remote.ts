@@ -1,9 +1,10 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db, talentTag, eq } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
-import { delCache, cacheKeys } from '#lib/server/cache/index.js';
+import { invalidateTalent } from '#lib/server/cache/index.js';
 import { readTalent } from './read.remote.js';
+import { listTalents } from '../list.remote.js';
 
 export const updateTalentTagsAction = command(
     v.object({
@@ -24,8 +25,11 @@ export const updateTalentTagsAction = command(
             );
         }
 
-        await delCache(cacheKeys.talent(talentId));
+        await invalidateTalent(talentId);
         void readTalent(talentId).refresh();
+        try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
+        void listTalents().refresh();
+        void listTalents({}).refresh();
 
         return { success: true };
     }

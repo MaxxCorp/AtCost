@@ -1,4 +1,4 @@
-import { query, command } from "$app/server";
+import { query, command, requested } from "$app/server";
 import {
     checkContactEncryptionStatus as checkStatusCore,
     startContactEncryptionMigration as startMigrationCore,
@@ -9,6 +9,9 @@ import {
     processContactEncryptionBatchSchema,
     type ContactEncryptionStatus,
 } from "@ac/validations";
+import { listContacts } from "./list.remote";
+import { listTalents } from "../talents/list.remote";
+import { invalidateContact, invalidateTalent } from "#lib/server/cache/index.js";
 
 export const checkContactEncryptionStatus = query(async (): Promise<ContactEncryptionStatus> => {
     const authUser = getAuthenticatedUser();
@@ -51,7 +54,15 @@ export const processContactEncryptionBatch = command(
         });
 
         if (result.done) {
+            await invalidateContact();
+            await invalidateTalent();
             void checkContactEncryptionStatus().refresh();
+            try { await requested(listContacts, 20).refreshAll(); } catch { /* ignore */ }
+            try { await requested(listTalents, 20).refreshAll(); } catch { /* ignore */ }
+            void listContacts().refresh();
+            void listContacts({}).refresh();
+            void listTalents().refresh();
+            void listTalents({}).refresh();
         }
 
         return result;

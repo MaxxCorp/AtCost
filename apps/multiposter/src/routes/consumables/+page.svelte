@@ -4,7 +4,7 @@
     import { deleteConsumables } from "./[id]/delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
     import { page as pageState } from "$app/state";
-    import { goto } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import {
         LoadingSection,
         ErrorSection,
@@ -69,6 +69,10 @@
     let selectedIds = $state<string[]>([]);
 
     const consumablesQuery = $derived(listConsumables(filterState));
+
+    afterNavigate(({ from }) => {
+        if (from) void consumablesQuery.refresh();
+    });
     const consumablesRes = $derived(consumablesQuery.current);
     const consumableItems = $derived(consumablesRes?.data ?? []);
 
@@ -91,6 +95,7 @@
         try {
             await deleteConsumables([item.id]);
             toast.success(m.delete_successful?.() || `${item.name} deleted successfully`);
+            selectedIds = selectedIds.filter((id) => id !== item.id);
             if (currentCount <= 1 && page > 1) {
                 setPage(page - 1);
             } else {

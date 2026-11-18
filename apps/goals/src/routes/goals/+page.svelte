@@ -42,6 +42,7 @@
 	} from '@ac/validations';
 	import GoalShowcaseSection from '#lib/components/goals/GoalShowcaseSection.svelte';
 	import GoalOverviewCard from '#lib/components/goals/GoalOverviewCard.svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 
 	const sessionQuery = getCurrentSessionUser({});
@@ -78,6 +79,14 @@
 
 	const campaigns = $derived(campaignsQuery.current?.data ?? []);
 	const totalItems = $derived(campaignsQuery.current?.total ?? 0);
+
+	afterNavigate(({ from }) => {
+		if (from) {
+			void campaignsQuery.refresh();
+			void showcaseQuery.refresh();
+			void sessionQuery.refresh();
+		}
+	});
 
 	// Collapsible Operator Showcase Configuration Panel
 	let showShowcaseConfigPanel = $state(false);

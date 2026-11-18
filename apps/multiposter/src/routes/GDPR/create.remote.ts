@@ -1,7 +1,9 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { createBlockSchema } from '#lib/validations/cms.js';
 import { createBlock, linkBlock } from '#lib/server/cms/operations.js';
 import { getAuthenticatedUser } from '#lib/server/authorization.js';
+import { readContent } from './read.remote';
+import { listBlocksFunction } from './list.remote';
 
 export const createBlockFunction = command(createBlockSchema, async (data) => {
     const user = getAuthenticatedUser();
@@ -10,6 +12,12 @@ export const createBlockFunction = command(createBlockSchema, async (data) => {
 
     const block = await createBlock(data.name, data.description);
     await linkBlock('gdpr', 'main', block.id);
+
+    try {
+        await requested(readContent, 20).refreshAll();
+    } catch { /* ignore */ }
+    void readContent({}).refresh();
+    void listBlocksFunction().refresh();
 
     return { success: true, block };
 });

@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk } from '@ac/db';
 import { eq, and, inArray } from '@ac/db';
@@ -19,7 +19,9 @@ export const deleteKiosk = command(
             );
 
         await Promise.all(ids.map(id => invalidateKiosk(id)));
-        await listKiosks().refresh();
+        try { await requested(listKiosks, 20).refreshAll(); } catch { /* ignore */ }
+        void listKiosks().refresh();
+        void listKiosks({}).refresh();
         return { success: true };
     }
 );

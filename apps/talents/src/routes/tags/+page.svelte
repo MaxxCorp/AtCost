@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { afterNavigate } from "$app/navigation";
     import { listTags } from "./list.remote.js";
     import { deleteTag } from "./[id]/delete.remote.js";
     import { createTag } from "./new/create.remote.js";
@@ -28,10 +29,20 @@
     breadcrumbState.set({ feature: "tags" });
 
     let activeTab = $state<"tags" | "categories">("tags");
+    let tagsManager = $state<{ refresh: () => Promise<void> } | undefined>();
+    let categoriesManager = $state<{ refresh: () => Promise<void> } | undefined>();
 
     // Fetch categories for the TagForm dropdown
     const categoriesQuery = $derived(listTagCategories({ limit: 100 }));
     const availableCategories = $derived(categoriesQuery.current?.data ?? []);
+
+    afterNavigate(({ from }) => {
+        if (from) {
+            void categoriesQuery.refresh();
+            void tagsManager?.refresh();
+            void categoriesManager?.refresh();
+        }
+    });
 
     const tagFilterGroups = $derived([
         {
@@ -73,7 +84,10 @@
             <div class="bg-gray-100 p-1.5 rounded-2xl flex items-center shadow-2xs">
                 <button
                     type="button"
-                    onclick={() => activeTab = "tags"}
+                    onclick={() => {
+                        activeTab = "tags";
+                        void categoriesQuery.refresh();
+                    }}
                     class={[
                         "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer",
                         activeTab === "tags"
@@ -104,6 +118,7 @@
         {#if activeTab === "tags"}
             <div class="animate-in fade-in duration-150">
                 <EntityManager
+                    bind:this={tagsManager}
                     title="Tags"
                     icon={TagIcon}
                     mode="standalone"
@@ -181,6 +196,7 @@
         {#if activeTab === "categories"}
             <div class="animate-in fade-in duration-150">
                 <EntityManager
+                    bind:this={categoriesManager}
                     title="Tag-Kategorien"
                     icon={FolderTree}
                     mode="standalone"

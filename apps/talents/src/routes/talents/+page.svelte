@@ -118,6 +118,7 @@
         try {
             await deleteTalent(talent.id);
             toast.success(m.successfully_saved ? m.successfully_saved() : "Deleted successfully");
+            selectedIds = selectedIds.filter((id) => id !== talent.id);
             await talentsQuery.refresh();
         } catch (error: any) {
             toast.error(error?.message || (m.something_went_wrong ? m.something_went_wrong() : "Something went wrong"));

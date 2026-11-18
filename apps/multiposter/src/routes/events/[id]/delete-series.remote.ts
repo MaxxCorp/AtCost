@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db } from '@ac/db';
 import { event, recurringSeries } from '@ac/db';
 import { eq, or } from '@ac/db';
@@ -122,7 +122,9 @@ export const deleteSeries = command(
             await invalidateEvent(deletedEventIds);
         }
 
-        await listEvents().refresh();
+        try { await requested(listEvents, 20).refreshAll(); } catch { /* ignore */ }
+        void listEvents().refresh();
+        void listEvents({}).refresh();
 
         console.log('--- deleteSeries DONE ---');
         return { success: true, deletedCount: deletedEventIds.length };

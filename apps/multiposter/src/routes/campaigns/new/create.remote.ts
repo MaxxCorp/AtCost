@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { campaign } from '@ac/db';
 import { listCampaigns } from '../list.remote';
@@ -25,7 +25,9 @@ export const createCampaign = form(createCampaignSchema, async (data) => {
 			throw new Error('Failed to create campaign');
 		}
 
-		await listCampaigns().refresh();
+		try { await requested(listCampaigns, 20).refreshAll(); } catch { /* ignore */ }
+		void listCampaigns().refresh();
+		void listCampaigns({}).refresh();
 		return { success: true };
 	} catch (error: any) {
 		if (error?.status && error?.location) {

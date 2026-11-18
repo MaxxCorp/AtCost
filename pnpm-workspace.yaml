@@ -8,4 +8,4 @@ allowBuilds:
   '@google/genai': true
   protobufjs: true
 patchedDependencies:
-  '@sveltejs/kit@3.2.0': patches/@sveltejs__kit@3.2.0.patch
+  '@sveltejs/kit@3.3.0': patches/@sveltejs__kit@3.3.0.patch

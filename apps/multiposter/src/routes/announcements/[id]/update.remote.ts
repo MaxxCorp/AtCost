@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, announcementTag, announcementContact, announcementContactRole, tag, announcementLocation, campaign } from '@ac/db';
 import { updateAnnouncementSchema } from '#lib/validations/announcements.js';
@@ -210,8 +210,11 @@ export const updateAnnouncement = form(updateAnnouncementSchema, async (input) =
 
         // Refresh caches
         await invalidateAnnouncement(announcementId);
-        await readAnnouncement(announcementId).refresh();
-        await listAnnouncements().refresh();
+        try { await requested(readAnnouncement, 20).refreshAll(); } catch { /* ignore */ }
+        void readAnnouncement(announcementId).refresh();
+        try { await requested(listAnnouncements, 20).refreshAll(); } catch { /* ignore */ }
+        void listAnnouncements().refresh();
+        void listAnnouncements({}).refresh();
 
 
         // Trigger background sync to external providers

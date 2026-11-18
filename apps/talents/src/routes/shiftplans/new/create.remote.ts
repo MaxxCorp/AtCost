@@ -1,8 +1,9 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
 import { shiftPlanTemplate } from '@ac/db/schema';
 import { createShiftplanSchema } from '@ac/validations';
+import { listShiftplans } from '../list.remote';
 
 export const createShiftplan = form(createShiftplanSchema, async (data) => {
     const user = getAuthenticatedUser();
@@ -22,6 +23,9 @@ export const createShiftplan = form(createShiftplanSchema, async (data) => {
         locationId: data.locationId || null,
         schedule: parsedSchedule,
     }).returning({ id: shiftPlanTemplate.id });
-    
+
+    try { await requested(listShiftplans, 20).refreshAll(); } catch { /* ignore */ }
+    void listShiftplans().refresh();
+    void listShiftplans({}).refresh();
     return inserted;
 });

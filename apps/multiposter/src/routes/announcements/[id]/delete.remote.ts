@@ -1,4 +1,4 @@
-import { command } from '$app/server';
+import { command, requested } from '$app/server';
 import { db } from '@ac/db';
 import { announcement } from '@ac/db';
 import { inArray } from '@ac/db';
@@ -27,7 +27,9 @@ export const deleteAnnouncements = command(v.array(v.string()), async (ids: stri
     await publishAnnouncementChange('delete', ids);
 
     await invalidateAnnouncement(ids);
-    await listAnnouncements().refresh();
+    try { await requested(listAnnouncements, 20).refreshAll(); } catch { /* ignore */ }
+    void listAnnouncements().refresh();
+    void listAnnouncements({}).refresh();
     return { success: true };
 });
 

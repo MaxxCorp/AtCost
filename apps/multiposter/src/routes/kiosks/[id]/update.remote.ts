@@ -1,4 +1,4 @@
-import { form } from '$app/server';
+import { form, requested } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation } from '@ac/db';
 import { eq, and } from '@ac/db';
@@ -95,8 +95,11 @@ export const updateKiosk = form(updateKioskSchema, async (data) => {
 
         // Refresh caches - Fetch the full state to ensure absolute consistency and avoid partial state wiping
         await invalidateKiosk(id);
-        getKiosk(id).set({ ...updated, locationIds });
-        await listKiosks().refresh();
+        try { await requested(getKiosk, 20).refreshAll(); } catch { /* ignore */ }
+        void getKiosk(id).refresh();
+        try { await requested(listKiosks, 20).refreshAll(); } catch { /* ignore */ }
+        void listKiosks().refresh();
+        void listKiosks({}).refresh();
         return { success: true };
     } catch (e: any) {
         console.error('Failed to update kiosk', e);
