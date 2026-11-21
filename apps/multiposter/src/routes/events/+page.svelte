@@ -50,6 +50,7 @@
 		isMultiDayEvent,
 	} from "#lib/utils/format-event-date.js";
 	import {
+		doesOccurrenceOverlapRange,
 		getAllSeriesOccurrences,
 		getUpcomingOccurrence,
 	} from "#lib/utils/event-series.js";
@@ -73,7 +74,11 @@
 	}
 
 	function getUpcomingInstance(event: any) {
-		return getUpcomingOccurrence(event, { excludePast });
+		return getUpcomingOccurrence(event, {
+			excludePast,
+			rangeStart: activeDateBounds.start,
+			rangeEnd: activeDateBounds.end,
+		});
 	}
 
 	function isSeriesEvent(event: any): boolean {
@@ -96,9 +101,13 @@
 		syncPageToUrl,
 		recordActiveItem,
 		activeItemAnchor,
+		isDateFilterActive,
+		getDateFilterBounds,
 		type FilterGroup,
 		type FilterStateMap,
 		type RadioFilterGroup,
+		type DateFilter,
+		type DateFilterValue,
 	} from "@ac/ui";
 
 	// View Mode / Display Mode types & state
@@ -106,6 +115,7 @@
 
 	interface ModeFilterSettings {
 		filterValues?: FilterStateMap;
+		dateFilter?: DateFilterValue;
 		excludePast?: boolean;
 		excludeSeries?: boolean;
 		onlySeries?: boolean;
@@ -139,12 +149,30 @@
 		}, 300);
 	}
 
+	const emptyDateFilter = (): DateFilterValue => ({
+		mode: "single",
+		from: "",
+		to: "",
+	});
+
+	function normalizeDateFilter(val: any): DateFilterValue {
+		if (!val || typeof val !== "object") return emptyDateFilter();
+		const mode = val.mode === "range" ? "range" : "single";
+		const from = typeof val.from === "string" ? val.from : "";
+		const to = mode === "range" && typeof val.to === "string" ? val.to : "";
+		return { mode, from, to };
+	}
+
 	let filterValues = $state<FilterStateMap>({});
+	let dateFilter = $state<DateFilterValue>(emptyDateFilter());
 	let excludePast = $state(false);
 	let excludeSeries = $state(false);
 	let onlySeries = $state(false);
 	let limit = $state(50);
 	let showMigrationDialog = $state(false);
+
+	const hasActiveDateFilter = $derived(isDateFilterActive(dateFilter));
+	const activeDateBounds = $derived(getDateFilterBounds(dateFilter));
 
 	let displayMode = $state<DisplayMode>("compacted");
 	let displayModeOverrides = $state<Record<string, DisplayMode>>({});
@@ -163,6 +191,7 @@
 		const saved = modeSettings[newMode];
 		if (saved) {
 			if (saved.filterValues) filterValues = saved.filterValues;
+			if (saved.dateFilter) dateFilter = normalizeDateFilter(saved.dateFilter);
 			if (saved.excludePast !== undefined) excludePast = saved.excludePast;
 			if (saved.excludeSeries !== undefined) excludeSeries = saved.excludeSeries;
 			if (saved.onlySeries !== undefined) onlySeries = saved.onlySeries;
@@ -248,6 +277,27 @@
 		},
 	]);
 
+	const dateFilters = $derived<DateFilter[]>([
+		{
+			id: "eventDate",
+			label: m.filter_date_label(),
+			value: dateFilter,
+			singleLabel: m.filter_date_single(),
+			rangeLabel: m.filter_date_range(),
+			dateLabel: m.filter_date_select(),
+			fromLabel: m.filter_date_from(),
+			toLabel: m.filter_date_to(),
+			todayLabel: m.filter_date_today(),
+			thisWeekLabel: m.filter_date_this_week(),
+			thisMonthLabel: m.filter_date_this_month(),
+			clearLabel: m.filter_date_clear(),
+			onchange: (val: DateFilterValue) => {
+				dateFilter = val;
+				setPage(1);
+			},
+		},
+	]);
+
 	onMount(async () => {
 		try {
 			const savedPrefs = await getPreference("eventsFilters", null);
@@ -268,6 +318,9 @@
 				const saved = modeSettings[initialMode] || {};
 				if (saved.filterValues) filterValues = saved.filterValues;
 				else if (prefs.filterValues) filterValues = prefs.filterValues;
+
+				if (saved.dateFilter) dateFilter = normalizeDateFilter(saved.dateFilter);
+				else if (prefs.dateFilter) dateFilter = normalizeDateFilter(prefs.dateFilter);
 
 				if (saved.excludePast !== undefined) excludePast = saved.excludePast;
 				else if (prefs.excludePast !== undefined) excludePast = prefs.excludePast;
@@ -299,6 +352,7 @@
 		// Capture reactive dependencies to track
 		const currentMode = displayMode;
 		const currentFilterValues = filterValues;
+		const currentDateFilter = dateFilter;
 		const currentExcludePast = excludePast;
 		const currentExcludeSeries = excludeSeries;
 		const currentOnlySeries = onlySeries;
@@ -310,6 +364,7 @@
 		untrack(() => {
 			modeSettings[currentMode] = {
 				filterValues: currentFilterValues,
+				dateFilter: currentDateFilter,
 				excludePast: currentExcludePast,
 				excludeSeries: currentExcludeSeries,
 				onlySeries: currentOnlySeries,
@@ -324,6 +379,7 @@
 				sortField: currentSortField,
 				sortOrder: currentSortOrder,
 				filterValues: currentFilterValues,
+				dateFilter: currentDateFilter,
 				excludePast: currentExcludePast,
 				excludeSeries: currentExcludeSeries,
 				onlySeries: currentOnlySeries,
@@ -346,6 +402,8 @@
 		excludePast,
 		excludeSeries: excludeSeries || undefined,
 		onlySeries: onlySeries || undefined,
+		startDate: activeDateBounds.start ? activeDateBounds.start.toISOString() : undefined,
+		endDate: activeDateBounds.end ? activeDateBounds.end.toISOString() : undefined,
 	});
 
 	async function handleDelete(event: any, isSeriesMaster: boolean) {
@@ -392,8 +450,16 @@
 
 		if (sortField === "startDateTime") {
 			grouped.sort((a: any, b: any) => {
-				const occA = getUpcomingOccurrence(a, { excludePast });
-				const occB = getUpcomingOccurrence(b, { excludePast });
+				const occA = getUpcomingOccurrence(a, {
+					excludePast,
+					rangeStart: activeDateBounds.start,
+					rangeEnd: activeDateBounds.end,
+				});
+				const occB = getUpcomingOccurrence(b, {
+					excludePast,
+					rangeStart: activeDateBounds.start,
+					rangeEnd: activeDateBounds.end,
+				});
 				const timeA = occA?.startDateTime
 					? new Date(occA.startDateTime).getTime()
 					: (a.startDateTime ? new Date(a.startDateTime).getTime() : 0);
@@ -419,15 +485,27 @@
 		return grouped;
 	}
 
-	function unrollEvents(rawEvents: any[], isExcludePast: boolean) {
+	function unrollEvents(
+		rawEvents: any[],
+		isExcludePast: boolean,
+		rangeStart: Date | null = null,
+		rangeEnd: Date | null = null,
+	) {
 		const grouped = groupEvents(rawEvents);
 		const unrolled: any[] = [];
 		const now = new Date();
 		now.setHours(0, 0, 0, 0);
+		const hasDateRange = Boolean(rangeStart || rangeEnd);
 
 		for (const master of grouped) {
 			const isSeries = isSeriesEvent(master);
 			if (!isSeries) {
+				if (
+					hasDateRange &&
+					!doesOccurrenceOverlapRange(master.startDateTime, master.endDateTime, rangeStart, rangeEnd)
+				) {
+					continue;
+				}
 				unrolled.push(master);
 			} else {
 				const occurrences = getAllSeriesOccurrences(master);
@@ -437,6 +515,12 @@
 						const iEnd = occ.endDateTime ? new Date(occ.endDateTime) : null;
 						const isFuture = (iStart ? iStart >= now : false) || (iEnd ? iEnd >= now : false);
 						if (!isFuture) continue;
+					}
+					if (
+						hasDateRange &&
+						!doesOccurrenceOverlapRange(occ.startDateTime, occ.endDateTime, rangeStart, rangeEnd)
+					) {
+						continue;
 					}
 					unrolled.push({
 						...master,
@@ -496,7 +580,7 @@
 	const rawEvents = $derived(eventsRes?.data ?? []);
 	const displayedEvents = $derived(
 		displayMode === "unrolled"
-			? unrollEvents(rawEvents, excludePast)
+			? unrollEvents(rawEvents, excludePast, activeDateBounds.start, activeDateBounds.end)
 			: groupEvents(rawEvents),
 	);
 
@@ -658,6 +742,7 @@
 					groups={filterGroups}
 					booleanFilters={booleanFilters}
 					radioGroups={radioGroups}
+					dateFilters={dateFilters}
 					bind:filters={filterValues}
 					buttonLabel={m.filters()}
 					onchange={() => setPage(1)}
@@ -700,6 +785,7 @@
 			groups={filterGroups}
 			filters={filterValues}
 			booleanFilters={booleanFilters}
+			dateFilters={dateFilters}
 			activeFiltersLabel={m.active_filters()}
 			clearAllLabel={m.clear_all_filters()}
 			onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
@@ -719,6 +805,7 @@
 					reset[g.id] = { include: [], exclude: [] };
 				}
 				filterValues = reset;
+				dateFilter = { mode: dateFilter.mode, from: "", to: "" };
 				excludePast = false;
 				excludeSeries = false;
 				onlySeries = false;
@@ -860,7 +947,7 @@
 										title={m.series_occurrence()}
 									>
 										<Calendar class="w-3 h-3 text-blue-500 shrink-0" />
-										{m.next ? m.next() : "Next"}
+										{hasActiveDateFilter ? m.series_occurrence() : (m.next ? m.next() : "Next")}
 									</span>
 								{/if}
 							</div>

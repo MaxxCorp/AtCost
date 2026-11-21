@@ -1268,5 +1268,15 @@
 	"sync_sign_up_via_contact": "Sign up via {contact}",
 	"sync_sign_up_by": "Sign up by {date}",
 	"sync_sign_up_closed": "Sign up closed",
-	"sync_sign_up_link_keyword": "Sign up"
+	"sync_sign_up_link_keyword": "Sign up",
+	"filter_date_label": "Date",
+	"filter_date_single": "Single date",
+	"filter_date_range": "Date range",
+	"filter_date_select": "Select date",
+	"filter_date_from": "From",
+	"filter_date_to": "To",
+	"filter_date_today": "Today",
+	"filter_date_this_week": "This week",
+	"filter_date_this_month": "This month",
+	"filter_date_clear": "Clear date filter"
 }

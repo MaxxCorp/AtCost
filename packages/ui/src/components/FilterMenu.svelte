@@ -1,8 +1,15 @@
 <script lang="ts">
 	import { untrack } from "svelte";
-	import type { FilterGroup, FilterStateMap, BooleanFilter, RadioFilterGroup } from "./EntityManager.types";
+	import type { FilterGroup, FilterStateMap, BooleanFilter, RadioFilterGroup, DateFilter, DateFilterValue } from "./EntityManager.types";
 	import type { Snippet } from "svelte";
 	import { normalizeOption, registerGroupOptions } from "../utils/filterOptionsCache.svelte";
+	import {
+		isDateFilterActive,
+		formatDateFilterSummary,
+		getTodayDateFilterValue,
+		getThisWeekDateFilterValue,
+		getThisMonthDateFilterValue,
+	} from "../utils/dateFilter";
 	import * as DropdownMenu from "./dropdown-menu";
 	import Button from "./button/button.svelte";
 	import {
@@ -15,6 +22,7 @@
 		Check,
 		Ban,
 		ChevronDown,
+		CalendarDays,
 	} from "@lucide/svelte";
 
 	interface Props {
@@ -22,6 +30,7 @@
 		filters?: FilterStateMap;
 		booleanFilters?: BooleanFilter[];
 		radioGroups?: RadioFilterGroup[];
+		dateFilters?: DateFilter[];
 		children?: Snippet;
 		buttonLabel?: string;
 		buttonVariant?: "outline" | "ghost" | "secondary" | "default";
@@ -49,6 +58,7 @@
 		filters = $bindable({}),
 		booleanFilters = [],
 		radioGroups = [],
+		dateFilters = [],
 		children,
 		buttonLabel = "Filters",
 		buttonVariant = "outline",
@@ -93,7 +103,63 @@
 		};
 	}
 
-	// Compute total active filters count (includes + excludes + active boolean flags)
+	function isDateFilterExpanded(df: DateFilter): boolean {
+		const key = `date:${df.id}`;
+		if (expandedGroups[key] !== undefined) {
+			return expandedGroups[key];
+		}
+		return isDateFilterActive(df.value);
+	}
+
+	function toggleDateFilter(df: DateFilter) {
+		const key = `date:${df.id}`;
+		const currentState = isDateFilterExpanded(df);
+		expandedGroups = {
+			...expandedGroups,
+			[key]: !currentState,
+		};
+	}
+
+	function updateDateFilter(df: DateFilter, next: DateFilterValue) {
+		if (
+			next.mode === df.value.mode &&
+			next.from === df.value.from &&
+			next.to === df.value.to
+		) {
+			return;
+		}
+		df.onchange(next);
+		onchange?.(filters);
+	}
+
+	function handleDateInput(
+		df: DateFilter,
+		field: "single" | "from" | "to",
+		rawVal: string,
+	) {
+		if (rawVal !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(rawVal)) {
+			return;
+		}
+		if (field === "single") {
+			updateDateFilter(df, { mode: "single", from: rawVal, to: "" });
+			return;
+		}
+		if (field === "from") {
+			const nextTo =
+				rawVal && df.value.to && rawVal > df.value.to
+					? rawVal
+					: df.value.to;
+			updateDateFilter(df, { mode: "range", from: rawVal, to: nextTo });
+			return;
+		}
+		const nextFrom =
+			rawVal && df.value.from && rawVal < df.value.from
+				? rawVal
+				: df.value.from;
+		updateDateFilter(df, { mode: "range", from: nextFrom, to: rawVal });
+	}
+
+	// Compute total active filters count (includes + excludes + active boolean flags + active date filters)
 	const activeFiltersCount = $derived.by(() => {
 		let count = 0;
 		for (const state of Object.values(filters || {})) {
@@ -103,6 +169,9 @@
 		}
 		for (const bf of booleanFilters || []) {
 			if (bf.checked) count += 1;
+		}
+		for (const df of dateFilters || []) {
+			if (isDateFilterActive(df.value)) count += 1;
 		}
 		return count;
 	});
@@ -180,6 +249,9 @@
 		filters = newFilters;
 		for (const bf of booleanFilters || []) {
 			bf.onchange(false);
+		}
+		for (const df of dateFilters || []) {
+			df.onchange({ mode: df.value.mode, from: "", to: "" });
 		}
 		onclear?.();
 		onfilterchange?.(filters);
@@ -406,13 +478,13 @@
 				</DropdownMenu.CheckboxItem>
 			{/each}
 
-			{#if groups.length > 0}
+			{#if groups.length > 0 || dateFilters.length > 0}
 				<DropdownMenu.Separator class="bg-gray-100 dark:bg-gray-800 my-1" />
 			{/if}
 		{/if}
 
 		<!-- Filter Criteria Groups (Vertical Accordion Expansion) -->
-		{#if groups.length > 0}
+		{#if groups.length > 0 || dateFilters.length > 0}
 			<DropdownMenu.Label
 				class="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 px-3 py-1.5"
 			>
@@ -420,6 +492,209 @@
 			</DropdownMenu.Label>
 
 			<div class="space-y-1">
+				{#each dateFilters as df (df.id)}
+					{@const isExpanded = isDateFilterExpanded(df)}
+					{@const isActive = isDateFilterActive(df.value)}
+					{@const summary = isActive ? formatDateFilterSummary(df.value, { fromLabel: df.fromLabel, toLabel: df.toLabel }) : ""}
+
+					<div class="rounded-xl overflow-hidden border border-transparent transition-colors {isExpanded ? 'border-gray-200/70 dark:border-gray-700/70 bg-gray-50/50 dark:bg-gray-800/40' : ''}">
+						<button
+							type="button"
+							class="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-gray-100/70 dark:hover:bg-gray-800/70 cursor-pointer transition-colors text-left"
+							onclick={(e) => {
+								e.stopPropagation();
+								toggleDateFilter(df);
+							}}
+						>
+							<div class="flex items-center gap-2 min-w-0">
+								<CalendarDays size={16} class="text-gray-400 dark:text-gray-500 shrink-0" />
+								<span class="font-medium text-sm text-gray-800 dark:text-gray-200 truncate">{df.label}</span>
+							</div>
+
+							<div class="flex items-center gap-2 shrink-0">
+								{#if isActive && summary}
+									<span
+										class="text-[10px] py-0.5 px-1.5 h-4 bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 rounded-full font-bold flex items-center truncate max-w-[140px]"
+										title={summary}
+									>
+										{summary}
+									</span>
+								{/if}
+								<ChevronDown
+									size={15}
+									class="text-gray-400 transition-transform duration-200 {isExpanded ? 'rotate-180 text-blue-600' : ''}"
+								/>
+							</div>
+						</button>
+
+						{#if isExpanded}
+							<div
+								class="px-2.5 pb-2.5 pt-2 space-y-2.5 border-t border-gray-100 dark:border-gray-800/80"
+								role="group"
+								aria-label={df.label}
+							>
+								<!-- Mode Toggle -->
+								<div class="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+									<button
+										type="button"
+										class="px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer {df.value.mode === 'single'
+											? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-2xs'
+											: 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}"
+										onclick={(e) => {
+											e.stopPropagation();
+											updateDateFilter(df, {
+												mode: "single",
+												from: df.value.from || df.value.to,
+												to: "",
+											});
+										}}
+									>
+										{df.singleLabel ?? "Single date"}
+									</button>
+									<button
+										type="button"
+										class="px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer {df.value.mode === 'range'
+											? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-2xs'
+											: 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}"
+										onclick={(e) => {
+											e.stopPropagation();
+											updateDateFilter(df, {
+												mode: "range",
+												from: df.value.from,
+												to: df.value.to,
+											});
+										}}
+									>
+										{df.rangeLabel ?? "Date range"}
+									</button>
+								</div>
+
+								<!-- Quick Presets -->
+								<div class="flex flex-wrap gap-1.5">
+									<button
+										type="button"
+										class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+										onclick={(e) => {
+											e.stopPropagation();
+											updateDateFilter(df, getTodayDateFilterValue());
+										}}
+									>
+										{df.todayLabel ?? "Today"}
+									</button>
+									<button
+										type="button"
+										class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+										onclick={(e) => {
+											e.stopPropagation();
+											updateDateFilter(df, getThisWeekDateFilterValue());
+										}}
+									>
+										{df.thisWeekLabel ?? "This week"}
+									</button>
+									<button
+										type="button"
+										class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+										onclick={(e) => {
+											e.stopPropagation();
+											updateDateFilter(df, getThisMonthDateFilterValue());
+										}}
+									>
+										{df.thisMonthLabel ?? "This month"}
+									</button>
+								</div>
+
+								<!-- Date Inputs -->
+								{#if df.value.mode === "single"}
+									<div>
+										<label
+											for="date-filter-{df.id}-single"
+											class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1"
+										>
+											{df.dateLabel ?? "Date"}
+										</label>
+										<input
+											id="date-filter-{df.id}-single"
+											type="date"
+											value={df.value.from}
+											onclick={(e) => e.stopPropagation()}
+											onkeydown={(e) => {
+												if (e.key !== "Escape") e.stopPropagation();
+											}}
+											oninput={(e) => handleDateInput(df, "single", e.currentTarget.value)}
+											onchange={(e) => handleDateInput(df, "single", e.currentTarget.value)}
+											class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+										/>
+									</div>
+								{:else}
+									<div class="space-y-2">
+										<div>
+											<label
+												for="date-filter-{df.id}-from"
+												class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1"
+											>
+												{df.fromLabel ?? "From"}
+											</label>
+											<input
+												id="date-filter-{df.id}-from"
+												type="date"
+												value={df.value.from}
+												onclick={(e) => e.stopPropagation()}
+												onkeydown={(e) => {
+													if (e.key !== "Escape") e.stopPropagation();
+												}}
+												oninput={(e) => handleDateInput(df, "from", e.currentTarget.value)}
+												onchange={(e) => handleDateInput(df, "from", e.currentTarget.value)}
+												class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+											/>
+										</div>
+										<div>
+											<label
+												for="date-filter-{df.id}-to"
+												class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1"
+											>
+												{df.toLabel ?? "To"}
+											</label>
+											<input
+												id="date-filter-{df.id}-to"
+												type="date"
+												value={df.value.to}
+												onclick={(e) => e.stopPropagation()}
+												onkeydown={(e) => {
+													if (e.key !== "Escape") e.stopPropagation();
+												}}
+												oninput={(e) => handleDateInput(df, "to", e.currentTarget.value)}
+												onchange={(e) => handleDateInput(df, "to", e.currentTarget.value)}
+												class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+											/>
+										</div>
+									</div>
+								{/if}
+
+								<!-- Clear Date Filter Action -->
+								{#if isActive}
+									<div class="pt-1 border-t border-gray-200/60 dark:border-gray-700/60">
+										<button
+											type="button"
+											class="w-full flex items-center justify-center gap-1 py-1 px-2 text-[11px] font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+											onclick={(e) => {
+												e.stopPropagation();
+												updateDateFilter(df, {
+													mode: df.value.mode,
+													from: "",
+													to: "",
+												});
+											}}
+										>
+											<X size={12} />
+											{df.clearLabel ?? clearGroupText(df.label)}
+										</button>
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
+
 				{#each groups as group (group.id)}
 					{@const groupCounts = getGroupActiveCount(group.id)}
 					{@const isExpanded = isGroupExpanded(group.id)}

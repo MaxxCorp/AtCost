@@ -1268,5 +1268,15 @@
 	"sync_sign_up_via_contact": "Anmeldung über {contact}",
 	"sync_sign_up_by": "Anmeldung bis {date}",
 	"sync_sign_up_closed": "Anmeldung geschlossen",
-	"sync_sign_up_link_keyword": "Anmeldung"
+	"sync_sign_up_link_keyword": "Anmeldung",
+	"filter_date_label": "Datum",
+	"filter_date_single": "Einzelnes Datum",
+	"filter_date_range": "Zeitraum",
+	"filter_date_select": "Datum wählen",
+	"filter_date_from": "Von",
+	"filter_date_to": "Bis",
+	"filter_date_today": "Heute",
+	"filter_date_this_week": "Diese Woche",
+	"filter_date_this_month": "Dieser Monat",
+	"filter_date_clear": "Datumsfilter zurücksetzen"
 }

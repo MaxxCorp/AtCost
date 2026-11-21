@@ -222,26 +222,106 @@ export function getAllSeriesOccurrences(masterEvent: any): SeriesOccurrenceItem[
 }
 
 /**
+ * Parses a Date or date-string into a valid Date instance or returns null.
+ */
+function toValidOccurrenceDate(value: Date | string | number | null | undefined): Date | null {
+    if (value === null || value === undefined || value === "") return null;
+    const d = value instanceof Date ? value : new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Checks whether an occurrence `[start, end)` (or point `[start, start]` when `end` is absent or `<= start`)
+ * overlaps a query range `[rangeStart, rangeEnd]`.
+ *
+ * Uses half-open semantics on positive-duration intervals (`end > rangeStart`) so exclusive-midnight
+ * all-day boundaries (e.g., ending at `2026-11-21T00:00:00Z`) do not bleed into the next day.
+ */
+export function doesOccurrenceOverlapRange(
+    start: Date | string | number | null | undefined,
+    end: Date | string | number | null | undefined,
+    rangeStart: Date | number | null | undefined,
+    rangeEnd: Date | number | null | undefined,
+): boolean {
+    const startDate = toValidOccurrenceDate(start);
+    if (!startDate) return false;
+    const startMs = startDate.getTime();
+
+    const endDate = toValidOccurrenceDate(end);
+    const endMs = endDate ? endDate.getTime() : null;
+    const hasPositiveDuration = endMs !== null && endMs > startMs;
+
+    const rangeStartDate = toValidOccurrenceDate(rangeStart);
+    if (rangeStartDate) {
+        const rsMs = rangeStartDate.getTime();
+        if (hasPositiveDuration) {
+            if (endMs! <= rsMs) return false;
+        } else if (startMs < rsMs) {
+            return false;
+        }
+    }
+
+    const rangeEndDate = toValidOccurrenceDate(rangeEnd);
+    if (rangeEndDate) {
+        if (startMs > rangeEndDate.getTime()) return false;
+    }
+
+    return true;
+}
+
+/**
  * Returns the upcoming or most relevant occurrence for an event series,
  * taking into account Occurrence #1 (master) and all subsequent instances.
+ * When `rangeStart` or `rangeEnd` is provided, returns the first matching occurrence
+ * within that date window (or `null` if none overlap).
  */
 export function getUpcomingOccurrence(
     event: any,
     options?: {
         now?: number | Date;
         excludePast?: boolean;
+        rangeStart?: number | Date | null;
+        rangeEnd?: number | Date | null;
     }
 ): SeriesOccurrenceItem | null {
     if (!event) return null;
 
     const occurrences = getAllSeriesOccurrences(event);
-    if (occurrences.length === 0) {
-        return event;
-    }
+    const hasRange = options?.rangeStart != null || options?.rangeEnd != null;
 
     const nowTime = options?.now
         ? (options.now instanceof Date ? options.now.getTime() : options.now)
         : Date.now();
+
+    if (hasRange) {
+        const rangeStartDate = toValidOccurrenceDate(options?.rangeStart);
+        const rangeEndDate = toValidOccurrenceDate(options?.rangeEnd);
+
+        if (occurrences.length === 0) {
+            return doesOccurrenceOverlapRange(event.startDateTime, event.endDateTime, rangeStartDate, rangeEndDate)
+                ? event
+                : null;
+        }
+
+        const matching = occurrences.filter((occ) => {
+            if (!doesOccurrenceOverlapRange(occ.startDateTime, occ.endDateTime, rangeStartDate, rangeEndDate)) {
+                return false;
+            }
+            if (options?.excludePast) {
+                const time = occ.endDateTime
+                    ? new Date(occ.endDateTime).getTime()
+                    : (occ.startDateTime ? new Date(occ.startDateTime).getTime() : 0);
+                if (time < nowTime) return false;
+            }
+            return true;
+        });
+
+        return matching[0] ?? null;
+    }
+
+    if (occurrences.length === 0) {
+        return event;
+    }
 
     const upcoming = occurrences.find((occ) => {
         const time = occ.endDateTime

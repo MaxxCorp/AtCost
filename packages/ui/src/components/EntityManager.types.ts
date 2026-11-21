@@ -47,6 +47,30 @@ export interface RadioFilterGroup {
     onchange: (value: string) => void;
 }
 
+export type DateFilterMode = "single" | "range";
+
+export interface DateFilterValue {
+    mode: DateFilterMode;
+    from: string;
+    to: string;
+}
+
+export interface DateFilter {
+    id: string;
+    label: string;
+    value: DateFilterValue;
+    onchange: (value: DateFilterValue) => void;
+    singleLabel?: string;
+    rangeLabel?: string;
+    dateLabel?: string;
+    fromLabel?: string;
+    toLabel?: string;
+    todayLabel?: string;
+    thisWeekLabel?: string;
+    thisMonthLabel?: string;
+    clearLabel?: string;
+}
+
 export type FilterDefinition = FilterGroup;
 export type FilterAssociation = FilterGroup;
 

@@ -1,12 +1,13 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
-import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
+import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, exists, isNull, isNotNull, gt, gte, lte, alias } from '@ac/db';
 import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
 import { extractContactDetails, resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 import { populateSeriesInstances } from '#lib/server/events/instances.js';
+import { findMatchingSeriesOccurrenceStart } from '#lib/server/events/date-filter.js';
 import { sanitizePublicEvent } from '#lib/server/public-sanitization.js';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
@@ -267,21 +268,68 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		);
 	}
 	
-	if (startDate) {
-		const startD = new Date(startDate);
-		conditionalFilters.push(or(
-			gte(event.startDateTime, startD),
-			gte(event.endDateTime, startD),
+	const parsedStart = startDate ? new Date(startDate) : null;
+	const validStartD = parsedStart && !isNaN(parsedStart.getTime()) ? parsedStart : null;
+	const parsedEnd = endDate ? new Date(endDate) : null;
+	const validEndD = parsedEnd && !isNaN(parsedEnd.getTime()) ? parsedEnd : null;
+
+	if (validStartD) {
+		const instanceEventStart = alias(event, 'instance_event_start');
+		const startOrConditions: any[] = [
+			gte(event.startDateTime, validStartD),
+			and(gt(event.endDateTime, validStartD), gt(event.endDateTime, event.startDateTime)),
 			isNotNull(event.seriesId),
 			and(
 				isNotNull(event.recurrence),
 				sql`${event.recurrence} != '[]'::jsonb`
-			)
-		));
+			),
+		];
+		if (!includeSeriesEntries) {
+			startOrConditions.push(
+				exists(
+					db.select({ id: sql`1` })
+						.from(instanceEventStart)
+						.where(
+							and(
+								eq(instanceEventStart.recurringEventId, event.id),
+								!isAuthorized ? eq(instanceEventStart.isPublic, true) : sql`true`,
+								or(
+									gte(instanceEventStart.startDateTime, validStartD),
+									and(
+										gt(instanceEventStart.endDateTime, validStartD),
+										gt(instanceEventStart.endDateTime, instanceEventStart.startDateTime),
+									),
+								),
+							)
+						)
+				)
+			);
+		}
+		conditionalFilters.push(or(...startOrConditions));
 	}
-	
-	if (endDate) {
-		conditionalFilters.push(lte(event.startDateTime, new Date(endDate)));
+
+	if (validEndD) {
+		if (!includeSeriesEntries) {
+			const instanceEventEnd = alias(event, 'instance_event_end');
+			conditionalFilters.push(
+				or(
+					lte(event.startDateTime, validEndD),
+					exists(
+						db.select({ id: sql`1` })
+							.from(instanceEventEnd)
+							.where(
+								and(
+									eq(instanceEventEnd.recurringEventId, event.id),
+									!isAuthorized ? eq(instanceEventEnd.isPublic, true) : sql`true`,
+									lte(instanceEventEnd.startDateTime, validEndD),
+								)
+							)
+					)
+				)
+			);
+		} else {
+			conditionalFilters.push(lte(event.startDateTime, validEndD));
+		}
 	}
 	
 	if (excludedTags && excludedTags.length > 0) {
@@ -354,10 +402,6 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		baseQuery = baseQuery.where(and(...conditions as any)) as any;
 	}
 
-	// Total count
-	const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
-	const total = Number(countResult[0]?.count || 0);
-
 	// Sorting
 	let orderField: any = event.updatedAt;
 	if (sortField === 'startDateTime') orderField = event.startDateTime;
@@ -365,13 +409,144 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	const orderExpression = sortOrder === 'desc' ? sql`${orderField} desc nulls last` : sql`${orderField} asc nulls last`;
 
-	// Pagination
-	const paginatedIdsResult = await baseQuery
-		.orderBy(orderExpression)
-		.limit(limit)
-		.offset(offset);
+	const useDateFilteredPagination = !includeSeriesEntries && Boolean(validStartD || validEndD);
+	let total = 0;
+	let ids: string[] = [];
+	const matchedStartMap = new Map<string, number | null>();
 
-	const ids = paginatedIdsResult.map(r => r.id);
+	let effectiveFilterStart: Date | null = validStartD;
+	if (excludePast) {
+		const cutoff = new Date();
+		cutoff.setHours(0, 0, 0, 0);
+		effectiveFilterStart =
+			validStartD && validStartD.getTime() > cutoff.getTime() ? validStartD : cutoff;
+	}
+
+	if (useDateFilteredPagination) {
+		let candidateQuery = db
+			.select({
+				id: event.id,
+				startDateTime: event.startDateTime,
+				endDateTime: event.endDateTime,
+				recurrence: event.recurrence,
+				exdates: event.exdates,
+				startTimeZone: event.startTimeZone,
+				seriesId: event.seriesId,
+				status: event.status,
+				isPublic: event.isPublic,
+			})
+			.from(event)
+			.$dynamic();
+
+		if (conditions.length > 0) {
+			candidateQuery = candidateQuery.where(and(...conditions as any)) as any;
+		}
+
+		const candidates = await candidateQuery.orderBy(orderExpression);
+
+		if (candidates.length > 0) {
+			const candidateIds = candidates.map((c) => c.id);
+			const seriesIds = Array.from(
+				new Set(candidates.map((c) => c.seriesId).filter((id): id is string => Boolean(id)))
+			);
+
+			const seriesRruleMap = new Map<string, string>();
+			if (seriesIds.length > 0) {
+				const seriesRecords = await db
+					.select({ id: recurringSeries.id, rrule: recurringSeries.rrule })
+					.from(recurringSeries)
+					.where(inArray(recurringSeries.id, seriesIds));
+				for (const s of seriesRecords) {
+					if (s.rrule) seriesRruleMap.set(s.id, s.rrule);
+				}
+			}
+
+			const instancesByMasterMap = new Map<string, any[]>();
+			const childInstances = await db
+				.select({
+					id: event.id,
+					recurringEventId: event.recurringEventId,
+					startDateTime: event.startDateTime,
+					endDateTime: event.endDateTime,
+					originalStartTime: event.originalStartTime,
+					status: event.status,
+					isPublic: event.isPublic,
+				})
+				.from(event)
+				.where(inArray(event.recurringEventId, candidateIds));
+
+			for (const inst of childInstances) {
+				if (inst.recurringEventId) {
+					const list = instancesByMasterMap.get(inst.recurringEventId) || [];
+					list.push(inst);
+					instancesByMasterMap.set(inst.recurringEventId, list);
+				}
+			}
+
+			const explicitIncludedSet = new Set(isAuthorized ? (includedEventIds || []) : []);
+			const matchingCandidates: Array<{ id: string; firstMatchStartMs: number | null }> = [];
+
+			for (const c of candidates) {
+				const rec: any = c.recurrence;
+				let rruleStr: string | null = null;
+				if (rec && Array.isArray(rec) && rec[0]) {
+					rruleStr = rec[0];
+				} else if (typeof rec === 'string' && rec.trim().length > 0) {
+					rruleStr = rec.trim();
+				} else if (c.seriesId) {
+					rruleStr = seriesRruleMap.get(c.seriesId) || null;
+				}
+
+				const dbInstances = instancesByMasterMap.get(c.id) || [];
+				const matchRes = findMatchingSeriesOccurrenceStart(c, rruleStr, dbInstances, {
+					rangeStart: effectiveFilterStart,
+					rangeEnd: validEndD,
+					excludePast: Boolean(excludePast),
+					excludeCancelled: Boolean(excludeCancelled),
+					excludeTentative: Boolean(excludeTentative),
+					excludeNonPublic: Boolean(excludeNonPublic),
+					publicOnly: !isAuthorized,
+				});
+
+				if (matchRes.matches || explicitIncludedSet.has(c.id)) {
+					const resolvedStartMs =
+						matchRes.firstMatchStartMs ??
+						(c.startDateTime ? new Date(c.startDateTime).getTime() : null);
+					matchingCandidates.push({
+						id: c.id,
+						firstMatchStartMs: resolvedStartMs,
+					});
+					matchedStartMap.set(c.id, resolvedStartMs);
+				}
+			}
+
+			if (sortField === 'startDateTime') {
+				matchingCandidates.sort((a, b) => {
+					const tA = a.firstMatchStartMs;
+					const tB = b.firstMatchStartMs;
+					if (tA === null && tB === null) return 0;
+					if (tA === null) return 1;
+					if (tB === null) return -1;
+					return sortOrder === 'desc' ? tB - tA : tA - tB;
+				});
+			}
+
+			total = matchingCandidates.length;
+			ids = matchingCandidates.slice(offset, offset + limit).map((c) => c.id);
+		}
+	} else {
+		// Total count
+		const countResult = await db.execute(sql`SELECT count(*) FROM (${baseQuery}) AS subquery`);
+		total = Number(countResult[0]?.count || 0);
+
+		// Pagination
+		const paginatedIdsResult = await baseQuery
+			.orderBy(orderExpression)
+			.limit(limit)
+			.offset(offset);
+
+		ids = paginatedIdsResult.map(r => r.id);
+	}
 
 	if (ids.length === 0) {
 		return { data: [], total };
@@ -1016,7 +1191,13 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		};
 	});
 
-	await populateSeriesInstances(data, 100, { publicOnly: !isAuthorized });
+	await populateSeriesInstances(
+		data,
+		100,
+		useDateFilteredPagination
+			? { publicOnly: !isAuthorized, rangeStart: effectiveFilterStart, rangeEnd: validEndD }
+			: { publicOnly: !isAuthorized }
+	);
 
 	if (!isAuthorized) {
 		data = data
@@ -1026,8 +1207,15 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	if (sortField === 'startDateTime' || includeSeriesEntries) {
 		data.sort((a: any, b: any) => {
-			const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-			const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+			const timeA =
+				(useDateFilteredPagination && matchedStartMap.has(a.id) ? matchedStartMap.get(a.id) : null) ??
+				(a.startDateTime ? new Date(a.startDateTime).getTime() : null);
+			const timeB =
+				(useDateFilteredPagination && matchedStartMap.has(b.id) ? matchedStartMap.get(b.id) : null) ??
+				(b.startDateTime ? new Date(b.startDateTime).getTime() : null);
+			if (timeA === null && timeB === null) return 0;
+			if (timeA === null) return 1;
+			if (timeB === null) return -1;
 			return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
 		});
 	} else if (sortField === 'createdAt') {

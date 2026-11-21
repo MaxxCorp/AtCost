@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { untrack } from "svelte";
-	import type { FilterGroup, FilterStateMap, BooleanFilter } from "./EntityManager.types";
-	import { X, Plus, Minus, Filter, Check, Loader2, Trash2 } from "@lucide/svelte";
+	import type { FilterGroup, FilterStateMap, BooleanFilter, DateFilter } from "./EntityManager.types";
+	import { X, Plus, Minus, Filter, Check, Loader2, Trash2, CalendarDays } from "@lucide/svelte";
+	import { isDateFilterActive, formatDateFilterSummary } from "../utils/dateFilter";
 	import {
 		getCachedOptionLabel,
 		loadOptionsForGroup,
@@ -15,6 +16,7 @@
 		groups?: FilterGroup[];
 		filters?: FilterStateMap;
 		booleanFilters?: BooleanFilter[];
+		dateFilters?: DateFilter[];
 		getOptionName?: (groupId: string, optionId: string) => string | undefined;
 		activeFiltersLabel?: string;
 		clearAllLabel?: string;
@@ -23,6 +25,7 @@
 		turnOffFilterTooltip?: string;
 		onremove?: (groupId: string, optionId: string, type: "include" | "exclude") => void;
 		onremoveboolean?: (filterId: string) => void;
+		onremovedate?: (filterId: string) => void;
 		onclearall?: () => void;
 	}
 
@@ -30,6 +33,7 @@
 		groups = [],
 		filters = {},
 		booleanFilters = [],
+		dateFilters = [],
 		getOptionName,
 		activeFiltersLabel = "Active Filters:",
 		clearAllLabel = "Clear all",
@@ -38,6 +42,7 @@
 		turnOffFilterTooltip = "Turn off filter",
 		onremove,
 		onremoveboolean,
+		onremovedate,
 		onclearall,
 	}: Props = $props();
 
@@ -167,7 +172,11 @@
 		booleanFilters.filter((bf) => bf.checked),
 	);
 
-	const totalActiveCount = $derived(activeChips.length + activeBooleanFilters.length);
+	const activeDateFilters = $derived(
+		dateFilters.filter((df) => isDateFilterActive(df.value)),
+	);
+
+	const totalActiveCount = $derived(activeChips.length + activeBooleanFilters.length + activeDateFilters.length);
 </script>
 
 {#if totalActiveCount > 0}
@@ -276,6 +285,34 @@
 					}}
 					title={turnOffFilterTooltip}
 					aria-label="{turnOffFilterTooltip}: {bf.label}"
+				>
+					<X size={12} strokeWidth={2.5} />
+				</button>
+			</span>
+		{/each}
+
+		{#each activeDateFilters as df (df.id)}
+			{@const summary = formatDateFilterSummary(df.value, { fromLabel: df.fromLabel, toLabel: df.toLabel })}
+			<span
+				class="group inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium bg-blue-50/90 text-blue-900 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800/60 shadow-xs hover:shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-all"
+				title="{df.label}: {summary}"
+			>
+				<CalendarDays size={12} class="text-blue-700 dark:text-blue-400 shrink-0" />
+				<span class="text-blue-700 dark:text-blue-400 font-semibold text-[11px] select-none">
+					{df.label}:
+				</span>
+				<span class="font-bold text-blue-950 dark:text-blue-100 truncate max-w-[220px]">
+					{summary}
+				</span>
+				<button
+					type="button"
+					class="ml-0.5 p-0.5 rounded-full hover:bg-blue-200/80 dark:hover:bg-blue-800/80 text-blue-700 dark:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+					onclick={() => {
+						df.onchange({ mode: df.value.mode, from: "", to: "" });
+						onremovedate?.(df.id);
+					}}
+					title={turnOffFilterTooltip}
+					aria-label="{turnOffFilterTooltip}: {df.label} {summary}"
 				>
 					<X size={12} strokeWidth={2.5} />
 				</button>

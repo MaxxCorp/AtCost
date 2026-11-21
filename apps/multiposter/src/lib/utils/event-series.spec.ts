@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSeriesItem, isNonSeriesEvent, isVirtualInstanceId, parseVirtualInstanceId, isSeriesMaster, isSeriesInstance, isMaterializedException, getSeriesRootId, getAllSeriesOccurrences, getUpcomingOccurrence } from "./event-series";
+import { isSeriesItem, isNonSeriesEvent, isVirtualInstanceId, parseVirtualInstanceId, isSeriesMaster, isSeriesInstance, isMaterializedException, getSeriesRootId, getAllSeriesOccurrences, getUpcomingOccurrence, doesOccurrenceOverlapRange } from "./event-series";
 
 describe("event-series helper", () => {
     it("identifies standard single one-off events as non-series events", () => {
@@ -394,6 +394,82 @@ describe("event-series helper", () => {
             "legacy-master-uuid_inst_2026-10-29T10:00:00.000Z",
             "legacy-master-uuid_inst_2026-11-05T10:00:00.000Z"
         ]);
+    });
+
+    it("doesOccurrenceOverlapRange handles point, multi-day, open-ended, and exclusive-midnight boundaries", () => {
+        const dayStart = new Date("2026-11-21T00:00:00.000Z");
+        const dayEnd = new Date("2026-11-21T23:59:59.999Z");
+
+        // Timed event inside day
+        expect(
+            doesOccurrenceOverlapRange("2026-11-21T10:00:00.000Z", "2026-11-21T12:00:00.000Z", dayStart, dayEnd)
+        ).toBe(true);
+
+        // Multi-day event spanning across Nov 21
+        expect(
+            doesOccurrenceOverlapRange("2026-11-19T10:00:00.000Z", "2026-11-23T12:00:00.000Z", dayStart, dayEnd)
+        ).toBe(true);
+
+        // Exclusive midnight ending exactly at 2026-11-21T00:00:00.000Z does NOT overlap Nov 21
+        expect(
+            doesOccurrenceOverlapRange("2026-11-20T00:00:00.000Z", "2026-11-21T00:00:00.000Z", dayStart, dayEnd)
+        ).toBe(false);
+
+        // Zero-duration event starting at rangeStart
+        expect(
+            doesOccurrenceOverlapRange("2026-11-21T00:00:00.000Z", null, dayStart, dayEnd)
+        ).toBe(true);
+
+        // Open-ended rangeEnd
+        expect(
+            doesOccurrenceOverlapRange("2026-12-01T10:00:00.000Z", "2026-12-01T11:00:00.000Z", dayStart, null)
+        ).toBe(true);
+
+        // Open-ended rangeStart
+        expect(
+            doesOccurrenceOverlapRange("2026-10-01T10:00:00.000Z", "2026-10-01T11:00:00.000Z", null, dayEnd)
+        ).toBe(true);
+    });
+
+    it("getUpcomingOccurrence selects occurrence inside rangeStart/rangeEnd and returns null if none match", () => {
+        const master = {
+            id: "master-range",
+            summary: "Weekly Yoga",
+            startDateTime: "2026-11-02T10:00:00.000Z",
+            endDateTime: "2026-11-02T11:00:00.000Z",
+            instances: [
+                {
+                    id: "master-range_inst_2026-11-09T10:00:00.000Z",
+                    startDateTime: "2026-11-09T10:00:00.000Z",
+                    endDateTime: "2026-11-09T11:00:00.000Z"
+                },
+                {
+                    id: "master-range_inst_2026-11-16T10:00:00.000Z",
+                    startDateTime: "2026-11-16T10:00:00.000Z",
+                    endDateTime: "2026-11-16T11:00:00.000Z"
+                },
+                {
+                    id: "master-range_inst_2026-11-23T10:00:00.000Z",
+                    startDateTime: "2026-11-23T10:00:00.000Z",
+                    endDateTime: "2026-11-23T11:00:00.000Z"
+                }
+            ]
+        };
+
+        // Pick past occurrence when range targets Nov 9 (even if now is Nov 21)
+        const pastRangeOcc = getUpcomingOccurrence(master, {
+            now: new Date("2026-11-21T12:00:00.000Z"),
+            rangeStart: new Date("2026-11-09T00:00:00.000Z"),
+            rangeEnd: new Date("2026-11-09T23:59:59.999Z"),
+        });
+        expect(pastRangeOcc?.id).toBe("master-range_inst_2026-11-09T10:00:00.000Z");
+
+        // Returns null when no occurrence overlaps the requested window (does not fall back outside range)
+        const noMatch = getUpcomingOccurrence(master, {
+            rangeStart: new Date("2026-11-11T00:00:00.000Z"),
+            rangeEnd: new Date("2026-11-11T23:59:59.999Z"),
+        });
+        expect(noMatch).toBeNull();
     });
 });
 

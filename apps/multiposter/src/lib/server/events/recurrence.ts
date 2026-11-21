@@ -172,7 +172,8 @@ export function expandRecurrenceRange(
 	rangeEnd: Date,
 	startTimeZone?: string | null,
 	exdates?: string[],
-	includeMaster: boolean = true
+	includeMaster: boolean = true,
+	maxCount?: number
 ): { date: Date; end: Date | null }[] {
 	try {
 		const ruleOptions = RRule.parseString(recurrenceRule);
@@ -251,11 +252,117 @@ export function expandRecurrenceRange(
 
 			const instanceEnd = end ? new Date(instanceStart.getTime() + durationMs) : null;
 			instances.push({ date: instanceStart, end: instanceEnd });
+
+			if (maxCount !== undefined && instances.length >= maxCount) {
+				break;
+			}
 		}
 
 		return instances;
 	} catch (e) {
 		console.error('Error expanding recurrence range:', e);
+		return [];
+	}
+}
+
+/**
+ * Expands up to `limitCount` recurring occurrences starting at or overlapping `rangeStart` (open-ended forward).
+ */
+export function expandRecurrenceFrom(
+	recurrenceRule: string,
+	start: Date,
+	end: Date | null,
+	rangeStart: Date,
+	limitCount: number = 100,
+	startTimeZone?: string | null,
+	exdates?: string[],
+	includeMaster: boolean = true
+): { date: Date; end: Date | null }[] {
+	try {
+		if (limitCount <= 0) return [];
+		const ruleOptions = RRule.parseString(recurrenceRule);
+		const tz = startTimeZone || 'UTC';
+		const wallClock = getWallClockComponents(start, tz);
+
+		ruleOptions.dtstart = new Date(
+			Date.UTC(
+				wallClock.year,
+				wallClock.month - 1,
+				wallClock.day,
+				wallClock.hour,
+				wallClock.minute,
+				wallClock.second
+			)
+		);
+
+		const rruleObj = new RRule(ruleOptions);
+		const durationMs = end ? Math.max(0, end.getTime() - start.getTime()) : 0;
+
+		const lookbackDate = new Date(rangeStart.getTime() - durationMs - 2 * 3600 * 1000);
+		const cursorWall = getWallClockComponents(lookbackDate, tz);
+		let cursor = new Date(
+			Date.UTC(
+				cursorWall.year,
+				cursorWall.month - 1,
+				cursorWall.day,
+				cursorWall.hour,
+				cursorWall.minute,
+				cursorWall.second
+			)
+		);
+
+		const exdateSet = new Set<string>();
+		if (exdates && Array.isArray(exdates)) {
+			for (const ex of exdates) {
+				const exD = new Date(ex);
+				if (!isNaN(exD.getTime())) {
+					exdateSet.add(exD.toISOString());
+					exdateSet.add(String(exD.getTime()));
+					exdateSet.add(exD.toISOString().split('T')[0]);
+				}
+			}
+		}
+
+		const instances: { date: Date; end: Date | null }[] = [];
+		const maxIterations = limitCount * 4 + 100;
+		const rangeStartMs = rangeStart.getTime();
+
+		for (let i = 0; i < maxIterations; i++) {
+			const nextRaw = rruleObj.after(cursor, i === 0);
+			if (!nextRaw) break;
+			cursor = nextRaw;
+
+			const instanceStart = rruleDateToZoned(nextRaw, tz);
+			if (!includeMaster && instanceStart.getTime() === start.getTime()) {
+				continue;
+			}
+
+			if (
+				exdateSet.has(instanceStart.toISOString()) ||
+				exdateSet.has(String(instanceStart.getTime())) ||
+				exdateSet.has(instanceStart.toISOString().split('T')[0])
+			) {
+				continue;
+			}
+
+			const instanceEnd = end ? new Date(instanceStart.getTime() + durationMs) : null;
+			const startMs = instanceStart.getTime();
+			const endMs = instanceEnd ? instanceEnd.getTime() : null;
+			const overlapsStart = endMs !== null && endMs > startMs ? endMs > rangeStartMs : startMs >= rangeStartMs;
+
+			if (!overlapsStart) {
+				continue;
+			}
+
+			instances.push({ date: instanceStart, end: instanceEnd });
+			if (instances.length >= limitCount) {
+				break;
+			}
+		}
+
+		return instances;
+	} catch (e) {
+		console.error('Error expanding recurrence from start:', e);
 		return [];
 	}
 }

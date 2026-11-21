@@ -1,5 +1,6 @@
 import { db, event, recurringSeries, inArray, eq, asc } from '@ac/db';
-import { expandRecurrence, createSignUpClosureResolver } from './recurrence';
+import { doesOccurrenceOverlapRange } from '#lib/utils/event-series.js';
+import { expandRecurrence, expandRecurrenceFrom, expandRecurrenceRange, createSignUpClosureResolver } from './recurrence';
 
 export interface SeriesInstanceItem {
 	id: string;
@@ -159,7 +160,7 @@ export async function getSeriesInstances(
 export async function populateSeriesInstances(
 	events: any[],
 	maxProjected: number = 100,
-	options: { publicOnly?: boolean } = {}
+	options: { publicOnly?: boolean; rangeStart?: Date | null; rangeEnd?: Date | null } = {}
 ): Promise<void> {
 	if (!events || events.length === 0) return;
 
@@ -253,15 +254,68 @@ export async function populateSeriesInstances(
 				? (master.endDateTime instanceof Date ? master.endDateTime : new Date(master.endDateTime))
 				: null;
 
-			const projected = expandRecurrence(
-				rruleStr,
-				startDate,
-				endDate,
-				maxProjected,
-				true,
-				master.startTimeZone || undefined,
-				exdates
-			);
+			const hasRange = Boolean(options.rangeStart || options.rangeEnd);
+			let projected: { date: Date; end: Date | null }[];
+			if (hasRange) {
+				const durationMs = endDate ? Math.max(0, endDate.getTime() - startDate.getTime()) : 0;
+				if (options.rangeStart && options.rangeEnd) {
+					const paddedStart = new Date(options.rangeStart.getTime() - durationMs - 2 * 3600 * 1000);
+					const paddedEnd = new Date(options.rangeEnd.getTime() + 2 * 3600 * 1000);
+					projected = expandRecurrenceRange(
+						rruleStr,
+						startDate,
+						endDate,
+						paddedStart,
+						paddedEnd,
+						master.startTimeZone || undefined,
+						exdates,
+						false,
+						maxProjected
+					);
+				} else if (options.rangeStart) {
+					projected = expandRecurrenceFrom(
+						rruleStr,
+						startDate,
+						endDate,
+						options.rangeStart,
+						maxProjected,
+						master.startTimeZone || undefined,
+						exdates,
+						false
+					);
+				} else {
+					const rangeEnd = options.rangeEnd!;
+					if (startDate.getTime() <= rangeEnd.getTime()) {
+						const paddedEnd = new Date(rangeEnd.getTime() + 2 * 3600 * 1000);
+						projected = expandRecurrenceRange(
+							rruleStr,
+							startDate,
+							endDate,
+							startDate,
+							paddedEnd,
+							master.startTimeZone || undefined,
+							exdates,
+							false,
+							maxProjected
+						);
+					} else {
+						projected = [];
+					}
+				}
+				projected = projected.filter((p) =>
+					doesOccurrenceOverlapRange(p.date, p.end, options.rangeStart ?? null, options.rangeEnd ?? null)
+				);
+			} else {
+				projected = expandRecurrence(
+					rruleStr,
+					startDate,
+					endDate,
+					maxProjected,
+					true,
+					master.startTimeZone || undefined,
+					exdates
+				);
+			}
 
 			const existingTimes = new Set<number>();
 			for (const inst of fetchedInstances) {
