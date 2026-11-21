@@ -25,7 +25,9 @@
     import { isSignUpClosed } from '#lib/utils/event-signup.js';
     import { getKioskSignUpText } from '#lib/utils/kiosk-signup.js';
     import { page } from '$app/state';
-    const isLoggedIn = $derived(Boolean(page.data?.user));
+    import { authClient } from '#lib/auth.js';
+    const session = authClient.useSession();
+    const isLoggedIn = $derived(Boolean(page.data?.user || $session.data?.user));
 
     let { event }: { event: Event } = $props();
 

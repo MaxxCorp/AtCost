@@ -1,6 +1,6 @@
 import { query } from '$app/server';
 import { listLocations as queryLocations } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { getAuthenticatedUser, hasAccess, ensureAccess } from '#lib/server/authorization.js';
 import { LocationPaginationSchema as PaginationSchema, type Location, type PaginatedResult } from '@ac/validations';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } from '#lib/server/cache/index.js';
 
@@ -9,7 +9,17 @@ import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys, hashParams } 
  */
 export const listLocations = query(PaginationSchema, async (input): Promise<PaginatedResult<Location>> => {
 	const user = getAuthenticatedUser();
-	ensureAccess(user, 'locations');
+	const allowed =
+		hasAccess(user, 'locations') ||
+		hasAccess(user, 'kiosks') ||
+		hasAccess(user, 'events') ||
+		hasAccess(user, 'announcements') ||
+		hasAccess(user, 'resources') ||
+		hasAccess(user, 'contacts') ||
+		hasAccess(user, 'talents');
+	if (!allowed) {
+		ensureAccess(user, 'locations');
+	}
 
 	const version = await getNamespaceVersion(CACHE_NAMESPACES.LOCATIONS);
 	const key = cacheKeys.locationsList(version, hashParams(input));

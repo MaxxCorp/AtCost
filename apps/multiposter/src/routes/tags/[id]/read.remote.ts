@@ -10,7 +10,12 @@ export const readTag = query(v.string(), async (id: string) => {
             hasAccess(user, 'tags') ||
             hasAccess(user, 'events') ||
             hasAccess(user, 'announcements') ||
-            hasAccess(user, 'contacts')
+            hasAccess(user, 'contacts') ||
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'locations') ||
+            hasAccess(user, 'resources') ||
+            hasAccess(user, 'recipes') ||
+            hasAccess(user, 'consumables')
         )
     );
 

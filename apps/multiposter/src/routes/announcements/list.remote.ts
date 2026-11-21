@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, announcementLocation, announcementTag, tag, announcementResource, resource, locationContact } from '@ac/db';
 import { eq, inArray, notInArray, and, or, not, ilike, sql, exists } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { announcementPaginationSchema as PaginationSchema, parseFilterValue, type Announcement, type PaginatedResult } from '@ac/validations';
 import type * as v from 'valibot';
 import { resolveAnnouncementContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
@@ -13,18 +13,17 @@ import { sanitizePublicAnnouncement } from '#lib/server/public-sanitization.js';
  * List all announcements
  */
 export const listAnnouncements = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<Announcement>> => {
-    let hasAccess = false;
-	try {
-		const user = getAuthenticatedUser();
-		ensureAccess(user, 'announcements');
-		hasAccess = true;
-	} catch (e) {
-		// unauthorized can only see public announcements
-	}
+    const user = getOptionalUser();
+    const isAuthorized = Boolean(
+        user && (
+            hasAccess(user, 'announcements') ||
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'campaigns')
+        )
+    );
 
-    const isPublicView = !hasAccess || Boolean(input?.excludeNonPublic);
     const version = await getNamespaceVersion(CACHE_NAMESPACES.ANNOUNCEMENTS);
-    const key = cacheKeys.announcementsList(version, hashParams(input), isPublicView ? 'public' : 'auth');
+    const key = cacheKeys.announcementsList(version, hashParams(input), isAuthorized ? 'auth' : 'public');
 
     return cached(key, 300, async () => {
     const { page = 1, limit = 50, search = '', locationId, tagId, sortField = 'updatedAt', sortOrder = 'desc', excludeNonPublic, excludedAnnouncementIds, includedAnnouncementIds, excludedTags, includedTags } = input || {};
@@ -34,7 +33,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     
     const conditions: any[] = [];
     
-    if (isPublicView) {
+    if (!isAuthorized) {
 		conditions.push(eq(announcement.isPublic, true));
 	}
 
@@ -114,7 +113,10 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 			sql`NOT EXISTS (
 				SELECT 1 FROM ${announcementTag} at
 				JOIN ${tag} t ON at.tag_id = t.id
-				WHERE at.announcement_id = ${announcement.id} AND t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+				WHERE at.announcement_id = ${announcement.id} AND (
+					t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+					OR t.id::text IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+				)
 			)`
 		);
 	}
@@ -124,7 +126,10 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 			sql`EXISTS (
 				SELECT 1 FROM ${announcementTag} at
 				JOIN ${tag} t ON at.tag_id = t.id
-				WHERE at.announcement_id = ${announcement.id} AND t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+				WHERE at.announcement_id = ${announcement.id} AND (
+					t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+					OR t.id::text IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+				)
 			)`
 		);
 	}
@@ -135,12 +140,12 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
 
 	if (includedAnnouncementIds && includedAnnouncementIds.length > 0) {
 		const explicitInclusion = inArray(announcement.id, includedAnnouncementIds);
-		if (conditionalFilters.length > 0 || conditions.length > (isPublicView ? 1 : 0)) {
+		if (conditionalFilters.length > 0 || conditions.length > (!isAuthorized ? 1 : 0)) {
 			const standardFilters = and(...conditions, ...conditionalFilters);
 			conditions.length = 0;
 			conditions.push(or(standardFilters, explicitInclusion));
 			
-			if (isPublicView) {
+			if (!isAuthorized) {
 				conditions.push(eq(announcement.isPublic, true));
 			}
 		} else {
@@ -219,7 +224,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
     for (const a of rawResults) {
         if (!a.contacts || a.contacts.length === 0) {
             for (const l of a.locations || []) {
-                if (l.location && !l.location.isPublic) continue;
+                if (!isAuthorized && l.location && !l.location.isPublic) continue;
                 if (l.location?.id) neededLocationIds.add(l.location.id);
             }
         }
@@ -280,8 +285,9 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
             contacts: sortedContacts,
             locations
         }, {
-            filterWorkOnly: true,
-            publicOnly: true,
+            filterWorkOnly: !isAuthorized,
+            publicOnly: !isAuthorized,
+            includeNonPublic: isAuthorized,
             fallbackToLocation: true,
             fallbackToFirst: true
         });
@@ -291,7 +297,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
             contacts: sortedContacts,
             createdAt: row.createdAt.toISOString(),
             updatedAt: row.updatedAt.toISOString(),
-            tags: (row.tags?.map((t: any) => t.tag) || []).filter((tagItem: any) => !isPublicView || tagItem?.visibility === 'external'),
+            tags: (row.tags?.map((t: any) => t.tag) || []).filter((tagItem: any) => tagItem && (isAuthorized || tagItem.visibility === 'external')),
             locations,
             locationIds: locations.map((l: any) => l.id),
             contactIds: row.contacts?.map((c: any) => c.contactId) || [],
@@ -299,7 +305,7 @@ export const listAnnouncements = query(PaginationSchema, async (input: v.InferOu
         };
     });
 
-    if (isPublicView) {
+    if (!isAuthorized) {
         data = data
             .map((item) => sanitizePublicAnnouncement(item))
             .filter((item): item is NonNullable<typeof item> => item !== null);

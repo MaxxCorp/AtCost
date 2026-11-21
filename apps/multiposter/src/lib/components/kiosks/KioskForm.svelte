@@ -17,7 +17,7 @@
         updateLocationSchema,
     } from "@ac/validations";
     import { readLocation } from "../../../routes/locations/[id]/read.remote";
-    import { MapPin } from "@lucide/svelte";
+    import { MapPin, Lock } from "@lucide/svelte";
     import { getLocationFilterGroups } from "#lib/filters/index.js";
     import { onMount, untrack } from "svelte";
     import { toast } from "svelte-sonner";
@@ -45,8 +45,11 @@
      } = $props();
 
     const type = "kiosk";
- 
- 
+
+    const locationsQuery = listLocations({ limit: 1000 });
+    const tagsQuery = listTags({ limit: 1000 });
+    const eventsQuery = listEvents({ limit: 1000 });
+    const announcementsQuery = listAnnouncements({ limit: 1000 });
 
     let selectedLocationIds = $state<string[]>(untrack(() => initialData?.locationIds || (initialData?.locationId ? [initialData.locationId] : [])));
     let lookAheadDays = $state(untrack(() => initialData?.lookAhead ? Math.round(initialData.lookAhead / 86400) : 28));
@@ -253,10 +256,14 @@
         </div>
 
         <div class="space-y-2">
-            {#await listLocations()}
-
+            {#if locationsQuery.loading && !locationsQuery.current}
                 <div class="animate-pulse h-10 bg-gray-100 rounded"></div>
-            {:then locs}
+            {:else if locationsQuery.error}
+                <div class="text-red-600 p-4 border border-red-200 rounded">
+                    {locationsQuery.error instanceof Error ? locationsQuery.error.message : m.something_went_wrong()}
+                </div>
+            {:else if locationsQuery.current}
+                {@const locs = locationsQuery.current}
                 <h3 class="text-lg font-semibold mb-2 flex items-center gap-2">
                     <MapPin size={18} class="text-blue-600" />
                     {m.feature_locations_title()}
@@ -269,7 +276,13 @@
                         mode="embedded"
                         initialItems={locs.data.filter((l: any) => selectedLocationIds.includes(l.id))}
                         filters={getLocationFilterGroups(m)}
-                        onchange={(ids: string[]) => selectedLocationIds = ids}
+                        onchange={(ids: string[]) => {
+                            const newlyAddedIds = ids.filter((id) => !selectedLocationIds.includes(id));
+                            selectedLocationIds = ids;
+                            if (newlyAddedIds.some((id) => locs.data.find((l: any) => l.id === id)?.isPublic === false)) {
+                                excludeNonPublic = false;
+                            }
+                        }}
                         listItemsRemote={listLocations as any}
                         createRemote={createLocation}
                         createSchema={createLocationSchema}
@@ -313,8 +326,18 @@
                         })}
                     >
                         {#snippet renderItemLabel(location: any)}
-                            {location.name}
-                            {location.roomId ? `(${location.roomId})` : ""}
+                            <span class="inline-flex items-center gap-1.5">
+                                <span>
+                                    {location.name}
+                                    {location.roomId ? `(${location.roomId})` : ""}
+                                </span>
+                                {#if location.isPublic === false}
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                        <Lock class="w-2.5 h-2.5" />
+                                        {m.private_label?.() ?? 'Internal'}
+                                    </span>
+                                {/if}
+                            </span>
                         {/snippet}
                         {#snippet renderForm({
                             remoteFunction: rf,
@@ -390,11 +413,7 @@
                 {#each rf.fields.locationIds.issues() ?? [] as issue (issue.message)}
                     <p class="mt-1 text-sm text-red-600">{translateIssue(issue.message, m)}</p>
                 {/each}
-            {:catch error}
-                <div class="text-red-600 p-4 border border-red-200 rounded">
-                    {error.message || m.something_went_wrong()}
-                </div>
-            {/await}
+            {/if}
 
             <p class="text-xs text-gray-500">
                 {m.linked_events_description()}
@@ -798,47 +817,91 @@
                 <input {...rf.fields.excludeSeries.as("text", String(excludeSeries))} class="hidden" />
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {#await listTags({ limit: 1000 })}
+                    {#if tagsQuery.loading && !tagsQuery.current}
                         <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
                         <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
-                    {:then tagsResult}
+                    {:else if tagsQuery.error}
+                        <div class="col-span-full text-red-600 p-4 border border-red-200 rounded">
+                            {tagsQuery.error instanceof Error ? tagsQuery.error.message : m.something_went_wrong()}
+                        </div>
+                    {:else if tagsQuery.current}
+                        {@const tagsResult = tagsQuery.current}
                         <div class="space-y-2">
-                            <KioskMultiSelect title={m.included_tags()} items={tagsResult.data} bind:selectedIds={includedTags} />
+                            <KioskMultiSelect
+                                title={m.included_tags()}
+                                items={tagsResult.data}
+                                bind:selectedIds={includedTags}
+                                onToggle={(item, selected) => {
+                                    if (selected && (item.isPublic === false || item.visibility === 'internal')) {
+                                        excludeNonPublic = false;
+                                    }
+                                }}
+                            />
                             <input {...rf.fields.includedTags.as("text", JSON.stringify(includedTags))} class="hidden" />
                         </div>
                         <div class="space-y-2">
                             <KioskMultiSelect title={m.excluded_tags()} items={tagsResult.data} bind:selectedIds={excludedTags} />
                             <input {...rf.fields.excludedTags.as("text", JSON.stringify(excludedTags))} class="hidden" />
                         </div>
-                    {/await}
+                    {/if}
                     
-                    {#await listEvents({ limit: 1000 })}
+                    {#if eventsQuery.loading && !eventsQuery.current}
                         <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
                         <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
-                    {:then eventsResult}
+                    {:else if eventsQuery.error}
+                        <div class="col-span-full text-red-600 p-4 border border-red-200 rounded">
+                            {eventsQuery.error instanceof Error ? eventsQuery.error.message : m.something_went_wrong()}
+                        </div>
+                    {:else if eventsQuery.current}
+                        {@const eventsResult = eventsQuery.current}
                         <div class="space-y-2">
-                            <KioskMultiSelect title={m.included_events()} items={eventsResult.data} labelKey="summary" bind:selectedIds={includedEventIds} />
+                            <KioskMultiSelect
+                                title={m.included_events()}
+                                items={eventsResult.data}
+                                labelKey="summary"
+                                bind:selectedIds={includedEventIds}
+                                onToggle={(item, selected) => {
+                                    if (selected && (item.isPublic === false || item.visibility === 'internal')) {
+                                        excludeNonPublic = false;
+                                    }
+                                }}
+                            />
                             <input {...rf.fields.includedEventIds.as("text", JSON.stringify(includedEventIds))} class="hidden" />
                         </div>
                         <div class="space-y-2">
                             <KioskMultiSelect title={m.excluded_events()} items={eventsResult.data} labelKey="summary" bind:selectedIds={excludedEventIds} />
                             <input {...rf.fields.excludedEventIds.as("text", JSON.stringify(excludedEventIds))} class="hidden" />
                         </div>
-                    {/await}
+                    {/if}
                     
-                    {#await listAnnouncements({ limit: 1000 })}
+                    {#if announcementsQuery.loading && !announcementsQuery.current}
                         <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
                         <div class="animate-pulse h-64 bg-gray-200 rounded"></div>
-                    {:then announcementsResult}
+                    {:else if announcementsQuery.error}
+                        <div class="col-span-full text-red-600 p-4 border border-red-200 rounded">
+                            {announcementsQuery.error instanceof Error ? announcementsQuery.error.message : m.something_went_wrong()}
+                        </div>
+                    {:else if announcementsQuery.current}
+                        {@const announcementsResult = announcementsQuery.current}
                         <div class="space-y-2">
-                            <KioskMultiSelect title={m.included_announcements()} items={announcementsResult.data} labelKey="title" bind:selectedIds={includedAnnouncementIds} />
+                            <KioskMultiSelect
+                                title={m.included_announcements()}
+                                items={announcementsResult.data}
+                                labelKey="title"
+                                bind:selectedIds={includedAnnouncementIds}
+                                onToggle={(item, selected) => {
+                                    if (selected && (item.isPublic === false || item.visibility === 'internal')) {
+                                        excludeNonPublic = false;
+                                    }
+                                }}
+                            />
                             <input {...rf.fields.includedAnnouncementIds.as("text", JSON.stringify(includedAnnouncementIds))} class="hidden" />
                         </div>
                         <div class="space-y-2">
                             <KioskMultiSelect title={m.excluded_announcements()} items={announcementsResult.data} labelKey="title" bind:selectedIds={excludedAnnouncementIds} />
                             <input {...rf.fields.excludedAnnouncementIds.as("text", JSON.stringify(excludedAnnouncementIds))} class="hidden" />
                         </div>
-                    {/await}
+                    {/if}
                 </div>
             </div>
         </details>

@@ -9,7 +9,7 @@ import { isPublicLocation, isPublicContact } from '#lib/server/public-sanitizati
 export const GET: RequestHandler = async ({ params }) => {
     const eventId = params.id;
     const user = getOptionalUser();
-    const isAuthorized = Boolean(user && hasAccess(user, 'events'));
+    const isAuthorized = Boolean(user && (hasAccess(user, 'events') || hasAccess(user, 'kiosks')));
 
     const buildIcs = async (publicOnly: boolean) => {
         let data: any = null;
@@ -81,7 +81,7 @@ export const GET: RequestHandler = async ({ params }) => {
         }
 
         if (publicOnly && !data.isPublic) {
-            error(403, 'Forbidden');
+            error(user ? 403 : 401, user ? 'Forbidden' : 'Unauthorized');
         }
 
         const vcalendar = new ICAL.Component(['vcalendar', [], []]);

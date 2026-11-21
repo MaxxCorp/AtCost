@@ -21,7 +21,7 @@ import { sanitizePublicEvent, filterPublicTags } from '#lib/server/public-saniti
  */
 export const readEvent = query(v.string(), async (eventId: string): Promise<Event | null> => {
 	const user = getOptionalUser();
-	const isAuthorized = !!(user && hasAccess(user, 'events'));
+	const isAuthorized = Boolean(user && (hasAccess(user, 'events') || hasAccess(user, 'kiosks')));
 
 	// 0. Cache check for public viewers / robots
 	if (!isAuthorized) {
@@ -29,7 +29,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		if (cachedPayload !== null) {
 			if (cachedPayload.isPrivate) {
 				if (!user) {
-					error(403, 'Authentication required to view this event');
+					error(401, 'Authentication required to view this event');
 				}
 				error(403, 'You do not have permission to view this event');
 			}
@@ -273,7 +273,7 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 			await setCache(cacheKeys.publicEvent(eventId), { isPrivate: true }, 300);
 		}
 		if (!user) {
-			error(403, 'Authentication required to view this event');
+			error(401, 'Authentication required to view this event');
 		}
 		if (!isAuthorized) {
 			error(403, 'You do not have permission to view this event');
@@ -308,12 +308,12 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 	if (allContacts.length === 0) {
 		const neededLocationIds = new Set<string>();
 		for (const l of result.locations || []) {
-			if (l.location && !l.location.isPublic) continue;
+			if (!isAuthorized && l.location && !l.location.isPublic) continue;
 			if (l.location?.id) neededLocationIds.add(l.location.id);
 		}
 		for (const r of result.resources || []) {
 			const res = r.resource as any;
-			if (res?.location && !res.location.isPublic) continue;
+			if (!isAuthorized && res?.location && !res.location.isPublic) continue;
 			const locId = res?.locationId;
 			if (locId) neededLocationIds.add(locId);
 		}
@@ -364,16 +364,18 @@ export const readEvent = query(v.string(), async (eventId: string): Promise<Even
 		locations: evtLocations,
 		resources: evtResources
 	}, {
-		filterWorkOnly: true,
-		publicOnly: true,
+		filterWorkOnly: !isAuthorized,
+		publicOnly: !isAuthorized,
+		includeNonPublic: isAuthorized,
 		fallbackToLocation: true,
 		fallbackToFirst: true
 	});
 
 	const resolvedSignUpContact = result.signUpMode === 'required' && result.signUpContact
 		? extractContactDetails(result.signUpContact, {
-			filterWorkOnly: true,
-			publicOnly: true
+			filterWorkOnly: !isAuthorized,
+			publicOnly: !isAuthorized,
+			includeNonPublic: isAuthorized
 		})
 		: null;
 

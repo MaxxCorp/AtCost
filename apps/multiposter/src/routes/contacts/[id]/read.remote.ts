@@ -15,7 +15,15 @@ import { sanitizePublicContact } from '#lib/server/public-sanitization.js';
  */
 export const readContact = query(v.string(), async (id: string): Promise<any> => {
     const user = getOptionalUser();
-    const isAuthorized = !!(user && hasAccess(user, 'contacts'));
+    const isAuthorized = Boolean(
+        user && (
+            hasAccess(user, 'contacts') ||
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'events') ||
+            hasAccess(user, 'announcements') ||
+            hasAccess(user, 'locations')
+        )
+    );
 
     // Cache check for public viewers / robots
     if (!isAuthorized) {
@@ -23,7 +31,7 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
         if (cachedPayload !== null) {
             if (cachedPayload.isPrivate) {
                 if (!user) {
-                    error(403, 'Authentication required to view this contact');
+                    error(401, 'Authentication required to view this contact');
                 }
                 error(403, 'You do not have permission to view this contact');
             }
@@ -71,7 +79,7 @@ export const readContact = query(v.string(), async (id: string): Promise<any> =>
             await setCache(cacheKeys.publicContact(id), { isPrivate: true }, 300);
         }
         if (!user) {
-            error(403, 'Authentication required to view this contact');
+            error(401, 'Authentication required to view this contact');
         }
         if (!isAuthorized) {
             error(403, 'You do not have permission to view this contact');

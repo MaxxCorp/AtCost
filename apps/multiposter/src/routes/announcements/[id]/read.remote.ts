@@ -2,6 +2,7 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { announcement, locationContact, eq, inArray } from '@ac/db';
 import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
+import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { type Announcement, getCampaignTargetIds } from '@ac/validations';
 import { resolveAnnouncementContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
@@ -13,18 +14,21 @@ import { sanitizePublicAnnouncement } from '#lib/server/public-sanitization.js';
  * 
  * Access rules:
  * - If announcement is public: anyone can view (but only public-safe fields)
- * - If announcement is private: only authenticated users with 'announcements' access can view
+ * - If announcement is private: only authenticated users with 'announcements' or 'kiosks' access can view
  */
 export const readAnnouncement = query(v.string(), async (announcementId: string): Promise<Announcement | null> => {
     const user = getOptionalUser();
-    const isAuthorized = !!(user && hasAccess(user, 'announcements'));
+    const isAuthorized = Boolean(user && (hasAccess(user, 'announcements') || hasAccess(user, 'kiosks')));
 
     // 0. Cache check for public viewers / robots
     if (!isAuthorized) {
         const cachedPayload = await getCache<{ isPrivate: boolean; data?: Announcement | null }>(cacheKeys.publicAnnouncement(announcementId));
         if (cachedPayload !== null) {
             if (cachedPayload.isPrivate) {
-                throw new Error('Unauthorized');
+                if (!user) {
+                    error(401, 'Authentication required to view this announcement');
+                }
+                error(403, 'You do not have permission to view this announcement');
             }
             return cachedPayload.data ? (sanitizePublicAnnouncement(cachedPayload.data) as any) : null;
         }
@@ -64,7 +68,12 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         if (!isAuthorized) {
             await setCache(cacheKeys.publicAnnouncement(announcementId), { isPrivate: true }, 300);
         }
-        if (!user || !isAuthorized) throw new Error('Unauthorized');
+        if (!user) {
+            error(401, 'Authentication required to view this announcement');
+        }
+        if (!isAuthorized) {
+            error(403, 'You do not have permission to view this announcement');
+        }
     }
 
     // 3. Resolve Primary Contact
@@ -92,7 +101,7 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
     if (allContacts.length === 0) {
         const neededLocationIds = new Set<string>();
         for (const l of result.locations || []) {
-            if (l.location && !l.location.isPublic) continue;
+            if (!isAuthorized && l.location && !l.location.isPublic) continue;
             if (l.location?.id) neededLocationIds.add(l.location.id);
         }
 
@@ -127,8 +136,9 @@ export const readAnnouncement = query(v.string(), async (announcementId: string)
         contacts: sortedContacts,
         locations
     }, {
-		filterWorkOnly: true,
-		publicOnly: true,
+		filterWorkOnly: !isAuthorized,
+		publicOnly: !isAuthorized,
+		includeNonPublic: isAuthorized,
 		fallbackToLocation: true,
 		fallbackToFirst: true
 	});

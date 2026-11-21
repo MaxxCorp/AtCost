@@ -9,7 +9,7 @@ import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 export const GET: RequestHandler = async ({ params, url }) => {
     const eventId = params.id;
     const user = getOptionalUser();
-    const isAuthorized = Boolean(user && hasAccess(user, 'events'));
+    const isAuthorized = Boolean(user && (hasAccess(user, 'events') || hasAccess(user, 'kiosks')));
 
     const findEvent = async () => {
         let data: any = null;
@@ -79,7 +79,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
             error(404, 'Event not found');
         }
         if (!data.isPublic && !isAuthorized) {
-            error(403, 'Forbidden');
+            error(user ? 403 : 401, user ? 'Forbidden' : 'Unauthorized');
         }
 
         const qrBytes = data.isPublic

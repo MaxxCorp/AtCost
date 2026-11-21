@@ -10,6 +10,7 @@ import { resolveLocationContactSync } from '#lib/server/contact-resolution.js';
 import { cached, getNamespaceVersion, CACHE_NAMESPACES, cacheKeys } from '#lib/server/cache/index.js';
 import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from '#lib/utils/kiosk-dates.js';
 import { sanitizePublicEvent, sanitizePublicAnnouncement } from '#lib/server/public-sanitization.js';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 
 function toSafeIsoString(date: Date | string | null | undefined): string | null {
     if (!date) return null;
@@ -25,8 +26,17 @@ function toSafeIsoString(date: Date | string | null | undefined): string | null 
 }
 
 export const readKioskView = query(v.string(), async (kioskId) => {
+    const user = getOptionalUser();
+    const isAuthorized = Boolean(
+        user && (
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'events') ||
+            hasAccess(user, 'announcements')
+        )
+    );
+
     const version = await getNamespaceVersion(CACHE_NAMESPACES.KIOSKS);
-    const key = cacheKeys.kioskView(kioskId, version);
+    const key = cacheKeys.kioskView(kioskId, version, isAuthorized ? 'auth' : 'public');
 
     return cached(key, 600, async () => {
         const kioskData = await db.query.kiosk.findFirst({
@@ -62,14 +72,15 @@ export const readKioskView = query(v.string(), async (kioskId) => {
 
         const hasConfiguredLocations = kioskLocationsData.length > 0;
 
-        // Kiosk displays are public-facing: only expose public locations and public work contacts
+        // Unauthenticated / unauthorized viewers only see public locations and public work contacts
         const locations = kioskLocationsData
-            .filter(kl => kl.location && kl.location.isPublic === true)
+            .filter(kl => kl.location && (isAuthorized || kl.location.isPublic === true))
             .map(kl => {
                 const loc = kl.location;
                 const resolvedContact = resolveLocationContactSync(loc, {
-                    filterWorkOnly: true,
-                    publicOnly: true,
+                    filterWorkOnly: !isAuthorized,
+                    publicOnly: !isAuthorized,
+                    includeNonPublic: isAuthorized,
                     fallbackToFirst: true
                 });
 
@@ -150,6 +161,8 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             effectiveExcludedTags = effectiveExcludedTags.filter(t => t !== 'Series');
         }
 
+        const effectiveExcludeNonPublic = !isAuthorized || Boolean(kioskData.excludeNonPublic);
+
         const eventsResult = await listEvents({
             limit: 250,
             locationId: locationIds.length > 0 ? locationIds : undefined,
@@ -157,7 +170,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             endDate,
             excludeTentative: kioskData.excludeTentative,
             excludeCancelled: kioskData.excludeCancelled,
-            excludeNonPublic: true,
+            excludeNonPublic: effectiveExcludeNonPublic,
             excludeSeries: kioskData.excludeSeries,
             includeSeriesEntries: !kioskData.excludeSeries,
             excludedEventIds: kioskData.excludedEventIds || [],
@@ -171,7 +184,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         const announcementsResult = await listAnnouncements({
             limit: 100,
             locationId: locationIds.length > 0 ? locationIds : undefined,
-            excludeNonPublic: true,
+            excludeNonPublic: effectiveExcludeNonPublic,
             excludedAnnouncementIds: kioskData.excludedAnnouncementIds || [],
             includedAnnouncementIds: kioskData.includedAnnouncementIds || [],
             excludedTags: effectiveExcludedTags,
@@ -179,12 +192,18 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         });
 
         const locationIdSet = new Set(locationIds);
-        let validEvents = eventsResult.data
-            .map((e: any) => sanitizePublicEvent(e))
-            .filter((e: any): e is NonNullable<typeof e> => e !== null);
+        const includedEventIdSet = new Set(kioskData.includedEventIds || []);
+        let validEvents = isAuthorized
+            ? eventsResult.data
+            : eventsResult.data
+                  .map((e: any) => sanitizePublicEvent(e))
+                  .filter((e: any): e is NonNullable<typeof e> => e !== null);
 
         if (locationIds.length > 0) {
             validEvents = validEvents.filter((e: any) => {
+                if (isAuthorized && (includedEventIdSet.has(e.id) || (e.recurringEventId && includedEventIdSet.has(e.recurringEventId)))) {
+                    return true;
+                }
                 const eLocIds = new Set<string>();
                 for (const l of (e.locations || [])) {
                     const id = l?.id || l?.locationId || l?.location?.id;
@@ -205,12 +224,18 @@ export const readKioskView = query(v.string(), async (kioskId) => {
             validEvents = validEvents.filter((e: any) => e.status !== 'cancelled');
         }
 
-        let validAnnouncements = announcementsResult.data
-            .map((a: any) => sanitizePublicAnnouncement(a))
-            .filter((a: any): a is NonNullable<typeof a> => a !== null);
+        const includedAnnouncementIdSet = new Set(kioskData.includedAnnouncementIds || []);
+        let validAnnouncements = isAuthorized
+            ? announcementsResult.data
+            : announcementsResult.data
+                  .map((a: any) => sanitizePublicAnnouncement(a))
+                  .filter((a: any): a is NonNullable<typeof a> => a !== null);
 
         if (locationIds.length > 0) {
             validAnnouncements = validAnnouncements.filter((a: any) => {
+                if (isAuthorized && includedAnnouncementIdSet.has(a.id)) {
+                    return true;
+                }
                 const aLocIds = new Set<string>();
                 for (const l of (a.locations || [])) {
                     const id = l?.id || l?.locationId || l?.location?.id;

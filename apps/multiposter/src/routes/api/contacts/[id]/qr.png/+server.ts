@@ -9,7 +9,15 @@ import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 export const GET: RequestHandler = async ({ params, url }) => {
     const contactId = params.id;
     const user = getOptionalUser();
-    const isAuthorized = Boolean(user && hasAccess(user, 'contacts'));
+    const isAuthorized = Boolean(
+        user && (
+            hasAccess(user, 'contacts') ||
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'events') ||
+            hasAccess(user, 'announcements') ||
+            hasAccess(user, 'locations')
+        )
+    );
 
     const generateQr = async () => {
         const baseUrl = PUBLIC_BASE_URL || url.origin || BETTER_AUTH_URL || "";
@@ -37,7 +45,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
         }
 
         if ((!data.isPublic || data.obfuscationStatus === 'obfuscated') && !isAuthorized) {
-            error(403, 'Forbidden');
+            error(user ? 403 : 401, user ? 'Forbidden' : 'Unauthorized');
         }
 
         const qrBytes = data.isPublic

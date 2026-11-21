@@ -10,7 +10,15 @@ export const GET: RequestHandler = async ({ params, url }) => {
     const contactId = params.id;
     const isPublicRequested = url.searchParams.has('public');
     const user = getOptionalUser();
-    const isAuthorized = Boolean(user && hasAccess(user, 'contacts'));
+    const isAuthorized = Boolean(
+        user && (
+            hasAccess(user, 'contacts') ||
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'events') ||
+            hasAccess(user, 'announcements') ||
+            hasAccess(user, 'locations')
+        )
+    );
     const enforcePublic = !isAuthorized || isPublicRequested;
 
     const generateVCard = async (publicOnly: boolean) => {
@@ -31,7 +39,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
         const data = await decryptContactRecord(rawData);
 
         if ((!data.isPublic || data.obfuscationStatus === 'obfuscated') && !isAuthorized) {
-            error(403, 'Forbidden');
+            error(user ? 403 : 401, user ? 'Forbidden' : 'Unauthorized');
         }
 
         const card = new ICAL.Component(['vcard', [], []]);

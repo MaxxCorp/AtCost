@@ -18,8 +18,8 @@ export function hashParams(params: unknown): string {
  * Cache key generators
  */
 export const cacheKeys = {
-    kioskView: (kioskId: string, version: number) => `cache:v2:kiosk:view:${kioskId}:v${version}`,
-    kioskDisplay: (kioskId: string) => `cache:v2:kiosk:display:${kioskId}`,
+    kioskView: (kioskId: string, version: number, access: string = 'public') => `cache:v2:kiosk:view:${access}:${kioskId}:v${version}`,
+    kioskDisplay: (kioskId: string, access: string = 'public') => `cache:v2:kiosk:display:${access}:${kioskId}`,
     publicEvent: (eventId: string) => `cache:v2:event:public:${eventId}`,
     eventsList: (access: string, version: number, hash: string) => `cache:v2:event:list:${access}:v${version}:${hash}`,
     eventQr: (eventId: string) => `cache:v2:event:qr:${eventId}`,
@@ -121,7 +121,10 @@ export async function invalidateLocation(locationIds?: string | string[]): Promi
 export async function invalidateKiosk(kioskId?: string): Promise<void> {
     const promises: Promise<unknown>[] = [bumpNamespaceVersion(CACHE_NAMESPACES.KIOSKS)];
     if (kioskId) {
-        promises.push(delCache(cacheKeys.kioskDisplay(kioskId)));
+        promises.push(delCache([
+            cacheKeys.kioskDisplay(kioskId, 'public'),
+            cacheKeys.kioskDisplay(kioskId, 'auth')
+        ]));
     }
     await Promise.all(promises);
 }

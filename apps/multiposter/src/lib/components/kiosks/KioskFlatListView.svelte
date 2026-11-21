@@ -36,7 +36,9 @@
     import { isMultiDayEvent, getEventDurationDays, getEventDateParts } from "#lib/utils/format-event-date.js";
     import * as m from '#lib/paraglide/messages.js';
     import { page } from '$app/state';
-    const isLoggedIn = $derived(Boolean(page.data?.user));
+    import { authClient } from '#lib/auth.js';
+    const session = authClient.useSession();
+    const isLoggedIn = $derived(Boolean(page.data?.user || $session.data?.user));
     import { resolve } from '$app/paths';
     import {
         type SeriesInstanceInfo,

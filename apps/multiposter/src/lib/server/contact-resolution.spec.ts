@@ -500,5 +500,87 @@ describe('Contact Resolution Engine', () => {
 				)
 			).toBeNull();
 		});
+
+		it('resolves non-public contacts and non-public location contacts when includeNonPublic is true', () => {
+			const eventWithPrivateOnly = {
+				id: 'evt-priv-1',
+				contacts: [{ contact: privateEmployee }]
+			};
+			const resolved = resolveEventContactSync(eventWithPrivateOnly, {
+				includeNonPublic: true,
+				publicOnly: false
+			});
+			expect(resolved).toEqual({
+				id: 'c-priv-emp',
+				name: 'Private Employee',
+				email: 'priv.emp@org.com',
+				phone: '+111',
+				isPublic: false,
+				qrCodePath: '/api/contacts/c-priv-emp/qr.png',
+				qrCodeDataUrl: undefined
+			});
+
+			const eventWithPrivateLocation = {
+				id: 'evt-priv-loc',
+				contacts: [],
+				locations: [
+					{
+						location: {
+							id: 'loc-priv',
+							isPublic: false,
+							locationContacts: [{ contact: privateEmployee }]
+						}
+					}
+				]
+			};
+			const resolvedFromLoc = resolveEventContactSync(eventWithPrivateLocation, {
+				includeNonPublic: true,
+				publicOnly: false
+			});
+			expect(resolvedFromLoc?.id).toBe('c-priv-emp');
+
+			const resolvedLocSync = resolveLocationContactSync(
+				{
+					id: 'loc-priv',
+					isPublic: false,
+					locationContacts: [{ contact: privateEmployee }]
+				},
+				{ includeNonPublic: true, publicOnly: false }
+			);
+			expect(resolvedLocSync?.id).toBe('c-priv-emp');
+
+			const resolvedAnnouncement = resolveAnnouncementContactSync(
+				{
+					contacts: [],
+					locations: [
+						{
+							location: {
+								id: 'loc-priv',
+								isPublic: false,
+								locationContacts: [{ contact: privateEmployee }]
+							}
+						}
+					]
+				},
+				{ includeNonPublic: true, publicOnly: false }
+			);
+			expect(resolvedAnnouncement?.id).toBe('c-priv-emp');
+
+			// Obfuscated contacts must still never be resolved even when includeNonPublic is true
+			expect(
+				resolveEventContactSync(
+					{ id: 'evt-obf-2', contacts: [{ contact: obfuscatedPublicEmployee }] },
+					{ includeNonPublic: true, publicOnly: false }
+				)
+			).toBeNull();
+
+			// publicOnly: true takes precedence over includeNonPublic: true
+			expect(
+				resolveEventContactSync(eventWithPrivateOnly, {
+					includeNonPublic: true,
+					publicOnly: true
+				})
+			).toBeNull();
+		});
 	});
 });

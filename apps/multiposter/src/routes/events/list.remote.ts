@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { query } from '$app/server';
 import { db, event, recurringSeries, eventContact, eventLocation, eventResource, resource, eventTag, contact, location, tag, locationContact, eq, ne, notInArray, inArray, and, or, not, ilike, sql, exists, isNull, isNotNull, gte, lte, alias } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { getOptionalUser, hasAccess } from '#lib/server/authorization.js';
 import { eventPaginationSchema as PaginationSchema, parseFilterValue, type PaginatedResult } from '@ac/validations';
 import { getEventRooms } from '#lib/utils/format-rooms.js';
 import { extractContactDetails, resolveEventContactSync, isEmployeeContact, sortContactsByPriority } from '#lib/server/contact-resolution.js';
@@ -10,18 +10,18 @@ import { populateSeriesInstances } from '#lib/server/events/instances.js';
 import { sanitizePublicEvent } from '#lib/server/public-sanitization.js';
 
 export const listEvents = query(PaginationSchema, async (input: v.InferOutput<typeof PaginationSchema>): Promise<PaginatedResult<any>> => {
-	let hasAccess = false;
-	try {
-		const user = getAuthenticatedUser();
-		ensureAccess(user, 'events');
-		hasAccess = true;
-	} catch (e) {
-		// unauthorized can only see public events
-	}
+	const user = getOptionalUser();
+	const isAuthorized = Boolean(
+		user && (
+			hasAccess(user, 'events') ||
+			hasAccess(user, 'kiosks') ||
+			hasAccess(user, 'synchronizations', 'use') ||
+			hasAccess(user, 'campaigns')
+		)
+	);
 
-	const isPublicView = !hasAccess || Boolean(input?.excludeNonPublic);
 	const version = await getNamespaceVersion(CACHE_NAMESPACES.EVENTS);
-	const key = cacheKeys.eventsList(isPublicView ? 'public' : 'auth', version, hashParams(input));
+	const key = cacheKeys.eventsList(isAuthorized ? 'auth' : 'public', version, hashParams(input));
 
 	return cached(key, 300, async () => {
 	const { page = 1, limit = 50, search = '', locationId, tagId, contactId, sortField = 'updatedAt', sortOrder = 'desc', excludeTentative, excludeCancelled, excludeNonPublic, excludePast, excludeSeries, onlySeries, includeSeriesEntries, excludedEventIds, includedEventIds, excludedTags, includedTags, startDate, endDate } = input || {};
@@ -33,7 +33,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		conditions.push(isNull(event.recurringEventId));
 	}
 
-	if (isPublicView) {
+	if (!isAuthorized) {
 		conditions.push(
 			eq(event.isPublic, true),
 			sql`NOT EXISTS (
@@ -58,7 +58,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		conditions.push(or(
 			ilike(event.summary, searchPattern),
 			ilike(event.description, searchPattern),
-			isPublicView
+			!isAuthorized
 				? sql`EXISTS (
 					SELECT 1 FROM ${eventLocation} el
 					JOIN ${location} l ON el.location_id = l.id
@@ -69,7 +69,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					JOIN ${location} l ON el.location_id = l.id
 					WHERE el.event_id = ${event.id} AND l.name ILIKE ${searchPattern}
 				)`,
-			isPublicView
+			!isAuthorized
 				? sql`EXISTS (
 					SELECT 1 FROM ${eventContact} ec
 					JOIN ${contact} c ON ec.contact_id = c.id
@@ -195,7 +195,22 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 	
 	if (excludeNonPublic) {
-		conditionalFilters.push(eq(event.isPublic, true));
+		conditionalFilters.push(
+			eq(event.isPublic, true),
+			sql`NOT EXISTS (
+				SELECT 1 FROM ${event} master_evt
+				WHERE (
+					master_evt.id = ${event.recurringEventId}
+					OR (
+						${event.seriesId} IS NOT NULL
+						AND master_evt.series_id = ${event.seriesId}
+						AND master_evt.recurring_event_id IS NULL
+						AND master_evt.id != ${event.id}
+					)
+				)
+				AND master_evt.is_public = false
+			)`
+		);
 	}
 
 	if (excludeSeries) {
@@ -240,7 +255,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 					  .where(
 						  and(
 							  eq(instanceEvent.recurringEventId, event.id),
-							  isPublicView ? eq(instanceEvent.isPublic, true) : sql`true`,
+							  !isAuthorized ? eq(instanceEvent.isPublic, true) : sql`true`,
 							  or(
 								  gte(instanceEvent.startDateTime, cutoff),
 								  gte(instanceEvent.endDateTime, cutoff)
@@ -274,7 +289,10 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			sql`NOT EXISTS (
 				SELECT 1 FROM ${eventTag} et
 				JOIN ${tag} t ON et.tag_id = t.id
-				WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+				WHERE et.event_id = ${event.id} AND (
+					t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+					OR t.id::text IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+				)
 			)`
 		);
 	}
@@ -284,7 +302,10 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			sql`EXISTS (
 				SELECT 1 FROM ${eventTag} et
 				JOIN ${tag} t ON et.tag_id = t.id
-				WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+				WHERE et.event_id = ${event.id} AND (
+					t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+					OR t.id::text IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+				)
 			)`
 		);
 	}
@@ -295,14 +316,29 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 
 	if (includedEventIds && includedEventIds.length > 0) {
 		const explicitInclusion = inArray(event.id, includedEventIds);
-		if (conditionalFilters.length > 0 || conditions.length > (isPublicView ? 3 : 1)) {
+		if (conditionalFilters.length > 0 || conditions.length > (!isAuthorized ? 3 : (includeSeriesEntries ? 0 : 1))) {
 			const standardFilters = and(...conditions, ...conditionalFilters);
 			conditions.length = 0;
 			conditions.push(or(standardFilters, explicitInclusion));
 			
-			// Re-apply access restriction if needed so included events must still be public
-			if (isPublicView) {
-				conditions.push(eq(event.isPublic, true));
+			// Re-apply access restriction if needed so unauthorized users can only ever see public events
+			if (!isAuthorized) {
+				conditions.push(
+					eq(event.isPublic, true),
+					sql`NOT EXISTS (
+						SELECT 1 FROM ${event} master_evt
+						WHERE (
+							master_evt.id = ${event.recurringEventId}
+							OR (
+								${event.seriesId} IS NOT NULL
+								AND master_evt.series_id = ${event.seriesId}
+								AND master_evt.recurring_event_id IS NULL
+								AND master_evt.id != ${event.id}
+							)
+						)
+						AND master_evt.is_public = false
+					)`
+				);
 			}
 			if (!includeSeriesEntries) {
 				conditions.push(isNull(event.recurringEventId));
@@ -347,7 +383,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			? inArray(event.id, ids)
 			: or(
 				inArray(event.id, ids),
-				isPublicView
+				!isAuthorized
 					? and(inArray(event.recurringEventId, ids), eq(event.isPublic, true))
 					: inArray(event.recurringEventId, ids)
 			),
@@ -416,17 +452,18 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				and(isNotNull(event.recurrence), sql`${event.recurrence} != '[]'::jsonb`)
 			),
 			lte(event.startDateTime, endD),
-			isPublicView ? eq(event.isPublic, true) : sql`true`
+			!isAuthorized ? eq(event.isPublic, true) : sql`true`
 		];
 
-		if (excludeTentative) masterConditions.push(ne(event.status, 'tentative'));
-		if (excludeCancelled) masterConditions.push(ne(event.status, 'cancelled'));
-		if (excludeNonPublic) masterConditions.push(eq(event.isPublic, true));
+		const masterFilterConditions: any[] = [];
+		if (excludeTentative) masterFilterConditions.push(ne(event.status, 'tentative'));
+		if (excludeCancelled) masterFilterConditions.push(ne(event.status, 'cancelled'));
+		if (excludeNonPublic) masterFilterConditions.push(eq(event.isPublic, true));
 
 		if (locationId) {
 			const { include, exclude } = parseFilterValue(locationId);
 			if (include.length > 0) {
-				masterConditions.push(
+				masterFilterConditions.push(
 					or(
 						exists(
 							db.select({ id: sql`1` })
@@ -443,7 +480,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				);
 			}
 			if (exclude.length > 0) {
-				masterConditions.push(
+				masterFilterConditions.push(
 					and(
 						not(exists(
 							db.select({ id: sql`1` })
@@ -464,7 +501,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		if (tagId) {
 			const { include, exclude } = parseFilterValue(tagId);
 			if (include.length > 0) {
-				masterConditions.push(
+				masterFilterConditions.push(
 					exists(
 						db.select({ id: sql`1` })
 						  .from(eventTag)
@@ -473,7 +510,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				);
 			}
 			if (exclude.length > 0) {
-				masterConditions.push(
+				masterFilterConditions.push(
 					not(exists(
 						db.select({ id: sql`1` })
 						  .from(eventTag)
@@ -486,7 +523,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		if (contactId) {
 			const { include, exclude } = parseFilterValue(contactId);
 			if (include.length > 0) {
-				masterConditions.push(
+				masterFilterConditions.push(
 					exists(
 						db.select({ id: sql`1` })
 						  .from(eventContact)
@@ -495,7 +532,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 				);
 			}
 			if (exclude.length > 0) {
-				masterConditions.push(
+				masterFilterConditions.push(
 					not(exists(
 						db.select({ id: sql`1` })
 						  .from(eventContact)
@@ -506,27 +543,44 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		}
 
 		if (excludedTags && excludedTags.length > 0) {
-			masterConditions.push(
+			masterFilterConditions.push(
 				sql`NOT EXISTS (
 					SELECT 1 FROM ${eventTag} et
 					JOIN ${tag} t ON et.tag_id = t.id
-					WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+					WHERE et.event_id = ${event.id} AND (
+						t.name IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+						OR t.id::text IN (${sql.join(excludedTags.map(t => sql`${t}`), sql`, `)})
+					)
 				)`
 			);
 		}
 
 		if (includedTags && includedTags.length > 0) {
-			masterConditions.push(
+			masterFilterConditions.push(
 				sql`EXISTS (
 					SELECT 1 FROM ${eventTag} et
 					JOIN ${tag} t ON et.tag_id = t.id
-					WHERE et.event_id = ${event.id} AND t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+					WHERE et.event_id = ${event.id} AND (
+						t.name IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+						OR t.id::text IN (${sql.join(includedTags.map(t => sql`${t}`), sql`, `)})
+					)
 				)`
 			);
 		}
 
 		if (excludedEventIds && excludedEventIds.length > 0) {
-			masterConditions.push(notInArray(event.id, excludedEventIds));
+			masterFilterConditions.push(notInArray(event.id, excludedEventIds));
+		}
+
+		if (isAuthorized && includedEventIds && includedEventIds.length > 0 && masterFilterConditions.length > 0) {
+			masterConditions.push(
+				or(
+					and(...masterFilterConditions),
+					inArray(event.id, includedEventIds)
+				)
+			);
+		} else {
+			masterConditions.push(...masterFilterConditions);
 		}
 
 		const masters = await db.query.event.findMany({
@@ -724,12 +778,12 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	for (const e of rawResults) {
 		if (!e.contacts || e.contacts.length === 0) {
 			for (const l of e.locations || []) {
-				if (l.location && !l.location.isPublic) continue;
+				if (!isAuthorized && l.location && !l.location.isPublic) continue;
 				if (l.location?.id) neededLocationIds.add(l.location.id);
 			}
 			for (const r of e.resources || []) {
 				const res = r.resource as any;
-				if (res?.location && !res.location.isPublic) continue;
+				if (!isAuthorized && res?.location && !res.location.isPublic) continue;
 				const locId = res?.locationId;
 				if (locId) neededLocationIds.add(locId);
 			}
@@ -761,13 +815,25 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		}
 	}
 
+	const includedEventIdSet = new Set(includedEventIds || []);
+	const isExplicitlyIncluded = (e: any) =>
+		isAuthorized &&
+		(includedEventIdSet.has(e.id) || Boolean(e.recurringEventId && includedEventIdSet.has(e.recurringEventId)));
+
 	let results = rawResults;
 	if (includeSeriesEntries && (startDate || endDate)) {
 		const startD = startDate ? new Date(startDate) : null;
 		const endD = endDate ? new Date(endDate) : null;
 		results = results.filter((e: any) => {
+			const isSeriesMaster = !e.recurringEventId && Boolean(
+				e.seriesId || (Array.isArray(e.recurrence) && e.recurrence.length > 0)
+			);
+			if (!isSeriesMaster && isExplicitlyIncluded(e)) {
+				return true;
+			}
 			const s = e.startDateTime ? new Date(e.startDateTime) : null;
-			if (startD && s && s < startD) return false;
+			const end = e.endDateTime ? new Date(e.endDateTime) : null;
+			if (startD && s && s < startD && (!end || end < startD)) return false;
 			if (endD && s && s > endD) return false;
 			return true;
 		});
@@ -779,24 +845,27 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	if (excludeTentative) {
 		results = results.filter((e: any) => e.status !== 'tentative');
 	}
-	if (isPublicView) {
+	if (!isAuthorized) {
 		results = results.filter((e: any) => e.isPublic === true);
+	} else if (excludeNonPublic) {
+		results = results.filter((e: any) => e.isPublic === true || isExplicitlyIncluded(e));
 	}
 
 	if (locationId) {
 		const { include, exclude } = parseFilterValue(locationId);
 		if (include.length > 0 || exclude.length > 0) {
 			results = results.filter((e: any) => {
+				if (isExplicitlyIncluded(e)) return true;
 				const eventLocIds = new Set<string>();
 				for (const l of (e.locations || [])) {
 					const loc = l?.location || l;
-					if (isPublicView && loc && !loc.isPublic) continue;
+					if (!isAuthorized && loc && !loc.isPublic) continue;
 					const id = l?.id || l?.locationId || loc?.id;
 					if (id) eventLocIds.add(id);
 				}
 				for (const r of (e.resources || [])) {
 					const res = r?.resource || r;
-					if (isPublicView && res?.location && !res.location.isPublic) continue;
+					if (!isAuthorized && res?.location && !res.location.isPublic) continue;
 					const id = r?.locationId || res?.locationId || res?.location?.id;
 					if (id) eventLocIds.add(id);
 				}
@@ -902,16 +971,18 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			locations: evtLocations,
 			resources: resWithLocContacts
 		}, {
-			filterWorkOnly: true,
-			publicOnly: true,
+			filterWorkOnly: !isAuthorized,
+			publicOnly: !isAuthorized,
+			includeNonPublic: isAuthorized,
 			fallbackToLocation: true,
 			fallbackToFirst: true
 		});
 
 		const resolvedSignUpContact = e.signUpMode === 'required' && e.signUpContact
 			? extractContactDetails(e.signUpContact, {
-				filterWorkOnly: true,
-				publicOnly: true
+				filterWorkOnly: !isAuthorized,
+				publicOnly: !isAuthorized,
+				includeNonPublic: isAuthorized
 			})
 			: null;
 
@@ -939,15 +1010,15 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			rooms,
 			locationIds: Array.from(allLocIds),
 			resourceIds: evtResources.map((r: any) => r.id),
-			tags: (e.tags?.map((t: any) => t.tag || t).filter(Boolean) || []).filter((tagItem: any) => !isPublicView || tagItem?.visibility === 'external'),
+			tags: (e.tags?.map((t: any) => t.tag || t).filter(Boolean) || []).filter((tagItem: any) => isAuthorized || tagItem?.visibility === 'external'),
 			resolvedContact,
 			resolvedSignUpContact,
 		};
 	});
 
-	await populateSeriesInstances(data, 100, { publicOnly: isPublicView });
+	await populateSeriesInstances(data, 100, { publicOnly: !isAuthorized });
 
-	if (isPublicView) {
+	if (!isAuthorized) {
 		data = data
 			.map((item: any) => sanitizePublicEvent(item))
 			.filter((item: any): item is NonNullable<typeof item> => item !== null);

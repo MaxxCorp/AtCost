@@ -457,6 +457,7 @@
                                 announcement={items[
                                     currentIndex
                                 ] as Announcement}
+                                allowInternal={true}
                             />
                         </div>
                     {/if}

@@ -17,6 +17,7 @@ export interface ResolvedContact {
 export interface ContactResolutionOptions {
 	filterWorkOnly?: boolean;
 	publicOnly?: boolean;
+	includeNonPublic?: boolean;
 	fallbackToLocation?: boolean;
 	fallbackToFirst?: boolean;
 }
@@ -24,40 +25,40 @@ export interface ContactResolutionOptions {
 /**
  * Checks whether a contact is eligible for resolution under the given options.
  * - Obfuscated contacts are never eligible.
- * - Contacts explicitly marked `isPublic === false` are never eligible as display/resolved contacts.
  * - When `publicOnly` is true, `contact.isPublic` must be strictly `true`.
+ * - Contacts explicitly marked `isPublic === false` are ineligible unless `includeNonPublic` is true.
  */
 export function isContactEligibleForResolution(
 	contactOrAssociation: any,
-	options: { filterWorkOnly?: boolean; publicOnly?: boolean } = {}
+	options: { filterWorkOnly?: boolean; publicOnly?: boolean; includeNonPublic?: boolean } = {}
 ): boolean {
 	if (!contactOrAssociation) return false;
 	const c = contactOrAssociation.contact || contactOrAssociation;
 	if (!c) return false;
 	if (c.obfuscationStatus === 'obfuscated') return false;
-	if (c.isPublic === false) return false;
 	if (options.publicOnly) {
 		return c.isPublic === true;
 	}
+	if (!options.includeNonPublic && c.isPublic === false) return false;
 	return true;
 }
 
 /**
  * Checks whether a location is eligible for contact resolution under the given options.
- * - Locations explicitly marked `location.isPublic === false` are never eligible.
  * - When `publicOnly` is true, `location.isPublic` must be strictly `true`.
+ * - Locations explicitly marked `location.isPublic === false` are ineligible unless `includeNonPublic` is true.
  */
 export function isLocationEligibleForResolution(
 	locationOrAssociation: any,
-	options: { filterWorkOnly?: boolean; publicOnly?: boolean } = {}
+	options: { filterWorkOnly?: boolean; publicOnly?: boolean; includeNonPublic?: boolean } = {}
 ): boolean {
 	if (!locationOrAssociation) return false;
 	const loc = locationOrAssociation.location || locationOrAssociation;
 	if (!loc) return false;
-	if (loc.isPublic === false) return false;
 	if (options.publicOnly) {
 		return loc.isPublic === true;
 	}
+	if (!options.includeNonPublic && loc.isPublic === false) return false;
 	return true;
 }
 
@@ -192,7 +193,7 @@ export function sortContactsByPriority<T = any>(contacts: T[]): T[] {
  */
 export function extractContactDetails(
 	contactOrAssociation: any,
-	options: { filterWorkOnly?: boolean; publicOnly?: boolean } = {}
+	options: { filterWorkOnly?: boolean; publicOnly?: boolean; includeNonPublic?: boolean } = {}
 ): ResolvedContact | null {
 	if (!contactOrAssociation) return null;
 	if (!isContactEligibleForResolution(contactOrAssociation, options)) return null;
@@ -250,7 +251,7 @@ export function extractContactDetails(
  */
 export function resolveContactFromList(
 	contacts: any[] | undefined | null,
-	options: { filterWorkOnly?: boolean; publicOnly?: boolean; fallbackToFirst?: boolean } = {}
+	options: { filterWorkOnly?: boolean; publicOnly?: boolean; includeNonPublic?: boolean; fallbackToFirst?: boolean } = {}
 ): ResolvedContact | null {
 	if (!contacts || contacts.length === 0) return null;
 
@@ -275,7 +276,7 @@ export function resolveContactFromList(
  */
 export function resolveLocationContactSync(
 	locationData: any,
-	options: { filterWorkOnly?: boolean; publicOnly?: boolean; fallbackToFirst?: boolean } = {}
+	options: { filterWorkOnly?: boolean; publicOnly?: boolean; includeNonPublic?: boolean; fallbackToFirst?: boolean } = {}
 ): ResolvedContact | null {
 	if (!locationData) return null;
 	if (!isLocationEligibleForResolution(locationData, options)) return null;
@@ -286,7 +287,7 @@ export function resolveLocationContactSync(
 
 export async function resolveLocationContact(
 	locationOrId: any,
-	options: { filterWorkOnly?: boolean; publicOnly?: boolean; fallbackToFirst?: boolean } = {}
+	options: { filterWorkOnly?: boolean; publicOnly?: boolean; includeNonPublic?: boolean; fallbackToFirst?: boolean } = {}
 ): Promise<ResolvedContact | null> {
 	if (!locationOrId) return null;
 
@@ -340,9 +341,10 @@ export function resolveEventContactSync(
 		fallbackToLocation = true,
 		fallbackToFirst = true,
 		filterWorkOnly = false,
-		publicOnly = false
+		publicOnly = false,
+		includeNonPublic = false
 	} = options;
-	const eligibilityOpts = { filterWorkOnly, publicOnly, fallbackToFirst };
+	const eligibilityOpts = { filterWorkOnly, publicOnly, includeNonPublic, fallbackToFirst };
 
 	const eventContacts = (eventData.contacts || [])
 		.map((ec: any) => {
@@ -414,9 +416,10 @@ export async function resolveEventContact(
 		fallbackToLocation = true,
 		fallbackToFirst = true,
 		filterWorkOnly = false,
-		publicOnly = false
+		publicOnly = false,
+		includeNonPublic = false
 	} = options;
-	const eligibilityOpts = { filterWorkOnly, publicOnly, fallbackToFirst };
+	const eligibilityOpts = { filterWorkOnly, publicOnly, includeNonPublic, fallbackToFirst };
 
 	// 1. Check event contacts
 	const rawEventContacts = await getEntityContacts('event', eventId, true);
@@ -494,9 +497,10 @@ export function resolveAnnouncementContactSync(
 		fallbackToLocation = true,
 		fallbackToFirst = true,
 		filterWorkOnly = false,
-		publicOnly = false
+		publicOnly = false,
+		includeNonPublic = false
 	} = options;
-	const eligibilityOpts = { filterWorkOnly, publicOnly, fallbackToFirst };
+	const eligibilityOpts = { filterWorkOnly, publicOnly, includeNonPublic, fallbackToFirst };
 
 	const contacts = (announcementData.contacts || [])
 		.map((ac: any) => {

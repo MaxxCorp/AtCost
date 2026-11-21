@@ -4,7 +4,7 @@
     import { type Announcement } from "@ac/validations";
 
 
-    let { announcement }: { announcement: any } = $props();
+    let { announcement, allowInternal = false }: { announcement: any; allowInternal?: boolean } = $props();
 </script>
 
 <div class="space-y-8">
@@ -14,7 +14,7 @@
                 {announcement.title}
             </h1>
             {#if announcement.tags && announcement.tags.length > 0}
-                {#each announcement.tags.filter((tag: any) => typeof tag === 'string' || (tag.tag ? tag.tag.visibility === 'external' : tag.visibility === 'external')) as tag}
+                {#each announcement.tags.filter((tag: any) => allowInternal || typeof tag === 'string' || (tag.tag ? tag.tag.visibility === 'external' : tag.visibility === 'external')) as tag, idx (typeof tag === 'string' ? `${tag}_${idx}` : tag.id || tag.tag?.id || tag.name || tag.tag?.name || idx)}
                     <span
                         class="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100"
                     >
@@ -35,7 +35,7 @@
         {@html announcement.content}
     </div>
 
-    {#if announcement.locations && announcement.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false).length > 0}
+    {#if announcement.locations && announcement.locations.filter((loc: any) => allowInternal || (loc?.location || loc)?.isPublic !== false).length > 0}
         <div class="mt-8 pt-6 border-t">
             <h3
                 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4"
@@ -43,18 +43,19 @@
                 {m.locations()}
             </h3>
             <div class="space-y-4">
-                {#each announcement.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false) as loc}
+                {#each announcement.locations.filter((loc: any) => allowInternal || (loc?.location || loc)?.isPublic !== false) as loc, idx (loc?.id || loc?.location?.id || loc?.name || loc?.location?.name || idx)}
+                    {@const l = loc?.location || loc}
                     <div class="flex items-start gap-3">
                         <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
                             <MapPin size={18} />
                         </div>
                         <div>
-                            <div class="font-medium text-gray-900">{loc.name}</div>
+                            <div class="font-medium text-gray-900">{l.name}</div>
                             <div class="text-sm text-gray-600">
-                                {loc.street}
-                                {loc.houseNumber}<br />
-                                {loc.zip}
-                                {loc.city}
+                                {l.street}
+                                {l.houseNumber}<br />
+                                {l.zip}
+                                {l.city}
                             </div>
                         </div>
                     </div>

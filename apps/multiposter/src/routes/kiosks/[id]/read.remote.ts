@@ -2,7 +2,7 @@ import { query } from '$app/server';
 import { db } from '@ac/db';
 import { kiosk, kioskLocation, location } from '@ac/db';
 import { eq, inArray, and } from '@ac/db';
-import { getAuthenticatedUser, ensureAccess } from '#lib/server/authorization.js';
+import { getAuthenticatedUser, getOptionalUser, hasAccess, ensureAccess } from '#lib/server/authorization.js';
 import * as v from 'valibot';
 import { resolveLocationContactSync } from '#lib/server/contact-resolution.js';
 import { cached, cacheKeys } from '#lib/server/cache/index.js';
@@ -44,22 +44,30 @@ export const getKiosk = query(v.string(), async (id: string) => {
 });
 
 export const getKioskForDisplay = query(v.string(), async (id: string) => {
-    // Public access allowed for Kiosk display: strictly filter to public locations and public work contacts
-    return cached(cacheKeys.kioskDisplay(id), 600, async () => {
+    const user = getOptionalUser();
+    const isAuthorized = Boolean(
+        user && (
+            hasAccess(user, 'kiosks') ||
+            hasAccess(user, 'events') ||
+            hasAccess(user, 'announcements')
+        )
+    );
+
+    // Public access allowed for Kiosk display: strictly filter to public locations and public work contacts when unauthorized
+    return cached(cacheKeys.kioskDisplay(id, isAuthorized ? 'auth' : 'public'), 600, async () => {
         const [result] = await db.select().from(kiosk).where(eq(kiosk.id, id));
 
         if (!result) return null;
 
+        const locationInKiosk = inArray(
+            location.id,
+            db.select({ id: kioskLocation.locationId })
+                .from(kioskLocation)
+                .where(eq(kioskLocation.kioskId, id))
+        );
+
         const locations = await db.query.location.findMany({
-            where: and(
-                eq(location.isPublic, true),
-                inArray(
-                    location.id,
-                    db.select({ id: kioskLocation.locationId })
-                        .from(kioskLocation)
-                        .where(eq(kioskLocation.kioskId, id))
-                )
-            ),
+            where: isAuthorized ? locationInKiosk : and(eq(location.isPublic, true), locationInKiosk),
             with: {
                 locationContacts: {
                     with: {
@@ -84,7 +92,7 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
             startDate: toSafeDate(result.startDate),
             endDate: toSafeDate(result.endDate),
             locations: locations
-                .filter((l: any) => l.isPublic === true)
+                .filter((l: any) => isAuthorized || l.isPublic === true)
                 .map((l: any) => ({
                     id: l.id,
                     name: l.name,
@@ -96,8 +104,9 @@ export const getKioskForDisplay = query(v.string(), async (id: string) => {
                     openingHours: l.openingHours,
                     inclusivitySupport: l.inclusivitySupport,
                     contact: resolveLocationContactSync(l, {
-                        filterWorkOnly: true,
-                        publicOnly: true,
+                        filterWorkOnly: !isAuthorized,
+                        publicOnly: !isAuthorized,
+                        includeNonPublic: isAuthorized,
                         fallbackToFirst: true
                     })
                 })),
