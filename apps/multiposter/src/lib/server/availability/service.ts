@@ -276,14 +276,22 @@ export class AvailabilityService {
         };
 
         // Helper to check if a booking matches the requested time window
-        const isBookingActiveAtTime = (booking: {
-            startDateTime: Date | null;
-            endDateTime: Date | null;
-            recurrence: any;
-            seriesId: string | null;
-            exdates: any;
-            startTimeZone: string | null;
-        }): boolean => {
+        const isBookingActiveAtTime = (
+            booking: {
+                startDateTime: Date | null;
+                endDateTime: Date | null;
+                prepMinutes?: number | null;
+                teardownMinutes?: number | null;
+                recurrence: any;
+                seriesId: string | null;
+                exdates: any;
+                startTimeZone: string | null;
+            },
+            windowStart: Date = params.startDateTime,
+            windowEnd: Date = params.endDateTime
+        ): boolean => {
+            const bPrepMs = (booking.prepMinutes || 0) * 60000;
+            const bTeardownMs = (booking.teardownMinutes || 0) * 60000;
             let rrule: string | null = null;
             if (Array.isArray(booking.recurrence) && booking.recurrence[0]) {
                 rrule = booking.recurrence[0];
@@ -296,25 +304,25 @@ export class AvailabilityService {
                 const durationMs = booking.endDateTime
                     ? new Date(booking.endDateTime).getTime() - new Date(booking.startDateTime).getTime()
                     : 0;
-                const rangeSearchStart = new Date(params.startDateTime.getTime() - durationMs);
+                const rangeSearchStart = new Date(windowStart.getTime() - durationMs - bTeardownMs);
                 const occurrences = expandRecurrenceRange(
                     rrule,
                     new Date(booking.startDateTime),
                     booking.endDateTime ? new Date(booking.endDateTime) : null,
                     rangeSearchStart,
-                    params.endDateTime,
+                    new Date(windowEnd.getTime() + bPrepMs),
                     booking.startTimeZone,
                     exdates
                 );
                 return occurrences.some((occ) => {
-                    const occStart = (occ.date || (occ as any).start).getTime();
-                    const occEnd = occ.end ? occ.end.getTime() : occStart + durationMs;
-                    return occStart < params.endDateTime.getTime() && occEnd > params.startDateTime.getTime();
+                    const occStart = (occ.date || (occ as any).start).getTime() - bPrepMs;
+                    const occEnd = (occ.end ? occ.end.getTime() : (occ.date || (occ as any).start).getTime() + durationMs) + bTeardownMs;
+                    return occStart < windowEnd.getTime() && occEnd > windowStart.getTime();
                 });
             } else if (booking.startDateTime && booking.endDateTime) {
-                const bStart = new Date(booking.startDateTime).getTime();
-                const bEnd = new Date(booking.endDateTime).getTime();
-                return bStart < params.endDateTime.getTime() && bEnd > params.startDateTime.getTime();
+                const bStart = new Date(booking.startDateTime).getTime() - bPrepMs;
+                const bEnd = new Date(booking.endDateTime).getTime() + bTeardownMs;
+                return bStart < windowEnd.getTime() && bEnd > windowStart.getTime();
             }
 
             return false;
@@ -327,6 +335,8 @@ export class AvailabilityService {
             summary: string | null;
             startDateTime: Date | null;
             endDateTime: Date | null;
+            prepMinutes?: number | null;
+            teardownMinutes?: number | null;
             recurrence: any;
             seriesId: string | null;
             exdates: any;
@@ -354,6 +364,8 @@ export class AvailabilityService {
                         summary: event.summary,
                         startDateTime: event.startDateTime,
                         endDateTime: event.endDateTime,
+                        prepMinutes: event.prepMinutes,
+                        teardownMinutes: event.teardownMinutes,
                         recurrence: event.recurrence,
                         seriesId: event.seriesId,
                         exdates: event.exdates,
@@ -690,7 +702,7 @@ export class AvailabilityService {
                         if (target.type === 'resource') {
                             // Check if this external busy slot is the booking of the current event itself
                             const booking = currentEventResourceBookings.find((b) => b.resourceId === target.id);
-                            if (booking && isBookingActiveAtTime(booking)) {
+                            if (booking && isBookingActiveAtTime(booking, targetResourceStart, targetResourceEnd)) {
                                 const busyItems = res.scheduleItems || [];
                                 // If at most 1 busy item, it is this event's own entry in Microsoft 365
                                 if (busyItems.length <= 1) {
@@ -701,7 +713,7 @@ export class AvailabilityService {
                             resourceAvailability[target.id] = res;
                         } else {
                             const booking = currentEventContactBookings.find((b) => b.contactId === target.id);
-                            if (booking && isBookingActiveAtTime(booking)) {
+                            if (booking && isBookingActiveAtTime(booking, params.startDateTime, params.endDateTime)) {
                                 const busyItems = res.scheduleItems || [];
                                 if (busyItems.length <= 1) {
                                     contactAvailability[target.id] = { available: true };
@@ -735,8 +747,8 @@ export class AvailabilityService {
                                     eq(eventResource.resourceId, resId),
                                     ne(event.status, 'cancelled'),
                                     targetMasterId ? ne(event.id, targetMasterId) : undefined,
-                                    lt(event.startDateTime, params.endDateTime),
-                                    gt(event.endDateTime, params.startDateTime)
+                                    sql`(${event.startDateTime} - (${event.prepMinutes} * interval '1 minute') < ${targetResourceEnd.toISOString()})`,
+                                    sql`(${event.endDateTime} + (${event.teardownMinutes} * interval '1 minute') > ${targetResourceStart.toISOString()})`
                                 ));
 
                             const localBooking = localBookings?.[0];
@@ -754,6 +766,8 @@ export class AvailabilityService {
                                     eventTitle: event.summary,
                                     startDateTime: event.startDateTime,
                                     endDateTime: event.endDateTime,
+                                    prepMinutes: event.prepMinutes,
+                                    teardownMinutes: event.teardownMinutes,
                                     recurrence: event.recurrence,
                                     seriesId: event.seriesId,
                                     exdates: event.exdates,
@@ -787,20 +801,22 @@ export class AvailabilityService {
                                     const durationMs = rec.endDateTime
                                         ? new Date(rec.endDateTime).getTime() - new Date(rec.startDateTime).getTime()
                                         : 0;
-                                    const rangeSearchStart = new Date(params.startDateTime.getTime() - durationMs);
+                                    const recPrepMs = (rec.prepMinutes || 0) * 60000;
+                                    const recTeardownMs = (rec.teardownMinutes || 0) * 60000;
+                                    const rangeSearchStart = new Date(targetResourceStart.getTime() - durationMs - recTeardownMs);
                                     const occurrences = expandRecurrenceRange(
                                         rrule,
                                         new Date(rec.startDateTime),
                                         rec.endDateTime ? new Date(rec.endDateTime) : null,
                                         rangeSearchStart,
-                                        params.endDateTime,
+                                        new Date(targetResourceEnd.getTime() + recPrepMs),
                                         rec.startTimeZone,
                                         exdates
                                     );
                                     const hasConflict = occurrences.some((occ) => {
-                                        const occStart = (occ.date || (occ as any).start).getTime();
-                                        const occEnd = occ.end ? occ.end.getTime() : occStart + durationMs;
-                                        return occStart < params.endDateTime.getTime() && occEnd > params.startDateTime.getTime();
+                                        const occStart = (occ.date || (occ as any).start).getTime() - recPrepMs;
+                                        const occEnd = (occ.end ? occ.end.getTime() : (occ.date || (occ as any).start).getTime() + durationMs) + recTeardownMs;
+                                        return occStart < targetResourceEnd.getTime() && occEnd > targetResourceStart.getTime();
                                     });
 
                                     if (hasConflict) {

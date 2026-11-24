@@ -6,7 +6,7 @@ import {
 
 import { db, account, syncConfig as syncConfigTable, eq, and, or } from '@ac/db';
 import type { SyncConfig } from '../../types';
-import { formatLocal } from './recurrence';
+import { formatLocal, parseGraphDateTime } from './recurrence';
 
 export interface MicrosoftClientConfig {
 	userId?: string;
@@ -1126,7 +1126,20 @@ export class MicrosoftGraphClient {
 			if (Array.isArray(scheduleRes.value)) {
 				for (const item of scheduleRes.value) {
 					const email = item.scheduleId?.toLowerCase();
-					const busyItems: any[] = item.scheduleItems || [];
+					const rawItems: any[] = Array.isArray(item.scheduleItems) ? item.scheduleItems : [];
+					const busyItems = rawItems.filter((b: any) => {
+						if (b?.status && !['busy', 'tentative', 'oof'].includes(String(b.status).toLowerCase())) {
+							return false;
+						}
+						const bStart = parseGraphDateTime(b?.start?.dateTime, b?.start?.timeZone ?? 'UTC');
+						const bEnd = parseGraphDateTime(b?.end?.dateTime, b?.end?.timeZone ?? 'UTC');
+						if (bStart && bEnd) {
+							if (bStart >= end || bEnd <= start) {
+								return false;
+							}
+						}
+						return true;
+					});
 					const isAvailable = busyItems.length === 0;
 
 					const busySlots = busyItems.map((b: any) => ({

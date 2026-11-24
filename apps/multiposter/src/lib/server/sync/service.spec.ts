@@ -2038,6 +2038,381 @@ describe('SyncService - Public Data Leak Prevention', () => {
 			}));
 		});
 
+		it('releases previous room (BHS.1.47) and books new room (BHS.1.34) with prep/teardown padding on room change', async () => {
+			const service = new SyncService();
+			const mockProviderInstance = {
+				bookRoom: vi.fn().mockResolvedValue({ success: true, bookingId: 'book-134' }),
+				releaseRoom: vi.fn().mockResolvedValue(undefined)
+			};
+			vi.spyOn(service as any, 'getProviderInstance').mockResolvedValue(mockProviderInstance);
+
+			const mockResConfig = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerType: 'microsoft-resources',
+				enabled: true,
+				settings: {}
+			};
+
+			const staleMapping = {
+				id: 'map-bhs147',
+				syncConfigId: 'cfg-res-1',
+				eventId: 'evt-room-change',
+				resourceId: 'res-bhs147',
+				externalId: 'ext-booking-147',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com', roomName: 'BHS.1.47' }
+			};
+
+			(db.select as any)
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockResolvedValueOnce([mockResConfig])
+					})
+				})
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockResolvedValueOnce([staleMapping])
+					})
+				});
+
+			const mockDeleteWhere = vi.fn().mockResolvedValueOnce([]);
+			(db.delete as any).mockReturnValueOnce({ where: mockDeleteWhere });
+			(db.insert as any).mockReturnValue({ values: vi.fn().mockResolvedValue([]) });
+
+			const itemRow = {
+				id: 'evt-room-change',
+				summary: 'Room Changed Event',
+				startDateTime: new Date('2026-11-10T09:00:00.000Z'), // 10:00 CET
+				endDateTime: new Date('2026-11-10T11:30:00.000Z'), // 12:30 CET
+				prepMinutes: 60,
+				teardownMinutes: 60,
+				startTimeZone: 'Europe/Berlin'
+			};
+
+			const resourceAttendees = [
+				{ resourceId: 'res-bhs134', email: 'bhs134@ballev.onmicrosoft.com', displayName: 'BHS.1.34' }
+			];
+
+			await (service as any).coordinateResourceBooking(itemRow, resourceAttendees, { id: 'cfg-cal-1' });
+
+			expect(mockProviderInstance.releaseRoom).toHaveBeenCalledWith('bhs147@ballev.onmicrosoft.com', 'ext-booking-147');
+			expect(mockDeleteWhere).toHaveBeenCalled();
+			expect(mockProviderInstance.bookRoom).toHaveBeenCalledWith(expect.objectContaining({
+				eventId: 'evt-room-change',
+				resourceId: 'res-bhs134',
+				roomEmail: 'bhs134@ballev.onmicrosoft.com',
+				start: new Date('2026-11-10T08:00:00.000Z'),
+				end: new Date('2026-11-10T12:30:00.000Z'),
+				startTimeZone: 'Europe/Berlin',
+				endTimeZone: 'Europe/Berlin'
+			}));
+		});
+
+		it('releases all existing room bookings in executeSyncItem even when all rooms are removed from event', async () => {
+			const service = new SyncService();
+			const eventId = 'evt-all-rooms-removed';
+			const calConfig: SyncConfig = {
+				id: 'cfg-cal-1',
+				userId: 'user-1',
+				providerId: 'microsoft-calendar',
+				providerType: 'microsoft-calendar',
+				direction: 'push',
+				enabled: true,
+				settings: {},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+			const resConfigRow = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerId: 'microsoft-resources',
+				providerType: 'microsoft-resources',
+				direction: 'push',
+				enabled: true,
+				settings: {},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+			const mockCalendarProvider: any = {
+				supportedEntityTypes: ['event'],
+				updateEvent: vi.fn().mockResolvedValue({ etag: 'etag-1' })
+			};
+			const mockResProvider = {
+				releaseRoom: vi.fn().mockResolvedValue(undefined),
+				bookRoom: vi.fn()
+			};
+			vi.spyOn(service as any, 'getProviderInstance').mockResolvedValue(mockResProvider);
+
+			const itemRow: any = {
+				id: eventId,
+				summary: 'No Rooms Left',
+				status: 'confirmed',
+				isPublic: true,
+				startDateTime: new Date('2026-11-10T10:00:00Z'),
+				endDateTime: new Date('2026-11-10T12:00:00Z'),
+				campaignId: 'camp-rm'
+			};
+			const mockCampaign: any = {
+				id: 'camp-rm',
+				content: {
+					version: 1,
+					targets: { 'cfg-cal-1': { enabled: true } },
+					items: {
+						[eventId]: {
+							entityType: 'event',
+							syncs: { 'cfg-cal-1': { status: 'synced', externalId: 'ms-evt-1' } }
+						}
+					},
+					externalIds: { 'ms-evt-1': { itemId: eventId, configId: 'cfg-cal-1' } }
+				}
+			};
+			const staleMapping = {
+				id: 'map-bhs147',
+				syncConfigId: 'cfg-res-1',
+				eventId,
+				resourceId: 'res-bhs147',
+				externalId: 'ext-booking-147',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com' }
+			};
+
+			// mapInternalToExternal DB lookups (empty -> no attendees) followed by coordinateResourceBooking lookups
+			(db.select as any)
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([]) }) }) // legacyMapping
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ innerJoin: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([]) }) }) }) // linkedResources
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ innerJoin: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([]) }) }) }) // locations
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ innerJoin: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([]) }) }) }) // tags
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([resConfigRow]) }) }) // microsoft-resources configs
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([staleMapping]) }) }); // stale mappings
+
+			(db.update as any).mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) });
+			(db.insert as any).mockReturnValue({ values: vi.fn().mockResolvedValue([]) });
+			const mockDeleteWhere = vi.fn().mockResolvedValue([]);
+			(db.delete as any).mockReturnValue({ where: mockDeleteWhere });
+
+			const batchContext: any = {
+				eventRecords: new Map([[eventId, itemRow]]),
+				campaigns: new Map([['camp-rm', mockCampaign]])
+			};
+
+			await service.executeSyncItem(calConfig, mockCalendarProvider, eventId, 'event', batchContext);
+
+			expect(mockResProvider.releaseRoom).toHaveBeenCalledWith('bhs147@ballev.onmicrosoft.com', 'ext-booking-147');
+			expect(mockResProvider.bookRoom).not.toHaveBeenCalled();
+			expect(mockDeleteWhere).toHaveBeenCalled();
+		});
+
+		it('calls provider.releaseRoom before deleting sync_mapping on syncResourceAssociationsChange unlink', async () => {
+			const service = new SyncService();
+			const callOrder: string[] = [];
+			const mockResProvider = {
+				releaseRoom: vi.fn().mockImplementation(async () => {
+					callOrder.push('releaseRoom');
+				})
+			};
+			vi.spyOn(service as any, 'getProviderInstance').mockResolvedValue(mockResProvider);
+			vi.spyOn(service, 'syncItems').mockResolvedValue(undefined);
+
+			const resConfigRow = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerType: 'microsoft-resources',
+				enabled: true,
+				settings: {}
+			};
+			const mappingRow = {
+				id: 'map-unlink-1',
+				syncConfigId: 'cfg-res-1',
+				eventId: 'evt-unlink-1',
+				resourceId: 'res-bhs147',
+				externalId: 'ext-booking-147',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com' }
+			};
+
+			(db.select as any)
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([resConfigRow]) }) })
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([mappingRow]) }) });
+
+			(db.delete as any).mockReturnValue({
+				where: vi.fn().mockImplementation(async () => {
+					callOrder.push('db.delete');
+					return [];
+				})
+			});
+
+			await service.syncResourceAssociationsChange('user-1', 'evt-unlink-1', 'res-bhs147', 'unlink');
+
+			expect(mockResProvider.releaseRoom).toHaveBeenCalledWith('bhs147@ballev.onmicrosoft.com', 'ext-booking-147');
+			expect(callOrder[0]).toBe('releaseRoom');
+			expect(callOrder).toContain('db.delete');
+			expect(service.syncItems).toHaveBeenCalledWith('user-1', ['evt-unlink-1'], 'event');
+		});
+
+		it('releases microsoft-resources room bookings when an event is cancelled or unpublished in syncSingleItem', async () => {
+			const service = new SyncService();
+			const eventId = 'evt-cancel-release';
+			const calConfig: SyncConfig = {
+				id: 'cfg-cal-1',
+				userId: 'user-1',
+				providerId: 'microsoft-calendar',
+				providerType: 'microsoft-calendar',
+				direction: 'push',
+				enabled: true,
+				settings: {},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+			const resConfigRow = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerId: 'microsoft-resources',
+				providerType: 'microsoft-resources',
+				direction: 'push',
+				enabled: true,
+				settings: {}
+			};
+			const mockCalendarProvider: any = {
+				supportedEntityTypes: ['event'],
+				deleteEvent: vi.fn().mockResolvedValue(undefined)
+			};
+			const mockResProvider = {
+				releaseRoom: vi.fn().mockResolvedValue(undefined)
+			};
+			vi.spyOn(service as any, 'getProviderInstance').mockResolvedValue(mockResProvider);
+
+			const cancelledEvent: any = {
+				id: eventId,
+				summary: 'Cancelled Room Event',
+				status: 'cancelled',
+				isPublic: true,
+				startDateTime: new Date('2026-11-10T10:00:00Z'),
+				endDateTime: new Date('2026-11-10T12:00:00Z'),
+				campaignId: 'camp-cancel'
+			};
+			const mockCampaign: any = {
+				id: 'camp-cancel',
+				content: {
+					version: 1,
+					targets: { 'cfg-cal-1': { enabled: true } },
+					items: {
+						[eventId]: {
+							entityType: 'event',
+							syncs: { 'cfg-cal-1': { status: 'synced', externalId: 'ms-evt-cancel' } }
+						}
+					},
+					externalIds: { 'ms-evt-cancel': { itemId: eventId, configId: 'cfg-cal-1' } }
+				}
+			};
+			const roomMapping = {
+				id: 'map-cancel-1',
+				syncConfigId: 'cfg-res-1',
+				eventId,
+				resourceId: 'res-bhs147',
+				externalId: 'ext-booking-cancel',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com' }
+			};
+
+			(db.select as any)
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([]) }) }) // legacy mapping
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([resConfigRow]) }) }) // releaseEventRoomBookings configs
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([roomMapping]) }) }); // releaseEventRoomBookings mappings
+
+			(db.update as any).mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) });
+			const mockDeleteWhere = vi.fn().mockResolvedValue([]);
+			(db.delete as any).mockReturnValue({ where: mockDeleteWhere });
+
+			const batchContext: any = {
+				eventRecords: new Map([[eventId, cancelledEvent]]),
+				campaigns: new Map([['camp-cancel', mockCampaign]])
+			};
+
+			await (service as any).syncSingleItem(calConfig, mockCalendarProvider, eventId, 'event', batchContext);
+
+			expect(mockCalendarProvider.deleteEvent).toHaveBeenCalledWith('ms-evt-cancel');
+			expect(mockResProvider.releaseRoom).toHaveBeenCalledWith('bhs147@ballev.onmicrosoft.com', 'ext-booking-cancel');
+			expect(mockDeleteWhere).toHaveBeenCalled();
+		});
+
+		it('sets roomBookingsManagedByResourceProvider and defaults endTimeZone to startTimeZone in mapInternalToExternal', async () => {
+			const service = new SyncService();
+			const internalEvent = {
+				id: 'evt-managed-rooms',
+				summary: 'BHS Room Event',
+				status: 'confirmed',
+				isPublic: true,
+				startDateTime: new Date('2026-11-10T09:00:00Z'),
+				endDateTime: new Date('2026-11-10T11:30:00Z'),
+				startTimeZone: 'Europe/Berlin',
+				endTimeZone: null
+			};
+
+			const msConfig: SyncConfig = {
+				id: 'cfg-ms-cal',
+				userId: 'user-1',
+				providerId: 'microsoft-calendar',
+				providerType: 'microsoft-calendar',
+				direction: 'push',
+				enabled: true,
+				settings: { includeRoomBookings: true },
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			(db.select as any)
+				// linkedResources
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						innerJoin: vi.fn().mockReturnValueOnce({
+							where: vi.fn().mockResolvedValueOnce([
+								{
+									resource: {
+										id: 'res-bhs147',
+										name: 'BHS.1.47',
+										allocationCalendars: [{ provider: 'microsoft-calendar', calendarId: 'bhs147@ballev.onmicrosoft.com' }]
+									}
+								}
+							])
+						})
+					})
+				})
+				// locations
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						innerJoin: vi.fn().mockReturnValueOnce({
+							where: vi.fn().mockResolvedValueOnce([])
+						})
+					})
+				})
+				// tags
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						innerJoin: vi.fn().mockReturnValueOnce({
+							where: vi.fn().mockResolvedValueOnce([])
+						})
+					})
+				})
+				// hasActiveMicrosoftResourcesConfig
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockReturnValueOnce({
+							limit: vi.fn().mockResolvedValueOnce([{ id: 'cfg-res-1', providerType: 'microsoft-resources' }])
+						})
+					})
+				});
+
+			const external = await (service as any).mapInternalToExternal(internalEvent, 'microsoft-calendar', undefined, msConfig);
+
+			expect(external.startTimeZone).toBe('Europe/Berlin');
+			expect(external.endTimeZone).toBe('Europe/Berlin');
+			expect(external.metadata?.roomBookingsManagedByResourceProvider).toBe(true);
+			expect(external.attendees).toEqual([
+				expect.objectContaining({
+					email: 'bhs147@ballev.onmicrosoft.com',
+					type: 'resource',
+					resourceId: 'res-bhs147'
+				})
+			]);
+		});
+
 		it('includes consented guest home emails in attendees for Google and Microsoft Calendar sync under default privacy settings', async () => {
 			const service = new SyncService();
 			const internalEvent = {

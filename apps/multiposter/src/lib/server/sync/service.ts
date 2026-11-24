@@ -90,6 +90,7 @@ export interface SyncBatchContext {
 	eventRecords?: Map<string, typeof eventTable.$inferSelect>;
 	campaigns?: Map<string, typeof campaignTable.$inferSelect>;
 	associations?: Map<string, any>;
+	hasActiveMicrosoftResources?: boolean;
 }
 
 /**
@@ -1932,6 +1933,33 @@ export class SyncService {
 	}
 
 	/**
+	 * Checks whether at least one enabled microsoft-resources sync configuration exists.
+	 */
+	private async hasActiveMicrosoftResourcesConfig(batchContext?: SyncBatchContext): Promise<boolean> {
+		if (batchContext?.hasActiveMicrosoftResources !== undefined) {
+			return batchContext.hasActiveMicrosoftResources;
+		}
+		let hasActive = false;
+		try {
+			const rows = await db
+				.select({ id: syncConfigTable.id, providerType: syncConfigTable.providerType })
+				.from(syncConfigTable)
+				.where(and(
+					eq(syncConfigTable.enabled, true),
+					eq(syncConfigTable.providerType, 'microsoft-resources')
+				))
+				.limit(1);
+			hasActive = Array.isArray(rows) && rows.some((r) => r && r.providerType === 'microsoft-resources');
+		} catch {
+			hasActive = false;
+		}
+		if (batchContext) {
+			batchContext.hasActiveMicrosoftResources = hasActive;
+		}
+		return hasActive;
+	}
+
+	/**
 	 * Map internal event to external event format
 	 */
 	private async mapInternalToExternal(
@@ -2350,6 +2378,31 @@ export class SyncService {
 			};
 		}
 
+		let startDateTime = internal.startDateTime || internal.createdAt || new Date();
+		let endDateTime = internal.endDateTime || null;
+
+		if (isEvent && config?.providerType === 'microsoft-calendar' && config.settings?.mailboxType === 'room') {
+			const prepMs = (internal.prepMinutes || 0) * 60000;
+			const teardownMs = (internal.teardownMinutes || 0) * 60000;
+			if (startDateTime && prepMs > 0) {
+				startDateTime = new Date(new Date(startDateTime).getTime() - prepMs);
+			}
+			if (endDateTime && teardownMs > 0) {
+				endDateTime = new Date(new Date(endDateTime).getTime() + teardownMs);
+			}
+		}
+
+		const includeRoomBookings = config?.settings?.includeRoomBookings !== false && (config?.settings?.autoBookOnCalendar !== false);
+		let roomBookingsManagedByResourceProvider = false;
+		if (
+			isEvent &&
+			config?.providerType === 'microsoft-calendar' &&
+			includeRoomBookings &&
+			attendees.some((a) => a.type === 'resource')
+		) {
+			roomBookingsManagedByResourceProvider = await this.hasActiveMicrosoftResourcesConfig(batchContext);
+		}
+
 		return {
 			externalId: '',
 			providerId,
@@ -2359,10 +2412,10 @@ export class SyncService {
 			preferredLanguage,
 			signUp,
 			location: venue?.name || internal.location || undefined,
-			startDateTime: internal.startDateTime || internal.createdAt || new Date(),
+			startDateTime,
 			startTimeZone: internal.startTimeZone || 'UTC',
-			endDateTime: internal.endDateTime || null,
-			endTimeZone: internal.endTimeZone || 'UTC',
+			endDateTime,
+			endTimeZone: internal.endTimeZone || internal.startTimeZone || 'UTC',
 			attendees: attendees.length > 0 ? attendees : undefined,
 			recurrence: recurrenceRules,
 			reminders: internal.reminders as any ?? undefined,
@@ -2386,7 +2439,8 @@ export class SyncService {
 				categoryBerlinDotDe: internal.categoryBerlinDotDe ?? undefined,
 				ticketPriceUnknown: Boolean(internal.ticketPriceUnknown),
 				registrationRequired: isEvent ? internal.signUpMode === 'required' : undefined,
-				signUpMode: isEvent ? (internal.signUpMode ?? 'off') : undefined
+				signUpMode: isEvent ? (internal.signUpMode ?? 'off') : undefined,
+				...(roomBookingsManagedByResourceProvider ? { roomBookingsManagedByResourceProvider: true } : {})
 			}
 		};
 
@@ -3120,10 +3174,12 @@ export class SyncService {
 
 			// Coordinate with dependent resource sync providers (e.g. microsoft-resources) for room bookings
 			const includeRoomBookings = config.settings?.includeRoomBookings !== false && (config.settings?.autoBookOnCalendar !== false);
-			if (includeRoomBookings && entityType === 'event' && externalItem.attendees) {
-				const resourceAttendees = externalItem.attendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
-				if (resourceAttendees.length > 0) {
-					await this.coordinateResourceBooking(itemRow, resourceAttendees, config, batchContext);
+			if (includeRoomBookings && entityType === 'event') {
+				if (itemRow.status === 'cancelled') {
+					await this.releaseEventRoomBookings(itemRow.id);
+				} else {
+					const resourceAttendees = (externalItem.attendees || []).filter((a) => a.type === 'resource' && a.email?.includes('@'));
+					await this.coordinateResourceBooking(itemRow, resourceAttendees, config, batchContext, externalItem.recurrence);
 				}
 			}
 
@@ -3136,18 +3192,101 @@ export class SyncService {
 	}
 
 	/**
+	 * Release all (or a specific) Microsoft resource room booking(s) for an event.
+	 */
+	private async releaseEventRoomBookings(eventId: string, resourceId?: string): Promise<void> {
+		try {
+			if (!eventId || eventId.includes('_inst_')) {
+				return;
+			}
+
+			const rawConfigs = await db
+				.select()
+				.from(syncConfigTable)
+				.where(eq(syncConfigTable.providerType, 'microsoft-resources'));
+
+			const validConfigs = (Array.isArray(rawConfigs) ? rawConfigs : []).filter(
+				(c) => c && c.providerType === 'microsoft-resources'
+			);
+			if (validConfigs.length === 0) return;
+
+			const configMap = new Map(validConfigs.map((c) => [c.id, this.rowToConfig(c)]));
+			const conditions = [
+				eq(syncMappingTable.eventId, eventId),
+				inArray(syncMappingTable.syncConfigId, Array.from(configMap.keys()))
+			];
+			if (resourceId) {
+				conditions.push(eq(syncMappingTable.resourceId, resourceId));
+			} else {
+				conditions.push(isNotNull(syncMappingTable.resourceId));
+			}
+
+			const rawMappings = await db
+				.select()
+				.from(syncMappingTable)
+				.where(and(...conditions));
+
+			const mappings = (Array.isArray(rawMappings) ? rawMappings : []).filter(
+				(m) => m && m.id && m.syncConfigId && (m.resourceId || m.providerId === 'microsoft-resources')
+			);
+			if (mappings.length === 0) return;
+
+			const providerCache = new Map<string, any>();
+
+			for (const m of mappings) {
+				const cfg = configMap.get(m.syncConfigId);
+				if (!cfg) continue;
+
+				let provider = providerCache.get(cfg.id);
+				if (!provider) {
+					try {
+						provider = await this.getProviderInstance(cfg);
+						providerCache.set(cfg.id, provider);
+					} catch (initErr) {
+						console.warn(`[SyncService] Failed to initialize provider ${cfg.id} for room release:`, initErr);
+						continue;
+					}
+				}
+
+				const roomEmail = (m.metadata as any)?.roomEmail;
+				try {
+					if (typeof provider.releaseRoom === 'function') {
+						if (roomEmail && m.externalId) {
+							await provider.releaseRoom(roomEmail, m.externalId);
+						} else if (m.resourceId) {
+							await provider.releaseRoom(eventId, m.resourceId);
+						}
+					}
+				} catch (relErr) {
+					console.warn(`[SyncService] Failed to release room booking ${m.externalId} on ${roomEmail || m.resourceId}:`, relErr);
+				}
+
+				await db.delete(syncMappingTable).where(eq(syncMappingTable.id, m.id));
+			}
+		} catch (err) {
+			console.warn(`[SyncService] Failed to release room bookings for event ${eventId}:`, err);
+		}
+	}
+
+	/**
 	 * Coordinates room booking with dependent Microsoft resource sync providers.
-	 * Verifies room availability, books rooms, creates sync mappings, and logs results.
+	 * Releases removed/changed rooms, verifies room availability, books or updates rooms,
+	 * creates/updates sync mappings, and logs results.
 	 */
 	private async coordinateResourceBooking(
 		itemRow: any,
 		resourceAttendees: Array<{ email: string; displayName?: string; resourceId?: string }>,
 		calendarConfig: SyncConfig,
-		batchContext?: SyncBatchContext
+		batchContext?: SyncBatchContext,
+		recurrence?: string[]
 	): Promise<void> {
 		try {
+			if (!itemRow?.id || String(itemRow.id).includes('_inst_')) {
+				return;
+			}
+
 			// Find active microsoft-resources sync configs
-			const resourceConfigs = await db
+			const rawResourceConfigs = await db
 				.select()
 				.from(syncConfigTable)
 				.where(and(
@@ -3155,20 +3294,94 @@ export class SyncService {
 					eq(syncConfigTable.providerType, 'microsoft-resources')
 				));
 
+			const resourceConfigs = (Array.isArray(rawResourceConfigs) ? rawResourceConfigs : []).filter(
+				(r) => r && r.providerType === 'microsoft-resources'
+			);
+
 			if (resourceConfigs.length === 0) return;
+
+			const desiredResourceIds = new Set(
+				resourceAttendees.map((r) => r.resourceId).filter((id): id is string => Boolean(id))
+			);
 
 			for (const resRow of resourceConfigs) {
 				const resConfig = this.rowToConfig(resRow);
 				const provider = await this.getProviderInstance(resConfig) as any;
 
+				// 1. Release any previously booked rooms for this event that are no longer attached
+				try {
+					const rawMappings = await db
+						.select()
+						.from(syncMappingTable)
+						.where(and(
+							eq(syncMappingTable.syncConfigId, resConfig.id),
+							eq(syncMappingTable.eventId, itemRow.id),
+							isNotNull(syncMappingTable.resourceId)
+						));
+
+					const existingMappings = (Array.isArray(rawMappings) ? rawMappings : []).filter(
+						(m) => m && m.id && m.resourceId && m.syncConfigId
+					);
+
+					for (const mapping of existingMappings) {
+						if (!mapping.resourceId || desiredResourceIds.has(mapping.resourceId)) {
+							continue;
+						}
+
+						const oldRoomEmail = (mapping.metadata as any)?.roomEmail;
+						try {
+							if (typeof provider.releaseRoom === 'function') {
+								if (oldRoomEmail && mapping.externalId) {
+									await provider.releaseRoom(oldRoomEmail, mapping.externalId);
+								} else {
+									await provider.releaseRoom(itemRow.id, mapping.resourceId);
+								}
+							}
+							await db.delete(syncMappingTable).where(eq(syncMappingTable.id, mapping.id));
+
+							try {
+								await db.insert(syncOperationTable).values({
+									syncConfigId: resConfig.id,
+									operation: 'delete',
+									status: 'completed',
+									entityType: 'resource',
+									entityId: mapping.resourceId,
+									results: {
+										roomRelease: {
+											roomEmail: oldRoomEmail,
+											bookingId: mapping.externalId
+										},
+										eventId: itemRow.id
+									},
+									startedAt: new Date(),
+									completedAt: new Date()
+								});
+							} catch (opLogErr) {
+								console.warn('[SyncService] Could not record room release operation:', opLogErr);
+							}
+						} catch (releaseErr) {
+							console.warn(`[SyncService] Failed to release stale room ${oldRoomEmail || mapping.resourceId} for event ${itemRow.id}:`, releaseErr);
+						}
+					}
+				} catch (lookupErr) {
+					console.warn(`[SyncService] Could not check existing room mappings for event ${itemRow.id}:`, lookupErr);
+				}
+
+				// 2. Book / update currently attached rooms
 				if (typeof provider.bookRoom === 'function') {
 					for (const room of resourceAttendees) {
 						if (!room.resourceId) continue;
 
 						const prepMs = (itemRow.prepMinutes || 0) * 60000;
 						const teardownMs = (itemRow.teardownMinutes || 0) * 60000;
-						const effectiveStart = itemRow.startDateTime ? new Date(itemRow.startDateTime.getTime() - prepMs) : itemRow.startDateTime;
-						const effectiveEnd = itemRow.endDateTime ? new Date(itemRow.endDateTime.getTime() + teardownMs) : itemRow.endDateTime;
+						const effectiveStart = itemRow.startDateTime
+							? new Date(new Date(itemRow.startDateTime).getTime() - prepMs)
+							: itemRow.startDateTime;
+						const effectiveEnd = itemRow.endDateTime
+							? new Date(new Date(itemRow.endDateTime).getTime() + teardownMs)
+							: itemRow.endDateTime;
+						const startTimeZone = itemRow.startTimeZone || 'UTC';
+						const endTimeZone = itemRow.endTimeZone || startTimeZone;
 
 						const bookingResult = await provider.bookRoom({
 							eventId: itemRow.id,
@@ -3179,42 +3392,48 @@ export class SyncService {
 							description: itemRow.description,
 							start: effectiveStart,
 							end: effectiveEnd,
-							startTimeZone: itemRow.startTimeZone || 'UTC',
-							endTimeZone: itemRow.endTimeZone || 'UTC'
+							startTimeZone,
+							endTimeZone,
+							isAllDay: Boolean(itemRow.isAllDay),
+							recurrence
 						});
 
-						if (!bookingResult.success) {
-							console.warn(`[SyncService] Room booking failed for ${room.displayName}:`, bookingResult.message);
-							await db.insert(syncOperationTable).values({
-								syncConfigId: resConfig.id,
-								operation: 'push',
-								status: 'failed',
-								entityType: 'resource',
-								entityId: room.resourceId,
-								errorMessage: bookingResult.message,
-								error: bookingResult.message,
-								results: {
-									roomBooking: bookingResult,
-									eventId: itemRow.id
-								},
-								startedAt: new Date(),
-								completedAt: new Date()
-							});
-						} else {
-							console.log(`[SyncService] Room booking successful:`, bookingResult.message);
-							await db.insert(syncOperationTable).values({
-								syncConfigId: resConfig.id,
-								operation: 'push',
-								status: 'completed',
-								entityType: 'resource',
-								entityId: room.resourceId,
-								results: {
-									roomBooking: bookingResult,
-									eventId: itemRow.id
-								},
-								startedAt: new Date(),
-								completedAt: new Date()
-							});
+						try {
+							if (!bookingResult.success) {
+								console.warn(`[SyncService] Room booking failed for ${room.displayName}:`, bookingResult.message);
+								await db.insert(syncOperationTable).values({
+									syncConfigId: resConfig.id,
+									operation: 'push',
+									status: 'failed',
+									entityType: 'resource',
+									entityId: room.resourceId,
+									errorMessage: bookingResult.message,
+									error: bookingResult.message,
+									results: {
+										roomBooking: bookingResult,
+										eventId: itemRow.id
+									},
+									startedAt: new Date(),
+									completedAt: new Date()
+								});
+							} else {
+								console.log(`[SyncService] Room booking successful:`, bookingResult.message);
+								await db.insert(syncOperationTable).values({
+									syncConfigId: resConfig.id,
+									operation: 'push',
+									status: 'completed',
+									entityType: 'resource',
+									entityId: room.resourceId,
+									results: {
+										roomBooking: bookingResult,
+										eventId: itemRow.id
+									},
+									startedAt: new Date(),
+									completedAt: new Date()
+								});
+							}
+						} catch (opLogErr) {
+							console.warn('[SyncService] Could not record room booking operation:', opLogErr);
 						}
 					}
 				}
@@ -3432,6 +3651,9 @@ export class SyncService {
 			}
 
 			if (!shouldBeSynced && !existingExternalId) {
+				if (entityType === 'event' && itemRow?.status === 'cancelled') {
+					await this.releaseEventRoomBookings(itemId);
+				}
 				console.log(`[SyncService] Skipping ${entityType} ${itemId}: not selected or not eligible for synchronization config ${config.id}`);
 				return;
 			}
@@ -3472,6 +3694,17 @@ export class SyncService {
 							delete campContent.externalIds[existingExternalId];
 						}
 						await db.update(campaignTable).set({ content: campContent, updatedAt: new Date() }).where(eq(campaignTable.id, (campaign!).id));
+					}
+					if (entityType === 'event') {
+						if (isCancelled) {
+							await this.releaseEventRoomBookings(itemId);
+						} else if (!shouldBeSynced && config.providerType === 'microsoft-calendar') {
+							const remainingSyncs = Object.values(campContent?.items?.[itemId]?.syncs || {});
+							const hasAnyRemainingSync = remainingSyncs.some((s) => Boolean(s?.externalId));
+							if (!hasAnyRemainingSync) {
+								await this.releaseEventRoomBookings(itemId);
+							}
+						}
 					}
 				} catch (e: any) {
 					console.error(`[SyncService] Failed to un-publish ${entityType} ${itemId}:`, e);
@@ -3658,19 +3891,32 @@ export class SyncService {
 		action: 'link' | 'unlink'
 	): Promise<void> {
 		try {
+			let targetEventId = eventId;
+			if (eventId.includes('_inst_')) {
+				const resolved = await this.getEventRecord(eventId);
+				if (resolved?.id && !resolved.id.includes('_inst_')) {
+					targetEventId = resolved.id;
+				}
+			}
+
 			if (action === 'unlink') {
-				// Remove specific sync_mapping records for this event + resource
-				await db
-					.delete(syncMappingTable)
-					.where(
-						and(
-							eq(syncMappingTable.eventId, eventId),
-							eq(syncMappingTable.resourceId, resourceId)
-						)
-					);
+				// Release room booking in external providers BEFORE deleting sync_mapping records
+				await this.releaseEventRoomBookings(targetEventId, resourceId);
+
+				if (!targetEventId.includes('_inst_')) {
+					// Remove any remaining sync_mapping records for this event + resource
+					await db
+						.delete(syncMappingTable)
+						.where(
+							and(
+								eq(syncMappingTable.eventId, targetEventId),
+								eq(syncMappingTable.resourceId, resourceId)
+							)
+						);
+				}
 			}
 			// Trigger re-sync of the event so external calendar events update (adding or removing room attendee)
-			await this.syncItems(userId, [eventId], 'event');
+			await this.syncItems(userId, [targetEventId], 'event');
 		} catch (err) {
 			console.error(`[SyncService] Failed to sync resource association change (${action}) for event ${eventId}:`, err);
 		}

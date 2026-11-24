@@ -220,6 +220,70 @@ describe('MicrosoftCalendarProvider', () => {
 			const mappedUpdate = (provider as any).mapToMicrosoftEvent(event, { isUpdate: true });
 			expect(mappedUpdate.attendees).toEqual([]);
 		});
+
+		it('should omit resource attendees and use display-only locations when roomBookingsManagedByResourceProvider is true', () => {
+			(provider as any).config = {
+				id: 'test-config',
+				providerType: 'microsoft-calendar',
+				settings: {
+					includeContacts: true,
+					includeRoomBookings: true
+				}
+			};
+
+			const event: ExternalEvent = {
+				externalId: 'ext-managed-1',
+				providerId: 'microsoft-calendar',
+				summary: 'Managed Room Event',
+				attendees: [
+					{ email: 'staff@example.com', displayName: 'Staff Member', type: 'required' },
+					{ email: 'bhs147@ballev.onmicrosoft.com', displayName: 'BHS.1.47', type: 'resource' }
+				],
+				metadata: {
+					roomBookingsManagedByResourceProvider: true
+				}
+			};
+
+			const mappedCreate = (provider as any).mapToMicrosoftEvent(event);
+			expect(mappedCreate.attendees).toHaveLength(1);
+			expect(mappedCreate.attendees[0].emailAddress.address).toBe('staff@example.com');
+			expect(mappedCreate.locations).toEqual([{ displayName: 'BHS.1.47' }]);
+			expect(mappedCreate.location).toEqual({ displayName: 'BHS.1.47' });
+
+			// With no human attendees on update, attendees must explicitly clear to []
+			const eventNoHumans: ExternalEvent = {
+				...event,
+				attendees: [
+					{ email: 'bhs147@ballev.onmicrosoft.com', displayName: 'BHS.1.47', type: 'resource' }
+				]
+			};
+			const mappedUpdate = (provider as any).mapToMicrosoftEvent(eventNoHumans, { isUpdate: true });
+			expect(mappedUpdate.attendees).toEqual([]);
+			expect(mappedUpdate.locations).toEqual([{ displayName: 'BHS.1.47' }]);
+		});
+
+		it('should clear stale conferenceRoom locations on update even when event.location is present', () => {
+			(provider as any).config = {
+				id: 'test-config',
+				providerType: 'microsoft-calendar',
+				settings: {
+					includeContacts: false,
+					includeRoomBookings: true
+				}
+			};
+
+			const eventWithVenueOnly: ExternalEvent = {
+				externalId: 'ext-room-removed',
+				providerId: 'microsoft-calendar',
+				summary: 'Room Removed Event',
+				location: 'Main Building',
+				attendees: []
+			};
+
+			const mappedUpdate = (provider as any).mapToMicrosoftEvent(eventWithVenueOnly, { isUpdate: true });
+			expect(mappedUpdate.attendees).toEqual([]);
+			expect(mappedUpdate.locations).toEqual([{ displayName: 'Main Building' }]);
+		});
 	});
 
 	describe('updateEvent', () => {

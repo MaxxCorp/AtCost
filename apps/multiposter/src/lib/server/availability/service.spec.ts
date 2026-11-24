@@ -375,5 +375,94 @@ describe('AvailabilityService', () => {
             undefined
         );
     });
+
+    it('should exclude self-booking using prepMinutes/teardownMinutes and correlate external busy with padded local occupant', async () => {
+        const currentEventId = 'e4f61f77-85ef-4a11-b06d-74d1264c4897';
+        const mockCurrentBooking = [{
+            eventId: currentEventId,
+            resourceId: 'room-self',
+            summary: 'Self Event',
+            startDateTime: new Date('2026-09-08T10:00:00Z'),
+            endDateTime: new Date('2026-09-08T11:00:00Z'),
+            prepMinutes: 60,
+            teardownMinutes: 60,
+            recurrence: null,
+            seriesId: null,
+            exdates: [],
+            startTimeZone: 'UTC'
+        }];
+
+        // Case 1: Self-booking where user checks 09:00-10:00 (only overlaps padded prep 09:00-12:00)
+        const mockWhere1 = vi.fn()
+            .mockResolvedValueOnce(mockCurrentBooking) // currentEventResourceBookings
+            .mockResolvedValueOnce([]) // currentEventContactBookings
+            .mockResolvedValueOnce([]) // local non-recurring collisions
+            .mockResolvedValueOnce([]); // local recurring collisions
+        const mockInnerJoin1 = vi.fn().mockReturnValue({ where: mockWhere1 });
+        const mockFrom1 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin1 });
+        (db.select as any).mockReturnValue({ from: mockFrom1 });
+
+        const mockProvider1 = {
+            name: 'microsoft',
+            checkSchedule: vi.fn().mockResolvedValue(new Map([
+                ['roomself@example.com', {
+                    available: false,
+                    reason: 'Busy in Microsoft 365: "Self Event"',
+                    eventTitle: 'Self Event',
+                    scheduleItems: [{
+                        status: 'busy',
+                        subject: 'Self Event',
+                        start: new Date('2026-09-08T09:00:00Z'),
+                        end: new Date('2026-09-08T12:00:00Z')
+                    }]
+                }]
+            ]))
+        };
+        (service as any).providers = [mockProvider1];
+
+        const selfRes = await service.checkAvailability({
+            currentEventId,
+            startDateTime: new Date('2026-09-08T09:15:00Z'),
+            endDateTime: new Date('2026-09-08T09:45:00Z'),
+            resources: [{ id: 'room-self', allocationCalendars: [{ email: 'roomself@example.com' }] }],
+            contacts: []
+        });
+        expect(selfRes.resourceAvailability['room-self'].available).toBe(true);
+
+        // Case 2: External busy resource correlated against another local event via padded SQL check
+        const mockWhere2 = vi.fn()
+            .mockResolvedValueOnce([]) // local non-recurring collisions
+            .mockResolvedValueOnce([]) // local recurring collisions
+            .mockResolvedValueOnce([{ eventId: 'other-padded-evt', eventTitle: 'Setup Occupant' }]); // external correlation
+        const mockInnerJoin2 = vi.fn().mockReturnValue({ where: mockWhere2 });
+        const mockFrom2 = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin2 });
+        (db.select as any).mockReturnValue({ from: mockFrom2 });
+
+        const mockProvider2 = {
+            name: 'microsoft',
+            checkSchedule: vi.fn().mockResolvedValue(new Map([
+                ['room2@example.com', {
+                    available: false,
+                    reason: 'Busy in Microsoft 365',
+                    scheduleItems: [{
+                        status: 'busy',
+                        start: new Date('2026-09-08T09:00:00Z'),
+                        end: new Date('2026-09-08T12:00:00Z')
+                    }]
+                }]
+            ]))
+        };
+        (service as any).providers = [mockProvider2];
+
+        const corrRes = await service.checkAvailability({
+            startDateTime: new Date('2026-09-08T09:15:00Z'),
+            endDateTime: new Date('2026-09-08T09:45:00Z'),
+            resources: [{ id: 'room-2', allocationCalendars: [{ email: 'room2@example.com' }] }],
+            contacts: []
+        });
+        expect(corrRes.resourceAvailability['room-2'].available).toBe(false);
+        expect(corrRes.resourceAvailability['room-2'].eventId).toBe('other-padded-evt');
+        expect(corrRes.resourceAvailability['room-2'].eventTitle).toBe('Setup Occupant');
+    });
 });
 

@@ -1,4 +1,34 @@
 import { RRule } from '#lib/utils/rrule-compat.js';
+import { parseDateTime, toZoned } from '@internationalized/date';
+
+export function parseGraphDateTime(dateTime?: string | null, timeZone?: string | null): Date | undefined {
+	if (!dateTime || typeof dateTime !== 'string') return undefined;
+	const trimmed = dateTime.trim();
+	if (!trimmed) return undefined;
+
+	// If the string already contains Z or an explicit UTC offset, parse directly.
+	if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(trimmed)) {
+		const d = new Date(trimmed);
+		return isNaN(d.getTime()) ? undefined : d;
+	}
+
+	const tz = (timeZone || '').trim();
+	if (!tz || tz.toUpperCase() === 'UTC') {
+		const d = new Date(`${trimmed}Z`);
+		return isNaN(d.getTime()) ? undefined : d;
+	}
+
+	try {
+		// Normalize fractional seconds if Graph included .0000000
+		const noFrac = trimmed.replace(/\.\d+$/, '');
+		const cal = parseDateTime(noFrac);
+		const zoned = toZoned(cal, tz);
+		const d = zoned.toDate();
+		return isNaN(d.getTime()) ? undefined : d;
+	} catch {
+		return undefined;
+	}
+}
 
 export const RRULE_WEEKDAY_TO_GRAPH: Record<number, string> = {
 	0: 'monday',

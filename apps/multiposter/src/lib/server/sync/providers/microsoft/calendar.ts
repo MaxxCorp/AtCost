@@ -458,10 +458,11 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			this.config?.settings?.includeContacts !== false &&
 			this.config?.settings?.syncParticipants !== false &&
 			this.config?.settings?.includeEventContacts !== false;
+		const managedByResourceProvider = Boolean(event.metadata?.roomBookingsManagedByResourceProvider);
 
 		const rawAttendees = event.attendees || [];
 		const eligibleAttendees = rawAttendees.filter((a) => {
-			if (a.type === 'resource') return includeRoomBookings;
+			if (a.type === 'resource') return includeRoomBookings && !managedByResourceProvider;
 			return includeContacts;
 		});
 
@@ -474,10 +475,22 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 			msEvent.attendees = [];
 		}
 
-		if (includeRoomBookings && rawAttendees.length > 0) {
-			// Map conference room locations for Exchange room booking
-			const roomAttendees = rawAttendees.filter((a) => a.type === 'resource' && a.email?.includes('@'));
-			if (roomAttendees.length > 0) {
+		const roomAttendees = includeRoomBookings
+			? rawAttendees.filter((a) => a.type === 'resource' && a.email?.includes('@'))
+			: [];
+
+		if (roomAttendees.length > 0) {
+			if (managedByResourceProvider) {
+				msEvent.locations = roomAttendees.map((r) => ({
+					displayName: r.displayName || r.email
+				}));
+				if (!msEvent.location && roomAttendees.length === 1) {
+					msEvent.location = {
+						displayName: roomAttendees[0].displayName || roomAttendees[0].email
+					};
+				}
+			} else {
+				// Map conference room locations for Exchange room booking
 				msEvent.locations = roomAttendees.map((r) => ({
 					displayName: r.displayName || r.email,
 					locationEmailAddress: r.email,
@@ -490,11 +503,9 @@ export class MicrosoftCalendarProvider implements SyncProvider {
 						locationType: 'conferenceRoom'
 					};
 				}
-			} else if (options?.isUpdate && !event.location) {
-				msEvent.locations = [];
 			}
-		} else if (options?.isUpdate && !event.location) {
-			msEvent.locations = [];
+		} else if (options?.isUpdate) {
+			msEvent.locations = event.location ? [{ displayName: event.location }] : [];
 		}
 
 		if (event.recurrence && event.recurrence.length > 0) {

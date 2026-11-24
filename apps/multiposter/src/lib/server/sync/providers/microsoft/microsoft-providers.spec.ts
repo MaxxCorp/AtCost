@@ -1,7 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { db } from '@ac/db';
 import { MicrosoftGraphClient } from './client';
 import { MicrosoftContactsProvider } from './contacts';
 import { MicrosoftResourceProvider } from './resources';
+
+vi.mock('@ac/db', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@ac/db')>();
+	return {
+		...actual,
+		db: {
+			select: vi.fn(),
+			insert: vi.fn(),
+			update: vi.fn(),
+			delete: vi.fn()
+		}
+	};
+});
 
 describe('Microsoft Sync Suite', () => {
 	describe('MicrosoftGraphClient', () => {
@@ -381,6 +395,319 @@ describe('Microsoft Sync Suite', () => {
 				'https://graph.microsoft.com/v1.0/users/grosser-saal%40ballev.onmicrosoft.com/calendar/events/res-booking-99',
 				{ method: 'DELETE' }
 			);
+		});
+
+		it('should ignore free and boundary-touching slots in checkRoomAvailability while flagging genuine overlaps', async () => {
+			const makeRequestMock = vi.fn()
+				.mockResolvedValueOnce({
+					value: [
+						{
+							scheduleId: 'bhs147@ballev.onmicrosoft.com',
+							scheduleItems: [
+								{
+									status: 'free',
+									start: { dateTime: '2026-11-10T10:00:00', timeZone: 'UTC' },
+									end: { dateTime: '2026-11-10T12:00:00', timeZone: 'UTC' }
+								},
+								{
+									status: 'busy',
+									start: { dateTime: '2026-11-10T08:00:00', timeZone: 'UTC' },
+									end: { dateTime: '2026-11-10T09:00:00', timeZone: 'UTC' }
+								},
+								{
+									status: 'busy',
+									start: { dateTime: '2026-11-10T13:30:00', timeZone: 'UTC' },
+									end: { dateTime: '2026-11-10T15:00:00', timeZone: 'UTC' }
+								}
+							]
+						}
+					]
+				})
+				.mockResolvedValueOnce({
+					value: [
+						{
+							scheduleId: 'bhs147@ballev.onmicrosoft.com',
+							scheduleItems: [
+								{
+									status: 'busy',
+									start: { dateTime: '2026-11-10T12:00:00', timeZone: 'UTC' },
+									end: { dateTime: '2026-11-10T14:00:00', timeZone: 'UTC' }
+								}
+							]
+						}
+					]
+				});
+			(provider as any).client.makeRequest = makeRequestMock;
+
+			const availFree = await provider.checkRoomAvailability(
+				['bhs147@ballev.onmicrosoft.com'],
+				new Date('2026-11-10T09:00:00Z'),
+				new Date('2026-11-10T13:30:00Z')
+			);
+			expect(availFree.get('bhs147@ballev.onmicrosoft.com')?.isAvailable).toBe(true);
+			expect(availFree.get('bhs147@ballev.onmicrosoft.com')?.busySlots).toHaveLength(0);
+
+			const availOverlap = await provider.checkRoomAvailability(
+				['bhs147@ballev.onmicrosoft.com'],
+				new Date('2026-11-10T09:00:00Z'),
+				new Date('2026-11-10T13:30:00Z')
+			);
+			expect(availOverlap.get('bhs147@ballev.onmicrosoft.com')?.isAvailable).toBe(false);
+			expect(availOverlap.get('bhs147@ballev.onmicrosoft.com')?.busySlots).toHaveLength(1);
+		});
+
+		it('should update an existing booking via PATCH when prep/teardown padding changes without self-conflicting', async () => {
+			(provider as any).config = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerId: 'microsoft-resources',
+				providerType: 'microsoft-resources',
+				direction: 'push',
+				enabled: true,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			const existingMapping = {
+				id: 'map-1',
+				syncConfigId: 'cfg-res-1',
+				eventId: 'evt-1',
+				resourceId: 'res-bhs147',
+				externalId: 'booking-existing-1',
+				metadata: {
+					roomEmail: 'bhs147@ballev.onmicrosoft.com',
+					roomName: 'BHS.1.47'
+				}
+			};
+
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([existingMapping])
+				})
+			});
+			const mockUpdateWhere = vi.fn().mockResolvedValueOnce([]);
+			(db.update as any).mockReturnValueOnce({
+				set: vi.fn().mockReturnValueOnce({
+					where: mockUpdateWhere
+				})
+			});
+
+			const makeRequestMock = vi.fn()
+				// 1. calendarView check finds only our existing booking
+				.mockResolvedValueOnce({
+					value: [
+						{
+							id: 'booking-existing-1',
+							subject: 'Seminar',
+							showAs: 'busy',
+							isCancelled: false,
+							start: { dateTime: '2026-11-10T11:00:00', timeZone: 'UTC' },
+							end: { dateTime: '2026-11-10T12:30:00', timeZone: 'UTC' }
+						}
+					]
+				})
+				// 2. PATCH existing booking
+				.mockResolvedValueOnce({
+					id: 'booking-existing-1'
+				});
+			(provider as any).client.makeRequest = makeRequestMock;
+
+			const res = await provider.bookRoom({
+				eventId: 'evt-1',
+				resourceId: 'res-bhs147',
+				roomEmail: 'bhs147@ballev.onmicrosoft.com',
+				roomName: 'BHS.1.47',
+				summary: 'Seminar',
+				start: new Date('2026-11-10T09:00:00Z'),
+				end: new Date('2026-11-10T13:30:00Z'),
+				startTimeZone: 'UTC'
+			});
+
+			expect(res.success).toBe(true);
+			expect(res.status).toBe('confirmed');
+			expect(res.bookingId).toBe('booking-existing-1');
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				1,
+				expect.stringContaining('/users/bhs147%40ballev.onmicrosoft.com/calendarView'),
+				expect.objectContaining({ method: 'GET' })
+			);
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				2,
+				'https://graph.microsoft.com/v1.0/users/bhs147%40ballev.onmicrosoft.com/calendar/events/booking-existing-1',
+				expect.objectContaining({
+					method: 'PATCH',
+					body: expect.stringContaining('"dateTime":"2026-11-10T09:00:00"')
+				})
+			);
+			const patchBody = JSON.parse(makeRequestMock.mock.calls[1][1].body);
+			expect(patchBody.end.dateTime).toBe('2026-11-10T13:30:00');
+			expect(patchBody.end.timeZone).toBe('UTC');
+			expect(mockUpdateWhere).toHaveBeenCalled();
+		});
+
+		it('should fall back to POST when PATCH of an existing booking returns 404', async () => {
+			(provider as any).config = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerId: 'microsoft-resources',
+				providerType: 'microsoft-resources',
+				direction: 'push',
+				enabled: true,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			const existingMapping = {
+				id: 'map-stale',
+				syncConfigId: 'cfg-res-1',
+				eventId: 'evt-2',
+				resourceId: 'res-bhs147',
+				externalId: 'booking-deleted-on-ms',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com' }
+			};
+
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([existingMapping])
+				})
+			});
+			const mockDeleteWhere = vi.fn().mockResolvedValueOnce([]);
+			(db.delete as any).mockReturnValueOnce({ where: mockDeleteWhere });
+			const mockInsertValues = vi.fn().mockResolvedValueOnce([]);
+			(db.insert as any).mockReturnValueOnce({ values: mockInsertValues });
+
+			const notFoundErr: any = new Error('ResourceNotFound: 404');
+			notFoundErr.status = 404;
+
+			const makeRequestMock = vi.fn()
+				.mockResolvedValueOnce({ value: [] }) // calendarView
+				.mockRejectedValueOnce(notFoundErr) // PATCH 404
+				.mockResolvedValueOnce({ value: [{ scheduleId: 'bhs147@ballev.onmicrosoft.com', scheduleItems: [] }] }) // getSchedule
+				.mockResolvedValueOnce({ id: 'booking-recreated-2' }); // POST
+			(provider as any).client.makeRequest = makeRequestMock;
+
+			const res = await provider.bookRoom({
+				eventId: 'evt-2',
+				resourceId: 'res-bhs147',
+				roomEmail: 'bhs147@ballev.onmicrosoft.com',
+				roomName: 'BHS.1.47',
+				summary: 'Recreated Event',
+				start: new Date('2026-11-10T09:00:00Z'),
+				end: new Date('2026-11-10T13:30:00Z')
+			});
+
+			expect(res.success).toBe(true);
+			expect(res.bookingId).toBe('booking-recreated-2');
+			expect(mockDeleteWhere).toHaveBeenCalled();
+			expect(mockInsertValues).toHaveBeenCalledWith(expect.objectContaining({
+				externalId: 'booking-recreated-2',
+				eventId: 'evt-2',
+				resourceId: 'res-bhs147'
+			}));
+			expect(makeRequestMock).toHaveBeenNthCalledWith(
+				4,
+				'https://graph.microsoft.com/v1.0/users/bhs147%40ballev.onmicrosoft.com/calendar/events',
+				expect.objectContaining({ method: 'POST' })
+			);
+		});
+
+		it('should return conflict on update when a different event overlaps in calendarView', async () => {
+			(provider as any).config = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerId: 'microsoft-resources',
+				providerType: 'microsoft-resources',
+				direction: 'push',
+				enabled: true,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			const existingMapping = {
+				id: 'map-1',
+				syncConfigId: 'cfg-res-1',
+				eventId: 'evt-1',
+				resourceId: 'res-bhs147',
+				externalId: 'booking-existing-1',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com' }
+			};
+
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([existingMapping])
+				})
+			});
+
+			const makeRequestMock = vi.fn().mockResolvedValueOnce({
+				value: [
+					{
+						id: 'booking-existing-1',
+						subject: 'My Event',
+						showAs: 'busy',
+						start: { dateTime: '2026-11-10T10:00:00', timeZone: 'UTC' },
+						end: { dateTime: '2026-11-10T12:30:00', timeZone: 'UTC' }
+					},
+					{
+						id: 'other-competing-event',
+						subject: 'Competing Meeting',
+						showAs: 'busy',
+						start: { dateTime: '2026-11-10T09:00:00', timeZone: 'UTC' },
+						end: { dateTime: '2026-11-10T10:00:00', timeZone: 'UTC' }
+					}
+				]
+			});
+			(provider as any).client.makeRequest = makeRequestMock;
+
+			const res = await provider.bookRoom({
+				eventId: 'evt-1',
+				resourceId: 'res-bhs147',
+				roomEmail: 'bhs147@ballev.onmicrosoft.com',
+				roomName: 'BHS.1.47',
+				summary: 'My Event',
+				start: new Date('2026-11-10T09:00:00Z'),
+				end: new Date('2026-11-10T13:30:00Z')
+			});
+
+			expect(res.success).toBe(false);
+			expect(res.status).toBe('conflict');
+			expect(res.message).toContain('Competing Meeting');
+			expect(makeRequestMock).toHaveBeenCalledTimes(1);
+		});
+
+		it('should default endTimeZone to startTimeZone and map recurrence in bookRoom', async () => {
+			const makeRequestMock = vi.fn()
+				.mockResolvedValueOnce({ value: [] }) // getSchedule
+				.mockResolvedValueOnce({ id: 'res-rec-1' }); // POST
+			(provider as any).client.makeRequest = makeRequestMock;
+
+			const res = await provider.bookRoom({
+				roomEmail: 'bhs147@ballev.onmicrosoft.com',
+				roomName: 'BHS.1.47',
+				summary: 'Weekly Yoga',
+				start: new Date('2026-11-10T08:00:00Z'), // 09:00 CET
+				end: new Date('2026-11-10T12:30:00Z'), // 13:30 CET
+				startTimeZone: 'Europe/Berlin',
+				recurrence: ['RRULE:FREQ=WEEKLY;COUNT=5']
+			});
+
+			expect(res.success).toBe(true);
+			const postCall = makeRequestMock.mock.calls.find(
+				(c) => String(c[0]).includes('/calendar/events') && c[1]?.method === 'POST'
+			);
+			expect(postCall).toBeDefined();
+			const body = JSON.parse(postCall![1].body);
+			expect(body.start).toEqual({
+				dateTime: '2026-11-10T09:00:00',
+				timeZone: 'Europe/Berlin'
+			});
+			expect(body.end).toEqual({
+				dateTime: '2026-11-10T13:30:00',
+				timeZone: 'Europe/Berlin'
+			});
+			expect(body.recurrence).toBeDefined();
+			expect(body.recurrence.pattern.type).toBe('weekly');
+			expect(body.recurrence.range.numberOfOccurrences).toBe(5);
+			expect(body.recurrence.range.recurrenceTimeZone).toBe('Europe/Berlin');
 		});
 	});
 });
