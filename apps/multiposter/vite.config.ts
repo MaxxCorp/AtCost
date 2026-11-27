@@ -20,9 +20,9 @@ export default defineConfig({
 				// Split API routes from pages for better performance
 				split: false,
 
-				// Set maxDuration for all functions (free tier: 60s)
-				maxDuration: 60,
-				runtime: 'nodejs24.x'
+				// Set maxDuration for all functions (free tier: 300s)
+				maxDuration: 300,
+				runtime: 'nodejs26.x'
 			}),
 
 			csrf: {
