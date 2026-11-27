@@ -471,5 +471,93 @@ describe("event-series helper", () => {
         });
         expect(noMatch).toBeNull();
     });
+
+    it("getAllSeriesOccurrences preserves materialized instance overrides and empty values instead of master defaults", () => {
+        const master = {
+            id: "master-overrides",
+            summary: "Series Master",
+            startDateTime: "2026-11-01T10:00:00.000Z",
+            endDateTime: "2026-11-01T11:00:00.000Z",
+            rooms: ["Room A"],
+            resources: [{ id: "res-a", name: "Room A", type: "room" }],
+            locations: [{ id: "loc-a", name: "Location A" }],
+            tags: [{ id: "t1", name: "Series" }, { id: "t2", name: "Music" }],
+            prepMinutes: 20,
+            instances: [
+                {
+                    id: "exc-changed",
+                    startDateTime: "2026-11-08T10:00:00.000Z",
+                    endDateTime: "2026-11-08T12:00:00.000Z",
+                    rooms: ["Room B"],
+                    resources: [{ id: "res-b", name: "Room B", type: "room" }],
+                    locations: [{ id: "loc-b", name: "Location B" }],
+                    tags: [{ id: "t1", name: "Series" }],
+                    prepMinutes: 0,
+                },
+                {
+                    id: "exc-cleared",
+                    startDateTime: "2026-11-15T10:00:00.000Z",
+                    endDateTime: "2026-11-15T11:00:00.000Z",
+                    rooms: [],
+                    resources: [],
+                },
+            ],
+        };
+
+        const occurrences = getAllSeriesOccurrences(master);
+        expect(occurrences).toHaveLength(3);
+        expect(occurrences[1].id).toBe("exc-changed");
+        expect(occurrences[1].rooms).toEqual(["Room B"]);
+        expect(occurrences[1].resources).toEqual([{ id: "res-b", name: "Room B", type: "room" }]);
+        expect(occurrences[1].locations).toEqual([{ id: "loc-b", name: "Location B" }]);
+        expect(occurrences[1].tags).toEqual([{ id: "t1", name: "Series" }]);
+        expect(occurrences[1].prepMinutes).toBe(0);
+
+        expect(occurrences[2].id).toBe("exc-cleared");
+        expect(occurrences[2].rooms).toEqual([]);
+        expect(occurrences[2].resources).toEqual([]);
+    });
+
+    it("getAllSeriesOccurrences inherits from rootMaster rather than the passed instance when called with an instance", () => {
+        const instanceWithDifferentRoom = {
+            id: "exc-1",
+            summary: "Special Instance",
+            startDateTime: "2026-11-08T10:00:00.000Z",
+            endDateTime: "2026-11-08T11:00:00.000Z",
+            rooms: ["Room Exception Only"],
+            isSeriesInstance: true,
+            recurringEventId: "master-root",
+            seriesMaster: {
+                id: "master-root",
+                summary: "Master Title",
+                startDateTime: "2026-11-01T10:00:00.000Z",
+                endDateTime: "2026-11-01T11:00:00.000Z",
+                rooms: ["Master Room"],
+                instances: [
+                    {
+                        id: "exc-1",
+                        summary: "Special Instance",
+                        startDateTime: "2026-11-08T10:00:00.000Z",
+                        endDateTime: "2026-11-08T11:00:00.000Z",
+                        rooms: ["Room Exception Only"],
+                    },
+                    {
+                        id: "master-root_inst_2026-11-15T10:00:00.000Z",
+                        startDateTime: "2026-11-15T10:00:00.000Z",
+                        endDateTime: "2026-11-15T11:00:00.000Z",
+                    },
+                ],
+            },
+        };
+
+        const occurrences = getAllSeriesOccurrences(instanceWithDifferentRoom);
+        expect(occurrences).toHaveLength(3);
+        expect(occurrences[0].id).toBe("master-root");
+        expect(occurrences[0].rooms).toEqual(["Master Room"]);
+        expect(occurrences[1].id).toBe("exc-1");
+        expect(occurrences[1].rooms).toEqual(["Room Exception Only"]);
+        expect(occurrences[2].id).toBe("master-root_inst_2026-11-15T10:00:00.000Z");
+        expect(occurrences[2].rooms).toEqual(["Master Room"]);
+    });
 });
 

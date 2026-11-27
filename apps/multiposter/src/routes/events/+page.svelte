@@ -53,11 +53,14 @@
 		doesOccurrenceOverlapRange,
 		getAllSeriesOccurrences,
 		getUpcomingOccurrence,
+		groupSeriesEvents,
+		unrollSeriesEvents,
 	} from "#lib/utils/event-series.js";
+	import { getLocale } from "#lib/paraglide/runtime.js";
 
 	function formatDate(dateStr: string | null | undefined) {
 		if (!dateStr) return "";
-		return new Date(dateStr).toLocaleDateString(undefined, {
+		return new Date(dateStr).toLocaleDateString(getLocale(), {
 			weekday: "short",
 			day: "numeric",
 			month: "short",
@@ -67,7 +70,7 @@
 
 	function formatTime(dateTimeStr: string | null | undefined) {
 		if (!dateTimeStr) return "";
-		return new Date(dateTimeStr).toLocaleTimeString(undefined, {
+		return new Date(dateTimeStr).toLocaleTimeString(getLocale(), {
 			hour: "2-digit",
 			minute: "2-digit",
 		});
@@ -425,147 +428,6 @@
 		}
 	}
 
-	function groupEvents(rawEvents: any[]) {
-		const grouped = rawEvents
-			.filter((e: any) => !e.recurringEventId)
-			.map((master: any) => {
-				const existingInstances = master.instances || [];
-				const rawChildInstances = rawEvents
-					.filter((e: any) => e.recurringEventId === master.id);
-				const combined = [...existingInstances];
-				const existingIds = new Set(combined.map((i: any) => i.id));
-				for (const child of rawChildInstances) {
-					if (!existingIds.has(child.id)) {
-						combined.push(child);
-						existingIds.add(child.id);
-					}
-				}
-				combined.sort((a: any, b: any) => {
-					const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-					const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
-					return dateA - dateB;
-				});
-				return { ...master, instances: combined };
-			});
-
-		if (sortField === "startDateTime") {
-			grouped.sort((a: any, b: any) => {
-				const occA = getUpcomingOccurrence(a, {
-					excludePast,
-					rangeStart: activeDateBounds.start,
-					rangeEnd: activeDateBounds.end,
-				});
-				const occB = getUpcomingOccurrence(b, {
-					excludePast,
-					rangeStart: activeDateBounds.start,
-					rangeEnd: activeDateBounds.end,
-				});
-				const timeA = occA?.startDateTime
-					? new Date(occA.startDateTime).getTime()
-					: (a.startDateTime ? new Date(a.startDateTime).getTime() : 0);
-				const timeB = occB?.startDateTime
-					? new Date(occB.startDateTime).getTime()
-					: (b.startDateTime ? new Date(b.startDateTime).getTime() : 0);
-				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
-			});
-		} else if (sortField === "createdAt") {
-			grouped.sort((a: any, b: any) => {
-				const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-				const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
-			});
-		} else {
-			grouped.sort((a: any, b: any) => {
-				const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-				const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
-			});
-		}
-
-		return grouped;
-	}
-
-	function unrollEvents(
-		rawEvents: any[],
-		isExcludePast: boolean,
-		rangeStart: Date | null = null,
-		rangeEnd: Date | null = null,
-	) {
-		const grouped = groupEvents(rawEvents);
-		const unrolled: any[] = [];
-		const now = new Date();
-		now.setHours(0, 0, 0, 0);
-		const hasDateRange = Boolean(rangeStart || rangeEnd);
-
-		for (const master of grouped) {
-			const isSeries = isSeriesEvent(master);
-			if (!isSeries) {
-				if (
-					hasDateRange &&
-					!doesOccurrenceOverlapRange(master.startDateTime, master.endDateTime, rangeStart, rangeEnd)
-				) {
-					continue;
-				}
-				unrolled.push(master);
-			} else {
-				const occurrences = getAllSeriesOccurrences(master);
-				for (const occ of occurrences) {
-					if (isExcludePast) {
-						const iStart = occ.startDateTime ? new Date(occ.startDateTime) : null;
-						const iEnd = occ.endDateTime ? new Date(occ.endDateTime) : null;
-						const isFuture = (iStart ? iStart >= now : false) || (iEnd ? iEnd >= now : false);
-						if (!isFuture) continue;
-					}
-					if (
-						hasDateRange &&
-						!doesOccurrenceOverlapRange(occ.startDateTime, occ.endDateTime, rangeStart, rangeEnd)
-					) {
-						continue;
-					}
-					unrolled.push({
-						...master,
-						...occ,
-						id: occ.id,
-						summary: occ.summary || master.summary,
-						startDateTime: occ.startDateTime,
-						endDateTime: occ.endDateTime,
-						status: occ.status || master.status,
-						isSeriesInstance: !occ.isMaster,
-						isSeriesMaster: Boolean(occ.isMaster),
-						recurringEventId: occ.isMaster ? null : master.id,
-						seriesMaster: master,
-						instances: master.instances,
-						locations: master.locations,
-						resources: master.resources,
-						rooms: master.rooms,
-						tags: master.tags,
-						user: master.user,
-						updatedAt: master.updatedAt,
-						createdAt: master.createdAt,
-					});
-				}
-			}
-		}
-
-		unrolled.sort((a: any, b: any) => {
-			if (sortField === "startDateTime") {
-				const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
-				const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
-				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
-			} else if (sortField === "createdAt") {
-				const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-				const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
-			} else {
-				const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-				const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-				return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
-			}
-		});
-
-		return unrolled;
-	}
-
 	let selectedIds = $state<string[]>([]);
 	let isBulkUpdatingStatus = $state(false);
 
@@ -580,8 +442,22 @@
 	const rawEvents = $derived(eventsRes?.data ?? []);
 	const displayedEvents = $derived(
 		displayMode === "unrolled"
-			? unrollEvents(rawEvents, excludePast, activeDateBounds.start, activeDateBounds.end)
-			: groupEvents(rawEvents),
+			? unrollSeriesEvents(rawEvents, {
+					sortField,
+					sortOrder,
+					excludePast,
+					rangeStart: activeDateBounds.start,
+					rangeEnd: activeDateBounds.end,
+					locationFilter: filterValues.locationId,
+					tagFilter: filterValues.tagId,
+				})
+			: groupSeriesEvents(rawEvents, {
+					sortField,
+					sortOrder,
+					excludePast,
+					rangeStart: activeDateBounds.start,
+					rangeEnd: activeDateBounds.end,
+				}),
 	);
 
 	const selectedEvents = $derived(
@@ -828,7 +704,8 @@
 					<div class="grid grid-cols-1 gap-5">
 				{#each displayedEvents as event (event.id)}
 					{@const upcomingInst = getUpcomingInstance(event)}
-					{@const displayDateEvent = (upcomingInst && !event.isSeriesInstance) ? {
+					{@const useUpcomingSummary = displayMode === "compacted" && Boolean(upcomingInst) && !event.isSeriesInstance}
+					{@const displayDateEvent = useUpcomingSummary && upcomingInst ? {
 						...event,
 						startDateTime: upcomingInst.startDateTime,
 						endDateTime: upcomingInst.endDateTime,
@@ -939,9 +816,9 @@
 										until: m.until(),
 										days_count: (c) => m.days_count({ count: c }),
 										loading: m.loading(),
-									})}
+									}, getLocale())}
 								</span>
-								{#if upcomingInst && !event.isSeriesInstance}
+								{#if useUpcomingSummary}
 									<span
 										class="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 shrink-0"
 										title={m.series_occurrence()}
@@ -1148,7 +1025,7 @@
 							{m.updated_on({
 								date: new Date(
 									event.updatedAt,
-								).toLocaleString([], {
+								).toLocaleString(getLocale(), {
 									year: "numeric",
 									month: "2-digit",
 									day: "2-digit",

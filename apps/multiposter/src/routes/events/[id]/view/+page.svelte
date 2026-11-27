@@ -74,7 +74,7 @@
     // Formatting helpers
     function formatDate(dateStr: string | null | undefined) {
         if (!dateStr) return "";
-        return new Date(dateStr).toLocaleDateString(undefined, {
+        return new Date(dateStr).toLocaleDateString(getLocale(), {
             weekday: "long",
             year: "numeric",
             month: "long",
@@ -84,7 +84,7 @@
 
     function formatTime(dateTimeStr: string | null | undefined) {
         if (!dateTimeStr) return "";
-        return new Date(dateTimeStr).toLocaleTimeString(undefined, {
+        return new Date(dateTimeStr).toLocaleTimeString(getLocale(), {
             hour: "2-digit",
             minute: "2-digit",
         });
@@ -138,13 +138,13 @@
         try {
             await navigator.clipboard.writeText(window.location.href);
             copiedLink = true;
-            toast.success("Link copied to clipboard");
+            toast.success(m.link_copied_to_clipboard());
             setTimeout(() => {
                 copiedLink = false;
             }, 2500);
         } catch (err) {
             console.error("Failed to copy link:", err);
-            toast.error("Failed to copy link");
+            toast.error(m.failed_to_copy_link());
         }
     }
 
@@ -504,9 +504,17 @@
                                                     ? formatDate(
                                                           event.startDateTime,
                                                       )
-                                                    : event.startDateTime
-                                                      ? `${formatDate(event.startDateTime)} at ${formatTime(event.startDateTime)}`
-                                                      : ""}
+                                                    : event.startDateTime && event.endDateTime
+                                                      ? m.event_date_from_time({
+                                                            date: formatDate(event.startDateTime),
+                                                            time: formatTime(event.startDateTime),
+                                                        })
+                                                      : event.startDateTime
+                                                        ? m.event_date_at_time({
+                                                              date: formatDate(event.startDateTime),
+                                                              time: formatTime(event.startDateTime),
+                                                          })
+                                                        : ""}
                                             </span>
                                             {#if event.endDateTime && event.startDateTime && new Date(event.startDateTime).toDateString() !== new Date(event.endDateTime).toDateString()}
                                                 <span
@@ -516,7 +524,10 @@
                                                         ? formatDate(
                                                               event.endDateTime,
                                                           )
-                                                        : `${formatDate(event.endDateTime)} at ${formatTime(event.endDateTime)}`}
+                                                        : m.event_date_at_time({
+                                                              date: formatDate(event.endDateTime),
+                                                              time: formatTime(event.endDateTime),
+                                                          })}
                                                 </span>
                                             {:else if event.endDateTime && !event.isAllDay}
                                                 <span
@@ -664,7 +675,7 @@
                                     <h3
                                         class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1.5"
                                     >
-                                        <Lock size={13} /> {m.internal_notes()} <span class="text-gray-400 font-normal">(Staff Only)</span>
+                                        <Lock size={13} /> {m.internal_notes()} <span class="text-gray-400 font-normal">({m.staff_only()})</span>
                                     </h3>
                                     <div class="prose prose-sm prose-amber max-w-none bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 text-amber-900 leading-relaxed">
                                         {@html event.internalNotes}
@@ -741,7 +752,7 @@
                                 {:else}
                                     <Copy size={16} />
                                 {/if}
-                                {copiedLink ? 'Link Copied' : 'Copy Link'}
+                                {copiedLink ? m.link_copied() : m.copy_link()}
                             </Button>
                         </div>
 

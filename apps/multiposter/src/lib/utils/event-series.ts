@@ -126,6 +126,24 @@ export interface SeriesOccurrenceItem {
 }
 
 /**
+ * Merges a series occurrence/exception onto a master event without letting
+ * `undefined` properties override master defaults, while ensuring explicit
+ * overrides (including `[]`, `0`, `false`, `""`, or `null`) take precedence.
+ */
+export function mergeOccurrenceWithMaster(master: any, inst: any): any {
+    const merged: Record<string, any> = master ? { ...master } : {};
+    if (inst && typeof inst === "object") {
+        for (const [key, value] of Object.entries(inst)) {
+            if (key === "instances" || key === "seriesMaster") continue;
+            if (value !== undefined) {
+                merged[key] = value;
+            }
+        }
+    }
+    return merged;
+}
+
+/**
  * Returns the complete chronological sequence of occurrences for a series master event,
  * explicitly including Occurrence #1 (the master event entry itself) along with any
  * child exceptions and projected virtual instances.
@@ -166,7 +184,7 @@ export function getAllSeriesOccurrences(masterEvent: any): SeriesOccurrenceItem[
                 summary: rootMaster.summary,
                 startDateTime: masterIso,
                 endDateTime: toIso(rootMaster.endDateTime),
-                status: rootMaster.status || 'published',
+                status: rootMaster.status || 'confirmed',
                 isMaster: true,
                 isSeriesMaster: true,
                 isSeriesInstance: false,
@@ -194,18 +212,19 @@ export function getAllSeriesOccurrences(masterEvent: any): SeriesOccurrenceItem[
         }
 
         occurrences.push({
-            ...masterEvent,
-            ...inst,
+            ...mergeOccurrenceWithMaster(rootMaster, inst),
             id: inst.id,
-            summary: inst.summary || masterEvent.summary,
+            summary: inst.summary || rootMaster.summary,
             startDateTime: instIso,
-            endDateTime: toIso(inst.endDateTime || masterEvent.endDateTime),
-            status: inst.status || masterEvent.status || 'published',
+            endDateTime: inst.endDateTime !== undefined
+                ? toIso(inst.endDateTime)
+                : (isVirtualInstanceId(inst.id) ? null : toIso(rootMaster.endDateTime)),
+            status: inst.status || rootMaster.status || 'confirmed',
             isMaster: false,
             isSeriesMaster: false,
             isSeriesInstance: true,
-            recurringEventId: masterEvent.id,
-            seriesMaster: masterEvent
+            recurringEventId: rootMaster.id,
+            seriesMaster: rootMaster
         });
         seenTimes.add(instTime);
         seenIds.add(inst.id);
@@ -339,5 +358,240 @@ export function getUpcomingOccurrence(
 
     // Return the latest occurrence if all are past, or the first one as fallback
     return occurrences[occurrences.length - 1] || occurrences[0] || null;
+}
+
+export interface SeriesListFilter {
+    include?: string[];
+    exclude?: string[];
+}
+
+export interface SeriesListOptions {
+    sortField?: "updatedAt" | "startDateTime" | "createdAt";
+    sortOrder?: "asc" | "desc";
+    excludePast?: boolean;
+    rangeStart?: Date | null;
+    rangeEnd?: Date | null;
+    now?: Date;
+    locationFilter?: SeriesListFilter;
+    tagFilter?: SeriesListFilter;
+}
+
+function getOccurrenceLocationIds(item: any): Set<string> {
+    const ids = new Set<string>();
+    for (const l of item?.locations || []) {
+        const id = l?.id || l?.locationId || l?.location?.id;
+        if (id) ids.add(String(id));
+    }
+    for (const r of item?.resources || []) {
+        const res = r?.resource || r;
+        const id = r?.locationId || res?.locationId || res?.location?.id;
+        if (id) ids.add(String(id));
+    }
+    for (const id of item?.locationIds || []) {
+        if (id) ids.add(String(id));
+    }
+    return ids;
+}
+
+function getOccurrenceTagIds(item: any): Set<string> {
+    const ids = new Set<string>();
+    for (const t of item?.tags || []) {
+        const id = typeof t === "string" ? t : t?.id || t?.tag?.id || t?.tagId;
+        if (id) ids.add(String(id));
+    }
+    for (const id of item?.tagIds || []) {
+        if (id) ids.add(String(id));
+    }
+    return ids;
+}
+
+function matchesIncludeExcludeFilter(ids: Set<string>, filter?: SeriesListFilter): boolean {
+    if (!filter) return true;
+    const exclude = filter.exclude || [];
+    const include = filter.include || [];
+    if (exclude.length > 0 && exclude.some((ex) => ids.has(ex))) {
+        return false;
+    }
+    if (include.length > 0) {
+        return include.some((inc) => ids.has(inc));
+    }
+    return true;
+}
+
+/**
+ * Groups flat event rows (masters + child exceptions) into master cards with sorted `instances`,
+ * preserving hydrated child exception properties over slim `master.instances` stubs.
+ */
+export function groupSeriesEvents(rawEvents: any[], options: SeriesListOptions = {}): any[] {
+    const sortField = options.sortField || "updatedAt";
+    const sortOrder = options.sortOrder || "desc";
+
+    const grouped = rawEvents
+        .filter((e: any) => !e.recurringEventId)
+        .map((master: any) => {
+            const existingInstances = master.instances || [];
+            const rawChildInstances = rawEvents.filter((e: any) => e.recurringEventId === master.id);
+            const rawChildById = new Map<string, any>(rawChildInstances.map((child: any) => [child.id, child]));
+
+            const combined: any[] = existingInstances.map((inst: any) => {
+                const hydrated = rawChildById.get(inst.id);
+                return hydrated ? { ...inst, ...hydrated } : inst;
+            });
+            const existingIds = new Set(combined.map((i: any) => i.id));
+            for (const child of rawChildInstances) {
+                if (!existingIds.has(child.id)) {
+                    combined.push(child);
+                    existingIds.add(child.id);
+                }
+            }
+            combined.sort((a: any, b: any) => {
+                const dateA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+                const dateB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+                return dateA - dateB;
+            });
+            return {
+                ...master,
+                instances: combined,
+                ...(master.seriesMaster
+                    ? { seriesMaster: { ...master.seriesMaster, instances: combined } }
+                    : {})
+            };
+        });
+
+    if (sortField === "startDateTime") {
+        grouped.sort((a: any, b: any) => {
+            const occA = getUpcomingOccurrence(a, {
+                now: options.now,
+                excludePast: options.excludePast,
+                rangeStart: options.rangeStart,
+                rangeEnd: options.rangeEnd,
+            });
+            const occB = getUpcomingOccurrence(b, {
+                now: options.now,
+                excludePast: options.excludePast,
+                rangeStart: options.rangeStart,
+                rangeEnd: options.rangeEnd,
+            });
+            const timeA = occA?.startDateTime
+                ? new Date(occA.startDateTime).getTime()
+                : (a.startDateTime ? new Date(a.startDateTime).getTime() : 0);
+            const timeB = occB?.startDateTime
+                ? new Date(occB.startDateTime).getTime()
+                : (b.startDateTime ? new Date(b.startDateTime).getTime() : 0);
+            return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+        });
+    } else if (sortField === "createdAt") {
+        grouped.sort((a: any, b: any) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+        });
+    } else {
+        grouped.sort((a: any, b: any) => {
+            const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+        });
+    }
+
+    return grouped;
+}
+
+/**
+ * Unrolls recurring series into individual occurrence cards, keeping each materialized
+ * exception's own fields (rooms, resources, locations, tags, prep/teardown, timestamps, etc.)
+ * instead of overwriting them with master series properties.
+ */
+export function unrollSeriesEvents(rawEvents: any[], options: SeriesListOptions = {}): any[] {
+    const sortField = options.sortField || "updatedAt";
+    const sortOrder = options.sortOrder || "desc";
+    const isExcludePast = Boolean(options.excludePast);
+    const rangeStart = options.rangeStart ?? null;
+    const rangeEnd = options.rangeEnd ?? null;
+
+    const grouped = groupSeriesEvents(rawEvents, options);
+    const unrolled: any[] = [];
+    const now = options.now ? new Date(options.now) : new Date();
+    now.setHours(0, 0, 0, 0);
+    const hasDateRange = Boolean(rangeStart || rangeEnd);
+
+    for (const master of grouped) {
+        const isSeries = Boolean(
+            master.isSeriesInstance ||
+            master.isSeries ||
+            master.recurringEventId ||
+            master.seriesId ||
+            (master.recurrence && master.recurrence.length > 0) ||
+            (master.instances && master.instances.length > 0)
+        );
+        if (!isSeries) {
+            if (
+                hasDateRange &&
+                !doesOccurrenceOverlapRange(master.startDateTime, master.endDateTime, rangeStart, rangeEnd)
+            ) {
+                continue;
+            }
+            if (!matchesIncludeExcludeFilter(getOccurrenceLocationIds(master), options.locationFilter)) {
+                continue;
+            }
+            if (!matchesIncludeExcludeFilter(getOccurrenceTagIds(master), options.tagFilter)) {
+                continue;
+            }
+            unrolled.push(master);
+        } else {
+            const occurrences = getAllSeriesOccurrences(master);
+            for (const occ of occurrences) {
+                if (isExcludePast) {
+                    const iStart = occ.startDateTime ? new Date(occ.startDateTime) : null;
+                    const iEnd = occ.endDateTime ? new Date(occ.endDateTime) : null;
+                    const isFuture = (iStart ? iStart >= now : false) || (iEnd ? iEnd >= now : false);
+                    if (!isFuture) continue;
+                }
+                if (
+                    hasDateRange &&
+                    !doesOccurrenceOverlapRange(occ.startDateTime, occ.endDateTime, rangeStart, rangeEnd)
+                ) {
+                    continue;
+                }
+                if (!matchesIncludeExcludeFilter(getOccurrenceLocationIds(occ), options.locationFilter)) {
+                    continue;
+                }
+                if (!matchesIncludeExcludeFilter(getOccurrenceTagIds(occ), options.tagFilter)) {
+                    continue;
+                }
+                unrolled.push({
+                    ...mergeOccurrenceWithMaster(master, occ),
+                    id: occ.id,
+                    summary: occ.summary || master.summary,
+                    startDateTime: occ.startDateTime,
+                    endDateTime: occ.endDateTime,
+                    status: occ.status || master.status,
+                    isSeriesInstance: !occ.isMaster,
+                    isSeriesMaster: Boolean(occ.isMaster),
+                    recurringEventId: occ.isMaster ? null : master.id,
+                    seriesMaster: master,
+                    instances: master.instances,
+                });
+            }
+        }
+    }
+
+    unrolled.sort((a: any, b: any) => {
+        if (sortField === "startDateTime") {
+            const timeA = a.startDateTime ? new Date(a.startDateTime).getTime() : 0;
+            const timeB = b.startDateTime ? new Date(b.startDateTime).getTime() : 0;
+            return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+        } else if (sortField === "createdAt") {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+        } else {
+            const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            return sortOrder === "desc" ? timeB - timeA : timeA - timeB;
+        }
+    });
+
+    return unrolled;
 }
 

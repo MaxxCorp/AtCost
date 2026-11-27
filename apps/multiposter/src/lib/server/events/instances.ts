@@ -10,6 +10,7 @@ export interface SeriesInstanceItem {
 	signUpClosureDate?: string | null;
 	status?: string | null;
 	isPublic?: boolean;
+	[key: string]: any;
 }
 
 export interface SeriesMasterSummary {
@@ -50,6 +51,7 @@ export async function getSeriesInstances(
 		signUpMode?: string | null;
 		signUpClosureDate?: Date | string | null;
 		signUpRecurrence?: string[] | null;
+		status?: string | null;
 	},
 	maxProjected: number = 100,
 	options: { publicOnly?: boolean } = {}
@@ -139,7 +141,7 @@ export async function getSeriesInstances(
 					startDateTime: p.date.toISOString(),
 					endDateTime: p.end ? p.end.toISOString() : null,
 					signUpClosureDate: toIsoSafe(resolveClosureDate(p.date)),
-					status: 'published',
+					status: master.status || 'confirmed',
 					isPublic: master.isPublic !== false,
 				});
 				existingTimes.add(pTime);
@@ -160,7 +162,7 @@ export async function getSeriesInstances(
 export async function populateSeriesInstances(
 	events: any[],
 	maxProjected: number = 100,
-	options: { publicOnly?: boolean; rangeStart?: Date | null; rangeEnd?: Date | null } = {}
+	options: { publicOnly?: boolean; rangeStart?: Date | null; rangeEnd?: Date | null; hydratedInstancesById?: Map<string, any> } = {}
 ): Promise<void> {
 	if (!events || events.length === 0) return;
 
@@ -223,15 +225,19 @@ export async function populateSeriesInstances(
 			? fetchedInstances.filter((inst: any) => inst.isPublic === true)
 			: fetchedInstances;
 
-		const instances: SeriesInstanceItem[] = visibleDbInstances.map((inst: any) => ({
-			id: inst.id,
-			summary: inst.summary,
-			startDateTime: toIsoSafe(inst.startDateTime),
-			endDateTime: toIsoSafe(inst.endDateTime),
-			signUpClosureDate: toIsoSafe(inst.signUpClosureDate),
-			status: inst.status,
-			isPublic: Boolean(inst.isPublic),
-		}));
+		const instances: SeriesInstanceItem[] = visibleDbInstances.map((inst: any) => {
+			const hydrated = options.hydratedInstancesById?.get(inst.id);
+			const base: SeriesInstanceItem = {
+				id: inst.id,
+				summary: inst.summary,
+				startDateTime: toIsoSafe(inst.startDateTime),
+				endDateTime: toIsoSafe(inst.endDateTime),
+				signUpClosureDate: toIsoSafe(inst.signUpClosureDate),
+				status: inst.status,
+				isPublic: Boolean(inst.isPublic),
+			};
+			return hydrated ? { ...hydrated, ...base } : base;
+		});
 
 		const rec: any = master.recurrence;
 		let rruleStr: string | null = null;
@@ -350,7 +356,7 @@ export async function populateSeriesInstances(
 						startDateTime: p.date.toISOString(),
 						endDateTime: p.end ? p.end.toISOString() : null,
 						signUpClosureDate: toIsoSafe(resolveClosureDate(p.date)),
-						status: 'published',
+						status: master.status || 'confirmed',
 						isPublic: master.isPublic !== false,
 					});
 					existingTimes.add(pTime);

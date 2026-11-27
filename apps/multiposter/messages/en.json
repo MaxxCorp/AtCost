@@ -1278,5 +1278,12 @@
 	"filter_date_today": "Today",
 	"filter_date_this_week": "This week",
 	"filter_date_this_month": "This month",
-	"filter_date_clear": "Clear date filter"
+	"filter_date_clear": "Clear date filter",
+	"event_date_from_time": "{date} from {time}",
+	"event_date_at_time": "{date} at {time}",
+	"copy_link": "Copy Link",
+	"link_copied": "Link Copied",
+	"link_copied_to_clipboard": "Link copied to clipboard",
+	"failed_to_copy_link": "Failed to copy link",
+	"staff_only": "Staff Only"
 }

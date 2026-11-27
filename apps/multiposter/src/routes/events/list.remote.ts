@@ -363,7 +363,9 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 	}
 
 	if (includedEventIds && includedEventIds.length > 0) {
-		const explicitInclusion = inArray(event.id, includedEventIds);
+		const explicitInclusion = includeSeriesEntries
+			? or(inArray(event.id, includedEventIds), inArray(event.recurringEventId, includedEventIds))
+			: inArray(event.id, includedEventIds);
 		if (conditionalFilters.length > 0 || conditions.length > (!isAuthorized ? 3 : (includeSeriesEntries ? 0 : 1))) {
 			const standardFilters = and(...conditions, ...conditionalFilters);
 			conditions.length = 0;
@@ -1088,7 +1090,7 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 		});
 	}
 
-	let data = results.map((e: any) => {
+	const mapRawEvent = (e: any) => {
 		const evtLocations = (e.locations?.map((l: any) => l.location).filter(Boolean) || []).map((loc: any) => ({
 			...loc,
 			locationContacts: locationContactsMap.get(loc.id) || []
@@ -1189,14 +1191,29 @@ export const listEvents = query(PaginationSchema, async (input: v.InferOutput<ty
 			resolvedContact,
 			resolvedSignUpContact,
 		};
-	});
+	};
+
+	let data = results.map(mapRawEvent);
+
+	let hydratedInstancesById: Map<string, any> | undefined;
+	if (!includeSeriesEntries) {
+		hydratedInstancesById = new Map<string, any>();
+		for (const rawItem of rawResults) {
+			if (!rawItem.recurringEventId) continue;
+			const mapped = mapRawEvent(rawItem);
+			const safeMapped = isAuthorized ? mapped : sanitizePublicEvent(mapped);
+			if (safeMapped) {
+				hydratedInstancesById.set(rawItem.id, safeMapped);
+			}
+		}
+	}
 
 	await populateSeriesInstances(
 		data,
 		100,
 		useDateFilteredPagination
-			? { publicOnly: !isAuthorized, rangeStart: effectiveFilterStart, rangeEnd: validEndD }
-			: { publicOnly: !isAuthorized }
+			? { publicOnly: !isAuthorized, rangeStart: effectiveFilterStart, rangeEnd: validEndD, hydratedInstancesById }
+			: { publicOnly: !isAuthorized, hydratedInstancesById }
 	);
 
 	if (!isAuthorized) {

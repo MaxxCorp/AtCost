@@ -3,6 +3,7 @@ import { formatRecurrenceText, type FormatRecurrenceOptions } from "./format-rec
 import { isSeriesItem, getSeriesRootId } from "./event-series.js";
 import { getNextWeekRange, getThisWeekRange, getNextMonthRange, getThisMonthRange } from "./kiosk-dates.js";
 import * as m from "#lib/paraglide/messages.js";
+import { getLocale } from "#lib/paraglide/runtime.js";
 
 export type SeriesInstanceInfo = {
     id: string;
@@ -175,49 +176,55 @@ export function getBucketKey(date: Date, smallest: "day" | "week" | "month" | "n
     return "all";
 }
 
-export function formatDateDay(dateStr: string | null | undefined): string {
+export function formatDateDay(dateStr: string | null | undefined, locale?: string): string {
     if (!dateStr) return "--";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? "--" : d.toLocaleDateString(undefined, { day: '2-digit' });
+    const loc = locale || getLocale() || undefined;
+    return isNaN(d.getTime()) ? "--" : d.toLocaleDateString(loc, { day: '2-digit' });
 }
 
-export function formatDateMonth(dateStr: string | null | undefined): string {
+export function formatDateMonth(dateStr: string | null | undefined, locale?: string): string {
     if (!dateStr) return "---";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? "---" : d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+    const loc = locale || getLocale() || undefined;
+    return isNaN(d.getTime()) ? "---" : d.toLocaleDateString(loc, { month: 'short' }).toUpperCase();
 }
 
-export function formatDateWeekday(dateStr: string | null | undefined): string {
+export function formatDateWeekday(dateStr: string | null | undefined, locale?: string): string {
     if (!dateStr) return "";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { weekday: 'short' });
+    const loc = locale || getLocale() || undefined;
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(loc, { weekday: 'short' });
 }
 
-export function formatTime(dateStr: string | null | undefined): string {
+export function formatTime(dateStr: string | null | undefined, locale?: string): string {
     if (!dateStr) return "";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? "" : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const loc = locale || getLocale() || undefined;
+    return isNaN(d.getTime()) ? "" : d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
 }
 
-export function formatTimeRange(startStr?: string | null, endStr?: string | null, isAllDay = false, showEndTime = true): string {
+export function formatTimeRange(startStr?: string | null, endStr?: string | null, isAllDay = false, showEndTime = true, locale?: string): string {
     if (isAllDay) return m.all_day_label?.() || "All Day";
     if (!startStr) return "";
     const start = new Date(startStr);
     if (isNaN(start.getTime())) return "";
-    const startFormatted = start.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    const loc = locale || getLocale() || undefined;
+    const startFormatted = start.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
 
     if (!endStr || !showEndTime) return startFormatted;
     const end = new Date(endStr);
     if (isNaN(end.getTime())) return startFormatted;
-    const endFormatted = end.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    const endFormatted = end.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
 
     return `${startFormatted} – ${endFormatted}`;
 }
 
-export function formatFullDate(dateStr: string | null | undefined): string {
+export function formatFullDate(dateStr: string | null | undefined, locale?: string): string {
     if (!dateStr) return "";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, {
+    const loc = locale || getLocale() || undefined;
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(loc, {
         weekday: 'short',
         year: 'numeric',
         month: 'short',

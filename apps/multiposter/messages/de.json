@@ -1278,5 +1278,12 @@
 	"filter_date_today": "Heute",
 	"filter_date_this_week": "Diese Woche",
 	"filter_date_this_month": "Dieser Monat",
-	"filter_date_clear": "Datumsfilter zurücksetzen"
+	"filter_date_clear": "Datumsfilter zurücksetzen",
+	"event_date_from_time": "{date} von {time}",
+	"event_date_at_time": "{date} um {time}",
+	"copy_link": "Link kopieren",
+	"link_copied": "Link kopiert",
+	"link_copied_to_clipboard": "Link in die Zwischenablage kopiert",
+	"failed_to_copy_link": "Link konnte nicht kopiert werden",
+	"staff_only": "Nur für Mitarbeitende"
 }

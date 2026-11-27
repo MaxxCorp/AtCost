@@ -346,6 +346,29 @@ export function isPublicEvent(event: any): boolean {
  */
 export function sanitizePublicSeriesInstance(inst: any): any | null {
 	if (!inst || inst.isPublic === false) return null;
+	const hasLocations = Array.isArray(inst.locations);
+	const hasResources = Array.isArray(inst.resources);
+	const hasTags = Array.isArray(inst.tags);
+
+	const publicLocations = hasLocations ? filterPublicLocations(inst.locations) : undefined;
+	const publicResources = hasResources
+		? inst.resources
+				.map((r: any) => r?.resource || r)
+				.filter((res: any) => Boolean(res && (!res.location || res.location.isPublic !== false)))
+				.map((res: any) => ({
+					id: res.id,
+					name: res.name,
+					type: res.type,
+					locationId: res.location?.isPublic === false ? null : (res.locationId ?? null),
+					maxOccupancy: res.maxOccupancy ?? null
+				}))
+		: undefined;
+	const publicTags = hasTags ? filterPublicTags(inst.tags) : undefined;
+	const rooms =
+		hasLocations || hasResources
+			? getEventRooms({ locations: publicLocations ?? [], resources: publicResources ?? [] })
+			: undefined;
+
 	return {
 		id: inst.id,
 		summary: inst.summary,
@@ -357,7 +380,29 @@ export function sanitizePublicSeriesInstance(inst: any): any | null {
 		isPublic: true,
 		isVirtual: Boolean(inst.isVirtual),
 		isException: Boolean(inst.isException),
-		recurringEventId: inst.recurringEventId ?? null
+		recurringEventId: inst.recurringEventId ?? null,
+		...(inst.prepMinutes !== undefined ? { prepMinutes: inst.prepMinutes } : {}),
+		...(inst.teardownMinutes !== undefined ? { teardownMinutes: inst.teardownMinutes } : {}),
+		...(publicLocations !== undefined
+			? {
+					locations: publicLocations,
+					locationId: publicLocations[0]?.id ?? null,
+					locationIds: publicLocations.map((l: any) => l.id)
+				}
+			: {}),
+		...(publicResources !== undefined
+			? {
+					resources: publicResources,
+					resourceIds: publicResources.map((r: any) => r.id)
+				}
+			: {}),
+		...(rooms !== undefined ? { rooms } : {}),
+		...(publicTags !== undefined
+			? {
+					tags: publicTags,
+					tagIds: publicTags.map((t) => t.id).filter(Boolean)
+				}
+			: {})
 	};
 }
 
