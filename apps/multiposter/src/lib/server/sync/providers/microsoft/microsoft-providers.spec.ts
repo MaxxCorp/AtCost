@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { db } from '@ac/db';
-import { MicrosoftGraphClient } from './client';
+import { MicrosoftGraphClient, hasMicrosoftAppCredentials } from './client';
 import { MicrosoftContactsProvider } from './contacts';
 import { MicrosoftResourceProvider } from './resources';
 
@@ -708,6 +708,141 @@ describe('Microsoft Sync Suite', () => {
 			expect(body.recurrence.pattern.type).toBe('weekly');
 			expect(body.recurrence.range.numberOfOccurrences).toBe(5);
 			expect(body.recurrence.range.recurrenceTimeZone).toBe('Europe/Berlin');
+		});
+
+		it('should ignore same-event legacy attendee copy in calendarView and create padded direct booking', async () => {
+			(provider as any).config = {
+				id: 'cfg-res-1',
+				userId: 'user-1',
+				providerId: 'microsoft-resources',
+				providerType: 'microsoft-resources',
+				direction: 'push',
+				enabled: true,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			(db.select as any).mockReturnValueOnce({
+				from: vi.fn().mockReturnValueOnce({
+					where: vi.fn().mockResolvedValueOnce([])
+				})
+			});
+			const mockInsertValues = vi.fn().mockResolvedValueOnce([]);
+			(db.insert as any).mockReturnValueOnce({ values: mockInsertValues });
+
+			const makeRequestMock = vi.fn()
+				.mockResolvedValueOnce({
+					value: [
+						{
+							scheduleId: 'bhs147@ballev.onmicrosoft.com',
+							scheduleItems: [
+								{
+									status: 'busy',
+									start: { dateTime: '2026-11-10T10:00:00', timeZone: 'UTC' },
+									end: { dateTime: '2026-11-10T12:30:00', timeZone: 'UTC' }
+								}
+							]
+						}
+					]
+				})
+				.mockResolvedValueOnce({
+					value: [
+						{
+							id: 'legacy-attendee-copy',
+							subject: 'Event',
+							showAs: 'busy',
+							transactionId: 'evt-legacy-1',
+							start: { dateTime: '2026-11-10T10:00:00', timeZone: 'UTC' },
+							end: { dateTime: '2026-11-10T12:30:00', timeZone: 'UTC' }
+						}
+					]
+				})
+				.mockResolvedValueOnce({ id: 'direct-padded-1' });
+			(provider as any).client.makeRequest = makeRequestMock;
+
+			const res = await provider.bookRoom({
+				eventId: 'evt-legacy-1',
+				resourceId: 'res-bhs147',
+				roomEmail: 'bhs147@ballev.onmicrosoft.com',
+				roomName: 'BHS.1.47',
+				summary: 'Workshop',
+				start: new Date('2026-11-10T09:00:00Z'),
+				end: new Date('2026-11-10T13:30:00Z')
+			});
+
+			expect(res.success).toBe(true);
+			expect(res.bookingId).toBe('direct-padded-1');
+			expect(mockInsertValues).toHaveBeenCalledWith(expect.objectContaining({
+				externalId: 'direct-padded-1',
+				eventId: 'evt-legacy-1',
+				resourceId: 'res-bhs147'
+			}));
+		});
+
+		it('should prefer App Credentials in auto mode for microsoft-resources even without mailboxEmail', async () => {
+			const resClient = new MicrosoftGraphClient();
+			const acquireAppTokenSpy = vi.spyOn(resClient as any, 'acquireAppToken').mockImplementation(async () => {
+				(resClient as any).accessToken = 'app-token-123';
+				return 'app-token-123';
+			});
+
+			await resClient.initialize({
+				id: 'cfg-res-auto',
+				userId: 'user-1',
+				providerId: 'microsoft-resources',
+				providerType: 'microsoft-resources',
+				direction: 'push',
+				enabled: true,
+				credentials: {
+					tenantId: 'tenant-1',
+					clientId: 'client-1',
+					clientSecret: 'secret-1'
+				},
+				settings: {
+					authMode: 'auto'
+				},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			});
+
+			expect(acquireAppTokenSpy).toHaveBeenCalledTimes(1);
+			expect(resClient.getAuthModeUsed()).toBe('app');
+		});
+
+		it('hasMicrosoftAppCredentials validates credentials and respects authMode=user', () => {
+			expect(hasMicrosoftAppCredentials({
+				id: 'cfg-1',
+				userId: 'user-1',
+				providerId: 'microsoft-calendar',
+				providerType: 'microsoft-calendar',
+				direction: 'push',
+				enabled: true,
+				credentials: {
+					tenantId: 't-1',
+					clientId: 'c-1',
+					clientSecret: 's-1'
+				},
+				settings: { authMode: 'auto' },
+				createdAt: new Date(),
+				updatedAt: new Date()
+			})).toBe(true);
+
+			expect(hasMicrosoftAppCredentials({
+				id: 'cfg-2',
+				userId: 'user-1',
+				providerId: 'microsoft-calendar',
+				providerType: 'microsoft-calendar',
+				direction: 'push',
+				enabled: true,
+				credentials: {
+					tenantId: 't-1',
+					clientId: 'c-1',
+					clientSecret: 's-1'
+				},
+				settings: { authMode: 'user' },
+				createdAt: new Date(),
+				updatedAt: new Date()
+			})).toBe(false);
 		});
 	});
 });

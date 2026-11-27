@@ -1,5 +1,6 @@
 export {
 	MicrosoftGraphClient,
+	hasMicrosoftAppCredentials,
 	type MicrosoftTargetTestResult,
 	type MicrosoftRoom,
 	type RoomAvailabilityResult,

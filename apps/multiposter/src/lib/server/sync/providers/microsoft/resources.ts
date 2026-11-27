@@ -160,8 +160,9 @@ export class MicrosoftResourceProvider implements SyncProvider {
 		start: Date,
 		end: Date,
 		ignoreExternalIds: Set<string>,
-		ignoreTransactionId?: string
-	): Promise<{ isAvailable: boolean; conflictMessage?: string; matchedExternalId?: string }> {
+		ignoreTransactionId?: string,
+		ignoreEventTransactionId?: string
+	): Promise<{ isAvailable: boolean; verified: boolean; conflictMessage?: string; matchedExternalId?: string }> {
 		try {
 			const url =
 				`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(roomEmail)}/calendarView` +
@@ -195,21 +196,25 @@ export class MicrosoftResourceProvider implements SyncProvider {
 					if (e.id) matchedExternalId = e.id;
 					continue;
 				}
+				if (ignoreEventTransactionId && e.transactionId === ignoreEventTransactionId) {
+					continue;
+				}
 				conflicts.push(e);
 			}
 
 			if (conflicts.length > 0) {
 				return {
 					isAvailable: false,
+					verified: true,
 					matchedExternalId,
 					conflictMessage: `Room has ${conflicts.length} conflict(s) (${conflicts.map((c) => `${c.subject || 'Busy'}: ${c.start?.dateTime || ''} - ${c.end?.dateTime || ''}`).join(', ')})`
 				};
 			}
 
-			return { isAvailable: true, matchedExternalId };
+			return { isAvailable: true, verified: true, matchedExternalId };
 		} catch (err: any) {
 			console.warn(`[MicrosoftResourceProvider] calendarView conflict check warning for ${roomEmail}:`, err?.message || err);
-			return { isAvailable: true };
+			return { isAvailable: true, verified: false };
 		}
 	}
 
@@ -374,7 +379,8 @@ export class MicrosoftResourceProvider implements SyncProvider {
 					start,
 					end,
 					new Set([existingMapping.externalId]),
-					transactionId
+					transactionId,
+					eventId
 				);
 
 				if (!avail.isAvailable) {
@@ -434,11 +440,12 @@ export class MicrosoftResourceProvider implements SyncProvider {
 							start,
 							end,
 							new Set(),
-							transactionId
+							transactionId,
+							eventId
 						);
 						if (selfCheck.isAvailable && selfCheck.matchedExternalId) {
 							matchedExternalId = selfCheck.matchedExternalId;
-						} else {
+						} else if (!(selfCheck.isAvailable && selfCheck.verified)) {
 							return {
 								success: false,
 								status: 'conflict',

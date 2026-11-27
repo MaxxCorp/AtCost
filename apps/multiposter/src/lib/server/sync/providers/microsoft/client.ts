@@ -11,12 +11,23 @@ import { formatLocal, parseGraphDateTime } from './recurrence';
 export interface MicrosoftClientConfig {
 	userId?: string;
 	authMode?: 'auto' | 'app' | 'user';
+	preferAppAuth?: boolean;
 	tenantId?: string;
 	clientId?: string;
 	clientSecret?: string;
 	mailboxEmail?: string;
 	calendarId?: string;
 	folderId?: string;
+}
+
+export function hasMicrosoftAppCredentials(config?: SyncConfig): boolean {
+	const settings = config?.settings || {};
+	const credentials = config?.credentials || {};
+	if (settings.authMode === 'user') return false;
+	const tenantId = credentials.tenantId || settings.tenantId || MICROSOFT_TENANT_ID;
+	const clientId = credentials.clientId || settings.clientId || MICROSOFT_CLIENT_ID;
+	const clientSecret = credentials.clientSecret || settings.clientSecret || MICROSOFT_CLIENT_SECRET;
+	return Boolean(tenantId && clientId && clientSecret);
 }
 
 export interface MicrosoftTargetTestResult {
@@ -102,6 +113,7 @@ export class MicrosoftGraphClient {
 			this.config = {
 				userId: syncConfig.userId,
 				authMode: (settings.authMode as any) || 'auto',
+				preferAppAuth: syncConfig.providerType === 'microsoft-resources',
 				tenantId: credentials.tenantId || settings.tenantId || MICROSOFT_TENANT_ID,
 				clientId: credentials.clientId || settings.clientId || MICROSOFT_CLIENT_ID,
 				clientSecret: credentials.clientSecret || settings.clientSecret || MICROSOFT_CLIENT_SECRET,
@@ -151,8 +163,8 @@ export class MicrosoftGraphClient {
 		// Determine preferred token mode
 		let tryAppFirst = mode === 'app';
 		if (mode === 'auto') {
-			// If targeting a detached/shared mailbox or places API and we have app credentials, try App Credentials first
-			if (hasTargetMailbox && hasAppCredentials) {
+			// If targeting a detached/shared mailbox or microsoft-resources and we have app credentials, try App Credentials first
+			if ((hasTargetMailbox || this.config.preferAppAuth) && hasAppCredentials) {
 				tryAppFirst = true;
 			}
 		}

@@ -53,7 +53,8 @@ import { GoogleCalendarProvider } from './providers/google-calendar';
 import {
 	MicrosoftCalendarProvider,
 	MicrosoftContactsProvider,
-	MicrosoftResourceProvider
+	MicrosoftResourceProvider,
+	hasMicrosoftAppCredentials
 } from './providers/microsoft/index.js';
 import { BerlinDeMainCalendarProvider } from './providers/berlin-de-main-calendar';
 import { BerlinDeMhCalendarProvider } from './providers/berlin-de-mh-calendar';
@@ -1960,6 +1961,29 @@ export class SyncService {
 	}
 
 	/**
+	 * Determines whether room bookings for a sync config will be managed directly on the room
+	 * calendars (via an active microsoft-resources config or microsoft-calendar with app credentials).
+	 */
+	private async canUseDirectMicrosoftRoomBooking(
+		config?: SyncConfig,
+		batchContext?: SyncBatchContext
+	): Promise<boolean> {
+		if (await this.hasActiveMicrosoftResourcesConfig(batchContext)) {
+			return true;
+		}
+		if (config?.providerType !== 'microsoft-calendar') {
+			return false;
+		}
+		const plainCredentials = config.credentials
+			? await decryptSyncCredentials(config.credentials)
+			: undefined;
+		return hasMicrosoftAppCredentials({
+			...config,
+			credentials: plainCredentials
+		});
+	}
+
+	/**
 	 * Map internal event to external event format
 	 */
 	private async mapInternalToExternal(
@@ -2400,7 +2424,7 @@ export class SyncService {
 			includeRoomBookings &&
 			attendees.some((a) => a.type === 'resource')
 		) {
-			roomBookingsManagedByResourceProvider = await this.hasActiveMicrosoftResourcesConfig(batchContext);
+			roomBookingsManagedByResourceProvider = await this.canUseDirectMicrosoftRoomBooking(config, batchContext);
 		}
 
 		return {
@@ -2866,7 +2890,7 @@ export class SyncService {
 		let mapping: typeof syncMappingTable.$inferSelect | undefined;
 		if (!isVirtual) {
 			const mappingWhere = entityType === 'event'
-				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id), isNull(syncMappingTable.resourceId))
 				: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
 
 			const [m] = await db
@@ -3052,7 +3076,7 @@ export class SyncService {
 		let legacyMapping: typeof syncMappingTable.$inferSelect | undefined;
 		if (!isVirtual) {
 			const mappingWhere = entityType === 'event'
-				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+				? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id), isNull(syncMappingTable.resourceId))
 				: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
 
 			const [lm] = await db.select().from(syncMappingTable).where(mappingWhere);
@@ -3200,47 +3224,52 @@ export class SyncService {
 				return;
 			}
 
-			const rawConfigs = await db
-				.select()
-				.from(syncConfigTable)
-				.where(eq(syncConfigTable.providerType, 'microsoft-resources'));
-
-			const validConfigs = (Array.isArray(rawConfigs) ? rawConfigs : []).filter(
-				(c) => c && c.providerType === 'microsoft-resources'
-			);
-			if (validConfigs.length === 0) return;
-
-			const configMap = new Map(validConfigs.map((c) => [c.id, this.rowToConfig(c)]));
-			const conditions = [
-				eq(syncMappingTable.eventId, eventId),
-				inArray(syncMappingTable.syncConfigId, Array.from(configMap.keys()))
-			];
+			const mappingConditions = [eq(syncMappingTable.eventId, eventId)];
 			if (resourceId) {
-				conditions.push(eq(syncMappingTable.resourceId, resourceId));
+				mappingConditions.push(eq(syncMappingTable.resourceId, resourceId));
 			} else {
-				conditions.push(isNotNull(syncMappingTable.resourceId));
+				mappingConditions.push(isNotNull(syncMappingTable.resourceId));
 			}
 
 			const rawMappings = await db
 				.select()
 				.from(syncMappingTable)
-				.where(and(...conditions));
+				.where(and(...mappingConditions));
 
 			const mappings = (Array.isArray(rawMappings) ? rawMappings : []).filter(
-				(m) => m && m.id && m.syncConfigId && (m.resourceId || m.providerId === 'microsoft-resources')
+				(m) => m && m.id && m.syncConfigId && m.resourceId && m.externalId !== undefined
 			);
 			if (mappings.length === 0) return;
 
+			const uniqueConfigIds = Array.from(new Set(mappings.map((m) => m.syncConfigId)));
+			const rawConfigs = await db
+				.select()
+				.from(syncConfigTable)
+				.where(inArray(syncConfigTable.id, uniqueConfigIds));
+
+			const validConfigs = (Array.isArray(rawConfigs) ? rawConfigs : []).filter(
+				(c) => c && (c.providerType === 'microsoft-resources' || c.providerType === 'microsoft-calendar')
+			);
+			if (validConfigs.length === 0) return;
+
+			const configMap = new Map(validConfigs.map((c) => [c.id, this.rowToConfig(c)]));
 			const providerCache = new Map<string, any>();
 
 			for (const m of mappings) {
 				const cfg = configMap.get(m.syncConfigId);
 				if (!cfg) continue;
 
+				if (cfg.providerType !== 'microsoft-resources' && m.providerId !== 'microsoft-resources') {
+					continue;
+				}
+
 				let provider = providerCache.get(cfg.id);
 				if (!provider) {
 					try {
-						provider = await this.getProviderInstance(cfg);
+						const resCfg: SyncConfig = cfg.providerType === 'microsoft-resources'
+							? cfg
+							: { ...cfg, providerType: 'microsoft-resources' as ProviderType };
+						provider = await this.getProviderInstance(resCfg);
 						providerCache.set(cfg.id, provider);
 					} catch (initErr) {
 						console.warn(`[SyncService] Failed to initialize provider ${cfg.id} for room release:`, initErr);
@@ -3294,18 +3323,30 @@ export class SyncService {
 					eq(syncConfigTable.providerType, 'microsoft-resources')
 				));
 
-			const resourceConfigs = (Array.isArray(rawResourceConfigs) ? rawResourceConfigs : []).filter(
-				(r) => r && r.providerType === 'microsoft-resources'
-			);
+			let targetConfigs: Array<typeof syncConfigTable.$inferSelect | SyncConfig> = (
+				Array.isArray(rawResourceConfigs) ? rawResourceConfigs : []
+			).filter((r) => r && r.providerType === 'microsoft-resources');
 
-			if (resourceConfigs.length === 0) return;
+			if (targetConfigs.length === 0 && calendarConfig?.providerType === 'microsoft-calendar') {
+				const plainCreds = calendarConfig.credentials
+					? await decryptSyncCredentials(calendarConfig.credentials)
+					: undefined;
+				if (hasMicrosoftAppCredentials({ ...calendarConfig, credentials: plainCreds })) {
+					targetConfigs = [{
+						...calendarConfig,
+						providerType: 'microsoft-resources' as ProviderType
+					}];
+				}
+			}
+
+			if (targetConfigs.length === 0) return;
 
 			const desiredResourceIds = new Set(
 				resourceAttendees.map((r) => r.resourceId).filter((id): id is string => Boolean(id))
 			);
 
-			for (const resRow of resourceConfigs) {
-				const resConfig = this.rowToConfig(resRow);
+			for (const resRow of targetConfigs) {
+				const resConfig = this.rowToConfig(resRow as any);
 				const provider = await this.getProviderInstance(resConfig) as any;
 
 				// 1. Release any previously booked rooms for this event that are no longer attached
@@ -3547,7 +3588,7 @@ export class SyncService {
 			let mapping: typeof syncMappingTable.$inferSelect | undefined;
 			if (!isVirtual) {
 				const mappingWhere = entityType === 'event'
-					? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id))
+					? and(eq(syncMappingTable.eventId, itemId), eq(syncMappingTable.syncConfigId, config.id), isNull(syncMappingTable.resourceId))
 					: and(eq(syncMappingTable.announcementId, itemId), eq(syncMappingTable.syncConfigId, config.id));
 
 				const [m] = await db
@@ -3845,15 +3886,22 @@ export class SyncService {
 					if (config.direction === 'push' || config.direction === 'bidirectional') {
 						try {
 							const provider = await this.getProviderInstance(config);
+							let resourceProvider: any = config.providerType === 'microsoft-resources' ? provider : null;
 							for (const mapping of mappings) {
 								const dedupeKey = `${config.id}:${mapping.externalId}`;
 								if (!deletedExternalKeys.has(dedupeKey)) {
 									deletedExternalKeys.add(dedupeKey);
 									try {
-										if (config.providerType === 'microsoft-resources') {
+										if (config.providerType === 'microsoft-resources' || (mapping.providerId === 'microsoft-resources' && mapping.resourceId)) {
+											if (!resourceProvider) {
+												resourceProvider = await this.getProviderInstance({
+													...config,
+													providerType: 'microsoft-resources' as ProviderType
+												});
+											}
 											const roomEmail = (mapping.metadata as any)?.roomEmail;
-											if (roomEmail && typeof (provider as any).releaseRoom === 'function') {
-												await (provider as any).releaseRoom(roomEmail, mapping.externalId);
+											if (roomEmail && typeof resourceProvider.releaseRoom === 'function') {
+												await resourceProvider.releaseRoom(roomEmail, mapping.externalId);
 											}
 										} else {
 											await provider.deleteEvent(mapping.externalId);

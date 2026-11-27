@@ -1,5 +1,5 @@
 {
-    "installCommand": "npm i -g pnpm@12.4.2 && npx pnpm install --no-frozen-lockfile",
+    "installCommand": "npm i -g --allow-scripts=pnpm pnpm@12.23.0 && npx pnpm install --no-frozen-lockfile",
     "buildCommand": "pnpm build",
     "outputDirectory": ".vercel/output",
     "crons": [

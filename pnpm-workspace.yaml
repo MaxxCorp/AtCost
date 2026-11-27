@@ -7,5 +7,3 @@ allowBuilds:
   workerd: true
   '@google/genai': true
   protobufjs: true
-patchedDependencies:
-  '@sveltejs/kit@3.3.0': patches/@sveltejs__kit@3.3.0.patch

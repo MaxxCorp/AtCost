@@ -2229,8 +2229,8 @@ describe('SyncService - Public Data Leak Prevention', () => {
 			};
 
 			(db.select as any)
-				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([resConfigRow]) }) })
-				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([mappingRow]) }) });
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([mappingRow]) }) })
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([resConfigRow]) }) });
 
 			(db.delete as any).mockReturnValue({
 				where: vi.fn().mockImplementation(async () => {
@@ -2313,8 +2313,8 @@ describe('SyncService - Public Data Leak Prevention', () => {
 
 			(db.select as any)
 				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([]) }) }) // legacy mapping
-				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([resConfigRow]) }) }) // releaseEventRoomBookings configs
-				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([roomMapping]) }) }); // releaseEventRoomBookings mappings
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([roomMapping]) }) }) // releaseEventRoomBookings mappings
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([resConfigRow]) }) }); // releaseEventRoomBookings configs
 
 			(db.update as any).mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) });
 			const mockDeleteWhere = vi.fn().mockResolvedValue([]);
@@ -2411,6 +2411,219 @@ describe('SyncService - Public Data Leak Prevention', () => {
 					resourceId: 'res-bhs147'
 				})
 			]);
+		});
+
+		it('falls back to direct padded room booking and stale room cleanup via microsoft-calendar app credentials when no microsoft-resources config exists', async () => {
+			const service = new SyncService();
+			const mockResProvider = {
+				bookRoom: vi.fn().mockResolvedValue({ success: true, bookingId: 'book-134-fallback' }),
+				releaseRoom: vi.fn().mockResolvedValue(undefined)
+			};
+			const getProviderSpy = vi.spyOn(service as any, 'getProviderInstance').mockResolvedValue(mockResProvider);
+
+			const calConfig: SyncConfig = {
+				id: 'cfg-ms-cal-only',
+				userId: 'user-1',
+				providerId: 'microsoft-calendar',
+				providerType: 'microsoft-calendar',
+				direction: 'push',
+				enabled: true,
+				credentials: {
+					tenantId: 'tenant-1',
+					clientId: 'client-1',
+					clientSecret: 'secret-1'
+				},
+				settings: {
+					authMode: 'auto',
+					mailboxType: 'shared',
+					mailboxEmail: 'shared@ballev.onmicrosoft.com'
+				},
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			const staleFallbackMapping = {
+				id: 'map-bhs147-fallback',
+				syncConfigId: 'cfg-ms-cal-only',
+				eventId: 'evt-fallback-pad',
+				resourceId: 'res-bhs147',
+				externalId: 'ext-booking-147',
+				providerId: 'microsoft-resources',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com', roomName: 'BHS.1.47' }
+			};
+
+			(db.select as any)
+				// 1. active microsoft-resources configs -> none
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockResolvedValueOnce([])
+					})
+				})
+				// 2. stale room mappings stored under cfg-ms-cal-only
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockResolvedValueOnce([staleFallbackMapping])
+					})
+				});
+
+			const mockDeleteWhere = vi.fn().mockResolvedValueOnce([]);
+			(db.delete as any).mockReturnValueOnce({ where: mockDeleteWhere });
+			(db.insert as any).mockReturnValue({ values: vi.fn().mockResolvedValue([]) });
+
+			const itemRow = {
+				id: 'evt-fallback-pad',
+				summary: 'Event With Prep & Teardown',
+				startDateTime: new Date('2026-11-10T09:00:00.000Z'), // 10:00 CET
+				endDateTime: new Date('2026-11-10T11:30:00.000Z'), // 12:30 CET
+				prepMinutes: 60,
+				teardownMinutes: 60,
+				startTimeZone: 'Europe/Berlin'
+			};
+
+			await (service as any).coordinateResourceBooking(
+				itemRow,
+				[{ resourceId: 'res-bhs134', email: 'bhs134@ballev.onmicrosoft.com', displayName: 'BHS.1.34' }],
+				calConfig
+			);
+
+			expect(getProviderSpy).toHaveBeenCalledWith(expect.objectContaining({
+				id: 'cfg-ms-cal-only',
+				providerType: 'microsoft-resources'
+			}));
+			expect(mockResProvider.releaseRoom).toHaveBeenCalledWith('bhs147@ballev.onmicrosoft.com', 'ext-booking-147');
+			expect(mockDeleteWhere).toHaveBeenCalled();
+			expect(mockResProvider.bookRoom).toHaveBeenCalledWith(expect.objectContaining({
+				eventId: 'evt-fallback-pad',
+				resourceId: 'res-bhs134',
+				roomEmail: 'bhs134@ballev.onmicrosoft.com',
+				start: new Date('2026-11-10T08:00:00.000Z'),
+				end: new Date('2026-11-10T12:30:00.000Z'),
+				startTimeZone: 'Europe/Berlin',
+				endTimeZone: 'Europe/Berlin'
+			}));
+		});
+
+		it('sets roomBookingsManagedByResourceProvider when microsoft-calendar has app credentials without microsoft-resources config', async () => {
+			const service = new SyncService();
+			const internalEvent = {
+				id: 'evt-managed-fallback',
+				summary: 'BHS Event',
+				status: 'confirmed',
+				isPublic: true,
+				startDateTime: new Date('2026-11-10T09:00:00Z'),
+				endDateTime: new Date('2026-11-10T11:30:00Z'),
+				startTimeZone: 'Europe/Berlin'
+			};
+
+			const msConfig: SyncConfig = {
+				id: 'cfg-ms-cal-only',
+				userId: 'user-1',
+				providerId: 'microsoft-calendar',
+				providerType: 'microsoft-calendar',
+				direction: 'push',
+				enabled: true,
+				credentials: {
+					tenantId: 'tenant-1',
+					clientId: 'client-1',
+					clientSecret: 'secret-1'
+				},
+				settings: { includeRoomBookings: true, authMode: 'auto' },
+				createdAt: new Date(),
+				updatedAt: new Date()
+			};
+
+			(db.select as any)
+				// linkedResources
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						innerJoin: vi.fn().mockReturnValueOnce({
+							where: vi.fn().mockResolvedValueOnce([
+								{
+									resource: {
+										id: 'res-bhs147',
+										name: 'BHS.1.47',
+										allocationCalendars: [{ provider: 'microsoft-calendar', calendarId: 'bhs147@ballev.onmicrosoft.com' }]
+									}
+								}
+							])
+						})
+					})
+				})
+				// locations
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						innerJoin: vi.fn().mockReturnValueOnce({
+							where: vi.fn().mockResolvedValueOnce([])
+						})
+					})
+				})
+				// tags
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						innerJoin: vi.fn().mockReturnValueOnce({
+							where: vi.fn().mockResolvedValueOnce([])
+						})
+					})
+				})
+				// hasActiveMicrosoftResourcesConfig -> none
+				.mockReturnValueOnce({
+					from: vi.fn().mockReturnValueOnce({
+						where: vi.fn().mockReturnValueOnce({
+							limit: vi.fn().mockResolvedValueOnce([])
+						})
+					})
+				});
+
+			const external = await (service as any).mapInternalToExternal(internalEvent, 'microsoft-calendar', undefined, msConfig);
+
+			expect(external.metadata?.roomBookingsManagedByResourceProvider).toBe(true);
+		});
+
+		it('releases fallback room bookings stored under a microsoft-calendar syncConfigId on unlink', async () => {
+			const service = new SyncService();
+			const mockResProvider = {
+				releaseRoom: vi.fn().mockResolvedValue(undefined)
+			};
+			const getProviderSpy = vi.spyOn(service as any, 'getProviderInstance').mockResolvedValue(mockResProvider);
+			vi.spyOn(service, 'syncItems').mockResolvedValue(undefined);
+
+			const calConfigRow = {
+				id: 'cfg-ms-cal-only',
+				userId: 'user-1',
+				providerType: 'microsoft-calendar',
+				enabled: true,
+				credentials: {
+					tenantId: 'tenant-1',
+					clientId: 'client-1',
+					clientSecret: 'secret-1'
+				},
+				settings: {}
+			};
+			const fallbackMappingRow = {
+				id: 'map-fallback-unlink',
+				syncConfigId: 'cfg-ms-cal-only',
+				eventId: 'evt-unlink-fb',
+				resourceId: 'res-bhs147',
+				externalId: 'ext-booking-fb',
+				providerId: 'microsoft-resources',
+				metadata: { roomEmail: 'bhs147@ballev.onmicrosoft.com' }
+			};
+
+			(db.select as any)
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([fallbackMappingRow]) }) })
+				.mockReturnValueOnce({ from: vi.fn().mockReturnValueOnce({ where: vi.fn().mockResolvedValueOnce([calConfigRow]) }) });
+
+			const mockDeleteWhere = vi.fn().mockResolvedValue([]);
+			(db.delete as any).mockReturnValue({ where: mockDeleteWhere });
+
+			await service.syncResourceAssociationsChange('user-1', 'evt-unlink-fb', 'res-bhs147', 'unlink');
+
+			expect(getProviderSpy).toHaveBeenCalledWith(expect.objectContaining({
+				id: 'cfg-ms-cal-only',
+				providerType: 'microsoft-resources'
+			}));
+			expect(mockResProvider.releaseRoom).toHaveBeenCalledWith('bhs147@ballev.onmicrosoft.com', 'ext-booking-fb');
+			expect(mockDeleteWhere).toHaveBeenCalled();
 		});
 
 		it('includes consented guest home emails in attendees for Google and Microsoft Calendar sync under default privacy settings', async () => {
