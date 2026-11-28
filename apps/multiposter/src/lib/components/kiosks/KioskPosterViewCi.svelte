@@ -10,8 +10,6 @@
         Calendar,
         CalendarDays,
         Clock,
-        Phone,
-        Mail,
         FileText,
         ZoomIn,
         ZoomOut,
@@ -253,15 +251,19 @@
         toast.info("Preset gelöscht");
     }
 
-    let effectiveSponsors = $derived<CiSponsorItem[]>([
-        ...(ciPreset.sponsors || []).filter(s => Boolean(s.logoUrl?.trim())),
-        ...sponsors.filter(s => Boolean(s.logoUrl?.trim())).map(s => ({
-            id: s.id,
-            name: s.name,
-            logoUrl: s.logoUrl,
-            placement: "center" as const
-        }))
-    ]);
+    let effectiveSponsors = $derived<CiSponsorItem[]>(
+        !showSponsors
+            ? []
+            : [
+                ...(ciPreset.sponsors || []).filter(s => Boolean(s.logoUrl?.trim())),
+                ...sponsors.filter(s => Boolean(s.logoUrl?.trim())).map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    logoUrl: s.logoUrl,
+                    placement: "center" as const
+                }))
+            ]
+    );
 
     // Legacy letterhead compatibility
     let isLetterheadMode = $derived(printOptions.printMode === "omit_ci");
@@ -454,7 +456,10 @@
                 if (prefs.sponsorPosition !== undefined) sponsorPosition = prefs.sponsorPosition;
                 if (Array.isArray(prefs.sponsors)) sponsors = prefs.sponsors;
                 if (prefs.ciPreset) {
-                    ciPreset = prefs.ciPreset.id === 'suedspitze_brick' ? { ...DEFAULT_PRESETS[1] } : prefs.ciPreset;
+                    const basePreset = prefs.ciPreset.id === 'suedspitze_brick' ? { ...DEFAULT_PRESETS[1] } : prefs.ciPreset;
+                    ciPreset = basePreset.locationLogoUrl === '/logos/location-suedspitze.jpg'
+                        ? { ...basePreset, locationLogoUrl: '/logos/location-suedspitze.png' }
+                        : basePreset;
                 }
                 if (Array.isArray(prefs.customPresets)) customPresets = prefs.customPresets;
                 if (prefs.printOptions) printOptions = { ...printOptions, ...prefs.printOptions };
@@ -645,20 +650,6 @@
         ].filter(Boolean);
         return parts.join(", ");
     });
-
-    function getDateRangeTitle(): string {
-        if (kiosk?.startDate && kiosk?.endDate) {
-            const s = new Date(kiosk.startDate);
-            const e = new Date(kiosk.endDate);
-            if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
-                const sStr = s.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-                const eStr = e.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-                return `${sStr} – ${eStr}`;
-            }
-        }
-        const now = new Date();
-        return now.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-    }
 
     // Check overflow
     function checkPageOverflow() {
@@ -1552,14 +1543,6 @@
                                     </p>
                                 {/if}
                             </div>
-                            <!-- Date Range Badge -->
-                            <div
-                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
-                                style="border-color: {ciPreset.lineColor}; color: {ciPreset.textColor}; background-color: {ciPreset.bgColor};"
-                            >
-                                <Calendar class="w-3.5 h-3.5" />
-                                <span>{getDateRangeTitle()}</span>
-                            </div>
                         </div>
                     </header>
                 </div>
@@ -1973,59 +1956,12 @@
 
             <!-- Optional Footer Slot for Custom Sections -->
             {#if customSections.some(s => s.enabled && s.slot === "footer")}
-                <div class="px-8 py-2 bg-slate-50 border-t border-slate-200 space-y-2">
+                <div class="px-8 py-2 space-y-2">
                     {#each customSections.filter(s => s.enabled && s.slot === "footer") as sec (sec.id)}
                         {@render customSectionCard(sec, "footer")}
                     {/each}
                 </div>
             {/if}
-
-            <!-- Bottom Section: Footer & Sponsors Bar -->
-            <footer class="poster-footer px-8 py-3.5 border-t border-slate-200 shrink-0 bg-slate-50/50 print:bg-transparent {getElementPrintClasses(elementSettings.locationDetails, printOptions.previewGreyscaleOnScreen)}">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <!-- Location Contact Details -->
-                    <div class="text-[10px] text-slate-600 flex items-center flex-wrap gap-x-4 gap-y-1">
-                        {#if currentLocation?.contact?.phone}
-                            <span class="inline-flex items-center gap-1 font-medium">
-                                <Phone class="w-3 h-3 text-slate-400" />
-                                {currentLocation.contact.phone}
-                            </span>
-                        {/if}
-                        {#if currentLocation?.contact?.email}
-                            <span class="inline-flex items-center gap-1 font-medium">
-                                <Mail class="w-3 h-3 text-slate-400" />
-                                {currentLocation.contact.email}
-                            </span>
-                        {/if}
-                        <span class="text-slate-400">
-                            Änderungen vorbehalten • Stand: {new Date().toLocaleDateString()}
-                        </span>
-                    </div>
-
-                    <!-- Bottom Sponsor Logos (If enabled and position is footer) -->
-                    {#if showSponsors && sponsorPosition === "footer" && sponsors.some(s => Boolean(s.logoUrl?.trim())) && elementSettings.sponsors.enabled}
-                        <div class="flex items-center gap-3 {getElementPrintClasses(elementSettings.sponsors, printOptions.previewGreyscaleOnScreen)}">
-                            <span class="text-[9px] uppercase tracking-wider font-semibold text-slate-400">
-                                {sponsorSectionTitle}:
-                            </span>
-                            <div class="flex items-center gap-3 flex-wrap">
-                                {#each sponsors.filter(s => Boolean(s.logoUrl?.trim())) as s (s.id)}
-                                    <div
-                                        role="button"
-                                        tabindex="0"
-                                        onclick={(e) => { e.stopPropagation(); selectedCardId = selectedCardId === s.id ? null : s.id; }}
-                                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); selectedCardId = selectedCardId === s.id ? null : s.id; } }}
-                                        class="cursor-pointer rounded-xs p-0.5 transition-all outline-hidden shrink-0 {selectedCardId === s.id ? 'ring-2 ring-amber-400 bg-amber-500/10 print:ring-0 print:bg-transparent' : 'hover:ring-1 hover:ring-amber-300/60'} {getCardPrintClasses(cardSettings[s.id], elementSettings.sponsors, printOptions.previewGreyscaleOnScreen)}"
-                                        title="{s.name || 'Sponsor'} (Klicken für Druck- & Farbeinstellungen)"
-                                    >
-                                        <img src={s.logoUrl} alt={s.name} class="h-6 max-w-[85px] object-contain transition" />
-                                    </div>
-                                {/each}
-                            </div>
-                        </div>
-                    {/if}
-                </div>
-            </footer>
             </div>
 
             <!-- Bottom Corporate Identity Triangle (SVG) -->

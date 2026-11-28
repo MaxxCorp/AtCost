@@ -294,7 +294,10 @@
             if (cachedCi) {
                 const parsed = JSON.parse(cachedCi);
                 if (parsed.ciPreset) {
-                    ciPreset = parsed.ciPreset.id === 'suedspitze_brick' ? { ...DEFAULT_PRESETS[1] } : parsed.ciPreset;
+                    const basePreset = parsed.ciPreset.id === 'suedspitze_brick' ? { ...DEFAULT_PRESETS[1] } : parsed.ciPreset;
+                    ciPreset = basePreset.locationLogoUrl === '/logos/location-suedspitze.jpg'
+                        ? { ...basePreset, locationLogoUrl: '/logos/location-suedspitze.png' }
+                        : basePreset;
                 }
                 if (Array.isArray(parsed.customPresets)) customPresets = parsed.customPresets;
                 if (parsed.printOptions) printOptions = { ...printOptions, ...parsed.printOptions };

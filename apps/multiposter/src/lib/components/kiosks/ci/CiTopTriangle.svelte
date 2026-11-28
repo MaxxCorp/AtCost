@@ -33,7 +33,10 @@
         onSelect?: (id: string) => void;
     } = $props();
 
-    let effectiveLocationLogo = $derived(customLocationLogo || preset.locationLogoUrl || "/logos/location-suedspitze.jpg");
+    const rawLocationLogo = $derived(customLocationLogo || preset.locationLogoUrl || "/logos/location-suedspitze.png");
+    let effectiveLocationLogo = $derived(
+        rawLocationLogo === "/logos/location-suedspitze.jpg" ? "/logos/location-suedspitze.png" : rawLocationLogo
+    );
     let effectiveOrgLogo = $derived(customOrgLogo || preset.orgLogoUrl || "/logos/org-ball.png");
 
     let heightMm = $derived(explicitHeightMm || preset.topHeightMm || 36);

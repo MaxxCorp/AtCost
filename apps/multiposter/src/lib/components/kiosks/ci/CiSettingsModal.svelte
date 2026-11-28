@@ -374,7 +374,7 @@
                             <input
                                 type="text"
                                 bind:value={preset.locationLogoUrl}
-                                placeholder="/logos/location-suedspitze.jpg oder URL"
+                                placeholder="/logos/location-suedspitze.png oder URL"
                                 class="w-full text-xs rounded border border-slate-300 dark:border-slate-600 px-3 py-1.5"
                             />
                         </div>
