@@ -25,12 +25,20 @@
         previewGreyscaleOnScreen = $bindable(false),
         isFlyer = false,
         showCi = true,
+        ciTopTitle = "CI Kopfbereich (Oberes Dreieck)",
+        ciTopDescription = "Standort-Logo & BALL e.V. Logo im geometrischen Vektor-Dreieck",
+        ciBottomTitle = "CI Fußbereich (Unteres Dreieck)",
+        ciBottomDescription = "Inklusions-Hinweis, Sponsoren-Logos & Standort-Adressblock",
         onSettingsChange
     }: {
         elementSettings: KioskElementSettings;
         previewGreyscaleOnScreen?: boolean;
         isFlyer?: boolean;
         showCi?: boolean;
+        ciTopTitle?: string;
+        ciTopDescription?: string;
+        ciBottomTitle?: string;
+        ciBottomDescription?: string;
         onSettingsChange?: () => void;
     } = $props();
 
@@ -124,18 +132,18 @@
             </h4>
 
             <div class="space-y-2">
-                <!-- CI Top Triangle -->
+                <!-- CI Top -->
                 <ElementSettingsRow
-                    title="CI Kopfbereich (Oberes Dreieck)"
-                    description="Standort-Logo & BALL e.V. Logo im geometrischen Vektor-Dreieck"
+                    title={ciTopTitle}
+                    description={ciTopDescription}
                     icon={Palette}
                     bind:config={elementSettings.ciTop}
                 />
 
-                <!-- CI Bottom Triangle -->
+                <!-- CI Bottom -->
                 <ElementSettingsRow
-                    title="CI Fußbereich (Unteres Dreieck)"
-                    description="Inklusions-Hinweis, Sponsoren-Logos & Standort-Adressblock"
+                    title={ciBottomTitle}
+                    description={ciBottomDescription}
                     icon={Building2}
                     bind:config={elementSettings.ciBottom}
                 />

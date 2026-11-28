@@ -11,6 +11,11 @@
     import KioskFoldedFlyerCiView from "#lib/components/kiosks/KioskFoldedFlyerCiView.svelte";
     import KioskPosterView from "#lib/components/kiosks/KioskPosterView.svelte";
     import KioskPosterViewCi from "#lib/components/kiosks/KioskPosterViewCi.svelte";
+    import KioskCarouselHierView from "#lib/components/kiosks/KioskCarouselHierView.svelte";
+    import KioskTableHierView from "#lib/components/kiosks/KioskTableHierView.svelte";
+    import KioskFlatListHierView from "#lib/components/kiosks/KioskFlatListHierView.svelte";
+    import KioskPosterHierView from "#lib/components/kiosks/KioskPosterHierView.svelte";
+    import KioskFoldedFlyerHierView from "#lib/components/kiosks/KioskFoldedFlyerHierView.svelte";
     import { type Event, type Announcement } from "@ac/validations";
 
     import { browser } from '$app/env';
@@ -38,7 +43,7 @@
     );
 
     const displayItems = $derived.by(() => {
-        const isCarousel = !kiosk?.uiMode || kiosk.uiMode === "carousel";
+        const isCarousel = !kiosk?.uiMode || kiosk.uiMode === "carousel" || kiosk.uiMode === "carousel_hier";
         if (!isCarousel || !effectiveCompressSeries) {
             return items;
         }
@@ -97,7 +102,7 @@
             }
         }
         localCompressOverride = overrideVal;
-        const isCarousel = !kiosk?.uiMode || kiosk.uiMode === "carousel";
+        const isCarousel = !kiosk?.uiMode || kiosk.uiMode === "carousel" || kiosk.uiMode === "carousel_hier";
         kioskState.showSeriesToggle = Boolean(kiosk && isCarousel && !kiosk.excludeSeries);
         kioskState.compressSeries = overrideVal ?? dbBase;
     }
@@ -140,7 +145,7 @@
     }
 
     function resetInactivity() {
-        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster' || kiosk?.uiMode === 'folded_flyer_ci' || kiosk?.uiMode === 'poster_ci') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster' || kiosk?.uiMode === 'folded_flyer_ci' || kiosk?.uiMode === 'poster_ci' || kiosk?.uiMode === 'flat_list_hier' || kiosk?.uiMode === 'folded_flyer_hier' || kiosk?.uiMode === 'poster_hier') return;
         console.log("Resetting inactivity timer"); // debug
         showHeader();
         // Reset loop timer on interaction to prevent flipping while reading/swiping
@@ -150,7 +155,7 @@
     // --- Loop Logic ---
     function startLoop() {
         clearInterval(timer);
-        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster' || kiosk?.uiMode === 'folded_flyer_ci' || kiosk?.uiMode === 'poster_ci') return;
+        if (kiosk?.uiMode === 'flat_list' || kiosk?.uiMode === 'folded_flyer' || kiosk?.uiMode === 'poster' || kiosk?.uiMode === 'folded_flyer_ci' || kiosk?.uiMode === 'poster_ci' || kiosk?.uiMode === 'flat_list_hier' || kiosk?.uiMode === 'folded_flyer_hier' || kiosk?.uiMode === 'poster_hier') return;
         timer = setInterval(
             () => {
                 nextSlide(true); // Auto-advance
@@ -448,12 +453,12 @@
 
 <svelte:head>
     <title>{kiosk?.name || "Kiosk"}</title>
-    {#if kiosk?.uiMode === "flat_list" || kiosk?.uiMode === "folded_flyer" || kiosk?.uiMode === "folded_flyer_ci" || kiosk?.uiMode === "poster" || kiosk?.uiMode === "poster_ci"}
+    {#if kiosk?.uiMode === "flat_list" || kiosk?.uiMode === "folded_flyer" || kiosk?.uiMode === "folded_flyer_ci" || kiosk?.uiMode === "poster" || kiosk?.uiMode === "poster_ci" || kiosk?.uiMode === "carousel_hier" || kiosk?.uiMode === "table_hier" || kiosk?.uiMode === "flat_list_hier" || kiosk?.uiMode === "folded_flyer_hier" || kiosk?.uiMode === "poster_hier"}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
         <link
             rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Patrick+Hand&family=Playfair+Display:wght@600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto+Slab:wght@400;600;700;800&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Jost:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Patrick+Hand&family=Playfair+Display:wght@600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto+Slab:wght@400;600;700;800&display=swap"
         />
     {/if}
 </svelte:head>
@@ -468,6 +473,10 @@
     <div
         class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto"
     ><KioskFlatListView items={items} kiosk={kiosk} /></div>
+{:else if kiosk?.uiMode === "flat_list_hier"}
+    <div
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white overflow-y-auto"
+    ><KioskFlatListHierView items={items} kiosk={kiosk} /></div>
 {:else if kiosk?.uiMode === "folded_flyer"}
     <div
         class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto"
@@ -476,6 +485,10 @@
     <div
         class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto"
     ><KioskFoldedFlyerCiView items={items} kiosk={kiosk} /></div>
+{:else if kiosk?.uiMode === "folded_flyer_hier"}
+    <div
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible overflow-y-auto"
+    ><KioskFoldedFlyerHierView items={items} kiosk={kiosk} /></div>
 {:else if kiosk?.uiMode === "poster"}
     <div
         class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible print:block print:w-auto print:h-auto print:m-0 print:p-0 overflow-y-auto"
@@ -484,9 +497,13 @@
     <div
         class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible print:block print:w-auto print:h-auto print:m-0 print:p-0 overflow-y-auto"
     ><KioskPosterViewCi items={items} kiosk={kiosk} /></div>
+{:else if kiosk?.uiMode === "poster_hier"}
+    <div
+        class="w-full min-h-screen bg-slate-100 dark:bg-slate-900 print:bg-white print:min-h-0 print:overflow-visible print:block print:w-auto print:h-auto print:m-0 print:p-0 overflow-y-auto"
+    ><KioskPosterHierView items={items} kiosk={kiosk} /></div>
 {:else}
     <div
-        class="fixed inset-0 bg-gray-900 overflow-hidden flex items-center justify-center"
+        class="fixed inset-0 {kiosk?.uiMode === 'carousel_hier' || kiosk?.uiMode === 'table_hier' ? 'bg-[#29235c]' : 'bg-gray-900'} overflow-hidden flex items-center justify-center"
         onpointerdown={handlePointerDown}
         onpointerup={handlePointerUp}
         role="region"
@@ -494,7 +511,7 @@
     >
         {#if displayItems.length === 0}
             <div
-                class="text-white text-xl opacity-50 flex flex-col items-center gap-4"
+                class="text-white text-xl opacity-75 flex flex-col items-center gap-4"
             >
                 <p>
                     {#if isOffline}
@@ -511,6 +528,8 @@
             </div>
         {:else if kiosk?.uiMode === "table"}
             <KioskTableView items={items} kiosk={kiosk} />
+        {:else if kiosk?.uiMode === "table_hier"}
+            <KioskTableHierView items={items} kiosk={kiosk} />
         {:else}
             {#if activeItem}
                 {#key `${activeIndex}_${(activeItem as any).id ?? activeIndex}`}
@@ -529,7 +548,9 @@
                             easing: cubicOut,
                         }}
                     >
-                        {#if "startDateTime" in activeItem}
+                        {#if kiosk?.uiMode === "carousel_hier"}
+                            <KioskCarouselHierView item={activeItem} kiosk={kiosk} />
+                        {:else if "startDateTime" in activeItem}
                             <EventView event={activeItem as Event} />
                         {:else}
                             <div class="w-full h-full bg-white flex flex-col overflow-y-auto p-6 sm:p-10 lg:p-16 pb-20">
@@ -547,12 +568,14 @@
 
             {#if displayItems.length > 1}
                 <div
-                    class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex max-w-[90vw] flex-wrap items-center justify-center gap-2 rounded-full bg-slate-950/50 px-3.5 py-1.5 backdrop-blur-md border border-white/15 shadow-lg"
+                    class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex max-w-[90vw] flex-wrap items-center justify-center gap-2 rounded-full {kiosk?.uiMode === 'carousel_hier' ? 'bg-[#29235c]/80 border-[#6950fc]/50' : 'bg-slate-950/50 border-white/15'} px-3.5 py-1.5 backdrop-blur-md border shadow-lg"
                 >
                     {#each displayItems as _, i (i)}
                         <div
                             class="h-2 rounded-full transition-all duration-300 {i === activeIndex
-                                ? 'w-8 bg-white shadow-xs'
+                                ? kiosk?.uiMode === 'carousel_hier'
+                                    ? 'w-8 bg-[#ffec00] shadow-xs'
+                                    : 'w-8 bg-white shadow-xs'
                                 : 'w-2 bg-white/40'}"
                         ></div>
                     {/each}

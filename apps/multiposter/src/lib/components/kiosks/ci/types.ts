@@ -87,6 +87,7 @@ export interface KioskFontOption {
 
 export const KIOSK_FONT_OPTIONS: KioskFontOption[] = [
     { id: 'default', label: 'Standard (System)', cssFamily: '' },
+    { id: 'hier_futura', label: 'HIER. Marken-Schrift (Futura / Jost)', cssFamily: "'Futura', 'Futura PT', 'Jost', 'Century Gothic', 'Poppins', sans-serif" },
     { id: 'inter', label: 'Modern Sans (Inter)', cssFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
     { id: 'poppins', label: 'Geometrisch (Poppins)', cssFamily: "'Poppins', 'Segoe UI', sans-serif" },
     { id: 'lora', label: 'Klassisch Serif (Lora)', cssFamily: "'Lora', Georgia, 'Times New Roman', serif" },

@@ -300,6 +300,26 @@
 													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
 														{kiosk.uiMode === "poster_ci" ? "Poster (CI)" : m.poster_badge()}
 													</span>
+												{:else if kiosk.uiMode === "carousel_hier"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f0e7f3] dark:bg-indigo-900/40 text-[#6950fc] dark:text-indigo-300 border border-[#6950fc]/25">
+														{m.carousel_hier_badge()}
+													</span>
+												{:else if kiosk.uiMode === "table_hier"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f0e7f3] dark:bg-indigo-900/40 text-[#6950fc] dark:text-indigo-300 border border-[#6950fc]/25">
+														{m.table_hier_badge()}
+													</span>
+												{:else if kiosk.uiMode === "flat_list_hier"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f0e7f3] dark:bg-indigo-900/40 text-[#6950fc] dark:text-indigo-300 border border-[#6950fc]/25">
+														{m.flat_list_hier_badge()}
+													</span>
+												{:else if kiosk.uiMode === "folded_flyer_hier"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f0e7f3] dark:bg-indigo-900/40 text-[#6950fc] dark:text-indigo-300 border border-[#6950fc]/25">
+														{m.folded_flyer_hier_badge()}
+													</span>
+												{:else if kiosk.uiMode === "poster_hier"}
+													<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f0e7f3] dark:bg-indigo-900/40 text-[#6950fc] dark:text-indigo-300 border border-[#6950fc]/25">
+														{m.poster_hier_badge()}
+													</span>
 												{/if}
 											</h3>
 										</div>

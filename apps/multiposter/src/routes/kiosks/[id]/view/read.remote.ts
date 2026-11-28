@@ -148,7 +148,7 @@ export const readKioskView = query(v.string(), async (kioskId) => {
         } else {
             const lookPast = Math.max(0, Math.min(Number(kioskData.lookPast || 0), 315360000));
             let lookAheadSeconds = Math.max(0, Math.min(Number(kioskData.lookAhead || 0), 315360000));
-            if ((kioskData.uiMode === 'flat_list' || kioskData.uiMode === 'folded_flyer' || kioskData.uiMode === 'poster' || kioskData.uiMode === 'folded_flyer_ci' || kioskData.uiMode === 'poster_ci') && lookAheadSeconds <= 604800) {
+            if ((kioskData.uiMode === 'flat_list' || kioskData.uiMode === 'folded_flyer' || kioskData.uiMode === 'poster' || kioskData.uiMode === 'folded_flyer_ci' || kioskData.uiMode === 'poster_ci' || kioskData.uiMode === 'flat_list_hier' || kioskData.uiMode === 'folded_flyer_hier' || kioskData.uiMode === 'poster_hier') && lookAheadSeconds <= 604800) {
                 lookAheadSeconds = 2592000; // 30 days default for monthly listings
             }
             startDate = new Date(now.getTime() - (lookPast * 1000)).toISOString();

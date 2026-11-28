@@ -439,13 +439,24 @@
                         onchange={validateForm}
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
-                        <option value="carousel">{m.carousel_full_screen()}</option>
-                        <option value="table">{m.table_view_list()}</option>
-                        <option value="flat_list">{m.flat_list_print_export()}</option>
-                        <option value="folded_flyer">{m.folded_flyer_print_template()}</option>
-                        <option value="folded_flyer_ci">{m.folded_flyer_ci_template()}</option>
-                        <option value="poster">{m.poster_print_template()}</option>
-                        <option value="poster_ci">{m.poster_ci_template()}</option>
+                        <optgroup label={m.ui_group_standard()}>
+                            <option value="carousel">{m.carousel_full_screen()}</option>
+                            <option value="table">{m.table_view_list()}</option>
+                            <option value="flat_list">{m.flat_list_print_export()}</option>
+                            <option value="folded_flyer">{m.folded_flyer_print_template()}</option>
+                            <option value="poster">{m.poster_print_template()}</option>
+                        </optgroup>
+                        <optgroup label={m.ui_group_ci()}>
+                            <option value="folded_flyer_ci">{m.folded_flyer_ci_template()}</option>
+                            <option value="poster_ci">{m.poster_ci_template()}</option>
+                        </optgroup>
+                        <optgroup label={m.ui_group_hier()}>
+                            <option value="carousel_hier">{m.carousel_hier_template()}</option>
+                            <option value="table_hier">{m.table_hier_template()}</option>
+                            <option value="flat_list_hier">{m.flat_list_hier_template()}</option>
+                            <option value="folded_flyer_hier">{m.folded_flyer_hier_template()}</option>
+                            <option value="poster_hier">{m.poster_hier_template()}</option>
+                        </optgroup>
                     </select>
                     {#if uiMode === "poster" || uiMode === "poster_ci"}
                         <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
@@ -454,6 +465,14 @@
                     {:else if uiMode === "folded_flyer_ci"}
                         <p class="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
                             {m.folded_flyer_ci_template()} – Folded flyer with corporate identity triangles, line & background color presets, and cost-saving print options.
+                        </p>
+                    {:else if uiMode === "carousel_hier" || uiMode === "table_hier"}
+                        <p class="text-xs text-[#6950fc] dark:text-indigo-400 mt-1">
+                            {m.hier_ci_hint_digital()}
+                        </p>
+                    {:else if uiMode === "flat_list_hier" || uiMode === "folded_flyer_hier" || uiMode === "poster_hier"}
+                        <p class="text-xs text-[#6950fc] dark:text-indigo-400 mt-1">
+                            {m.hier_ci_hint_print()}
                         </p>
                     {/if}
                 </div>

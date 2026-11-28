@@ -230,21 +230,43 @@
 }
 
 .card-greyscale .poster-date-pill,
-.print\:card-greyscale .poster-date-pill {
+.print\:card-greyscale .poster-date-pill,
+.card-greyscale .hier-date-pill,
+.print\:card-greyscale .hier-date-pill {
   background-color: #0f172a !important;
   color: #ffffff !important;
 }
 .card-greyscale .poster-date-pill span,
-.print\:card-greyscale .poster-date-pill span {
+.print\:card-greyscale .poster-date-pill span,
+.card-greyscale .hier-date-pill span,
+.print\:card-greyscale .hier-date-pill span {
   color: #cbd5e1 !important;
 }
 .card-greyscale .poster-date-pill span.font-black,
-.print\:card-greyscale .poster-date-pill span.font-black {
+.print\:card-greyscale .poster-date-pill span.font-black,
+.card-greyscale .hier-date-pill span.font-black,
+.print\:card-greyscale .hier-date-pill span.font-black {
   color: #ffffff !important;
 }
 .card-greyscale .poster-date-pill svg,
-.print\:card-greyscale .poster-date-pill svg {
+.print\:card-greyscale .poster-date-pill svg,
+.card-greyscale .hier-date-pill svg,
+.print\:card-greyscale .hier-date-pill svg {
   color: #cbd5e1 !important;
+}
+
+.card-greyscale .hier-badge,
+.print\:card-greyscale .hier-badge {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.card-greyscale .hier-card-accent,
+.print\:card-greyscale .hier-card-accent {
+  border-left-color: #64748b !important;
+  border-color: #cbd5e1 !important;
+  background-color: #f8fafc !important;
 }
 
 .card-greyscale h1,
@@ -332,18 +354,32 @@ img.print\:card-greyscale {
     border-left-color: #64748b !important;
     background-color: #f8fafc !important;
   }
-  .print\:card-greyscale .poster-date-pill {
+  .print\:card-greyscale .poster-date-pill,
+  .print\:card-greyscale .hier-date-pill {
     background-color: #0f172a !important;
     color: #ffffff !important;
   }
-  .print\:card-greyscale .poster-date-pill span {
+  .print\:card-greyscale .poster-date-pill span,
+  .print\:card-greyscale .hier-date-pill span {
     color: #cbd5e1 !important;
   }
-  .print\:card-greyscale .poster-date-pill span.font-black {
+  .print\:card-greyscale .poster-date-pill span.font-black,
+  .print\:card-greyscale .hier-date-pill span.font-black {
     color: #ffffff !important;
   }
-  .print\:card-greyscale .poster-date-pill svg {
+  .print\:card-greyscale .poster-date-pill svg,
+  .print\:card-greyscale .hier-date-pill svg {
     color: #cbd5e1 !important;
+  }
+  .print\:card-greyscale .hier-badge {
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
+    border-color: #cbd5e1 !important;
+  }
+  .print\:card-greyscale .hier-card-accent {
+    border-left-color: #64748b !important;
+    border-color: #cbd5e1 !important;
+    background-color: #f8fafc !important;
   }
   .print\:card-greyscale h3 {
     color: #0f172a !important;
@@ -435,4 +471,9 @@ img.print\:card-greyscale {
 }
 .kiosk-typography-scope .text-\[13px\] {
   font-size: calc(13px * var(--kiosk-font-scale, 1));
+}
+
+/* Hier. in Marzahn-Süd Brand Typography Scope (Futura Bold / Jost geometric sans) */
+.hier-ci-scope {
+  font-family: 'Futura', 'Futura PT', 'Jost', 'Century Gothic', 'Poppins', sans-serif;
 }
