@@ -21,12 +21,12 @@
             {m.create_item_label?.({ item: m.recipe?.() || 'Recipe' }) || 'New Recipe'}
         </h1>
         <p class="text-sm text-gray-500 mt-1">
-            Create a recipe with consumables and preparation instructions.
+            {m.recipe_new_description()}
         </p>
     </div>
 
     {#if consumablesQuery.loading && !consumablesQuery.current}
-        <LoadingSection message="Loading consumables..." />
+        <LoadingSection message={m.loading_item({ item: m.consumables() })} />
     {:else}
         <RecipeForm
             remoteFunction={createRecipe}

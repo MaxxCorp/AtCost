@@ -16,6 +16,9 @@
 		selectedText?: string;
 		selectAllLabel?: string;
 		deselectAllLabel?: string;
+		deletingLabel?: string;
+		clearSelectionTitle?: string;
+		ariaLabel?: string;
 		actions?: Snippet;
 		class?: string;
 	}
@@ -33,6 +36,9 @@
 		selectedText = undefined,
 		selectAllLabel = undefined,
 		deselectAllLabel = undefined,
+		deletingLabel = "Deleting...",
+		clearSelectionTitle = undefined,
+		ariaLabel = "Bulk actions",
 		actions = undefined,
 		class: className = "",
 	}: Props = $props();
@@ -66,7 +72,7 @@
 {#if count > 0}
 	<div class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] inset-x-0 z-50 flex justify-center pointer-events-none px-4">
 		<aside
-			aria-label="Bulk actions"
+			aria-label={ariaLabel}
 			transition:fly={{ y: 24, duration: 200 }}
 			class="pointer-events-auto flex items-center gap-2 sm:gap-3 p-2 sm:px-4 sm:py-2.5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-200/90 dark:border-gray-700/90 shadow-2xl rounded-2xl text-sm max-w-[calc(100vw-2rem)] sm:max-w-fit overflow-x-auto {className}"
 		>
@@ -115,7 +121,7 @@
 			>
 				{#if bulkDeleting}
 					<LoaderCircle size={13} class="animate-spin" />
-					<span>Deleting...</span>
+					<span>{deletingLabel}</span>
 				{:else}
 					<Trash2 size={13} />
 					<span>{deleteLabel} ({count})</span>
@@ -128,7 +134,7 @@
 			type="button"
 			class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0 cursor-pointer ml-1"
 			onclick={onDeselectAll}
-			title={deselectAllLabel ?? "Clear selection"}
+			title={clearSelectionTitle ?? deselectAllLabel ?? "Clear selection"}
 		>
 			<X size={15} />
 		</button>

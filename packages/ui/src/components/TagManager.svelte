@@ -98,16 +98,16 @@
     const filterGroups = $derived([
         {
             id: "visibility",
-            label: "Sichtbarkeit",
+            label: m?.visibility?.() ?? "Visibility",
             icon: Globe,
             options: [
-                { id: "internal", label: "Nur Intern (HR / Abrechnung)" },
-                { id: "external", label: "Nur Extern (Multiposter / Kioske)" },
+                { id: "internal", label: m?.visibility_internal_only?.() ?? "Internal Only (HR / Accounting)" },
+                { id: "external", label: m?.visibility_external_only?.() ?? "Public Only (Multiposter / Kiosks)" },
             ]
         },
         ...(categoriesRemote || categories.length > 0 ? [{
             id: "categoryId",
-            label: "Kategorie",
+            label: m?.category?.() ?? "Category",
             icon: FolderTree,
             ...(categoriesRemote ? { optionsRemote: categoriesRemote } : {}),
             ...(categories.length > 0 ? { options: categories.map(c => ({ id: c.id, label: c.name })) } : {}),
@@ -155,8 +155,8 @@
             (t.category?.name && t.category.name.toLowerCase().includes(query))
         );
     }}
-    groupBy={(t: any) => t.category?.name || "Allgemein"}
-    selectorGroupBy={(t: any) => t.category?.name || "Allgemein"}
+    groupBy={(t: any) => t.category?.name || (m?.general?.() ?? "General")}
+    selectorGroupBy={(t: any) => t.category?.name || (m?.general?.() ?? "General")}
     {m}
     {...rest}
 >
@@ -183,12 +183,12 @@
                             {#if t.visibility === 'external'}
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                     <Globe size={10} />
-                                    Öffentlich
+                                    {m?.public_label?.() ?? "Public"}
                                 </span>
                             {:else}
                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                                     <Lock size={10} />
-                                    Intern
+                                    {m?.private_label?.() ?? "Internal"}
                                 </span>
                             {/if}
                         </div>

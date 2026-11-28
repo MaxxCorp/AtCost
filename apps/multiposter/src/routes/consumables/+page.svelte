@@ -1,5 +1,6 @@
 <script lang="ts">
     import * as m from "#lib/paraglide/messages.js";
+    import { getLocale } from "#lib/paraglide/runtime.js";
     import { listConsumables } from "./list.remote";
     import { deleteConsumables } from "./[id]/delete.remote";
     import Breadcrumb from "#lib/components/ui/Breadcrumb.svelte";
@@ -63,7 +64,7 @@
 
     function formatDate(dateStr?: string | null): string {
         if (!dateStr) return "-";
-        return new Date(dateStr).toLocaleDateString();
+        return new Date(dateStr).toLocaleDateString(getLocale());
     }
 
     let selectedIds = $state<string[]>([]);
@@ -146,19 +147,19 @@
 
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
             <span class="text-xs text-gray-500 flex items-center gap-1">
-                <ArrowUpDown size={14} /> Sort:
+                <ArrowUpDown size={14} /> {m.sort_label()}
             </span>
             <select
                 bind:value={sortField}
                 onchange={() => setPage(1)}
                 class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
-                <option value="name">Name</option>
-                <option value="purchasePrice">Purchase Price</option>
-                <option value="amount">Amount</option>
-                <option value="storageLocation">Storage Location</option>
-                <option value="expirationDate">Expiration Date</option>
-                <option value="createdAt">Created Date</option>
+                <option value="name">{m.sort_name()}</option>
+                <option value="purchasePrice">{m.purchase_price()}</option>
+                <option value="amount">{m.amount()}</option>
+                <option value="storageLocation">{m.storage_location()}</option>
+                <option value="expirationDate">{m.expiration_date()}</option>
+                <option value="createdAt">{m.sort_created_date()}</option>
             </select>
             <button
                 type="button"
@@ -195,7 +196,7 @@
                     <Package size={40} class="mx-auto text-gray-300" />
                     <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.consumables?.() || 'Consumables' }) || 'No consumables found'}</h3>
                     <p class="text-sm text-gray-500 max-w-md mx-auto">
-                        Get started by adding items you purchase for events and catering recipes.
+                        {m.consumables_empty_description()}
                     </p>
                     <Button href="/consumables/new" class="bg-amber-600 hover:bg-amber-700 text-white mt-2">
                         <Plus size={16} class="mr-1.5" />
@@ -220,15 +221,15 @@
                                                     }
                                                 }}
                                                 class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500 cursor-pointer mx-auto transition-colors"
-                                                title="Select all"
+                                                title={m.select_all()}
                                             />
                                         </th>
-                                        <th class="py-3 px-4">Item</th>
-                                        <th class="py-3 px-4">Price / Package</th>
-                                        <th class="py-3 px-4">Cost per Unit</th>
-                                        <th class="py-3 px-4">Storage Location</th>
-                                        <th class="py-3 px-4">Expiration Date</th>
-                                        <th class="py-3 px-4 text-right">Actions</th>
+                                        <th class="py-3 px-4">{m.item_label()}</th>
+                                        <th class="py-3 px-4">{m.price_per_package()}</th>
+                                        <th class="py-3 px-4">{m.cost_per_unit()}</th>
+                                        <th class="py-3 px-4">{m.storage_location()}</th>
+                                        <th class="py-3 px-4">{m.expiration_date()}</th>
+                                        <th class="py-3 px-4 text-right">{m.actions()}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
@@ -247,7 +248,7 @@
                                                     bind:group={selectedIds}
                                                     value={item.id}
                                                     class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500 cursor-pointer mx-auto transition-colors"
-                                                    title={selectedIds.includes(item.id) ? "Deselect" : "Select"}
+                                                    title={selectedIds.includes(item.id) ? m.deselect() : m.select()}
                                                 />
                                             </td>
                                             <td class="py-3 px-4">
@@ -340,22 +341,22 @@
                         {#if consumablesRes && Math.ceil((consumablesRes.total || 0) / limit) > 1}
                             {@const totalPages = Math.ceil((consumablesRes.total || 0) / limit)}
                             <div class="p-3 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, consumablesRes.total)} of {consumablesRes.total}</span>
+                                <span>{m.showing_range({ from: (page - 1) * limit + 1, to: Math.min(page * limit, consumablesRes.total), total: consumablesRes.total })}</span>
                                 <div class="flex items-center gap-1">
                                     <button
                                         disabled={page <= 1}
                                         onclick={() => setPage(page - 1)}
                                         class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                                     >
-                                        Prev
+                                        {m.previous()}
                                     </button>
-                                    <span>Page {page} of {totalPages}</span>
+                                    <span>{m.page_of({ page, total: totalPages })}</span>
                                     <button
                                         disabled={page >= totalPages}
                                         onclick={() => setPage(page + 1)}
                                         class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                                     >
-                                        Next
+                                        {m.next()}
                                     </button>
                                 </div>
                             </div>
@@ -366,7 +367,7 @@
             {#snippet failed(error: unknown, reset: () => void)}
                 <ErrorSection
                     headline={m.error?.() || 'Error'}
-                    message={error instanceof Error ? error.message : 'Failed to load consumables'}
+                    message={error instanceof Error ? error.message : m.failed_to_load({ item: m.consumables() })}
                     href="/consumables"
                     button={m.try_again?.() || 'Try Again'}
                 />
@@ -380,7 +381,11 @@
             onDeselectAll={() => (selectedIds = [])}
             onDelete={handleBulkDelete}
             deleteLabel={m.delete ? m.delete() : "Delete"}
-            selectAllLabel={m.select_all ? m.select_all() : `Select All (${consumableItems.length})`}
+            selectAllLabel={`${m.select_all()} (${consumableItems.length})`}
             deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+            selectedText={m.selected()}
+            deletingLabel={m.deleting()}
+            ariaLabel={m.bulk_actions()}
+            clearSelectionTitle={m.clear_selection()}
         />
 </div>

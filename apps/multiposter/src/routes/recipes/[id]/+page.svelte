@@ -30,7 +30,7 @@
     {:else if recipeQuery.error}
         <ErrorSection
             headline={m.error?.() || 'Error'}
-            message={recipeQuery.error.message || 'Failed to load recipe'}
+            message={recipeQuery.error.message || m.failed_to_load({ item: m.recipe() })}
             href={getLastListUrl("recipes", "/recipes")}
             button={m.back_to_feature?.({ feature: m.recipes?.() || 'Recipes' }) || 'Back to Recipes'}
         />
@@ -43,12 +43,12 @@
                 {m.edit_item_label?.({ item: recipe.name }) || `Edit ${recipe.name}`}
             </h1>
             <p class="text-sm text-gray-500 mt-1">
-                Update ingredients, portion count, or preparation instructions.
+                {m.recipe_edit_description()}
             </p>
         </div>
 
         {#if consumablesQuery.loading && !consumablesQuery.current}
-            <LoadingSection message="Loading consumables..." />
+            <LoadingSection message={m.loading_item({ item: m.consumables() })} />
         {:else}
             <RecipeForm
                 remoteFunction={updateRecipe}
@@ -62,7 +62,7 @@
     {:else}
         <ErrorSection
             headline={m.item_not_found?.({ item: m.recipe?.() || 'Recipe' }) || 'Recipe not found'}
-            message="The requested recipe could not be found."
+            message={m.recipe_not_found_message()}
             href={getLastListUrl("recipes", "/recipes")}
             button={m.back_to_feature?.({ feature: m.recipes?.() || 'Recipes' }) || 'Back to Recipes'}
         />

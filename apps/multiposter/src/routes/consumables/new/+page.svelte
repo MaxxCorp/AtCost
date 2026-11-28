@@ -16,7 +16,7 @@
             {m.create_item_label?.({ item: m.consumable?.() || 'Consumable' }) || 'New Consumable'}
         </h1>
         <p class="text-sm text-gray-500 mt-1">
-            Add a new consumable item with purchase price, unit, and storage details.
+            {m.consumable_new_description()}
         </p>
     </div>
 

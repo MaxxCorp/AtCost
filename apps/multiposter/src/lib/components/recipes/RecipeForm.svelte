@@ -9,7 +9,7 @@
     import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import { formatCurrency, getCurrencySymbol } from "@ac/validations";
     import type { Consumable } from "@ac/validations";
-    import { TagManager, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
+    import { TagManager, getLastListUrl, useFormValidationFeedback, translateIssue } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import { listConsumables } from "../../../routes/consumables/list.remote";
     import { createConsumable } from "../../../routes/consumables/new/create.remote";
@@ -127,7 +127,7 @@
             }
         ];
         selectedConsumableId = '';
-        toast.success(`Added ${c.name}`);
+        toast.success(m.added_item_toast({ name: c.name }));
     }
 
     function handleConsumableQuickCreated(res: any) {
@@ -143,7 +143,7 @@
                     unit: newConsumable.unit || 'piece',
                 }
             ];
-            toast.success(`Created and added ${newConsumable.name} to ingredients`);
+            toast.success(m.created_and_added_ingredient_toast({ name: newConsumable.name }));
         }
         showQuickCreateConsumable = false;
     }
@@ -162,8 +162,8 @@
             total += lineCost;
             return {
                 ...ing,
-                consumableName: c?.name || 'Unknown item',
-                unit: ing.unit || c?.unit || 'unit',
+                consumableName: c?.name || m.unknown_item(),
+                unit: ing.unit || c?.unit || m.unit_fallback(),
                 costPerUnit: cpu,
                 lineCost: Math.round(lineCost * 100) / 100,
             };
@@ -212,12 +212,12 @@
                 toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
                 const err = res?.error || (rf as any).result?.error;
-                const errorMsg = typeof err === 'string' ? err : (err?.message || 'Action failed');
+                const errorMsg = typeof err === 'string' ? err : (err?.message || m.action_failed());
                 toast.error(errorMsg);
             }
         } catch (err: any) {
             console.error('Error submitting recipe form:', err);
-            toast.error(err.message || 'Error submitting form');
+            toast.error(err.message || m.error_submitting_form());
         }
     })}
     class="space-y-6"
@@ -248,11 +248,11 @@
                 <input
                     id="name"
                     {...rf.fields.name.as('text', initialData?.name ?? '')}
-                    placeholder="e.g., Spaghetti Bolognese, Caesar Salad, Fruit Punch"
+                    placeholder={m.recipe_name_placeholder()}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.name.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -271,7 +271,7 @@
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.portions.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
         </div>
@@ -283,7 +283,7 @@
             <input
                 id="description"
                 {...rf.fields.description.as('text', initialData?.description ?? '')}
-                placeholder="Short summary or dietary note (e.g. Vegetarian, Gluten-free)"
+                placeholder={m.recipe_description_placeholder()}
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
         </div>
@@ -296,7 +296,7 @@
                 id="instructions"
                 {...rf.fields.instructions.as('text', initialData?.instructions ?? '')}
                 rows="4"
-                placeholder="Step 1: Chop vegetables...&#10;Step 2: Sauté in pan...&#10;Step 3: Simmer for 20 minutes..."
+                placeholder={m.recipe_instructions_placeholder()}
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
             ></textarea>
         </div>
@@ -311,7 +311,7 @@
                     {m.ingredients?.() || 'Ingredients'}
                 </h3>
                 <p class="text-xs text-gray-500 mt-0.5">
-                    Select consumables needed for this recipe to calculate the cost per portion.
+                    {m.recipe_ingredients_description()}
                 </p>
             </div>
             <Button
@@ -330,7 +330,7 @@
         <div class="p-3 bg-gray-50/75 rounded-xl border border-gray-200/70">
             {#if consumablesList.length === 0}
                 <div class="flex items-center justify-between py-1">
-                    <p class="text-xs text-gray-500">No consumables found in the system yet.</p>
+                    <p class="text-xs text-gray-500">{m.no_consumables_in_system()}</p>
                     <Button
                         type="button"
                         variant="outline"
@@ -353,7 +353,7 @@
                             {@const rawCost = c.amount > 0 ? (c.purchasePrice / c.amount) : Number(c.purchasePrice || 0)}
                             {@const unitCost = rawCost > 0 && rawCost < 0.01 ? rawCost.toFixed(4) : rawCost.toFixed(2)}
                             <option value={c.id}>
-                                {c.name} — {formatCurrency(Number(unitCost), c.currency)} / {c.unit || 'unit'} (Pkg: {formatCurrency(Number(c.purchasePrice), c.currency)} / {c.amount} {c.unit || ''})
+                                {c.name} — {formatCurrency(Number(unitCost), c.currency)} / {c.unit || m.unit_fallback()} ({m.package_short()}: {formatCurrency(Number(c.purchasePrice), c.currency)} / {c.amount} {c.unit || ''})
                             </option>
                         {/each}
                     </select>
@@ -373,18 +373,18 @@
 
         {#if ingredients.length === 0}
             <div class="py-6 text-center border-2 border-dashed border-gray-200 rounded-xl space-y-1">
-                <p class="text-sm text-gray-400">No ingredients added yet.</p>
-                <p class="text-xs text-gray-400">Select a consumable above and click "{m.add_ingredient?.() || 'Add Ingredient'}" to add it to this recipe.</p>
+                <p class="text-sm text-gray-400">{m.no_ingredients_added()}</p>
+                <p class="text-xs text-gray-400">{m.no_ingredients_hint({ action: m.add_ingredient?.() || 'Add Ingredient' })}</p>
             </div>
         {:else}
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left border-collapse">
                     <thead>
                         <tr class="border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            <th class="py-2.5 px-3">Consumable</th>
-                            <th class="py-2.5 px-3 w-32">Amount</th>
-                            <th class="py-2.5 px-3 w-28">Unit</th>
-                            <th class="py-2.5 px-3 w-32 text-right">Cost</th>
+                            <th class="py-2.5 px-3">{m.consumable()}</th>
+                            <th class="py-2.5 px-3 w-32">{m.amount()}</th>
+                            <th class="py-2.5 px-3 w-28">{m.unit()}</th>
+                            <th class="py-2.5 px-3 w-32 text-right">{m.cost()}</th>
                             <th class="py-2.5 px-2 w-12"></th>
                         </tr>
                     </thead>
@@ -447,11 +447,11 @@
             <div class="mt-4 p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-6">
                     <div>
-                        <span class="text-xs text-gray-500 uppercase font-semibold">Total Batch Cost</span>
+                        <span class="text-xs text-gray-500 uppercase font-semibold">{m.total_batch_cost()}</span>
                         <p class="text-lg font-bold text-gray-900">{formatCurrency(ingredientCalculations.totalBatchCost, recipeCurrency)}</p>
                     </div>
                     <div class="border-l border-emerald-200 pl-6">
-                        <span class="text-xs text-gray-500 uppercase font-semibold">Portions</span>
+                        <span class="text-xs text-gray-500 uppercase font-semibold">{m.portions()}</span>
                         <p class="text-lg font-bold text-gray-900">{portions}</p>
                     </div>
                 </div>
@@ -514,7 +514,7 @@
             </Button>
         {/if}
 
-        <AsyncButton loading={rf.pending} type="submit">
+        <AsyncButton loading={rf.pending} loadingLabel={isUpdating ? m.saving() : m.creating()} type="submit">
             {isUpdating ? (m.save_changes?.() || 'Save Changes') : (m.create?.() || 'Create')}
         </AsyncButton>
     </div>

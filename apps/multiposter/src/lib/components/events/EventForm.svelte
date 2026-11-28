@@ -3439,6 +3439,8 @@
                 }) || "Unlink Price List"}
                 selectAllLabel={m.select_all?.() || "Select All"}
                 deselectAllLabel={m.deselect_all?.() || "Deselect All"}
+                selectedText={m.selected?.() || "selected"}
+                deletingLabel={m.deleting?.() || "Deleting..."}
             >
                 {#snippet toolbarActions(manager?: {
                     items: any[];
@@ -3479,7 +3481,7 @@
                             <span
                                 class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200"
                             >
-                                Event
+                                {m.event_badge?.() || "Event"}
                             </span>
                         {/if}
                     </div>
@@ -3488,7 +3490,7 @@
                 {#snippet renderItemBadge(item: any)}
                     <span class="text-xs text-gray-500">
                         {item.items?.length || 0}
-                        {item.items?.length === 1 ? "item" : "items"}
+                        {(item.items?.length || 0) === 1 ? (m.item_singular?.() || "item") : (m.items_plural?.() || "items")}
                     </span>
                 {/snippet}
 
@@ -3599,13 +3601,13 @@
                 <div class="flex items-center gap-3 text-right">
                     {#if cateringCost > 0}
                         <div class="text-xs text-gray-600">
-                            Cost: <span class="font-mono text-gray-800"
+                            {m.cost?.() || "Cost"}: <span class="font-mono text-gray-800"
                                 >{formatCurrency(
                                     cateringCost,
                                     eventCurrency,
                                 )}</span
                             >
-                            • Profit:
+                            • {m.profit?.() || "Profit"}:
                             <span
                                 class="font-mono font-semibold text-emerald-700"
                                 >+{formatCurrency(

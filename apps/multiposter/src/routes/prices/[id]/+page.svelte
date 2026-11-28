@@ -34,7 +34,7 @@
     {:else if priceQuery.error}
         <ErrorSection
             headline={m.error?.() || 'Error'}
-            message={priceQuery.error instanceof Error ? priceQuery.error.message : 'Failed to load price list'}
+            message={priceQuery.error instanceof Error ? priceQuery.error.message : m.failed_to_load({ item: m.price_list() })}
             href={getLastListUrl("prices", "/prices")}
             button={m.back_to_feature?.({ feature: m.prices?.() || 'Prices' }) || 'Back to Prices'}
         />
@@ -63,7 +63,7 @@
     {:else}
         <ErrorSection
             headline={m.item_not_found?.({ item: m.price_list?.() || 'Price List' }) || 'Price list not found'}
-            message="The requested price list could not be found."
+            message={m.price_list_not_found_message()}
             href={getLastListUrl("prices", "/prices")}
             button={m.back_to_feature?.({ feature: m.prices?.() || 'Prices' }) || 'Back to Prices'}
         />

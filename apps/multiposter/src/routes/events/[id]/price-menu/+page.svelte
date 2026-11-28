@@ -358,10 +358,10 @@
                             m.price_menu_show_tallies_desc(),
                         )}
                         {@render toggleRow(
-                            "Event QR Code & ID",
+                            m.price_menu_show_event_qr(),
                             settings.showEventQr ?? true,
                             (v) => (settings.showEventQr = v),
-                            "Include event QR code & short ID on the sheet for automatic tally sheet scanning.",
+                            m.price_menu_show_event_qr_desc(),
                         )}
                         {@render toggleRow(
                             m.price_menu_show_stats(),

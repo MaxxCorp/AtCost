@@ -29,7 +29,7 @@
     import { createConsumableSchema, createRecipeSchema, SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from "@ac/validations";
     import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import type { Consumable, Recipe, PriceItem } from "@ac/validations";
-    import { getLastListUrl, useFormValidationFeedback } from "@ac/ui";
+    import { getLastListUrl, useFormValidationFeedback, translateIssue } from "@ac/ui";
     import * as Dialog from "#lib/components/ui/dialog/index.js";
     import ConsumableForm from "../consumables/ConsumableForm.svelte";
     import RecipeForm from "../recipes/RecipeForm.svelte";
@@ -202,7 +202,7 @@
             }
         ];
         selectedConsumableId = '';
-        toast.success(`Added ${c.name}`);
+        toast.success(m.added_item_toast({ name: c.name }));
     }
 
     function handleAddFromRecipe() {
@@ -236,7 +236,7 @@
             }
         ];
         selectedRecipeId = '';
-        toast.success(`Added ${r.name}`);
+        toast.success(m.added_item_toast({ name: r.name }));
     }
 
     async function onConsumableQuickCreated(res: any) {
@@ -268,7 +268,7 @@
                     currency: item.currency || currency,
                 }
             ];
-            toast.success(`Created and added ${item.name}`);
+            toast.success(m.created_and_added_toast({ name: item.name }));
         }
         showQuickCreateConsumable = false;
         try {
@@ -309,7 +309,7 @@
                     currency: fullRecipe.currency || currency,
                 }
             ];
-            toast.success(`Created and added ${fullRecipe.name}`);
+            toast.success(m.created_and_added_toast({ name: fullRecipe.name }));
         }
         showQuickCreateRecipe = false;
     }
@@ -350,7 +350,7 @@
         currency: it.currency || currency,
             };
         });
-        toast.success(`Loaded items from template: ${tpl.name}`);
+        toast.success(m.loaded_template_toast({ name: tpl.name }));
     }
 
     function updateFactor(index: number, newFactor: number) {
@@ -385,7 +385,7 @@
             factor: defaultFactor,
             unitPrice: Math.round(item.costPrice * defaultFactor * 100) / 100,
         }));
-        toast.success(`Applied ${defaultFactor}× factor to all items`);
+        toast.success(m.applied_factor_toast({ factor: defaultFactor }));
     }
 
     function removeItem(index: number) {
@@ -479,12 +479,12 @@
                 toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
                 const err = res?.error || (rf as any).result?.error;
-                const errorMsg = typeof err === 'string' ? err : (err?.message || 'Action failed');
+                const errorMsg = typeof err === 'string' ? err : (err?.message || m.action_failed());
                 toast.error(errorMsg);
             }
         } catch (err: any) {
             console.error('Error submitting price form:', err);
-            toast.error(err.message || 'Error submitting form');
+            toast.error(err.message || m.error_submitting_form());
         }
     })}
     class="space-y-6"
@@ -514,11 +514,11 @@
                 <input
                     id="name"
                     {...rf.fields.name.as('text', initialData?.name ?? '')}
-                    placeholder="e.g., Standard Bar, Drink Package, Merchandise, Catering"
+                    placeholder={m.price_name_placeholder()}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.name.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -538,7 +538,7 @@
                     {/each}
                 </select>
                 {#each rf.fields.currency.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -568,7 +568,7 @@
             <input
                 id="description"
                 {...rf.fields.description.as('text', initialData?.description ?? '')}
-                placeholder="Optional description of the price list / package"
+                placeholder={m.price_description_placeholder()}
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
         </div>
@@ -583,7 +583,7 @@
                     {m.price_items?.() || 'Price Items'}
                 </h3>
                 <p class="text-xs text-gray-500 mt-0.5">
-                    {m.markup_factor?.() || 'Pricing Factor'}: items default to {defaultFactor}× cost markup. Modify per item or apply across the price list.
+                    {m.price_factor_hint({ label: m.markup_factor?.() || 'Pricing Factor', factor: defaultFactor })}
                 </p>
             </div>
 
@@ -678,7 +678,8 @@
                         >
                             <option value="">{m.load_from_template?.() || 'Import from Template...'}</option>
                             {#each templatesList as tpl (tpl.id)}
-                                <option value={tpl.id}>{tpl.name} ({(tpl.items || []).length} items)</option>
+                                {@const tplCount = (tpl.items || []).length}
+                                <option value={tpl.id}>{tpl.name} ({tplCount} {tplCount === 1 ? m.item_singular() : m.items_plural()})</option>
                             {/each}
                         </select>
                     </div>
@@ -693,7 +694,7 @@
                     >
                         <option value="">{m.select_consumable?.() || 'Select a consumable...'}</option>
                         {#each consumablesList as c (c.id)}
-                            {@const displayUnit = c.amount > 1 && c.unit && c.unit !== 'piece' ? `${c.amount} ${c.unit}` : (c.unit || 'unit')}
+                            {@const displayUnit = c.amount > 1 && c.unit && c.unit !== 'piece' ? `${c.amount} ${c.unit}` : (c.unit || m.unit_fallback())}
                             <option value={c.id}>
                                 {c.name} — {formatCurrency(Number(c.purchasePrice || 0), c.currency || currency)} / {displayUnit}
                             </option>
@@ -729,7 +730,7 @@
                         <option value="">{m.select_recipe?.() || 'Select a prepared recipe...'}</option>
                         {#each recipesList as r (r.id)}
                             <option value={r.id}>
-                                {r.name} — {formatCurrency(r.costPerPortion ?? 0, currency)} / portion ({r.portions} {r.portions === 1 ? 'portion' : 'portions'})
+                                {r.name} — {formatCurrency(r.costPerPortion ?? 0, currency)} / {m.portion()} ({r.portions} {r.portions === 1 ? m.portions_unit_singular() : m.portions_unit_plural()})
                             </option>
                         {/each}
                     </select>
@@ -762,20 +763,20 @@
             <div class="py-8 text-center border-2 border-dashed border-gray-200 rounded-xl">
                 <Receipt size={32} class="mx-auto text-gray-300 mb-2" />
                 <p class="text-sm font-medium text-gray-500">{m.no_items_in_price_list?.() || 'No price items added yet.'}</p>
-                <p class="text-xs text-gray-400 mt-1">Use the bar above to add consumables or recipes to this price list.</p>
+                <p class="text-xs text-gray-400 mt-1">{m.no_items_in_price_list_hint()}</p>
             </div>
         {:else}
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left border-collapse">
                     <thead>
                         <tr class="border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            <th class="py-2.5 px-3 min-w-[160px]">Item</th>
-                            <th class="py-2.5 px-2.5 w-24">Type</th>
+                            <th class="py-2.5 px-3 min-w-[160px]">{m.item_label()}</th>
+                            <th class="py-2.5 px-2.5 w-24">{m.type_column()}</th>
                             <th class="py-2.5 px-2.5 w-28">{m.base_cost?.() || 'Base Cost'}</th>
                             <th class="py-2.5 px-2.5 w-44">{m.factor?.() || 'Markup Factor'}</th>
                             <th class="py-2.5 px-2.5 w-32">{m.selling_price?.() || 'Selling Price'}</th>
                             <th class="py-2.5 px-2.5 w-28">{m.portion_size?.() || 'Portion'}</th>
-                            <th class="py-2.5 px-3 w-36 text-right">Total ({currentParticipants}p)</th>
+                            <th class="py-2.5 px-3 w-36 text-right">{m.total_for_participants_short({ count: currentParticipants })}</th>
                             <th class="py-2.5 px-2 w-10"></th>
                         </tr>
                     </thead>
@@ -810,11 +811,11 @@
                                 <td class="align-top py-2.5 px-2.5 pt-3.5">
                                     {#if item.itemType === 'recipe'}
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                            <ChefHat size={12} /> Recipe
+                                            <ChefHat size={12} /> {m.recipe()}
                                         </span>
                                     {:else}
                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                                            <Package size={12} /> Consumable
+                                            <Package size={12} /> {m.consumable()}
                                         </span>
                                     {/if}
                                 </td>
@@ -830,7 +831,7 @@
                                             value={item.costPrice}
                                             oninput={(e: any) => updateCostPrice(index, parseFloat(e.target.value) || 0)}
                                             class="w-full pl-6 pr-2 py-1.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-gray-50/60 focus:bg-white focus:ring-2 focus:ring-blue-500"
-                                            title="Cost per unit / portion"
+                                            title={m.cost_per_unit_portion_title()}
                                         />
                                     </div>
                                 </td>
@@ -901,7 +902,7 @@
                                         {formatCurrency(calc?.totalPrice ?? 0, item.currency || currency)}
                                     </span>
                                     <span class="text-[10px] text-gray-500 font-normal block leading-tight mt-0.5">
-                                        Cost: {formatCurrency(calc?.totalCost ?? 0, item.currency || currency)} • Profit: <span class="text-emerald-600 font-semibold">+{formatCurrency(calc?.grossProfit ?? 0, item.currency || currency)}</span>
+                                        {m.cost()}: {formatCurrency(calc?.totalCost ?? 0, item.currency || currency)} • {m.profit()}: <span class="text-emerald-600 font-semibold">+{formatCurrency(calc?.grossProfit ?? 0, item.currency || currency)}</span>
                                     </span>
                                 </td>
 
@@ -911,6 +912,7 @@
                                         type="button"
                                         onclick={() => removeItem(index)}
                                         class="p-1 text-gray-400 hover:text-red-600 rounded-md transition-colors"
+                                        title={m.remove()}
                                     >
                                         <Trash2 size={16} />
                                     </button>
@@ -929,7 +931,7 @@
                             {m.price_items?.() || 'Items'} & {m.participants?.() || 'Participants'}
                         </span>
                         <p class="text-xl font-bold text-white mt-0.5">
-                            {items.length} {items.length === 1 ? 'item' : 'items'}
+                            {items.length} {items.length === 1 ? m.item_singular() : m.items_plural()}
                             <span class="text-sm font-normal text-slate-400">({currentParticipants} {m.participants?.() || 'p'})</span>
                         </p>
                     </div>
@@ -942,7 +944,7 @@
                             {formatCurrency(calculations.totalCost, currency)}
                         </p>
                         <span class="text-[10px] text-slate-400 block">
-                            {formatCurrency(calculations.perPersonCost, currency)} / {m.portion?.() || 'person'}
+                            {formatCurrency(calculations.perPersonCost, currency)} / {m.person()}
                         </span>
                     </div>
 
@@ -969,7 +971,7 @@
                         {formatCurrency(calculations.grandTotal, currency)}
                     </p>
                     <span class="text-xs text-indigo-300/80 block mt-0.5">
-                        {formatCurrency(calculations.perPersonSales, currency)} / {m.portion?.() || 'person'}
+                        {formatCurrency(calculations.perPersonSales, currency)} / {m.person()}
                     </span>
                 </div>
             </div>
@@ -987,7 +989,7 @@
             </Button>
         {/if}
 
-        <AsyncButton loading={rf.pending} type="submit">
+        <AsyncButton loading={rf.pending} loadingLabel={isUpdating ? m.saving() : m.creating()} type="submit">
             {isUpdating ? (m.save_changes?.() || 'Save Changes') : (m.create?.() || 'Create')}
         </AsyncButton>
     </div>

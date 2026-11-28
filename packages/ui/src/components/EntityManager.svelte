@@ -131,12 +131,19 @@
         searchPlaceholder?: string;
         linkItemLabel?: string;
         changeItemLabel?: string;
+        associatedItemLabel?: string;
         quickCreateLabel?: string;
         showQuickCreateButton?: boolean;
         closeSearchLabel?: string;
         editLabel?: string;
+        deleteLabel?: string;
+        unlinkLabel?: string;
         deleteForeverLabel?: string;
         confirmUnlinkLabel?: string;
+        selectAllLabel?: string;
+        deselectAllLabel?: string;
+        selectedText?: string;
+        deletingLabel?: string;
         filtersLabel?: string;
         preferenceKey?: string;
         m?: any;
@@ -189,19 +196,26 @@
         selectorSortOrder = undefined,
         hierarchical = false,
 
-        // Localization defaults
-        loadingLabel = `Loading ${title.toLowerCase()}...`,
-        noItemsLabel = `No ${title.toLowerCase()} associated yet.`,
-        noItemsFoundLabel = `No ${title.toLowerCase()} found.`,
-        searchPlaceholder = `Search ${title.toLowerCase()}...`,
-        linkItemLabel = `Link ${title}`,
+        // Localization defaults (keep undefined when omitted so `m` takes precedence)
+        loadingLabel = undefined,
+        noItemsLabel = undefined,
+        noItemsFoundLabel = undefined,
+        searchPlaceholder = undefined,
+        linkItemLabel = undefined,
         changeItemLabel = undefined,
-        quickCreateLabel = "Quick Create",
+        associatedItemLabel: _associatedItemLabel = undefined,
+        quickCreateLabel = undefined,
         showQuickCreateButton = true,
-        closeSearchLabel = "Close Search",
-        editLabel = "Edit",
+        closeSearchLabel = undefined,
+        editLabel = undefined,
+        deleteLabel = undefined,
+        unlinkLabel = undefined,
         deleteForeverLabel = undefined,
-        confirmUnlinkLabel = "Remove link",
+        confirmUnlinkLabel = undefined,
+        selectAllLabel = undefined,
+        deselectAllLabel = undefined,
+        selectedText = undefined,
+        deletingLabel = undefined,
         filtersLabel = undefined,
         preferenceKey = undefined,
         m = undefined,
@@ -209,43 +223,49 @@
 
     const i18n = {
         get loadingLabel() {
-            return m?.loading_item?.({ item: title.toLowerCase() }) ?? `Loading ${title.toLowerCase()}...`;
+            return loadingLabel ?? m?.loading_item?.({ item: title }) ?? `Loading ${title.toLowerCase()}...`;
         },
         get filtersLabel() {
-            return filtersLabel ?? m?.filters?.() ?? (typeof m?.filters === "function" ? m.filters() : (m?.filters ?? "Filters"));
+            return filtersLabel ?? (typeof m?.filters === "function" ? m.filters() : m?.filters) ?? "Filters";
         },
         get noItemsLabel() {
-            return m?.no_items?.({ items: title.toLowerCase() }) ?? `No ${title.toLowerCase()} associated yet.`;
+            return noItemsLabel ?? m?.no_items_associated_label?.({ item: title }) ?? m?.no_items?.({ items: title }) ?? `No ${title.toLowerCase()} associated yet.`;
         },
         get noItemsFoundLabel() {
-            return m?.not_found?.({ item: title.toLowerCase() }) ?? `No ${title.toLowerCase()} found.`;
+            return noItemsFoundLabel ?? m?.no_items_found?.({ item: title }) ?? m?.not_found?.({ item: title }) ?? `No ${title.toLowerCase()} found.`;
         },
         get searchPlaceholder() {
-            return m?.search_placeholder?.({ item: title.toLowerCase() }) ?? `Search ${title.toLowerCase()}...`;
+            return searchPlaceholder ?? m?.search_placeholder?.({ item: title }) ?? `Search ${title.toLowerCase()}...`;
         },
         get linkItemLabel() {
-            return m?.link_item_label?.({ item: title.toLowerCase() }) ?? `Link ${title}`;
+            return linkItemLabel ?? m?.link_item_label?.({ item: title }) ?? `Link ${title}`;
         },
         get changeItemLabel() {
-            return changeItemLabel ?? m?.change_item_label?.({ item: title.toLowerCase() }) ?? `Change ${title}`;
+            return changeItemLabel ?? m?.change_item_label?.({ item: title }) ?? `Change ${title}`;
         },
         get quickCreateLabel() {
-            return m?.quick_create?.() ?? "Quick Create";
+            return quickCreateLabel ?? m?.quick_create?.() ?? "Quick Create";
         },
         get closeSearchLabel() {
-            return m?.close_search?.() ?? "Close Search";
+            return closeSearchLabel ?? m?.close_search?.() ?? "Close Search";
         },
         get editLabel() {
-            return m?.edit?.() ?? "Edit";
+            return editLabel ?? m?.edit?.() ?? "Edit";
+        },
+        get deleteLabel() {
+            return deleteLabel ?? m?.delete?.() ?? "Delete";
+        },
+        get unlinkLabel() {
+            return unlinkLabel ?? m?.unlink?.() ?? "Unlink";
         },
         get deleteForeverLabel() {
-            return deleteForeverLabel ?? m?.delete_forever?.({ item: title.toLowerCase() }) ?? `Delete ${title.toLowerCase()} forever`;
+            return deleteForeverLabel ?? m?.delete_forever?.({ item: title }) ?? `Delete ${title.toLowerCase()} forever`;
         },
         get confirmUnlinkLabel() {
-            return m?.confirm_unlink_label?.({ item: title.toLowerCase() }) ?? "Remove link";
+            return confirmUnlinkLabel ?? m?.confirm_unlink_label?.({ item: title }) ?? unlinkLabel ?? m?.unlink?.() ?? "Remove link";
         },
         get deleteConfirmLabel() {
-            return m?.delete_confirm?.({ item: title.toLowerCase() }) ?? `Delete this ${title.toLowerCase()}?`;
+            return m?.delete_confirm?.({ item: title }) ?? `Delete this ${title.toLowerCase()}?`;
         },
         get deleteSuccessLabel() {
             return m?.deleted_successfully?.() ?? "Deleted successfully";
@@ -263,7 +283,7 @@
             return m?.item_updated?.({ item: title }) ?? `${title} updated`;
         },
         get failedToLoadLabel() {
-            return m?.failed_to_load?.({ item: title.toLowerCase() }) ?? `Failed to load ${title.toLowerCase()}`;
+            return m?.failed_to_load?.({ item: title }) ?? `Failed to load ${title.toLowerCase()}`;
         },
         get failedToLoadAssociations() {
             return m?.failed_to_load_associations?.() ?? "Failed to load associations";
@@ -276,6 +296,27 @@
         },
         get unassignedGroupLabel() {
             return m?.no_location?.() ?? m?.no_locations_associated?.() ?? "No Location";
+        },
+        get unnamedItemLabel() {
+            return m?.unnamed_item?.() ?? "Unnamed Item";
+        },
+        get selectLabel() {
+            return m?.select?.() ?? "Select";
+        },
+        get deselectLabel() {
+            return m?.deselect?.() ?? "Deselect";
+        },
+        get selectAllLabel() {
+            return selectAllLabel ?? (m?.select_all ? `${m.select_all()} (${displayedFilteredItems.length})` : `Select All (${displayedFilteredItems.length})`);
+        },
+        get deselectAllLabel() {
+            return deselectAllLabel ?? m?.deselect_all?.() ?? "Deselect All";
+        },
+        get selectedText() {
+            return selectedText ?? m?.selected?.() ?? "selected";
+        },
+        get deletingLabel() {
+            return deletingLabel ?? m?.deleting?.() ?? "Deleting...";
         }
     };
 
@@ -992,6 +1033,18 @@
                     booleanFilters={booleanFilters}
                     radioGroups={radioGroups}
                     buttonLabel={i18n.filtersLabel}
+                    systemFiltersLabel={m?.system_filters?.()}
+                    filterCriteriaLabel={m?.filter_criteria?.()}
+                    searchPlaceholder={m?.filter_group_placeholder ? (l: string) => m.filter_group_placeholder({ label: l }) : undefined}
+                    cycleStateHelp={m?.cycle_state_help?.()}
+                    includeHelp={m?.include_help?.()}
+                    excludeHelp={m?.exclude_help?.()}
+                    includeTooltip={m?.include?.()}
+                    excludeTooltip={m?.exclude?.()}
+                    loadingText={m?.loading_item ? (l: string) => m.loading_item({ item: l }) : undefined}
+                    noOptionsText={m?.no_options_found ? () => m.no_options_found() : undefined}
+                    clearGroupText={m?.clear_group ? (l: string) => m.clear_group({ label: l }) : undefined}
+                    clearAllText={m?.clear_all_filters_count ? (c: number) => m.clear_all_filters_count({ count: c }) : undefined}
                     onfilterchange={(f) => persistActiveFilters(f)}
                     onclear={() => persistActiveFilters(activeFilters)}
                 />
@@ -1060,6 +1113,9 @@
             filters={activeFilters}
             activeFiltersLabel={i18n.activeFiltersLabel}
             clearAllLabel={i18n.clearAllLabel}
+            removeFilterTooltip={m?.remove_filter?.()}
+            removeExclusionTooltip={m?.remove_exclusion?.()}
+            turnOffFilterTooltip={m?.turn_off_filter?.()}
             onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
                 const current = activeFilters[groupId] || { include: [], exclude: [] };
                 persistActiveFilters({
@@ -1108,6 +1164,18 @@
                         booleanFilters={booleanFilters}
                         radioGroups={radioGroups}
                         buttonLabel={i18n.filtersLabel}
+                        systemFiltersLabel={m?.system_filters?.()}
+                        filterCriteriaLabel={m?.filter_criteria?.()}
+                        searchPlaceholder={m?.filter_group_placeholder ? (l: string) => m.filter_group_placeholder({ label: l }) : undefined}
+                        cycleStateHelp={m?.cycle_state_help?.()}
+                        includeHelp={m?.include_help?.()}
+                        excludeHelp={m?.exclude_help?.()}
+                        includeTooltip={m?.include?.()}
+                        excludeTooltip={m?.exclude?.()}
+                        loadingText={m?.loading_item ? (l: string) => m.loading_item({ item: l }) : undefined}
+                        noOptionsText={m?.no_options_found ? () => m.no_options_found() : undefined}
+                        clearGroupText={m?.clear_group ? (l: string) => m.clear_group({ label: l }) : undefined}
+                        clearAllText={m?.clear_all_filters_count ? (c: number) => m.clear_all_filters_count({ count: c }) : undefined}
                         onfilterchange={(f) => persistActiveFilters(f)}
                         onclear={() => persistActiveFilters(activeFilters)}
                     />
@@ -1121,6 +1189,9 @@
                     filters={activeFilters}
                     activeFiltersLabel={i18n.activeFiltersLabel}
                     clearAllLabel={i18n.clearAllLabel}
+                    removeFilterTooltip={m?.remove_filter?.()}
+                    removeExclusionTooltip={m?.remove_exclusion?.()}
+                    turnOffFilterTooltip={m?.turn_off_filter?.()}
                     onremove={(groupId: string, optId: string, type: "include" | "exclude") => {
                         const current = activeFilters[groupId] || { include: [], exclude: [] };
                         persistActiveFilters({
@@ -1153,7 +1224,7 @@
                 {#if isSelectorLoading}
                     <div class="flex items-center justify-center py-8 text-gray-500 gap-2 font-medium text-sm">
                         <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
-                        <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                        <span>{i18n.loadingLabel}</span>
                     </div>
                 {:else if selectorError}
                     <div class="text-xs text-center py-8 text-red-500 font-medium">
@@ -1187,7 +1258,7 @@
                                             (`${(item as any).givenName || ""} ${(item as any).familyName || ""}`.trim() || undefined) ||
                                             (item as any).company ||
                                             item.id ||
-                                            "Unnamed Item"}
+                                            i18n.unnamedItemLabel}
                                     {/if}
                                 </div>
                             </div>
@@ -1310,7 +1381,7 @@
             {#if isDisplayedLoading}
                 <div class="flex items-center justify-center py-6 text-gray-500 gap-2 font-medium text-sm">
                     <Loader2 class="h-5 w-5 animate-spin text-blue-600" />
-                    <span>{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                    <span>{i18n.loadingLabel}</span>
                 </div>
             {:else if displayedError}
                 <div class="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
@@ -1333,7 +1404,7 @@
                                         bind:group={selectedIds}
                                         value={item.id}
                                         class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer flex-shrink-0 transition-colors"
-                                        title={selectedIds.includes(item.id) ? "Deselect" : "Select"}
+                                        title={selectedIds.includes(item.id) ? i18n.deselectLabel : i18n.selectLabel}
                                     />
                                 {/if}
                                 <div class="flex-1 min-w-0">
@@ -1491,7 +1562,7 @@
                         {#if readItemRemote && isEditItemLoading && !editItemData}
                             <div class="p-8 flex flex-col items-center justify-center gap-2">
                                 <div class="animate-spin h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                <span class="text-xs text-gray-400 font-medium">{loadingLabel || i18n.loadingLabel || "Loading..."}</span>
+                                <span class="text-xs text-gray-400 font-medium">{i18n.loadingLabel}</span>
                             </div>
                         {:else if readItemRemote && editItemError}
                             <div class="p-8 text-center text-red-500 text-sm">
@@ -1556,8 +1627,12 @@
         onSelectAll={() => (selectedIds = displayedFilteredItems.map((i: any) => i.id).filter(Boolean))}
         onDeselectAll={() => (selectedIds = [])}
         onDelete={handleBulkDelete}
-        deleteLabel={i18n.deleteForeverLabel || "Delete"}
-        selectAllLabel={`Select All (${displayedFilteredItems.length})`}
-        deselectAllLabel="Deselect All"
+        deleteLabel={i18n.deleteForeverLabel}
+        selectAllLabel={i18n.selectAllLabel}
+        deselectAllLabel={i18n.deselectAllLabel}
+        selectedText={i18n.selectedText}
+        deletingLabel={i18n.deletingLabel}
+        ariaLabel={m?.bulk_actions?.()}
+        clearSelectionTitle={m?.clear_selection?.()}
     />
 {/if}

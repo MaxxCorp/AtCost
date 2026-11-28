@@ -143,38 +143,38 @@
                     class="px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer {templateFilter === 'all' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}"
                     onclick={() => { templateFilter = 'all'; setPage(1); }}
                 >
-                    All
+                    {m.filter_all()}
                 </button>
                 <button
                     type="button"
                     class="px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer {templateFilter === 'templates' ? 'bg-white shadow-xs text-violet-700' : 'text-gray-500 hover:text-gray-900'}"
                     onclick={() => { templateFilter = 'templates'; setPage(1); }}
                 >
-                    Templates Only
+                    {m.templates_only()}
                 </button>
                 <button
                     type="button"
                     class="px-2.5 py-1.5 rounded-md font-medium transition-colors cursor-pointer {templateFilter === 'custom' ? 'bg-white shadow-xs text-gray-900' : 'text-gray-500 hover:text-gray-900'}"
                     onclick={() => { templateFilter = 'custom'; setPage(1); }}
                 >
-                    Custom
+                    {m.custom_only()}
                 </button>
             </div>
         </div>
 
         <div class="flex items-center gap-2 w-full md:w-auto justify-end">
             <span class="text-xs text-gray-500 flex items-center gap-1">
-                <ArrowUpDown size={14} /> Sort:
+                <ArrowUpDown size={14} /> {m.sort_label()}
             </span>
             <select
                 bind:value={sortField}
                 onchange={() => setPage(1)}
                 class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
-                <option value="name">Name</option>
-                <option value="isTemplate">Template Status</option>
-                <option value="createdAt">Created Date</option>
-                <option value="updatedAt">Updated Date</option>
+                <option value="name">{m.sort_name()}</option>
+                <option value="isTemplate">{m.sort_template_status()}</option>
+                <option value="createdAt">{m.sort_created_date()}</option>
+                <option value="updatedAt">{m.sort_updated_date()}</option>
             </select>
             <button
                 type="button"
@@ -203,7 +203,7 @@
     {:else if pricesQuery.error}
         <ErrorSection
             headline={m.error?.() || 'Error'}
-            message={pricesQuery.error instanceof Error ? pricesQuery.error.message : 'Failed to load prices'}
+            message={pricesQuery.error instanceof Error ? pricesQuery.error.message : m.failed_to_load({ item: m.prices() })}
             href="/prices"
             button={m.try_again?.() || 'Try Again'}
         />
@@ -212,7 +212,7 @@
             <Receipt size={40} class="mx-auto text-gray-300" />
             <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.prices?.() || 'Prices' }) || 'No price lists found'}</h3>
             <p class="text-sm text-gray-500 max-w-md mx-auto">
-                Create your first price list aggregating consumables and recipes.
+                {m.prices_empty_description()}
             </p>
             <Button href="/prices/new" class="bg-violet-600 hover:bg-violet-700 text-white mt-2">
                 <Plus size={16} class="mr-1.5" />
@@ -238,13 +238,13 @@
                                         bind:group={selectedIds}
                                         value={item.id}
                                         class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-violet-600 focus:ring-violet-500 cursor-pointer mt-1 flex-shrink-0 transition-colors"
-                                        title={selectedIds.includes(item.id) ? "Deselect" : "Select"}
+                                        title={selectedIds.includes(item.id) ? m.deselect() : m.select()}
                                     />
                                     <h3 class="text-lg font-bold text-gray-900 leading-snug">{item.name}</h3>
                                 </div>
                                 {#if item.isTemplate}
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 flex-shrink-0">
-                                        <Layers size={11} /> Template
+                                        <Layers size={11} /> {m.template()}
                                     </span>
                                 {/if}
                             </div>
@@ -256,7 +256,7 @@
                             <!-- Item pills preview -->
                             <div class="space-y-1.5 pt-1">
                                 <span class="text-[10px] text-gray-400 uppercase tracking-wider font-bold block">
-                                    {(item.items || []).length} Items:
+                                    {(item.items || []).length} {m.items_label()}:
                                 </span>
                                 <div class="flex flex-wrap gap-1.5 max-h-24 overflow-hidden">
                                     {#each (item.items || []).slice(0, 5) as mi (mi.id || mi.name)}
@@ -271,7 +271,7 @@
                                     {/each}
                                     {#if (item.items || []).length > 5}
                                         <span class="text-[11px] text-gray-400 px-1 py-0.5">
-                                            +{(item.items || []).length - 5} more
+                                            {m.plus_more({ count: (item.items || []).length - 5 })}
                                         </span>
                                     {/if}
                                 </div>
@@ -281,7 +281,7 @@
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <div>
                                 <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-bold">
-                                    Price / Person
+                                    {m.price_per_person()}
                                 </span>
                                 <span class="text-xl font-extrabold text-violet-900">
                                     {formatCurrency(item.totalPricePerPortion ?? 0, item.currency || 'EUR')}
@@ -297,7 +297,7 @@
                                     class="h-8 px-2.5 text-xs font-medium flex items-center gap-1"
                                     title={m.edit?.() || 'Edit'}
                                 >
-                                    <Pencil size={13} /> Edit
+                                    <Pencil size={13} /> {m.edit()}
                                 </Button>
                                 <Button
                                     variant="ghost"
@@ -318,22 +318,22 @@
             <!-- Pagination footer -->
             {#if totalPages > 1}
                 <div class="p-3 bg-white rounded-xl border border-gray-100 flex items-center justify-between text-xs text-gray-500 shadow-2xs mt-4">
-                    <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</span>
+                    <span>{m.showing_range({ from: (page - 1) * limit + 1, to: Math.min(page * limit, total), total })}</span>
                     <div class="flex items-center gap-1">
                         <button
                             disabled={page <= 1}
                             onclick={() => setPage(page - 1)}
                             class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                         >
-                            Prev
+                            {m.previous()}
                         </button>
-                        <span>Page {page} of {totalPages}</span>
+                        <span>{m.page_of({ page, total: totalPages })}</span>
                         <button
                             disabled={page >= totalPages}
                             onclick={() => setPage(page + 1)}
                             class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                         >
-                            Next
+                            {m.next()}
                         </button>
                     </div>
                 </div>
@@ -348,7 +348,11 @@
         onDeselectAll={() => (selectedIds = [])}
         onDelete={handleBulkDelete}
         deleteLabel={m.delete ? m.delete() : "Delete"}
-        selectAllLabel={m.select_all ? m.select_all() : `Select All (${priceItems.length})`}
+        selectAllLabel={`${m.select_all()} (${priceItems.length})`}
         deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+        selectedText={m.selected()}
+        deletingLabel={m.deleting()}
+        ariaLabel={m.bulk_actions()}
+        clearSelectionTitle={m.clear_selection()}
     />
 </div>

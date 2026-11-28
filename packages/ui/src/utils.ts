@@ -39,7 +39,10 @@ export function translateIssue(message: string, m: any): string {
 		"Contact is required": "contact_required",
 		"Responsible employee is required": "responsible_employee_required",
 		"Next step name is required": "next_step_name_required",
-		"At least one working hour field must be configured": "at_least_one_working_hour_required"
+		"At least one working hour field must be configured": "at_least_one_working_hour_required",
+		"Price list name is required": "price_list_name_required",
+		"Item name is required": "item_name_required",
+		"Unit is required": "unit_required"
 	};
 
 	if (message.startsWith("Invalid email")) {

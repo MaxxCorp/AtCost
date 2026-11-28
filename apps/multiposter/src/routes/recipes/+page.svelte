@@ -129,17 +129,17 @@
 
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
             <span class="text-xs text-gray-500 flex items-center gap-1">
-                <ArrowUpDown size={14} /> Sort:
+                <ArrowUpDown size={14} /> {m.sort_label()}
             </span>
             <select
                 bind:value={sortField}
                 onchange={() => setPage(1)}
                 class="px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
-                <option value="name">Name</option>
-                <option value="portions">Portions</option>
-                <option value="createdAt">Created Date</option>
-                <option value="updatedAt">Updated Date</option>
+                <option value="name">{m.sort_name()}</option>
+                <option value="portions">{m.portions()}</option>
+                <option value="createdAt">{m.sort_created_date()}</option>
+                <option value="updatedAt">{m.sort_updated_date()}</option>
             </select>
             <button
                 type="button"
@@ -178,7 +178,7 @@
                 <ChefHat size={40} class="mx-auto text-gray-300" />
                 <h3 class="text-base font-bold text-gray-900">{m.no_items_found?.({ item: m.recipes?.() || 'Recipes' }) || 'No recipes found'}</h3>
                 <p class="text-sm text-gray-500 max-w-md mx-auto">
-                    Create your first recipe by combining consumables into prepared items with cost per portion calculations.
+                    {m.recipes_empty_description()}
                 </p>
                 <Button href="/recipes/new" class="bg-emerald-600 hover:bg-emerald-700 text-white mt-2">
                     <Plus size={16} class="mr-1.5" />
@@ -204,12 +204,12 @@
                                             bind:group={selectedIds}
                                             value={item.id}
                                             class="h-4.5 w-4.5 rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer mt-1 flex-shrink-0 transition-colors"
-                                            title={selectedIds.includes(item.id) ? "Deselect" : "Select"}
+                                            title={selectedIds.includes(item.id) ? m.deselect() : m.select()}
                                         />
                                         <h3 class="text-lg font-bold text-gray-900 leading-snug">{item.name}</h3>
                                     </div>
                                     <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 flex-shrink-0">
-                                        {item.portions} {item.portions === 1 ? 'portion' : 'portions'}
+                                        {item.portions} {item.portions === 1 ? m.portions_unit_singular() : m.portions_unit_plural()}
                                     </span>
                                 </div>
 
@@ -252,7 +252,7 @@
                                         class="h-8 px-2.5 text-xs font-medium flex items-center gap-1"
                                         title={m.edit?.() || 'Edit'}
                                     >
-                                        <Pencil size={13} /> Edit
+                                        <Pencil size={13} /> {m.edit()}
                                     </Button>
                                     <Button
                                         variant="ghost"
@@ -273,22 +273,22 @@
                 <!-- Pagination footer -->
                 {#if totalPages > 1}
                     <div class="p-3 bg-white rounded-xl border border-gray-100 flex items-center justify-between text-xs text-gray-500 shadow-2xs mt-4">
-                        <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</span>
+                        <span>{m.showing_range({ from: (page - 1) * limit + 1, to: Math.min(page * limit, total), total })}</span>
                         <div class="flex items-center gap-1">
                             <button
                                 disabled={page <= 1}
                                 onclick={() => setPage(page - 1)}
                                 class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                             >
-                                Prev
+                                {m.previous()}
                             </button>
-                            <span>Page {page} of {totalPages}</span>
+                            <span>{m.page_of({ page, total: totalPages })}</span>
                             <button
                                 disabled={page >= totalPages}
                                 onclick={() => setPage(page + 1)}
                                 class="px-2.5 py-1 rounded border border-gray-200 bg-white disabled:opacity-50 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
                             >
-                                Next
+                                {m.next()}
                             </button>
                         </div>
                     </div>
@@ -298,7 +298,7 @@
         {#snippet failed(error: unknown, reset: () => void)}
             <ErrorSection
                 headline={m.error?.() || 'Error'}
-                message={error instanceof Error ? error.message : 'Failed to load recipes'}
+                message={error instanceof Error ? error.message : m.failed_to_load({ item: m.recipes() })}
                 href="/recipes"
                 button={m.try_again?.() || 'Try Again'}
             />
@@ -312,7 +312,11 @@
         onDeselectAll={() => (selectedIds = [])}
         onDelete={handleBulkDelete}
         deleteLabel={m.delete ? m.delete() : "Delete"}
-        selectAllLabel={m.select_all ? m.select_all() : `Select All (${recipeItems.length})`}
+        selectAllLabel={`${m.select_all()} (${recipeItems.length})`}
         deselectAllLabel={m.deselect_all ? m.deselect_all() : "Deselect All"}
+        selectedText={m.selected()}
+        deletingLabel={m.deleting()}
+        ariaLabel={m.bulk_actions()}
+        clearSelectionTitle={m.clear_selection()}
     />
 </div>

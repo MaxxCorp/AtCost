@@ -8,7 +8,7 @@
     import { Calendar, MapPin, Package, Scale, Tag as TagIcon } from "@lucide/svelte";
     import CurrencyIcon from "#lib/components/ui/CurrencyIcon.svelte";
     import { SUPPORTED_CURRENCIES, getCurrencySymbol } from "@ac/validations";
-    import { TagManager, getLastListUrl, useFormValidationFeedback } from "@ac/ui";
+    import { TagManager, getLastListUrl, useFormValidationFeedback, translateIssue } from "@ac/ui";
     import { listTags as listTagsRemote } from "../../../routes/tags/list.remote";
     import { createTag as createTagRemote } from "../../../routes/tags/new/create.remote";
     import { updateTag as updateTagRemote } from "../../../routes/tags/[id]/update.remote";
@@ -95,12 +95,12 @@
                 toast.error(m.please_fix_validation?.() || 'Please fix validation errors');
             } else {
                 const err = res?.error || (rf as any).result?.error;
-                const errorMsg = typeof err === 'string' ? err : (err?.message || 'Action failed');
+                const errorMsg = typeof err === 'string' ? err : (err?.message || m.action_failed());
                 toast.error(errorMsg);
             }
         } catch (err: any) {
             console.error('Error submitting consumable form:', err);
-            toast.error(err.message || 'Error submitting form');
+            toast.error(err.message || m.error_submitting_form());
         }
     })}
     class="space-y-6"
@@ -127,11 +127,11 @@
             <input
                 id="name"
                 {...rf.fields.name.as('text', initialData?.name ?? '')}
-                placeholder="e.g., Organic Milk 1L, Coffee Beans, Red Wine Bottle"
+                placeholder={m.consumable_name_placeholder()}
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
             {#each rf.fields.name.issues() as issue (issue.message)}
-                <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
             {/each}
         </div>
 
@@ -143,7 +143,7 @@
                 id="description"
                 {...rf.fields.description.as('text', initialData?.description ?? '')}
                 rows="2"
-                placeholder="Optional details, brand, packaging notes..."
+                placeholder={m.consumable_description_placeholder()}
                 class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             ></textarea>
         </div>
@@ -164,7 +164,7 @@
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.purchasePrice.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -184,7 +184,7 @@
                     {/each}
                 </select>
                 {#each rf.fields.currency.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -203,7 +203,7 @@
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.amount.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
 
@@ -216,11 +216,11 @@
                     id="unit"
                     {...rf.fields.unit.as('text', initialData?.unit ?? 'piece')}
                     oninput={(e: any) => unit = e.target.value}
-                    placeholder="e.g. kg, g, l, ml, piece, bottle, pack"
+                    placeholder={m.consumable_unit_placeholder()}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
                 {#each rf.fields.unit.issues() as issue (issue.message)}
-                    <p class="text-xs text-red-500 mt-1">{issue.message}</p>
+                    <p class="text-xs text-red-500 mt-1">{translateIssue(issue.message, m)}</p>
                 {/each}
             </div>
         </div>
@@ -232,7 +232,7 @@
                 {m.cost_per_unit?.() || 'Cost per Unit'}:
             </span>
             <span class="text-base font-bold text-emerald-900">
-                {getCurrencySymbol(currency)}{calculatedCostPerUnit > 0 && calculatedCostPerUnit < 0.01 ? calculatedCostPerUnit.toFixed(4) : calculatedCostPerUnit.toFixed(2)} / {unit || 'unit'}
+                {getCurrencySymbol(currency)}{calculatedCostPerUnit > 0 && calculatedCostPerUnit < 0.01 ? calculatedCostPerUnit.toFixed(4) : calculatedCostPerUnit.toFixed(2)} / {unit || m.unit_fallback()}
             </span>
         </div>
 
@@ -245,7 +245,7 @@
                 <input
                     id="storageLocation"
                     {...rf.fields.storageLocation.as('text', initialData?.storageLocation ?? '')}
-                    placeholder="e.g., Pantry Shelf A3, Bar Cooler, Cold Storage"
+                    placeholder={m.consumable_storage_placeholder()}
                     class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 />
             </div>
@@ -311,7 +311,7 @@
             </Button>
         {/if}
 
-        <AsyncButton loading={rf.pending} type="submit">
+        <AsyncButton loading={rf.pending} loadingLabel={isUpdating ? m.saving() : m.creating()} type="submit">
             {isUpdating ? (m.save_changes?.() || 'Save Changes') : (m.create?.() || 'Create')}
         </AsyncButton>
     </div>

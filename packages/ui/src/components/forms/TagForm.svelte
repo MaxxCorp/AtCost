@@ -116,7 +116,7 @@
 
     async function handleSaveCategory() {
         if (!catFormName.trim()) {
-            toast.error("Bitte einen Kategorienamen eingeben");
+            toast.error(m?.category_name_required?.() ?? "Please enter a category name");
             return;
         }
 
@@ -154,7 +154,7 @@
                     }
                     onCategoryCreated?.(newCat);
                 }
-                toast.success("Kategorie erfolgreich erstellt");
+                toast.success(m?.category_created?.() ?? "Category created successfully");
             } else {
                 if (updateCategoryRemote && selectedCategoryId) {
                     const res = await updateCategoryRemote({
@@ -171,11 +171,11 @@
                     categoriesList = categoriesList.map(c => c.id === selectedCategoryId ? { ...c, name: catFormName.trim(), color: catFormColor, description: catFormDescription.trim() } : c);
                     onCategoryUpdated?.({ id: selectedCategoryId, name: catFormName.trim(), color: catFormColor, description: catFormDescription.trim() });
                 }
-                toast.success("Kategorie erfolgreich aktualisiert");
+                toast.success(m?.category_updated?.() ?? "Category updated successfully");
             }
             isCategoryModalOpen = false;
         } catch (err: any) {
-            toast.error(err?.message || "Fehler beim Speichern der Kategorie");
+            toast.error(err?.message || (m?.error_saving_category?.() ?? "Error saving category"));
         } finally {
             isSavingCategory = false;
         }
@@ -183,7 +183,7 @@
 
     async function handleDeleteCategory() {
         if (!selectedCategoryId) return;
-        if (!confirm("Möchten Sie diese Kategorie wirklich löschen?")) return;
+        if (!confirm(m?.confirm_delete_category?.() ?? "Are you sure you want to delete this category?")) return;
 
         isSavingCategory = true;
         try {
@@ -197,17 +197,17 @@
                 remoteFunction.fields.categoryId.set(null);
             }
             onCategoryDeleted?.(deletedId);
-            toast.success("Kategorie gelöscht");
+            toast.success(m?.category_deleted?.() ?? "Category deleted");
             isCategoryModalOpen = false;
         } catch (err: any) {
-            toast.error(err?.message || "Fehler beim Löschen der Kategorie");
+            toast.error(err?.message || (m?.error_deleting_category?.() ?? "Error deleting category"));
         } finally {
             isSavingCategory = false;
         }
     }
 
     const feedback = useFormValidationFeedback(() => remoteFunction, {
-        message: () => "Bitte korrigieren Sie die Formularfehler",
+        message: () => m?.please_fix_validation?.() ?? "Please fix the validation errors in the form.",
     });
 </script>
 
@@ -222,15 +222,15 @@
                 const error = (remoteFunction as any).error;
 
                 if (error || (result && result.success === false)) {
-                    toast.error(error?.message || result?.error || "Fehler beim Speichern");
+                    toast.error(error?.message || result?.error || (m?.error_saving?.() ?? "Error saving"));
                     return;
                 }
 
-                toast.success("Tag erfolgreich gespeichert!");
+                toast.success(m?.tag_saved_success?.() ?? "Tag saved successfully!");
                 if (onSuccess) onSuccess(result);
                 else await goto(cancelHref);
             } catch (error: any) {
-                toast.error(error?.message || "Fehler beim Speichern");
+                toast.error(error?.message || (m?.error_saving?.() ?? "Error saving"));
             }
         })}
 >
@@ -241,16 +241,16 @@
     <!-- Name -->
     <div>
         <label for="tag-name" class="block font-semibold text-gray-700 mb-1">
-            Tag-Bezeichnung *
+            {m?.tag_name?.() ?? "Tag Name"} *
         </label>
         <input
             id="tag-name"
             {...remoteFunction.fields.name.as("text", initialData?.data?.name || initialData?.name || "")}
-            placeholder="z.B. Gehaltsempfänger, Barista, VIP, Festangestellt"
+            placeholder={m?.tag_name_placeholder?.() ?? "e.g. Salaried, Barista, VIP, Permanent"}
             class="w-full px-3.5 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden {(remoteFunction.fields.name.issues() ?? []).length > 0 ? 'border-rose-500' : 'border-gray-200'}"
-            onblur={() => remoteFunction.validate()}
+            onblur={() => { void remoteFunction.validate().catch(() => {}); }}
         />
-        {#each remoteFunction.fields.name.issues() ?? [] as issue}
+        {#each remoteFunction.fields.name.issues() ?? [] as issue, i (`${i}-${issue.message}`)}
             <p class="mt-1 text-[11px] text-rose-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </div>
@@ -258,7 +258,7 @@
     <!-- Visibility: Internal vs External -->
     <div>
         <span class="block font-semibold text-gray-700 mb-1">
-            Sichtbarkeit (Visibility) *
+            {m?.visibility?.() ?? "Visibility"} *
         </span>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <label
@@ -276,10 +276,10 @@
                 <div>
                     <div class="font-bold text-gray-900 flex items-center gap-1">
                         <Shield class="w-3.5 h-3.5 text-indigo-600" />
-                        Intern (Standard)
+                        {m?.tag_visibility_internal?.() ?? "Internal (Default)"}
                     </div>
                     <p class="text-[11px] text-gray-500 mt-0.5">
-                        Nur für interne Zwecke (Abrechnung, Payroll, HR, interne Filter). Niemals auf Kiosken oder öffentlichen Ansichten sichtbar.
+                        {m?.tag_visibility_internal_desc?.() ?? "For internal use only (accounting, payroll, HR, internal filters). Never visible on kiosks or public views."}
                     </p>
                 </div>
             </label>
@@ -299,10 +299,10 @@
                 <div>
                     <div class="font-bold text-gray-900 flex items-center gap-1">
                         <Globe class="w-3.5 h-3.5 text-emerald-600" />
-                        Öffentlich (External)
+                        {m?.tag_visibility_external?.() ?? "Public (External)"}
                     </div>
                     <p class="text-[11px] text-gray-500 mt-0.5">
-                        Sichtbar auf öffentlichen Displays, Kiosken und Event-Webseiten für externe Besucher.
+                        {m?.tag_visibility_external_desc?.() ?? "Visible on public displays, kiosks, and event web pages for external visitors."}
                     </p>
                 </div>
             </label>
@@ -313,7 +313,7 @@
     <div>
         <div class="flex items-center justify-between mb-1">
             <label for="tag-category" class="block font-semibold text-gray-700">
-                Kategorie
+                {m?.category?.() ?? "Category"}
             </label>
             <div class="flex items-center gap-2">
                 {#if selectedCategoryId && selectedCategory}
@@ -321,20 +321,20 @@
                         type="button"
                         onclick={() => openEditCategory(selectedCategory)}
                         class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline transition-colors cursor-pointer"
-                        title="Ausgewählte Kategorie bearbeiten"
+                        title={m?.edit_category?.() ?? "Edit Category"}
                     >
                         <Pencil class="w-3 h-3" />
-                        Kategorie bearbeiten
+                        {m?.edit_category?.() ?? "Edit Category"}
                     </button>
                 {/if}
                 <button
                     type="button"
                     onclick={openCreateCategory}
                     class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline transition-colors cursor-pointer"
-                    title="Neue Kategorie anlegen"
+                    title={m?.new_category?.() ?? "New Category"}
                 >
                     <Plus class="w-3 h-3" />
-                    Neue Kategorie
+                    {m?.new_category?.() ?? "New Category"}
                 </button>
             </div>
         </div>
@@ -350,8 +350,8 @@
                     }}
                     class="flex-1 px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden bg-white"
                 >
-                    <option value="">Keine Kategorie (Allgemein)</option>
-                    {#each categoriesList as cat}
+                    <option value="">{m?.no_category_general?.() ?? "No Category (General)"}</option>
+                    {#each categoriesList as cat (cat.id)}
                         <option value={cat.id}>{cat.name}</option>
                     {/each}
                 </select>
@@ -361,8 +361,8 @@
                 type="button"
                 onclick={openCreateCategory}
                 class="p-2 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-600 hover:text-indigo-600 transition-colors shrink-0 shadow-2xs cursor-pointer"
-                title="Neue Kategorie erstellen"
-                aria-label="Neue Kategorie erstellen"
+                title={m?.create_category?.() ?? "Create Category"}
+                aria-label={m?.create_category?.() ?? "Create Category"}
             >
                 <Plus class="w-4 h-4" />
             </button>
@@ -372,8 +372,8 @@
                     type="button"
                     onclick={() => openEditCategory(selectedCategory)}
                     class="p-2 border border-indigo-200 rounded-xl bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 transition-colors shrink-0 shadow-2xs cursor-pointer"
-                    title="Ausgewählte Kategorie bearbeiten"
-                    aria-label="Ausgewählte Kategorie bearbeiten"
+                    title={m?.edit_category?.() ?? "Edit Category"}
+                    aria-label={m?.edit_category?.() ?? "Edit Category"}
                 >
                     <Pencil class="w-4 h-4" />
                 </button>
@@ -390,10 +390,10 @@
     <!-- Color Preset -->
     <div>
         <span class="block font-semibold text-gray-700 mb-1.5">
-            Farbe / Tag-Pill
+            {m?.color_tag_pill?.() ?? "Color / Tag Pill"}
         </span>
         <div class="flex items-center gap-2 flex-wrap">
-            {#each colorPresets as preset}
+            {#each colorPresets as preset (preset.value)}
                 <button
                     type="button"
                     onclick={() => {
@@ -417,13 +417,13 @@
     <!-- Description -->
     <div>
         <label for="tag-desc" class="block font-semibold text-gray-700 mb-1">
-            Beschreibung (optional)
+            {m?.description_optional?.() ?? "Description (optional)"}
         </label>
         <textarea
             id="tag-desc"
             {...remoteFunction.fields.description.as("text", initialData?.data?.description || initialData?.description || "")}
             rows="2"
-            placeholder="Optionale Beschreibung des Tags..."
+            placeholder={m?.tag_description_placeholder?.() ?? "Optional description of the tag..."}
             class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden"
         ></textarea>
     </div>
@@ -431,21 +431,21 @@
     <div class="flex justify-end gap-2 mt-6 border-t pt-4">
         {#if onCancel}
             <Button variant="outline" type="button" size="sm" onclick={onCancel}>
-                Abbrechen
+                {m?.cancel?.() ?? "Cancel"}
             </Button>
         {:else}
             <Button variant="outline" href={cancelHref} size="sm">
-                Abbrechen
+                {m?.cancel?.() ?? "Cancel"}
             </Button>
         {/if}
         <AsyncButton
             type="submit"
             size="sm"
-            loadingLabel={effectiveIsUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
+            loadingLabel={effectiveIsUpdating ? (m?.saving?.() ?? "Saving...") : (m?.creating?.() ?? "Creating...")}
             loading={(remoteFunction as any).pending}
             class="bg-indigo-600 hover:bg-indigo-700 text-white"
         >
-            {effectiveIsUpdating ? "Änderungen speichern" : "Tag anlegen"}
+            {effectiveIsUpdating ? (m?.save_changes?.() ?? "Save Changes") : (m?.create_tag?.() ?? "Create Tag")}
         </AsyncButton>
     </div>
 </form>
@@ -469,7 +469,7 @@
                         {/if}
                     </div>
                     <h3 id="category-modal-title" class="font-bold text-gray-900 text-sm">
-                        {categoryModalMode === 'create' ? 'Neue Kategorie erstellen' : 'Kategorie bearbeiten'}
+                        {categoryModalMode === 'create' ? (m?.create_category?.() ?? 'Create Category') : (m?.edit_category?.() ?? 'Edit Category')}
                     </h3>
                 </div>
                 <button
@@ -484,23 +484,23 @@
             <div class="p-5 space-y-4">
                 <div>
                     <label for="cat-modal-name" class="block font-semibold text-gray-700 mb-1">
-                        Kategoriename *
+                        {m?.category_name?.() ?? "Category Name"} *
                     </label>
                     <input
                         id="cat-modal-name"
                         type="text"
                         bind:value={catFormName}
-                        placeholder="z.B. Abrechnung, Festangestellte, Vertrieb..."
+                        placeholder={m?.category_name_placeholder?.() ?? "e.g. Accounting, Permanent Staff, Sales..."}
                         class="w-full px-3.5 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden text-xs"
                     />
                 </div>
 
                 <div>
                     <span class="block font-semibold text-gray-700 mb-1.5">
-                        Farbe
+                        {m?.color?.() ?? "Color"}
                     </span>
                     <div class="flex items-center gap-1.5 flex-wrap">
-                        {#each colorPresets as preset}
+                        {#each colorPresets as preset (preset.value)}
                             <button
                                 type="button"
                                 onclick={() => { catFormColor = preset.value; }}
@@ -515,13 +515,13 @@
 
                 <div>
                     <label for="cat-modal-desc" class="block font-semibold text-gray-700 mb-1">
-                        Beschreibung (optional)
+                        {m?.description_optional?.() ?? "Description (optional)"}
                     </label>
                     <textarea
                         id="cat-modal-desc"
                         bind:value={catFormDescription}
                         rows="2"
-                        placeholder="Optionale Beschreibung für diese Tag-Kategorie..."
+                        placeholder={m?.category_description_placeholder?.() ?? "Optional description for this tag category..."}
                         class="w-full px-3.5 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden text-xs"
                     ></textarea>
                 </div>
@@ -536,11 +536,11 @@
                             size="sm"
                             onclick={handleDeleteCategory}
                             loading={isSavingCategory}
-                            loadingLabel="Wird gelöscht..."
+                            loadingLabel={m?.deleting?.() ?? "Deleting..."}
                             class="text-rose-600 hover:bg-rose-50 border-rose-200 hover:border-rose-300"
                         >
                             <Trash2 class="w-3.5 h-3.5 mr-1" />
-                            Löschen
+                            {m?.delete?.() ?? "Delete"}
                         </AsyncButton>
                     {/if}
                 </div>
@@ -551,18 +551,18 @@
                         disabled={isSavingCategory}
                         class="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 font-medium text-gray-700 transition-colors cursor-pointer text-xs"
                     >
-                        Abbrechen
+                        {m?.cancel?.() ?? "Cancel"}
                     </button>
                     <AsyncButton
                         type="button"
                         size="sm"
                         onclick={handleSaveCategory}
                         loading={isSavingCategory}
-                        loadingLabel="Speichern..."
+                        loadingLabel={m?.saving?.() ?? "Saving..."}
                         class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
                     >
                         <Check class="w-3.5 h-3.5 mr-1" />
-                        {categoryModalMode === 'create' ? 'Kategorie erstellen' : 'Übernehmen'}
+                        {categoryModalMode === 'create' ? (m?.create_category?.() ?? 'Create Category') : (m?.apply?.() ?? 'Apply')}
                     </AsyncButton>
                 </div>
             </div>

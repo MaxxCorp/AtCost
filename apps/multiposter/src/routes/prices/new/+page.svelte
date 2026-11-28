@@ -31,7 +31,7 @@
     </div>
 
     {#if isLoading && !consumablesQuery.current && !recipesQuery.current}
-        <LoadingSection message="Loading items..." />
+        <LoadingSection message={m.loading_item({ item: m.items_label() })} />
     {:else}
         <PriceForm
             remoteFunction={createPrice}

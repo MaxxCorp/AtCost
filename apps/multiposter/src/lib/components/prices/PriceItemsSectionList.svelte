@@ -274,7 +274,7 @@
                                 <span
                                     class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-200 text-gray-700"
                                 >
-                                    {section.items.length} {section.items.length === 1 ? "item" : "items"}
+                                    {section.items.length} {section.items.length === 1 ? (m.item_singular?.() || "item") : (m.items_plural?.() || "items")}
                                 </span>
                             </div>
                             <div class="flex items-center gap-2 text-right">
@@ -283,7 +283,7 @@
                                 </span>
                                 {#if participantsCount > 1}
                                     <span class="text-[11px] font-mono text-emerald-700 font-medium">
-                                        • {formatCurrency(section.subtotal * participantsCount, listCurrency)} ({participantsCount}p)
+                                        • {formatCurrency(section.subtotal * participantsCount, listCurrency)} ({participantsCount} {m.participants?.() || "participants"})
                                     </span>
                                 {/if}
                             </div>
@@ -352,13 +352,13 @@
                                                 {m.portion_size?.() || "Portion"}: {portion} {item.unit || ""}
                                             </span>
                                             {#if costPrice > 0}
-                                                <span>• Cost: {formatCurrency(costPrice, item.currency || listCurrency)}</span>
+                                                <span>• {m.cost?.() || "Cost"}: {formatCurrency(costPrice, item.currency || listCurrency)}</span>
                                                 {#if item.factor}
                                                     <span>• {Number(item.factor).toFixed(1)}×</span>
                                                 {/if}
                                                 {#if lineProfitPerPortion > 0}
                                                     <span class="text-emerald-700 font-semibold">
-                                                        • Margin: +{formatCurrency(lineProfitPerPortion, item.currency || listCurrency)}
+                                                        • {m.margin?.() || "Margin"}: +{formatCurrency(lineProfitPerPortion, item.currency || listCurrency)}
                                                     </span>
                                                 {/if}
                                             {/if}
@@ -381,7 +381,7 @@
                                             <div class="font-mono text-xs font-semibold text-emerald-700">
                                                 {formatCurrency(lineTotalPerPortion * participantsCount, item.currency || listCurrency)}
                                                 <span class="text-[10px] text-emerald-600 font-normal">
-                                                    ({participantsCount}p)
+                                                    ({participantsCount} {m.participants?.() || "participants"})
                                                 </span>
                                             </div>
                                         {/if}
@@ -429,7 +429,7 @@
         <Dialog.Header>
             <Dialog.Title class="text-xl font-bold flex items-center gap-2 text-amber-900">
                 <Package size={22} class="text-amber-600" />
-                <span>{m.edit?.() || "Edit"} {m.consumable?.() || "Consumable"}</span>
+                <span>{m.edit_item_label?.({ item: m.consumable?.() || "Consumable" }) || "Edit Consumable"}</span>
             </Dialog.Title>
         </Dialog.Header>
 
@@ -450,7 +450,7 @@
         {:else if consumableQuery?.loading}
             <div class="py-12 flex flex-col items-center justify-center gap-3 text-gray-500">
                 <Loader2 size={24} class="animate-spin text-amber-600" />
-                <span class="text-xs">Loading consumable details...</span>
+                <span class="text-xs">{m.loading_consumable_details?.() || "Loading consumable details..."}</span>
             </div>
         {/if}
     </Dialog.Content>
@@ -470,7 +470,7 @@
         <Dialog.Header>
             <Dialog.Title class="text-xl font-bold flex items-center gap-2 text-emerald-900">
                 <ChefHat size={22} class="text-emerald-600" />
-                <span>{m.edit?.() || "Edit"} {m.recipe?.() || "Recipe"}</span>
+                <span>{m.edit_item_label?.({ item: m.recipe?.() || "Recipe" }) || "Edit Recipe"}</span>
             </Dialog.Title>
         </Dialog.Header>
 
@@ -491,7 +491,7 @@
         {:else if recipeQuery?.loading}
             <div class="py-12 flex flex-col items-center justify-center gap-3 text-gray-500">
                 <Loader2 size={24} class="animate-spin text-emerald-600" />
-                <span class="text-xs">Loading recipe details...</span>
+                <span class="text-xs">{m.loading_recipe_details?.() || "Loading recipe details..."}</span>
             </div>
         {/if}
     </Dialog.Content>

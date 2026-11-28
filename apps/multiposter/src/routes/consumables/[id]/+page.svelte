@@ -32,7 +32,7 @@
                     {m.edit_item_label?.({ item: consumable.name }) || `Edit ${consumable.name}`}
                 </h1>
                 <p class="text-sm text-gray-500 mt-1">
-                    Update price, storage location, or expiration date.
+                    {m.consumable_edit_description()}
                 </p>
             </div>
 
@@ -46,7 +46,7 @@
         {:else}
             <ErrorSection
                 headline={m.item_not_found?.({ item: m.consumable?.() || 'Consumable' }) || 'Consumable not found'}
-                message="The requested consumable could not be found."
+                message={m.consumable_not_found_message()}
                 href={getLastListUrl("consumables", "/consumables")}
                 button={m.back_to_feature?.({ feature: m.consumables?.() || 'Consumables' }) || 'Back to Consumables'}
             />
@@ -54,7 +54,7 @@
     {:catch error}
         <ErrorSection
             headline={m.error?.() || 'Error'}
-            message={error.message || 'Failed to load consumable'}
+            message={error.message || m.failed_to_load({ item: m.consumable() })}
             href={getLastListUrl("consumables", "/consumables")}
             button={m.back_to_feature?.({ feature: m.consumables?.() || 'Consumables' }) || 'Back to Consumables'}
         />

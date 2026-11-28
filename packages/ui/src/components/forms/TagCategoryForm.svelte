@@ -45,7 +45,7 @@
     let selectedColor = $state(initialData?.data?.color || initialData?.color || "indigo");
 
     const feedback = useFormValidationFeedback(() => remoteFunction, {
-        message: () => "Bitte korrigieren Sie die Formularfehler",
+        message: () => m?.please_fix_validation?.() ?? "Please fix the validation errors in the form.",
     });
 </script>
 
@@ -60,15 +60,15 @@
                 const error = (remoteFunction as any).error;
 
                 if (error || (result && result.success === false)) {
-                    toast.error(error?.message || result?.error || "Fehler beim Speichern");
+                    toast.error(error?.message || result?.error || (m?.error_saving?.() ?? "Error saving"));
                     return;
                 }
 
-                toast.success("Kategorie erfolgreich gespeichert!");
+                toast.success(m?.category_created?.() ?? "Category saved successfully!");
                 if (onSuccess) onSuccess(result);
                 else await goto(cancelHref);
             } catch (error: any) {
-                toast.error(error?.message || "Fehler beim Speichern");
+                toast.error(error?.message || (m?.error_saving?.() ?? "Error saving"));
             }
         })}
 >
@@ -78,38 +78,38 @@
 
     <div>
         <label for="cat-name" class="block font-semibold text-gray-700 mb-1">
-            Kategoriename *
+            {m?.category_name?.() ?? "Category Name"} *
         </label>
         <input
             id="cat-name"
             {...remoteFunction.fields.name.as("text", initialData?.data?.name || initialData?.name || "")}
-            placeholder="z.B. Abrechnung & Vergütung, Abteilungen"
+            placeholder={m?.category_name_placeholder?.() ?? "e.g. Accounting, Permanent Staff, Sales..."}
             class="w-full px-3.5 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden {(remoteFunction.fields.name.issues() ?? []).length > 0 ? 'border-rose-500' : 'border-gray-200'}"
-            onblur={() => remoteFunction.validate()}
+            onblur={() => { void remoteFunction.validate().catch(() => {}); }}
         />
-        {#each remoteFunction.fields.name.issues() ?? [] as issue}
+        {#each remoteFunction.fields.name.issues() ?? [] as issue, i (`${i}-${issue.message}`)}
             <p class="mt-1 text-[11px] text-rose-600">{translateIssue(issue.message, m)}</p>
         {/each}
     </div>
 
     <div>
         <label for="cat-slug" class="block font-semibold text-gray-700 mb-1">
-            Code / Slug (optional)
+            Code / Slug ({m?.optional?.() ?? "optional"})
         </label>
         <input
             id="cat-slug"
             {...remoteFunction.fields.slug.as("text", initialData?.data?.slug || initialData?.slug || "")}
-            placeholder="z.B. payroll, department"
+            placeholder="e.g. payroll, department"
             class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden font-mono"
         />
     </div>
 
     <div>
         <span class="block font-semibold text-gray-700 mb-1.5">
-            Akzentfarbe
+            {m?.color?.() ?? "Color"}
         </span>
         <div class="flex items-center gap-2 flex-wrap">
-            {#each colorPresets as preset}
+            {#each colorPresets as preset (preset.value)}
                 <button
                     type="button"
                     onclick={() => {
@@ -132,13 +132,13 @@
 
     <div>
         <label for="cat-desc" class="block font-semibold text-gray-700 mb-1">
-            Beschreibung (optional)
+            {m?.description_optional?.() ?? "Description (optional)"}
         </label>
         <textarea
             id="cat-desc"
             {...remoteFunction.fields.description.as("text", initialData?.data?.description || initialData?.description || "")}
             rows="2"
-            placeholder="Verwendungszweck dieser Kategorie..."
+            placeholder={m?.category_description_placeholder?.() ?? "Optional description for this tag category..."}
             class="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-hidden"
         ></textarea>
     </div>
@@ -146,21 +146,21 @@
     <div class="flex justify-end gap-2 mt-6 border-t pt-4">
         {#if onCancel}
             <Button variant="outline" type="button" size="sm" onclick={onCancel}>
-                Abbrechen
+                {m?.cancel?.() ?? "Cancel"}
             </Button>
         {:else}
             <Button variant="outline" href={cancelHref} size="sm">
-                Abbrechen
+                {m?.cancel?.() ?? "Cancel"}
             </Button>
         {/if}
         <AsyncButton
             type="submit"
             size="sm"
-            loadingLabel={effectiveIsUpdating ? "Wird gespeichert..." : "Wird angelegt..."}
+            loadingLabel={effectiveIsUpdating ? (m?.saving?.() ?? "Saving...") : (m?.creating?.() ?? "Creating...")}
             loading={(remoteFunction as any).pending}
             class="bg-indigo-600 hover:bg-indigo-700 text-white"
         >
-            {effectiveIsUpdating ? "Änderungen speichern" : "Kategorie anlegen"}
+            {effectiveIsUpdating ? (m?.save_changes?.() ?? "Save Changes") : (m?.create_category?.() ?? "Create Category")}
         </AsyncButton>
     </div>
 </form>
