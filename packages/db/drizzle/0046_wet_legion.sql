@@ -1,0 +1,1 @@
+ALTER TABLE "kiosk" ADD COLUMN "compress_series" boolean DEFAULT true NOT NULL;

@@ -20,6 +20,7 @@
     import { page } from "$app/state";
     import { subscribeRealtimeChannel } from "#lib/client/realtime/client.svelte.js";
     import { readKioskView } from "./read.remote";
+    import { compressSeriesEvents, type EnrichedEvent } from "#lib/utils/kiosk-flat-helpers.js";
 
     let kioskId = $derived(page.params.id);
     let kiosk = $state<any>(null);
@@ -28,6 +29,99 @@
     let currentIndex = $state(0);
     let direction = $state(1); // 1 for forward (next), -1 for backward (prev)
     let isOffline = $state(false);
+    let localCompressOverride = $state<boolean | null>(null);
+
+    const effectiveCompressSeries = $derived(
+        localCompressOverride !== null
+            ? localCompressOverride
+            : Boolean(kiosk?.compressSeries ?? true)
+    );
+
+    const displayItems = $derived.by(() => {
+        const isCarousel = !kiosk?.uiMode || kiosk.uiMode === "carousel";
+        if (!isCarousel || !effectiveCompressSeries) {
+            return items;
+        }
+        const rawEvents: EnrichedEvent[] = [];
+        const announcements: Announcement[] = [];
+        for (const item of items) {
+            if ("startDateTime" in item) {
+                rawEvents.push(item as EnrichedEvent);
+            } else {
+                announcements.push(item as Announcement);
+            }
+        }
+        const compressedEvents = compressSeriesEvents(rawEvents, "none", {
+            short: false,
+            includeEnd: true,
+        });
+        return [...compressedEvents, ...announcements].sort((a, b) => {
+            const timeA =
+                "startDateTime" in a && a.startDateTime
+                    ? new Date(a.startDateTime).getTime()
+                    : a.updatedAt
+                      ? new Date(a.updatedAt).getTime()
+                      : 0;
+            const timeB =
+                "startDateTime" in b && b.startDateTime
+                    ? new Date(b.startDateTime).getTime()
+                    : b.updatedAt
+                      ? new Date(b.updatedAt).getTime()
+                      : 0;
+            return timeA - timeB;
+        });
+    });
+
+    const activeIndex = $derived(
+        displayItems.length > 0 ? ((currentIndex % displayItems.length) + displayItems.length) % displayItems.length : 0
+    );
+    const activeItem = $derived(displayItems[activeIndex]);
+
+    function syncKioskSeriesToggleState() {
+        const dbBase = Boolean(kiosk?.compressSeries ?? true);
+        let overrideVal: boolean | null = null;
+        if (typeof window !== "undefined" && kioskId) {
+            try {
+                const raw = localStorage.getItem(`kiosk_carousel_prefs_${kioskId}`);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (
+                        typeof parsed?.compressSeries === "boolean" &&
+                        parsed?.dbBase === dbBase
+                    ) {
+                        overrideVal = parsed.compressSeries;
+                    }
+                }
+            } catch {
+                // ignore malformed storage
+            }
+        }
+        localCompressOverride = overrideVal;
+        const isCarousel = !kiosk?.uiMode || kiosk.uiMode === "carousel";
+        kioskState.showSeriesToggle = Boolean(kiosk && isCarousel && !kiosk.excludeSeries);
+        kioskState.compressSeries = overrideVal ?? dbBase;
+    }
+
+    function setCompressSeriesOverride(val: boolean) {
+        localCompressOverride = val;
+        kioskState.compressSeries = val;
+        currentIndex = 0;
+        if (typeof window !== "undefined" && kioskId) {
+            try {
+                localStorage.setItem(
+                    `kiosk_carousel_prefs_${kioskId}`,
+                    JSON.stringify({
+                        compressSeries: val,
+                        dbBase: Boolean(kiosk?.compressSeries ?? true),
+                    })
+                );
+            } catch {
+                // ignore storage errors
+            }
+        }
+        showHeader();
+        resetLoop();
+    }
 
     let timer: ReturnType<typeof setInterval>;
     let inactivityTimer: ReturnType<typeof setTimeout>;
@@ -71,16 +165,16 @@
     }
 
     function nextSlide(auto = false) {
-        if (items.length <= 1) return;
+        if (displayItems.length <= 1) return;
         direction = 1;
-        currentIndex = (currentIndex + 1) % items.length;
+        currentIndex = (currentIndex + 1) % displayItems.length;
         if (!auto) resetLoop();
     }
 
     function prevSlide() {
-        if (items.length <= 1) return;
+        if (displayItems.length <= 1) return;
         direction = -1;
-        currentIndex = (currentIndex - 1 + items.length) % items.length;
+        currentIndex = (currentIndex - 1 + displayItems.length) % displayItems.length;
         resetLoop();
     }
 
@@ -180,8 +274,9 @@
             }
 
             items = enrichedItems;
+            syncKioskSeriesToggleState();
 
-            if (items.length > 1) {
+            if (displayItems.length > 1) {
                 startLoop();
             }
 
@@ -258,8 +353,8 @@
                         if (e.endDateTime) return new Date(e.endDateTime) > now;
                         if (e.startDateTime && e.isAllDay) {
                             const d = new Date(e.startDateTime);
-                            d.setHours(23, 59, 59, 999);
-                            return d > now;
+                            const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+                            return endOfDay > now;
                         }
                         return false;
                     }
@@ -268,7 +363,8 @@
                 });
 
                 items = validItems;
-                if (items.length > 1) {
+                syncKioskSeriesToggleState();
+                if (displayItems.length > 1) {
                     startLoop();
                 }
                 // Update storage to remove old ones
@@ -313,6 +409,7 @@
 
     onMount(() => {
         kioskState.isKiosk = true;
+        kioskState.onToggleCompressSeries = setCompressSeriesOverride;
         showHeader();
 
         if (browser) {
@@ -342,6 +439,8 @@
         unsubRealtimeAnnouncements?.();
         kioskState.isKiosk = false;
         kioskState.isHeaderVisible = true;
+        kioskState.showSeriesToggle = false;
+        kioskState.onToggleCompressSeries = null;
         clearInterval(timer);
         clearTimeout(inactivityTimer);
     });
@@ -393,7 +492,7 @@
         role="region"
         aria-label="Event Kiosk"
     >
-        {#if items.length === 0}
+        {#if displayItems.length === 0}
             <div
                 class="text-white text-xl opacity-50 flex flex-col items-center gap-4"
             >
@@ -413,62 +512,60 @@
         {:else if kiosk?.uiMode === "table"}
             <KioskTableView items={items} kiosk={kiosk} />
         {:else}
-            <div
-                class="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 overflow-y-auto"
-                in:fly={{
-                    x: direction * 500,
-                    duration: 600,
-                    opacity: 0,
-                    easing: cubicOut,
-                }}
-                out:fly={{
-                    x: direction * -500,
-                    duration: 600,
-                    opacity: 0,
-                    easing: cubicOut,
-                }}
-            >
-                <div
-                    class="w-full max-w-7xl relative flex flex-col items-center"
-                >
-                    {#if "startDateTime" in items[currentIndex]}
-                        <EventView event={items[currentIndex] as Event} />
-                    {:else}
-                        <!-- Wrapper for Announcement to match EventView styling/sizing if needed, or specific component -->
-                        <!-- AnnouncementView is usually just the content, we might need a container -->
-                        <div
-                            class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-4xl"
-                        >
-                            <AnnouncementView
-                                announcement={items[
-                                    currentIndex
-                                ] as Announcement}
-                                allowInternal={true}
-                            />
-                        </div>
-                    {/if}
-
-                    <!-- Progress/Status Indicator -->
-                    <div class="mt-6 flex gap-2">
-                        {#each items as _, i (i)}
-                            <div
-                                class="w-2 h-2 rounded-full transition-colors duration-300 {i ===
-                                currentIndex
-                                    ? 'bg-white'
-                                    : 'bg-white/30'}"
-                            ></div>
-                        {/each}
+            {#if activeItem}
+                {#key `${activeIndex}_${(activeItem as any).id ?? activeIndex}`}
+                    <div
+                        class="absolute inset-0 w-full h-full overflow-hidden"
+                        in:fly={{
+                            x: direction * 500,
+                            duration: 600,
+                            opacity: 0,
+                            easing: cubicOut,
+                        }}
+                        out:fly={{
+                            x: direction * -500,
+                            duration: 600,
+                            opacity: 0,
+                            easing: cubicOut,
+                        }}
+                    >
+                        {#if "startDateTime" in activeItem}
+                            <EventView event={activeItem as Event} />
+                        {:else}
+                            <div class="w-full h-full bg-white flex flex-col overflow-y-auto p-6 sm:p-10 lg:p-16 pb-20">
+                                <div class="w-full flex-1">
+                                    <AnnouncementView
+                                        announcement={activeItem as Announcement}
+                                        allowInternal={true}
+                                    />
+                                </div>
+                            </div>
+                        {/if}
                     </div>
+                {/key}
+            {/if}
 
-                    {#if isOffline}
+            {#if displayItems.length > 1}
+                <div
+                    class="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex max-w-[90vw] flex-wrap items-center justify-center gap-2 rounded-full bg-slate-950/50 px-3.5 py-1.5 backdrop-blur-md border border-white/15 shadow-lg"
+                >
+                    {#each displayItems as _, i (i)}
                         <div
-                            class="absolute top-4 right-4 text-white/50 text-xs bg-black/30 px-2 py-1 rounded"
-                        >
-                            Offline Mode
-                        </div>
-                    {/if}
+                            class="h-2 rounded-full transition-all duration-300 {i === activeIndex
+                                ? 'w-8 bg-white shadow-xs'
+                                : 'w-2 bg-white/40'}"
+                        ></div>
+                    {/each}
                 </div>
-            </div>
+            {/if}
+
+            {#if isOffline}
+                <div
+                    class="pointer-events-none absolute top-4 right-4 z-30 text-white/90 text-xs font-medium bg-slate-950/60 backdrop-blur-md border border-white/15 px-2.5 py-1 rounded-full shadow-md"
+                >
+                    Offline Mode
+                </div>
+            {/if}
         {/if}
     </div>
 {/if}

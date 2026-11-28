@@ -100,6 +100,7 @@
     let excludeTentative = $state(untrack(() => initialData?.excludeTentative ?? true));
     let excludeCancelled = $state(untrack(() => initialData?.excludeCancelled ?? false));
     let excludeSeries = $state(untrack(() => initialData?.excludeSeries ?? false));
+    let compressSeries = $state(untrack(() => initialData?.compressSeries ?? true));
     
     let excludedEventIds = $state<string[]>(untrack(() => initialData?.excludedEventIds || []));
     let includedEventIds = $state<string[]>(untrack(() => initialData?.includedEventIds || []));
@@ -483,6 +484,23 @@
                         </optgroup>
                     </select>
                 </div>
+            </div>
+
+            <div class="pt-2">
+                <label class="inline-flex items-start gap-2.5 text-sm text-gray-700 font-medium {excludeSeries ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}">
+                    <input
+                        type="checkbox"
+                        bind:checked={compressSeries}
+                        disabled={excludeSeries}
+                        onchange={validateForm}
+                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    />
+                    <span>
+                        <span class="block text-gray-900">{m.compress_series()}</span>
+                        <span class="block text-xs text-gray-500 font-normal">{m.compress_series_tooltip()}</span>
+                    </span>
+                </label>
+                <input {...rf.fields.compressSeries.as("text", String(compressSeries))} class="hidden" />
             </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

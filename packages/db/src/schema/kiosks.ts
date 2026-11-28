@@ -21,6 +21,7 @@ export const kiosk = pgTable("kiosk", {
     excludeTentative: boolean("exclude_tentative").default(true).notNull(),
     excludeCancelled: boolean("exclude_cancelled").default(false).notNull(),
     excludeSeries: boolean("exclude_series").default(false).notNull(),
+    compressSeries: boolean("compress_series").default(true).notNull(),
     showEventQrCodes: boolean("show_event_qr_codes").default(false).notNull(),
     excludedEventIds: jsonb("excluded_event_ids").$type<string[]>().default([]).notNull(),
     includedEventIds: jsonb("included_event_ids").$type<string[]>().default([]).notNull(),

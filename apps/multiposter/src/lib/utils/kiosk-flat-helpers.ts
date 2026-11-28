@@ -12,6 +12,8 @@ export type SeriesInstanceInfo = {
     signUpClosureDate?: string | null;
     status?: string | null;
     isAllDay?: boolean;
+    locations?: any[];
+    resources?: any[];
 };
 
 export type EnrichedEvent = Event & {
@@ -290,8 +292,11 @@ export function compressSeriesEvents(
                             id: g.id,
                             startDateTime: d.toISOString(),
                             endDateTime: g.endDateTime,
+                            signUpClosureDate: g.signUpClosureDate ?? null,
                             status: g.status || 'confirmed',
-                            isAllDay: g.isAllDay
+                            isAllDay: g.isAllDay,
+                            locations: g.locations,
+                            resources: g.resources
                         });
                     } else {
                         if (g.status && g.status !== 'confirmed') {
@@ -299,6 +304,9 @@ export function compressSeriesEvents(
                         }
                         if (!g.id.includes('_inst_')) {
                             existing.id = g.id;
+                            existing.locations = g.locations;
+                            existing.resources = g.resources;
+                            existing.signUpClosureDate = g.signUpClosureDate ?? existing.signUpClosureDate ?? null;
                         }
                     }
                 }
@@ -333,6 +341,9 @@ export function compressSeriesEvents(
             const allCancelled = instances.every(i => i.status === 'cancelled');
             const allTentative = instances.every(i => i.status === 'tentative');
             const overallStatus = allCancelled ? 'cancelled' : allTentative ? 'tentative' : (first.status === 'cancelled' || first.status === 'tentative' ? 'confirmed' : first.status);
+            const heroImage = first.heroImage || group.find((g) => g.heroImage)?.heroImage || null;
+            const qrCodeDataUrl = first.id === sKey ? first.qrCodeDataUrl : group.find((g) => g.id === sKey)?.qrCodeDataUrl;
+            const mergedInstances = Array.isArray(first.instances) && first.instances.length > 0 ? first.instances : group;
 
             compressed.push({
                 ...first,
@@ -340,13 +351,15 @@ export function compressSeriesEvents(
                 startDateTime: instances[0].startDateTime || first.startDateTime,
                 endDateTime: instances[0].endDateTime || first.endDateTime,
                 status: overallStatus,
+                heroImage,
+                instances: mergedInstances,
                 isCompressedSeries: true,
                 seriesDates: dates,
                 seriesInstances: instances,
                 recurrenceText: recText,
                 instanceCount: instances.length,
                 qrCodePath: `/api/events/${sKey}/qr.png`,
-                qrCodeDataUrl: undefined
+                qrCodeDataUrl
             });
         } else {
             compressed.push({

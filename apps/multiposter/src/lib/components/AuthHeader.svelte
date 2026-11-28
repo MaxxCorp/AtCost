@@ -3,6 +3,8 @@
 	import { onMount } from "svelte";
 	import * as m from "#lib/paraglide/messages.js";
 	import { setLocale, getLocale } from "#lib/paraglide/runtime.js";
+	import { RefreshCw, Layers } from "@lucide/svelte";
+	import { kioskState } from "#lib/stores/kiosk.svelte.js";
 
 	let sessionPromise = $state(authClient.getSession());
 	let isOpen = $state(false);
@@ -84,6 +86,35 @@
 		</div>
 
 		<div class="flex items-center gap-4">
+			{#if kioskState.showSeriesToggle}
+				<div
+					class="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs"
+					title={m.compress_series_tooltip()}
+				>
+					<button
+						type="button"
+						onclick={() => kioskState.onToggleCompressSeries?.(true)}
+						class="px-2.5 py-1 rounded-lg font-medium transition-colors inline-flex items-center gap-1.5 {kioskState.compressSeries
+							? 'bg-white text-indigo-700 shadow-xs font-semibold'
+							: 'text-slate-500 hover:text-slate-900'}"
+						title={m.series_compacted_desc()}
+					>
+						<RefreshCw class="w-3.5 h-3.5 {kioskState.compressSeries ? 'text-indigo-600' : 'text-slate-400'}" />
+						<span class="hidden sm:inline">{m.series_compacted()}</span>
+					</button>
+					<button
+						type="button"
+						onclick={() => kioskState.onToggleCompressSeries?.(false)}
+						class="px-2.5 py-1 rounded-lg font-medium transition-colors inline-flex items-center gap-1.5 {!kioskState.compressSeries
+							? 'bg-white text-slate-900 shadow-xs font-semibold'
+							: 'text-slate-500 hover:text-slate-900'}"
+						title={m.series_unrolled_desc()}
+					>
+						<Layers class="w-3.5 h-3.5 {!kioskState.compressSeries ? 'text-slate-700' : 'text-slate-400'}" />
+						<span class="hidden sm:inline">{m.series_unrolled()}</span>
+					</button>
+				</div>
+			{/if}
 			<div class="flex items-center gap-1 mr-2 border-r border-gray-200 pr-4">
 				<button
 					onclick={() => setLocale("en")}
