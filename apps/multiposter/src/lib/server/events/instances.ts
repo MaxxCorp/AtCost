@@ -10,6 +10,9 @@ export interface SeriesInstanceItem {
 	signUpClosureDate?: string | null;
 	status?: string | null;
 	isPublic?: boolean;
+	locations?: any[];
+	locationIds?: string[];
+	resources?: any[];
 	[key: string]: any;
 }
 
@@ -21,7 +24,24 @@ export interface SeriesMasterSummary {
 	recurrence?: string[] | null;
 	signUpRecurrence?: string[] | null;
 	isPublic?: boolean;
+	locations?: any[];
+	locationIds?: string[];
+	resources?: any[];
 	instances?: SeriesInstanceItem[];
+}
+
+function extractInstanceLocations(inst: any, publicOnly?: boolean): any[] | undefined {
+	if (!Array.isArray(inst?.locations)) return undefined;
+	const locs = inst.locations.map((l: any) => l?.location || l).filter(Boolean);
+	return publicOnly ? locs.filter((loc: any) => loc?.isPublic === true) : locs;
+}
+
+function extractInstanceResources(inst: any, publicOnly?: boolean): any[] | undefined {
+	if (!Array.isArray(inst?.resources)) return undefined;
+	const ress = inst.resources.map((r: any) => r?.resource || r).filter(Boolean);
+	return publicOnly
+		? ress.filter((res: any) => !res?.location || res.location.isPublic === true)
+		: ress;
 }
 
 function toIsoSafe(d: any): string | null {
@@ -62,6 +82,10 @@ export async function getSeriesInstances(
 
 	const fetchedInstances = await db.query.event.findMany({
 		where: eq(event.recurringEventId, masterId),
+		with: {
+			locations: { with: { location: true } },
+			resources: { with: { resource: { with: { location: true } } } },
+		},
 		orderBy: [asc(event.startDateTime)],
 	});
 
@@ -69,15 +93,26 @@ export async function getSeriesInstances(
 		? fetchedInstances.filter((inst: any) => inst.isPublic === true)
 		: fetchedInstances;
 
-	const instances: SeriesInstanceItem[] = visibleDbInstances.map((inst: any) => ({
-		id: inst.id,
-		summary: inst.summary,
-		startDateTime: toIsoSafe(inst.startDateTime),
-		endDateTime: toIsoSafe(inst.endDateTime),
-		signUpClosureDate: toIsoSafe(inst.signUpClosureDate),
-		status: inst.status,
-		isPublic: Boolean(inst.isPublic),
-	}));
+	const instances: SeriesInstanceItem[] = visibleDbInstances.map((inst: any) => {
+		const locs = extractInstanceLocations(inst, options.publicOnly);
+		const ress = extractInstanceResources(inst, options.publicOnly);
+		return {
+			id: inst.id,
+			summary: inst.summary,
+			startDateTime: toIsoSafe(inst.startDateTime),
+			endDateTime: toIsoSafe(inst.endDateTime),
+			signUpClosureDate: toIsoSafe(inst.signUpClosureDate),
+			status: inst.status,
+			isPublic: Boolean(inst.isPublic),
+			...(locs !== undefined
+				? {
+						locations: locs,
+						locationIds: locs.map((l: any) => l.id).filter(Boolean),
+					}
+				: {}),
+			...(ress !== undefined ? { resources: ress } : {}),
+		};
+	});
 
 	const rec: any = master.recurrence;
 	let rruleStr: string | null = null;
@@ -186,6 +221,10 @@ export async function populateSeriesInstances(
 	// Fetch all real database instances (exceptions) in a single query
 	const allDbInstances = await db.query.event.findMany({
 		where: inArray(event.recurringEventId, masterIds),
+		with: {
+			locations: { with: { location: true } },
+			resources: { with: { resource: { with: { location: true } } } },
+		},
 		orderBy: [asc(event.startDateTime)],
 	});
 
@@ -227,6 +266,8 @@ export async function populateSeriesInstances(
 
 		const instances: SeriesInstanceItem[] = visibleDbInstances.map((inst: any) => {
 			const hydrated = options.hydratedInstancesById?.get(inst.id);
+			const locs = extractInstanceLocations(inst, options.publicOnly);
+			const ress = extractInstanceResources(inst, options.publicOnly);
 			const base: SeriesInstanceItem = {
 				id: inst.id,
 				summary: inst.summary,
@@ -235,6 +276,13 @@ export async function populateSeriesInstances(
 				signUpClosureDate: toIsoSafe(inst.signUpClosureDate),
 				status: inst.status,
 				isPublic: Boolean(inst.isPublic),
+				...(!hydrated?.locations && locs !== undefined
+					? {
+							locations: locs,
+							locationIds: locs.map((l: any) => l.id).filter(Boolean),
+						}
+					: {}),
+				...(!hydrated?.resources && ress !== undefined ? { resources: ress } : {}),
 			};
 			return hydrated ? { ...hydrated, ...base } : base;
 		});
@@ -375,6 +423,15 @@ export async function populateSeriesInstances(
 			recurrence: master.recurrence,
 			signUpRecurrence: master.signUpRecurrence ?? null,
 			isPublic: master.isPublic !== false,
+			...(Array.isArray(master.locations)
+				? {
+						locations: extractInstanceLocations(master, options.publicOnly),
+						locationIds: extractInstanceLocations(master, options.publicOnly)?.map((l: any) => l.id).filter(Boolean),
+					}
+				: {}),
+			...(Array.isArray(master.resources)
+				? { resources: extractInstanceResources(master, options.publicOnly) }
+				: {}),
 			instances,
 		};
 	}

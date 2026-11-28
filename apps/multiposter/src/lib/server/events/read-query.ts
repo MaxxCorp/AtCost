@@ -389,6 +389,10 @@ export async function queryEventById(eventId: string): Promise<Event | null> {
 		if (result.recurringEventId) {
 			masterRecord = await db.query.event.findFirst({
 				where: eq(event.id, result.recurringEventId),
+				with: {
+					locations: { with: { location: true } },
+					resources: { with: { resource: { with: { location: true } } } },
+				},
 			});
 		} else {
 			masterRecord = result;
@@ -419,6 +423,15 @@ export async function queryEventById(eventId: string): Promise<Event | null> {
 				{ publicOnly: !isAuthorized }
 			);
 
+			const rawMasterLocations = (masterRecord.locations || []).map((l: any) => l?.location || l).filter(Boolean);
+			const visibleMasterLocations = isAuthorized
+				? rawMasterLocations
+				: rawMasterLocations.filter((loc: any) => loc?.isPublic === true);
+			const rawMasterResources = (masterRecord.resources || []).map((r: any) => r?.resource || r).filter(Boolean);
+			const visibleMasterResources = isAuthorized
+				? rawMasterResources
+				: rawMasterResources.filter((res: any) => !res?.location || res.location.isPublic === true);
+
 			seriesMaster = {
 				id: masterRecord.id,
 				summary: masterRecord.summary,
@@ -432,6 +445,9 @@ export async function queryEventById(eventId: string): Promise<Event | null> {
 						: null,
 				signUpClosureDate: masterRecord.signUpClosureDate ? (masterRecord.signUpClosureDate instanceof Date ? masterRecord.signUpClosureDate.toISOString() : new Date(masterRecord.signUpClosureDate).toISOString()) : null,
 				isPublic: Boolean(masterRecord.isPublic),
+				locations: visibleMasterLocations,
+				locationIds: visibleMasterLocations.map((l: any) => l.id).filter(Boolean),
+				resources: visibleMasterResources,
 				instances: instances.length > 0 ? instances : undefined,
 			};
 
@@ -502,7 +518,7 @@ export async function queryEventById(eventId: string): Promise<Event | null> {
 		return publicSafeEvent;
 	}
 
-	const allLocations = result.locations.map((l: any) => l.location);
+	const allLocations = (result.locations || []).map((l: any) => l?.location).filter(Boolean);
 	const allResources = result.resources
 		.map((r: any) => r.resource)
 		.filter(Boolean)

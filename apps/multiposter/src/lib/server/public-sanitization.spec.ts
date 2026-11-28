@@ -500,6 +500,62 @@ describe('Centralized Public Sanitization', () => {
 			expect(recEvent.signUpRecurrence).toBeNull();
 			expect(recEvent.resolvedSignUpContact).toBeNull();
 		});
+
+		it('sanitizes multiple public locations on event, seriesMaster, and series instances while stripping private ones', () => {
+			const rawSeriesEvent = {
+				id: 'evt-series-pub',
+				summary: 'Multi-Venue Series',
+				isPublic: true,
+				status: 'confirmed',
+				locations: [
+					{ id: 'loc-1', name: 'Venue One', isPublic: true },
+					{ id: 'loc-2', name: 'Venue Two', isPublic: true },
+					{ id: 'loc-priv', name: 'Backroom', isPublic: false }
+				],
+				seriesMaster: {
+					id: 'master-pub',
+					summary: 'Multi-Venue Series',
+					isPublic: true,
+					locations: [
+						{ id: 'loc-1', name: 'Venue One', isPublic: true },
+						{ id: 'loc-priv', name: 'Backroom', isPublic: false }
+					],
+					instances: [
+						{
+							id: 'inst-1',
+							summary: 'Multi-Venue Series',
+							isPublic: true,
+							startDateTime: '2026-12-01T10:00:00Z',
+							endDateTime: '2026-12-01T12:00:00Z',
+							locations: [
+								{ id: 'loc-1', name: 'Venue One', isPublic: true },
+								{ id: 'loc-2', name: 'Venue Two', isPublic: true },
+								{ id: 'loc-priv', name: 'Backroom', isPublic: false }
+							]
+						}
+					]
+				},
+				instances: [
+					{
+						id: 'inst-1',
+						summary: 'Multi-Venue Series',
+						isPublic: true,
+						startDateTime: '2026-12-01T10:00:00Z',
+						endDateTime: '2026-12-01T12:00:00Z',
+						locations: [
+							{ id: 'loc-1', name: 'Venue One', isPublic: true },
+							{ id: 'loc-2', name: 'Venue Two', isPublic: true },
+							{ id: 'loc-priv', name: 'Backroom', isPublic: false }
+						]
+					}
+				]
+			};
+
+			const sanitized = sanitizePublicEvent(rawSeriesEvent)!;
+			expect(sanitized.locations.map((l: any) => l.id)).toEqual(['loc-1', 'loc-2']);
+			expect(sanitized.seriesMaster.locations.map((l: any) => l.id)).toEqual(['loc-1']);
+			expect(sanitized.instances[0].locations.map((l: any) => l.id)).toEqual(['loc-1', 'loc-2']);
+		});
 	});
 
 	describe('Announcements (sanitizePublicAnnouncement)', () => {

@@ -1285,5 +1285,6 @@
 	"link_copied": "Link kopiert",
 	"link_copied_to_clipboard": "Link in die Zwischenablage kopiert",
 	"failed_to_copy_link": "Link konnte nicht kopiert werden",
-	"staff_only": "Nur für Mitarbeitende"
+	"staff_only": "Nur für Mitarbeitende",
+	"other_series_locations": "Weitere Standorte in dieser Serie"
 }

@@ -21,6 +21,7 @@
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
 
     import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import { getVisibleEventLocations, getAdditionalSeriesLocations } from "#lib/utils/event-locations.js";
     import { isMultiDayEvent, getEventDurationDays, formatFriendlyEventTime } from '#lib/utils/format-event-date.js';
     import { isSignUpClosed } from '#lib/utils/event-signup.js';
     import { getKioskSignUpText } from '#lib/utils/kiosk-signup.js';
@@ -30,6 +31,9 @@
     const isLoggedIn = $derived(Boolean(page.data?.user || $session.data?.user));
 
     let { event }: { event: Event } = $props();
+
+    const displayLocations = $derived(getVisibleEventLocations(event, { allowInternal: isLoggedIn }));
+    const additionalSeriesLocations = $derived(getAdditionalSeriesLocations(event, displayLocations, { allowInternal: isLoggedIn }));
 
     function formatDateTime(dateStr: string | null) {
         if (!dateStr) return "";
@@ -186,19 +190,53 @@
         
         <!-- Meta Data Column (Locations & Contact) -->
         <div class="space-y-4 {(!hasDescription && !hasSidebar) ? 'max-w-2xl mx-auto w-full' : ''}">
-            {#if event.locations && event.locations.length > 0}
+            {#if displayLocations.length > 0 || additionalSeriesLocations.length > 0 || getEventRooms(event).length > 0}
                 <div class="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
                     <MapPin class="w-6 h-6 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div>
+                    <div class="min-w-0 flex-1">
                         <h3 class="font-semibold text-gray-900 text-sm">
-                            {m.location()}
+                            {displayLocations.length + additionalSeriesLocations.length > 1 ? m.locations() : m.location()}
                         </h3>
-                        {#each event.locations as loc (loc.id || loc.name)}
-                            <p class="text-gray-700 text-sm font-medium mt-0.5">{loc.name}</p>
-                            {#if loc.street || loc.city}
-                                <p class="text-xs text-gray-500">{loc.street || ''} {loc.houseNumber || ''} {loc.zip || ''} {loc.city || ''}</p>
-                            {/if}
-                        {/each}
+                        {#if displayLocations.length > 0}
+                            <div class="space-y-2 mt-1">
+                                {#each displayLocations as loc (loc.id || loc.name)}
+                                    <div>
+                                        <p class="text-gray-700 text-sm font-medium">{loc.name}</p>
+                                        {#if loc.street || loc.houseNumber || loc.zip || loc.city}
+                                            <p class="text-xs text-gray-500">
+                                                {[
+                                                    [loc.street, loc.houseNumber].filter(Boolean).join(" "),
+                                                    [loc.zip, loc.city].filter(Boolean).join(" ")
+                                                ].filter(Boolean).join(", ")}
+                                            </p>
+                                        {/if}
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                        {#if additionalSeriesLocations.length > 0}
+                            <div class="mt-3 pt-2.5 border-t border-gray-200/70 space-y-1.5">
+                                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    {m.other_series_locations()}
+                                </h4>
+                                <div class="space-y-1.5">
+                                    {#each additionalSeriesLocations as group (group.location.id || group.location.name)}
+                                        {@const loc = group.location}
+                                        <div>
+                                            <p class="text-gray-600 text-xs font-medium">{loc.name}</p>
+                                            {#if loc.street || loc.houseNumber || loc.zip || loc.city}
+                                                <p class="text-xs text-gray-400">
+                                                    {[
+                                                        [loc.street, loc.houseNumber].filter(Boolean).join(" "),
+                                                        [loc.zip, loc.city].filter(Boolean).join(" ")
+                                                    ].filter(Boolean).join(", ")}
+                                                </p>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
                         {#if getEventRooms(event).length > 0}
                             <div class="flex flex-wrap items-center gap-1.5 mt-2">
                                 {#each getEventRooms(event) as roomName (roomName)}

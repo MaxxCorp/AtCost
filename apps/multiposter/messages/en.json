@@ -1285,5 +1285,6 @@
 	"link_copied": "Link Copied",
 	"link_copied_to_clipboard": "Link copied to clipboard",
 	"failed_to_copy_link": "Failed to copy link",
-	"staff_only": "Staff Only"
+	"staff_only": "Staff Only",
+	"other_series_locations": "Other series locations"
 }

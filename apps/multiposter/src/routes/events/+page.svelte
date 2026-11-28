@@ -39,6 +39,7 @@
 	import { getPreference, setPreference } from "#lib/utils/idb.js";
 	import { formatRecurrenceText } from "#lib/utils/format-recurrence.js";
 	import { getEventRooms } from "#lib/utils/format-rooms.js";
+	import { getVisibleEventLocations } from "#lib/utils/event-locations.js";
 	import {
 		formatEventStatus,
 		getStatusBadgeClass,
@@ -724,6 +725,7 @@
 						startDateTime: upcomingInst.startDateTime,
 						endDateTime: upcomingInst.endDateTime,
 					} : event}
+					{@const eventLocations = getVisibleEventLocations(event, { allowInternal: true })}
 					<div
 						id="item-{event.id}"
 						use:activeItemAnchor={{ feature: 'events', id: event.id }}
@@ -859,28 +861,24 @@
 		{/if}
 	</div>
 {/if}
-								{#if event.locations && event.locations.length > 0}
+							{#if eventLocations.length > 0}
 								<div
 									class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2"
 								>
 									<MapPin
 										class="w-4 h-4 mr-2 text-primary-500 shrink-0"
 									/>
-									<span class="truncate">
-										{#each event.locations as l, i (l.id || l.location?.id || i)}
-											{@const locObj = l.location || l}
+									<div class="flex flex-wrap items-center gap-x-1 gap-y-0.5 min-w-0">
+										{#each eventLocations as locObj, i (locObj.id || locObj.name || i)}
 											{#if locObj && locObj.name}
 												<a
 													href="/locations/{locObj.id}"
 													class="hover:underline hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
 													>{locObj.name}</a
-												>{i <
-												event.locations.length - 1
-													? ", "
-													: ""}
+												>{i < eventLocations.length - 1 ? ", " : ""}
 											{/if}
 										{/each}
-									</span>
+									</div>
 								</div>
 							{/if}
 

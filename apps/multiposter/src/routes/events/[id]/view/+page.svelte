@@ -46,6 +46,11 @@
     import { formatTicketPrice, isEventFree } from "#lib/utils/format-ticket-price.js";
 
     import { getEventRooms } from "#lib/utils/format-rooms.js";
+    import {
+        getVisibleEventLocations,
+        getAdditionalSeriesLocations,
+        getEventLocationNames,
+    } from "#lib/utils/event-locations.js";
     import { formatEventStatus, getStatusBadgeClass, getStatusDotClass } from "#lib/utils/format-event-status.js";
     import {
         isSignUpClosed,
@@ -237,7 +242,10 @@
                 {@const recurrenceRule = (Array.isArray(event.recurrence) ? event.recurrence[0] : typeof event.recurrence === "string" ? event.recurrence : null) || (event as any).seriesMaster?.recurrence?.[0] || null}
                 {@const eventInstances = event.instances || []}
                 {@const hasContact = !!(event.resolvedContact && event.resolvedContact.isPublic !== false)}
-                {@const hasStaffNotes = !!(checkCanEdit(event) && event.internalNotes && event.internalNotes.trim().length > 0)}
+                {@const canViewInternal = checkCanEdit(event)}
+                {@const displayLocations = getVisibleEventLocations(event, { allowInternal: canViewInternal })}
+                {@const additionalSeriesLocations = getAdditionalSeriesLocations(event, displayLocations, { allowInternal: canViewInternal })}
+                {@const hasStaffNotes = !!(canViewInternal && event.internalNotes && event.internalNotes.trim().length > 0)}
                 {@const displayTicketPrice = formatTicketPrice(event.ticketPrice, event.ticketPriceUnknown, { currency: event.currency || 'EUR' })}
                 {@const otherContacts = ((event as any).contacts || []).filter((c: any) => {
                     const cObj = c.contact || c;
@@ -580,9 +588,10 @@
                                                             <div class="flex flex-wrap items-center gap-1.5 max-h-52 overflow-y-auto pr-1 py-0.5">
                                                                 {#each eventInstances as inst (inst.id || inst.startDateTime)}
                                                                     {@const isCurrent = inst.id === event.id || (Boolean(event.recurringEventId) && !!inst.startDateTime && !!event.startDateTime && new Date(inst.startDateTime).getTime() === new Date(event.startDateTime).getTime())}
+                                                                    {@const instLocationNames = getEventLocationNames(inst, { allowInternal: canViewInternal })}
                                                                     <a
                                                                         href={`/events/${inst.id}/view`}
-                                                                        title={`${formatFullDate(inst.startDateTime)}${inst.status === 'cancelled' ? ` – ${m.cancelled()}` : inst.status === 'tentative' ? ` – ${m.tentative()}` : ''}`}
+                                                                        title={`${formatFullDate(inst.startDateTime)}${inst.status === 'cancelled' ? ` – ${m.cancelled()}` : inst.status === 'tentative' ? ` – ${m.tentative()}` : ''}${instLocationNames.length > 0 ? ` • ${instLocationNames.join(', ')}` : ''}`}
                                                                         class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold tracking-tight transition-all shadow-2xs {inst.status === 'cancelled'
                                                                             ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
                                                                             : inst.status === 'tentative'
@@ -613,8 +622,8 @@
                                     </li>
 
                                     <!-- Locations -->
-                                    {#if event.locations && event.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false).length > 0}
-                                        {#each event.locations.filter((loc: any) => (loc?.location || loc)?.isPublic !== false) as loc (loc.id || loc.name)}
+                                    {#if displayLocations.length > 0}
+                                        {#each displayLocations as loc (loc.id || loc.name)}
                                             <li
                                                 class="flex items-start gap-3 text-gray-700"
                                             >
@@ -622,18 +631,26 @@
                                                     size={18}
                                                     class="text-red-500 flex-shrink-0 mt-0.5"
                                                 />
-                                                <div>
-                                                    <a
-                                                        href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(
-                                                            `${loc.name} ${loc.street || ''} ${loc.houseNumber || ''} ${loc.zip || ''} ${loc.city || ''}`,
-                                                        )}"
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        class="hover:underline text-blue-600 font-medium inline-flex items-center gap-1"
-                                                    >
-                                                        <span>{loc.name}</span>
-                                                        <ExternalLink size={12} class="opacity-60" />
-                                                    </a>
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                                        <a
+                                                            href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(
+                                                                `${loc.name} ${loc.street || ''} ${loc.houseNumber || ''} ${loc.zip || ''} ${loc.city || ''}`,
+                                                            )}"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            class="hover:underline text-blue-600 font-medium inline-flex items-center gap-1"
+                                                        >
+                                                            <span>{loc.name}</span>
+                                                            <ExternalLink size={12} class="opacity-60" />
+                                                        </a>
+                                                        {#if canViewInternal && loc.isPublic === false}
+                                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                                                <Lock size={10} />
+                                                                {m.private_label()}
+                                                            </span>
+                                                        {/if}
+                                                    </div>
                                                     {#if loc.street || loc.city}
                                                         <div
                                                             class="text-xs text-gray-500 mt-0.5"
@@ -646,6 +663,69 @@
                                                 </div>
                                             </li>
                                         {/each}
+                                    {/if}
+
+                                    {#if additionalSeriesLocations.length > 0}
+                                        <li class="pt-2.5 border-t border-gray-200/70 space-y-2.5">
+                                            <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                {m.other_series_locations()}
+                                            </div>
+                                            <ul class="space-y-2">
+                                                {#each additionalSeriesLocations as group (group.location.id || group.location.name)}
+                                                    {@const loc = group.location}
+                                                    <li class="flex items-start gap-2.5 text-gray-700">
+                                                        <MapPin
+                                                            size={16}
+                                                            class="text-slate-400 flex-shrink-0 mt-0.5"
+                                                        />
+                                                        <div class="min-w-0 flex-1 space-y-1">
+                                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                                <a
+                                                                    href="https://www.google.com/maps/search/?api=1&query={encodeURIComponent(
+                                                                        `${loc.name} ${loc.street || ''} ${loc.houseNumber || ''} ${loc.zip || ''} ${loc.city || ''}`,
+                                                                    )}"
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    class="hover:underline text-blue-600 font-medium inline-flex items-center gap-1 text-xs sm:text-sm"
+                                                                >
+                                                                    <span>{loc.name}</span>
+                                                                    <ExternalLink size={11} class="opacity-60" />
+                                                                </a>
+                                                                {#if canViewInternal && loc.isPublic === false}
+                                                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                                                        <Lock size={10} />
+                                                                        {m.private_label()}
+                                                                    </span>
+                                                                {/if}
+                                                            </div>
+                                                            {#if loc.street || loc.city}
+                                                                <div class="text-xs text-gray-500">
+                                                                    {loc.street || ''}
+                                                                    {loc.houseNumber || ''}{#if loc.street && loc.city}, {/if}{loc.zip || ''}
+                                                                    {loc.city || ''}
+                                                                </div>
+                                                            {/if}
+                                                            {#if group.occurrences.length > 0}
+                                                                <div class="flex flex-wrap items-center gap-1 pt-0.5">
+                                                                    {#each group.occurrences as occ (occ.id)}
+                                                                        {#if occ.startDateTime}
+                                                                            <a
+                                                                                href={`/events/${occ.id}/view`}
+                                                                                title={formatFullDate(occ.startDateTime)}
+                                                                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold border border-slate-200 transition-colors"
+                                                                            >
+                                                                                <span>{formatDateWeekday(occ.startDateTime)}</span>
+                                                                                <span>{formatDateDay(occ.startDateTime)} {formatDateMonth(occ.startDateTime)}</span>
+                                                                            </a>
+                                                                        {/if}
+                                                                    {/each}
+                                                                </div>
+                                                            {/if}
+                                                        </div>
+                                                    </li>
+                                                {/each}
+                                            </ul>
+                                        </li>
                                     {/if}
 
                                     <!-- Room Badges -->
@@ -872,7 +952,7 @@
                     signUpMode={event.signUpMode || "off"}
                     signUpClosureDate={event.signUpClosureDate ?? null}
                     resolvedSignUpContact={event.resolvedSignUpContact ?? null}
-                    locations={event.locations || []}
+                    locations={displayLocations}
                     onSuccess={() => { if (!preferLiveQuery()) void refreshRemoteResource(eventQuery); }}
                 />
                 {#if event.prices && event.prices.length > 0}

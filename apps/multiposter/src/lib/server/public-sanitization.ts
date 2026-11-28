@@ -489,6 +489,9 @@ export function sanitizePublicEvent(event: any): any | null {
 					.map((inst: any) => sanitizePublicSeriesInstance(inst))
 					.filter((inst: any): inst is NonNullable<typeof inst> => inst !== null)
 			: [];
+		const masterLocations = Array.isArray(event.seriesMaster.locations)
+			? filterPublicLocations(event.seriesMaster.locations)
+			: undefined;
 		publicSeriesMaster = {
 			id: event.seriesMaster.id,
 			summary: event.seriesMaster.summary,
@@ -497,6 +500,12 @@ export function sanitizePublicEvent(event: any): any | null {
 			startDateTime: toIsoSafe(event.seriesMaster.startDateTime),
 			endDateTime: toIsoSafe(event.seriesMaster.endDateTime),
 			isPublic: true,
+			...(masterLocations !== undefined
+				? {
+						locations: masterLocations,
+						locationIds: masterLocations.map((l: any) => l.id).filter(Boolean)
+					}
+				: {}),
 			instances: masterInstances
 		};
 	}
