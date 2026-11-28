@@ -121,7 +121,7 @@
         return null;
     });
 
-    let signUpDialogOpen = $derived(
+    const signUpDialogOpen = $derived(
         manualSignUpOpen || (autoSignUpKey !== null && dismissedAutoSignUpKey !== autoSignUpKey),
     );
 
@@ -368,7 +368,7 @@
                             </div>
                             <Button
                                 type="button"
-                                onclick={() => (signUpDialogOpen = true)}
+                                onclick={() => setSignUpDialogOpen(true)}
                                 class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm shrink-0"
                             >
                                 <UserPlus size={16} />
@@ -727,7 +727,7 @@
                                     type="button"
                                     variant="default"
                                     class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                                    onclick={() => (signUpDialogOpen = true)}
+                                    onclick={() => setSignUpDialogOpen(true)}
                                 >
                                     <UserPlus size={16} />
                                     {m.reservations?.() || 'Reservations'}

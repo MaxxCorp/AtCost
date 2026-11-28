@@ -279,7 +279,7 @@
 	}
 </script>
 
-<Dialog.Root {open} onOpenChange={handleOpenChange}>
+<Dialog.Root bind:open={() => open, handleOpenChange}>
 	<Dialog.Content class="sm:max-w-xl max-h-[90vh] overflow-y-auto">
 		<Dialog.Header>
 			<Dialog.Title class="flex items-center gap-2 text-xl">
